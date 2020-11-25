@@ -4,7 +4,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.5
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/cluster-logging-operator-e2e
     decorate: true
     decoration_config:
@@ -35,7 +35,7 @@ presubmits:
         - name: JOB_NAME_SAFE
           value: cluster-logging-operator-e2e
         - name: TEST_COMMAND
-          value: FAKE_HOME_DIR=/tmp/home LOG_DIR=/tmp/artifacts/logging-logs ARTIFACT_DIR=/tmp/artifacts/logging-artifacts make test-e2e-olm
+          value: FAKE_HOME_DIR=/tmp/home LOG_DIR=/tmp/artifacts/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts make test-e2e-olm
         - name: TEST_IMAGESTREAM_TAG
           value: stable:cluster-logging-operator-e2e
         image: ci-operator:latest
@@ -83,7 +83,7 @@ presubmits:
         name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -92,7 +92,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.5
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/e2e-operator
     decorate: true
     decoration_config:
@@ -114,16 +114,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-operator-cluster-profile
         - --target=e2e-operator
-        - --template=/usr/local/e2e-operator
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: e2e-operator
-        - name: TEST_COMMAND
-          value: make test-e2e-olm
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -139,9 +131,6 @@ presubmits:
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
-        - mountPath: /usr/local/e2e-operator
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -164,12 +153,9 @@ presubmits:
       - name: github-credentials-openshift-ci-robot-private-git-cloner
         secret:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -178,7 +164,79 @@ presubmits:
     always_run: true
     branches:
     - release-4.5
-    cluster: api.ci
+    cluster: build02
+    context: ci/prow/e2e-upgrade-44-45
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    hidden: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-elasticsearch-operator-release-4.5-e2e-upgrade-44-45
+    path_alias: github.com/openshift/elasticsearch-operator
+    rerun_command: /test e2e-upgrade-44-45
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-password-file=/etc/boskos/password
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --secret-dir=/usr/local/e2e-upgrade-44-45-cluster-profile
+        - --target=e2e-upgrade-44-45
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-upgrade-44-45-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-upgrade-44-45,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-4.5
+    cluster: build02
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -223,7 +281,7 @@ presubmits:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -232,7 +290,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.5
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -277,7 +335,7 @@ presubmits:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator

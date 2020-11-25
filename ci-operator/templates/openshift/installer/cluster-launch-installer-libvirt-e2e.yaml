@@ -201,20 +201,20 @@ objects:
 
         trap 'rc=$?; if test "${rc}" -eq 0; then touch "${HOME}"/setup-success; else touch "${HOME}"/exit "${HOME}"/setup-failed; fi; exit "${rc}"' EXIT
         trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-        cat  > "${HOME}"/run-tests.sh << 'EOF'
+        cat  > "${HOME}"/run-tests.sh << EOF
         #!/bin/bash
         set -euo pipefail
-        export PATH=/home/packer:$PATH
-        mkdir -p /tmp/artifacts/junit
+        export PATH=/home/packer:\$PATH
+        mkdir -p ${ARTIFACT_DIR}/junit
 
         function run-tests() {
-          openshift-tests run "${TEST_SUITE}" \
-            -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
+          openshift-tests run "\${TEST_SUITE}" \
+            -o ${ARTIFACT_DIR}/e2e.log --junit-dir ${ARTIFACT_DIR}/junit
           return 0
         }
 
         set -eu
-        ${TEST_COMMAND}
+        \${TEST_COMMAND}
         EOF
         chmod +x "${HOME}"/run-tests.sh
         mock-nss.sh
@@ -222,6 +222,9 @@ objects:
         # gcloud compute will use this key rather than create a new one
         cp -a /tmp/cluster/ssh-privatekey ~/.ssh/google_compute_engine
         cp -a /tmp/cluster/ssh-publickey ~/.ssh/google_compute_engine.pub
+        echo 'ServerAliveInterval 30' | tee -a "${HOME}"/.ssh/config
+        echo 'ServerAliveCountMax 1200' | tee -a "${HOME}"/.ssh/config
+        chmod 0600 "${HOME}"/.ssh/config
         gcloud auth activate-service-account \
           --quiet --key-file /tmp/cluster/gce.json
         gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"

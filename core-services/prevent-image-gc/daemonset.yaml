@@ -179,6 +179,24 @@ spec:
           requests:
             cpu: 50m
       - command:
+          - /bin/bash
+          - -c
+          - |
+            #!/bin/bash
+            set -euo pipefail
+
+            trap 'jobs -p | xargs -r kill || true; exit 0' TERM
+            while true; do
+              sleep 600 &
+              wait $!
+            done
+        image: registry.svc.ci.openshift.org/openshift/release:tectonic-console-builder-v22
+        imagePullPolicy: Always
+        name: consolebuilder22
+        resources:
+          requests:
+            cpu: 50m
+      - command:
         - /bin/bash
         - -c
         - |

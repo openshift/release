@@ -37,3 +37,9 @@ EOF
     diff <(echo "$PRE_RC_GEN") <(echo "$POST_RC_GEN")
     exit 1
 fi
+
+# Call the validate-release-jobs script.  It will exit a non-zero value if/when there
+# is a problem and a zero if everything checks out.
+./hack/validate-release-jobs.py -r ${base_dir}
+
+exit 0

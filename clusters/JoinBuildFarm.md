@@ -97,6 +97,6 @@ Cluster admin:
 
 DPTP:
 
-* The secret `regcred` has to be defined in the `ci` namespace, e.g. [regcred_secret_template.yaml](https://github.com/openshift/release/blob/b2ee6d838506945347a620717f00205c40e80d9f/clusters/build-clusters/vsphere/ci/regcred_secret_template.yaml#L14).
+* The secret `registry-pull-credentials` has to be defined in the `ci` namespace, e.g. [registry-pull-credentials_secret_template.yaml](https://github.com/openshift/release/blob/master/clusters/build-clusters/vsphere/ci-operator/registry-pull-credentials_secret_template.yaml#L14).
 * Deploy [the RPM services](https://github.com/openshift/release/tree/master/clusters/build-clusters/common/ocp) in the joining cluster.
 * Depending on the tests, populate the necessary ConfigMaps/Secrets to the cluster via Prow's [config-updater](https://github.com/openshift/release/blob/a15365e4d907d2ca76e4adfb97e8e84da98ce048/core-services/prow/02_config/_plugins.yaml#L470) and [ci-secret-bootstrap](https://github.com/openshift/release/tree/master/core-services/ci-secret-bootstrap).

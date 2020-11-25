@@ -3,7 +3,7 @@ postsubmits:
   - agent: kubernetes
     branches:
     - ^release-4\.7$
-    cluster: api.ci
+    cluster: build02
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -16,12 +16,11 @@ postsubmits:
       containers:
       - args:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
         - --promote
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --target=[images]
-        - --target=base-7
-        - --target=base-8
         command:
         - ci-operator
         image: ci-operator:latest
@@ -34,6 +33,9 @@ postsubmits:
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
+        - mountPath: /etc/push-secret
+          name: push-secret
+          readOnly: true
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
@@ -41,7 +43,10 @@ postsubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
+      - name: push-secret
+        secret:
+          secretName: registry-push-credentials-ci-central
       - name: result-aggregator
         secret:
           secretName: result-aggregator

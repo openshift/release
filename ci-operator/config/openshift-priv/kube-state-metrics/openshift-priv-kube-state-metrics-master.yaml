@@ -1,8 +1,16 @@
 base_images:
   base:
-    name: 4.6-priv
+    name: 4.7-priv
     namespace: ocp-private
     tag: base
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.7
   ocp_builder_rhel-8-golang-openshift-4.6:
     name: builder
     namespace: ocp
@@ -25,12 +33,12 @@ images:
 - dockerfile_path: Dockerfile.ocp
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-openshift-4.6:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-openshift-4.6
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
   to: kube-state-metrics
 promotion:
-  name: 4.6-priv
+  name: 4.7-priv
   namespace: ocp-private
 resources:
   '*':
@@ -38,9 +46,13 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: 4.6-priv
+  name: 4.7-priv
   namespace: ocp-private
 tests:
+- as: vendor
+  commands: make validate-modules
+  container:
+    from: src
 - as: e2e-aws
   steps:
     cluster_profile: aws

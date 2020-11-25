@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: 4.6-priv
+    name: 4.7-priv
     namespace: ocp-private
     tag: base
   base-machine:
@@ -8,7 +8,7 @@ base_images:
     namespace: openshift
     tag: "29"
   cli:
-    name: 4.6-priv
+    name: 4.7-priv
     namespace: ocp-private
     tag: cli
   cli-jq:
@@ -16,23 +16,27 @@ base_images:
     namespace: ocp
     tag: latest
   machine-os-content-base:
-    name: 4.6-priv
+    name: 4.7-priv
     namespace: ocp-private
     tag: machine-os-content
   oc-rpms:
-    name: 4.6-priv
+    name: 4.7-priv
     namespace: ocp-private
     tag: oc-rpms
-  ocp_builder_golang-1.13:
+  ocp_builder_rhel-8-golang-1.14:
     name: builder
     namespace: ocp
-    tag: golang-1.13
-  ocp_builder_golang-1.14:
+    tag: rhel-8-golang-openshift-4.6
+  ocp_builder_rhel-8-golang-1.15:
     name: builder
     namespace: ocp
-    tag: golang-1.14
+    tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
   tools:
-    name: 4.6-priv
+    name: 4.7-priv
     namespace: ocp-private
     tag: tools
 binary_build_commands: openshift-hack/build-go.sh
@@ -40,22 +44,22 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.14
+    tag: rhel-8-release-golang-1.15-openshift-4.6
 canonical_go_repository: k8s.io/kubernetes
 images:
 - dockerfile_path: openshift-hack/images/hyperkube/Dockerfile.rhel
   from: base
   inputs:
-    ocp_builder_golang-1.14:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:golang-1.14
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
   to: hyperkube
 - dockerfile_path: openshift-hack/images/tests/Dockerfile.rhel
   from: tools
   inputs:
-    ocp_builder_golang-1.14:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:golang-1.14
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
   to: kubernetes-tests
 - context_dir: openshift-hack/images/os/
   from: base
@@ -72,7 +76,7 @@ promotion:
     artifacts: artifacts
   excluded_images:
   - machine-os-content
-  name: 4.6-priv
+  name: 4.7-priv
   namespace: ocp-private
 raw_steps:
 - pipeline_image_cache_step:
@@ -166,7 +170,7 @@ resources:
       memory: 8Gi
 rpm_build_commands: openshift-hack/build-rpms.sh
 tag_specification:
-  name: 4.6-priv
+  name: 4.7-priv
   namespace: ocp-private
 tests:
 - artifact_dir: /tmp/artifacts
@@ -201,6 +205,11 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-kubernetes-e2e-gcp
+- artifact_dir: /tmp/artifacts
+  as: k8s-e2e-gcp-serial
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-kubernetes-e2e-gcp-serial
 - as: e2e-aws
   steps:
     cluster_profile: aws
@@ -217,7 +226,7 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
-- as: e2e-cmd
+- as: e2e-agnostic-cmd
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-cmd
@@ -230,10 +239,24 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws-jenkins
 - as: e2e-gcp-upgrade
-  commands: TEST_SUITE=all run-upgrade-tests
-  openshift_installer:
+  steps:
     cluster_profile: gcp
-    upgrade: true
+    workflow: openshift-upgrade-gcp-loki
+- as: e2e-aws-upgrade
+  steps:
+    cluster_profile: aws
+    workflow: openshift-upgrade-aws-loki
+- as: e2e-azure-upgrade
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-upgrade-azure-loki
+- as: e2e-aws-selfupgrade
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
+    workflow: openshift-upgrade-aws-loki
 - as: e2e-aws-serial
   steps:
     cluster_profile: aws
@@ -247,9 +270,17 @@ tests:
   openshift_installer_upi:
     cluster_profile: vsphere
 - as: k8s-e2e-conformance-aws
-  commands: openshift-hack/conformance-k8s.sh
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: openshift-hack/conformance-k8s.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: openshift-priv

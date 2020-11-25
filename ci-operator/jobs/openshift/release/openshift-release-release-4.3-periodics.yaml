@@ -4,7 +4,6 @@ periodics:
   decorate: true
   interval: 30m
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.3"
   name: promote-release-openshift-machine-os-content-e2e-aws-4.3
   spec:
@@ -14,7 +13,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/pull-secret
       - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-cluster-profile
       - --target=e2e-$(CLUSTER_TYPE)
@@ -53,12 +51,6 @@ periodics:
 
         # verify the tests pass
         ci-operator $@
-
-        # also tag the image into the art-latest stream
-        oc tag "${to_quay}" "ocp/${BRANCH}-art-latest:${TAG}"
-
-        # also tag the image into the private art-latest stream
-        oc tag "${to_quay}" "ocp-priv/${BRANCH}-art-latest-priv:${TAG}"
 
         # also tag the image into the ocp private stream
         oc tag "${to_quay}" "ocp-private/${BRANCH}-priv:${TAG}"
@@ -160,7 +152,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -169,7 +161,6 @@ periodics:
   decorate: true
   interval: 8h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.3"
   name: promote-release-openshift-machine-os-content-e2e-aws-4.3-s390x
   spec:
@@ -204,12 +195,6 @@ periodics:
         fi
 
         # TODO: Enable e2e testing when arch specific CI is available
-
-        # Tag the image into the art-latest stream for the arch
-        oc tag "${to_quay}" "ocp-${ARCH}/${BRANCH}-art-latest-${ARCH}:${TAG}"
-
-        # Tag the image into the private art-latest stream for the arch
-        oc tag "${to_quay}" "ocp-${ARCH}-priv/${BRANCH}-art-latest-${ARCH}-priv:${TAG}"
       env:
       - name: TAG_NS
         value: rhcos
@@ -309,361 +294,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-- agent: kubernetes
-  cluster: api.ci
-  cron: 0 4,16 * * *
-  decorate: true
-  labels:
-    ci.openshift.io/release-type: informing
-    dptp.openshift.io/ssh-bastion: "true"
-    job-env: remote-libvirt
-    job-release: "4.3"
-    job-test: e2e
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: release-openshift-origin-installer-e2e-remote-libvirt-s390x-4.3
-  spec:
-    containers:
-    - args:
-      - --artifact-dir=$(ARTIFACTS)
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --kubeconfig=/etc/apici/kubeconfig
-      - --secret-dir=/usr/local/e2e-remote-libvirt-cluster-profile
-      - --secret-dir=/usr/local/pull-secret
-      - --target=e2e-remote-libvirt
-      - --template=/usr/local/e2e-remote-libvirt
-      command:
-      - ci-operator
-      env:
-      - name: ARCH
-        value: s390x
-      - name: BRANCH
-        value: "4.3"
-      - name: BASTION_SVC_IP
-        value: 172.30.20.161
-      - name: BASTION_SVC_0_1_IP
-        value: 172.30.60.61
-      - name: BASTION_SVC_0_2_IP
-        value: 172.30.135.156
-      - name: BASTION_SVC_0_3_IP
-        value: 172.30.63.176
-      - name: BASTION_SVC_0_4_IP
-        value: 172.30.62.128
-      - name: BASTION_SVC_1_0_IP
-        value: 172.30.28.119
-      - name: BASTION_SVC_1_1_IP
-        value: 172.30.227.115
-      - name: BASTION_SVC_1_2_IP
-        value: 172.30.210.45
-      - name: BASTION_SVC_1_3_IP
-        value: 172.30.198.47
-      - name: BASTION_SVC_1_4_IP
-        value: 172.30.220.83
-      - name: CLUSTER_TYPE
-        value: libvirt-s390x
-      - name: CONFIG_SPEC
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 4Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
-          tests:
-          - as: e2e-$(CLUSTER_TYPE)-all
-            commands: $(TEST_COMMAND)
-            openshift_installer:
-              cluster_profile: libvirt-s390x
-      - name: JOB_NAME_SAFE
-        value: e2e-remote-libvirt
-      - name: MULTIARCH_RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp-s390x/release-s390x:4.3
-      - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.3
-      - name: REMOTE_LIBVIRT_HOSTNAME
-        value: ocponz
-      - name: REMOTE_LIBVIRT_HOSTNAME_1
-        value: ocponz2
-      - name: TEST_COMMAND
-        value: |
-          # these tests are not able to run in CI due to
-          # missing test image dependencies.  They must be
-          # run manually
-          cat > invert_excluded.py <<EOSCRIPT
-          #!/usr/libexec/platform-python
-          import sys
-          all_tests = set()
-          excluded_tests = set()
-          for l in sys.stdin.readlines():
-            all_tests.add(l.strip())
-          with open(sys.argv[1], "r") as f:
-            for l in f.readlines():
-              excluded_tests.add(l.strip())
-          test_suite = all_tests - excluded_tests
-          for t in test_suite:
-            print(t)
-          EOSCRIPT
-          chmod +x invert_excluded.py
-          cat > excluded_tests <<EOEXCLUDE
-            "[Area:Networking] multicast when using one of the plugins 'redhat/openshift-ovs-multitenant, redhat/openshift-ovs-networkpolicy' should allow multicast traffic in namespaces where it is enabled [Suite:openshift/conformance/parallel]"
-            "[Conformance][Area:Networking][Feature:Router] The HAProxy router converges when multiple routers are writing conflicting status [Suite:openshift/conformance/parallel/minimal]"
-            "[Conformance][Area:Networking][Feature:Router] The HAProxy router converges when multiple routers are writing status [Suite:openshift/conformance/parallel/minimal]"
-            "[Conformance][Area:Networking][Feature:Router] The HAProxy router should enable openshift-monitoring to pull metrics [Suite:openshift/conformance/parallel/minimal] [Skipped:ibmcloud]"
-            "[Conformance][Area:Networking][Feature:Router] The HAProxy router should expose prometheus metrics for a route [Suite:openshift/conformance/parallel/minimal]"
-            "[Conformance][Area:Networking][Feature:Router] The HAProxy router should override the route host for overridden domains with a custom value [Suite:openshift/conformance/parallel/minimal]"
-            "[Conformance][Area:Networking][Feature:Router] The HAProxy router should override the route host with a custom value [Suite:openshift/conformance/parallel/minimal]"
-            "[Conformance][Area:Networking][Feature:Router] The HAProxy router should respond with 503 to unrecognized hosts [Suite:openshift/conformance/parallel/minimal]"
-            "[Conformance][Area:Networking][Feature:Router] The HAProxy router should run even if it has no access to update status [Suite:openshift/conformance/parallel/minimal]"
-            "[Conformance][Area:Networking][Feature:Router] The HAProxy router should serve a route that points to two services and respect weights [Suite:openshift/conformance/parallel/minimal]"
-            "[Conformance][Area:Networking][Feature:Router] The HAProxy router should serve routes that were created from an ingress [Suite:openshift/conformance/parallel/minimal]"
-            "[Conformance][Area:Networking][Feature:Router] The HAProxy router should serve the correct routes when scoped to a single namespace and label set [Suite:openshift/conformance/parallel/minimal]"
-            "[Conformance][templates] templateinstance readiness test  should report failed soon after an annotated objects has failed [Suite:openshift/conformance/parallel/minimal]"
-            "[Conformance][templates] templateinstance readiness test  should report ready soon after all annotated objects are ready [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Builds] Multi-stage image builds  should succeed [Conformance] [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Builds] Optimized image builds  should succeed [Conformance] [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Builds] build have source revision metadata  started build should contain source revision information [Suite:openshift/conformance/parallel]"
-            "[Feature:Builds] build with empty source  started build should build even with an empty source in build config [Suite:openshift/conformance/parallel]"
-            "[Feature:Builds] forcePull should affect pulling builder images  ForcePull test case execution custom [Suite:openshift/conformance/parallel]"
-            "[Feature:Builds] forcePull should affect pulling builder images  ForcePull test case execution docker [Suite:openshift/conformance/parallel]"
-            "[Feature:Builds] forcePull should affect pulling builder images  ForcePull test case execution s2i [Suite:openshift/conformance/parallel]"
-            "[Feature:Builds] result image should have proper labels set  S2I build from a template should create a image from \"test-s2i-build.json\" template with proper Docker labels [Suite:openshift/conformance/parallel]"
-            "[Feature:Builds][Conformance] build can reference a cluster service  with a build being created from new-build should be able to run a build that references a cluster service [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Builds][Conformance] build without output image  building from templates should create an image from a S2i template without an output image reference defined [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Builds][Conformance] custom build with buildah  being created from new-build should complete build with custom builder image [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Builds][Conformance] oc new-app  should fail with a --name longer than 58 characters [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Builds][Conformance] oc new-app  should succeed with a --name of 58 characters [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Builds][Conformance] oc new-app  should succeed with an imagestream [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Builds][Conformance] s2i build with a quota  Building from a template should create an s2i build with a quota and run it [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Builds][Conformance] s2i build with a root user image should create a root build and pass with a privileged SCC [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Builds][Conformance][valueFrom] process valueFrom in build strategy environment variables  should fail resolving unresolvable valueFrom in docker build environment variable references [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Builds][Conformance][valueFrom] process valueFrom in build strategy environment variables  should fail resolving unresolvable valueFrom in sti build environment variable references [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Builds][Conformance][valueFrom] process valueFrom in build strategy environment variables  should successfully resolve valueFrom in docker build environment variables [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Builds][Conformance][valueFrom] process valueFrom in build strategy environment variables  should successfully resolve valueFrom in s2i build environment variables [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Builds][pruning] prune builds based on settings in the buildconfig  [Conformance] buildconfigs should have a default history limit set when created via the group api [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Builds][pruning] prune builds based on settings in the buildconfig  should prune builds after a buildConfig change [Suite:openshift/conformance/parallel]"
-            "[Feature:Builds][pruning] prune builds based on settings in the buildconfig  should prune canceled builds based on the failedBuildsHistoryLimit setting [Suite:openshift/conformance/parallel]"
-            "[Feature:Builds][pruning] prune builds based on settings in the buildconfig  should prune completed builds based on the successfulBuildsHistoryLimit setting [Suite:openshift/conformance/parallel]"
-            "[Feature:Builds][pruning] prune builds based on settings in the buildconfig  should prune errored builds based on the failedBuildsHistoryLimit setting [Suite:openshift/conformance/parallel]"
-            "[Feature:Builds][pruning] prune builds based on settings in the buildconfig  should prune failed builds based on the failedBuildsHistoryLimit setting [Suite:openshift/conformance/parallel]"
-            "[Feature:Builds][timing] capture build stages and durations  should record build stages and durations for s2i [Suite:openshift/conformance/parallel]"
-            "[Feature:DeploymentConfig] deploymentconfigs when tagging images [Conformance] should successfully tag the deployed image [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:DeploymentConfig] deploymentconfigs with minimum ready seconds set [Conformance] should not transition the deployment to Complete before satisfied [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:DeploymentConfig] deploymentconfigs with multiple image change triggers [Conformance] should run a successful deployment with a trigger used by different containers [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:DeploymentConfig] deploymentconfigs with multiple image change triggers [Conformance] should run a successful deployment with multiple triggers [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:ImageAppend] Image append should create images by appending them [Suite:openshift/conformance/parallel]"
-            "[Feature:ImageExtract] Image extract should extract content from an image [Suite:openshift/conformance/parallel]"
-            "[Feature:OAuthServer] [Headers] expected headers returned from the authorize URL [Suite:openshift/conformance/parallel]"
-            "[Feature:OAuthServer] [Headers] expected headers returned from the grant URL [Suite:openshift/conformance/parallel]"
-            "[Feature:OAuthServer] [Headers] expected headers returned from the login URL for the allow all IDP [Suite:openshift/conformance/parallel]"
-            "[Feature:OAuthServer] [Headers] expected headers returned from the login URL for the bootstrap IDP [Suite:openshift/conformance/parallel]"
-            "[Feature:OAuthServer] [Headers] expected headers returned from the login URL for when there is only one IDP [Suite:openshift/conformance/parallel]"
-            "[Feature:OAuthServer] [Headers] expected headers returned from the logout URL [Suite:openshift/conformance/parallel]"
-            "[Feature:OAuthServer] [Headers] expected headers returned from the root URL [Suite:openshift/conformance/parallel]"
-            "[Feature:OAuthServer] [Headers] expected headers returned from the token URL [Suite:openshift/conformance/parallel]"
-            "[Feature:OAuthServer] [Headers] expected headers returned from the token request URL [Suite:openshift/conformance/parallel]"
-            "[Feature:OAuthServer] [Token Expiration] Using a OAuth client with a non-default token max age to generate tokens that do not expire works as expected when using a code authorization flow [Suite:openshift/conformance/parallel]"
-            "[Feature:OAuthServer] [Token Expiration] Using a OAuth client with a non-default token max age to generate tokens that do not expire works as expected when using a token authorization flow [Suite:openshift/conformance/parallel]"
-            "[Feature:OAuthServer] [Token Expiration] Using a OAuth client with a non-default token max age to generate tokens that expire shortly works as expected when using a code authorization flow [Suite:openshift/conformance/parallel]"
-            "[Feature:OAuthServer] [Token Expiration] Using a OAuth client with a non-default token max age to generate tokens that expire shortly works as expected when using a token authorization flow [Suite:openshift/conformance/parallel]"
-            "[Feature:Prometheus][Conformance] Prometheus when installed on the cluster should have a Watchdog alert in firing state [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Prometheus][Conformance] Prometheus when installed on the cluster should have non-Pod host cAdvisor metrics [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Prometheus][Conformance] Prometheus when installed on the cluster should provide ingress metrics [Suite:openshift/conformance/parallel/minimal] [Skipped:ibmcloud]"
-            "[Feature:Prometheus][Conformance] Prometheus when installed on the cluster should report less than two alerts in firing or pending state [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Prometheus][Conformance] Prometheus when installed on the cluster should report telemetry if a cloud.openshift.com token is present [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Prometheus][Conformance] Prometheus when installed on the cluster should start and expose a secured proxy and unsecured metrics [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Prometheus][Conformance] Prometheus when installed on the cluster shouldn't have failing rules evaluation [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Prometheus][Conformance] Prometheus when installed on the cluster shouldn't report any alerts in firing state apart from Watchdog and AlertmanagerReceiversNotConfigured [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Prometheus][Conformance] Prometheus when installed on the cluster when using openshift-sdn should be able to get the sdn ovs flows [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Prometheus][Feature:Builds] Prometheus when installed on the cluster should start and expose a secured proxy and verify build metrics [Suite:openshift/conformance/parallel]"
-            "[Suite:openshift/oauth/htpasswd] HTPasswd IDP should successfully configure htpasswd and be responsive [Suite:openshift/conformance/parallel]"
-            "[Suite:openshift/oauth] LDAP IDP should authenticate against an ldap server [Suite:openshift/conformance/parallel]"
-            "[Suite:openshift/oauth] LDAP should start an OpenLDAP test server [Suite:openshift/conformance/parallel]"
-            "[cli] oc adm must-gather runs successfully [Suite:openshift/conformance/parallel]"
-            "[cli] oc adm must-gather runs successfully with options [Suite:openshift/conformance/parallel]"
-            "[cli]oc rsh[Conformance] rsh specific flags should work well when access to a remote shell [Suite:openshift/conformance/parallel/minimal]"
-            "[image_ecosystem][mongodb] openshift mongodb image  creating from a template should instantiate the template [Suite:openshift/conformance/parallel]"
-            "[job][Conformance] openshift can execute jobs controller should create and run a job in user project [Suite:openshift/conformance/parallel/minimal]"
-            "[k8s.io] Pods should contain environment variables for services [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[k8s.io] Pods should support pod readiness gates [NodeFeature:PodReadinessGate] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[k8s.io] [sig-node] Events should be sent by kubelets and the scheduler about pods scheduling and running  [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[sig-api-machinery] Aggregator Should be able to support the 1.10 Sample API Server using the current Aggregator [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[sig-apps] ReplicaSet should serve a basic image on each replica with a public image  [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[sig-apps] ReplicationController should serve a basic image on each replica with a public image  [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[sig-autoscaling] [HPA] Horizontal pod autoscaling (scale resource: CPU) [sig-autoscaling] ReplicationController light Should scale from 1 pod to 2 pods [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-autoscaling] [HPA] Horizontal pod autoscaling (scale resource: CPU) [sig-autoscaling] ReplicationController light Should scale from 2 pods to 1 pod [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking Granular Checks: Services should function for client IP based session affinity: http [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:Network/OVNKubernetes]"
-            "[sig-network] Networking Granular Checks: Services should function for client IP based session affinity: udp [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:Network/OVNKubernetes]"
-            "[sig-network] Networking Granular Checks: Services should function for endpoint-Service: http [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:Network/OVNKubernetes]"
-            "[sig-network] Networking Granular Checks: Services should function for endpoint-Service: udp [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:Network/OVNKubernetes]"
-            "[sig-network] Networking Granular Checks: Services should function for node-Service: http [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking Granular Checks: Services should function for node-Service: udp [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking Granular Checks: Services should function for pod-Service: http [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking Granular Checks: Services should function for pod-Service: udp [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking Granular Checks: Services should update endpoints: http [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking Granular Checks: Services should update endpoints: udp [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking should provide Internet connection for containers [Feature:Networking-IPv4] [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:azure]"
-            "[sig-network] Services should be able to switch session affinity for NodePort service [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:Network/OVNKubernetes]"
-            "[sig-network] Services should be able to switch session affinity for service with type clusterIP [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:Network/OVNKubernetes]"
-            "[sig-network] Services should have session affinity work for NodePort service [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:Network/OVNKubernetes]"
-            "[sig-network] Services should have session affinity work for service with type clusterIP [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:Network/OVNKubernetes]"
-            "[sig-storage] CSI mock volume CSI Volume expansion should expand volume by restarting pod if attach=off, nodeExpansion=on [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] CSI mock volume CSI Volume expansion should expand volume by restarting pod if attach=on, nodeExpansion=on [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] CSI mock volume CSI Volume expansion should expand volume without restarting pod if nodeExpansion=off [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] CSI mock volume CSI Volume expansion should not expand volume if resizingOnDriver=off, resizingOnSC=on [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] CSI mock volume CSI attach test using mock driver should not require VolumeAttach for drivers without attachment [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] CSI mock volume CSI attach test using mock driver should preserve attachment policy when no CSIDriver present [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] CSI mock volume CSI attach test using mock driver should require VolumeAttach for drivers with attachment [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] CSI mock volume CSI online volume expansion should expand volume without restarting pod if attach=off, nodeExpansion=on [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] CSI mock volume CSI online volume expansion should expand volume without restarting pod if attach=on, nodeExpansion=on [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] CSI mock volume CSI volume limit information using mock driver should report attach limit when limit is bigger than 0 [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] CSI mock volume CSI workload information using mock driver contain ephemeral=true when using inline volume [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] CSI mock volume CSI workload information using mock driver should be passed when podInfoOnMount=true [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] CSI mock volume CSI workload information using mock driver should not be passed when CSIDriver does not exist [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] CSI mock volume CSI workload information using mock driver should not be passed when podInfoOnMount=false [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] CSI mock volume CSI workload information using mock driver should not be passed when podInfoOnMount=nil [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] Dynamic Provisioning [k8s.io] GlusterDynamicProvisioner should create and delete persistent volumes [fast] [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] GCP Volumes GlusterFS should be mountable [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] GCP Volumes NFSv3 should be mountable for NFSv3 [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] GCP Volumes NFSv4 should be mountable for NFSv4 [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Inline-volume (default fs)] subPath should be able to unmount after the subpath directory is deleted [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Inline-volume (default fs)] subPath should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Inline-volume (default fs)] subPath should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Inline-volume (default fs)] subPath should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Inline-volume (default fs)] subPath should support existing single file [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Inline-volume (default fs)] subPath should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Inline-volume (default fs)] subPath should support file as subpath [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Inline-volume (default fs)] subPath should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Inline-volume (default fs)] subPath should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Inline-volume (default fs)] subPath should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Inline-volume (default fs)] subPath should support readOnly file specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Inline-volume (default fs)] subPath should verify container cannot write to subpath readonly volumes [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Inline-volume (default fs)] volumes should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Inline-volume (default fs)] volumes should be mountable [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Inline-volume (default fs)] volumes should store data [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (block volmode)] volumeMode should fail to create pod by failing to mount volume [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (default fs)] subPath should be able to unmount after the subpath directory is deleted [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (default fs)] subPath should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (default fs)] subPath should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (default fs)] subPath should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (default fs)] subPath should support existing single file [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (default fs)] subPath should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (default fs)] subPath should support file as subpath [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (default fs)] subPath should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (default fs)] subPath should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (default fs)] subPath should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (default fs)] subPath should support readOnly file specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (default fs)] subPath should verify container cannot write to subpath readonly volumes [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (default fs)] volumes should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (default fs)] volumes should be mountable [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (default fs)] volumes should store data [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (filesystem volmode)] volumeMode should create sc, pod, pv, and pvc, read/write to the pv, and delete all created resources [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (filesystem volmode)] volumeMode should not mount / map unused volumes in a pod [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] provisioning should provision storage with defaults [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] provisioning should provision storage with mount options [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] subPath should be able to unmount after the subpath directory is deleted [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] subPath should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] subPath should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] subPath should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] subPath should support existing single file [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] subPath should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] subPath should support file as subpath [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] subPath should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] subPath should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] subPath should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] subPath should support readOnly file specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] subPath should verify container cannot write to subpath readonly volumes [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] volumes should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] volumes should be mountable [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] volumes should store data [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (filesystem volmode)] volumeMode should create sc, pod, pv, and pvc, read/write to the pv, and delete all created resources [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (filesystem volmode)] volumeMode should not mount / map unused volumes in a pod [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Inline-volume (default fs)] subPath should be able to unmount after the subpath directory is deleted [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Inline-volume (default fs)] subPath should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Inline-volume (default fs)] subPath should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Inline-volume (default fs)] subPath should support existing single file [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Inline-volume (default fs)] subPath should support file as subpath [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Inline-volume (default fs)] subPath should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Inline-volume (default fs)] subPath should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Inline-volume (default fs)] subPath should support readOnly file specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Inline-volume (default fs)] subPath should verify container cannot write to subpath readonly volumes [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Inline-volume (default fs)] volumes should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Inline-volume (default fs)] volumes should be mountable [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Inline-volume (default fs)] volumes should store data [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Pre-provisioned PV (block volmode)] volumeMode should fail to create pod by failing to mount volume [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Pre-provisioned PV (default fs)] subPath should be able to unmount after the subpath directory is deleted [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Pre-provisioned PV (default fs)] subPath should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Pre-provisioned PV (default fs)] subPath should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Pre-provisioned PV (default fs)] subPath should support existing single file [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Pre-provisioned PV (default fs)] subPath should support file as subpath [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Pre-provisioned PV (default fs)] subPath should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Pre-provisioned PV (default fs)] subPath should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Pre-provisioned PV (default fs)] subPath should support readOnly file specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Pre-provisioned PV (default fs)] subPath should verify container cannot write to subpath readonly volumes [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Pre-provisioned PV (default fs)] volumes should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Pre-provisioned PV (default fs)] volumes should be mountable [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Pre-provisioned PV (default fs)] volumes should store data [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Pre-provisioned PV (filesystem volmode)] volumeMode should create sc, pod, pv, and pvc, read/write to the pv, and delete all created resources [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Pre-provisioned PV (filesystem volmode)] volumeMode should not mount / map unused volumes in a pod [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] PersistentVolumes NFS when invoking the Recycle reclaim policy should test that a PV becomes Available and is clean after the PVC is deleted. [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] PersistentVolumes NFS with Single PV - PVC pairs create a PV and a pre-bound PVC: test write access [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] PersistentVolumes NFS with Single PV - PVC pairs create a PVC and a pre-bound PV: test write access [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] PersistentVolumes NFS with Single PV - PVC pairs create a PVC and non-pre-bound PV: test write access [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] PersistentVolumes NFS with Single PV - PVC pairs should create a non-pre-bound PV and PVC: test write access  [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] PersistentVolumes NFS with multiple PVs and PVCs all in same ns should create 2 PVs and 4 PVCs: test write access [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] PersistentVolumes NFS with multiple PVs and PVCs all in same ns should create 3 PVs and 3 PVCs: test write access [Suite:openshift/conformance/parallel] [Suite:k8s]"
-          EOEXCLUDE
-          export PATH=/usr/libexec/origin:$PATH
-          openshift-tests run openshift/conformance/parallel --dry-run | ./invert_excluded.py excluded_tests > test-suite.txt
-          TEST_SUITE="--file=test-suite.txt" run-tests
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/apici
-        name: apici-ci-operator-credentials
-        readOnly: true
-      - mountPath: /usr/local/e2e-remote-libvirt-cluster-profile
-        name: cluster-profile
-      - mountPath: /usr/local/e2e-remote-libvirt
-        name: job-definition
-        subPath: cluster-launch-installer-remote-libvirt-e2e.yaml
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-    serviceAccountName: ci-operator
-    volumes:
-    - name: apici-ci-operator-credentials
-      secret:
-        items:
-        - key: sa.ci-operator.apici.config
-          path: kubeconfig
-        secretName: apici-ci-operator-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-metal
-    - configMap:
-        name: prow-job-cluster-launch-installer-remote-libvirt-e2e
-      name: job-definition
-    - name: pull-secret
-      secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -672,7 +303,6 @@ periodics:
   decorate: true
   interval: 8h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.3"
   name: promote-release-openshift-machine-os-content-e2e-aws-4.3-ppc64le
   spec:
@@ -707,12 +337,6 @@ periodics:
         fi
 
         # TODO: Enable e2e testing when arch specific CI is available
-
-        # Tag the image into the art-latest stream for the arch
-        oc tag "${to_quay}" "ocp-${ARCH}/${BRANCH}-art-latest-${ARCH}:${TAG}"
-
-        # Tag the image into the private art-latest stream for the arch
-        oc tag "${to_quay}" "ocp-${ARCH}-priv/${BRANCH}-art-latest-${ARCH}-priv:${TAG}"
       env:
       - name: TAG_NS
         value: rhcos
@@ -812,7 +436,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -1019,7 +643,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -1028,7 +652,6 @@ periodics:
   decorate: true
   interval: 24h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.3"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-origin-installer-old-rhcos-e2e-aws-4.3
@@ -1039,7 +662,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/pull-secret
       - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
@@ -1147,7 +769,7 @@ periodics:
             name: cluster-secrets-aws
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -1156,7 +778,6 @@ periodics:
   decorate: true
   interval: 24h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.3"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-origin-installer-e2e-aws-sdn-multitenant-4.3
@@ -1171,7 +792,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-sdn-multitenant-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws
@@ -1264,7 +884,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -1286,7 +906,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-ovn-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws
@@ -1370,7 +989,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -1379,7 +998,6 @@ periodics:
   decorate: true
   interval: 16h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.3"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-installer-e2e-aws-ovn-4.3
@@ -1394,7 +1012,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-ovn-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws
@@ -1478,7 +1095,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -1487,7 +1104,6 @@ periodics:
   decorate: true
   interval: 16h
   labels:
-    ci.openshift.io/release-type: broken
     job-release: "4.3"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-installer-e2e-gcp-ovn-4.3
@@ -1502,7 +1118,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-gcp-ovn-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-gcp
@@ -1586,7 +1201,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -1595,7 +1210,6 @@ periodics:
   decorate: true
   interval: 16h
   labels:
-    ci.openshift.io/release-type: broken
     job-release: "4.3"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-installer-e2e-azure-ovn-4.3
@@ -1610,7 +1224,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-azure-ovn-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-azure
@@ -1694,7 +1307,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -1703,7 +1316,6 @@ periodics:
   decorate: true
   interval: 16h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.3"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-installer-e2e-azure-4.3
@@ -1718,7 +1330,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-azure-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-azure
@@ -1804,7 +1415,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -1813,7 +1424,6 @@ periodics:
   cron: '@yearly'
   decorate: true
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.3"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-installer-e2e-azure-fips-4.3
@@ -1828,7 +1438,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-azure-fips-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-azure-fips
@@ -1916,7 +1525,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -1925,7 +1534,6 @@ periodics:
   decorate: true
   interval: 2h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.3"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-installer-e2e-aws-fips-4.3
@@ -1940,7 +1548,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-fips-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws-fips
@@ -2028,7 +1635,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -2037,7 +1644,6 @@ periodics:
   decorate: true
   interval: 16h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.3"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-installer-e2e-aws-proxy-4.3
@@ -2052,7 +1658,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-proxy-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws-proxy
@@ -2140,7 +1745,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -2149,7 +1754,6 @@ periodics:
   decorate: true
   interval: 16h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.3"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-installer-e2e-metal-4.3
@@ -2243,7 +1847,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -2252,7 +1856,6 @@ periodics:
   decorate: true
   interval: 24h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.3"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-installer-e2e-metal-serial-4.3
@@ -2346,7 +1949,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -2355,7 +1958,6 @@ periodics:
   decorate: true
   interval: 16h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.3"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-installer-e2e-azure-serial-4.3
@@ -2370,7 +1972,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-azure-serial-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-azure-serial
@@ -2456,7 +2057,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -2465,7 +2066,6 @@ periodics:
   decorate: true
   interval: 16h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.3"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-origin-installer-e2e-gcp-4.3
@@ -2480,7 +2080,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-gcp-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-gcp
@@ -2568,7 +2167,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -2577,7 +2176,6 @@ periodics:
   decorate: true
   interval: 16h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.3"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-installer-e2e-gcp-4.3
@@ -2592,7 +2190,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-gcp-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-gcp
@@ -2680,7 +2277,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -2689,7 +2286,6 @@ periodics:
   cron: '@yearly'
   decorate: true
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.3"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-installer-e2e-gcp-fips-4.3
@@ -2704,7 +2300,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-gcp-fips-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-gcp-fips
@@ -2794,7 +2389,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -2803,7 +2398,6 @@ periodics:
   cron: '@yearly'
   decorate: true
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.3"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-installer-e2e-azure-fips-serial-4.3
@@ -2818,7 +2412,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-azure-fips-serial-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-azure-fips-serial
@@ -2906,7 +2499,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -2915,7 +2508,6 @@ periodics:
   cron: '@yearly'
   decorate: true
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.3"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-installer-e2e-aws-fips-serial-4.3
@@ -2930,7 +2522,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-fips-serial-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws-fips-serial
@@ -3018,7 +2609,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -3027,7 +2618,6 @@ periodics:
   decorate: true
   interval: 24h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.3"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-installer-e2e-gcp-serial-4.3
@@ -3042,7 +2632,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-gcp-serial-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-gcp-serial
@@ -3130,7 +2719,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -3139,7 +2728,6 @@ periodics:
   cron: '@yearly'
   decorate: true
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.3"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-installer-e2e-gcp-fips-serial-4.3
@@ -3154,7 +2742,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-gcp-fips-serial-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-gcp-fips-serial
@@ -3244,7 +2831,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -3253,7 +2840,6 @@ periodics:
   decorate: true
   interval: 24h
   labels:
-    ci.openshift.io/release-type: informing
     job-env: aws
     job-release: "4.3"
     job-test: e2e
@@ -3270,7 +2856,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws
@@ -3365,7 +2950,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -3374,7 +2959,6 @@ periodics:
   decorate: true
   interval: 24h
   labels:
-    ci.openshift.io/release-type: informing
     job-env: aws
     job-release: "4.3"
     job-test: e2e
@@ -3391,7 +2975,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws
@@ -3486,7 +3069,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -3495,7 +3078,6 @@ periodics:
   decorate: true
   interval: 24h
   labels:
-    ci.openshift.io/release-type: informing
     job-env: aws
     job-release: "4.3"
     job-test: e2e
@@ -3512,7 +3094,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws
@@ -3609,7 +3190,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -3618,7 +3199,6 @@ periodics:
   decorate: true
   interval: 24h
   labels:
-    ci.openshift.io/release-type: informing
     job-env: aws
     job-release: "4.3"
     job-test: e2e
@@ -3635,7 +3215,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws
@@ -3732,7 +3311,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -3741,7 +3320,6 @@ periodics:
   decorate: true
   interval: 24h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.3"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-origin-installer-e2e-gcp-shared-vpc-4.3
@@ -3756,7 +3334,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-gcp-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-gcp
@@ -3855,7 +3432,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -3864,7 +3441,6 @@ periodics:
   decorate: true
   interval: 24h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.3"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-origin-installer-e2e-azure-shared-vpc-4.3
@@ -3879,7 +3455,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-azure-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-azure
@@ -3976,7 +3551,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -3985,7 +3560,6 @@ periodics:
   decorate: true
   interval: 24h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.3"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-origin-installer-e2e-gcp-compact-4.3
@@ -4000,7 +3574,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-gcp-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-gcp
@@ -4086,7 +3659,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -4095,7 +3668,6 @@ periodics:
   decorate: true
   interval: 24h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.3"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-origin-installer-e2e-azure-compact-4.3
@@ -4110,7 +3682,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-azure-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-azure
@@ -4194,7 +3765,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -4203,7 +3774,6 @@ periodics:
   decorate: true
   interval: 24h
   labels:
-    ci.openshift.io/release-type: informing
     job-env: aws
     job-release: "4.3"
     job-test: e2e
@@ -4220,7 +3790,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-disruptive-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws-disruptive
@@ -4303,7 +3872,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -4312,7 +3881,6 @@ periodics:
   decorate: true
   interval: 24h
   labels:
-    ci.openshift.io/release-type: informing
     job-env: aws
     job-release: "4.3"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -4328,7 +3896,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-serial-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws-serial
@@ -4423,7 +3990,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -4432,7 +3999,6 @@ periodics:
   decorate: true
   interval: 24h
   labels:
-    ci.openshift.io/release-type: informing
     job-env: gcp
     job-release: "4.3"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -4448,7 +4014,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-gcp-serial-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-gcp-serial
@@ -4545,7 +4110,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -4554,7 +4119,6 @@ periodics:
   decorate: true
   interval: 24h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.3"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-installer-console-aws-4.3
@@ -4569,7 +4133,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-console-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws-console
@@ -4598,7 +4161,8 @@ periodics:
           tests:
           - as: e2e-$(CLUSTER_TYPE)-console
             commands: ./test-prow-e2e.sh release
-            openshift_installer_console:
+            openshift_installer_custom_test_image:
+              from: stable:console-tests
               cluster_profile: "$(CLUSTER_TYPE)"
       - name: JOB_NAME_SAFE
         value: e2e-aws-console
@@ -4653,7 +4217,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -4662,7 +4226,6 @@ periodics:
   decorate: true
   interval: 24h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.3"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-installer-e2e-aws-4.3
@@ -4677,7 +4240,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws
@@ -4772,7 +4334,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -4781,7 +4343,6 @@ periodics:
   decorate: true
   interval: 24h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.3"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-installer-e2e-aws-serial-4.3
@@ -4796,7 +4357,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-serial-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws-serial
@@ -4891,7 +4451,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -4900,7 +4460,6 @@ periodics:
   decorate: true
   interval: 24h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.3"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-origin-installer-e2e-aws-upgrade-fips-4.3
@@ -4911,7 +4470,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/pull-secret
       - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-fips-cluster-profile
       - --target=e2e-$(CLUSTER_TYPE)-fips
@@ -4936,10 +4494,10 @@ periodics:
           exit 1
         fi
 
-        from=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${initial}" )
-        to=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${latest}" )
-        export RELEASE_IMAGE_INITIAL=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${initial}" )
-        export RELEASE_IMAGE_LATEST=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${latest}" )
+        from=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${initial}" )
+        to=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${latest}" )
+        export RELEASE_IMAGE_INITIAL=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${initial}" )
+        export RELEASE_IMAGE_LATEST=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${latest}" )
 
         # prow doesn't allow init containers or a second container
         export PATH=$PATH:/tmp/bin
@@ -5033,7 +4591,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -5044,11 +4602,10 @@ periodics:
           path: sa.release-bot.app.ci.config
         secretName: build-farm-credentials
 - agent: kubernetes
-  cluster: api.ci
+  cluster: vsphere
   decorate: true
   interval: 24h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.3"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-installer-e2e-vsphere-upi-4.3
@@ -5063,7 +4620,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-vsphere-upi-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-vsphere-upi
@@ -5149,16 +4705,15 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: api.ci
+  cluster: vsphere
   decorate: true
   interval: 24h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.3"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-installer-e2e-vsphere-upi-serial-4.3
@@ -5173,7 +4728,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-vsphere-upi-serial-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-vsphere-upi-serial
@@ -5259,7 +4813,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -5268,7 +4822,6 @@ periodics:
   decorate: true
   interval: 24h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.3"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-installer-e2e-aws-upi-4.3
@@ -5283,7 +4836,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-upi-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws-upi
@@ -5369,7 +4921,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -5378,7 +4930,6 @@ periodics:
   decorate: true
   interval: 16h
   labels:
-    ci.openshift.io/release-type: informing
     job-env: aws
     job-release: "4.3"
     job-test: e2e
@@ -5392,7 +4943,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/pull-secret
       - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
@@ -5416,10 +4966,10 @@ periodics:
           exit 1
         fi
 
-        from=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${initial}" )
-        to=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${latest}" )
-        export RELEASE_IMAGE_INITIAL=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${initial}" )
-        export RELEASE_IMAGE_LATEST=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${latest}" )
+        from=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${initial}" )
+        to=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${latest}" )
+        export RELEASE_IMAGE_INITIAL=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${initial}" )
+        export RELEASE_IMAGE_LATEST=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${latest}" )
 
         # prow doesn't allow init containers or a second container
         export PATH=$PATH:/tmp/bin
@@ -5508,7 +5058,7 @@ periodics:
             name: cluster-secrets-aws
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -5523,7 +5073,6 @@ periodics:
   decorate: true
   interval: 24h
   labels:
-    ci.openshift.io/release-type: informing
     job-env: aws
     job-release: "4.3"
     job-test: e2e
@@ -5537,7 +5086,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/pull-secret
       - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
@@ -5555,20 +5103,20 @@ periodics:
           echo "error: Could not find an initial version"
           exit 1
         fi
-        export RELEASE_IMAGE_INITIAL=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${data}" )
+        export RELEASE_IMAGE_INITIAL=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${data}" )
 
         if ! curl --fail -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest --data-urlencode 'in=>4.2.0 <4.3.0-0' > ${data}; then
           echo "error: Could not find a middle version"
           exit 1
         fi
-        next=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${data}" )
+        next=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${data}" )
         export CONFIG_SPEC="${CONFIG_SPEC/RELEASE_IMAGE_NEXT_0/$next}"
 
         if ! curl --fail -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.3.0-0.nightly/latest > ${data}; then
           echo "error: Could not find newest version"
           exit 1
         fi
-        export RELEASE_IMAGE_LATEST=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${data}" )
+        export RELEASE_IMAGE_LATEST=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${data}" )
 
         ci-operator $@
       - ""
@@ -5648,7 +5196,7 @@ periodics:
             name: cluster-secrets-aws
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -5657,7 +5205,6 @@ periodics:
   decorate: true
   interval: 16h
   labels:
-    ci.openshift.io/release-type: informing
     job-env: aws
     job-release: "4.3"
     job-test: e2e
@@ -5671,7 +5218,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/pull-secret
       - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
@@ -5695,10 +5241,10 @@ periodics:
           exit 1
         fi
 
-        from=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${initial}" )
-        to=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${latest}" )
-        export RELEASE_IMAGE_INITIAL=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${initial}" )
-        export RELEASE_IMAGE_LATEST=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${latest}" )
+        from=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${initial}" )
+        to=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${latest}" )
+        export RELEASE_IMAGE_INITIAL=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${initial}" )
+        export RELEASE_IMAGE_LATEST=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${latest}" )
 
         # prow doesn't allow init containers or a second container
         export PATH=$PATH:/tmp/bin
@@ -5787,7 +5333,7 @@ periodics:
             name: cluster-secrets-aws
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -5802,7 +5348,6 @@ periodics:
   decorate: true
   interval: 24h
   labels:
-    ci.openshift.io/release-type: informing
     job-env: aws
     job-release: "4.3"
     job-test: e2e
@@ -5815,7 +5360,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/pull-secret
       - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
@@ -5839,10 +5383,10 @@ periodics:
           exit 1
         fi
 
-        from=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${initial}" )
-        to=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${latest}" )
-        export RELEASE_IMAGE_INITIAL=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${initial}" )
-        export RELEASE_IMAGE_LATEST=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${latest}" )
+        from=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${initial}" )
+        to=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${latest}" )
+        export RELEASE_IMAGE_INITIAL=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${initial}" )
+        export RELEASE_IMAGE_LATEST=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${latest}" )
 
         # prow doesn't allow init containers or a second container
         export PATH=$PATH:/tmp/bin
@@ -5919,7 +5463,7 @@ periodics:
             name: cluster-secrets-aws
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -5934,7 +5478,6 @@ periodics:
   decorate: true
   interval: 24h
   labels:
-    ci.openshift.io/release-type: informing
     job-env: aws
     job-release: "4.3"
     job-test: e2e
@@ -5947,7 +5490,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/pull-secret
       - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
@@ -5971,10 +5513,10 @@ periodics:
           exit 1
         fi
 
-        from=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${initial}" )
-        to=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${latest}" )
-        export RELEASE_IMAGE_INITIAL=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${initial}" )
-        export RELEASE_IMAGE_LATEST=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${latest}" )
+        from=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${initial}" )
+        to=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${latest}" )
+        export RELEASE_IMAGE_INITIAL=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${initial}" )
+        export RELEASE_IMAGE_LATEST=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${latest}" )
 
         # prow doesn't allow init containers or a second container
         export PATH=$PATH:/tmp/bin
@@ -6051,7 +5593,7 @@ periodics:
             name: cluster-secrets-aws
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -6066,7 +5608,6 @@ periodics:
   decorate: true
   interval: 24h
   labels:
-    ci.openshift.io/release-type: informing
     job-env: aws
     job-release: "4.3"
     job-test: e2e
@@ -6083,7 +5624,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-cnv-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws
@@ -6167,7 +5707,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -6176,7 +5716,6 @@ periodics:
   decorate: true
   interval: 16h
   labels:
-    ci.openshift.io/release-type: informing
     job-env: gcp
     job-release: "4.3"
     job-test: e2e
@@ -6189,7 +5728,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/pull-secret
       - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
@@ -6213,10 +5751,10 @@ periodics:
           exit 1
         fi
 
-        from=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${initial}" )
-        to=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${latest}" )
-        export RELEASE_IMAGE_INITIAL=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${initial}" )
-        export RELEASE_IMAGE_LATEST=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${latest}" )
+        from=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${initial}" )
+        to=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${latest}" )
+        export RELEASE_IMAGE_INITIAL=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${initial}" )
+        export RELEASE_IMAGE_LATEST=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${latest}" )
 
         # prow doesn't allow init containers or a second container
         export PATH=$PATH:/tmp/bin
@@ -6295,7 +5833,7 @@ periodics:
             name: cluster-profile-gcp
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -6310,7 +5848,6 @@ periodics:
   decorate: true
   interval: 16h
   labels:
-    ci.openshift.io/release-type: informing
     job-env: azure
     job-release: "4.3"
     job-test: e2e
@@ -6323,7 +5860,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/pull-secret
       - --secret-dir=/usr/local/e2e-azure-upgrade-cluster-profile
       - --target=e2e-azure-upgrade
@@ -6347,10 +5883,10 @@ periodics:
           exit 1
         fi
 
-        from=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${initial}" )
-        to=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${latest}" )
-        export RELEASE_IMAGE_INITIAL=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${initial}" )
-        export RELEASE_IMAGE_LATEST=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${latest}" )
+        from=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${initial}" )
+        to=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${latest}" )
+        export RELEASE_IMAGE_INITIAL=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${initial}" )
+        export RELEASE_IMAGE_LATEST=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${latest}" )
 
         # prow doesn't allow init containers or a second container
         export PATH=$PATH:/tmp/bin
@@ -6427,7 +5963,7 @@ periodics:
             name: cluster-secrets-azure4
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -6444,7 +5980,6 @@ periodics:
     skip_cloning: true
   interval: 48h
   labels:
-    ci.openshift.io/release-type: informing
     job-env: openstack
     job-release: "4.3"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -6460,7 +5995,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-openstack-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-openstack
@@ -6544,301 +6078,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-- agent: kubernetes
-  cluster: api.ci
-  cron: 0 0,12 * * *
-  decorate: true
-  labels:
-    ci.openshift.io/release-type: informing
-    dptp.openshift.io/ssh-bastion: "true"
-    job-env: remote-libvirt
-    job-release: "4.3"
-    job-test: e2e
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: release-openshift-origin-installer-e2e-remote-libvirt-ppc64le-4.3
-  spec:
-    containers:
-    - args:
-      - --artifact-dir=$(ARTIFACTS)
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --kubeconfig=/etc/apici/kubeconfig
-      - --secret-dir=/usr/local/e2e-remote-libvirt-cluster-profile
-      - --secret-dir=/usr/local/pull-secret
-      - --target=e2e-remote-libvirt
-      - --template=/usr/local/e2e-remote-libvirt
-      command:
-      - ci-operator
-      env:
-      - name: ARCH
-        value: ppc64le
-      - name: BRANCH
-        value: "4.3"
-      - name: BASTION_SVC_IP
-        value: 172.30.185.48
-      - name: BASTION_SVC_0_1_IP
-        value: 172.30.185.14
-      - name: BASTION_SVC_0_2_IP
-        value: 172.30.68.38
-      - name: BASTION_SVC_0_3_IP
-        value: 172.30.83.172
-      - name: BASTION_SVC_1_0_IP
-        value: 172.30.254.137
-      - name: BASTION_SVC_1_1_IP
-        value: 172.30.70.187
-      - name: BASTION_SVC_1_2_IP
-        value: 172.30.114.129
-      - name: BASTION_SVC_1_3_IP
-        value: 172.30.131.153
-      - name: CLUSTER_TYPE
-        value: libvirt-ppc64le
-      - name: CONFIG_SPEC
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 4Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
-          tests:
-          - as: e2e-$(CLUSTER_TYPE)-all
-            commands: $(TEST_COMMAND)
-            openshift_installer:
-              cluster_profile: libvirt-ppc64le
-      - name: JOB_NAME_SAFE
-        value: e2e-remote-libvirt
-      - name: MULTIARCH_RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp-ppc64le/release-ppc64le:4.3
-      - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.3
-      - name: REMOTE_LIBVIRT_HOSTNAME
-        value: c155f2u33
-      - name: REMOTE_LIBVIRT_HOSTNAME_1
-        value: c155f2u31
-      - name: TEST_COMMAND
-        value: |
-          # these tests are not able to run in CI due to
-          # missing test image dependencies.  They must be
-          # run manually
-          cat > invert_excluded.py <<EOSCRIPT
-          #!/usr/libexec/platform-python
-          import sys
-          all_tests = set()
-          excluded_tests = set()
-          for l in sys.stdin.readlines():
-            all_tests.add(l.strip())
-          with open(sys.argv[1], "r") as f:
-            for l in f.readlines():
-              excluded_tests.add(l.strip())
-          test_suite = all_tests - excluded_tests
-          for t in test_suite:
-            print(t)
-          EOSCRIPT
-          chmod +x invert_excluded.py
-          cat > excluded_tests <<EOEXCLUDE
-            "[Conformance][Area:Networking][Feature:Router] The HAProxy router should expose prometheus metrics for a route [Suite:openshift/conformance/parallel/minimal]"
-            "[Conformance][Area:Networking][Feature:Router] The HAProxy router should override the route host for overridden domains with a custom value [Suite:openshift/conformance/parallel/minimal]"
-            "[Conformance][Area:Networking][Feature:Router] The HAProxy router should override the route host with a custom value [Suite:openshift/conformance/parallel/minimal]"
-            "[Conformance][Area:Networking][Feature:Router] The HAProxy router should run even if it has no access to update status [Suite:openshift/conformance/parallel/minimal]"
-            "[Conformance][Area:Networking][Feature:Router] The HAProxy router should serve a route that points to two services and respect weights [Suite:openshift/conformance/parallel/minimal]"
-            "[Conformance][Area:Networking][Feature:Router] The HAProxy router should serve routes that were created from an ingress [Suite:openshift/conformance/parallel/minimal]"
-            "[Conformance][Area:Networking][Feature:Router] The HAProxy router should serve the correct routes when scoped to a single namespace and label set [Suite:openshift/conformance/parallel/minimal]"
-            "[Conformance][templates] templateinstance readiness test  should report failed soon after an annotated objects has failed [Suite:openshift/conformance/parallel/minimal]"
-            "[Conformance][templates] templateinstance readiness test  should report ready soon after all annotated objects are ready [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Builds] build have source revision metadata  started build should contain source revision information [Suite:openshift/conformance/parallel]"
-            "[Feature:Builds] build with empty source  started build should build even with an empty source in build config [Suite:openshift/conformance/parallel]"
-            "[Feature:Builds] forcePull should affect pulling builder images  ForcePull test case execution custom [Suite:openshift/conformance/parallel]"
-            "[Feature:Builds] forcePull should affect pulling builder images  ForcePull test case execution docker [Suite:openshift/conformance/parallel]"
-            "[Feature:Builds] forcePull should affect pulling builder images  ForcePull test case execution s2i [Suite:openshift/conformance/parallel]"
-            "[Feature:Builds] result image should have proper labels set  S2I build from a template should create a image from \"test-s2i-build.json\" template with proper Docker labels [Suite:openshift/conformance/parallel]"
-            "[Feature:Builds][Conformance] build can reference a cluster service  with a build being created from new-build should be able to run a build that references a cluster service [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Builds][Conformance] build without output image  building from templates should create an image from a S2i template without an output image reference defined [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Builds][Conformance] custom build with buildah  being created from new-build should complete build with custom builder image [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Builds][Conformance] oc new-app  should fail with a --name longer than 58 characters [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Builds][Conformance] oc new-app  should succeed with a --name of 58 characters [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Builds][Conformance] oc new-app  should succeed with an imagestream [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Builds][Conformance] s2i build with a quota  Building from a template should create an s2i build with a quota and run it [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Builds][Conformance] s2i build with a root user image should create a root build and pass with a privileged SCC [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Builds][Conformance][valueFrom] process valueFrom in build strategy environment variables  should fail resolving unresolvable valueFrom in docker build environment variable references [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Builds][Conformance][valueFrom] process valueFrom in build strategy environment variables  should fail resolving unresolvable valueFrom in sti build environment variable references [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Builds][Conformance][valueFrom] process valueFrom in build strategy environment variables  should successfully resolve valueFrom in docker build environment variables [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Builds][Conformance][valueFrom] process valueFrom in build strategy environment variables  should successfully resolve valueFrom in s2i build environment variables [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Builds][pruning] prune builds based on settings in the buildconfig  [Conformance] buildconfigs should have a default history limit set when created via the group api [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:Builds][pruning] prune builds based on settings in the buildconfig  should prune builds after a buildConfig change [Suite:openshift/conformance/parallel]"
-            "[Feature:Builds][pruning] prune builds based on settings in the buildconfig  should prune canceled builds based on the failedBuildsHistoryLimit setting [Suite:openshift/conformance/parallel]"
-            "[Feature:Builds][pruning] prune builds based on settings in the buildconfig  should prune completed builds based on the successfulBuildsHistoryLimit setting [Suite:openshift/conformance/parallel]"
-            "[Feature:Builds][pruning] prune builds based on settings in the buildconfig  should prune errored builds based on the failedBuildsHistoryLimit setting [Suite:openshift/conformance/parallel]"
-            "[Feature:Builds][pruning] prune builds based on settings in the buildconfig  should prune failed builds based on the failedBuildsHistoryLimit setting [Suite:openshift/conformance/parallel]"
-            "[Feature:Builds][timing] capture build stages and durations  should record build stages and durations for s2i [Suite:openshift/conformance/parallel]"
-            "[Feature:DeploymentConfig] deploymentconfigs when tagging images [Conformance] should successfully tag the deployed image [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:DeploymentConfig] deploymentconfigs with multiple image change triggers [Conformance] should run a successful deployment with a trigger used by different containers [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:DeploymentConfig] deploymentconfigs with multiple image change triggers [Conformance] should run a successful deployment with multiple triggers [Suite:openshift/conformance/parallel/minimal]"
-            "[Feature:ImageAppend] Image append should create images by appending them [Suite:openshift/conformance/parallel]"
-            "[Feature:ImageExtract] Image extract should extract content from an image [Suite:openshift/conformance/parallel]"
-            "[Suite:openshift/oauth] LDAP IDP should authenticate against an ldap server [Suite:openshift/conformance/parallel]"
-            "[Suite:openshift/oauth] LDAP should start an OpenLDAP test server [Suite:openshift/conformance/parallel]"
-            "[image_ecosystem][mongodb] openshift mongodb image  creating from a template should instantiate the template [Suite:openshift/conformance/parallel]"
-            "[k8s.io] Container Runtime blackbox test when running a container with a new image should be able to pull image from gcr.io [NodeConformance] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[k8s.io] InitContainer [NodeConformance] should invoke init containers on a RestartAlways pod [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[sig-storage] CSI mock volume CSI Volume expansion should expand volume by restarting pod if attach=off, nodeExpansion=on [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] CSI mock volume CSI Volume expansion should expand volume by restarting pod if attach=on, nodeExpansion=on [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] CSI mock volume CSI Volume expansion should expand volume without restarting pod if nodeExpansion=off [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] CSI mock volume CSI Volume expansion should not expand volume if resizingOnDriver=off, resizingOnSC=on [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] CSI mock volume CSI attach test using mock driver should not require VolumeAttach for drivers without attachment [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] CSI mock volume CSI attach test using mock driver should preserve attachment policy when no CSIDriver present [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] CSI mock volume CSI attach test using mock driver should require VolumeAttach for drivers with attachment [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] CSI mock volume CSI online volume expansion should expand volume without restarting pod if attach=off, nodeExpansion=on [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] CSI mock volume CSI online volume expansion should expand volume without restarting pod if attach=on, nodeExpansion=on [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] CSI mock volume CSI workload information using mock driver contain ephemeral=true when using inline volume [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] CSI mock volume CSI workload information using mock driver should be passed when podInfoOnMount=true [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] CSI mock volume CSI workload information using mock driver should not be passed when CSIDriver does not exist [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] CSI mock volume CSI workload information using mock driver should not be passed when podInfoOnMount=false [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] CSI mock volume CSI workload information using mock driver should not be passed when podInfoOnMount=nil [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] Dynamic Provisioning [k8s.io] GlusterDynamicProvisioner should create and delete persistent volumes [fast] [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] GCP Volumes GlusterFS should be mountable [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] GCP Volumes NFSv3 should be mountable for NFSv3 [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] GCP Volumes NFSv4 should be mountable for NFSv4 [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Inline-volume (default fs)] subPath should be able to unmount after the subpath directory is deleted [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Inline-volume (default fs)] subPath should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Inline-volume (default fs)] subPath should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Inline-volume (default fs)] subPath should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Inline-volume (default fs)] subPath should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Inline-volume (default fs)] subPath should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Inline-volume (default fs)] subPath should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Inline-volume (default fs)] subPath should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Inline-volume (default fs)] volumes should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Inline-volume (default fs)] volumes should store data [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (default fs)] subPath should be able to unmount after the subpath directory is deleted [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (default fs)] subPath should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (default fs)] subPath should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (default fs)] subPath should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (default fs)] subPath should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (default fs)] subPath should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (default fs)] subPath should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (default fs)] subPath should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (default fs)] volumes should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (default fs)] volumes should store data [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (filesystem volmode)] volumeMode should not mount / map unused volumes in a pod [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:ibmcloud]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] provisioning should provision storage with mount options [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] subPath should be able to unmount after the subpath directory is deleted [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] subPath should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] subPath should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] subPath should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] subPath should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] subPath should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] subPath should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] subPath should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] volumes should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] volumes should store data [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (filesystem volmode)] volumeMode should not mount / map unused volumes in a pod [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Inline-volume (default fs)] volumes should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Inline-volume (default fs)] volumes should store data [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Pre-provisioned PV (default fs)] volumes should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Pre-provisioned PV (default fs)] volumes should store data [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Pre-provisioned PV (filesystem volmode)] volumeMode should not mount / map unused volumes in a pod [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] PersistentVolumes NFS when invoking the Recycle reclaim policy should test that a PV becomes Available and is clean after the PVC is deleted. [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] PersistentVolumes NFS with Single PV - PVC pairs create a PV and a pre-bound PVC: test write access [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] PersistentVolumes NFS with Single PV - PVC pairs create a PVC and a pre-bound PV: test write access [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] PersistentVolumes NFS with Single PV - PVC pairs create a PVC and non-pre-bound PV: test write access [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] PersistentVolumes NFS with Single PV - PVC pairs should create a non-pre-bound PV and PVC: test write access  [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] PersistentVolumes NFS with multiple PVs and PVCs all in same ns should create 2 PVs and 4 PVCs: test write access [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] PersistentVolumes NFS with multiple PVs and PVCs all in same ns should create 3 PVs and 3 PVCs: test write access [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[Area:Networking] multicast when using one of the plugins 'redhat/openshift-ovs-multitenant, redhat/openshift-ovs-networkpolicy' should allow multicast traffic in namespaces where it is enabled [Suite:openshift/conformance/parallel]"
-            "[Area:Networking] multicast when using one of the plugins 'redhat/openshift-ovs-multitenant, redhat/openshift-ovs-networkpolicy' should block multicast traffic in namespaces where it is disabled [Suite:openshift/conformance/parallel]"
-            "[sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic] should adopt matching orphans and release non-matching pods [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic] should not deadlock when a pod's predecessor fails [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic] should perform rolling updates and roll backs of template modifications with PVCs [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic] should provide basic identity [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] PVC Protection Verify \"immediate\" deletion of a PVC that is not in active use by a pod [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] PVC Protection Verify that PVC in active use by a pod is not removed immediately [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] PVC Protection Verify that scheduling of a pod that uses PVC that is being deleted fails and the pod becomes Unschedulable [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[cli] oc adm must-gather runs successfully [Suite:openshift/conformance/parallel]"
-            "[cli] oc adm must-gather runs successfully with options [Suite:openshift/conformance/parallel]"
-            "[Feature:Prometheus][Conformance] Prometheus when installed on the cluster shouldn't report any alerts in firing state apart from Watchdog and AlertmanagerReceiversNotConfigured [Suite:openshift/conformance/parallel/minimal]"
-            "[k8s.io] InitContainer [NodeConformance] should not start app containers and fail the pod if init containers fail on a RestartNever pod [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[k8s.io] InitContainer [NodeConformance] should not start app containers if init containers fail on a RestartAlways pod [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[sig-network] Services should be able to switch session affinity for NodePort service [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:Network/OVNKubernetes]"
-            "[sig-network] Services should have session affinity work for NodePort service [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:Network/OVNKubernetes]"
-            "[Feature:OAuthServer] [Headers] expected headers returned from the authorize URL [Suite:openshift/conformance/parallel]"
-            "[Feature:OAuthServer] [Headers] expected headers returned from the grant URL [Suite:openshift/conformance/parallel]"
-            "[Feature:OAuthServer] [Headers] expected headers returned from the login URL for the allow all IDP [Suite:openshift/conformance/parallel]"
-            "[Feature:OAuthServer] [Headers] expected headers returned from the login URL for the bootstrap IDP [Suite:openshift/conformance/parallel]"
-            "[Feature:OAuthServer] [Headers] expected headers returned from the login URL for when there is only one IDP [Suite:openshift/conformance/parallel]"
-            "[Feature:OAuthServer] [Headers] expected headers returned from the logout URL [Suite:openshift/conformance/parallel]"
-            "[Feature:OAuthServer] [Headers] expected headers returned from the root URL [Suite:openshift/conformance/parallel]"
-            "[Feature:OAuthServer] [Headers] expected headers returned from the token URL [Suite:openshift/conformance/parallel]"
-            "[Feature:OAuthServer] [Headers] expected headers returned from the token request URL [Suite:openshift/conformance/parallel]"
-            "[Feature:OAuthServer] [Token Expiration] Using a OAuth client with a non-default token max age to generate tokens that do not expire works as expected when using a code authorization flow [Suite:openshift/conformance/parallel]"
-            "[Feature:OAuthServer] [Token Expiration] Using a OAuth client with a non-default token max age to generate tokens that do not expire works as expected when using a token authorization flow [Suite:openshift/conformance/parallel]"
-            "[Feature:OAuthServer] [Token Expiration] Using a OAuth client with a non-default token max age to generate tokens that expire shortly works as expected when using a code authorization flow [Suite:openshift/conformance/parallel]"
-            "[Feature:OAuthServer] [Token Expiration] Using a OAuth client with a non-default token max age to generate tokens that expire shortly works as expected when using a token authorization flow [Suite:openshift/conformance/parallel]"
-            "[Suite:openshift/oauth/htpasswd] HTPasswd IDP should successfully configure htpasswd and be responsive [Suite:openshift/conformance/parallel]"
-            "[sig-network] Networking Granular Checks: Services should function for client IP based session affinity: http [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:Network/OVNKubernetes]"
-            "[sig-network] Networking Granular Checks: Services should function for client IP based session affinity: udp [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:Network/OVNKubernetes]"
-            "[sig-network] Networking Granular Checks: Services should function for endpoint-Service: http [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:Network/OVNKubernetes]"
-            "[sig-network] Networking Granular Checks: Services should function for endpoint-Service: udp [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:Network/OVNKubernetes]"
-            "[sig-network] Networking Granular Checks: Services should function for node-Service: http [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking Granular Checks: Services should function for node-Service: udp [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking Granular Checks: Services should function for pod-Service: http [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking Granular Checks: Services should function for pod-Service: udp [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking Granular Checks: Services should update endpoints: http [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking Granular Checks: Services should update endpoints: udp [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking should provide Internet connection for containers [Feature:Networking-IPv4] [Suite:openshift/conformance/parallel] [Suite:k8s] [Skipped:azure]"
-            "[Feature:DeploymentConfig] deploymentconfigs with minimum ready seconds set [Conformance] should not transition the deployment to Complete before satisfied [Suite:openshift/conformance/parallel/minimal]"
-            "[k8s.io] Pods should support pod readiness gates [NodeFeature:PodReadinessGate] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-          EOEXCLUDE
-          export PATH=/usr/libexec/origin:$PATH
-          openshift-tests run openshift/conformance/parallel --dry-run | ./invert_excluded.py excluded_tests > test-suite.txt
-          TEST_SUITE="--file=test-suite.txt" run-tests
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/apici
-        name: apici-ci-operator-credentials
-        readOnly: true
-      - mountPath: /usr/local/e2e-remote-libvirt-cluster-profile
-        name: cluster-profile
-      - mountPath: /usr/local/e2e-remote-libvirt
-        name: job-definition
-        subPath: cluster-launch-installer-remote-libvirt-e2e.yaml
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-    serviceAccountName: ci-operator
-    volumes:
-    - name: apici-ci-operator-credentials
-      secret:
-        items:
-        - key: sa.ci-operator.apici.config
-          path: kubeconfig
-        secretName: apici-ci-operator-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-metal
-    - configMap:
-        name: prow-job-cluster-launch-installer-remote-libvirt-e2e
-      name: job-definition
-    - name: pull-secret
-      secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -6852,7 +6092,6 @@ periodics:
     workdir: true
   interval: 16h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.3"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-e2e-aws-scaleup-rhel7-4.3
@@ -6865,7 +6104,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-scaleup-rhel7-cluster-profile
       - --target=e2e-aws-scaleup-rhel7
       - --template=/usr/local/e2e-aws-scaleup-rhel7
@@ -6934,7 +6172,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: sentry-dsn
       secret:
         secretName: sentry-dsn
@@ -6945,7 +6183,6 @@ periodics:
     skip_cloning: true
   interval: 48h
   labels:
-    ci.openshift.io/release-type: informing
     job-env: openstack
     job-release: "4.3"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -6961,7 +6198,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-openstack-serial-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-openstack-serial
@@ -7049,7 +6285,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -7058,7 +6294,6 @@ periodics:
   decorate: true
   interval: 16h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.3"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-installer-e2e-aws-mirrors-4.3
@@ -7073,7 +6308,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws
@@ -7159,7 +6393,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -7168,7 +6402,6 @@ periodics:
   decorate: true
   interval: 48h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.3"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-origin-installer-e2e-aws-calico-4.3
@@ -7183,7 +6416,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-calico-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws
@@ -7267,7 +6499,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials

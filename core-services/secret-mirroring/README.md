@@ -34,10 +34,4 @@ secrets:
   to:
     namespace: ci
     name: my-secret
-- from:
-    namespace: my-kerbID-secrets
-    name: my-secret
-  to:
-    namespace: ci-stg
-    name: my-secret
 ```

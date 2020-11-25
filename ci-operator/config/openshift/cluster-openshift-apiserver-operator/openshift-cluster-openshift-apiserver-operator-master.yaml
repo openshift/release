@@ -1,16 +1,20 @@
 base_images:
   base:
-    name: "4.6"
+    name: "4.7"
     namespace: ocp
     tag: base
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.7
   ocp_builder_rhel-8-golang-openshift-4.6:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-openshift-4.6
-  openshift_release_golang-1.13:
-    name: release
-    namespace: openshift
-    tag: golang-1.13
   openshift_release_golang-1.14:
     name: release
     namespace: openshift
@@ -24,12 +28,12 @@ build_root:
 images:
 - from: base
   inputs:
-    ocp_builder_rhel-8-golang-openshift-4.6:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-openshift-4.6
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
   to: cluster-openshift-apiserver-operator
 promotion:
-  name: "4.6"
+  name: "4.7"
   namespace: ocp
 resources:
   '*':
@@ -37,7 +41,7 @@ resources:
       cpu: "3"
       memory: 3Gi
 tag_specification:
-  name: "4.6"
+  name: "4.7"
   namespace: ocp
 test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
 tests:
@@ -59,30 +63,53 @@ tests:
     workflow: openshift-e2e-aws
 - artifact_dir: /tmp/artifacts
   as: e2e-aws-operator
-  commands: |
-    mkdir -p /tmp/artifacts
-    make test-e2e JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
-- as: e2e-aws-upgrade
-  commands: TEST_SUITE=all run-upgrade-tests
-  openshift_installer:
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        mkdir -p /tmp/artifacts
+        make test-e2e JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-upgrade
+  steps:
     cluster_profile: aws
-    upgrade: true
+    workflow: openshift-upgrade-aws-loki
 - artifact_dir: /tmp/artifacts
   as: e2e-aws-operator-encryption
-  commands: |
-    mkdir -p /tmp/artifacts
-    make test-e2e-encryption JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        mkdir -p /tmp/artifacts
+        make test-e2e-encryption JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - artifact_dir: /tmp/artifacts
   as: e2e-aws-operator-encryption-perf
-  commands: |
-    mkdir -p /tmp/artifacts
-    make test-e2e-encryption-perf JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        mkdir -p /tmp/artifacts
+        make test-e2e-encryption-perf JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: openshift

@@ -106,7 +106,7 @@ class GenDoc():
         if self.sort_only:
             return
         if not self.resources:
-            raise IOError('No resources added to document')
+            raise IOError(f"No resources added to document {str(self.filename_or_stream)}")
 
         for i, res in enumerate(self.resources):
             if i > 0:

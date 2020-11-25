@@ -42,6 +42,18 @@ items:
     name: flexy-containerized-ci
     namespace: qe
 
+- kind: ServiceAccount
+  apiVersion: v1
+  metadata:
+    name: integration-qe
+    namespace: qe
+
+- kind: ServiceAccount
+  apiVersion: v1
+  metadata:
+    name: cnf-qe-sa
+    namespace: cnf-qe
+
 - kind: Group
   apiVersion: v1
   metadata:
@@ -117,6 +129,20 @@ items:
   - jlebon
   - peterbaouoft
   - smarterclayton
+- kind: Group
+  apiVersion: v1
+  metadata:
+    name: rhcos-admins
+  users:
+  - ashcrow
+  - bh7cw
+  - cgwalters
+  - dustymabe
+  - darkmuggle
+  - jlebon
+  - miabbott
+  - mike-nguyen
+  - ravanelli
 - kind: Group
   apiVersion: v1
   metadata:
@@ -229,7 +255,6 @@ items:
     kind: ClusterRole
     apiGroup: rbac.authorization.k8s.io
     name: system:image-puller
-
 - kind: RoleBinding
   apiVersion: rbac.authorization.k8s.io/v1beta1
   metadata:
@@ -774,6 +799,31 @@ items:
 - kind: Namespace
   apiVersion: v1
   metadata:
+    name: cnf-qe
+- kind: Group
+  apiVersion: v1
+  metadata:
+    name: cnf-qe-team
+  users:
+  - Avielyo10
+  - ayosef
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: admin
+    namespace: cnf-qe
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: cnf-qe-team
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: admin
+
+- kind: Namespace
+  apiVersion: v1
+  metadata:
     name: open-cluster-management
     annotations:
       purpose: "RedHat Advanced Cluster Management Build Artifacts"
@@ -844,3 +894,55 @@ items:
     kind: ClusterRole
     apiGroup: rbac.authorization.k8s.io
     name: system:image-puller
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: rhcos-buildconfig-dev
+    namespace: rhcos-devel
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:rhcos-admins
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: system:build-strategy-custom
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: rhcos-devel-buildconfig-dev
+    namespace: rhcos-devel
+  subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: system:rhcos-admins
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: system:build-strategy-custom
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: rhcos-admins
+    namespace: rhcos
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: admin
+  subjects:
+    - apiGroup: rbac.authorization.k8s.io
+      kind: Group
+      name: rhcos-admins
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: rhcos-devel-admins
+    namespace: rhcos-devel
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: admin
+  subjects:
+    - apiGroup: rbac.authorization.k8s.io
+      kind: Group
+      name: rhcos-admins

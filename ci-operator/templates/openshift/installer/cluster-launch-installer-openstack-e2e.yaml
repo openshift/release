@@ -346,7 +346,7 @@ objects:
         }]}
         EOF
 
-        export HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "shiftstack.devcluster.openshift.com" | python -c 'import json,sys;print json.load(sys.stdin)["HostedZones"][0]["Id"].split("/")[-1]')
+        export HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "shiftstack.devcluster.openshift.com" | python -c 'import json,sys;print(json.load(sys.stdin)["HostedZones"][0]["Id"].split("/")[-1])')
         aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch file://${ARTIFACT_DIR}/installer/api-record.json
 
         cat > ${ARTIFACT_DIR}/installer/install-config.yaml << EOF
@@ -494,18 +494,12 @@ objects:
           for server in $(openstack server list -c Name -f value | grep $CLUSTER_NAME | sort); do
               echo -e "\n$ openstack server show $server" >>${ARTIFACT_DIR}/openstack_nodes.log
               openstack server show $server >>${ARTIFACT_DIR}/openstack_nodes.log
+              if [[ "$server" == *"bootstrap"* ]]; then
+                openstack console log show $server &>${ARTIFACT_DIR}/bootstrap/nova.log
+              else
+                openstack console log show $server &>${ARTIFACT_DIR}/nodes/console_${server}.log
+              fi
           done
-
-          # Get bootstrap nova logs
-          # NOTE(shadower): The server names are in the form
-          # `$CLUSTER_NAME-fmszv-bootstrap`. I could not find how to
-          # get the middle part (`fmszv`) (it's not in the shell
-          # environment here) so we'll list all the servers and look
-          # the bootstrap name up that way.
-          local BOOTSTRAP_NAME=$(openstack server list --format value --column Name | grep "${CLUSTER_NAME}-.*-bootstrap")
-          if [ -n "$BOOTSTRAP_NAME" ]; then
-              openstack console log show "$BOOTSTRAP_NAME" &>${ARTIFACT_DIR}/bootstrap/nova.log
-          fi
 
           oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o jsonpath --template '{range .items[*]}{.metadata.name}{"\n"}{end}' > /tmp/nodes
           oc --insecure-skip-tls-verify --request-timeout=5s get pods --all-namespaces --template '{{ range .items }}{{ $name := .metadata.name }}{{ $ns := .metadata.namespace }}{{ range .spec.containers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ range .spec.initContainers }}-n {{ $ns }} {{ $name }} -c {{ .name }}{{ "\n" }}{{ end }}{{ end }}' > /tmp/containers
@@ -545,7 +539,6 @@ objects:
           # gather nodes first in parallel since they may contain the most relevant debugging info
           while IFS= read -r i; do
             mkdir -p ${ARTIFACT_DIR}/nodes/$i
-            queue ${ARTIFACT_DIR}/nodes/$i/nova.log openstack console log show $i
             queue ${ARTIFACT_DIR}/nodes/$i/heap oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/debug/pprof/heap
             FILTER=gzip queue ${ARTIFACT_DIR}/nodes/$i/journal.gz oc --insecure-skip-tls-verify adm node-logs $i --unify=false
           done < /tmp/nodes
@@ -580,18 +573,24 @@ objects:
           mkdir -p ${ARTIFACT_DIR}/must-gather
           queue ${ARTIFACT_DIR}/must-gather/must-gather.log oc --insecure-skip-tls-verify adm must-gather --dest-dir ${ARTIFACT_DIR}/must-gather
 
+          echo "Gathering audit logs..."
+          mkdir -p ${ARTIFACT_DIR}/audit-logs
+          queue ${ARTIFACT_DIR}/audit-logs/must-gather.log oc --insecure-skip-tls-verify adm must-gather --dest-dir ${ARTIFACT_DIR}/audit-logs -- /usr/bin/gather_audit_logs
+
           echo "Waiting for logs ..."
           wait
 
           # This is a temporary conversion of cluster operator status to JSON matching the upgrade - may be moved to code in the future
           mkdir -p ${ARTIFACT_DIR}/junit
-          <${ARTIFACT_DIR}/clusteroperators.json jq -r 'def one(condition; t): t as $t | first([.[] | select(condition)] | map(.type=t)[]) // null; def msg: "Operator \(.type) (\(.reason)): \(.message)"; def xmlfailure: if .failure then "<failure message=\"\(.failure | @html)\">\(.failure | @html)</failure>" else "" end; def xmltest: "<testcase name=\"\(.name | @html)\">\( xmlfailure )</testcase>"; def withconditions: map({name: "operator install \(.metadata.name)"} + (.status.conditions | (one(.type=="Available" and .status!="True"; "unavailable") // one(.type=="Degraded" and .status=="True"; "degraded") // one(.type=="Progressing" and .status=="True"; "progressing") // null) | if . then {failure: .|msg} else null end)); .items | withconditions | "<testsuite name=\"Operator results\" tests=\"\( length )\" failures=\"\( [.[] | select(.failure)] | length )\">\n\( [.[] | xmltest] | join("\n"))\n</testsuite>"' > ${ARTIFACT_DIR}/junit/junit_install_status.xml
+          <${ARTIFACT_DIR}/clusteroperators.json jq -r 'def one(condition; t): t as $t | first([.[] | select(condition)] | map(.type=t)[]) // null; def msg: "Operator \(.type) (\(.reason)): \(.message)"; def xmlfailure: if .failure then "<failure message=\"\(.failure | @html)\">\(.failure | @html)</failure>" else "" end; def xmltest: "<testcase name=\"\(.name | @html)\">\( xmlfailure )</testcase>"; def withconditions: map({name: "operator conditions \(.metadata.name)"} + (.status.conditions | (one(.type=="Available" and .status!="True"; "unavailable") // one(.type=="Degraded" and .status=="True"; "degraded") // one(.type=="Progressing" and .status=="True"; "progressing") // null) | if . then {failure: .|msg} else null end)); .items | withconditions | "<testsuite name=\"Operator results\" tests=\"\( length )\" failures=\"\( [.[] | select(.failure)] | length )\">\n\( [.[] | xmltest] | join("\n"))\n</testsuite>"' > ${ARTIFACT_DIR}/junit/junit_install_status.xml
 
-          tar -czC ${ARTIFACT_DIR}/must-gather -f ${ARTIFACT_DIR}/must-gather.tar.gz . &&
-          rm -rf ${ARTIFACT_DIR}/must-gather
+          for artifact in must-gather audit-logs ; do
+            tar -czC ${ARTIFACT_DIR}/${artifact} -f ${ARTIFACT_DIR}/${artifact}.tar.gz . &&
+            rm -rf ${ARTIFACT_DIR}/${artifact}
+          done
 
           echo "Removing entries from DNS ..."
-          export HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "shiftstack.devcluster.openshift.com" | python -c 'import json,sys;print json.load(sys.stdin)["HostedZones"][0]["Id"].split("/")[-1]')
+          export HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "shiftstack.devcluster.openshift.com" | python -c 'import json,sys;print(json.load(sys.stdin)["HostedZones"][0]["Id"].split("/")[-1])')
           sed -e's/UPSERT/DELETE/g' ${ARTIFACT_DIR}/installer/api-record.json > ${ARTIFACT_DIR}/installer/delete-api-record.json
           aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch file://${ARTIFACT_DIR}/installer/delete-api-record.json
           sed -e's/UPSERT/DELETE/g' ${ARTIFACT_DIR}/installer/ingress-record.json > ${ARTIFACT_DIR}/installer/delete-ingress-record.json

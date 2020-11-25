@@ -41,7 +41,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -50,7 +50,7 @@ presubmits:
     always_run: false
     branches:
     - master
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/performance-e2e-aws
     decorate: true
     decoration_config:
@@ -71,16 +71,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/performance-e2e-aws-cluster-profile
         - --target=performance-e2e-aws
-        - --template=/usr/local/performance-e2e-aws
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: performance-e2e-aws
-        - name: TEST_COMMAND
-          value: cd features && source hack/test_env.sh && export FEATURES="mcp performance" && make deploy && make functests
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -93,9 +85,6 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/performance-e2e-aws-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/performance-e2e-aws
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -115,12 +104,9 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -129,7 +115,7 @@ presubmits:
     always_run: false
     branches:
     - master
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/sctp-e2e-aws
     decorate: true
     decoration_config:
@@ -150,16 +136,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/sctp-e2e-aws-cluster-profile
         - --target=sctp-e2e-aws
-        - --template=/usr/local/sctp-e2e-aws
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: sctp-e2e-aws
-        - name: TEST_COMMAND
-          value: cd features && export FEATURES=sctp && make deploy && make functests
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -172,9 +150,6 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/sctp-e2e-aws-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/sctp-e2e-aws
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -194,12 +169,9 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator

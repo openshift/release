@@ -4,7 +4,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/e2e-aws
     decorate: true
     decoration_config:
@@ -58,7 +58,7 @@ presubmits:
               name: cluster-secrets-aws
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -67,7 +67,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/e2e-aws-upgrade
     decorate: true
     decoration_config:
@@ -121,16 +121,81 @@ presubmits:
               name: cluster-secrets-aws
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-upgrade,?($|\s.*)
   - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: build02
+    context: ci/prow/e2e-gcp
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-storage-operator-master-e2e-gcp
+    rerun_command: /test e2e-gcp
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-password-file=/etc/boskos/password
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --secret-dir=/usr/local/e2e-gcp-cluster-profile
+        - --target=e2e-gcp
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-gcp-cluster-profile
+          name: cluster-profile
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-gcp,?($|\s.*)
+  - agent: kubernetes
     always_run: false
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/e2e-openstack
     decorate: true
     decoration_config:
@@ -149,7 +214,6 @@ presubmits:
         - --kubeconfig=/etc/apici/kubeconfig
         - --lease-server-password-file=/etc/boskos/password
         - --lease-server-username=ci
-        - --lease-server=https://boskos-ci.svc.ci.openshift.org
         - --repo=cluster-storage-operator
         - --secret-dir=/usr/local/e2e-openstack-cluster-profile
         - --target=e2e-openstack
@@ -208,13 +272,13 @@ presubmits:
         name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
     trigger: (?m)^/test( | .* )e2e-openstack,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/e2e-ovirt
     decorate: true
     decoration_config:
@@ -232,6 +296,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/-storage-opekubeconfig
         - --repo=cluster-storage-operator
+        - --secret-dir=/etc/boskos
         - --secret-dir=/usr/local/e2e-ovirt-cluster-profile
         - --target=e2e-ovirt
         - --template=/usr/local/e2e-ovirt
@@ -256,6 +321,9 @@ presubmits:
         - mountPath: /etc/apici
           name: apici-ci-operator-credentials
           readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /usr/local/e2e-ovirt-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/e2e-ovirt
@@ -272,6 +340,12 @@ presubmits:
           - key: sa.ci-operator.apici.config
             path: kubeconfig
           secretName: apici-ci-operator-credentials
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -286,13 +360,13 @@ presubmits:
         name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
     trigger: (?m)^/test( | .* )e2e-ovirt,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - master
-    cluster: build01
+    cluster: build02
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -329,7 +403,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -338,7 +412,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build01
+    cluster: build02
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -374,7 +448,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -383,7 +457,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build01
+    cluster: build02
     context: ci/prow/verify
     decorate: true
     decoration_config:
@@ -419,7 +493,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator

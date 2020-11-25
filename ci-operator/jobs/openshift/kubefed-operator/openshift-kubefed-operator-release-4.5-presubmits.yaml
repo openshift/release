@@ -41,7 +41,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -50,7 +50,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.5
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/olm-e2e
     decorate: true
     decoration_config:
@@ -69,17 +69,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/olm-e2e-cluster-profile
         - --target=olm-e2e
-        - --template=/usr/local/olm-e2e
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: olm-e2e
-        - name: TEST_COMMAND
-          value: |
-            make -f Makefile.ci olm-e2e
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -92,9 +83,6 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/olm-e2e-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/olm-e2e
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -114,12 +102,9 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -164,7 +149,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -209,7 +194,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator

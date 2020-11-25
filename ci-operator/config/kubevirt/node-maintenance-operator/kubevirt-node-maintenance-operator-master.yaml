@@ -35,7 +35,7 @@ promotion:
   excluded_images:
   - node-maintenance-operator-index-base
   - node-maintenance-operator-index-intermediate
-  name: "4.6"
+  name: "4.7"
   namespace: kubevirt
 resources:
   '*':
@@ -43,13 +43,21 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: "4.6"
+  name: "4.7"
   namespace: ocp
 tests:
 - as: openshift-e2e
-  commands: make cluster-sync-deploy cluster-functest
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make cluster-sync-deploy cluster-functest
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: kubevirt

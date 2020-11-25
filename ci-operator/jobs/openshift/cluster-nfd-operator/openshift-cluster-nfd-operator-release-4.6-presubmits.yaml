@@ -4,7 +4,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.6
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/e2e-aws
     decorate: true
     decoration_config:
@@ -58,7 +58,7 @@ presubmits:
               name: cluster-secrets-aws
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -67,16 +67,16 @@ presubmits:
     always_run: true
     branches:
     - release-4.6
-    cluster: api.ci
-    context: ci/prow/e2e-aws-upgrade
+    cluster: build02
+    context: ci/prow/e2e-upgrade
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cluster-nfd-operator-release-4.6-e2e-aws-upgrade
-    rerun_command: /test e2e-aws-upgrade
+    name: pull-ci-openshift-cluster-nfd-operator-release-4.6-e2e-upgrade
+    rerun_command: /test e2e-upgrade
     spec:
       containers:
       - args:
@@ -84,8 +84,8 @@ presubmits:
         - --lease-server-password-file=/etc/boskos/password
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/usr/local/e2e-aws-upgrade-cluster-profile
-        - --target=e2e-aws-upgrade
+        - --secret-dir=/usr/local/e2e-upgrade-cluster-profile
+        - --target=e2e-upgrade
         command:
         - ci-operator
         image: ci-operator:latest
@@ -98,7 +98,7 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
+        - mountPath: /usr/local/e2e-upgrade-cluster-profile
           name: cluster-profile
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -121,16 +121,16 @@ presubmits:
               name: cluster-secrets-aws
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-upgrade,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-upgrade,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - release-4.6
-    cluster: build01
+    cluster: build02
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -147,6 +147,7 @@ presubmits:
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --target=[images]
+        - --target=[release:latest]
         command:
         - ci-operator
         image: ci-operator:latest
@@ -166,7 +167,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -175,7 +176,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.6
-    cluster: build01
+    cluster: build02
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -211,7 +212,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -220,7 +221,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.6
-    cluster: build01
+    cluster: build02
     context: ci/prow/verify
     decorate: true
     decoration_config:
@@ -256,7 +257,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator

@@ -3,6 +3,14 @@ base_images:
     name: 4.7-priv
     namespace: ocp-private
     tag: base
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.7
   ocp_builder_rhel-8-golang-openshift-4.6:
     name: builder
     namespace: ocp
@@ -25,11 +33,12 @@ images:
 - dockerfile_path: Dockerfile.ocp
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-openshift-4.6:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-openshift-4.6
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
   to: prometheus-alertmanager
 promotion:
+  disabled: true
   name: 4.7-priv
   namespace: ocp-private
 resources:
@@ -41,6 +50,10 @@ tag_specification:
   name: 4.7-priv
   namespace: ocp-private
 tests:
+- as: vendor
+  commands: make unused && git diff --exit-code
+  container:
+    from: src
 - as: e2e-aws
   steps:
     cluster_profile: aws

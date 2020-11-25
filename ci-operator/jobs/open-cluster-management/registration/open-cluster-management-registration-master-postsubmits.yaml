@@ -3,7 +3,7 @@ postsubmits:
   - agent: kubernetes
     branches:
     - ^master$
-    cluster: api.ci
+    cluster: build02
     decorate: true
     extra_refs:
     - base_ref: master
@@ -14,8 +14,9 @@ postsubmits:
       containers:
       - args:
         - --config-dir=../../openshift/release/ci-operator/config/open-cluster-management/registration/
-        - --current-release=master
-        - --future-release=2.1
+        - --current-release=2.2
+        - --current-promotion-namespace=open-cluster-management
+        - --future-release=2.2
         - --fast-forward
         - --confirm
         - --username=acm-cicd
@@ -40,7 +41,7 @@ postsubmits:
   - agent: kubernetes
     branches:
     - ^master$
-    cluster: api.ci
+    cluster: build02
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -53,6 +54,7 @@ postsubmits:
       containers:
       - args:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --promote
         - --report-password-file=/etc/report/password.txt
@@ -73,6 +75,9 @@ postsubmits:
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
+        - mountPath: /etc/push-secret
+          name: push-secret
+          readOnly: true
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
@@ -83,7 +88,10 @@ postsubmits:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
+      - name: push-secret
+        secret:
+          secretName: registry-push-credentials-ci-central
       - name: result-aggregator
         secret:
           secretName: result-aggregator

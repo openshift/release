@@ -1,0 +1,63 @@
+base_images:
+  base:
+    name: 4.8-priv
+    namespace: ocp-private
+    tag: base
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.7
+  ocp_builder_rhel-8-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+canonical_go_repository: github.com/openshift/network-metrics-daemon
+images:
+- dockerfile_path: Dockerfile.openshift
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
+  to: network-metrics-daemon
+promotion:
+  name: 4.8-priv
+  namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: 4.8-priv
+  namespace: ocp-private
+tests:
+- as: unit
+  commands: make unittests
+  container:
+    from: src
+- as: e2e
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: make run-test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+zz_generated_metadata:
+  branch: release-4.8
+  org: openshift-priv
+  repo: network-metrics-daemon

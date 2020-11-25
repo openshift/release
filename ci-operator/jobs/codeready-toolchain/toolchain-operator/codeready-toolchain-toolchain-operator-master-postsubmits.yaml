@@ -3,7 +3,7 @@ postsubmits:
   - agent: kubernetes
     branches:
     - ^master$
-    cluster: api.ci
+    cluster: build02
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -45,14 +45,14 @@ postsubmits:
           secretName: apici-ci-operator-credentials
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
   - agent: kubernetes
     branches:
     - ^master$
-    cluster: api.ci
+    cluster: build02
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -96,14 +96,14 @@ postsubmits:
           secretName: apici-ci-operator-credentials
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn
   - agent: kubernetes
     branches:
     - ^master$
-    cluster: api.ci
+    cluster: build02
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -116,6 +116,7 @@ postsubmits:
       containers:
       - args:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
         - --promote
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
@@ -132,6 +133,9 @@ postsubmits:
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
+        - mountPath: /etc/push-secret
+          name: push-secret
+          readOnly: true
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
@@ -139,14 +143,17 @@ postsubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
+      - name: push-secret
+        secret:
+          secretName: registry-push-credentials-ci-central
       - name: result-aggregator
         secret:
           secretName: result-aggregator
   - agent: kubernetes
     branches:
     - ^master$
-    cluster: api.ci
+    cluster: build02
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -188,7 +195,7 @@ postsubmits:
           secretName: apici-ci-operator-credentials
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: sentry-dsn
         secret:
           secretName: sentry-dsn

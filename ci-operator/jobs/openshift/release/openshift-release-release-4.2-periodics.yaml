@@ -4,7 +4,6 @@ periodics:
   decorate: true
   interval: 2h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.2"
   name: promote-release-openshift-machine-os-content-e2e-aws-4.2
   spec:
@@ -14,7 +13,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/pull-secret
       - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-cluster-profile
       - --template=/usr/local/e2e-$(CLUSTER_TYPE)
@@ -52,12 +50,6 @@ periodics:
 
         # verify the tests pass
         ci-operator $@
-
-        # also tag the image into the art-latest stream
-        oc tag "${to_quay}" "ocp/${BRANCH}-art-latest:${TAG}"
-
-        # also tag the image into the private art-latest stream
-        oc tag "${to_quay}" "ocp-priv/${BRANCH}-art-latest-priv:${TAG}"
 
         # also tag the image into the ocp private stream
         oc tag "${to_quay}" "ocp-private/${BRANCH}-priv:${TAG}"
@@ -159,7 +151,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -168,7 +160,6 @@ periodics:
   decorate: true
   interval: 8h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.2"
   name: promote-release-openshift-machine-os-content-e2e-aws-4.2-s390x
   spec:
@@ -203,12 +194,6 @@ periodics:
         fi
 
         # TODO: Enable e2e testing when arch specific CI is available
-
-        # Tag the image into the art-latest stream for the arch
-        oc tag "${to_quay}" "ocp-${ARCH}/${BRANCH}-art-latest-${ARCH}:${TAG}"
-
-        # Tag the image into the private art-latest stream for the arch
-        oc tag "${to_quay}" "ocp-${ARCH}-priv/${BRANCH}-art-latest-${ARCH}-priv:${TAG}"
       env:
       - name: TAG_NS
         value: rhcos
@@ -308,7 +293,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -317,7 +302,6 @@ periodics:
   cron: 0 0,12 * * *
   decorate: true
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.2"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-origin-installer-old-rhcos-e2e-aws-4.2
@@ -328,7 +312,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/pull-secret
       - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
@@ -436,7 +419,7 @@ periodics:
             name: cluster-secrets-aws
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -445,7 +428,6 @@ periodics:
   decorate: true
   interval: 12h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.2"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-origin-installer-e2e-aws-sdn-multitenant-4.2
@@ -460,7 +442,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-sdn-multitenant-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws
@@ -553,7 +534,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -562,7 +543,6 @@ periodics:
   decorate: true
   interval: 12h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.2"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-installer-e2e-azure-4.2
@@ -577,7 +557,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-azure-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-azure
@@ -663,7 +642,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -672,7 +651,6 @@ periodics:
   cron: '@yearly'
   decorate: true
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.2"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-installer-e2e-azure-fips-4.2
@@ -687,7 +665,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-azure-fips-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-azure-fips
@@ -775,7 +752,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -784,7 +761,6 @@ periodics:
   cron: '@yearly'
   decorate: true
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.2"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-installer-e2e-aws-fips-4.2
@@ -799,7 +775,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-fips-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws-fips
@@ -887,7 +862,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -896,7 +871,6 @@ periodics:
   decorate: true
   interval: 12h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.2"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-installer-e2e-aws-proxy-4.2
@@ -911,7 +885,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-proxy-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws-proxy
@@ -999,7 +972,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -1008,7 +981,6 @@ periodics:
   decorate: true
   interval: 12h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.2"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-installer-e2e-metal-4.2
@@ -1102,7 +1074,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -1111,7 +1083,6 @@ periodics:
   decorate: true
   interval: 12h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.2"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-installer-e2e-metal-serial-4.2
@@ -1205,7 +1176,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -1214,7 +1185,6 @@ periodics:
   decorate: true
   interval: 12h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.2"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-installer-e2e-azure-serial-4.2
@@ -1229,7 +1199,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-azure-serial-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-azure-serial
@@ -1315,7 +1284,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -1324,7 +1293,6 @@ periodics:
   decorate: true
   interval: 12h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.2"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-origin-installer-e2e-gcp-4.2
@@ -1339,7 +1307,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-gcp-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-gcp
@@ -1427,7 +1394,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -1436,7 +1403,6 @@ periodics:
   decorate: true
   interval: 12h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.2"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-installer-e2e-gcp-4.2
@@ -1451,7 +1417,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-gcp-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-gcp
@@ -1539,7 +1504,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -1548,7 +1513,6 @@ periodics:
   cron: '@yearly'
   decorate: true
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.2"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-installer-e2e-gcp-fips-4.2
@@ -1563,7 +1527,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-gcp-fips-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-gcp-fips
@@ -1653,7 +1616,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -1662,7 +1625,6 @@ periodics:
   cron: '@yearly'
   decorate: true
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.2"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-installer-e2e-azure-fips-serial-4.2
@@ -1677,7 +1639,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-azure-fips-serial-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-azure-fips-serial
@@ -1765,7 +1726,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -1774,7 +1735,6 @@ periodics:
   cron: '@yearly'
   decorate: true
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.2"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-installer-e2e-aws-fips-serial-4.2
@@ -1789,7 +1749,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-fips-serial-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws-fips-serial
@@ -1877,7 +1836,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -1886,7 +1845,6 @@ periodics:
   decorate: true
   interval: 12h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.2"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-origin-installer-e2e-gcp-serial-4.2
@@ -1901,7 +1859,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-gcp-serial-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-gcp-serial
@@ -1989,7 +1946,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -1998,7 +1955,6 @@ periodics:
   decorate: true
   interval: 12h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.2"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-installer-e2e-gcp-serial-4.2
@@ -2013,7 +1969,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-gcp-serial-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-gcp-serial
@@ -2101,7 +2056,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -2110,7 +2065,6 @@ periodics:
   cron: '@yearly'
   decorate: true
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.2"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-installer-e2e-gcp-fips-serial-4.2
@@ -2125,7 +2079,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-gcp-fips-serial-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-gcp-fips-serial
@@ -2215,7 +2168,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -2224,7 +2177,6 @@ periodics:
   decorate: true
   interval: 12h
   labels:
-    ci.openshift.io/release-type: informing
     job-env: aws
     job-release: "4.2"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -2240,7 +2192,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws
@@ -2335,7 +2286,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -2344,7 +2295,6 @@ periodics:
   decorate: true
   interval: 12h
   labels:
-    ci.openshift.io/release-type: informing
     job-env: aws
     job-release: "4.2"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -2360,7 +2310,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-serial-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws-serial
@@ -2455,7 +2404,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -2464,7 +2413,6 @@ periodics:
   decorate: true
   interval: 24h
   labels:
-    ci.openshift.io/release-type: informing
     job-env: aws
     job-release: "4.2"
     release.openshift.io/verify: "true"
@@ -2476,7 +2424,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/pull-secret
       - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
@@ -2500,10 +2447,10 @@ periodics:
           exit 1
         fi
 
-        from=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${initial}" )
-        to=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${latest}" )
-        export RELEASE_IMAGE_INITIAL=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${initial}" )
-        export RELEASE_IMAGE_LATEST=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${latest}" )
+        from=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${initial}" )
+        to=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${latest}" )
+        export RELEASE_IMAGE_INITIAL=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${initial}" )
+        export RELEASE_IMAGE_LATEST=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${latest}" )
 
         # prow doesn't allow init containers or a second container
         export PATH=$PATH:/tmp/bin
@@ -2592,7 +2539,7 @@ periodics:
             name: cluster-secrets-aws
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -2607,7 +2554,6 @@ periodics:
   decorate: true
   interval: 12h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.2"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-installer-console-aws-4.2
@@ -2622,7 +2568,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-console-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws-console
@@ -2651,7 +2596,8 @@ periodics:
           tests:
           - as: e2e-$(CLUSTER_TYPE)-console
             commands: ./test-prow-e2e.sh release
-            openshift_installer_console:
+            openshift_installer_custom_test_image:
+              from: stable:console-tests
               cluster_profile: "$(CLUSTER_TYPE)"
       - name: JOB_NAME_SAFE
         value: e2e-aws-console
@@ -2706,7 +2652,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -2715,7 +2661,6 @@ periodics:
   decorate: true
   interval: 12h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.2"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-installer-e2e-aws-4.2
@@ -2730,7 +2675,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws
@@ -2825,7 +2769,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -2834,7 +2778,6 @@ periodics:
   decorate: true
   interval: 12h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.2"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-installer-e2e-aws-serial-4.2
@@ -2849,7 +2792,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-serial-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws-serial
@@ -2944,7 +2886,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -2953,227 +2895,6 @@ periodics:
   decorate: true
   interval: 12h
   labels:
-    ci.openshift.io/release-type: informing
-    job-release: "4.2"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: release-openshift-ocp-installer-e2e-vsphere-upi-4.2
-  spec:
-    containers:
-    - args:
-      - --artifact-dir=$(ARTIFACTS)
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
-      - --secret-dir=/usr/local/e2e-vsphere-upi-cluster-profile
-      - --secret-dir=/usr/local/pull-secret
-      - --target=e2e-vsphere-upi
-      - --template=/usr/local/e2e-vsphere-upi
-      command:
-      - ci-operator
-      env:
-      - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.2
-      - name: BRANCH
-        value: "4.2"
-      - name: CLUSTER_TYPE
-        value: vsphere
-      - name: CONFIG_SPEC
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 4Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
-          tests:
-          - as: e2e-$(CLUSTER_TYPE)
-            commands: TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer_upi:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-$(CLUSTER_TYPE)-serial
-            commands: TEST_SUITE=openshift/conformance/serial run-tests
-            openshift_installer_upi:
-              cluster_profile: "$(CLUSTER_TYPE)"
-      - name: JOB_NAME_SAFE
-        value: e2e-vsphere-upi
-      - name: TEST_COMMAND
-        value: TEST_SUITE=openshift/conformance/parallel run-tests
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/apici
-        name: apici-ci-operator-credentials
-        readOnly: true
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/e2e-vsphere-upi-cluster-profile
-        name: cluster-profile
-      - mountPath: /usr/local/e2e-vsphere-upi
-        name: job-definition
-        subPath: cluster-launch-installer-upi-e2e.yaml
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-    serviceAccountName: ci-operator
-    volumes:
-    - name: apici-ci-operator-credentials
-      secret:
-        items:
-        - key: sa.ci-operator.apici.config
-          path: kubeconfig
-        secretName: apici-ci-operator-credentials
-    - name: boskos
-      secret:
-        items:
-        - key: password
-          path: password
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-vsphere
-    - configMap:
-        name: prow-job-cluster-launch-installer-upi-e2e
-      name: job-definition
-    - name: pull-secret
-      secret:
-        secretName: regcred
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-- agent: kubernetes
-  cluster: api.ci
-  decorate: true
-  interval: 12h
-  labels:
-    ci.openshift.io/release-type: informing
-    job-release: "4.2"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: release-openshift-ocp-installer-e2e-vsphere-upi-serial-4.2
-  spec:
-    containers:
-    - args:
-      - --artifact-dir=$(ARTIFACTS)
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
-      - --secret-dir=/usr/local/e2e-vsphere-upi-serial-cluster-profile
-      - --secret-dir=/usr/local/pull-secret
-      - --target=e2e-vsphere-upi-serial
-      - --template=/usr/local/e2e-vsphere-upi-serial
-      command:
-      - ci-operator
-      env:
-      - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.2
-      - name: BRANCH
-        value: "4.2"
-      - name: CLUSTER_TYPE
-        value: vsphere
-      - name: CONFIG_SPEC
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 4Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
-          tests:
-          - as: e2e-$(CLUSTER_TYPE)
-            commands: TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer_upi:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-$(CLUSTER_TYPE)-serial
-            commands: TEST_SUITE=openshift/conformance/serial run-tests
-            openshift_installer_upi:
-              cluster_profile: "$(CLUSTER_TYPE)"
-      - name: JOB_NAME_SAFE
-        value: e2e-vsphere-upi-serial
-      - name: TEST_COMMAND
-        value: TEST_SUITE=openshift/conformance/serial run-tests
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/apici
-        name: apici-ci-operator-credentials
-        readOnly: true
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/e2e-vsphere-upi-serial-cluster-profile
-        name: cluster-profile
-      - mountPath: /usr/local/e2e-vsphere-upi-serial
-        name: job-definition
-        subPath: cluster-launch-installer-upi-e2e.yaml
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-    serviceAccountName: ci-operator
-    volumes:
-    - name: apici-ci-operator-credentials
-      secret:
-        items:
-        - key: sa.ci-operator.apici.config
-          path: kubeconfig
-        secretName: apici-ci-operator-credentials
-    - name: boskos
-      secret:
-        items:
-        - key: password
-          path: password
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-vsphere
-    - configMap:
-        name: prow-job-cluster-launch-installer-upi-e2e
-      name: job-definition
-    - name: pull-secret
-      secret:
-        secretName: regcred
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-- agent: kubernetes
-  cluster: api.ci
-  decorate: true
-  interval: 12h
-  labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.2"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-installer-e2e-aws-upi-4.2
@@ -3188,7 +2909,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-upi-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws-upi
@@ -3274,7 +2994,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -3283,7 +3003,6 @@ periodics:
   decorate: true
   interval: 4h
   labels:
-    ci.openshift.io/release-type: informing
     job-env: aws
     job-release: "4.2"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -3296,7 +3015,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/pull-secret
       - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
@@ -3320,10 +3038,10 @@ periodics:
           exit 1
         fi
 
-        from=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${initial}" )
-        to=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${latest}" )
-        export RELEASE_IMAGE_INITIAL=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${initial}" )
-        export RELEASE_IMAGE_LATEST=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${latest}" )
+        from=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${initial}" )
+        to=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${latest}" )
+        export RELEASE_IMAGE_INITIAL=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${initial}" )
+        export RELEASE_IMAGE_LATEST=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${latest}" )
 
         # prow doesn't allow init containers or a second container
         export PATH=$PATH:/tmp/bin
@@ -3418,7 +3136,7 @@ periodics:
             name: cluster-secrets-aws
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -3427,7 +3145,6 @@ periodics:
   decorate: true
   interval: 12h
   labels:
-    ci.openshift.io/release-type: informing
     job-env: aws
     job-release: "4.2"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -3439,7 +3156,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/pull-secret
       - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
@@ -3463,10 +3179,10 @@ periodics:
           exit 1
         fi
 
-        from=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${initial}" )
-        to=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${latest}" )
-        export RELEASE_IMAGE_INITIAL=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${initial}" )
-        export RELEASE_IMAGE_LATEST=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${latest}" )
+        from=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${initial}" )
+        to=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${latest}" )
+        export RELEASE_IMAGE_INITIAL=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${initial}" )
+        export RELEASE_IMAGE_LATEST=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${latest}" )
 
         # prow doesn't allow init containers or a second container
         export PATH=$PATH:/tmp/bin
@@ -3543,7 +3259,7 @@ periodics:
             name: cluster-secrets-aws
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -3558,7 +3274,6 @@ periodics:
   decorate: true
   interval: 12h
   labels:
-    ci.openshift.io/release-type: informing
     job-env: aws
     job-release: "4.2"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -3570,7 +3285,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/pull-secret
       - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
@@ -3594,10 +3308,10 @@ periodics:
           exit 1
         fi
 
-        from=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${initial}" )
-        to=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${latest}" )
-        export RELEASE_IMAGE_INITIAL=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${initial}" )
-        export RELEASE_IMAGE_LATEST=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${latest}" )
+        from=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${initial}" )
+        to=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${latest}" )
+        export RELEASE_IMAGE_INITIAL=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${initial}" )
+        export RELEASE_IMAGE_LATEST=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${latest}" )
 
         # prow doesn't allow init containers or a second container
         export PATH=$PATH:/tmp/bin
@@ -3674,7 +3388,7 @@ periodics:
             name: cluster-secrets-aws
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -3704,7 +3418,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-cnv-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws
@@ -3788,7 +3501,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -3797,7 +3510,6 @@ periodics:
   decorate: true
   interval: 12h
   labels:
-    ci.openshift.io/release-type: informing
     job-env: gcp
     job-release: "4.2"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -3809,7 +3521,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/pull-secret
       - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
@@ -3833,10 +3544,10 @@ periodics:
           exit 1
         fi
 
-        from=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${initial}" )
-        to=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${latest}" )
-        export RELEASE_IMAGE_INITIAL=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${initial}" )
-        export RELEASE_IMAGE_LATEST=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${latest}" )
+        from=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${initial}" )
+        to=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${latest}" )
+        export RELEASE_IMAGE_INITIAL=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${initial}" )
+        export RELEASE_IMAGE_LATEST=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${latest}" )
 
         # prow doesn't allow init containers or a second container
         export PATH=$PATH:/tmp/bin
@@ -3913,7 +3624,7 @@ periodics:
             name: cluster-secrets-gcp
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -3928,7 +3639,6 @@ periodics:
   decorate: true
   interval: 12h
   labels:
-    ci.openshift.io/release-type: informing
     job-env: azure
     job-release: "4.2"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -3940,7 +3650,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/pull-secret
       - --secret-dir=/usr/local/e2e-azure-upgrade-cluster-profile
       - --target=e2e-azure-upgrade
@@ -3964,10 +3673,10 @@ periodics:
           exit 1
         fi
 
-        from=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${initial}" )
-        to=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${latest}" )
-        export RELEASE_IMAGE_INITIAL=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${initial}" )
-        export RELEASE_IMAGE_LATEST=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${latest}" )
+        from=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${initial}" )
+        to=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${latest}" )
+        export RELEASE_IMAGE_INITIAL=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${initial}" )
+        export RELEASE_IMAGE_LATEST=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${latest}" )
 
         # prow doesn't allow init containers or a second container
         export PATH=$PATH:/tmp/bin
@@ -4044,7 +3753,7 @@ periodics:
             name: cluster-secrets-azure4
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -4057,124 +3766,12 @@ periodics:
 - agent: kubernetes
   cluster: api.ci
   decorate: true
-  decoration_config:
-    skip_cloning: true
-  interval: 48h
-  labels:
-    ci.openshift.io/release-type: informing
-    job-env: openstack
-    job-release: "4.2"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: release-openshift-ocp-installer-e2e-openstack-4.2
-  spec:
-    containers:
-    - args:
-      - --artifact-dir=$(ARTIFACTS)
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
-      - --secret-dir=/usr/local/e2e-openstack-cluster-profile
-      - --secret-dir=/usr/local/pull-secret
-      - --target=e2e-openstack
-      - --template=/usr/local/e2e-openstack
-      command:
-      - ci-operator
-      env:
-      - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.2
-      - name: BRANCH
-        value: "4.2"
-      - name: CLUSTER_TYPE
-        value: openstack
-      - name: CONFIG_SPEC
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 4Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
-          tests:
-          - as: e2e-$(CLUSTER_TYPE)
-            commands: TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-      - name: JOB_NAME_SAFE
-        value: e2e-openstack
-      - name: KURYR_ENABLED
-        value: "false"
-      - name: TEST_COMMAND
-        value: TEST_SUITE=openshift/conformance/parallel run-tests
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/apici
-        name: apici-ci-operator-credentials
-        readOnly: true
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/e2e-openstack-cluster-profile
-        name: cluster-profile
-      - mountPath: /usr/local/e2e-openstack
-        name: job-definition
-        subPath: cluster-launch-installer-openstack-e2e.yaml
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-    serviceAccountName: ci-operator
-    volumes:
-    - name: apici-ci-operator-credentials
-      secret:
-        items:
-        - key: sa.ci-operator.apici.config
-          path: kubeconfig
-        secretName: apici-ci-operator-credentials
-    - name: boskos
-      secret:
-        items:
-        - key: password
-          path: password
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-openstack
-    - configMap:
-        name: prow-job-cluster-launch-installer-openstack-e2e
-      name: job-definition
-    - name: pull-secret
-      secret:
-        secretName: regcred
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-- agent: kubernetes
-  cluster: api.ci
-  decorate: true
   extra_refs:
   - base_ref: release-4.2
     org: openshift
     repo: openshift-ansible
   interval: 12h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.2"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-e2e-aws-scaleup-rhel7-4.2
@@ -4187,7 +3784,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-scaleup-rhel7-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws-scaleup-rhel7
@@ -4263,7 +3859,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -4273,124 +3869,8 @@ periodics:
 - agent: kubernetes
   cluster: api.ci
   decorate: true
-  decoration_config:
-    skip_cloning: true
-  interval: 48h
-  labels:
-    job-env: openstack
-    job-release: "4.2"
-    job-type: launch
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: release-openshift-ocp-installer-e2e-openstack-serial-4.2
-  spec:
-    containers:
-    - args:
-      - --artifact-dir=$(ARTIFACTS)
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
-      - --secret-dir=/usr/local/e2e-openstack-serial-cluster-profile
-      - --secret-dir=/usr/local/pull-secret
-      - --target=e2e-openstack-serial
-      - --template=/usr/local/e2e-openstack-serial
-      command:
-      - ci-operator
-      env:
-      - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.2
-      - name: BRANCH
-        value: "4.2"
-      - name: CLUSTER_TYPE
-        value: openstack
-      - name: CONFIG_SPEC
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 4Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
-          tests:
-          - as: e2e-$(CLUSTER_TYPE)
-            commands: TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-$(CLUSTER_TYPE)-serial
-            commands: TEST_SUITE=openshift/conformance/serial run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-      - name: JOB_NAME_SAFE
-        value: e2e-openstack-serial
-      - name: KURYR_ENABLED
-        value: "false"
-      - name: TEST_COMMAND
-        value: TEST_SUITE=openshift/conformance/serial run-tests
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/apici
-        name: apici-ci-operator-credentials
-        readOnly: true
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/e2e-openstack-serial-cluster-profile
-        name: cluster-profile
-      - mountPath: /usr/local/e2e-openstack-serial
-        name: job-definition
-        subPath: cluster-launch-installer-openstack-e2e.yaml
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-    serviceAccountName: ci-operator
-    volumes:
-    - name: apici-ci-operator-credentials
-      secret:
-        items:
-        - key: sa.ci-operator.apici.config
-          path: kubeconfig
-        secretName: apici-ci-operator-credentials
-    - name: boskos
-      secret:
-        items:
-        - key: password
-          path: password
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-openstack
-    - configMap:
-        name: prow-job-cluster-launch-installer-openstack-e2e
-      name: job-definition
-    - name: pull-secret
-      secret:
-        secretName: regcred
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-- agent: kubernetes
-  cluster: api.ci
-  decorate: true
   interval: 12h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.2"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-installer-e2e-aws-mirrors-4.2
@@ -4405,7 +3885,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws
@@ -4491,7 +3970,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials

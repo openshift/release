@@ -4,7 +4,6 @@ periodics:
   decorate: true
   interval: 2h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.2"
   name: promote-release-openshift-machine-os-content-e2e-aws-4.1
   spec:
@@ -14,7 +13,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/pull-secret
       - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-cluster-profile
       - --template=/usr/local/e2e-$(CLUSTER_TYPE)
@@ -52,12 +50,6 @@ periodics:
 
         # verify the tests pass
         ci-operator $@
-
-        # also tag the image into the art-latest stream
-        oc tag "${to_quay}" "ocp/${BRANCH}-art-latest:${TAG}"
-
-        # also tag the image into the private art-latest stream
-        oc tag "${to_quay}" "ocp-priv/${BRANCH}-art-latest-priv:${TAG}"
 
         # also tag the image into the ocp private stream
         oc tag "${to_quay}" "ocp-private/${BRANCH}-priv:${TAG}"
@@ -159,7 +151,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -168,7 +160,6 @@ periodics:
   decorate: true
   interval: 24h
   labels:
-    ci.openshift.io/release-type: informing
     job-env: aws
     job-release: "4.1"
   name: release-openshift-origin-installer-e2e-aws-4.1
@@ -183,7 +174,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws
@@ -278,7 +268,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -287,7 +277,6 @@ periodics:
   decorate: true
   interval: 24h
   labels:
-    ci.openshift.io/release-type: informing
     job-env: aws
     job-release: "4.1"
   name: release-openshift-origin-installer-e2e-aws-serial-4.1
@@ -302,7 +291,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-serial-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws-serial
@@ -397,7 +385,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -406,7 +394,6 @@ periodics:
   decorate: true
   interval: 24h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.1"
   name: release-openshift-ocp-installer-e2e-aws-4.1
   spec:
@@ -420,7 +407,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws
@@ -515,7 +501,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -524,7 +510,6 @@ periodics:
   decorate: true
   interval: 24h
   labels:
-    ci.openshift.io/release-type: informing
     job-release: "4.1"
   name: release-openshift-ocp-installer-e2e-aws-serial-4.1
   spec:
@@ -538,7 +523,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/e2e-aws-serial-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws-serial
@@ -633,7 +617,7 @@ periodics:
       name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -642,7 +626,6 @@ periodics:
   decorate: true
   interval: 24h
   labels:
-    ci.openshift.io/release-type: informing
     job-env: aws
     job-release: "4.1"
     release.openshift.io/verify: "true"
@@ -654,7 +637,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/pull-secret
       - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
@@ -678,10 +660,10 @@ periodics:
           exit 1
         fi
 
-        from=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${initial}" )
-        to=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${latest}" )
-        export RELEASE_IMAGE_INITIAL=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${initial}" )
-        export RELEASE_IMAGE_LATEST=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${latest}" )
+        from=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${initial}" )
+        to=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${latest}" )
+        export RELEASE_IMAGE_INITIAL=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${initial}" )
+        export RELEASE_IMAGE_LATEST=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${latest}" )
 
         # prow doesn't allow init containers or a second container
         export PATH=$PATH:/tmp/bin
@@ -770,7 +752,7 @@ periodics:
             name: cluster-secrets-aws
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -785,7 +767,6 @@ periodics:
   decorate: true
   interval: 24h
   labels:
-    ci.openshift.io/release-type: informing
     job-env: aws
     job-release: "4.1"
   name: release-openshift-origin-installer-e2e-aws-upgrade-rollback-4.1
@@ -796,7 +777,6 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --lease-server=https://boskos-ci.svc.ci.openshift.org
       - --secret-dir=/usr/local/pull-secret
       - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
@@ -820,10 +800,10 @@ periodics:
           exit 1
         fi
 
-        from=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${initial}" )
-        to=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["name"]' "${latest}" )
-        export RELEASE_IMAGE_INITIAL=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${initial}" )
-        export RELEASE_IMAGE_LATEST=$( python -c 'import json,sys; print json.load(open(sys.argv[1], "r"))["pullSpec"]' "${latest}" )
+        from=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${initial}" )
+        to=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${latest}" )
+        export RELEASE_IMAGE_INITIAL=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${initial}" )
+        export RELEASE_IMAGE_LATEST=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${latest}" )
 
         # prow doesn't allow init containers or a second container
         export PATH=$PATH:/tmp/bin
@@ -900,7 +880,7 @@ periodics:
             name: cluster-secrets-aws
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials

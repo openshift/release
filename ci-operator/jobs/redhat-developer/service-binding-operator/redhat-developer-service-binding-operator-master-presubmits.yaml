@@ -4,17 +4,17 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: api.ci
-    context: ci/prow/4.5-acceptance
+    cluster: build01
+    context: ci/prow/4.6-acceptance
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: "4.5"
+      ci-operator.openshift.io/variant: "4.6"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-redhat-developer-service-binding-operator-master-4.5-acceptance
-    rerun_command: /test 4.5-acceptance
+    name: pull-ci-redhat-developer-service-binding-operator-master-4.6-acceptance
+    rerun_command: /test 4.6-acceptance
     spec:
       containers:
       - args:
@@ -24,17 +24,9 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/acceptance-cluster-profile
         - --target=acceptance
-        - --template=/usr/local/acceptance
-        - --variant=4.5
+        - --variant=4.6
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: acceptance
-        - name: TEST_COMMAND
-          value: VERBOSE=2 make -k test-acceptance test-acceptance-artifacts
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -47,9 +39,6 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/acceptance-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/acceptance
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -69,110 +58,28 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.5-acceptance,?($|\s.*)
+    trigger: (?m)^/test( | .* )4.6-acceptance,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - master
-    cluster: api.ci
-    context: ci/prow/4.5-e2e
+    cluster: build01
+    context: ci/prow/4.6-lint
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: "4.5"
+      ci-operator.openshift.io/variant: "4.6"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-redhat-developer-service-binding-operator-master-4.5-e2e
-    rerun_command: /test 4.5-e2e
-    spec:
-      containers:
-      - args:
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
-        - --report-password-file=/etc/report/password.txt
-        - --report-username=ci
-        - --secret-dir=/usr/local/e2e-cluster-profile
-        - --target=e2e
-        - --template=/usr/local/e2e
-        - --variant=4.5
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: e2e
-        - name: TEST_COMMAND
-          value: VERBOSE=2 LOGS_DIR=/tmp/artifacts make -k test-e2e parse-test-e2e-operator-log
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/e2e-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/e2e
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: password
-            path: password
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.5-e2e,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
-    cluster: api.ci
-    context: ci/prow/4.5-lint
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: "4.5"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-redhat-developer-service-binding-operator-master-4.5-lint
-    rerun_command: /test 4.5-lint
+    name: pull-ci-redhat-developer-service-binding-operator-master-4.6-lint
+    rerun_command: /test 4.6-lint
     spec:
       containers:
       - args:
@@ -180,7 +87,7 @@ presubmits:
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --target=lint
-        - --variant=4.5
+        - --variant=4.6
         command:
         - ci-operator
         image: ci-operator:latest
@@ -200,26 +107,26 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.5-lint,?($|\s.*)
+    trigger: (?m)^/test( | .* )4.6-lint,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - master
-    cluster: api.ci
-    context: ci/prow/4.5-unit
+    cluster: build01
+    context: ci/prow/4.6-unit
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: "4.5"
+      ci-operator.openshift.io/variant: "4.6"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-redhat-developer-service-binding-operator-master-4.5-unit
-    rerun_command: /test 4.5-unit
+    name: pull-ci-redhat-developer-service-binding-operator-master-4.6-unit
+    rerun_command: /test 4.6-unit
     spec:
       containers:
       - args:
@@ -228,7 +135,7 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/secrets/redhat-developer-service-binding-operator-codecov-token
         - --target=unit
-        - --variant=4.5
+        - --variant=4.6
         command:
         - ci-operator
         image: ci-operator:latest
@@ -251,11 +158,11 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: redhat-developer-service-binding-operator-codecov-token
         secret:
           secretName: redhat-developer-service-binding-operator-codecov-token
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.5-unit,?($|\s.*)
+    trigger: (?m)^/test( | .* )4.6-unit,?($|\s.*)

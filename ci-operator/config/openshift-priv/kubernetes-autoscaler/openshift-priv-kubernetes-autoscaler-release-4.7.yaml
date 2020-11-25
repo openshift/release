@@ -7,6 +7,18 @@ base_images:
     name: builder
     namespace: ocp
     tag: golang-1.13
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.7
+  ocp_builder_rhel-8-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
   openshift_release_golang-1.12:
     name: release
     namespace: openshift
@@ -27,12 +39,12 @@ build_root:
     tag: golang-1.13
 canonical_go_repository: k8s.io/autoscaler
 images:
-- dockerfile_path: images/cluster-autoscaler/Dockerfile.rhel7
+- dockerfile_path: images/cluster-autoscaler/Dockerfile.rhel
   from: base
   inputs:
-    ocp_builder_golang-1.13:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
   to: cluster-autoscaler
 - context_dir: vertical-pod-autoscaler
   dockerfile_path: Dockerfile.openshift
@@ -43,6 +55,7 @@ images:
       - registry.svc.ci.openshift.org/openshift/release:golang-1.14
   to: vertical-pod-autoscaler
 promotion:
+  disabled: true
   name: 4.7-priv
   namespace: ocp-private
 resources:
@@ -73,7 +86,7 @@ test_binary_build_commands: OS_GOFLAGS='-race' make build
 tests:
 - artifact_dir: /tmp/artifacts
   as: unit
-  commands: ARTIFACT_DIR=/tmp/artifacts JUNIT_REPORT=1 hack/test-go.sh
+  commands: JUNIT_REPORT=1 hack/test-go.sh
   container:
     from: src
 - as: git-history

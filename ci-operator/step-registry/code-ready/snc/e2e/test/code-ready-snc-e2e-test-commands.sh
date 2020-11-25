@@ -12,6 +12,9 @@ mock-nss.sh
 cp "${CLUSTER_PROFILE_DIR}"/ssh-privatekey "${HOME}"/.ssh/google_compute_engine
 chmod 0600 "${HOME}"/.ssh/google_compute_engine
 cp "${CLUSTER_PROFILE_DIR}"/ssh-publickey "${HOME}"/.ssh/google_compute_engine.pub
+echo 'ServerAliveInterval 30' | tee -a "${HOME}"/.ssh/config
+echo 'ServerAliveCountMax 1200' | tee -a "${HOME}"/.ssh/config
+chmod 0600 "${HOME}"/.ssh/config
 
 # Copy pull secret to user home
 cp "${CLUSTER_PROFILE_DIR}"/pull-secret "${HOME}"/pull-secret
@@ -31,29 +34,7 @@ function run-tests() {
   pushd snc
   set -e
   export OPENSHIFT_PULL_SECRET_PATH="${HOME}"/pull-secret
-  ./snc.sh
-  if [[ $? -ne 0 ]]; then
-    exit 1
-  fi
-  # wait till the cluster is stable
-  sleep 5m
-  export KUBECONFIG=crc-tmp-install-data/auth/kubeconfig
-  # Remove all the failed Pods
-  oc delete pods --field-selector=status.phase=Failed -A
-
-  # Wait till all the pods are either running or completed or in terminating state
-  while oc get pod --no-headers --all-namespaces | grep -v Running | grep -v Completed | grep -v Terminating; do
-     sleep 2
-  done
-
-  # Check the cluster operator output, status for available should be true for all operators
-  while oc get co -ojsonpath='{.items[*].status.conditions[?(@.type=="Available")].status}' | grep -v True; do
-     sleep 2
-  done
-
-  # Run createdisk script
-  export SNC_VALIDATE_CERT=false
-  ./createdisk.sh crc-tmp-install-data
+  ./ci.sh
   popd
 }
 
@@ -79,6 +60,11 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   --recurse /opt/snc packer@"${INSTANCE_PREFIX}":~/snc
+
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  packer@"${INSTANCE_PREFIX}" \
+  --command 'sudo yum install -y unzip'
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \

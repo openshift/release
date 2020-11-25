@@ -45,8 +45,7 @@ cat > packet-teardown.yaml <<-EOF
       slack:
         token: "{{ 'T027F3GAJ/B011TAG710V/' + lookup('file', slackhook_path + '/.slackhook') }}"
         msg: 'Packet teardown failed. Error msg: {{ ansible_failed_result.msg }}'
-        username: 'Ansible on {{ packet_hostname }}'
-        channel: "#team-edge-installer"
+        username: '{{ packet_hostname }}'
         color: warning
         icon_emoji: ":failed:"
     - name: fail the play

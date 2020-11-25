@@ -1,8 +1,16 @@
 base_images:
   base:
-    name: 4.6-priv
+    name: 4.7-priv
     namespace: ocp-private
     tag: base
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.7
   ocp_builder_rhel-8-golang-openshift-4.6:
     name: builder
     namespace: ocp
@@ -24,9 +32,9 @@ canonical_go_repository: github.com/openshift/elasticsearch-operator
 images:
 - from: base
   inputs:
-    ocp_builder_rhel-8-golang-openshift-4.6:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-openshift-4.6
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
   to: elasticsearch-operator
 - dockerfile_path: olm_deploy/operatorregistry/Dockerfile
   from: base
@@ -35,7 +43,7 @@ images:
   from: src
   to: elasticsearch-operator-src
 promotion:
-  name: 4.6-priv
+  name: 4.7-priv
   namespace: ocp-private
 resources:
   '*':
@@ -43,19 +51,29 @@ resources:
       cpu: 200m
       memory: 200Mi
 tag_specification:
-  name: 4.6-priv
+  name: 4.7-priv
   namespace: ocp-private
 tests:
-- as: unit
-  commands: make test-unit
+- artifact_dir: /tmp/artifacts
+  as: unit
+  commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=/tmp/artifacts/eo-logs ARTIFACT_DIR=${ARTIFACT_DIR}/eo-artifacts make test-unit
   container:
     from: src
-- as: e2e-operator
-  commands: make test-e2e-olm
-  openshift_installer_src:
+- artifact_dir: /tmp/artifacts
+  as: e2e-operator
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=/tmp/artifacts/eo-logs ARTIFACT_DIR=${ARTIFACT_DIR}/eo-artifacts make test-e2e-olm
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: cluster-logging-operator-e2e
-  commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=/tmp/artifacts/logging-logs ARTIFACT_DIR=/tmp/artifacts/logging-artifacts make test-e2e-olm
+  commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=/tmp/artifacts/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts make test-e2e-olm
   openshift_installer_custom_test_image:
     cluster_profile: aws
     from: stable:cluster-logging-operator-e2e

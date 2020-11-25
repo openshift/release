@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: "4.6"
+    name: "4.7"
     namespace: ocp
     tag: base
 build_root:
@@ -9,7 +9,7 @@ build_root:
     namespace: openshift
     tag: golang-1.10
 promotion:
-  name: "4.6"
+  name: "4.7"
   namespace: ocp
 resources:
   '*':
@@ -17,7 +17,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: "4.6"
+  name: "4.7"
   namespace: ocp
 tests:
 - as: unit
@@ -29,9 +29,17 @@ tests:
   container:
     from: src
 - as: e2e-aws-operator
-  commands: make test-e2e
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: openshift

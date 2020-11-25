@@ -11,6 +11,7 @@ image-mirror-files:
 	BASE=quay.io/openshift/origin- VERSION=4.3 TAG=4.3,4.3.0 ../../../hack/mirror-file > mapping_origin_4_3
 	BASE=quay.io/openshift/origin- VERSION=4.4 TAG=4.4,4.4.0 ../../../hack/mirror-file > mapping_origin_4_4
 	BASE=quay.io/openshift/origin- VERSION=4.5 TAG=4.5,4.5.0 ../../../hack/mirror-file > mapping_origin_4_5
-	BASE=quay.io/openshift/origin- VERSION=4.6 TAG=4.6,4.6.0,latest ../../../hack/mirror-file > mapping_origin_4_6
-	BASE=quay.io/openshift/origin- VERSION=4.7 TAG=4.7,4.7.0 ../../../hack/mirror-file > mapping_origin_4_7
+	BASE=quay.io/openshift/origin- VERSION=4.6 TAG=4.6,4.6.0 ../../../hack/mirror-file > mapping_origin_4_6
+	BASE=quay.io/openshift/origin- VERSION=4.7 TAG=4.7,4.7.0,latest ../../../hack/mirror-file > mapping_origin_4_7
+	BASE=quay.io/openshift/origin- VERSION=4.8 TAG=4.8,4.8.0 ../../../hack/mirror-file > mapping_origin_4_8
 .PHONY: image-mirror-files

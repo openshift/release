@@ -1,0 +1,125 @@
+base_images:
+  base:
+    name: 4.8-priv
+    namespace: ocp-private
+    tag: base
+  ocp_builder_golang-1.13:
+    name: builder
+    namespace: ocp
+    tag: golang-1.13
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.7
+  ocp_builder_rhel-8-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
+  openshift_release_golang-1.12:
+    name: release
+    namespace: openshift
+    tag: golang-1.12
+  openshift_release_golang-1.13:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+  openshift_release_golang-1.14:
+    name: release
+    namespace: openshift
+    tag: golang-1.14
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+canonical_go_repository: k8s.io/autoscaler
+images:
+- dockerfile_path: images/cluster-autoscaler/Dockerfile.rhel
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
+  to: cluster-autoscaler
+- context_dir: vertical-pod-autoscaler
+  dockerfile_path: Dockerfile.openshift
+  from: base
+  inputs:
+    openshift_release_golang-1.14:
+      as:
+      - registry.svc.ci.openshift.org/openshift/release:golang-1.14
+  to: vertical-pod-autoscaler
+promotion:
+  name: 4.8-priv
+  namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  bin:
+    requests:
+      cpu: "2"
+      memory: 4Gi
+  cluster-autoscaler:
+    requests:
+      cpu: "2"
+      memory: 4Gi
+  test-bin:
+    requests:
+      cpu: "2"
+      memory: 4Gi
+  unit:
+    requests:
+      cpu: "2"
+      memory: 8Gi
+tag_specification:
+  name: 4.8-priv
+  namespace: ocp-private
+test_binary_build_commands: OS_GOFLAGS='-race' make build
+tests:
+- artifact_dir: /tmp/artifacts
+  as: unit
+  commands: JUNIT_REPORT=1 hack/test-go.sh
+  container:
+    from: src
+- as: git-history
+  commands: ./hack/verify_history.sh
+  container:
+    from: src
+- as: goimports
+  commands: IS_CONTAINER=TRUE make goimports
+  container:
+    from: src
+- as: govet
+  commands: IS_CONTAINER=TRUE make vet
+  container:
+    from: src
+- as: golint
+  commands: IS_CONTAINER=TRUE make lint
+  container:
+    from: src
+- as: e2e-aws-operator
+  commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e
+  openshift_installer_custom_test_image:
+    cluster_profile: aws
+    from: stable:cluster-api-actuator-pkg
+- as: e2e-azure-operator
+  commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e
+  openshift_installer_custom_test_image:
+    cluster_profile: azure4
+    from: stable:cluster-api-actuator-pkg
+- as: e2e-gcp-operator
+  commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e
+  openshift_installer_custom_test_image:
+    cluster_profile: gcp
+    from: stable:cluster-api-actuator-pkg
+zz_generated_metadata:
+  branch: release-4.8
+  org: openshift-priv
+  repo: kubernetes-autoscaler

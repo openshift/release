@@ -45,7 +45,7 @@ make gather
 tar -czC "/tmp/artifacts/must-gather" -f "/tmp/artifacts/must-gather-\$HOSTNAME.tar.gz" .
 
 # Get sosreport including sar data
-sosreport --ticket-number "\$HOSTNAME" --batch -o sar,filesys,networkmanager,virsh,libvirt,kvm --tmp-dir /tmp/artifacts
+sosreport --ticket-number "\$HOSTNAME" --batch -o container_log,filesys,kvm,libvirt,logs,networkmanager,podman,processor,rpm,sar,virsh,yum --tmp-dir /tmp/artifacts
 
 # Get libvirt logs
 tar -czC "/var/log/libvirt/qemu" -f "/tmp/artifacts/libvirt-logs-\$HOSTNAME.tar.gz" --transform "s?^\.?libvirt-logs-\$HOSTNAME?" .

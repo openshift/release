@@ -4,7 +4,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.4
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -41,7 +41,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -50,7 +50,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.4
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/metering-e2e-aws
     decorate: true
     decoration_config:
@@ -69,21 +69,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/metering-e2e-aws-cluster-profile
         - --target=metering-e2e-aws
-        - --template=/usr/local/metering-e2e-aws
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: metering-e2e-aws
-        - name: TEST_COMMAND
-          value: |
-            set -x
-            # Increase the size of the machines so that there are machines large enough
-            # to run Presto, and the full metering stack.
-            kubectl -n openshift-machine-api get machinesets -o name | grep worker | cut -d/ -f2 | xargs -I{} kubectl -n openshift-machine-api scale machineset {} --replicas 3
-            TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/e2e make e2e
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -96,9 +83,6 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/metering-e2e-aws-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/metering-e2e-aws
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -118,12 +102,9 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -132,7 +113,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.4
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -168,7 +149,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -177,7 +158,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.4
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/verify
     decorate: true
     decoration_config:
@@ -213,7 +194,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator

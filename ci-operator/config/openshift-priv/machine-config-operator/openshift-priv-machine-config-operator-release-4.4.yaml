@@ -51,14 +51,21 @@ tests:
   container:
     from: src
 - as: e2e-gcp-op
-  commands: make test-e2e
-  openshift_installer_src:
+  steps:
     cluster_profile: gcp
-- as: e2e-gcp-upgrade
-  commands: TEST_SUITE=all run-upgrade-tests
-  openshift_installer:
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- as: e2e-agnostic-upgrade
+  steps:
     cluster_profile: gcp
-    upgrade: true
+    workflow: openshift-upgrade-gcp-loki
 - as: e2e-aws-scaleup-rhel7
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_ansible_40:

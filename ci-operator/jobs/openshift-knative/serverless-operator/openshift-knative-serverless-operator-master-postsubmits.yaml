@@ -3,25 +3,26 @@ postsubmits:
   - agent: kubernetes
     branches:
     - ^master$
-    cluster: api.ci
+    cluster: build02
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/is-promotion: "true"
       ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: "4.5"
+      ci-operator.openshift.io/variant: "4.6"
     max_concurrency: 1
-    name: branch-ci-openshift-knative-serverless-operator-master-4.5-images
+    name: branch-ci-openshift-knative-serverless-operator-master-4.6-images
     spec:
       containers:
       - args:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
         - --promote
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --target=[images]
-        - --variant=4.5
+        - --variant=4.6
         command:
         - ci-operator
         image: ci-operator:latest
@@ -34,6 +35,9 @@ postsubmits:
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
+        - mountPath: /etc/push-secret
+          name: push-secret
+          readOnly: true
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
@@ -41,7 +45,10 @@ postsubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
+      - name: push-secret
+        secret:
+          secretName: registry-push-credentials-ci-central
       - name: result-aggregator
         secret:
           secretName: result-aggregator

@@ -7,6 +7,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: golang-1.13
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
   ocp_builder_rhel-8-golang-openshift-4.6:
     name: builder
     namespace: ocp
@@ -23,14 +27,15 @@ build_root:
     tag: golang-1.13
 canonical_go_repository: github.com/openshift/cluster-autoscaler-operator
 images:
-- dockerfile_path: Dockerfile.rhel7
+- dockerfile_path: Dockerfile.rhel
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-openshift-4.6:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-openshift-4.6
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
   to: cluster-autoscaler-operator
 promotion:
+  disabled: true
   name: 4.7-priv
   namespace: ocp-private
 resources:
@@ -44,6 +49,10 @@ tag_specification:
 tests:
 - as: unit
   commands: NO_DOCKER=1 make test
+  container:
+    from: src
+- as: generate
+  commands: IS_CONTAINER=TRUE NO_DOCKER=1 make generate
   container:
     from: src
 - as: goimports
@@ -67,11 +76,10 @@ tests:
   openshift_installer_custom_test_image:
     cluster_profile: aws
     from: stable:cluster-api-actuator-pkg
-- as: e2e-aws-upgrade
-  commands: TEST_SUITE=all run-upgrade-tests
-  openshift_installer:
+- as: e2e-upgrade
+  steps:
     cluster_profile: aws
-    upgrade: true
+    workflow: openshift-upgrade-aws-loki
 zz_generated_metadata:
   branch: release-4.7
   org: openshift-priv

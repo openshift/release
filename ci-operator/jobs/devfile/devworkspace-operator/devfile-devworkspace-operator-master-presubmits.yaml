@@ -1,67 +1,20 @@
 presubmits:
   devfile/devworkspace-operator:
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - master
-    cluster: api.ci
-    context: ci/prow/v4-images
+    cluster: build01
+    context: ci/prow/v5-devworkspaces-operator-e2e
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: v4
+      ci-operator.openshift.io/variant: v5
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-devfile-devworkspace-operator-master-v4-images
-    rerun_command: /test v4-images
-    spec:
-      containers:
-      - args:
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-password-file=/etc/report/password.txt
-        - --report-username=ci
-        - --target=[images]
-        - --variant=v4
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )v4-images,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
-    cluster: api.ci
-    context: ci/prow/v4-openshift-web-terminal-e2e
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: v4
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-devfile-devworkspace-operator-master-v4-openshift-web-terminal-e2e
-    rerun_command: /test v4-openshift-web-terminal-e2e
+    name: pull-ci-devfile-devworkspace-operator-master-v5-devworkspaces-operator-e2e
+    rerun_command: /test v5-devworkspaces-operator-e2e
     spec:
       containers:
       - args:
@@ -69,19 +22,11 @@ presubmits:
         - --lease-server-password-file=/etc/boskos/password
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/usr/local/openshift-web-terminal-e2e-cluster-profile
-        - --target=openshift-web-terminal-e2e
-        - --template=/usr/local/openshift-web-terminal-e2e
-        - --variant=v4
+        - --secret-dir=/usr/local/devworkspaces-operator-e2e-cluster-profile
+        - --target=devworkspaces-operator-e2e
+        - --variant=v5
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: openshift-web-terminal-e2e
-        - name: TEST_COMMAND
-          value: .cico/cico_openshift_e2e.sh
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -92,11 +37,8 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/openshift-web-terminal-e2e-cluster-profile
+        - mountPath: /usr/local/devworkspaces-operator-e2e-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/openshift-web-terminal-e2e
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -116,21 +58,18 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )v4-openshift-web-terminal-e2e,?($|\s.*)
+    trigger: (?m)^/test( | .* )v5-devworkspaces-operator-e2e,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/v5-images
     decorate: true
     decoration_config:
@@ -168,87 +107,8 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )v5-images,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
-    cluster: api.ci
-    context: ci/prow/v5-openshift-web-terminal-e2e
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: v5
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-devfile-devworkspace-operator-master-v5-openshift-web-terminal-e2e
-    rerun_command: /test v5-openshift-web-terminal-e2e
-    spec:
-      containers:
-      - args:
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
-        - --report-password-file=/etc/report/password.txt
-        - --report-username=ci
-        - --secret-dir=/usr/local/openshift-web-terminal-e2e-cluster-profile
-        - --target=openshift-web-terminal-e2e
-        - --template=/usr/local/openshift-web-terminal-e2e
-        - --variant=v5
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: openshift-web-terminal-e2e
-        - name: TEST_COMMAND
-          value: .cico/cico_openshift_e2e.sh
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/openshift-web-terminal-e2e-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/openshift-web-terminal-e2e
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: password
-            path: password
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )v5-openshift-web-terminal-e2e,?($|\s.*)

@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: "4.6"
+    name: "4.7"
     namespace: ocp
     tag: base
   ocp_builder_golang-1.13:
@@ -11,6 +11,18 @@ base_images:
     name: builder
     namespace: ocp
     tag: golang-1.14
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.7
+  ocp_builder_rhel-8-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
@@ -21,12 +33,12 @@ images:
 - dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
-    ocp_builder_golang-1.14:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:golang-1.14
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
   to: cluster-kube-scheduler-operator
 promotion:
-  name: "4.6"
+  name: "4.7"
   namespace: ocp
 resources:
   '*':
@@ -34,7 +46,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: "4.6"
+  name: "4.7"
   namespace: ocp
 test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
 tests:
@@ -47,9 +59,17 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws-loki
 - as: e2e-aws-operator
-  commands: make e2e
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: verify
   commands: |
     make verify -k --warn-undefined-variables
@@ -64,11 +84,10 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-serial
-- as: e2e-aws-upgrade
-  commands: TEST_SUITE=all run-upgrade-tests
-  openshift_installer:
+- as: e2e-upgrade
+  steps:
     cluster_profile: aws
-    upgrade: true
+    workflow: openshift-upgrade-aws-loki
 zz_generated_metadata:
   branch: master
   org: openshift

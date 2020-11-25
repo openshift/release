@@ -1,0 +1,65 @@
+kind: List
+apiVersion: v1
+items:
+  # ppc64le-osuosl-ci namespace for authorized access
+  - kind: Namespace
+    apiVersion: v1
+    metadata:
+      name: ppc64le-osuosl-ci
+  - kind: Group
+    apiVersion: v1
+    metadata:
+      name: ppc64le-osuosl-ci-admins
+    users:
+      - hamzy
+  - kind: RoleBinding
+    apiVersion: rbac.authorization.k8s.io/v1
+    metadata:
+      name: ppc64le-osuosl-ci-admin-binding-cluster
+      namespace: ppc64le-osuosl-ci
+    roleRef:
+      apiGroup: rbac.authorization.k8s.io
+      kind: ClusterRole
+      name: admin
+    subjects:
+      - kind: Group
+        name: ppc64le-osuosl-ci-admins
+  # ppc64le-osuosl-ci-public namespace for unauthorized access
+  - kind: Namespace
+    apiVersion: v1
+    metadata:
+      name: ppc64le-osuosl-ci-public
+  - kind: RoleBinding
+    apiVersion: rbac.authorization.k8s.io/v1
+    metadata:
+      name: ppc64le-osuosl-ci-public-admin-binding-cluster
+      namespace: ppc64le-osuosl-ci-public
+    roleRef:
+      apiGroup: rbac.authorization.k8s.io
+      kind: ClusterRole
+      name: admin
+    subjects:
+      - kind: Group
+        name: ppc64le-osuosl-ci-admins
+  - kind: Role
+    apiVersion: rbac.authorization.k8s.io/v1
+    metadata:
+      namespace: ppc64le-osuosl-ci
+      name: secret-admin
+    rules:
+    - apiGroups: [""]
+      resources: ["secrets"]
+      verbs: ["update", "get", "create", "watch", "list", "patch", "delete"]
+  - kind: RoleBinding
+    apiVersion: rbac.authorization.k8s.io/v1
+    metadata:
+      name: secret-admin
+      namespace: ppc64le-osuosl-ci
+    subjects:
+    - kind: ServiceAccount
+      name: ci-operator
+      namespace: ci
+    roleRef:
+      kind: Role
+      name: secret-admin
+      namespace: ppc64le-osuosl-ci

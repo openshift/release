@@ -1,4 +1,8 @@
 base_images:
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
   ocp_builder_rhel-8-golang-openshift-4.6:
     name: builder
     namespace: ocp
@@ -24,17 +28,24 @@ images:
 - dockerfile_path: release/ansible/Dockerfile.rhel8
   from: os
   inputs:
-    ocp_builder_rhel-8-golang-openshift-4.6:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-openshift-4.6
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
   to: ansible-operator
 - dockerfile_path: release/helm/Dockerfile
   from: os-minimal
   inputs:
-    ocp_builder_rhel-8-golang-openshift-4.6:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-openshift-4.6
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
   to: helm-operator
+- dockerfile_path: release/sdk/Dockerfile
+  from: os-minimal
+  inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
+  to: operator-sdk
 - dockerfile_path: ci/dockerfiles/ansible-e2e.Dockerfile
   from: ansible-operator
   inputs:
@@ -46,20 +57,6 @@ images:
   dockerfile_path: build/Dockerfile
   from: ansible-operator
   to: osdk-ansible-full-e2e
-- dockerfile_path: ci/dockerfiles/ansible-e2e-hybrid.Dockerfile
-  from: os
-  inputs:
-    osdk-builder:
-      as:
-      - osdk-builder
-  to: osdk-ansible-e2e-hybrid
-- dockerfile_path: ci/dockerfiles/helm-e2e-hybrid.Dockerfile
-  from: os-minimal
-  inputs:
-    osdk-builder:
-      as:
-      - osdk-builder
-  to: osdk-helm-e2e-hybrid
 - dockerfile_path: ci/dockerfiles/helm-e2e.Dockerfile
   from: helm-operator
   inputs:
@@ -72,12 +69,10 @@ promotion:
   - osdk-builder
   - osdk-ansible-e2e
   - osdk-ansible-full-e2e
-  - osdk-ansible-e2e-hybrid
   - osdk-helm-e2e
-  - osdk-helm-e2e-hybrid
   - memcached-operator
   - nginx-operator
-  name: 4.6-priv
+  name: 4.7-priv
   namespace: ocp-private
 resources:
   '*':
@@ -85,39 +80,52 @@ resources:
       cpu: 200m
       memory: 200Mi
 tag_specification:
-  name: 4.6-priv
+  name: 4.7-priv
   namespace: ocp-private
 test_binary_build_commands: make build/operator-sdk-dev-x86_64-linux-gnu
 tests:
 - as: unit
   commands: |
-    mkdir -p $GOPATH/src/github.com/operator-framework/operator-sdk
-    cp -r ./* $GOPATH/src/github.com/operator-framework/operator-sdk/
-    cd $GOPATH/src/github.com/operator-framework/operator-sdk
-    rm -rf vendor/github.com/operator-framework/operator-sdk
-    make test/unit
+    echo "running unit tests"
+    make test-unit
   container:
     from: src
 - as: sanity
   commands: |
-    export GO111MODULE=on
-    export GOFLAGS=-mod=vendor
-    mkdir -p $GOPATH/src/github.com/operator-framework/operator-sdk
-    cp -r ./* $GOPATH/src/github.com/operator-framework/operator-sdk/
-    cd $GOPATH/src/github.com/operator-framework/operator-sdk
-    go vet ./...
-    ./hack/check_license.sh
-    ./hack/check_error_log_msg_format.sh
+    echo "setting environment"
+    export GOCACHE=/tmp
+    export XDG_CACHE_HOME=/tmp
+    unset VERSION
+    echo "patch upstream"
+    make -f ci/prow.Makefile patch
+    echo "running make test-sanity"
+    make test-sanity
   container:
     from: src
 - as: e2e-aws-ansible
-  commands: make -f ci/prow.Makefile test-e2e-ansible
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make -f ci/prow.Makefile test-e2e-ansible
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: e2e-aws-helm
-  commands: make -f ci/prow.Makefile test-e2e-helm
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make -f ci/prow.Makefile test-e2e-helm
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: openshift-priv

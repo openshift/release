@@ -1,0 +1,135 @@
+base_images:
+  must-gather:
+    name: 4.6-priv
+    namespace: ocp-private
+    tag: must-gather
+  operator-registry:
+    name: 4.6-priv
+    namespace: ocp-private
+    tag: operator-registry
+  os:
+    name: ubi
+    namespace: ocp
+    tag: "7"
+binary_build_commands: make build
+build_root:
+  project_image:
+    dockerfile_path: openshift-ci/Dockerfile.tools
+canonical_go_repository: github.com/openshift/ocs-operator
+images:
+- dockerfile_path: openshift-ci/Dockerfile.deploy
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/ocs-operator/build/_output/bin/ocs-operator
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/ocs-operator/build/_output/bin/metrics-exporter
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/ocs-operator/metrics/deploy/prometheus-ocs-rules-external.yaml
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/ocs-operator/metrics/deploy/prometheus-ocs-rules.yaml
+  to: ocs-operator
+- dockerfile_path: openshift-ci/Dockerfile.registry.build
+  from: operator-registry
+  to: ocs-registry
+- dockerfile_path: build/Dockerfile
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: _output/bin
+        source_path: /go/src/github.com/openshift/ocs-operator/build/_output/bin/ocs-operator
+      - destination_dir: _output/bin
+        source_path: /go/src/github.com/openshift/ocs-operator/build/_output/bin/metrics-exporter
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/ocs-operator/metrics/deploy/prometheus-ocs-rules-external.yaml
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/ocs-operator/metrics/deploy/prometheus-ocs-rules.yaml
+  to: ocs-operator-quay
+- dockerfile_path: openshift-ci/Dockerfile.registry
+  from: operator-registry
+  to: ocs-registry-quay
+- dockerfile_path: must-gather/Dockerfile
+  from: must-gather
+  inputs:
+    src:
+      paths:
+      - destination_dir: must-gather
+        source_path: /go/src/github.com/openshift/ocs-operator/must-gather/Dockerfile
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/ocs-operator/must-gather/collection-scripts
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/ocs-operator/must-gather/templates
+  to: ocs-must-gather-quay
+operator:
+  bundles:
+  - dockerfile_path: openshift-ci/Dockerfile.bundle
+  substitutions:
+  - pullspec: quay.io/ocs-dev/ocs-operator:latest
+    with: ocs-operator
+promotion:
+  excluded_images:
+  - ocs-operator
+  - operator-registry-base
+  - ocs-registry
+  - ocs-operator-quay
+  - ocs-registry-quay
+  - ocs-must-gather-quay
+  name: ocs-4.6-priv
+  namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: 4.6-priv
+  namespace: ocp-private
+tests:
+- as: verify-latest-csv
+  commands: |
+    make verify-latest-csv
+  container:
+    from: src
+- as: ocs-operator-ci
+  commands: |
+    make ocs-operator-ci
+  container:
+    from: src
+- as: ocs-operator-bundle-e2e-aws
+  steps:
+    cluster_profile: aws
+    env:
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: openshift-storage
+      OO_PACKAGE: ocs-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: tests
+      commands: |
+        make functest
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-aws
+- as: red-hat-storage-ocs-ci-e2e-aws
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export REDHAT_OCS_CI_FORCE_TOOL_POD_INSTALL="true" && make cluster-deploy && make red-hat-storage-ocs-ci
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-4.6
+  org: openshift-priv
+  repo: ocs-operator

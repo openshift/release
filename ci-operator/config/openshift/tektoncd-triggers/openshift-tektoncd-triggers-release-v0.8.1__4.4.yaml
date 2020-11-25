@@ -1,0 +1,64 @@
+base_images:
+  ubi-minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+binary_build_commands: make install
+build_root:
+  project_image:
+    dockerfile_path: openshift/ci-operator/build-image/Dockerfile
+canonical_go_repository: github.com/tektoncd/triggers
+images:
+- dockerfile_path: openshift/ci-operator/tekton-images/controller/Dockerfile
+  from: ubi-minimal
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/.
+  to: tektoncd-triggers-controller
+- dockerfile_path: openshift/ci-operator/tekton-images/webhook/Dockerfile
+  from: ubi-minimal
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/.
+  to: tektoncd-triggers-webhook
+- dockerfile_path: openshift/ci-operator/tekton-images/eventlistenersink/Dockerfile
+  from: ubi-minimal
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/.
+  to: tektoncd-triggers-eventlistenersink
+promotion:
+  name: tektoncd-triggers-v0.8.1-4.4
+  namespace: openshift
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.4"
+  namespace: ocp
+tests:
+- as: e2e
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-v0.8.1
+  org: openshift
+  repo: tektoncd-triggers
+  variant: "4.4"

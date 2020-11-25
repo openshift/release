@@ -1,0 +1,67 @@
+base_images:
+  base:
+    name: 4.8-priv
+    namespace: ocp-private
+    tag: base
+  dev-scripts:
+    name: test
+    namespace: openshift-kni
+    tag: dev-scripts
+  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.7
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.15
+canonical_go_repository: github.com/openshift/cluster-version-operator
+images:
+- dockerfile_path: Dockerfile.rhel
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
+  to: cluster-version-operator
+promotion:
+  name: 4.8-priv
+  namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: 4.8-priv
+  namespace: ocp-private
+tests:
+- as: gofmt
+  commands: go fmt ./... && git diff --exit-code
+  container:
+    from: src
+- as: unit
+  commands: go test ./...
+  container:
+    from: src
+- as: e2e-agnostic
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp
+- as: e2e-agnostic-upgrade
+  steps:
+    cluster_profile: gcp
+    env:
+      TEST_COMMAND: run-upgrade
+      TEST_OPTIONS: abort-at=100
+      TEST_SUITE: all
+    workflow: openshift-upgrade-gcp-loki
+- as: e2e-metal-assisted
+  steps:
+    cluster_profile: packet
+    workflow: baremetalds-assisted
+zz_generated_metadata:
+  branch: release-4.8
+  org: openshift-priv
+  repo: cluster-version-operator

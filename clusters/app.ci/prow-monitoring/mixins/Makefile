@@ -1,7 +1,7 @@
 #
 SHELL=/usr/bin/env bash -o pipefail
 
-dashboards = build_cop boskos boskos_http canary configresolver deck e2e_template_jobs dptp ghproxy hook jenkins_operator osde2e plank prow sinker tide
+dashboards = build_cop boskos boskos_acquire boskos_http canary configresolver deck e2e_template_jobs dptp ghproxy hook jenkins_operator osde2e plank prow sinker tide
 
 all: $(dashboards) prometheus-prow-rules_prometheusrule.yaml alertmanager-prow-secret_template.yaml
 
@@ -27,8 +27,10 @@ clean:
 install:
 	jb install
 
-validate-latest: clean install all
-	@echo "Generating sinker.json ..."
+upgrade:
+	jb update
+
+validate: clean install all
 	git diff --exit-code ./
 
 .PHONY : generate-k8s-dashboards

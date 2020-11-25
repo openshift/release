@@ -13,18 +13,23 @@ images:
   dockerfile_path: Dockerfile
   from: os
   to: odh-manifests-tests
+promotion:
+  additional_images:
+    latest: odh-manifests-tests
+  name: odh-manifests-tests
+  namespace: ocp
 resources:
   '*':
     requests:
       cpu: 1000m
       memory: 1Gi
 tag_specification:
-  name: "4.4"
+  name: "4.6"
   namespace: ocp
 tests:
 - as: odh-manifests-e2e
   steps:
-    cluster_profile: azure4
+    cluster_profile: gcp
     test:
     - as: e2e
       commands: $HOME/peak/installandtest.sh
@@ -33,11 +38,11 @@ tests:
         requests:
           cpu: 2000m
           memory: 3Gi
-    workflow: ipi-azure
+    workflow: ipi-gcp
 - as: odh-manifests-e2e-nightly
   cron: 30 0 * * *
   steps:
-    cluster_profile: azure4
+    cluster_profile: gcp
     test:
     - as: e2e
       commands: $HOME/peak/installandtest.sh
@@ -46,7 +51,7 @@ tests:
         requests:
           cpu: 2000m
           memory: 3Gi
-    workflow: ipi-azure
+    workflow: ipi-gcp
 zz_generated_metadata:
   branch: master
   org: opendatahub-io

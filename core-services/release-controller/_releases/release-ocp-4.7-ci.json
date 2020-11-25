@@ -1,12 +1,11 @@
 {
-  "hide": true,
   "name":"4.7.0-0.ci",
   "to": "release",
   "message": "This release contains CI image builds of all code in release-4.7 (master) branches, and is updated each time someone merges.",
   "mirrorPrefix": "4.7",
-  "expires":"12h",
-  "maxUnreadyReleases": 1,
-  "minCreationIntervalSeconds": 7200,
+  "expires":"72h",
+  "maxUnreadyReleases": 2,
+  "minCreationIntervalSeconds": 1800,
   "pullSecretName": "source",
   "publish":{
     "mirror-to-origin":{
@@ -31,21 +30,43 @@
           "ironic-ipa-downloader",
           "ironic-machine-os-downloader",
           "ironic-static-ip-manager",
-          "cluster-samples-operator"
+          "cluster-samples-operator",
+          "operator-marketplace"
         ]
       }
     },
     "tag":{"tagRef":{"name":"4.7-ci"}}
   },
   "verify":{
-    "gcp":{
-      "prowJob":{"name":"release-openshift-origin-installer-e2e-gcp-4.7"}
+    "azure":{
+      "prowJob":{"name":"release-openshift-origin-installer-e2e-azure-4.7"}
+    },
+    "aws-serial":{
+      "prowJob":{"name":"release-openshift-origin-installer-e2e-aws-serial-4.7"}
+    },
+    "upgrade":{
+      "upgrade":true,
+      "optional":true,
+      "prowJob":{"name":"release-openshift-origin-installer-e2e-gcp-upgrade-4.7"}
     },
     "upgrade-minor":{
       "upgrade":true,
       "upgradeFrom": "PreviousMinor",
       "optional":false,
       "prowJob":{"name":"release-openshift-origin-installer-e2e-aws-upgrade"}
+    }
+  },
+  "periodic":{
+    "upgrade-aws-minor":{
+      "interval":"6h",
+      "upgrade":true,
+      "upgradeFrom": "PreviousMinor",
+      "prowJob":{"name":"release-openshift-origin-installer-e2e-aws-upgrade-4.6-stable-to-4.7-ci"}
+    },
+    "upgrade-gcp":{
+      "interval":"6h",
+      "upgrade":true,
+      "prowJob":{"name":"release-openshift-origin-installer-e2e-gcp-upgrade-4.7"}
     }
   }
 }

@@ -1,29 +1,41 @@
 base_images:
   base:
-    name: 4.6-priv
+    name: 4.7-priv
     namespace: ocp-private
     tag: base
   ocp_builder_golang-1.13:
     name: builder
     namespace: ocp
     tag: golang-1.13
+  ocp_builder_golang-1.14:
+    name: builder
+    namespace: ocp
+    tag: golang-1.14
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: golang-1.14
 canonical_go_repository: github.com/openshift/oauth-server
 images:
 - dockerfile_path: images/Dockerfile.rhel
   from: base
   inputs:
-    ocp_builder_golang-1.13:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
   to: oauth-server
 promotion:
-  name: 4.6-priv
+  name: 4.7-priv
   namespace: ocp-private
 resources:
   '*':
@@ -31,7 +43,7 @@ resources:
       cpu: "3"
       memory: 6Gi
 tag_specification:
-  name: 4.6-priv
+  name: 4.7-priv
   namespace: ocp-private
 test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
 tests:
@@ -56,11 +68,10 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
-- as: e2e-gcp-upgrade
-  commands: TEST_SUITE=all run-upgrade-tests
-  openshift_installer:
+- as: e2e-agnostic-upgrade
+  steps:
     cluster_profile: gcp
-    upgrade: true
+    workflow: openshift-upgrade-gcp-loki
 - as: e2e-aws-serial
   steps:
     cluster_profile: aws

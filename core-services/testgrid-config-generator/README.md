@@ -1,0 +1,2 @@
+The `_allow-list.yaml` file contains the mapping between release-type used to setup the dashboard for the testgrid tool where the default dashboardType needs to be overridden. 
+Input can be given as a dictionary with the name of the job being the key and the release-type as the value.

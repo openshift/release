@@ -55,11 +55,25 @@ objects:
             name: gcsweb-private-tls
           - mountPath: /etc/proxy/secrets
             name: session-secret
-        - image: gcr.io/k8s-prow/gcsweb:v20200826-f9138eb980
+        - image: gcr.io/k8s-prow/gcsweb:v20201124-061f85d859
           name: gcsweb-private
           args:
           - "-b"
           - "origin-ci-private"
+          - --gcs-credentials-file=/etc/sa/credentials.json
+          volumeMounts:
+          - mountPath: /etc/sa
+            name: gcs-credentials-file
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds:
+            periodSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz/ready
+              port: 8081
         volumes:
         - name: gcsweb-private-tls
           secret:
@@ -67,6 +81,9 @@ objects:
         - name: session-secret
           secret:
             secretName: gcsweb-private-session-secret
+        - name: gcs-credentials-file
+          secret:
+            secretName: openshift-private-viewer
 - apiVersion: v1
   kind: Service
   metadata:
@@ -96,6 +113,8 @@ objects:
 - apiVersion: v1
   kind: Route
   metadata:
+    annotations:
+      haproxy.router.openshift.io/timeout: 1h
     name: gcsweb-private
     namespace: ${namespace}
   spec:

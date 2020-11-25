@@ -1,0 +1,56 @@
+base_images:
+  base:
+    name: "4.8"
+    namespace: ocp
+    tag: base
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
+binary_build_commands: go build -o ./bin/nfsplugin ./cmd/nfsplugin
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+canonical_go_repository: github.com/kubernetes-csi/csi-driver-nfs
+images:
+- dockerfile_path: images/Dockerfile
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
+  to: csi-driver-nfs
+promotion:
+  name: "4.8"
+  namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.8"
+  namespace: ocp
+tests:
+- as: go-fmt
+  commands: make test-fmt
+  container:
+    from: src
+- as: go-vet
+  commands: make test-vet
+  container:
+    from: src
+- as: vendor
+  commands: make test-vendor
+  container:
+    from: src
+zz_generated_metadata:
+  branch: release-4.8
+  org: openshift
+  repo: csi-driver-nfs

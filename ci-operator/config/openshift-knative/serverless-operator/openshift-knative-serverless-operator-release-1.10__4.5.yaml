@@ -1,0 +1,142 @@
+base_images:
+  base:
+    name: "4.5"
+    namespace: ocp
+    tag: base
+  ocp_4.5_cli:
+    name: "4.5"
+    namespace: ocp
+    tag: cli
+  openshift_knative-v0.15.2_knative-eventing-src:
+    name: knative-v0.15.2
+    namespace: openshift
+    tag: knative-eventing-src
+  openshift_knative-v0.15.2_knative-serving-src:
+    name: knative-v0.15.2
+    namespace: openshift
+    tag: knative-serving-src
+  openshift_knative-v0.16.0_knative-eventing-src:
+    name: knative-v0.16.0
+    namespace: openshift
+    tag: knative-eventing-src
+  openshift_knative-v0.16.0_knative-serving-src:
+    name: knative-v0.16.0
+    namespace: openshift
+    tag: knative-serving-src
+build_root:
+  project_image:
+    dockerfile_path: openshift/ci-operator/build-image/Dockerfile
+images:
+- context_dir: openshift/ci-operator/source-image
+  from: src
+  inputs:
+    ocp_4.5_cli:
+      as:
+      - registry.svc.ci.openshift.org/ocp/4.5:cli
+    openshift_knative-v0.16.0_knative-eventing-src:
+      as:
+      - registry.svc.ci.openshift.org/openshift/knative-v0.16.0:knative-eventing-src
+    openshift_knative-v0.16.0_knative-serving-src:
+      as:
+      - registry.svc.ci.openshift.org/openshift/knative-v0.16.0:knative-serving-src
+  to: serverless-operator-src
+- context_dir: serving/ingress
+  from: base
+  to: knative-openshift-ingress
+- context_dir: knative-operator
+  from: base
+  to: knative-operator
+- context_dir: olm-catalog/serverless-operator
+  from: base
+  to: serverless-bundle
+promotion:
+  name: openshift-serverless-v1.10.0
+  namespace: openshift
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.5"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: operator-e2e-aws-ocp-45
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws
+    test:
+    - as: operator-e2e
+      commands: make test-e2e
+      dependencies:
+      - env: KNATIVE_OPENSHIFT_INGRESS
+        name: knative-openshift-ingress
+      - env: KNATIVE_OPERATOR
+        name: knative-operator
+      from: serverless-operator-src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-aws
+- as: upstream-e2e-aws-ocp-45
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws
+    test:
+    - as: serverless-e2e
+      commands: make test-upstream-e2e-no-upgrade
+      dependencies:
+      - env: KNATIVE_OPENSHIFT_INGRESS
+        name: knative-openshift-ingress
+      - env: KNATIVE_OPERATOR
+        name: knative-operator
+      from: serverless-operator-src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-aws
+- as: e2e-aws-ocp-45-continuous
+  cron: 0 */12 * * 1-5
+  steps:
+    cluster_profile: aws
+    test:
+    - as: serverless-e2e
+      commands: make install-mesh test-all-e2e
+      dependencies:
+      - env: KNATIVE_OPENSHIFT_INGRESS
+        name: knative-openshift-ingress
+      - env: KNATIVE_OPERATOR
+        name: knative-operator
+      from: serverless-operator-src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-aws
+- as: upgrade-tests-aws-ocp-45
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws
+    test:
+    - as: serverless-e2e
+      commands: make test-upgrade
+      dependencies:
+      - env: KNATIVE_OPENSHIFT_INGRESS
+        name: knative-openshift-ingress
+      - env: KNATIVE_OPERATOR
+        name: knative-operator
+      from: serverless-operator-src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-aws
+zz_generated_metadata:
+  branch: release-1.10
+  org: openshift-knative
+  repo: serverless-operator
+  variant: "4.5"

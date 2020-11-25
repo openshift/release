@@ -5,21 +5,8 @@ set -o errexit
 set -o pipefail
 set -x
 
+export KUBECONFIG=${SHARED_DIR}/kubeconfig
 export OPS_MIRROR_KEY=${CLUSTER_PROFILE_DIR}/ops-mirror.pem
-
-# Temporarily use this workaround since we don't have a way to determine the cluster version
-# Revisit once this story is complete, https://issues.redhat.com/browse/DPTP-1311
-case "${PULL_BASE_REF}" in
-master) export CLUSTER_VERSION="4.6";;
-release-4.7) export CLUSTER_VERSION="4.6";;
-release-4.6) export CLUSTER_VERSION="4.6";;
-release-4.5) export CLUSTER_VERSION="4.5";;
-release-4.4) export CLUSTER_VERSION="4.4";;
-release-4.3) export CLUSTER_VERSION="4.3";;
-release-4.2) export CLUSTER_VERSION="4.2";;
-release-4.1) export CLUSTER_VERSION="4.1";;
-*) echo >&2 "Unsupported PULL_BASE_REF '${PULL_BASE_REF}'"
-esac
 
 # Ensure our UID, which is randomly generated, is in /etc/passwd. This is required
 # to be able to SSH.
@@ -32,6 +19,12 @@ if ! whoami &> /dev/null; then
     fi
 fi
 
+# Install an updated version of the client
+mkdir -p /tmp/client
+curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz | tar --directory=/tmp/client -xzf -
+PATH=/tmp/client:$PATH
+oc version --client
+
 cat > prep.yaml <<-'EOF'
 ---
 - name: Prep Playbook
@@ -40,19 +33,23 @@ cat > prep.yaml <<-'EOF'
   gather_facts: false
 
   vars:
-    cluster_version: "{{ lookup('env', 'CLUSTER_VERSION') }}"
+    kubeconfig_path: "{{ lookup('env', 'KUBECONFIG') }}"
     ops_mirror_path: "{{ lookup('env', 'OPS_MIRROR_KEY') }}"
 
   tasks:
-  - name: Fail if 'CLUSTER_VERSION' is not defined
-    fail:
-      msg: "'CLUSTER_VERSION' must be a defined environment variable"
-    when:
-    - cluster_version == ''
+  - name: Get cluster version
+    command: >
+      oc get clusterversion
+      --kubeconfig={{ kubeconfig_path }}
+      --output=jsonpath='{.items[0].status.desired.version}'
+    delegate_to: localhost
+    register: oc_get
+    until:
+    - oc_get.stdout != ''
 
-  - name: Set release_version to payload version
+  - name: Set release_version to cluster version
     set_fact:
-      release_version: "{{ cluster_version | regex_search('^\\d+\\.\\d+') }}"
+      release_version: "{{ oc_get.stdout | regex_search('^\\d+\\.\\d+') }}"
 
   - name: Wait for host connection to ensure SSH has started
     wait_for_connection:
@@ -72,33 +69,6 @@ cat > prep.yaml <<-'EOF'
     copy:
       src: rhel-7-server-rpms-4.X.repo
       dest: /etc/yum.repos.d/
-
-  # Temporary pre-release kernel install until RHEL 7.9 GA
-  - name: Get current kernel version
-    command: uname -r
-    register: kernel_version
-
-  - name: Test current kernel version
-    debug:
-      msg: "Kernel is old"
-    when: kernel_version.stdout is version('3.10.0-1148', 'lt')
-
-  - when: kernel_version.stdout is version('3.10.0-1148', 'lt')
-    block:
-    - name: Download pre-release kernel
-      get_url:
-        url: https://mirror.openshift.com/enterprise/other/openshift-ansible/rteague/x86_64/kernel-3.10.0-1148.el7.x86_64.rpm
-        dest: /tmp/kernel-3.10.0-1148.el7.x86_64.rpm
-        client_cert: /var/lib/yum/ops-mirror.pem
-
-    - name: Install pre-release kernel
-      yum:
-        name: /tmp/kernel-3.10.0-1148.el7.x86_64.rpm
-        state: present
-      async: 3600
-      poll: 30
-      register: result
-      until: result is succeeded
 EOF
 
 cat > rhel-7-server-ose-4.X-devel-rpms.repo.j2 <<-'EOF'
@@ -137,6 +107,16 @@ enabled = 1
 [rhel-7-server-extras-rpms]
 name = Red Hat Enterprise Linux 7 Server - Extras (RPMs)
 baseurl = https://mirror.openshift.com/enterprise/reposync/ci-deps/rhel-server-extras-rpms/
+failovermethod = priority
+gpgcheck = 0
+sslclientcert = /var/lib/yum/ops-mirror.pem
+sslclientkey = /var/lib/yum/ops-mirror.pem
+sslverify = 0
+enabled = 1
+
+[rhel-7-fast-datapath-rpms]
+name = Red Hat Enterprise Linux 7 Server - Fast Datapath (RPMs)
+baseurl = https://mirror.openshift.com/enterprise/reposync/ci-deps/rhel-fast-datapath-rpms/
 failovermethod = priority
 gpgcheck = 0
 sslclientcert = /var/lib/yum/ops-mirror.pem

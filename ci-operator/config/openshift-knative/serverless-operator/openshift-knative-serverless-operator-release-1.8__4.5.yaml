@@ -7,6 +7,14 @@ base_images:
     name: "4.5"
     namespace: ocp
     tag: cli
+  openshift_knative-v0.14.1_knative-serving-src:
+    name: knative-v0.14.1
+    namespace: openshift
+    tag: knative-serving-src
+  openshift_knative-v0.14.2_knative-eventing-src:
+    name: knative-v0.14.2
+    namespace: openshift
+    tag: knative-eventing-src
 build_root:
   project_image:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
@@ -18,6 +26,12 @@ images:
       paths:
       - destination_dir: .
         source_path: /usr/bin/oc
+    openshift_knative-v0.14.1_knative-serving-src:
+      as:
+      - registry.svc.ci.openshift.org/openshift/knative-v0.14.1:knative-serving-src
+    openshift_knative-v0.14.2_knative-eventing-src:
+      as:
+      - registry.svc.ci.openshift.org/openshift/knative-v0.14.2:knative-eventing-src
   to: serverless-operator-src
 - context_dir: serving/ingress
   from: base
@@ -41,19 +55,6 @@ tag_specification:
   namespace: ocp
 tests:
 - as: e2e-aws-ocp-45
-  steps:
-    cluster_profile: aws
-    test:
-    - as: serverless-e2e
-      commands: make test-e2e
-      from: serverless-operator-src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: openshift-e2e-aws
-- as: e2e-aws-ocp-45-continuous
-  cron: 0 */6 * * *
   steps:
     cluster_profile: aws
     test:

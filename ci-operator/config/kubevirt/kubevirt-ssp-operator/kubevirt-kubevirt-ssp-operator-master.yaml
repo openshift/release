@@ -1,0 +1,40 @@
+base_images:
+  base:
+    name: "4.6"
+    namespace: ocp
+    tag: base
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- dockerfile_path: build/Dockerfile
+  to: kubevirt-ssp-operator-container
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.6"
+  namespace: ocp
+tests:
+- as: e2e-functests
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: export OC=oc V=5 && make ocp-ci-deploy && make functests
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+zz_generated_metadata:
+  branch: master
+  org: kubevirt
+  repo: kubevirt-ssp-operator

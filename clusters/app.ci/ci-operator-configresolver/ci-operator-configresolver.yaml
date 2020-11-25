@@ -99,6 +99,18 @@ items:
           app: prow
           component: ci-operator-configresolver
       spec:
+        affinity:
+          podAntiAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                  - key: component
+                    operator: In
+                    values:
+                    - ci-operator-configresolver
+                topologyKey: "kubernetes.io/hostname"
         containers:
         - name: ci-operator-configresolver
           image: ci-operator-configresolver:latest
@@ -167,6 +179,9 @@ items:
           - name: release-47
             mountPath: /etc/configs/release-4.7
             readOnly: true
+          - name: release-48
+            mountPath: /etc/configs/release-4.8
+            readOnly: true
           - name: job-config-misc
             mountPath: /etc/job-config/misc
             readOnly: true
@@ -196,6 +211,9 @@ items:
             readOnly: true
           - name: job-config-47
             mountPath: /etc/job-config/4.7
+            readOnly: true
+          - name: job-config-48
+            mountPath: /etc/job-config/4.8
             readOnly: true
           resources:
             requests:
@@ -238,6 +256,9 @@ items:
         - name: release-47
           configMap:
             name: ci-operator-4.7-configs
+        - name: release-48
+          configMap:
+            name: ci-operator-4.8-configs
         - name: job-config-misc
           configMap:
             name: job-config-misc
@@ -268,3 +289,6 @@ items:
         - name: job-config-47
           configMap:
             name: job-config-4.7
+        - name: job-config-48
+          configMap:
+            name: job-config-4.8

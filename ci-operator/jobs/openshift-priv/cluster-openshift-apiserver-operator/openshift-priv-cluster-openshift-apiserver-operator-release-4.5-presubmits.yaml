@@ -4,7 +4,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.5
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/e2e-aws
     decorate: true
     decoration_config:
@@ -67,7 +67,7 @@ presubmits:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -76,7 +76,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.5
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/e2e-aws-operator
     decorate: true
     decoration_config:
@@ -98,18 +98,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-aws-operator-cluster-profile
         - --target=e2e-aws-operator
-        - --template=/usr/local/e2e-aws-operator
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: e2e-aws-operator
-        - name: TEST_COMMAND
-          value: |
-            mkdir -p /tmp/artifacts
-            make test-e2e JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -125,9 +115,6 @@ presubmits:
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
-        - mountPath: /usr/local/e2e-aws-operator
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -150,12 +137,9 @@ presubmits:
       - name: github-credentials-openshift-ci-robot-private-git-cloner
         secret:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -164,7 +148,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.5
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/e2e-aws-operator-encryption
     decorate: true
     decoration_config:
@@ -186,18 +170,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-aws-operator-encryption-cluster-profile
         - --target=e2e-aws-operator-encryption
-        - --template=/usr/local/e2e-aws-operator-encryption
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: e2e-aws-operator-encryption
-        - name: TEST_COMMAND
-          value: |
-            mkdir -p /tmp/artifacts
-            make test-e2e-encryption JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -213,9 +187,6 @@ presubmits:
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
-        - mountPath: /usr/local/e2e-aws-operator-encryption
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -238,12 +209,9 @@ presubmits:
       - name: github-credentials-openshift-ci-robot-private-git-cloner
         secret:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -252,7 +220,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.5
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/e2e-aws-operator-encryption-perf
     decorate: true
     decoration_config:
@@ -274,18 +242,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-aws-operator-encryption-perf-cluster-profile
         - --target=e2e-aws-operator-encryption-perf
-        - --template=/usr/local/e2e-aws-operator-encryption-perf
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: e2e-aws-operator-encryption-perf
-        - name: TEST_COMMAND
-          value: |
-            mkdir -p /tmp/artifacts
-            make test-e2e-encryption-perf JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -301,9 +259,6 @@ presubmits:
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
-        - mountPath: /usr/local/e2e-aws-operator-encryption-perf
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -326,12 +281,9 @@ presubmits:
       - name: github-credentials-openshift-ci-robot-private-git-cloner
         secret:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -340,8 +292,8 @@ presubmits:
     always_run: true
     branches:
     - release-4.5
-    cluster: api.ci
-    context: ci/prow/e2e-aws-upgrade
+    cluster: build02
+    context: ci/prow/e2e-upgrade
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -349,9 +301,9 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-cluster-openshift-apiserver-operator-release-4.5-e2e-aws-upgrade
+    name: pull-ci-openshift-priv-cluster-openshift-apiserver-operator-release-4.5-e2e-upgrade
     path_alias: github.com/openshift/cluster-openshift-apiserver-operator
-    rerun_command: /test e2e-aws-upgrade
+    rerun_command: /test e2e-upgrade
     spec:
       containers:
       - args:
@@ -360,8 +312,8 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/usr/local/e2e-aws-upgrade-cluster-profile
-        - --target=e2e-aws-upgrade
+        - --secret-dir=/usr/local/e2e-upgrade-cluster-profile
+        - --target=e2e-upgrade
         command:
         - ci-operator
         image: ci-operator:latest
@@ -374,7 +326,7 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
+        - mountPath: /usr/local/e2e-upgrade-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
@@ -403,16 +355,16 @@ presubmits:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-upgrade,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-upgrade,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - release-4.5
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -457,7 +409,7 @@ presubmits:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -466,7 +418,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.5
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -511,7 +463,7 @@ presubmits:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -520,7 +472,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.5
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/verify
     decorate: true
     decoration_config:
@@ -565,7 +517,7 @@ presubmits:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator

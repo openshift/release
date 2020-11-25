@@ -19,7 +19,7 @@ images:
 resources:
   '*':
     requests:
-      cpu: 200m
+      cpu: 800m
       memory: 6Gi
 tag_specification:
   name: "4.5"
@@ -31,11 +31,18 @@ tests:
     test:
     - as: integration-e2e-steps
       commands: scripts/openshiftci-presubmit-all-tests.sh
+      credentials:
+      - mount_path: /usr/local/ci-secrets/odo-rabbitmq
+        name: odo-rabbitmq
+        namespace: test-credentials
+      env:
+      - default: /usr/local/ci-secrets/odo-rabbitmq/amqpuri
+        name: ODO_RABBITMQ_AMQP_URL
       from: oc-bin-image
       resources:
         requests:
           cpu: "2"
-          memory: 4Gi
+          memory: 6Gi
     workflow: ipi-aws
 - as: integration-e2e-periodic
   cron: 0 */6 * * *
@@ -48,7 +55,7 @@ tests:
       resources:
         requests:
           cpu: "2"
-          memory: 4Gi
+          memory: 6Gi
     workflow: ipi-aws
 zz_generated_metadata:
   branch: master

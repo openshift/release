@@ -277,3 +277,9 @@ $ curl --insecure -v https://${site} 2>&1 | awk 'BEGIN { cert=0 } /^\* Server ce
 * Connection #0 to host api.build02.gcp.ci.openshift.org left intact
 
 ```
+
+## Upgrade the cluster
+
+Unlike `build01` which has an automated job to do the upgrades, we upgrade `build02` manually.
+This is to keep the possibility of failover: in case of `build01` is upgraded to a version with issues,
+we still have a working `build02` in our build farm.

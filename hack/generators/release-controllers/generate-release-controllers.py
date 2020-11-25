@@ -73,9 +73,9 @@ class Context:
 
 def run(git_clone_dir):
     releases_4x = []
-    for name in glob.glob(f'{git_clone_dir}/ci-operator/config/openshift/origin/openshift-origin-release-4.*.yaml'):
-        bn = os.path.splitext(os.path.basename(name))[0]  # e.g. openshift-origin-release-4.4
-        major_minor = bn.split('-')[-1]  # 4.4
+    for name in glob.glob(f'{git_clone_dir}/ci-operator/jobs/openshift/release/openshift-release-release-4.*-periodics.yaml'):
+        bn = os.path.splitext(os.path.basename(name))[0]  # e.g. openshift-release-release-4.4-periodics
+        major_minor = bn.split('-')[-2]  # 4.4
         releases_4x.append(major_minor)
 
     path_base = pathlib.Path(git_clone_dir)
@@ -113,18 +113,11 @@ def run(git_clone_dir):
     with genlib.GenDoc(path_rc_release_resources.joinpath('admin_deploy-ocp-publish-art.yaml'), context=config) as gendoc:
         content.add_art_publish(gendoc)
 
-    with genlib.GenDoc(path_rc_build_configs.joinpath(f'ci-builder-images.yaml')) as gendoc_builders:
-        with genlib.GenDoc(path_rc_build_configs.joinpath(f'ci-release-images.yaml')) as gendoc_release:
-            with genlib.GenDoc(path_rc_build_configs.joinpath(f'ci-base-images.yaml')) as gendoc_base:
-                for major_minor in releases_4x:
-                    major, minor = major_minor.split('.')
-                    content.add_golang_builders(gendoc_builders, clone_dir=git_clone_dir, major=major, minor=minor)
-                    content.add_golang_release_builders(gendoc_release, clone_dir=git_clone_dir, major=major, minor=minor)
-                    content.add_base_image_builders(gendoc_base, clone_dir=git_clone_dir, major=major, minor=minor)
+    with genlib.GenDoc(path_rc_release_resources.joinpath(f'rpms-ocp-3.11.yaml'), context=config) as gendoc:
+        content.add_rpm_mirror_service(gendoc, git_clone_dir, '3.11')
 
     for major_minor in releases_4x:
-        major, minor = major_minor.split('.')
-        with genlib.GenDoc(path_rc_release_resources.joinpath(f'rpms-ocp-{major_minor}.yaml'), context) as gendoc:
+        with genlib.GenDoc(path_rc_release_resources.joinpath(f'rpms-ocp-{major_minor}.yaml'), context=config) as gendoc:
             content.add_rpm_mirror_service(gendoc, git_clone_dir, major_minor)
 
         # If there is an annotation defined for the public release controller, use it as a template

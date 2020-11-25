@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: ci
+  name: ci-docs
+spec:
+  selector:
+    app: ci-docs
+  ports:
+  - port: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: ci
+  name: ci-docs
+  labels:
+    app: ci-docs
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"ci-docs:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"ci-docs\")].image"}]'
+spec:
+  replicas: 2
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: ci-docs
+  template:
+    metadata:
+      labels:
+        app: ci-docs
+    spec:
+      containers:
+      - name: ci-docs
+        image: ci-docs
+        resources:
+          requests:
+            memory: "250Mi"
+            cpu: "100m"

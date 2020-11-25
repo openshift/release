@@ -1,0 +1,77 @@
+base_images:
+  base:
+    name: "4.5"
+    namespace: ocp
+    tag: base
+binary_build_commands: .ci/openshift-ci/build.sh
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- context_dir: .ci/openshift-ci/images
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/kata-containers/runtime/_out
+  to: kata-installer
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.5"
+  namespace: ocp
+tests:
+- artifact_dir: /go/src/github.com/kata-containers/tests/_output/tests/openshift-e2e
+  as: kata-containers-e2e-periodic
+  cron: 2 7 * * *
+  steps:
+    cluster_profile: azure4
+    test:
+    - as: kata-containers-e2e-test
+      commands: |
+        KATA_WORKDIR=/go/src/github.com/kata-containers/tests
+        LOCAL_SHARED_DIR=${KATA_WORKDIR}/shared_dir
+        mkdir -p $LOCAL_SHARED_DIR
+        cd $KATA_WORKDIR
+        # TODO: Currently the oc binary isn't available in the test container,
+        # so remove this when it is fixed in the multistage test machinery.
+        if ! command -V oc; then
+          curl https://mirror.openshift.com/pub/openshift-v4/clients/ocp/4.5.0/openshift-client-linux.tar.gz | tar -C . -xzf -
+          mkdir -p ${LOCAL_SHARED_DIR}/bin
+          cp -f oc kubectl ${LOCAL_SHARED_DIR}/bin
+          export PATH="${PATH}:${LOCAL_SHARED_DIR}/bin"
+        fi
+        # TODO: Also on multistage test the shared directory is currently
+        # read-only, so some oc commands might fail to read the kubeconfig file.
+        cp -f ${SHARED_DIR}/* ${LOCAL_SHARED_DIR}
+        export KUBECONFIG=${LOCAL_SHARED_DIR}/kubeconfig
+        # TODO: The ipi-azure test step does not export AZURE_AUTH_LOCATION
+        # which causes openshift-tests to fail.
+        export AZURE_AUTH_LOCATION=${LOCAL_SHARED_DIR}/metadata.json
+        # The test script will clone the origin repository in order to build
+        # the openshift-tests binary. However an origin (empty) folder can be
+        # left behind when the current container image was created, so the
+        # test script is going to fail.
+        [ -d "/go/src/github.com/openshift/origin" ] && rm -rf "/go/src/github.com/openshift/origin"
+        # Overwrite the default tests directories otherwise it will use /var and
+        # end up failing (read-only directory).
+        export KATA_TESTS_BASEDIR="${KATA_WORKDIR}/_output/tests"
+        .ci/openshift-ci/test.sh
+      from: pipeline:bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-azure
+zz_generated_metadata:
+  branch: master
+  org: kata-containers
+  repo: runtime

@@ -15,6 +15,14 @@ base_images:
     name: builder
     namespace: ocp
     tag: golang-1.14
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
   openshift_release_golang-1.13:
     name: release
     namespace: openshift
@@ -30,12 +38,11 @@ images:
 - dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
-    ocp_builder_golang-1.14:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:golang-1.14
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
   to: cluster-network-operator
 promotion:
-  disabled: true
   name: 4.6-priv
   namespace: ocp-private
 resources:
@@ -65,15 +72,10 @@ tests:
   openshift_installer:
     cluster_profile: gcp
     upgrade: true
-- as: e2e-gcp-upgrade
-  commands: TEST_SUITE=all run-upgrade-tests
-  openshift_installer:
-    cluster_profile: gcp
-    upgrade: true
-- as: e2e-aws-sdn-single
+- as: e2e-agnostic-upgrade
   steps:
-    cluster_profile: aws
-    workflow: openshift-e2e-aws-sdn-single
+    cluster_profile: gcp
+    workflow: openshift-upgrade-gcp-loki
 - as: e2e-aws-sdn-multi
   steps:
     cluster_profile: aws
@@ -86,21 +88,31 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-ovn-hybrid
-- as: e2e-metal-ipi
+- as: e2e-metal-ipi-ovn-ipv6
   steps:
     cluster_profile: packet
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
-- as: e2e-windows-hybrid-network
+- as: e2e-aws-ovn-windows
   steps:
     cluster_profile: aws
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-aws-ovn-hybrid
-- as: e2e-vsphere
+- as: e2e-aws-ovn-windows-custom-vxlan
+  steps:
+    cluster_profile: aws
+    test:
+    - ref: windows-e2e-operator-test-with-custom-vxlan-port
+    workflow: ipi-aws-ovn-hybrid-custom-vxlan-port
+- as: e2e-vsphere-ovn
   steps:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere-ovn
-- as: e2e-azure
+- as: e2e-azure-ovn
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-ovn

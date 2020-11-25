@@ -1,3 +1,4 @@
+from __future__ import print_function
 import json, sys, yaml, os, fnmatch, re;
 
 basename = '*.yaml'
@@ -17,7 +18,7 @@ for dirpath, dirnames, filenames in os.walk(dir):
     if y['promotion'].get('namespace','') != 'ocp' or y['promotion'].get('name','') not in ['4.0', '4.1', '4.2']:
       continue
 
-    print '/'.join([parts[0], parts[1], branch])
+    print( '/'.join([parts[0], parts[1], branch]))
 
 if count == 0:
   exit(1)

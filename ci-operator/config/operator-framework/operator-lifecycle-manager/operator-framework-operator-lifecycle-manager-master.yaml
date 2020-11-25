@@ -1,8 +1,16 @@
 base_images:
   base:
-    name: "4.6"
+    name: "4.7"
     namespace: ocp
     tag: base
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.7
   ocp_builder_rhel-8-golang-openshift-4.6:
     name: builder
     namespace: ocp
@@ -14,12 +22,12 @@ images:
 - dockerfile_path: Dockerfile
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-openshift-4.6:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-openshift-4.6
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
   to: operator-lifecycle-manager
 promotion:
-  name: "4.6"
+  name: "4.7"
   namespace: ocp
 resources:
   '*':
@@ -27,7 +35,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: "4.6"
+  name: "4.7"
   namespace: ocp
 tests:
 - as: verify
@@ -43,20 +51,27 @@ tests:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
 - as: e2e-aws-olm
-  commands: JUNIT_DIRECTORY=$(ARTIFACT_DIR) make e2e
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIRECTORY=$(ARTIFACT_DIR) make e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - artifact_dir: /tmp/artifacts
   as: e2e-aws-console-olm
   commands: ./test-prow-e2e.sh olmFull
   openshift_installer_custom_test_image:
     cluster_profile: aws
     from: stable:console-tests
-- as: e2e-gcp-upgrade
-  commands: TEST_SUITE=all run-upgrade-tests
-  openshift_installer:
+- as: e2e-upgrade
+  steps:
     cluster_profile: gcp
-    upgrade: true
+    workflow: openshift-upgrade-gcp-loki
 zz_generated_metadata:
   branch: master
   org: operator-framework

@@ -1,28 +1,36 @@
 base_images:
   base:
-    name: "4.6"
+    name: "4.7"
     namespace: ocp
     tag: base
-  ocp_builder_golang-1.13:
+  ocp_builder_golang-1.14:
     name: builder
     namespace: ocp
-    tag: golang-1.13
+    tag: golang-1.14
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: golang-1.14
 images:
 - dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
-    ocp_builder_golang-1.13:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
   to: cluster-authentication-operator
 promotion:
-  name: "4.6"
+  name: "4.7"
   namespace: ocp
 resources:
   '*':
@@ -30,7 +38,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: "4.6"
+  name: "4.7"
   namespace: ocp
 tests:
 - as: verify
@@ -50,21 +58,28 @@ tests:
     make test-unit JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
   container:
     from: src
-- as: e2e
+- as: e2e-agnostic
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
 - as: e2e-operator
-  commands: |
-    mkdir -p /tmp/artifacts
-    make test-e2e JUNITFILE=/tmp/artifacts/junit_report.xml
-  openshift_installer_src:
+  steps:
     cluster_profile: gcp
-- as: e2e-upgrade
-  commands: TEST_SUITE=all run-upgrade-tests
-  openshift_installer:
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        mkdir -p /tmp/artifacts
+        make test-e2e JUNITFILE=/tmp/artifacts/junit_report.xml
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- as: e2e-agnostic-upgrade
+  steps:
     cluster_profile: gcp
-    upgrade: true
+    workflow: openshift-upgrade-gcp-loki
 - artifact_dir: /tmp/artifacts
   as: e2e-console-login
   commands: ./test-prow-e2e.sh login
@@ -73,11 +88,19 @@ tests:
     from: stable:console-tests
 - artifact_dir: /tmp/artifacts
   as: e2e-operator-encryption
-  commands: |
-    mkdir -p /tmp/artifacts
-    make test-e2e-encryption JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
-  openshift_installer_src:
+  steps:
     cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        mkdir -p /tmp/artifacts
+        make test-e2e-encryption JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
 zz_generated_metadata:
   branch: master
   org: openshift

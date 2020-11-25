@@ -1,3 +1,4 @@
+from __future__ import print_function;
 import json, sys, copy;
 import ruamel.yaml as yaml; # ruamel allows us to preserve formatting
 
@@ -33,4 +34,4 @@ for t in ['postsubmits','presubmits']:
 if count > 0:
   out = yaml.dump(y, default_flow_style=False, Dumper=yaml.RoundTripDumper)
   out = out.replace(from_branch+'.yaml', to_branch+'.yaml')
-  print out
+  print(out)

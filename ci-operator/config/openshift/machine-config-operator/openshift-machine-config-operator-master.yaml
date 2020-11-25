@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: "4.6"
+    name: "4.7"
     namespace: ocp
     tag: base
   dev-scripts:
@@ -11,6 +11,14 @@ base_images:
     name: builder
     namespace: ocp
     tag: golang-1.13
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.7
   ocp_builder_rhel-8-golang-openshift-4.6:
     name: builder
     namespace: ocp
@@ -28,12 +36,12 @@ images:
 - dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-openshift-4.6:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-openshift-4.6
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
   to: machine-config-operator
 promotion:
-  name: "4.6"
+  name: "4.7"
   namespace: ocp
 resources:
   '*':
@@ -41,7 +49,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: "4.6"
+  name: "4.7"
   namespace: ocp
 tests:
 - as: unit
@@ -52,20 +60,31 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
+- as: e2e-aws-serial
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-serial
 - as: verify
   commands: |
     make verify
   container:
     from: src
 - as: e2e-gcp-op
-  commands: make test-e2e
-  openshift_installer_src:
+  steps:
     cluster_profile: gcp
-- as: e2e-gcp-upgrade
-  commands: TEST_SUITE=all run-upgrade-tests
-  openshift_installer:
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- as: e2e-agnostic-upgrade
+  steps:
     cluster_profile: gcp
-    upgrade: true
+    workflow: openshift-upgrade-gcp-loki
 - as: e2e-aws-workers-rhel7
   steps:
     cluster_profile: aws
@@ -75,16 +94,32 @@ tests:
   openshift_installer:
     cluster_profile: aws
 - as: cluster-bootimages
-  commands: ./test/e2e/old-bootimages.sh
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: ./test/e2e/old-bootimages.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: e2e-vsphere-upi
-  commands: TEST_SUITE=openshift/conformance/parallel run-tests
-  openshift_installer_upi:
+  steps:
     cluster_profile: vsphere
+    workflow: openshift-e2e-vsphere-upi
 - as: e2e-metal-ipi
   steps:
     cluster_profile: packet
+    workflow: baremetalds-e2e
+- as: e2e-metal-ipi-ovn-dualstack
+  steps:
+    cluster_profile: packet
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
 - as: e2e-azure
   steps:

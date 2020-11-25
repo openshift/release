@@ -45,6 +45,19 @@ tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/dev-scripts.tar.gz"
 # Prepare configuration and run dev-scripts
 scp "${SSHOPTS[@]}" "${CLUSTER_PROFILE_DIR}/pull-secret" "root@${IP}:pull-secret"
 
+# Additional mechanism to inject dev-scripts additional variables directly 
+# from a multistage step configuration.
+# Backward compatible with the previous approach based on creating the
+# dev-scripts-additional-config file from a multistage step command
+if [[ -n "${DEVSCRIPTS_CONFIG:-}" ]]; then
+  readarray -t config <<< "${DEVSCRIPTS_CONFIG}"
+  for var in "${config[@]}"; do
+    if [[ ! -z "${var}" ]]; then 
+      echo "export ${var}" >> "${SHARED_DIR}/dev-scripts-additional-config"
+    fi
+  done
+fi
+
 # Copy additional dev-script configuration provided by the the job, if present
 if [[ -e "${SHARED_DIR}/dev-scripts-additional-config" ]]
 then
@@ -74,22 +87,17 @@ fi
 
 cd dev-scripts
 
-set +x
-echo "export PULL_SECRET='\$(cat /root/pull-secret)'" > /root/dev-scripts/config_root.sh
-set -x
+cp /root/pull-secret /root/dev-scripts/pull_secret.json
 
 curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar -C /usr/bin -xzf -
 
-echo "export OPENSHIFT_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}" >> /root/dev-scripts/config_root.sh
+echo "export OPENSHIFT_RELEASE_IMAGE=${OPENSHIFT_INSTALL_RELEASE_IMAGE}" >> /root/dev-scripts/config_root.sh
 echo "export ADDN_DNS=\$(awk '/nameserver/ { print \$2;exit; }' /etc/resolv.conf)" >> /root/dev-scripts/config_root.sh
 echo "export OPENSHIFT_CI=true" >> /root/dev-scripts/config_root.sh
 echo "export WORKER_MEMORY=16384" >> /root/dev-scripts/config_root.sh
 
-# FIXME(stbenjam): Temporary to work around ovn bug
-echo "export IP_STACK=v4" >> /root/dev-scripts/config_root.sh
-
 # Inject PR additional configuration, if available
-if [[ -e /root/dev-scripts/dev-scripts-additional-config ]] 
+if [[ -e /root/dev-scripts/dev-scripts-additional-config ]]
 then
   cat /root/dev-scripts/dev-scripts-additional-config >> /root/dev-scripts/config_root.sh
 # Inject job additional configuration, if available
@@ -103,10 +111,3 @@ echo 'export KUBECONFIG=/root/dev-scripts/ocp/ostest/auth/kubeconfig' >> /root/.
 timeout -s 9 105m make
 
 EOF
-
-
-
-
-
-
-

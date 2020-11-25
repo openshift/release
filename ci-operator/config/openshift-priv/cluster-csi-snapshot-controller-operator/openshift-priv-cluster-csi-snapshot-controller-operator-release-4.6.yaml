@@ -3,27 +3,30 @@ base_images:
     name: 4.6-priv
     namespace: ocp-private
     tag: base
-  openshift_release_golang-1.13:
-    name: release
-    namespace: openshift
-    tag: golang-1.13
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
 binary_build_commands: make build
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: golang-1.15
 canonical_go_repository: github.com/openshift/cluster-csi-snapshot-controller-operator
 images:
 - dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
-    openshift_release_golang-1.13:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
       as:
-      - registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
   to: cluster-csi-snapshot-controller-operator
 promotion:
-  disabled: true
   name: 4.6-priv
   namespace: ocp-private
 resources:
@@ -51,11 +54,10 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
-- as: e2e-aws-upgrade
-  commands: TEST_SUITE=all run-upgrade-tests
-  openshift_installer:
+- as: e2e-upgrade
+  steps:
     cluster_profile: aws
-    upgrade: true
+    workflow: openshift-upgrade-aws-loki
 zz_generated_metadata:
   branch: release-4.6
   org: openshift-priv

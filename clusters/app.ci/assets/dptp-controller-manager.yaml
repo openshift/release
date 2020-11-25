@@ -10,6 +10,21 @@ rules:
   verbs:
   - '*'
 - apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  resourceNames:
+  - dptp-controller-manager
+  verbs:
+  - get
+  - update
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - create
+- apiGroups:
   - ""
   resources:
   - configmaps
@@ -66,7 +81,6 @@ spec:
     matchNames:
     - ci
 ---
-spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -110,12 +124,43 @@ spec:
         - --testImagesDistributorOptions.additional-image-stream-tag=ocp/builder:rhel-golang-1.12
         - --testImagesDistributorOptions.additional-image-stream-tag=ocp/builder:rhel-golang-1.13
         - --testImagesDistributorOptions.additional-image-stream-namespace=ci
+        - --testImagesDistributorOptions.forbidden-registry=registry.build01.ci.openshift.org
+        - --testImagesDistributorOptions.forbidden-registry=registry.build02.ci.openshift.org
         - --enable-controller=test_images_distributor
-        - --enable-controller=promotionreconciler
         - --enable-controller=secret_syncer
         - --secretSyncerConfigOptions.secretBoostrapConfigFile=/etc/ci-secret-bootstrap/_config.yaml
         - --secretSyncerConfigOptions.config=/etc/secret-mirroring/mapping.yaml
         - --step-config-path=/etc/registry
+        - --enable-controller=registry_syncer
+        - --registrySyncerOptions.imagePullSecretPath=/etc/regcred/.dockerconfigjson
+        - --registrySyncerOptions.denied-image-stream=origin/release
+        - --registrySyncerOptions.denied-image-stream=ocp/release
+        - --registrySyncerOptions.denied-image-stream=ocp-priv/release-priv
+        - --registrySyncerOptions.denied-image-stream=ocp-ppc64le/release-ppc64le
+        - --registrySyncerOptions.denied-image-stream=ocp-ppc64le-priv/release-ppc64le-priv
+        - --registrySyncerOptions.denied-image-stream=ocp-s390x/release-s390x
+        - --registrySyncerOptions.denied-image-stream=ocp-s390x-priv/release-s390x-priv
+        - --registrySyncerOptions.image-stream-namespace=ci
+        - --registrySyncerOptions.image-stream-namespace=origin
+        - --registrySyncerOptions.image-stream-namespace=ocp
+        - --registrySyncerOptions.image-stream-namespace=ocp-private
+        - --registrySyncerOptions.image-stream-namespace=ocp-priv
+        - --registrySyncerOptions.image-stream-namespace=ocp-ppc64le
+        - --registrySyncerOptions.image-stream-namespace=ocp-ppc64le-priv
+        - --registrySyncerOptions.image-stream-namespace=ocp-s390x
+        - --registrySyncerOptions.image-stream-namespace=ocp-s390x-priv
+        - --registrySyncerOptions.image-stream-namespace=codeready-toolchain
+        - --registrySyncerOptions.image-stream-namespace=integr8ly
+        - --registrySyncerOptions.image-stream-namespace=ovirt
+        - --registrySyncerOptions.image-stream-namespace=openshift-kni
+        - --registrySyncerOptions.image-stream-namespace=redht-developer
+        - --registrySyncerOptions.image-stream-namespace=images-openshift-acme
+        - --registrySyncerOptions.image-stream-namespace=fabric8-services
+        - --registrySyncerOptions.image-stream-prefix=openshift/knative-
+        - --registrySyncerOptions.image-stream-prefix=openshift/kubefed-operator-
+        - --registrySyncerOptions.image-stream-prefix=openshift/tektoncd-
+        - --registrySyncerOptions.image-stream-prefix=ocp/ocs-
+        - --registrySyncerOptions.image-stream-namespace=open-cluster-management
         - --dry-run=false
         env:
         - name: KUBECONFIG
@@ -174,6 +219,9 @@ spec:
         - name: release-47
           mountPath: /etc/configs/release-4.7
           readOnly: true
+        - name: release-48
+          mountPath: /etc/configs/release-4.8
+          readOnly: true
         - name: job-config-misc
           mountPath: /etc/job-config/misc
           readOnly: true
@@ -204,6 +252,9 @@ spec:
         - name: job-config-47
           mountPath: /etc/job-config/4.7
           readOnly: true
+        - name: job-config-48
+          mountPath: /etc/job-config/4.8
+          readOnly: true
         resources:
           requests:
             memory: "2Gi"
@@ -212,13 +263,13 @@ spec:
       volumes:
       - name: oauth
         secret:
-          secretName: github-credentials-openshift-ci-robot
+          secretName: github-credentials-openshift-merge-robot
       - name: kubeconfigs
         secret:
           secretName: dptp-controller-manager
       - name: regcred
         secret:
-          secretName: registry-cluster-pull-secret
+          secretName: registry-pull-credentials
       - name: registry
         configMap:
           name: step-registry
@@ -258,6 +309,9 @@ spec:
       - name: release-47
         configMap:
           name: ci-operator-4.7-configs
+      - name: release-48
+        configMap:
+          name: ci-operator-4.8-configs
       - name: config
         configMap:
           name: config
@@ -291,6 +345,9 @@ spec:
       - name: job-config-47
         configMap:
           name: job-config-4.7
+      - name: job-config-48
+        configMap:
+          name: job-config-4.8
 ---
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition

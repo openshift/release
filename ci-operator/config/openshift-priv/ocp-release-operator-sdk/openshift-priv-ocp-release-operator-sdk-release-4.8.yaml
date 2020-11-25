@@ -1,0 +1,132 @@
+base_images:
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
+  os:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-base-openshift-4.6
+  os-minimal:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-base-openshift-4.6
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-openshift-4.6
+canonical_go_repository: github.com/openshift/ocp-release-operator-sdk
+images:
+- dockerfile_path: ci/dockerfiles/builder.Dockerfile
+  from: root
+  to: osdk-builder
+- dockerfile_path: release/ansible/Dockerfile.rhel8
+  from: os
+  inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
+  to: ansible-operator
+- dockerfile_path: release/helm/Dockerfile
+  from: os-minimal
+  inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
+  to: helm-operator
+- dockerfile_path: release/sdk/Dockerfile
+  from: os-minimal
+  inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
+  to: operator-sdk
+- dockerfile_path: ci/dockerfiles/ansible-e2e.Dockerfile
+  from: ansible-operator
+  inputs:
+    osdk-builder:
+      as:
+      - osdk-builder
+  to: osdk-ansible-e2e
+- context_dir: test/ansible
+  dockerfile_path: build/Dockerfile
+  from: ansible-operator
+  to: osdk-ansible-full-e2e
+- dockerfile_path: ci/dockerfiles/helm-e2e.Dockerfile
+  from: helm-operator
+  inputs:
+    osdk-builder:
+      as:
+      - osdk-builder
+  to: osdk-helm-e2e
+promotion:
+  excluded_images:
+  - osdk-builder
+  - osdk-ansible-e2e
+  - osdk-ansible-full-e2e
+  - osdk-helm-e2e
+  - memcached-operator
+  - nginx-operator
+  name: 4.8-priv
+  namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 200Mi
+tag_specification:
+  name: 4.8-priv
+  namespace: ocp-private
+test_binary_build_commands: make build/operator-sdk-dev-x86_64-linux-gnu
+tests:
+- as: unit
+  commands: |
+    echo "running unit tests"
+    make test-unit
+  container:
+    from: src
+- as: sanity
+  commands: |
+    echo "setting environment"
+    export GOCACHE=/tmp
+    export XDG_CACHE_HOME=/tmp
+    unset VERSION
+    echo "patch upstream"
+    make -f ci/prow.Makefile patch
+    echo "running make test-sanity"
+    make test-sanity
+  container:
+    from: src
+- as: e2e-aws-ansible
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make -f ci/prow.Makefile test-e2e-ansible
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-helm
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make -f ci/prow.Makefile test-e2e-helm
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-4.8
+  org: openshift-priv
+  repo: ocp-release-operator-sdk

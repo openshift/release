@@ -4,7 +4,7 @@ presubmits:
     always_run: false
     branches:
     - master
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/e2e
     decorate: true
     decoration_config:
@@ -14,7 +14,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-integr8ly-integreatly-operator-master-e2e
     rerun_command: /test e2e
-    run_if_changed: ^(build/)|^(cmd/)|^(deploy/)|^(manifests/)|^(pkg/)|^(templates/monitoring/)|^(test/)|^(vendor/)|^(version/)
+    run_if_changed: (^(build/)|^(cmd/)|^(deploy/)|^(manifests/)|^(pkg/)|^(templates/monitoring/)|^(test/)|^(vendor/)|^(version/)).*([^.].{2}|\.[^m].|\..[^d])$
     spec:
       containers:
       - args:
@@ -73,7 +73,7 @@ presubmits:
         name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -118,7 +118,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -163,7 +163,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -208,7 +208,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -217,7 +217,85 @@ presubmits:
     always_run: false
     branches:
     - master
-    cluster: api.ci
+    cluster: build01
+    context: ci/prow/rhoam-e2e
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-integr8ly-integreatly-operator-master-rhoam-e2e
+    rerun_command: /test rhoam-e2e
+    run_if_changed: (^(build/)|^(cmd/)|^(deploy/)|^(manifests/)|^(pkg/)|^(templates/monitoring/)|^(test/)|^(vendor/)|^(version/)).*([^.].{2}|\.[^m].|\..[^d])$
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-password-file=/etc/boskos/password
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --secret-dir=/usr/local/rhoam-e2e-cluster-profile
+        - --target=rhoam-e2e
+        - --template=/usr/local/rhoam-e2e
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: JOB_NAME_SAFE
+          value: rhoam-e2e
+        - name: TEST_COMMAND
+          value: make test/e2e/rhoam/prow
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/rhoam-e2e-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/rhoam-e2e
+          name: job-definition
+          subPath: cluster-launch-installer-src.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-src
+        name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhoam-e2e,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - master
+    cluster: build01
     context: ci/prow/test-cases-lint
     decorate: true
     decoration_config:
@@ -254,7 +332,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -299,7 +377,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -344,7 +422,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -353,7 +431,7 @@ presubmits:
     always_run: false
     branches:
     - master
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/versions
     decorate: true
     decoration_config:
@@ -390,7 +468,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator

@@ -14,7 +14,7 @@ images:
   from: base
   to: work
 promotion:
-  name: "4.5"
+  name: "2.2"
   namespace: open-cluster-management
 resources:
   '*':
@@ -24,7 +24,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: "4.4"
+  name: "4.6"
   namespace: ocp
 test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
 tests:
@@ -54,13 +54,21 @@ tests:
   container:
     from: test-bin
 - as: e2e
-  commands: |
-    KUBECTL=oc
-    IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:work}
-    export KUBECTL IMAGE_NAME
-    make test-e2e
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        KUBECTL=oc
+        IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:work}
+        export KUBECTL IMAGE_NAME
+        make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: open-cluster-management

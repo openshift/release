@@ -1,0 +1,91 @@
+base_images:
+  base:
+    name: "4.8"
+    namespace: ocp
+    tag: base
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
+  openshift_release_golang-1.13:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+binary_build_commands: go build -o bin/manager sigs.k8s.io/cluster-api-provider-azure/cmd/manager/
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+canonical_go_repository: sigs.k8s.io/cluster-api-provider-azure
+images:
+- dockerfile_path: Dockerfile.rhel
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
+  to: azure-machine-controllers
+promotion:
+  name: "4.8"
+  namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.8"
+  namespace: ocp
+tests:
+- as: goimports
+  commands: IS_CONTAINER=TRUE make goimports
+  container:
+    from: src
+- as: govet
+  commands: |
+    # Instead of getting alias for cluster-api-provider-azure under
+    # /go/src/sigs.k8s.io/cluster-api-provider-azure, I get https://github.com/openshift/release
+    # instead. Recreate the alias directory until the issue is fixed.
+    if [ ! -e /go/src/sigs.k8s.io/cluster-api-provider-azure/pkg ]; then
+      rm -rf /go/src/sigs.k8s.io/cluster-api-provider-azure
+      cp -r /go/src/github.com/openshift/cluster-api-provider-azure/ /go/src/sigs.k8s.io/.
+      cd /go/src/sigs.k8s.io/cluster-api-provider-azure
+    fi
+    IS_CONTAINER=TRUE make vet
+  container:
+    from: src
+- as: generate
+  commands: IS_CONTAINER=TRUE NO_DOCKER=1 make generate
+  container:
+    from: src
+- as: unit
+  commands: |
+    NO_DOCKER=1 make test
+  container:
+    from: src
+- as: e2e-azure
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure
+- as: e2e-azure-operator
+  commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e
+  openshift_installer_custom_test_image:
+    cluster_profile: azure4
+    from: stable:cluster-api-actuator-pkg
+- as: e2e-upgrade
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-upgrade-azure-loki
+- as: git-history
+  commands: ./hack/verify_history.sh
+  container:
+    from: src
+zz_generated_metadata:
+  branch: release-4.8
+  org: openshift
+  repo: cluster-api-provider-azure

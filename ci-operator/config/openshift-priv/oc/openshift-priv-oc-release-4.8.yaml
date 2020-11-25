@@ -1,0 +1,167 @@
+base_images:
+  base:
+    name: 4.8-priv
+    namespace: ocp-private
+    tag: base
+  must-gather-base:
+    name: 4.8-priv
+    namespace: ocp-private
+    tag: must-gather
+  ocp_builder_rhel-7-golang-1.15-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-7-golang-1.15-openshift-4.7
+  ocp_builder_rhel-7-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-7-golang-openshift-4.6
+  ocp_builder_rhel-8-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
+  openshift_release_golang-1.13:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+  openshift_release_golang-1.14:
+    name: release
+    namespace: openshift
+    tag: golang-1.14
+  tests-base:
+    name: 4.8-priv
+    namespace: ocp-private
+    tag: tests
+binary_build_commands: make build --warn-undefined-variables
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.14
+canonical_go_repository: github.com/openshift/oc
+images:
+- dockerfile_path: images/cli/Dockerfile.rhel
+  from: base
+  inputs:
+    ocp_builder_rhel-7-golang-1.15-openshift-4.7:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-7-golang-1.15-openshift-4.7
+  to: cli
+- context_dir: images/tools
+  from: cli
+  to: tools
+- dockerfile_path: images/cli/Dockerfile.rhel
+  from: tests-base
+  inputs:
+    ocp_builder_rhel-7-golang-1.15-openshift-4.7:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-7-golang-1.15-openshift-4.7
+  to: tests
+- dockerfile_path: images/cli/Dockerfile.rhel
+  from: must-gather-base
+  inputs:
+    ocp_builder_rhel-7-golang-1.15-openshift-4.7:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-7-golang-1.15-openshift-4.7
+  to: must-gather
+- context_dir: images/deployer
+  dockerfile_path: Dockerfile.rhel
+  from: cli
+  to: deployer
+- dockerfile_path: images/cli-artifacts/Dockerfile.rhel
+  from: cli
+  inputs:
+    ocp_builder_rhel-7-golang-1.15-openshift-4.7:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-7-golang-1.15-openshift-4.7
+  to: cli-artifacts
+- context_dir: images/recycler/
+  dockerfile_path: Dockerfile.rhel
+  from: cli
+  to: recycler
+promotion:
+  additional_images:
+    oc-rpms: rpms
+  excluded_images:
+  - tests
+  - must-gather
+  - oc-base-with-rpms
+  name: 4.8-priv
+  namespace: ocp-private
+raw_steps:
+- rpm_image_injection_step:
+    from: base
+    to: oc-base-with-rpms
+resources:
+  '*':
+    requests:
+      cpu: "3"
+      memory: 6Gi
+  build-rpms-from-tar:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+rpm_build_commands: |-
+  TMPDIR=$( mktemp -d )
+  RPMBUILD_DIR=_rpmbuild/
+  mkdir -p ${RPMBUILD_DIR}/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+  tar -czf "${TMPDIR}/openshift-clients-0.0.1.tar.gz" --exclude='.git' --transform='s|^.|openshift-clients-0.0.1|' --exclude='openshift-clients-0.0.1.tar.gz' ./
+  cp ./oc.spec "${RPMBUILD_DIR}/SPECS/"
+  cp "${TMPDIR}/openshift-clients-0.0.1.tar.gz" "${RPMBUILD_DIR}/SOURCES/"
+  rpmbuild -ba --nodeps --define "_topdir $( pwd )/${RPMBUILD_DIR}" ${RPMBUILD_DIR}/SPECS/oc.spec --define "os_git_vars OS_GIT_VERSION='0.0.0' OS_GIT_COMMIT='${OPENSHIFT_BUILD_COMMIT::8}' OS_GIT_MAJOR='' OS_GIT_MINOR='' OS_GIT_TREE_STATE=''"
+rpm_build_location: _rpmbuild/RPMS/
+tag_specification:
+  name: 4.8-priv
+  namespace: ocp-private
+test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
+tests:
+- as: build-rpms-from-tar
+  commands: '# noop, just to force the building the `rpms` target'
+  container:
+    from: oc-base-with-rpms
+- as: rpm-build
+  commands: |
+    make rpm-build
+  container:
+    from: src
+- as: verify
+  commands: |
+    make verify -k --warn-undefined-variables
+  container:
+    from: bin
+- as: verify-deps
+  commands: |
+    make verify-deps -k --warn-undefined-variables
+  container:
+    from: src
+- artifact_dir: /tmp/artifacts
+  as: unit
+  commands: |
+    mkdir -p /tmp/artifacts
+    make test-unit JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
+  container:
+    from: test-bin
+- as: e2e-aws
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- as: e2e-aws-serial
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-serial
+- as: e2e-agnostic-cmd
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-cmd
+- as: e2e-aws-upgrade
+  commands: TEST_SUITE=all run-upgrade-tests
+  openshift_installer:
+    cluster_profile: aws
+    upgrade: true
+- as: e2e-aws-builds
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-builds
+zz_generated_metadata:
+  branch: release-4.8
+  org: openshift-priv
+  repo: oc

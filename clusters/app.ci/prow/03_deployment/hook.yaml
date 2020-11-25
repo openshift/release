@@ -1,7 +1,7 @@
 kind: List
 apiVersion: v1
 items:
-- apiVersion: v1
+- apiVersion: route.openshift.io/v1
   kind: Route
   metadata:
     namespace: ci
@@ -60,10 +60,22 @@ items:
           app: prow
           component: hook
       spec:
+        affinity:
+          podAntiAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                  - key: component
+                    operator: In
+                    values:
+                    - hook
+                topologyKey: "kubernetes.io/hostname"
         serviceAccountName: hook
         containers:
         - name: hook
-          image: gcr.io/k8s-prow/hook:v20200826-f9138eb980
+          image: gcr.io/k8s-prow/hook:v20201124-061f85d859
           args:
           - --config-path=/etc/config/config.yaml
           - --github-token-path=/etc/github/oauth
@@ -75,6 +87,9 @@ items:
           - --github-graphql-endpoint=http://ghproxy/graphql
           - --bugzilla-endpoint=https://bugzilla.redhat.com
           - --bugzilla-api-key-path=/etc/bugzilla/api
+          - --jira-endpoint=https://issues.redhat.com
+          - --jira-username=dptp-bot
+          - --jira-password-file=/etc/jira/password
           env:
           # Multiple configs can only be passed via the env var and not via the flag
           - name: KUBECONFIG
@@ -96,6 +111,9 @@ items:
             readOnly: true
           - name: bugzilla
             mountPath: /etc/bugzilla
+            readOnly: true
+          - name: jira
+            mountPath: /etc/jira
             readOnly: true
           - name: unsplash-api
             mountPath: /etc/unsplash-api
@@ -135,6 +153,9 @@ items:
           - name: job-config-47
             mountPath: /etc/job-config/4.7
             readOnly: true
+          - name: job-config-48
+            mountPath: /etc/job-config/4.8
+            readOnly: true
           - mountPath: /etc/build-farm-credentials
             name: build-farm-credentials
             readOnly: true
@@ -142,6 +163,16 @@ items:
             requests:
               memory: "3Gi"
               cpu: "200m"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 45
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /healthz/ready
+              port: 8081
         volumes:
         - name: hmac
           secret:
@@ -152,6 +183,9 @@ items:
         - name: bugzilla
           secret:
             secretName: bugzilla-credentials-openshift-bugzilla-robot
+        - name: jira
+          secret:
+            secretName: jira-credentials-dptp-bot
         - name: unsplash-api
           secret:
             secretName: unsplash-api-key
@@ -191,6 +225,9 @@ items:
         - name: job-config-47
           configMap:
             name: job-config-4.7
+        - name: job-config-48
+          configMap:
+            name: job-config-4.8
         - name: build-farm-credentials
           secret:
             items:

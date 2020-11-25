@@ -1,0 +1,14 @@
+# We have a PDB that doesn't allow draining of nodes when they still have any test workloads. This
+# means that cluster upgrades takes very long (days) if we stick to the default of 1 for maxUnavailable.
+# Since the ClusterAutoscaler  will scale the cluster up if we run into capacity issues, this has no
+# drawbacks (Ideally we would never do in-place upgrades and instead just create new nodes, but Openshift
+# doesn't support that).
+#
+# Be careful to not add any further config options here, we don't want to manage the rest of the MachineConfigPools
+# settings.
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfigPool
+metadata:
+  name: worker
+spec:
+  maxUnavailable: 20

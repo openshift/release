@@ -1,0 +1,51 @@
+base_images:
+  base:
+    name: "4.7"
+    namespace: ocp
+    tag: base
+  base-machine:
+    name: fedora
+    namespace: openshift
+    tag: "29"
+  machine-os-content-base:
+    name: "4.7"
+    namespace: ocp
+    tag: machine-os-content
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- context_dir: images/os/
+  from: base
+  inputs:
+    base-machine-with-rpms:
+      as:
+      - fedora:29
+    machine-os-content-base:
+      as:
+      - registry.svc.ci.openshift.org/rhcos/machine-os-content:4.7
+  to: machine-os-content
+raw_steps:
+- rpm_image_injection_step:
+    from: base-machine
+    to: base-machine-with-rpms
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 4Gi
+rpm_build_commands: hack/build-rpms.sh
+tag_specification:
+  name: "4.7"
+  namespace: ocp
+tests:
+- as: e2e-aws
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+zz_generated_metadata:
+  branch: release-1.20
+  org: cri-o
+  repo: cri-o

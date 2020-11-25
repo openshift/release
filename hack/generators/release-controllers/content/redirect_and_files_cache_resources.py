@@ -6,7 +6,7 @@ def _add_files_cache_resources(gendoc):
     if not context.private:
         gendoc.add_comments("""
 The release controller creates a files cache stateful set in each ci-release namespace
-used by a release controller. Create a service and a route to this public instance.        
+used by a release controller. Create a service and a route to this public instance.
         """)
         gendoc.append({
             'apiVersion': 'v1',
@@ -50,7 +50,7 @@ used by a release controller. Create a service and a route to this public instan
         gendoc.add_comments("""
         The release controller creates a files cache stateful set in each ci-release namespace
         used by a release controller. This is a private instance and we need to place and oauth
-        proxy in front of the normal service.        
+        proxy in front of the normal service.
                 """)
 
         # In private mode, we setup an oauth proxy in front of the files cache.
@@ -216,7 +216,7 @@ the cluster.  This imagestream is used as a commandline parameter to the release
                 {
                     'from': {
                         'kind': 'DockerImage',
-                        'name': 'registry.svc.ci.openshift.org/ocp/4.5:tests'
+                        'name': 'registry.svc.ci.openshift.org/ocp/4.6:tests'
                     },
                     'importPolicy': {
                         'scheduled': True

@@ -1,0 +1,49 @@
+base_images:
+  base:
+    name: "4.6"
+    namespace: ocp
+    tag: base
+binary_build_commands: make install
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  to: kubevirt-must-gather
+promotion:
+  name: "4.6"
+  namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.6"
+  namespace: ocp
+tests:
+- as: kubevirt-must-gather-e2e-aws
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        git clone https://github.com/kubevirt/hyperconverged-cluster-operator
+        cd hyperconverged-cluster-operator
+        sed -i "s#15m#30m#g" ./deploy/kustomize/deploy_kustomize.sh
+        CONTENT_ONLY=false MARKETPLACE_MODE=false ./deploy/kustomize/deploy_kustomize.sh
+        image=$(component=kubevirt-must-gather eval echo ${IMAGE_FORMAT})
+        oc adm must-gather --image="${image}"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: master
+  org: kubevirt
+  repo: must-gather

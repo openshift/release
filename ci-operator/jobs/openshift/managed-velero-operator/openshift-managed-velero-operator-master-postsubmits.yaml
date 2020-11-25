@@ -3,22 +3,20 @@ postsubmits:
   - agent: kubernetes
     branches:
     - ^master$
-    cluster: api.ci
+    cluster: build02
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: branch-ci-openshift-managed-velero-operator-master-coverage
+      ci-operator.openshift.io/prowgen-controlled: "true"
+    max_concurrency: 1
+    name: branch-ci-openshift-managed-velero-operator-master-publish-coverage
     spec:
       containers:
       - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
         - --secret-dir=/secrets/managed-velero-operator-codecov-token
-        - --target=coverage
+        - --target=publish-coverage
         command:
         - ci-operator
         image: ci-operator:latest
@@ -28,58 +26,9 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
         - mountPath: /secrets/managed-velero-operator-codecov-token
           name: managed-velero-operator-codecov-token
           readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
-      - name: managed-velero-operator-codecov-token
-        secret:
-          secretName: managed-velero-operator-codecov-token
-      - name: pull-secret
-        secret:
-          secretName: regcred
-  - agent: kubernetes
-    branches:
-    - ^master$
-    cluster: api.ci
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/is-promotion: "true"
-      ci-operator.openshift.io/prowgen-controlled: "true"
-    max_concurrency: 1
-    name: branch-ci-openshift-managed-velero-operator-master-images
-    spec:
-      containers:
-      - args:
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --promote
-        - --report-password-file=/etc/report/password.txt
-        - --report-username=ci
-        - --target=[images]
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -88,9 +37,12 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: managed-velero-operator-codecov-token
+        secret:
+          secretName: managed-velero-operator-codecov-token
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator

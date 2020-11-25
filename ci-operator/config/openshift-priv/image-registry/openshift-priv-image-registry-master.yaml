@@ -1,37 +1,45 @@
 base_images:
   base:
-    name: 4.6-priv
+    name: 4.7-priv
     namespace: ocp-private
     tag: base
   ocp_builder_golang-1.13:
     name: builder
     namespace: ocp
     tag: golang-1.13
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.7
   ocp_builder_rhel-8-golang-openshift-4.6:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-openshift-4.6
-  openshift_release_golang-1.13:
+  openshift_release_golang-1.15:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: golang-1.15
 binary_build_commands: make build
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: golang-1.15
 canonical_go_repository: github.com/openshift/image-registry
 images:
 - dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-openshift-4.6:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-openshift-4.6
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
   to: docker-registry
 promotion:
-  name: 4.6-priv
+  name: 4.7-priv
   namespace: ocp-private
 resources:
   '*':
@@ -43,13 +51,13 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: 4.6-priv
+  name: 4.7-priv
   namespace: ocp-private
 test_binary_build_commands: OS_GOFLAGS='-race' make build
 tests:
 - artifact_dir: /tmp/artifacts
   as: unit
-  commands: ARTIFACT_DIR=/tmp/artifacts JUNIT_REPORT=1 hack/test-go.sh
+  commands: JUNIT_REPORT=1 hack/test-go.sh
   container:
     from: test-bin
 - as: e2e-aws

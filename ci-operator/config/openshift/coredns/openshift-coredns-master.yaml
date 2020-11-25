@@ -1,12 +1,28 @@
 base_images:
   base:
-    name: "4.6"
+    name: "4.7"
     namespace: ocp
     tag: base
+  dev-scripts:
+    name: test
+    namespace: openshift-kni
+    tag: dev-scripts
   ocp_builder_golang-1.12:
     name: builder
     namespace: ocp
     tag: golang-1.12
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.7
+  ocp_builder_rhel-8-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
   openshift_release_golang-1.12:
     name: release
     namespace: openshift
@@ -15,18 +31,18 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.12
+    tag: rhel-8-release-golang-1.15-openshift-4.6
 canonical_go_repository: github.com/coredns/coredns
 images:
 - dockerfile_path: Dockerfile.openshift.rhel7
   from: base
   inputs:
-    ocp_builder_golang-1.12:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:golang-1.12
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
   to: coredns
 promotion:
-  name: "4.6"
+  name: "4.7"
   namespace: ocp
 resources:
   '*':
@@ -40,7 +56,7 @@ resources:
     requests:
       memory: 4Gi
 tag_specification:
-  name: "4.6"
+  name: "4.7"
   namespace: ocp
 tests:
 - as: unit
@@ -56,6 +72,10 @@ tests:
   openshift_installer:
     cluster_profile: aws
     upgrade: true
+- as: e2e-metal-ipi
+  steps:
+    cluster_profile: packet
+    workflow: baremetalds-e2e
 zz_generated_metadata:
   branch: master
   org: openshift

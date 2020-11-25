@@ -1,8 +1,16 @@
 base_images:
   base:
-    name: 4.6-priv
+    name: 4.7-priv
     namespace: ocp-private
     tag: base
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
   openshift_release_golang-1.12:
     name: release
     namespace: openshift
@@ -22,12 +30,12 @@ images:
 - dockerfile_path: images/release/Dockerfile
   from: base
   inputs:
-    openshift_release_golang-1.13:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
       as:
-      - openshift/golang-builder:1.12
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
   to: kube-storage-version-migrator
 promotion:
-  name: 4.6-priv
+  name: 4.7-priv
   namespace: ocp-private
 resources:
   '*':
@@ -35,7 +43,7 @@ resources:
       cpu: "3"
       memory: 1Gi
 tag_specification:
-  name: 4.6-priv
+  name: 4.7-priv
   namespace: ocp-private
 test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
 tests:

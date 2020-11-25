@@ -1,0 +1,90 @@
+base_images:
+  base:
+    name: 4.8-priv
+    namespace: ocp-private
+    tag: cli
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.7
+  ocp_builder_rhel-8-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-openshift-4.6
+canonical_go_repository: github.com/openshift/jenkins
+images:
+- context_dir: "2"
+  dockerfile_path: Dockerfile.rhel8
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/jenkins/2/.
+  to: jenkins
+- context_dir: slave-base
+  dockerfile_path: Dockerfile.rhel8
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/jenkins/slave-base/.
+  to: jenkins-agent-base
+- context_dir: agent-maven-3.5
+  dockerfile_path: Dockerfile.rhel8
+  from: jenkins-agent-base
+  inputs:
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/jenkins/agent-maven-3.5/.
+  to: jenkins-agent-maven
+- context_dir: agent-nodejs-12
+  dockerfile_path: Dockerfile.rhel8
+  from: jenkins-agent-base
+  inputs:
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/jenkins/agent-nodejs-12/.
+  to: jenkins-agent-nodejs
+promotion:
+  name: 4.8-priv
+  namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: 4.8-priv
+  namespace: ocp-private
+tests:
+- as: e2e-aws
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- as: e2e-aws-jenkins
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-jenkins
+zz_generated_metadata:
+  branch: release-4.8
+  org: openshift-priv
+  repo: jenkins

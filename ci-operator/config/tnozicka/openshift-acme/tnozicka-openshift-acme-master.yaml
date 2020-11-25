@@ -26,7 +26,7 @@ images:
   to: exposer
 promotion:
   name: "0.9"
-  namespace: openshift-acme
+  namespace: images-openshift-acme
 resources:
   '*':
     requests:
@@ -54,34 +54,58 @@ tests:
     from: test-bin
 - artifact_dir: /tmp/artifacts
   as: e2e-cluster-wide
-  commands: |
-    CONTROLLER_IMAGE=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:controller}
-    EXPOSER_IMAGE=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:exposer}
-    export CONTROLLER_IMAGE EXPOSER_IMAGE
-    ./hack/ci-deploy.sh cluster-wide
-    make ci-test-e2e-cluster-wide E2E_JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        CONTROLLER_IMAGE=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:controller}
+        EXPOSER_IMAGE=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:exposer}
+        export CONTROLLER_IMAGE EXPOSER_IMAGE
+        ./hack/ci-deploy.sh cluster-wide
+        make ci-test-e2e-cluster-wide E2E_JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - artifact_dir: /tmp/artifacts
   as: e2e-single-namespace
-  commands: |
-    CONTROLLER_IMAGE=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:controller}
-    EXPOSER_IMAGE=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:exposer}
-    export CONTROLLER_IMAGE EXPOSER_IMAGE
-    ./hack/ci-deploy.sh single-namespace
-    make ci-test-e2e-single-namespace E2E_JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        CONTROLLER_IMAGE=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:controller}
+        EXPOSER_IMAGE=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:exposer}
+        export CONTROLLER_IMAGE EXPOSER_IMAGE
+        ./hack/ci-deploy.sh single-namespace
+        make ci-test-e2e-single-namespace E2E_JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - artifact_dir: /tmp/artifacts
   as: e2e-specific-namespaces
-  commands: |
-    CONTROLLER_IMAGE=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:controller}
-    EXPOSER_IMAGE=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:exposer}
-    export CONTROLLER_IMAGE EXPOSER_IMAGE
-    ./hack/ci-deploy.sh specific-namespaces
-    make ci-test-e2e-specific-namespaces E2E_JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        CONTROLLER_IMAGE=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:controller}
+        EXPOSER_IMAGE=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:exposer}
+        export CONTROLLER_IMAGE EXPOSER_IMAGE
+        ./hack/ci-deploy.sh specific-namespaces
+        make ci-test-e2e-specific-namespaces E2E_JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: tnozicka

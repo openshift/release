@@ -4,7 +4,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.4
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/full-integ-aws
     decorate: true
     decoration_config:
@@ -23,17 +23,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/full-integ-aws-cluster-profile
         - --target=full-integ-aws
-        - --template=/usr/local/full-integ-aws
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: full-integ-aws
-        - name: TEST_COMMAND
-          value: |
-            . openshift/ci-operator/build-image/setup-logging-for-e2e.sh
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -46,9 +37,6 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/full-integ-aws-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/full-integ-aws
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -68,12 +56,9 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -120,7 +105,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -165,7 +150,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -174,7 +159,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.4
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/upgrade-full-integ-aws
     decorate: true
     decoration_config:
@@ -193,19 +178,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/upgrade-full-integ-aws-cluster-profile
         - --target=upgrade-full-integ-aws
-        - --template=/usr/local/upgrade-full-integ-aws
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: upgrade-full-integ-aws
-        - name: TEST_COMMAND
-          value: |
-            OPENSHIFT_BUILD_NAMESPACE= IMAGE_FORMAT= USE_CUSTOM_IMAGES=true hack/deploy-logging.sh
-            export LOGGING_DEPLOY_MODE=upgrade
-            . openshift/ci-operator/build-image/setup-logging-for-e2e.sh
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -218,9 +192,6 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/upgrade-full-integ-aws-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/upgrade-full-integ-aws
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -240,12 +211,9 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator

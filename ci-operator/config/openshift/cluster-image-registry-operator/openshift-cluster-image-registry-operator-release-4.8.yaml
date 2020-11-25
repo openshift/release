@@ -1,0 +1,135 @@
+base_images:
+  base:
+    name: "4.8"
+    namespace: ocp
+    tag: base
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.7
+  ocp_builder_rhel-8-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
+  openshift_release_golang-1.14:
+    name: release
+    namespace: openshift
+    tag: golang-1.14
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.14
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
+  to: cluster-image-registry-operator
+promotion:
+  name: "4.8"
+  namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.8"
+  namespace: ocp
+tests:
+- artifact_dir: /tmp/artifacts
+  as: unit
+  commands: JUNIT_REPORT=1 make test-unit
+  container:
+    from: src
+- as: e2e-aws
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- artifact_dir: /tmp/artifacts
+  as: e2e-aws-operator
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_REPORT=1 make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-image-registry
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-image-registry
+- as: e2e-upgrade
+  steps:
+    cluster_profile: aws
+    workflow: openshift-upgrade-aws-loki
+- as: e2e-gcp
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp
+- artifact_dir: /tmp/artifacts
+  as: e2e-gcp-operator
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_REPORT=1 make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- as: e2e-azure
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure
+- artifact_dir: /tmp/artifacts
+  as: e2e-azure-operator
+  steps:
+    cluster_profile: azure4
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_REPORT=1 make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-azure
+- as: e2e-vsphere
+  steps:
+    cluster_profile: vsphere
+    workflow: openshift-e2e-vsphere
+- as: e2e-vsphere-operator
+  steps:
+    cluster_profile: vsphere
+    test:
+    - artifact_dir: /tmp/artifacts
+      as: e2e-test
+      commands: JUNIT_REPORT=1 make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-vsphere
+- as: verify
+  commands: make verify
+  container:
+    from: src
+zz_generated_metadata:
+  branch: release-4.8
+  org: openshift
+  repo: cluster-image-registry-operator

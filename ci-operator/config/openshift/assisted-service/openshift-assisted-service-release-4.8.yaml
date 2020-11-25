@@ -1,0 +1,37 @@
+base_images:
+  openshift_release_golang-1.14:
+    name: release
+    namespace: openshift
+    tag: golang-1.14
+  ubi8:
+    name: ubi
+    namespace: ocp
+    tag: "8"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.14
+images:
+- dockerfile_path: Dockerfile.assisted-service
+  from: src
+  inputs:
+    openshift_release_golang-1.14:
+      as:
+      - registry.svc.ci.openshift.org/openshift/release:golang-1.14
+  to: assisted-service
+promotion:
+  name: "4.8"
+  namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.8"
+  namespace: ocp
+zz_generated_metadata:
+  branch: release-4.8
+  org: openshift
+  repo: assisted-service

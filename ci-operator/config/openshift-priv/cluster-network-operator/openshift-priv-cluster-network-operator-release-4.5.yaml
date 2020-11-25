@@ -56,15 +56,10 @@ tests:
   openshift_installer:
     cluster_profile: gcp
     upgrade: true
-- as: e2e-gcp-upgrade
-  commands: TEST_SUITE=all run-upgrade-tests
-  openshift_installer:
-    cluster_profile: gcp
-    upgrade: true
-- as: e2e-aws-sdn-single
+- as: e2e-agnostic-upgrade
   steps:
-    cluster_profile: aws
-    workflow: openshift-e2e-aws-sdn-single
+    cluster_profile: gcp
+    workflow: openshift-upgrade-gcp-loki
 - as: e2e-aws-sdn-multi
   steps:
     cluster_profile: aws
@@ -77,9 +72,13 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-ovn-hybrid
-- as: e2e-metal-ipi
+- as: e2e-metal-ipi-ovn-ipv6
   steps:
     cluster_profile: packet
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
 zz_generated_metadata:
   branch: release-4.5

@@ -17,12 +17,34 @@ tag_specification:
   name: "4.5"
   namespace: ocp
 tests:
-- as: chectl-e2e
-  commands: |
-    oc new-project che
-    .ci/cico_chectl_openshift.sh
-  openshift_installer_src:
+- as: chectl-e2e-operator-installer
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        oc new-project eclipse-che
+        .ci/oci_chectl_operator.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: chectl-e2e-olm-installer
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        oc new-project eclipse-che
+        .ci/oci_chectl_olm.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: che-incubator

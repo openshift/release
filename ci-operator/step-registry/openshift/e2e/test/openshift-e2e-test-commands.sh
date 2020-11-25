@@ -18,6 +18,15 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 mkdir -p "${HOME}"
 
+# Override the upstream docker.io registry due to issues with rate limiting
+# https://bugzilla.redhat.com/show_bug.cgi?id=1895107
+# sjenning: TODO: use of personal repo is temporary; should find long term location for these mirrored images
+export KUBE_TEST_REPO_LIST=${HOME}/repo_list.yaml
+cat <<EOF > ${KUBE_TEST_REPO_LIST}
+dockerLibraryRegistry: quay.io/sjenning
+dockerGluster: quay.io/sjenning
+EOF
+
 # if the cluster profile included an insights secret, install it to the cluster to
 # report support data from the support-operator
 if [[ -f "${CLUSTER_PROFILE_DIR}/insights-live.yaml" ]]; then
@@ -48,6 +57,8 @@ aws)
     ;;
 azure4) export TEST_PROVIDER=azure;;
 vsphere) export TEST_PROVIDER=vsphere;;
+openstack) export TEST_PROVIDER='{"type":"openstack"}';;
+openstack-vexxhost) export TEST_PROVIDER='{"type":"openstack"}';;
 *) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"; exit 1;;
 esac
 
@@ -66,7 +77,24 @@ if [[ "${CLUSTER_TYPE}" == gcp ]]; then
     popd
 fi
 
-openshift-tests "${TEST_COMMAND}" "${TEST_SUITE}" \
+if [[ -n "${TEST_OPTIONS}" ]]; then
+    TEST_ARGS="--options=${TEST_OPTIONS}"
+fi
+
+if [[ "${TEST_COMMAND}" == "run-upgrade" && -n "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}" ]]; then
+    # OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE is a pullspec of release:latest imagestreamtag
+    TEST_ARGS="${TEST_ARGS:-} --to-image=${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"
+fi
+
+if [[ -n "${TEST_SKIPS}" ]]; then
+    TESTS="$(openshift-tests "${TEST_COMMAND}" --dry-run "${TEST_SUITE}")"
+    echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests
+    echo "Skipping tests:"
+    echo "${TESTS}" | grep "${TEST_SKIPS}"
+    TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
+fi
+
+openshift-tests "${TEST_COMMAND}" "${TEST_SUITE}" ${TEST_ARGS:-} \
     --provider "${TEST_PROVIDER}" \
     -o /tmp/artifacts/e2e.log \
     --junit-dir /tmp/artifacts/junit

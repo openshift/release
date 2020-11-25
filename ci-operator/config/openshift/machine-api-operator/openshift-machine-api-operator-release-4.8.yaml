@@ -1,0 +1,128 @@
+base_images:
+  base:
+    name: "4.8"
+    namespace: ocp
+    tag: base
+  dev-scripts:
+    name: test
+    namespace: openshift-kni
+    tag: dev-scripts
+  ocp_builder_golang-1.13:
+    name: builder
+    namespace: ocp
+    tag: golang-1.13
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
+  openshift_release_golang-1.13:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+binary_build_commands: NO_DOCKER=1 make build
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- dockerfile_path: Dockerfile.rhel
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
+  to: machine-api-operator
+promotion:
+  name: "4.8"
+  namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.8"
+  namespace: ocp
+tests:
+- as: unit
+  commands: NO_DOCKER=1 make test
+  container:
+    from: src
+- as: generate
+  commands: IS_CONTAINER=TRUE NO_DOCKER=1 make generate
+  container:
+    from: src
+- as: goimports
+  commands: IS_CONTAINER=TRUE make goimports
+  container:
+    from: src
+- as: govet
+  commands: IS_CONTAINER=TRUE make vet
+  container:
+    from: src
+- as: golint
+  commands: IS_CONTAINER=TRUE make lint
+  container:
+    from: src
+- as: e2e-aws
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- as: e2e-azure
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure
+- as: e2e-aws-operator
+  commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e
+  openshift_installer_custom_test_image:
+    cluster_profile: aws
+    from: stable:cluster-api-actuator-pkg
+- as: e2e-aws-operator-tech-preview
+  commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-tech-preview
+  openshift_installer_custom_test_image:
+    cluster_profile: aws
+    from: stable:cluster-api-actuator-pkg
+- as: e2e-aws-upgrade
+  commands: TEST_SUITE=all run-upgrade-tests
+  openshift_installer:
+    cluster_profile: aws
+    upgrade: true
+- as: e2e-aws-workers-rhel7
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-workers-rhel7
+- as: e2e-azure-operator
+  commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e
+  openshift_installer_custom_test_image:
+    cluster_profile: azure4
+    from: stable:cluster-api-actuator-pkg
+- as: e2e-gcp
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp
+- as: e2e-gcp-operator
+  commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e
+  openshift_installer_custom_test_image:
+    cluster_profile: gcp
+    from: stable:cluster-api-actuator-pkg
+- as: e2e-metal-ipi
+  steps:
+    cluster_profile: packet
+    workflow: baremetalds-e2e
+- as: e2e-vsphere-serial
+  steps:
+    cluster_profile: vsphere
+    workflow: openshift-e2e-vsphere-serial
+- as: e2e-libvirt
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-libvirt
+zz_generated_metadata:
+  branch: release-4.8
+  org: openshift
+  repo: machine-api-operator

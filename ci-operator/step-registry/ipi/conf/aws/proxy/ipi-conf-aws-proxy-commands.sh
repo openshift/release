@@ -15,7 +15,7 @@ cat > /tmp/proxy.ign << EOF
       "tls": {}
     },
     "timeouts": {},
-    "version": "2.2.0"
+    "version": "3.0.0"
   },
   "passwd": {
     "users": [
@@ -30,44 +30,28 @@ cat > /tmp/proxy.ign << EOF
   "storage": {
     "files": [
       {
-        "filesystem": "root",
         "path": "/etc/squid/passwords",
-        "user": {
-          "name": "root"
-        },
         "contents": {
           "source": "data:text/plain;base64,${HTPASSWD_CONTENTS}"
         },
         "mode": 420
       },
       {
-        "filesystem": "root",
         "path": "/etc/squid/squid.conf",
-        "user": {
-          "name": "root"
-        },
         "contents": {
           "source": "data:text/plain;base64,${SQUID_CONFIG}"
         },
         "mode": 420
       },
       {
-        "filesystem": "root",
         "path": "/etc/squid.sh",
-        "user": {
-          "name": "root"
-        },
         "contents": {
           "source": "data:text/plain;base64,${SQUID_SH}"
         },
         "mode": 420
       },
       {
-        "filesystem": "root",
         "path": "/etc/squid/proxy.sh",
-        "user": {
-          "name": "root"
-        },
         "contents": {
           "source": "data:text/plain;base64,${PROXY_SH}"
         },
@@ -78,7 +62,7 @@ cat > /tmp/proxy.ign << EOF
   "systemd": {
     "units": [
       {
-        "contents": "[Service]\n\nExecStart=bash /etc/squid.sh\n\n[Install]\nWantedBy=multi-user.target\n",
+        "contents": "[Unit]\nWants=network-online.target\nAfter=network-online.target\n[Service]\n\nStandardOutput=journal+console\nExecStart=bash /etc/squid.sh\n\n[Install]\nRequiredBy=multi-user.target\n",
         "enabled": true,
         "name": "squid.service"
       },
@@ -110,8 +94,8 @@ Parameters:
     ConstraintDescription: Infrastructure name must be alphanumeric, start with a letter, and have a maximum of 27 characters.
     Description: A short, unique cluster ID used to tag cloud resources and identify items owned or used by the cluster.
     Type: String
-  RhcosAmi:
-    Description: Current Red Hat Enterprise Linux CoreOS AMI to use for proxy.
+  Ami:
+    Description: Current CoreOS AMI to use for proxy.
     Type: AWS::EC2::Image::Id
   AllowedProxyCidr:
     AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|1[0-9]|2[0-9]|3[0-2]))$
@@ -143,7 +127,7 @@ Metadata:
     - Label:
         default: "Host Information"
       Parameters:
-      - RhcosAmi
+      - Ami
       - ProxyIgnitionLocation
     - Label:
         default: "Network Configuration"
@@ -160,8 +144,8 @@ Metadata:
         default: "VPC ID"
       AllowedProxyCidr:
         default: "Allowed ingress Source"
-      RhcosAmi:
-        default: "Red Hat Enterprise Linux CoreOS AMI ID"
+      Ami:
+        default: "CoreOS AMI ID"
       ProxyIgnitionLocation:
         default: "Bootstrap Ignition Source"
       ClusterName:
@@ -219,10 +203,10 @@ Resources:
   ProxyInstance:
     Type: AWS::EC2::Instance
     Properties:
-      ImageId: !Ref RhcosAmi
+      ImageId: !Ref Ami
       IamInstanceProfile: !Ref ProxyInstanceProfile
       KeyName: "openshift-dev"
-      InstanceType: "i3.large"
+      InstanceType: "m5.xlarge"
       NetworkInterfaces:
       - AssociatePublicIpAddress: "true"
         DeviceIndex: "0"
@@ -231,7 +215,7 @@ Resources:
         SubnetId: !Ref "PublicSubnet"
       UserData:
         Fn::Base64: !Sub
-        - '{"ignition":{"config":{"replace":{"source":"\${IgnitionLocation}","verification":{}}},"timeouts":{},"version":"2.1.0"},"networkd":{},"passwd":{},"storage":{},"systemd":{}}'
+        - '{"ignition":{"config":{"replace":{"source":"\${IgnitionLocation}"}},"version":"3.0.0"}}'
         - {
           IgnitionLocation: !Ref ProxyIgnitionLocation
         }
@@ -243,6 +227,9 @@ Outputs:
   ProxyPrivateIp:
     Description: The proxy node private IP address.
     Value: !GetAtt ProxyInstance.PrivateIp
+  ProxyPublicIp:
+    Description: The proxy node public IP address.
+    Value: !GetAtt ProxyInstance.PublicIp
 EOF
 }
 
@@ -260,14 +247,25 @@ PROXY_IMAGE=registry.svc.ci.openshift.org/origin/4.5:egress-http-proxy
 
 PROXY_NAME="$(/tmp/yq r "${CONFIG}" 'metadata.name')"
 REGION="$(/tmp/yq r "${CONFIG}" 'platform.aws.region')"
+echo Using region: ${REGION}
+test -n "${REGION}"
 
-RHCOS_AMI="$(jq -r ".amis[\"${REGION}\"].hvm" /var/lib/openshift-install/rhcos.json)"
+curl -L -o /tmp/fcos-stable.json https://builds.coreos.fedoraproject.org/streams/stable.json
+AMI=$(jq -r .architectures.x86_64.images.aws.regions[\"${REGION}\"].image < /tmp/fcos-stable.json)
+if [ -z "${AMI}" ]; then
+  echo "Missing AMI in region: ${REGION}" 1>&2
+  exit 1
+fi
+RELEASE=$(jq -r .architectures.x86_64.images.aws.regions[\"${REGION}\"].release < /tmp/fcos-stable.json)
+echo "Using FCOS ${RELEASE} AMI: ${AMI}"
 
 ssh_pub_key=$(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")
 
 # get the VPC ID from a subnet -> subnet.VpcId
 aws_subnet="$(/tmp/yq r "${CONFIG}" 'platform.aws.subnets[0]')"
+echo "Using aws_subnet: ${aws_subnet}"
 vpc_id="$(aws --region "${REGION}" ec2 describe-subnets --subnet-ids "${aws_subnet}" | jq -r '.[][0].VpcId')"
+echo "Using vpc_id: ${vpc_id}"
 
 # for each subnet:
 # aws ec2 describe-route-tables --filters Name=association.subnet-id,Values=${value} | grep '"GatewayId": "igw.*'
@@ -285,6 +283,7 @@ done
 if [[ -z "$public_subnet" ]]; then
   echo "Cound not find a public subnet in ${SUBNETS}" && exit 1
 fi
+echo "Using public_subnet: ${public_subnet}"
 
 PASSWORD="$(uuidgen | sha256sum | cut -b -32)"
 HTPASSWD_CONTENTS="${PROXY_NAME}:$(openssl passwd -apr1 ${PASSWORD})"
@@ -356,28 +355,33 @@ aws --region "${REGION}" cloudformation create-stack \
   ParameterKey=VpcId,ParameterValue="${vpc_id}" \
   ParameterKey=ProxyIgnitionLocation,ParameterValue="${PROXY_URI}" \
   ParameterKey=InfrastructureName,ParameterValue="${PROXY_NAME}" \
-  ParameterKey=RhcosAmi,ParameterValue="${RHCOS_AMI}" \
+  ParameterKey=Ami,ParameterValue="${AMI}" \
   ParameterKey=PublicSubnet,ParameterValue="${public_subnet}" &
 
 wait "$!"
+echo "Created stack"
 
 aws --region "${REGION}" cloudformation wait stack-create-complete --stack-name "${PROXY_NAME}-proxy" &
 wait "$!"
+echo "Waited for stack"
 
 INSTANCE_ID="$(aws --region "${REGION}" cloudformation describe-stacks --stack-name "${PROXY_NAME}-proxy" \
 --query 'Stacks[].Outputs[?OutputKey == `ProxyId`].OutputValue' --output text)"
+echo "Instance ${INSTANCE_ID}"
 
 # to allow log collection during gather:
 # append to proxy instance ID to "${SHARED_DIR}/aws-instance-ids.txt"
 echo "${INSTANCE_ID}" >> "${SHARED_DIR}/aws-instance-ids.txt"
 
-PROXY_IP="$(aws --region "${REGION}" cloudformation describe-stacks --stack-name "${PROXY_NAME}-proxy" \
+PRIVATE_PROXY_IP="$(aws --region "${REGION}" cloudformation describe-stacks --stack-name "${PROXY_NAME}-proxy" \
   --query 'Stacks[].Outputs[?OutputKey == `ProxyPrivateIp`].OutputValue' --output text)"
+PUBLIC_PROXY_IP="$(aws --region "${REGION}" cloudformation describe-stacks --stack-name "${PROXY_NAME}-proxy" \
+  --query 'Stacks[].Outputs[?OutputKey == `ProxyPublicIp`].OutputValue' --output text)"
 
 # echo proxy IP to ${SHARED_DIR}/proxyip
-echo "${PROXY_IP}" >> "${SHARED_DIR}/proxyip"
+echo "${PUBLIC_PROXY_IP}" >> "${SHARED_DIR}/proxyip"
 
-PROXY_URL="http://${PROXY_NAME}:${PASSWORD}@${PROXY_IP}:3128/"
+PROXY_URL="http://${PROXY_NAME}:${PASSWORD}@${PRIVATE_PROXY_IP}:3128/"
 # due to https://bugzilla.redhat.com/show_bug.cgi?id=1750650 we don't use a tls end point for squid
 
 cat >> "${CONFIG}" << EOF

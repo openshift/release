@@ -3,7 +3,7 @@ postsubmits:
   - agent: kubernetes
     branches:
     - ^master$
-    cluster: api.ci
+    cluster: build02
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -16,6 +16,7 @@ postsubmits:
       containers:
       - args:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
         - --promote
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
@@ -32,6 +33,9 @@ postsubmits:
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
+        - mountPath: /etc/push-secret
+          name: push-secret
+          readOnly: true
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
@@ -39,7 +43,10 @@ postsubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
+      - name: push-secret
+        secret:
+          secretName: registry-push-credentials-ci-central
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -47,42 +54,36 @@ postsubmits:
     branches:
     - master
     - stage
-    cluster: api.ci
     labels:
       master: ci.openshift.redhat.com
     name: test_branch_openshift_ansible_extended_conformance_gce
   - agent: jenkins
     branches:
     - master
-    cluster: api.ci
     labels:
       master: ci.openshift.redhat.com
     name: test_branch_openshift_ansible_logging
   - agent: jenkins
     branches:
     - master
-    cluster: api.ci
     labels:
       master: ci.openshift.redhat.com
     name: test_branch_openshift_ansible_logging_json_file
   - agent: jenkins
     branches:
     - master
-    cluster: api.ci
     labels:
       master: ci.openshift.redhat.com
     name: test_branch_origin_extended_conformance_install_containerized
   - agent: jenkins
     branches:
     - master
-    cluster: api.ci
     labels:
       master: ci.openshift.redhat.com
     name: test_branch_origin_extended_conformance_install_in_tree
   - agent: jenkins
     branches:
     - master
-    cluster: api.ci
     labels:
       master: ci.openshift.redhat.com
     name: test_branch_origin_extended_conformance_install_update_containerized

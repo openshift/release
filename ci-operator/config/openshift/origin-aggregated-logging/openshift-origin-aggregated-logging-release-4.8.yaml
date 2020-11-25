@@ -1,0 +1,111 @@
+base_images:
+  base:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-base-openshift-4.6
+  base_centos:
+    name: centos
+    namespace: openshift
+    tag: "7"
+  golang-builder:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
+  ubi7:
+    name: ubi
+    namespace: ocp
+    tag: "7"
+  ubi8:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-base-openshift-4.6
+  ubi8-nodejs10:
+    name: builder
+    namespace: ocp
+    tag: ubi8.nodejs.10
+  ubi8-python36:
+    name: builder
+    namespace: ocp
+    tag: ubi8.python.36
+  ubi8-ruby25:
+    name: builder
+    namespace: ocp
+    tag: ubi8.ruby.25
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-openshift-4.6
+images:
+- dockerfile_path: openshift/ci-operator/build-image/Dockerfile
+  from: src
+  to: origin-aggregated-logging-tests
+- dockerfile_path: test/unit/Dockerfile.rhel8
+  from: ubi8-ruby25
+  to: logging-test-unit
+- context_dir: fluentd
+  dockerfile_path: Dockerfile
+  from: ubi8-ruby25
+  to: logging-fluentd
+- context_dir: elasticsearch
+  dockerfile_path: Dockerfile.rhel8
+  from: ubi8
+  to: logging-elasticsearch6
+- context_dir: kibana
+  dockerfile_path: Dockerfile.rhel8
+  from: ubi8-nodejs10
+  to: logging-kibana6
+- context_dir: curator
+  dockerfile_path: Dockerfile
+  from: ubi8-python36
+  to: logging-curator5
+- context_dir: eventrouter/
+  dockerfile_path: Dockerfile.centos7
+  from: ubi8
+  to: logging-eventrouter
+promotion:
+  additional_images:
+    logging-ci-test-runner: src
+  name: "4.8"
+  namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: "1"
+      memory: 200Mi
+  src:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.8"
+  namespace: ocp
+tests:
+- as: unit
+  commands: /tmp/run.sh
+  container:
+    from: logging-test-unit
+- as: smoke
+  commands: make test
+  openshift_installer_custom_test_image:
+    cluster_profile: aws
+    from: stable:origin-aggregated-logging-tests
+- as: elastic-operator-e2e
+  commands: make test-e2e-olm
+  openshift_installer_custom_test_image:
+    cluster_profile: aws
+    from: stable:elasticsearch-operator-src
+- as: cluster-logging-operator-e2e
+  commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=/tmp/artifacts/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts make test-e2e-olm
+  openshift_installer_custom_test_image:
+    cluster_profile: aws
+    from: stable:cluster-logging-operator-e2e
+- as: clo-functional
+  commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=/tmp/artifacts/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts make test-functional
+  openshift_installer_custom_test_image:
+    cluster_profile: aws
+    from: stable:cluster-logging-operator-e2e
+zz_generated_metadata:
+  branch: release-4.8
+  org: openshift
+  repo: origin-aggregated-logging

@@ -169,6 +169,30 @@ images:
       - destination_dir: .
         source_path: /go/bin/singlethreaded
   to: knative-serving-test-singlethreaded
+- dockerfile_path: openshift/ci-operator/knative-test-images/servingcontainer/Dockerfile
+  from: base
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/servingcontainer
+  to: knative-serving-test-servingcontainer
+- dockerfile_path: openshift/ci-operator/knative-test-images/sidecarcontainer/Dockerfile
+  from: base
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/sidecarcontainer
+  to: knative-serving-test-sidecarcontainer
+- dockerfile_path: openshift/ci-operator/knative-test-images/hellohttp2/Dockerfile
+  from: base
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/hellohttp2
+  to: knative-serving-test-hellohttp2
 - dockerfile_path: openshift/ci-operator/knative-test-images/hellovolume/Dockerfile
   from: base
   inputs:
@@ -177,6 +201,9 @@ images:
       - destination_dir: .
         source_path: /go/bin/hellovolume
   to: knative-serving-test-hellovolume
+promotion:
+  name: knative-nightly
+  namespace: openshift
 resources:
   '*':
     requests:
@@ -188,9 +215,17 @@ tag_specification:
 test_binary_build_commands: make test-install
 tests:
 - as: e2e-aws-ocp-46
-  commands: make test-e2e
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: release-next
   org: openshift

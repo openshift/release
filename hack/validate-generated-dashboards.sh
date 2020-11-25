@@ -15,4 +15,4 @@ jb --version
 
 mixins_dir="${base_dir}/clusters/app.ci/prow-monitoring/mixins"
 
-make -C "${mixins_dir}" validate-latest
+make -C "${mixins_dir}" validate

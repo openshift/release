@@ -15,19 +15,28 @@ items:
         component: gcsweb
     template:
       metadata:
-        creationTimestamp: null
         labels:
           app: prow
           component: gcsweb
       spec:
         containers:
-        - image: gcr.io/k8s-prow/gcsweb:v20200826-f9138eb980
+        - image: gcr.io/k8s-prow/gcsweb:v20201124-061f85d859
           name: gcsweb
           args:
           - "-b"
           - "origin-ci-test"
           - "-b"
           - "origin-federated-results"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 10
+            periodSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz/ready
+              port: 8081
 - kind: Service
   apiVersion: v1
   metadata:
@@ -51,6 +60,8 @@ items:
 - kind: Route
   apiVersion: v1
   metadata:
+    annotations:
+      haproxy.router.openshift.io/timeout: 1h
     name: gcsweb
     namespace: ci
     labels:

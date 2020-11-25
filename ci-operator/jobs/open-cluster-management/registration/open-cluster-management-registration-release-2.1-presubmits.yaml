@@ -4,7 +4,7 @@ presubmits:
     always_run: true
     branches:
     - release-2.1
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/build
     decorate: true
     decoration_config:
@@ -47,7 +47,7 @@ presubmits:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -56,7 +56,7 @@ presubmits:
     always_run: true
     branches:
     - release-2.1
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/e2e
     decorate: true
     decoration_config:
@@ -76,20 +76,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-cluster-profile
         - --target=e2e
-        - --template=/usr/local/e2e
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: e2e
-        - name: TEST_COMMAND
-          value: |
-            KUBECTL=oc
-            IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:registration}
-            export KUBECTL IMAGE_NAME
-            make test-e2e
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -105,9 +93,6 @@ presubmits:
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
-        - mountPath: /usr/local/e2e
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -130,12 +115,9 @@ presubmits:
       - name: github-credentials-openshift-ci-robot-private-git-cloner
         secret:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -144,7 +126,7 @@ presubmits:
     always_run: true
     branches:
     - release-2.1
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -187,7 +169,7 @@ presubmits:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -196,7 +178,7 @@ presubmits:
     always_run: true
     branches:
     - release-2.1
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/integration
     decorate: true
     decoration_config:
@@ -239,7 +221,7 @@ presubmits:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -248,7 +230,7 @@ presubmits:
     always_run: true
     branches:
     - release-2.1
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -291,7 +273,7 @@ presubmits:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -300,7 +282,7 @@ presubmits:
     always_run: true
     branches:
     - release-2.1
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/verify
     decorate: true
     decoration_config:
@@ -343,7 +325,7 @@ presubmits:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -352,7 +334,7 @@ presubmits:
     always_run: true
     branches:
     - release-2.1
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/verify-deps
     decorate: true
     decoration_config:
@@ -395,7 +377,7 @@ presubmits:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator

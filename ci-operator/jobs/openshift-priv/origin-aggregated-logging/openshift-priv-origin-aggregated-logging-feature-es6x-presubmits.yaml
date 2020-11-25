@@ -4,7 +4,7 @@ presubmits:
     always_run: true
     branches:
     - feature-es6x
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/full-integ-aws
     decorate: true
     decoration_config:
@@ -26,17 +26,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/full-integ-aws-cluster-profile
         - --target=full-integ-aws
-        - --template=/usr/local/full-integ-aws
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: full-integ-aws
-        - name: TEST_COMMAND
-          value: |
-            . openshift/ci-operator/build-image/setup-logging-for-e2e.sh
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -52,9 +43,6 @@ presubmits:
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
-        - mountPath: /usr/local/full-integ-aws
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -77,12 +65,9 @@ presubmits:
       - name: github-credentials-openshift-ci-robot-private-git-cloner
         secret:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -91,7 +76,7 @@ presubmits:
     always_run: true
     branches:
     - feature-es6x
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -136,7 +121,7 @@ presubmits:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -145,7 +130,7 @@ presubmits:
     always_run: true
     branches:
     - feature-es6x
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -190,7 +175,7 @@ presubmits:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -199,7 +184,7 @@ presubmits:
     always_run: true
     branches:
     - feature-es6x
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/upgrade-full-integ-aws
     decorate: true
     decoration_config:
@@ -221,19 +206,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/upgrade-full-integ-aws-cluster-profile
         - --target=upgrade-full-integ-aws
-        - --template=/usr/local/upgrade-full-integ-aws
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: upgrade-full-integ-aws
-        - name: TEST_COMMAND
-          value: |
-            OPENSHIFT_BUILD_NAMESPACE= IMAGE_FORMAT= USE_CUSTOM_IMAGES=true hack/deploy-logging.sh
-            export LOGGING_DEPLOY_MODE=upgrade
-            . openshift/ci-operator/build-image/setup-logging-for-e2e.sh
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -249,9 +223,6 @@ presubmits:
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
-        - mountPath: /usr/local/upgrade-full-integ-aws
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -274,12 +245,9 @@ presubmits:
       - name: github-credentials-openshift-ci-robot-private-git-cloner
         secret:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator

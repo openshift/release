@@ -1,10 +1,10 @@
 base_images:
   base:
-    name: "4.6"
+    name: "4.7"
     namespace: ocp
     tag: base
   operator-registry:
-    name: "4.6"
+    name: "4.7"
     namespace: ocp
     tag: operator-registry
   os:
@@ -25,7 +25,7 @@ images:
   from: base
   to: dpdk
 promotion:
-  name: "4.6"
+  name: "4.7"
   namespace: openshift-kni
 resources:
   '*':
@@ -33,7 +33,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: "4.6"
+  name: "4.7"
   namespace: ocp
 tests:
 - as: ci
@@ -41,13 +41,55 @@ tests:
   container:
     from: src
 - as: e2e-gcp
-  commands: make functests-on-ci
-  openshift_installer_src:
+  steps:
     cluster_profile: gcp
-- as: e2e-gcp-origin
-  commands: RUN_ORIGIN_TESTS=true make functests-on-ci
-  openshift_installer_src:
+    test:
+    - as: e2e-gcp
+      commands: make functests-on-ci
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-gcp
+- as: e2e-gcp-ovn
+  steps:
     cluster_profile: gcp
+    test:
+    - as: e2e-gcp-ovn
+      commands: make functests-on-ci
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-gcp-ovn
+- as: e2e-gcp-ovn-periodic
+  cron: '* */8 * * *'
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: e2e-gcp-ovn-periodic
+      commands: make functests-on-ci
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-gcp-ovn
+- as: e2e-gcp-periodic
+  cron: '* */8 * * *'
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: e2e-gcp-periodic
+      commands: make functests-on-ci
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-gcp
 zz_generated_metadata:
   branch: master
   org: openshift-kni

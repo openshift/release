@@ -1,34 +1,54 @@
 base_images:
   base:
-    name: "4.6"
+    name: "4.7"
     namespace: ocp
     tag: base
-  openshift_release_golang-1.13:
-    name: release
-    namespace: openshift
+  dev-scripts:
+    name: test
+    namespace: openshift-kni
+    tag: dev-scripts
+  ocp_builder_golang-1.13:
+    name: builder
+    namespace: ocp
     tag: golang-1.13
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.7
+  ocp_builder_rhel-8-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
+  openshift_release_golang-1.13:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: rhel-8-release-golang-1.15-openshift-4.6
 images:
-- dockerfile_path: images/router/base/Dockerfile
+- dockerfile_path: images/router/base/Dockerfile.rhel
   from: base
   inputs:
-    openshift_release_golang-1.13:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
       as:
-      - registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
   optional: true
-  to: base-router
+  to: haproxy-router-base
 - dockerfile_path: images/router/haproxy/Dockerfile.rhel8
-  from: base-router
+  from: haproxy-router-base
   to: haproxy-router
 - dockerfile_path: images/router/f5/Dockerfile
-  from: base-router
+  from: haproxy-router-base
   to: f5-router
 promotion:
-  name: "4.6"
+  name: "4.7"
   namespace: ocp
 resources:
   '*':
@@ -36,7 +56,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: "4.6"
+  name: "4.7"
   namespace: ocp
 tests:
 - as: verify
@@ -47,22 +67,33 @@ tests:
   commands: go test -race ./...
   container:
     from: src
-- as: e2e
+- as: e2e-agnostic
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
-- as: e2e-metal-ipi
+- as: e2e-metal-ipi-ovn-ipv6
   steps:
     cluster_profile: packet
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
-- as: e2e-metal-ipi-router
+- as: e2e-metal-ipi-ovn-dualstack
   steps:
     cluster_profile: packet
-    pre:
-    - ref: baremetalds-packet-setup
-    - ref: ipi-install-rbac
-    - ref: baremetalds-devscripts-conf-dualstack
-    - ref: baremetalds-devscripts-setup
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NETWORK_TYPE=OVNKubernetes
+    workflow: baremetalds-e2e
+- as: e2e-metal-ipi-ovn-router
+  steps:
+    cluster_profile: packet
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NETWORK_TYPE=OVNKubernetes
     test:
     - as: baremetalds-e2e-conf-router
       commands: |

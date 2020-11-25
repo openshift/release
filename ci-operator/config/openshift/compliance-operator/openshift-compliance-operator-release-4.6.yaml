@@ -3,27 +3,30 @@ base_images:
     name: ubi
     namespace: ocp
     tag: "8"
-  ocp_builder_golang-1.13:
+  ocp_builder_golang-1.14:
     name: builder
     namespace: ocp
-    tag: golang-1.13
+    tag: golang-1.14
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: golang-1.14
 images:
 - dockerfile_path: Dockerfile.ci
   from: base
   inputs:
-    ocp_builder_golang-1.13:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
   to: compliance-operator
 - dockerfile_path: images/testcontent/Dockerfile.ci
   to: testcontent
 promotion:
-  disabled: true
   name: "4.6"
   namespace: ocp
 resources:
@@ -49,9 +52,17 @@ tests:
   container:
     from: src
 - as: e2e-aws
-  commands: make e2e
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: release-4.6
   org: openshift

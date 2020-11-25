@@ -17,7 +17,6 @@ images:
   from: base
   to: cincinnati-graph-data-container
 promotion:
-  disabled: true
   excluded_images:
   - cincinnati-operator
   name: 4.6-priv
@@ -37,10 +36,24 @@ tests:
   commands: make unit-test
   container:
     from: src
-- as: cincinnati-operator-e2e-aws
-  commands: make func-test
-  openshift_installer_src:
-    cluster_profile: aws
+- as: operator-e2e
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: e2e-test
+      cli: initial
+      commands: OPENSHIFT_BUILD_NAMESPACE= OPERAND_IMAGE=quay.io/app-sre/cincinnati@sha256:d1d2f881bce1a1375ec8470133ee0a912164b8a7ecce19aac24d24e623aef59b make func-test
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: stable:cincinnati-operator
+      - env: GRAPH_DATA_IMAGE
+        name: stable:cincinnati-graph-data-container
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-gcp
 zz_generated_metadata:
   branch: release-4.6
   org: openshift-priv

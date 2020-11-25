@@ -1,0 +1,66 @@
+base_images:
+  base:
+    name: ubi
+    namespace: ocp
+    tag: "8"
+  ocp_builder_golang-1.13:
+    name: builder
+    namespace: ocp
+    tag: golang-1.13
+  ocp_builder_golang-1.14:
+    name: builder
+    namespace: ocp
+    tag: golang-1.14
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.14
+canonical_go_repository: github.com/openshift/file-integrity-operator
+images:
+- dockerfile_path: Dockerfile.ci
+  inputs:
+    ocp_builder_golang-1.14:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.14
+  to: file-integrity-operator
+promotion:
+  name: 4.8-priv
+  namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 400Mi
+tag_specification:
+  name: 4.8-priv
+  namespace: ocp-private
+tests:
+- as: go-build
+  commands: make
+  container:
+    from: src
+- as: unit
+  commands: make test-unit
+  container:
+    from: src
+- as: verify
+  commands: make verify
+  container:
+    from: src
+- as: e2e-aws
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-4.8
+  org: openshift-priv
+  repo: file-integrity-operator

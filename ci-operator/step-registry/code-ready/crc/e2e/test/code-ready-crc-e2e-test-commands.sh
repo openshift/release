@@ -15,6 +15,9 @@ mock-nss.sh
 cp "${CLUSTER_PROFILE_DIR}"/ssh-privatekey "${HOME}"/.ssh/google_compute_engine
 chmod 0600 "${HOME}"/.ssh/google_compute_engine
 cp "${CLUSTER_PROFILE_DIR}"/ssh-publickey "${HOME}"/.ssh/google_compute_engine.pub
+echo 'ServerAliveInterval 30' | tee -a "${HOME}"/.ssh/config
+echo 'ServerAliveCountMax 1200' | tee -a "${HOME}"/.ssh/config
+chmod 0600 "${HOME}"/.ssh/config
 
 # Copy pull secret to user home
 cp "${CLUSTER_PROFILE_DIR}"/pull-secret "${HOME}"/pull-secret
@@ -50,8 +53,8 @@ EOF
 chmod +x "${HOME}"/run-tests.sh
 
 # Get the bundle
-curl -L "https://storage.googleapis.com/crc-bundle-github-ci/crc_libvirt_${BUNDLE_VERSION}.zip" -o "${HOME}"/bundle.zip
-unzip -P "$(cat /var/run/bundle-secret/secret.txt)"  "${HOME}"/bundle.zip -d  "${HOME}"
+curl -L "https://storage.googleapis.com/crc-bundle-github-ci/crc_libvirt_${BUNDLE_VERSION}.zip" -o /tmp/bundle.zip
+unzip -P "$(cat /var/run/bundle-secret/secret.txt)"  /tmp/bundle.zip -d  /tmp
 
 echo "${BUNDLE}" > "${HOME}"/bundle
 
@@ -83,7 +86,7 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \
   --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
-  --recurse "${HOME}"/"${BUNDLE}" packer@"${INSTANCE_PREFIX}":~/"${BUNDLE}"
+  --recurse /tmp/"${BUNDLE}" packer@"${INSTANCE_PREFIX}":~/"${BUNDLE}"
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \

@@ -1,0 +1,42 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: openshift-kni
+    tag: dev-scripts
+  ocp_builder_rhel-8-base-openshift:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-base-openshift
+  ocp_builder_rhel-8-base-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-base-openshift-4.7
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.15
+images:
+- dockerfile_path: Dockerfile.ocp
+  from: ocp_builder_rhel-8-base-openshift
+  to: ironic-machine-os-downloader
+promotion:
+  name: "4.8"
+  namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.8"
+  namespace: ocp
+tests:
+- as: e2e-metal-ipi
+  steps:
+    cluster_profile: packet
+    workflow: baremetalds-e2e
+zz_generated_metadata:
+  branch: release-4.8
+  org: openshift
+  repo: ironic-rhcos-downloader

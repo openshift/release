@@ -3,6 +3,14 @@ base_images:
     name: ubi
     namespace: ocp
     tag: "8"
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
 base_rpm_images:
   rpm:
     name: ubi
@@ -20,12 +28,15 @@ images:
   to: kuryr-tester
 - dockerfile_path: openshift-kuryr-cni-rhel8.Dockerfile
   from: rpm-os
+  inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
   to: kuryr-cni
 - dockerfile_path: openshift-kuryr-controller-rhel8.Dockerfile
   from: rpm-os
   to: kuryr-controller
 promotion:
-  disabled: true
   name: "4.6"
   namespace: ocp
 raw_steps:

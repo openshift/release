@@ -3,30 +3,51 @@ base_images:
     name: 4.7-priv
     namespace: ocp-private
     tag: cli
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.7
+  ocp_builder_rhel-8-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.10
+    tag: rhel-8-release-openshift-4.6
 canonical_go_repository: github.com/openshift/jenkins
 images:
-- dockerfile_path: Dockerfile.rhel7
+- context_dir: "2"
+  dockerfile_path: Dockerfile.rhel8
   from: base
   inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
     src:
       paths:
       - destination_dir: .
         source_path: /go/src/github.com/openshift/jenkins/2/.
   to: jenkins
-- dockerfile_path: Dockerfile.rhel7
+- context_dir: slave-base
+  dockerfile_path: Dockerfile.rhel8
   from: base
   inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
     src:
       paths:
       - destination_dir: .
         source_path: /go/src/github.com/openshift/jenkins/slave-base/.
   to: jenkins-agent-base
-- dockerfile_path: Dockerfile.rhel7
+- context_dir: agent-maven-3.5
+  dockerfile_path: Dockerfile.rhel8
   from: jenkins-agent-base
   inputs:
     src:
@@ -34,15 +55,17 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/openshift/jenkins/agent-maven-3.5/.
   to: jenkins-agent-maven
-- dockerfile_path: Dockerfile.rhel7
+- context_dir: agent-nodejs-12
+  dockerfile_path: Dockerfile.rhel8
   from: jenkins-agent-base
   inputs:
     src:
       paths:
       - destination_dir: .
-        source_path: /go/src/github.com/openshift/jenkins/agent-nodejs-10/.
+        source_path: /go/src/github.com/openshift/jenkins/agent-nodejs-12/.
   to: jenkins-agent-nodejs
 promotion:
+  disabled: true
   name: 4.7-priv
   namespace: ocp-private
 resources:

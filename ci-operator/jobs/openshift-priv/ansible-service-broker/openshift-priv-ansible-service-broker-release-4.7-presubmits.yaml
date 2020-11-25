@@ -4,7 +4,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.7
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/build
     decorate: true
     decoration_config:
@@ -49,7 +49,7 @@ presubmits:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -58,7 +58,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.7
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/fmt
     decorate: true
     decoration_config:
@@ -103,7 +103,7 @@ presubmits:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -112,7 +112,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.7
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/fmtcheck
     decorate: true
     decoration_config:
@@ -157,7 +157,7 @@ presubmits:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -166,7 +166,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.7
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -211,7 +211,7 @@ presubmits:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -220,7 +220,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.7
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/lint
     decorate: true
     decoration_config:
@@ -265,7 +265,7 @@ presubmits:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -274,7 +274,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.7
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/operator-molecule-e2e
     decorate: true
     decoration_config:
@@ -296,19 +296,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/operator-molecule-e2e-cluster-profile
         - --target=operator-molecule-e2e
-        - --template=/usr/local/operator-molecule-e2e
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: operator-molecule-e2e
-        - name: TEST_COMMAND
-          value: |
-            echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
-            cd operator
-            molecule test -s cluster
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -324,9 +313,6 @@ presubmits:
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
-        - mountPath: /usr/local/operator-molecule-e2e
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -349,12 +335,9 @@ presubmits:
       - name: github-credentials-openshift-ci-robot-private-git-cloner
         secret:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -363,7 +346,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.7
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/operator-molecule-olm-e2e
     decorate: true
     decoration_config:
@@ -385,19 +368,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/operator-molecule-olm-e2e-cluster-profile
         - --target=operator-molecule-olm-e2e
-        - --template=/usr/local/operator-molecule-olm-e2e
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: operator-molecule-olm-e2e
-        - name: TEST_COMMAND
-          value: |
-            echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
-            cd operator
-            molecule test -s cluster-olm
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -413,9 +385,6 @@ presubmits:
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
-        - mountPath: /usr/local/operator-molecule-olm-e2e
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -438,12 +407,9 @@ presubmits:
       - name: github-credentials-openshift-ci-robot-private-git-cloner
         secret:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -452,7 +418,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.7
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/test
     decorate: true
     decoration_config:
@@ -497,7 +463,7 @@ presubmits:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -506,7 +472,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.7
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/vet
     decorate: true
     decoration_config:
@@ -551,7 +517,7 @@ presubmits:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator

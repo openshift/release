@@ -430,6 +430,30 @@ presubmits:
       serviceAccountName: ci-operator
     trigger: (?m)^/test( | .* )upgrade-private-v19.0,?($|\s.*)
   - agent: kubernetes
+    always_run: false
+    branches:
+    - master
+    cluster: api.ci
+    context: upgrade-private-v20.0
+    decorate: true
+    name: pull-ci-azure-master-upgrade-private-v20.0
+    rerun_command: /test upgrade-private-v20.0
+    spec:
+      containers:
+      - args:
+        - hack/tests/e2e-upgrade.sh
+        - v20.0
+        env:
+        - name: API_VERSION
+          value: 2019-10-27-preview
+        - name: PRIVATE_API_SERVER
+          value: "true"
+        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        name: ""
+        resources: {}
+      serviceAccountName: ci-operator
+    trigger: (?m)^/test( | .* )upgrade-private-v20.0,?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - master
@@ -506,6 +530,25 @@ presubmits:
       serviceAccountName: ci-operator
     trigger: (?m)^/test( | .* )upgrade-v19.0,?($|\s.*)
   - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: api.ci
+    context: upgrade-v20.0
+    decorate: true
+    name: pull-ci-azure-master-upgrade-v20.0
+    rerun_command: /test upgrade-v20.0
+    spec:
+      containers:
+      - args:
+        - hack/tests/e2e-upgrade.sh
+        - v20.0
+        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        name: ""
+        resources: {}
+      serviceAccountName: ci-operator
+    trigger: (?m)^/test( | .* )upgrade-v20.0,?($|\s.*)
+  - agent: kubernetes
     always_run: false
     branches:
     - master
@@ -528,7 +571,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build01
+    cluster: api.ci
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -564,7 +607,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -573,7 +616,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     decorate: true
     name: verify
     rerun_command: /test verify

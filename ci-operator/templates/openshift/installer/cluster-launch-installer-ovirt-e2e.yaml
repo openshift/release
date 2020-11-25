@@ -86,6 +86,9 @@ objects:
     - name: cluster-profile
       secret:
         secretName: ${JOB_NAME_SAFE}-cluster-profile
+    - name: boskos-credentials
+      secret:
+        secretName: boskos
 
     containers:
 
@@ -105,6 +108,8 @@ objects:
         mountPath: /etc/openshift-installer
       - name: artifacts
         mountPath: /tmp/artifacts
+      - name: boskos-credentials
+        mountPath: /etc/boskos
       env:
       - name: ARTIFACT_DIR
         value: /tmp/artifacts
@@ -112,6 +117,10 @@ objects:
         value: ${CLUSTER_TYPE}
       - name: CLUSTER_NAME
         value: ${NAMESPACE}-${JOB_NAME_HASH}
+      - name: LEASE_SERVER
+        value: https://boskos-ci.apps.ci.l2s4.p1.openshiftapps.com
+      - name: LEASE_SERVER_USERNAME
+        value: ci
       command:
       - /bin/bash
       - -c
@@ -121,47 +130,41 @@ objects:
 
         trap 'rc=$?; CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi; if test "${rc}" -ne 0; then touch /tmp/shared/exit; fi; exit "${rc}"' EXIT
 
-        # hack for bazel
-        function boskosctl() {
-          /app/boskos/cmd/cli/app.binary "${@}"
-        }
-
         function extract_leases_info() {
           echo "$( jq ."${1}" --raw-output "${2}" )"
         }
 
         lease_type="${CLUSTER_TYPE}-quota-slice"
+        job_resources_path="/etc/openshift-installer/job_resources.json"
 
         echo "[INFO] Acquiring a lease ..."
-        resource="$( boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" acquire --type "${lease_type}" --state "free" --target-state "leased" --timeout 150m )"
+        resource="$( boskosctl --server-url ${LEASE_SERVER} --username ${LEASE_SERVER_USERNAME} --password-file /etc/boskos/password --owner-name "${CLUSTER_NAME}" acquire --type "${lease_type}" --state "free" --target-state "leased" --timeout 150m )"
         resource_name="$(echo "${resource}"|jq .name --raw-output)"
         lease_path="/etc/openshift-installer/${resource_name}.json"
         echo "[INFO] Lease acquired! at $(date --utc) Leased resource: ${resource}"
         echo "[INFO] Sending heartbeats to retain the lease ${resource_name}"
-        boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" heartbeat --resource "${resource}" &
+        boskosctl --server-url ${LEASE_SERVER} --username ${LEASE_SERVER_USERNAME} --password-file /etc/boskos/password --owner-name "${CLUSTER_NAME}" heartbeat --resource "${resource}" &
         heartbeats_pid=$!
 
         #For conformance runs we require double resources
         if [ "${LEASE_TYPE}" == "conformance" ]; then
-          resource_conformance="$( boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" acquire --type "${lease_type}" --state "free" --target-state "leased" --timeout 150m )"
+          resource_conformance="$( boskosctl --server-url ${LEASE_SERVER} --username ${LEASE_SERVER_USERNAME} --password-file /etc/boskos/password --owner-name "${CLUSTER_NAME}" acquire --type "${lease_type}" --state "free" --target-state "leased" --timeout 150m )"
           resource_conformance_name="$(echo "${resource_conformance}"|jq .name --raw-output)"
           echo "[INFO] Lease acquired! at $(date --utc) Leased resource: ${resource_conformance}"
-          boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" heartbeat --resource "${resource_conformance}" &
+          boskosctl --server-url ${LEASE_SERVER} --username ${LEASE_SERVER_USERNAME} --password-file /etc/boskos/password --owner-name "${CLUSTER_NAME}" heartbeat --resource "${resource_conformance}" &
           heartbeats_conformance_pid=$!
         fi
 
-        ovirt_engine_template_name="$(extract_leases_info ovirt_engine_template_name ${lease_path})"
         if [ "${LEASE_TYPE}" == "conformance" ]; then
-          worker_cpu="8"
-          worker_mem="16384"
-          master_cpu="8"
-          master_mem="16384"
+          worker_cpu="$(extract_leases_info conformance_worker_cpu ${job_resources_path})"
+          worker_mem="$(extract_leases_info conformance_worker_mem ${job_resources_path})"
+          master_cpu="$(extract_leases_info conformance_master_cpu ${job_resources_path})"
+          master_mem="$(extract_leases_info conformance_master_mem ${job_resources_path})"
         else
-          worker_cpu="4"
-          worker_mem="9000"
-          master_cpu="4"
-          master_mem="9000"
-          ovirt_engine_template_name="${ovirt_engine_template_name}-8G"
+          worker_cpu="$(extract_leases_info minimal_worker_cpu ${job_resources_path})"
+          worker_mem="$(extract_leases_info minimal_worker_mem ${job_resources_path})"
+          master_cpu="$(extract_leases_info minimal_master_cpu ${job_resources_path})"
+          master_mem="$(extract_leases_info minimal_master_mem ${job_resources_path})"
         fi
 
         #Saving parameters for the env
@@ -174,10 +177,7 @@ objects:
         MASTER_CPU="${master_cpu}"
         MASTER_MEM="${master_mem}"
         OCP_CLUSTER="$(extract_leases_info cluster_name ${lease_path})"
-        OVIRT_ENGINE_CLUSTER_ID="$(extract_leases_info ovirt_engine_cluster_id ${lease_path})"
         OVIRT_ENGINE_NETWORK="$(extract_leases_info ovirt_network_name ${lease_path})"
-        OVIRT_ENGINE_VNIC_PEOFILE_ID="$(extract_leases_info ovirt_vnic_profile_id ${lease_path})"
-        OVIRT_ENGINE_TEMPLATE_NAME="${ovirt_engine_template_name}"
         EOF
 
         touch /tmp/shared/leased
@@ -186,12 +186,12 @@ objects:
             echo "killing heartbeat process "${heartbeats_pid}" at $(date --utc)"
             kill -9 "${heartbeats_pid}"
             echo "[INFO] Releasing the lease on resouce ${resource_name}"
-            boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" release --name "${resource_name}" --target-state "free"
+            boskosctl --server-url ${LEASE_SERVER} --username ${LEASE_SERVER_USERNAME} --password-file /etc/boskos/password --owner-name "${CLUSTER_NAME}" release --name "${resource_name}" --target-state "free"
             if [ "${LEASE_TYPE}" == "conformance" ]; then
               echo "killing heartbeat process "${heartbeats_conformance_pid}" at $(date --utc)"
               kill -9 "${heartbeats_conformance_pid}"
               echo "[INFO] Releasing the lease on resouce ${resource_conformance}"
-              boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" release --name "${resource_conformance_name}" --target-state "free"
+              boskosctl --server-url ${LEASE_SERVER} --username ${LEASE_SERVER_USERNAME} --password-file /etc/boskos/password --owner-name "${CLUSTER_NAME}" release --name "${resource_conformance_name}" --target-state "free"
             fi
         }
 
@@ -298,6 +298,11 @@ objects:
             grep 'Early' |
           openshift-tests run -o ${ARTIFACT_DIR}/e2e.log \
             --junit-dir ${ARTIFACT_DIR}/junit -f -
+        }
+
+        function run-csi-tests() {
+          TEST_CSI_DRIVER_FILES="${TEST_CSI_DRIVER_FILES}" openshift-tests run "${TEST_SUITE}" \
+            --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
         }
 
         # https://bugzilla.redhat.com/show_bug.cgi?id=1839463
@@ -442,10 +447,9 @@ objects:
             ovirt_cluster_id: ${OVIRT_ENGINE_CLUSTER_ID}
             ovirt_storage_domain_id: ${OVIRT_ENGINE_STORAGE_DOMAIN_ID}
             api_vip: ${OVIRT_APIVIP}
+            ingress_vip: ${OVIRT_INGRESSVIP}
             dns_vip: ${OVIRT_DNSVIP}
             ovirt_network_name: ${OVIRT_ENGINE_NETWORK}
-            vnicProfileID: ${OVIRT_ENGINE_VNIC_PEOFILE_ID}
-            ingress_vip: ${OVIRT_INGRESSVIP}
         pullSecret: >
           ${PULL_SECRET}
         sshKey: |
@@ -492,14 +496,18 @@ objects:
 
         }
 
-        #change the masters igntion , to use tempfs for etcd IOPS optimization
-        TF_LOG=debug openshift-install --dir=${ARTIFACT_DIR}/installer create ignition-configs --log-level=debug
-        python -c \
-            'import json, sys; j = json.load(sys.stdin); j[u"systemd"] = {}; j[u"systemd"][u"units"] = [{u"contents": "[Unit]\nDescription=Mount etcd as a ramdisk\nBefore=local-fs.target\n[Mount]\n What=none\nWhere=/var/lib/etcd\nType=tmpfs\nOptions=size=2G\n[Install]\nWantedBy=local-fs.target", u"enabled": True, u"name":u"var-lib-etcd.mount"}]; json.dump(j, sys.stdout)' \
-            <${ARTIFACT_DIR}/installer/master.ign \
-            >${ARTIFACT_DIR}/installer/master.ign.out
-        mv ${ARTIFACT_DIR}/installer/master.ign.out ${ARTIFACT_DIR}/installer/master.ign
+        #change the masters igntion for non upgrade jobs, to use tempfs for etcd IOPS optimization
+        if [[ ! -n $(echo "$JOB_NAME" | grep -P '\-upgrade\-') ]]; then
+          echo "Using tmpfs hack for job $JOB_NAME"
+          TF_LOG=debug openshift-install --dir=${ARTIFACT_DIR}/installer create ignition-configs --log-level=debug
+          python -c \
+              'import json, sys; j = json.load(sys.stdin); j[u"systemd"] = {}; j[u"systemd"][u"units"] = [{u"contents": "[Unit]\nDescription=Mount etcd as a ramdisk\nBefore=local-fs.target\n[Mount]\n What=none\nWhere=/var/lib/etcd\nType=tmpfs\nOptions=size=2G\n[Install]\nWantedBy=local-fs.target", u"enabled": True, u"name":u"var-lib-etcd.mount"}]; json.dump(j, sys.stdout)' \
+              <${ARTIFACT_DIR}/installer/master.ign \
+              >${ARTIFACT_DIR}/installer/master.ign.out
 
+          mv ${ARTIFACT_DIR}/installer/master.ign.out ${ARTIFACT_DIR}/installer/master.ign
+        fi
+        
         # What we're doing here is we generate manifests first and force that OpenShift SDN is configured.
         TF_LOG=debug openshift-install --dir=${ARTIFACT_DIR}/installer create manifests --log-level=debug &
         wait "$!"
@@ -517,7 +525,7 @@ objects:
           update_image_registry &
         fi
 
-        # we need jq for later rhcos url extraction 
+        # we need jq for later rhcos url extraction
         mkdir /tmp/bin
         (curl -L -o /tmp/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 2>/dev/null && chmod +x /tmp/bin/jq)
         if ! command -V /tmp/bin/jq; then
@@ -664,12 +672,12 @@ objects:
           # This is a temporary conversion of cluster operator status to JSON matching the upgrade - may be moved to code in the future
           mkdir -p ${ARTIFACT_DIR}/junit
           curl -sL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 >/tmp/jq && chmod ug+x /tmp/jq
-          <${ARTIFACT_DIR}/clusteroperators.json /tmp/jq -r 'def one(condition; t): t as $t | first([.[] | select(condition)] | map(.type=t)[]) // null; def msg: "Operator \(.type) (\(.reason)): \(.message)"; def xmlfailure: if .failure then "<failure message=\"\(.failure | @html)\">\(.failure | @html)</failure>" else "" end; def xmltest: "<testcase name=\"\(.name | @html)\">\( xmlfailure )</testcase>"; def withconditions: map({name: "operator install \(.metadata.name)"} + ((.status.conditions // [{type:"Available",status: "False",message:"operator is not reporting conditions"}]) | (one(.type=="Available" and .status!="True"; "unavailable") // one(.type=="Degraded" and .status=="True"; "degraded") // one(.type=="Progressing" and .status=="True"; "progressing") // null) | if . then {failure: .|msg} else null end)); .items | withconditions | "<testsuite name=\"Operator results\" tests=\"\( length )\" failures=\"\( [.[] | select(.failure)] | length )\">\n\( [.[] | xmltest] | join("\n"))\n</testsuite>"' >${ARTIFACT_DIR}/junit/junit_install_status.xml
+          <${ARTIFACT_DIR}/clusteroperators.json /tmp/jq -r 'def one(condition; t): t as $t | first([.[] | select(condition)] | map(.type=t)[]) // null; def msg: "Operator \(.type) (\(.reason)): \(.message)"; def xmlfailure: if .failure then "<failure message=\"\(.failure | @html)\">\(.failure | @html)</failure>" else "" end; def xmltest: "<testcase name=\"\(.name | @html)\">\( xmlfailure )</testcase>"; def withconditions: map({name: "operator conditions \(.metadata.name)"} + ((.status.conditions // [{type:"Available",status: "False",message:"operator is not reporting conditions"}]) | (one(.type=="Available" and .status!="True"; "unavailable") // one(.type=="Degraded" and .status=="True"; "degraded") // one(.type=="Progressing" and .status=="True"; "progressing") // null) | if . then {failure: .|msg} else null end)); .items | withconditions | "<testsuite name=\"Operator results\" tests=\"\( length )\" failures=\"\( [.[] | select(.failure)] | length )\">\n\( [.[] | xmltest] | join("\n"))\n</testsuite>"' >${ARTIFACT_DIR}/junit/junit_install_status.xml
 
           #We set OVIRT_CONFIG and insert he path to the engine ca to the config file
           export OVIRT_CONFIG=${ARTIFACT_DIR}/installer/ovirt-config.yaml
-          curl -k -o "${ARTIFACT_DIR}/installer/ovirt-engine.ca" ${OVIRT_ENGINE_URL::-4}/services/pki-resource?resource=ca-certificate
-          sed 's|ovirt_cafile: ""|ovirt_cafile: ${ARTIFACT_DIR}/installer/ovirt-engine.ca|' -i ${ARTIFACT_DIR}/installer/ovirt-config.yaml
+          curl -k --retry 30 --retry-delay 30 -o "${ARTIFACT_DIR}/installer/ovirt-engine.ca" ${OVIRT_ENGINE_URL::-4}/services/pki-resource?resource=ca-certificate
+          sed "s|ovirt_cafile: \"\"|ovirt_cafile: ${ARTIFACT_DIR}/installer/ovirt-engine.ca|" -i ${ARTIFACT_DIR}/installer/ovirt-config.yaml
           echo "Destroy bootstrap ..."
           openshift-install --dir ${ARTIFACT_DIR}/installer destroy bootstrap
           echo "Destroy cluster ..."
@@ -681,7 +689,7 @@ objects:
         trap 'teardown; touch /tmp/shared/teardown-exit; exit $DELETE_FAIL' EXIT
         trap 'kill $(jobs -p); teardown; touch /tmp/shared/teardown-exit; exit $DELETE_FAIL' TERM
 
-        for i in $(seq 1 180); do
+        for i in $(seq 1 240); do
 
           if [[ -f /tmp/shared/exit ]] || [[ -f /tmp/shared/test-exit ]]; then
             exit 0

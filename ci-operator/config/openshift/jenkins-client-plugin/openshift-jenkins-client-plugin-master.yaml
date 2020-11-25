@@ -1,6 +1,6 @@
 base_images:
   original_jenkins:
-    name: "4.6"
+    name: "4.7"
     namespace: ocp
     tag: jenkins
 build_root:
@@ -20,7 +20,7 @@ images:
 promotion:
   excluded_images:
   - jenkins
-  name: "4.6"
+  name: "4.7"
   namespace: ocp
 resources:
   '*':
@@ -28,7 +28,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: "4.6"
+  name: "4.7"
   namespace: ocp
 tests:
 - as: e2e-aws-jenkins
@@ -36,9 +36,17 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws-jenkins
 - as: e2e-aws-operator
-  commands: make test-e2e
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: openshift

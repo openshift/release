@@ -4,7 +4,7 @@ presubmits:
     always_run: true
     branches:
     - fcos
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/e2e-aws
     decorate: true
     decoration_config:
@@ -58,7 +58,7 @@ presubmits:
               name: cluster-secrets-aws
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -67,7 +67,7 @@ presubmits:
     always_run: false
     branches:
     - fcos
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/e2e-gcp
     decorate: true
     decoration_config:
@@ -124,7 +124,7 @@ presubmits:
               name: cluster-profile-gcp
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -133,7 +133,7 @@ presubmits:
     always_run: false
     branches:
     - fcos
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/e2e-openstack
     decorate: true
     decoration_config:
@@ -152,7 +152,6 @@ presubmits:
         - --kubeconfig=/etc/apici/kubeconfig
         - --lease-server-password-file=/etc/boskos/password
         - --lease-server-username=ci
-        - --lease-server=https://boskos-ci.svc.ci.openshift.org
         - --repo=installer
         - --secret-dir=/usr/local/e2e-openstack-cluster-profile
         - --target=e2e-openstack
@@ -213,7 +212,7 @@ presubmits:
         name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
     trigger: (?m)^/test( | .* )e2e-openstack,?($|\s.*)
   - agent: kubernetes
     always_run: false
@@ -274,7 +273,7 @@ presubmits:
               name: cluster-secrets-vsphere
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -352,7 +351,7 @@ presubmits:
         name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -361,7 +360,7 @@ presubmits:
     always_run: true
     branches:
     - fcos
-    cluster: build01
+    cluster: build02
     context: ci/prow/gofmt
     decorate: true
     decoration_config:
@@ -397,7 +396,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -406,7 +405,7 @@ presubmits:
     always_run: true
     branches:
     - fcos
-    cluster: build01
+    cluster: build02
     context: ci/prow/golint
     decorate: true
     decoration_config:
@@ -442,7 +441,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -451,7 +450,7 @@ presubmits:
     always_run: true
     branches:
     - fcos
-    cluster: build01
+    cluster: build02
     context: ci/prow/govet
     decorate: true
     decoration_config:
@@ -487,7 +486,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -496,7 +495,7 @@ presubmits:
     always_run: true
     branches:
     - fcos
-    cluster: build01
+    cluster: build02
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -532,7 +531,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -541,7 +540,7 @@ presubmits:
     always_run: true
     branches:
     - fcos
-    cluster: build01
+    cluster: build02
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -577,7 +576,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -586,7 +585,52 @@ presubmits:
     always_run: true
     branches:
     - fcos
-    cluster: build01
+    cluster: build02
+    context: ci/prow/verify-codegen
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-fcos-verify-codegen
+    rerun_command: /test verify-codegen
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --target=verify-codegen
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )verify-codegen,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - fcos
+    cluster: build02
     context: ci/prow/verify-vendor
     decorate: true
     decoration_config:
@@ -622,7 +666,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator

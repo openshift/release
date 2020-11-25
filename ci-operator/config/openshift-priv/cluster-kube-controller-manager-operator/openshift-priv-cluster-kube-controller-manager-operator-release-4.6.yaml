@@ -11,6 +11,14 @@ base_images:
     name: builder
     namespace: ocp
     tag: golang-1.14
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
@@ -22,12 +30,11 @@ images:
 - dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
-    ocp_builder_golang-1.14:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:golang-1.14
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
   to: cluster-kube-controller-manager-operator
 promotion:
-  disabled: true
   name: 4.6-priv
   namespace: ocp-private
 resources:
@@ -62,15 +69,22 @@ tests:
     workflow: openshift-e2e-aws-loki
 - artifact_dir: /tmp/artifacts
   as: e2e-aws-operator
-  commands: |
-    make test-e2e JUNITFILE=/tmp/artifacts/junit_report.xml
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
-- as: e2e-aws-upgrade
-  commands: TEST_SUITE=all run-upgrade-tests
-  openshift_installer:
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e JUNITFILE=/tmp/artifacts/junit_report.xml
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-upgrade
+  steps:
     cluster_profile: aws
-    upgrade: true
+    workflow: openshift-upgrade-aws-loki
 zz_generated_metadata:
   branch: release-4.6
   org: openshift-priv

@@ -18,7 +18,6 @@ images:
         source_path: /go/src/github.com/openshift/jenkins-client-plugin/.
   to: jenkins
 promotion:
-  disabled: true
   excluded_images:
   - jenkins
   name: "4.6"
@@ -37,9 +36,17 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws-jenkins
 - as: e2e-aws-operator
-  commands: make test-e2e
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: release-4.6
   org: openshift

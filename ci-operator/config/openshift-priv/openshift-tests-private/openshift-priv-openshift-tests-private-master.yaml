@@ -1,9 +1,9 @@
 base_images:
   cli:
-    name: 4.6-priv
+    name: 4.7-priv
     namespace: ocp-private
     tag: cli
-binary_build_commands: make build
+binary_build_commands: make all
 build_root:
   image_stream_tag:
     name: release
@@ -20,8 +20,14 @@ images:
         source_path: /usr/bin/oc
   to: oc-bin-image
 promotion:
-  name: 4.6-priv
+  name: ginkgo-test-priv
   namespace: ocp-private
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.7"
 resources:
   '*':
     limits:
@@ -37,17 +43,27 @@ resources:
     requests:
       cpu: "4"
       memory: 4Gi
-tag_specification:
-  name: 4.6-priv
-  namespace: ocp-private
 test_binary_build_commands: make test
 tests:
 - as: e2e-aws
   steps:
     cluster_profile: aws
     test:
-    - as: e2e-test
-      commands: ./bin/extended-platform-tests run openshift/conformance/parallel --run "High-24829"
+    - as: title-bin-test
+      commands: make name-check && ./bin/extended-platform-tests run openshift/conformance/parallel --run "High-24829"
+      from: oc-bin-image
+      resources:
+        requests:
+          cpu: "2"
+          memory: 4Gi
+    workflow: ipi-aws
+- as: sanity
+  cron: 0 */8 * * *
+  steps:
+    cluster_profile: aws
+    test:
+    - as: periodic-e2e-test
+      commands: make nightly-test
       from: oc-bin-image
       resources:
         requests:

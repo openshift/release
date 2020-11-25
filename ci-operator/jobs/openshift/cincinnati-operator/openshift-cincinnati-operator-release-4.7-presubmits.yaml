@@ -4,16 +4,61 @@ presubmits:
     always_run: true
     branches:
     - release-4.7
-    cluster: api.ci
-    context: ci/prow/cincinnati-operator-e2e-aws
+    cluster: build01
+    context: ci/prow/images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cincinnati-operator-release-4.7-cincinnati-operator-e2e-aws
-    rerun_command: /test cincinnati-operator-e2e-aws
+    name: pull-ci-openshift-cincinnati-operator-release-4.7-images
+    rerun_command: /test images
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --target=[images]
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-4.7
+    cluster: build01
+    context: ci/prow/operator-e2e
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cincinnati-operator-release-4.7-operator-e2e
+    rerun_command: /test operator-e2e
     spec:
       containers:
       - args:
@@ -21,18 +66,10 @@ presubmits:
         - --lease-server-password-file=/etc/boskos/password
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/usr/local/cincinnati-operator-e2e-aws-cluster-profile
-        - --target=cincinnati-operator-e2e-aws
-        - --template=/usr/local/cincinnati-operator-e2e-aws
+        - --secret-dir=/usr/local/operator-e2e-cluster-profile
+        - --target=operator-e2e
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: cincinnati-operator-e2e-aws
-        - name: TEST_COMMAND
-          value: make func-test
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -43,11 +80,8 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/cincinnati-operator-e2e-aws-cluster-profile
+        - mountPath: /usr/local/operator-e2e-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/cincinnati-operator-e2e-aws
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -66,68 +100,21 @@ presubmits:
         projected:
           sources:
           - secret:
-              name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )cincinnati-operator-e2e-aws,?($|\s.*)
+    trigger: (?m)^/test( | .* )operator-e2e,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - release-4.7
-    cluster: api.ci
-    context: ci/prow/images
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cincinnati-operator-release-4.7-images
-    rerun_command: /test images
-    spec:
-      containers:
-      - args:
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-password-file=/etc/report/password.txt
-        - --report-username=ci
-        - --target=[images]
-        - --target=[release:latest]
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )images,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-4.7
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -163,7 +150,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator

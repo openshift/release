@@ -14,7 +14,7 @@ periodics:
       - --to-latest
       command:
       - /usr/bin/oc
-      image: registry.svc.ci.openshift.org/ocp/4.5:cli
+      image: registry.svc.ci.openshift.org/ocp/4.7:cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -46,7 +46,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20200826-f9138eb980
+      image: gcr.io/k8s-prow/commenter:v20201124-061f85d859
       imagePullPolicy: Always
       name: ""
       resources:
@@ -90,7 +90,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20200826-f9138eb980
+      image: gcr.io/k8s-prow/commenter:v20201124-061f85d859
       imagePullPolicy: Always
       name: ""
       resources:
@@ -126,7 +126,6 @@ periodics:
         -label:needs-ok-to-test
         org:openshift
         org:openshift-priv
-        repo:operator-framework/operator-sdk
         repo:operator-framework/operator-lifecycle-manager
         repo:operator-framework/operator-marketplace
         repo:operator-framework/operator-registry
@@ -143,7 +142,7 @@ periodics:
       - --random
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20200826-f9138eb980
+      image: gcr.io/k8s-prow/commenter:v20201124-061f85d859
       imagePullPolicy: Always
       name: ""
       resources:
@@ -169,6 +168,7 @@ periodics:
       - |-
         --query=org:openshift
         repo:operator-framework/operator-sdk
+        repo:operator-framework/operator-lib
         repo:tnozicka/openshift-acme
         -label:lifecycle/frozen
         label:lifecycle/rotten
@@ -187,7 +187,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20200826-f9138eb980
+      image: gcr.io/k8s-prow/commenter:v20201124-061f85d859
       imagePullPolicy: Always
       name: ""
       resources:
@@ -213,6 +213,7 @@ periodics:
       - |-
         --query=org:openshift
         repo:operator-framework/operator-sdk
+        repo:operator-framework/operator-lib
         repo:tnozicka/openshift-acme
         -label:lifecycle/frozen
         label:lifecycle/stale
@@ -235,7 +236,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20200826-f9138eb980
+      image: gcr.io/k8s-prow/commenter:v20201124-061f85d859
       imagePullPolicy: Always
       name: ""
       resources:
@@ -261,6 +262,7 @@ periodics:
       - |-
         --query=org:openshift
         repo:operator-framework/operator-sdk
+        repo:operator-framework/operator-lib
         repo:tnozicka/openshift-acme
         -label:lifecycle/frozen
         -label:lifecycle/stale
@@ -282,7 +284,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20200826-f9138eb980
+      image: gcr.io/k8s-prow/commenter:v20201124-061f85d859
       imagePullPolicy: Always
       name: ""
       resources:
@@ -296,7 +298,7 @@ periodics:
       secret:
         secretName: github-credentials-openshift-bot
 - agent: kubernetes
-  cluster: api.ci
+  cluster: app.ci
   decorate: true
   decoration_config:
     timeout: 8h0m0s
@@ -309,14 +311,14 @@ periodics:
     - args:
       - --config=/etc/config/labels.yaml
       - --confirm=true
-      - --orgs=openshift,cri-o,operator-framework,openshift-priv,redhat-operator-ecosystem,openshift-psap,openshift-metal3
+      - --orgs=openshift,cri-o,operator-framework,openshift-priv,redhat-operator-ecosystem,openshift-psap,openshift-metal3,shipwright-io
       - --token=/etc/github/oauth
       - --endpoint=http://ghproxy
       - --graphql-endpoint=http://ghproxy/graphql
       - --debug
       command:
       - /app/label_sync/app.binary
-      image: gcr.io/k8s-prow/label_sync:v20200826-f9138eb980
+      image: gcr.io/k8s-prow/label_sync:v20201124-061f85d859
       imagePullPolicy: Always
       name: ""
       resources:
@@ -461,8 +463,8 @@ periodics:
       - --git-email=openshift-bot@redhat.com
       - --target-dir=.
       - --config-dir=./ci-operator/config
-      - --current-release=4.6
-      - --future-release=4.7
+      - --current-release=4.7
+      - --future-release=4.8
       - --self-approve=true
       - --assign=ghost
       - --whitelist-file=./core-services/openshift-priv/_whitelist.yaml
@@ -516,7 +518,6 @@ periodics:
       - --ignore-repo=ci-operator/jobs/openshift/origin-web-console-server
       - --ignore-repo=ci-operator/jobs/openvswitch/ovn-kubernetes
       - --ignore-repo=ci-operator/templates/openshift/installer
-      - --ignore-repo=ci-operator/config/openshift/cluster-api-provider-azure
       - --ignore-repo=ci-operator/config/openshift/csi-driver-registrar
       - --ignore-repo=ci-operator/config/openshift/csi-external-resizer
       - --ignore-repo=ci-operator/config/openshift/csi-external-snapshotter
@@ -525,7 +526,6 @@ periodics:
       - --ignore-repo=ci-operator/config/openshift/knative-client
       - --ignore-repo=ci-operator/config/openshift/knative-serving
       - --ignore-repo=ci-operator/config/openshift/sig-storage-local-static-provisioner
-      - --ignore-repo=ci-operator/jobs/openshift/cluster-api-provider-azure
       - --ignore-repo=ci-operator/jobs/openshift/csi-driver-registrar
       - --ignore-repo=ci-operator/jobs/openshift/csi-external-resizer
       - --ignore-repo=ci-operator/jobs/openshift/csi-external-snapshotter
@@ -540,6 +540,8 @@ periodics:
       - --ignore-repo=ci-operator/jobs/openshift/build-machinery-go
       - --ignore-repo=ci-operator/config/openshift/etcd
       - --ignore-repo=ci-operator/jobs/openshift/etcd
+      - --ignore-repo=ci-operator/config/opendatahub-io/manifests
+      - --ignore-repo=ci-operator/jobs/opendatahub-io/manifests
       - --ignore-org=openshift-priv
       command:
       - /usr/bin/autoowners
@@ -558,7 +560,7 @@ periodics:
       secret:
         secretName: github-credentials-openshift-bot
 - agent: kubernetes
-  cluster: api.ci
+  cluster: app.ci
   decorate: true
   extra_refs:
   - base_ref: master
@@ -581,7 +583,7 @@ periodics:
       - --github-graphql-endpoint=http://ghproxy/graphql
       command:
       - /app/prow/cmd/branchprotector/app.binary
-      image: gcr.io/k8s-prow/branchprotector:v20200826-f9138eb980
+      image: gcr.io/k8s-prow/branchprotector:v20201124-061f85d859
       imagePullPolicy: Always
       name: ""
       resources:
@@ -628,7 +630,7 @@ periodics:
       - --fix-repos
       command:
       - /app/prow/cmd/peribolos/app.binary
-      image: gcr.io/k8s-prow/peribolos:v20200826-f9138eb980
+      image: gcr.io/k8s-prow/peribolos:v20201124-061f85d859
       imagePullPolicy: Always
       name: ""
       resources:
@@ -664,7 +666,7 @@ periodics:
       - --confirm=true
       command:
       - oc
-      image: quay.io/openshift/origin-cli:4.5
+      image: registry.svc.ci.openshift.org/ocp/4.7:cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -676,7 +678,7 @@ periodics:
           memory: 4Gi
     serviceAccountName: image-pruner
 - agent: kubernetes
-  cluster: api.ci
+  cluster: app.ci
   decorate: true
   extra_refs:
   - base_ref: master
@@ -685,37 +687,108 @@ periodics:
   interval: 12h
   labels:
     ci.openshift.io/role: infra
-  name: openshift-release-master-core-apply
+  name: periodic-openshift-release-master-core-apply
   spec:
     containers:
     - args:
       - --config-dir=core-services
+      - --config-dir=clusters/build-clusters/common
       - --confirm=true
+      - --kubeconfig=/etc/build-farm-credentials/kubeconfig
       - --as=
       command:
       - applyconfig
       env:
-      - name: build01_build01_reg_auth_value
-        valueFrom:
-          secretKeyRef:
-            key: build01_build01_reg_auth_value.txt
-            name: build-farm-credentials
-      - name: build01_build02_reg_auth_value
-        valueFrom:
-          secretKeyRef:
-            key: build01_build02_reg_auth_value.txt
-            name: build-farm-credentials
-      - name: build01_ci_reg_auth_value
-        valueFrom:
-          secretKeyRef:
-            key: build01_ci_reg_auth_value.txt
-            name: build-farm-credentials
       - name: slack_api_url
         valueFrom:
           secretKeyRef:
             key: url
             name: ci-slack-api-url
-      image: registry.svc.ci.openshift.org/ci/applyconfig:latest
+      image: applyconfig:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/build-farm-credentials
+        name: build-farm-credentials
+        readOnly: true
+    serviceAccountName: config-updater
+    volumes:
+    - name: build-farm-credentials
+      secret:
+        items:
+        - key: sa.config-updater.api.ci.config
+          path: kubeconfig
+        secretName: build-farm-credentials
+- agent: kubernetes
+  cluster: app.ci
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  interval: 12h
+  name: periodic-openshift-release-master-services-apply
+  spec:
+    containers:
+    - args:
+      - --config-dir=services
+      - --confirm=true
+      - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+      - --as=
+      command:
+      - applyconfig
+      image: applyconfig:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/build-farm-credentials
+        name: build-farm-credentials
+        readOnly: true
+    serviceAccountName: config-updater
+    volumes:
+    - name: build-farm-credentials
+      secret:
+        items:
+        - key: sa.config-updater.api.ci.config
+          path: kubeconfig
+        secretName: build-farm-credentials
+- agent: kubernetes
+  cluster: app.ci
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  interval: 12h
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-openshift-release-master-app-ci-apply
+  spec:
+    containers:
+    - args:
+      - --config-dir=clusters/app.ci
+      - --confirm=true
+      - --as=
+      command:
+      - applyconfig
+      env:
+      - name: OPENSHIFT_PROMETHEUS_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            key: prometheus-k8s-basic-auth-password
+            name: app-ci-openshift-monitoring-credentials
+      - name: SLACK_API_URL
+        valueFrom:
+          secretKeyRef:
+            key: url
+            name: ci-slack-api-url
+      image: applyconfig:latest
       imagePullPolicy: Always
       name: ""
       resources:
@@ -723,29 +796,151 @@ periodics:
           cpu: 10m
     serviceAccountName: config-updater
 - agent: kubernetes
-  cluster: api.ci
+  cluster: app.ci
   decorate: true
   extra_refs:
   - base_ref: master
     org: openshift
     repo: release
   interval: 12h
-  name: openshift-release-master-services-apply
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-openshift-release-master-build01-apply
   spec:
     containers:
     - args:
-      - --config-dir=services
+      - --config-dir=clusters/build-clusters/01_cluster
       - --confirm=true
       - --as=
+      - --kubeconfig=/etc/build-farm-credentials/kubeconfig
       command:
       - applyconfig
-      image: registry.svc.ci.openshift.org/ci/applyconfig:latest
+      env:
+      - name: github_client_id
+        valueFrom:
+          secretKeyRef:
+            key: build01_github_client_id
+            name: build-farm-credentials
+      - name: github_client_secret
+        valueFrom:
+          secretKeyRef:
+            key: build01_github_client_secret
+            name: build-farm-credentials
+      - name: slack_api_url
+        valueFrom:
+          secretKeyRef:
+            key: url
+            name: ci-slack-api-url
+      image: applyconfig:latest
       imagePullPolicy: Always
       name: ""
       resources:
         requests:
           cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/build-farm-credentials
+        name: build-farm-credentials
+        readOnly: true
     serviceAccountName: config-updater
+    volumes:
+    - name: build-farm-credentials
+      secret:
+        items:
+        - key: sa.config-updater.build01.config
+          path: kubeconfig
+        secretName: build-farm-credentials
+- agent: kubernetes
+  cluster: app.ci
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  interval: 12h
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-openshift-release-master-build02-apply
+  spec:
+    containers:
+    - args:
+      - --config-dir=clusters/build-clusters/02_cluster
+      - --confirm=true
+      - --as=
+      - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+      command:
+      - applyconfig
+      env:
+      - name: github_client_id
+        valueFrom:
+          secretKeyRef:
+            key: build02_github_client_id
+            name: build-farm-credentials
+      - name: github_client_secret
+        valueFrom:
+          secretKeyRef:
+            key: build02_github_client_secret
+            name: build-farm-credentials
+      - name: slack_api_url
+        valueFrom:
+          secretKeyRef:
+            key: url
+            name: ci-slack-api-url
+      image: applyconfig:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/build-farm-credentials
+        name: build-farm-credentials
+        readOnly: true
+    serviceAccountName: config-updater
+    volumes:
+    - name: build-farm-credentials
+      secret:
+        items:
+        - key: sa.config-updater.build02.config
+          path: kubeconfig
+        secretName: build-farm-credentials
+- agent: kubernetes
+  cluster: app.ci
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  interval: 12h
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-openshift-release-master-vsphere-apply
+  spec:
+    containers:
+    - args:
+      - --config-dir=clusters/build-clusters/vsphere
+      - --confirm=true
+      - --as=
+      - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+      command:
+      - applyconfig
+      image: applyconfig:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/build-farm-credentials
+        name: build-farm-credentials
+        readOnly: true
+    serviceAccountName: config-updater
+    volumes:
+    - name: build-farm-credentials
+      secret:
+        items:
+        - key: sa.config-updater.vsphere.config
+          path: kubeconfig
+        secretName: build-farm-credentials
 - agent: kubernetes
   cluster: api.ci
   decorate: true
@@ -761,7 +956,7 @@ periodics:
       - postsubmit-update
       command:
       - make
-      image: registry.svc.ci.openshift.org/ci/origin-release:cli
+      image: registry.svc.ci.openshift.org/ocp/4.7:cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -795,7 +990,7 @@ periodics:
       env:
       - name: KUBECONFIG
         value: /etc/build-farm-credentials/api.ci.kubeconfig:/etc/build-farm-credentials/build01.kubeconfig:/etc/app-ci-config-updater-kubeconfig/kubeconfig:/etc/build-farm-credentials/build02.kubeconfig:/etc/build-farm-credentials/vsphere.kubeconfig
-      image: gcr.io/k8s-prow/config-bootstrapper:v20200826-f9138eb980
+      image: gcr.io/k8s-prow/config-bootstrapper:v20201124-061f85d859
       imagePullPolicy: Always
       name: ""
       resources:
@@ -840,8 +1035,8 @@ periodics:
     containers:
     - args:
       - --config-dir=./ci-operator/config/
-      - --current-release=4.6
-      - --future-release=4.7
+      - --current-release=4.7
+      - --future-release=4.8
       - --fast-forward
       - --confirm
       - --username=openshift-merge-robot
@@ -917,8 +1112,8 @@ periodics:
     containers:
     - args:
       - --config-dir=./ci-operator/config/
-      - --current-release=4.6
-      - --future-release=4.7
+      - --current-release=4.7
+      - --future-release=4.8
       - --confirm
       - --username=openshift-merge-robot
       - --token-path=/etc/github/oauth
@@ -995,7 +1190,7 @@ periodics:
         done
       command:
       - /bin/bash
-      image: registry.svc.ci.openshift.org/ocp/4.5:cli
+      image: registry.svc.ci.openshift.org/ocp/4.7:cli
       imagePullPolicy: Always
       name: ""
       resources: {}
@@ -1113,6 +1308,24 @@ periodics:
       - --config=/etc/ci-secret-bootstrap/_config.yaml
       - --dry-run=false
       - --force=true
+      - --validate-bitwarden-items-usage
+      - --bw-allow-unused=openshift-ci-robot
+      - --bw-allow-unused=openshift-merge-robot
+      - --bw-allow-unused=openshift-build-robot
+      - --bw-allow-unused=openshift-publish-robot
+      - --bw-allow-unused=openshift-bugzilla-robot
+      - --bw-allow-unused=openshift-cherrypick-robot
+      - --bw-allow-unused=jira-credentials-dptp-bot
+      - --bw-allow-unused=openshift-bugzilla-robot@redhat.com
+      - --bw-allow-unused=openshift-bot
+      - --bw-allow-unused=openshift-github-robots@redhat.com
+      - --bw-allow-unused=aos-cicd@redhat.com
+      - --bw-allow-unused=aos-team-dp-testplatform@redhat.com mailing list
+      - --bw-allow-unused=AWS ci-longlivedcluster-bot
+      - --bw-allow-unused=bugzilla.redhat.com
+      - --bw-allow-unused=build_farm_02_cluster
+      - --bw-allow-unused=kata-jenkins-ci.westus2.cloudapp.azure.com
+      - --bw-allow-unused=quay.io
       command:
       - /usr/bin/ci-secret-bootstrap
       env:
@@ -1166,7 +1379,7 @@ periodics:
   - base_ref: master
     org: openshift
     repo: release
-  - base_ref: openshift-4.6-rhel-8
+  - base_ref: openshift-4.7
     org: openshift
     repo: ocp-build-data
   labels:
@@ -1181,14 +1394,11 @@ periodics:
       - --create-pr=true
       - --self-approve=true
       - --prune-unused-replacements=true
-      - --prune-ocp-builder-replacements=true
+      - --prune-ocp-builder-replacements=false
       - --ensure-correct-promotion-dockerfile=true
-      - --current-release-minor=6
+      - --current-release-minor=7
       - --ensure-correct-promotion-dockerfile-ignored-repos=openshift/origin-aggregated-logging
-      - --ensure-correct-promotion-dockerfile-ignored-repos=openshift/ocp-release-operator-sdk
-      - --ensure-correct-promotion-dockerfile-ignored-repos=openshift/jenkins
       - --ensure-correct-promotion-dockerfile-ignored-repos=openshift/console
-      - --ensure-correct-promotion-dockerfile-ignored-repos=kube-reporting/metering-operator
       command:
       - /usr/bin/registry-replacer
       image: registry.svc.ci.openshift.org/ci/registry-replacer:latest
@@ -1210,7 +1420,7 @@ periodics:
   cron: '@yearly'
   decorate: true
   extra_refs:
-  - base_ref: openshift-4.6-rhel-8
+  - base_ref: openshift-4.7
     org: openshift
     repo: ocp-build-data
   labels:
@@ -1223,7 +1433,7 @@ periodics:
       - --github-endpoint=http://ghproxy
       - --ocp-build-data-repo-dir=./
       - --create-prs=true
-      - --minor=6
+      - --minor=7
       - --pr-creation-ceiling=1000
       command:
       - /usr/bin/ocp-build-data-enforcer
@@ -1233,6 +1443,54 @@ periodics:
       image: registry.svc.ci.openshift.org/ci/ocp-build-data-enforcer:latest
       imagePullPolicy: Always
       name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: token
+        readOnly: true
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-bot
+- agent: kubernetes
+  cluster: app.ci
+  cron: '@daily'
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  - base_ref: master
+    org: kubernetes
+    repo: test-infra
+    workdir: true
+  labels:
+    ci.openshift.io/role: infra
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-prow-auto-testgrid-generator
+  spec:
+    containers:
+    - args:
+      - --github-token-path=/etc/github/oauth
+      - --github-endpoint=http://ghproxy
+      - --github-endpoint=https://api.github.com
+      - --github-graphql-endpoint=http://ghproxy/graphql
+      - --github-login=openshift-bot
+      - --git-name=openshift-bot
+      - --git-email=openshift-bot@redhat.com
+      - --working-dir=.
+      - --assign=petr-muller
+      - --testgrid-config=./config/testgrids/openshift
+      - --release-config=../../openshift/release/core-services/release-controller/_releases
+      - --prow-jobs-dir=../../openshift/release/ci-operator/jobs
+      - --allow-list=../../openshift/release/core-services/testgrid-config-generator/_allow-list.yaml
+      command:
+      - /usr/bin/autotestgridgenerator
+      image: registry.svc.ci.openshift.org/ci/auto-testgrid-generator:latest
+      imagePullPolicy: Always
+      name: auto-testgrid-generator
       resources:
         requests:
           cpu: 500m

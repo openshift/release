@@ -16,6 +16,7 @@ images:
 promotion:
   additional_images:
     console-tests: src
+  disabled: true
   name: 4.7-priv
   namespace: ocp-private
 resources:
@@ -26,7 +27,7 @@ resources:
   analyze:
     requests:
       cpu: "1"
-      memory: 10Gi
+      memory: 12Gi
   console:
     requests:
       cpu: "1"
@@ -46,24 +47,44 @@ test_binary_build_commands: ./build.sh
 tests:
 - artifact_dir: /tmp/artifacts
   as: backend
-  commands: export ARTIFACT_DIR=/tmp/artifacts; ./test-backend.sh
+  commands: ./test-backend.sh
   container:
     from: test-bin
 - artifact_dir: /tmp/artifacts
   as: frontend
-  commands: export ARTIFACT_DIR=/tmp/artifacts; ./test-frontend.sh
+  commands: ./test-frontend.sh
   container:
     from: test-bin
 - artifact_dir: /tmp/artifacts
   as: analyze
-  commands: export ARTIFACT_DIR=/tmp/artifacts; ./analyze.sh
+  commands: ./analyze.sh
   container:
     from: test-bin
 - artifact_dir: /tmp/artifacts
   as: e2e-gcp-console
-  commands: ./test-prow-e2e.sh
-  openshift_installer_src:
+  steps:
     cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: ./test-prow-e2e.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- artifact_dir: /tmp/artifacts
+  as: kubevirt-plugin
+  commands: |2
+
+    # Deploy Kubevirt
+    source ./frontend/packages/kubevirt-plugin/integration-tests/deploy-kubevirt-gating.sh
+
+    # Run kubevirt-plugin gating suite
+    ./test-prow-e2e.sh kubevirt-gating
+  openshift_installer_custom_test_image:
+    cluster_profile: azure4
+    from: pipeline:src
 zz_generated_metadata:
   branch: release-4.7
   org: openshift-priv

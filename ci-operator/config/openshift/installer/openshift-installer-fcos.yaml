@@ -7,6 +7,10 @@ base_images:
     name: "4.1"
     namespace: ocp
     tag: cli
+  ocp_4.6_cli:
+    name: "4.6"
+    namespace: ocp
+    tag: cli
   ocp_builder_golang-1.13:
     name: builder
     namespace: ocp
@@ -15,6 +19,14 @@ base_images:
     name: builder
     namespace: ocp
     tag: golang-1.14
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
   openshift_release_golang-1.13:
     name: release
     namespace: openshift
@@ -27,23 +39,26 @@ base_images:
     name: "4.2"
     namespace: origin
     tag: cli
-  origin_4.5_cli:
-    name: "4.5"
-    namespace: origin
-    tag: cli
   origin_4.6_cli:
     name: "4.6"
     namespace: origin
     tag: cli
+  rhel-7:
+    name: "4.6"
+    namespace: ocp
+    tag: base-7
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: golang-1.14
 images:
 - dockerfile_path: images/installer/Dockerfile.ci
   from: base
   inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
     openshift_release_golang-1.14:
       as:
       - registry.svc.ci.openshift.org/openshift/release:golang-1.14
@@ -54,6 +69,9 @@ images:
     ocp_builder_golang-1.14:
       as:
       - registry.svc.ci.openshift.org/ocp/builder:golang-1.14
+    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
   to: installer-artifacts
 - dockerfile_path: images/libvirt/Dockerfile.ci
   from: base
@@ -63,11 +81,11 @@ images:
       - registry.svc.ci.openshift.org/openshift/release:golang-1.14
   to: libvirt-installer
 - dockerfile_path: images/installer/Dockerfile.upi.ci
-  from: base
+  from: rhel-7
   inputs:
-    ocp_4.1_cli:
+    ocp_4.6_cli:
       as:
-      - registry.svc.ci.openshift.org/ocp/4.1:cli
+      - registry.svc.ci.openshift.org/ocp/4.6:cli
     ocp_builder_golang-1.14:
       as:
       - registry.svc.ci.openshift.org/ocp/builder:golang-1.14
@@ -78,17 +96,30 @@ images:
     openshift_release_golang-1.14:
       as:
       - registry.svc.ci.openshift.org/openshift/release:golang-1.14
-    origin_4.2_cli:
+    origin_4.6_cli:
       as:
-      - registry.svc.ci.openshift.org/origin/4.2:cli
+      - registry.svc.ci.openshift.org/origin/4.6:cli
   to: openstack-installer
 - dockerfile_path: images/baremetal/Dockerfile.ci
   from: base
   inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
     openshift_release_golang-1.14:
       as:
       - registry.svc.ci.openshift.org/openshift/release:golang-1.14
   to: baremetal-installer
+- dockerfile_path: images/installer/Dockerfile.ci
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
+    openshift_release_golang-1.14:
+      as:
+      - registry.svc.ci.openshift.org/openshift/release:golang-1.14
+  to: ovirt-installer
 promotion:
   name: "4.6"
   namespace: origin
@@ -118,6 +149,10 @@ resources:
       cpu: "3"
       memory: 5Gi
   openstack-installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  ovirt-installer:
     requests:
       cpu: "3"
       memory: 5Gi
@@ -151,6 +186,10 @@ tests:
     from: src
 - as: verify-vendor
   commands: IS_CONTAINER=TRUE ./hack/verify-vendor.sh
+  container:
+    from: src
+- as: verify-codegen
+  commands: IS_CONTAINER=TRUE ./hack/verify-codegen.sh
   container:
     from: src
 - as: e2e-gcp

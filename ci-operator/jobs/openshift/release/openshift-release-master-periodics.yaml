@@ -67,7 +67,7 @@ periodics:
             name: cluster-secrets-aws
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: result-aggregator
       secret:
         secretName: result-aggregator
@@ -141,7 +141,7 @@ periodics:
             name: cluster-profile-packet
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: result-aggregator
       secret:
         secretName: result-aggregator
@@ -215,7 +215,7 @@ periodics:
             name: cluster-profile-packet
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: result-aggregator
       secret:
         secretName: result-aggregator
@@ -289,7 +289,151 @@ periodics:
             name: cluster-profile-packet
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: vsphere
+  cron: 0 0,12 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: ocp-4.4
+    job-release: "4.4"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ocp-4.4-e2e-vsphere-upi
+  spec:
+    containers:
+    - args:
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-password-file=/etc/boskos/password
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-vsphere-upi-cluster-profile
+      - --target=e2e-vsphere-upi
+      - --variant=ocp-4.4
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-vsphere-upi-cluster-profile
+        name: cluster-profile
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-vsphere
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: vsphere
+  cron: 30 0,12 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: ocp-4.4
+    job-release: "4.4"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ocp-4.4-e2e-vsphere-upi-serial
+  spec:
+    containers:
+    - args:
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-password-file=/etc/boskos/password
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-vsphere-upi-serial-cluster-profile
+      - --target=e2e-vsphere-upi-serial
+      - --variant=ocp-4.4
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-vsphere-upi-serial-cluster-profile
+        name: cluster-profile
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-vsphere
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
     - name: result-aggregator
       secret:
         secretName: result-aggregator
@@ -361,7 +505,7 @@ periodics:
             name: cluster-secrets-aws
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: result-aggregator
       secret:
         secretName: result-aggregator
@@ -433,7 +577,7 @@ periodics:
             name: cluster-secrets-aws
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: result-aggregator
       secret:
         secretName: result-aggregator
@@ -507,7 +651,7 @@ periodics:
             name: cluster-profile-packet
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: result-aggregator
       secret:
         secretName: result-aggregator
@@ -581,7 +725,7 @@ periodics:
             name: cluster-profile-packet
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: result-aggregator
       secret:
         secretName: result-aggregator
@@ -655,7 +799,295 @@ periodics:
             name: cluster-profile-packet
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: vsphere
+  cron: 0 1,9,17 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: ocp-4.5
+    job-release: "4.5"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ocp-4.5-e2e-vsphere
+  spec:
+    containers:
+    - args:
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-password-file=/etc/boskos/password
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-vsphere-cluster-profile
+      - --target=e2e-vsphere
+      - --variant=ocp-4.5
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-vsphere-cluster-profile
+        name: cluster-profile
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-vsphere
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: vsphere
+  cron: 30 1,9,17 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: ocp-4.5
+    job-release: "4.5"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ocp-4.5-e2e-vsphere-serial
+  spec:
+    containers:
+    - args:
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-password-file=/etc/boskos/password
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-vsphere-serial-cluster-profile
+      - --target=e2e-vsphere-serial
+      - --variant=ocp-4.5
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-vsphere-serial-cluster-profile
+        name: cluster-profile
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-vsphere
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: vsphere
+  cron: 15 1,9,17 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: ocp-4.5
+    job-release: "4.5"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ocp-4.5-e2e-vsphere-upi
+  spec:
+    containers:
+    - args:
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-password-file=/etc/boskos/password
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-vsphere-upi-cluster-profile
+      - --target=e2e-vsphere-upi
+      - --variant=ocp-4.5
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-vsphere-upi-cluster-profile
+        name: cluster-profile
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-vsphere
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: vsphere
+  cron: 45 1,9,17 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: ocp-4.5
+    job-release: "4.5"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ocp-4.5-e2e-vsphere-upi-serial
+  spec:
+    containers:
+    - args:
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-password-file=/etc/boskos/password
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-vsphere-upi-serial-cluster-profile
+      - --target=e2e-vsphere-upi-serial
+      - --variant=ocp-4.5
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-vsphere-upi-serial-cluster-profile
+        name: cluster-profile
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-vsphere
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
     - name: result-aggregator
       secret:
         secretName: result-aggregator
@@ -727,7 +1159,79 @@ periodics:
             name: cluster-secrets-aws
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: api.ci
+  cron: 30 */6 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: ocp-4.6
+    job-release: "4.6"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ocp-4.6-e2e-aws-workers-rhel7
+  spec:
+    containers:
+    - args:
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-password-file=/etc/boskos/password
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-aws-workers-rhel7-cluster-profile
+      - --target=e2e-aws-workers-rhel7
+      - --variant=ocp-4.6
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-aws-workers-rhel7-cluster-profile
+        name: cluster-profile
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
     - name: result-aggregator
       secret:
         secretName: result-aggregator
@@ -801,7 +1305,7 @@ periodics:
             name: cluster-profile-packet
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: result-aggregator
       secret:
         secretName: result-aggregator
@@ -875,7 +1379,7 @@ periodics:
             name: cluster-profile-packet
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: result-aggregator
       secret:
         secretName: result-aggregator
@@ -949,7 +1453,7 @@ periodics:
             name: cluster-profile-packet
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: result-aggregator
       secret:
         secretName: result-aggregator
@@ -1023,7 +1527,1899 @@ periodics:
             name: cluster-profile-packet
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: vsphere
+  cron: 0 2,8,14,20 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: ocp-4.6
+    job-release: "4.6"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ocp-4.6-e2e-vsphere
+  spec:
+    containers:
+    - args:
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-password-file=/etc/boskos/password
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-vsphere-cluster-profile
+      - --target=e2e-vsphere
+      - --variant=ocp-4.6
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-vsphere-cluster-profile
+        name: cluster-profile
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-vsphere
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: vsphere
+  cron: 30 2,8,14,20 */6 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: ocp-4.6
+    job-release: "4.6"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ocp-4.6-e2e-vsphere-serial
+  spec:
+    containers:
+    - args:
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-password-file=/etc/boskos/password
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-vsphere-serial-cluster-profile
+      - --target=e2e-vsphere-serial
+      - --variant=ocp-4.6
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-vsphere-serial-cluster-profile
+        name: cluster-profile
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-vsphere
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: vsphere
+  cron: 15 2,8,14,20 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: ocp-4.6
+    job-release: "4.6"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ocp-4.6-e2e-vsphere-upi
+  spec:
+    containers:
+    - args:
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-password-file=/etc/boskos/password
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-vsphere-upi-cluster-profile
+      - --target=e2e-vsphere-upi
+      - --variant=ocp-4.6
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-vsphere-upi-cluster-profile
+        name: cluster-profile
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-vsphere
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: vsphere
+  cron: 45 2,8,14,20 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: ocp-4.6
+    job-release: "4.6"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ocp-4.6-e2e-vsphere-upi-serial
+  spec:
+    containers:
+    - args:
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-password-file=/etc/boskos/password
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-vsphere-upi-serial-cluster-profile
+      - --target=e2e-vsphere-upi-serial
+      - --variant=ocp-4.6
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-vsphere-upi-serial-cluster-profile
+        name: cluster-profile
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-vsphere
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 0 */2 * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: ocp-4.7
+    job-release: "4.7"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ocp-4.7-e2e-aws-proxy
+  spec:
+    containers:
+    - args:
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-password-file=/etc/boskos/password
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-aws-proxy-cluster-profile
+      - --target=e2e-aws-proxy
+      - --variant=ocp-4.7
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-aws-proxy-cluster-profile
+        name: cluster-profile
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: api.ci
+  cron: 30 */6 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: ocp-4.7
+    job-release: "4.7"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ocp-4.7-e2e-aws-workers-rhel7
+  spec:
+    containers:
+    - args:
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-password-file=/etc/boskos/password
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-aws-workers-rhel7-cluster-profile
+      - --target=e2e-aws-workers-rhel7
+      - --variant=ocp-4.7
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-aws-workers-rhel7-cluster-profile
+        name: cluster-profile
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 0 1 1 *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: ocp-4.7
+    job-release: "4.7"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ocp-4.7-e2e-metal-ipi
+  spec:
+    containers:
+    - args:
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-password-file=/etc/boskos/password
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-metal-ipi-cluster-profile
+      - --target=e2e-metal-ipi
+      - --variant=ocp-4.7
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-metal-ipi-cluster-profile
+        name: cluster-profile
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-packet
+        - configMap:
+            name: cluster-profile-packet
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 0 * * 1
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: ocp-4.7
+    job-release: "4.7"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ocp-4.7-e2e-metal-ipi-compact
+  spec:
+    containers:
+    - args:
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-password-file=/etc/boskos/password
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-metal-ipi-compact-cluster-profile
+      - --target=e2e-metal-ipi-compact
+      - --variant=ocp-4.7
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-metal-ipi-compact-cluster-profile
+        name: cluster-profile
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-packet
+        - configMap:
+            name: cluster-profile-packet
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 0 1 1 *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: ocp-4.7
+    job-release: "4.7"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ocp-4.7-e2e-metal-ipi-ovn-dualstack
+  spec:
+    containers:
+    - args:
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-password-file=/etc/boskos/password
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-metal-ipi-ovn-dualstack-cluster-profile
+      - --target=e2e-metal-ipi-ovn-dualstack
+      - --variant=ocp-4.7
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-metal-ipi-ovn-dualstack-cluster-profile
+        name: cluster-profile
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-packet
+        - configMap:
+            name: cluster-profile-packet
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 0 1 1 *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: ocp-4.7
+    job-release: "4.7"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ocp-4.7-e2e-metal-ipi-ovn-ipv6
+  spec:
+    containers:
+    - args:
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-password-file=/etc/boskos/password
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-metal-ipi-ovn-ipv6-cluster-profile
+      - --target=e2e-metal-ipi-ovn-ipv6
+      - --variant=ocp-4.7
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-metal-ipi-ovn-ipv6-cluster-profile
+        name: cluster-profile
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-packet
+        - configMap:
+            name: cluster-profile-packet
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 0 * * 1
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: ocp-4.7
+    job-release: "4.7"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ocp-4.7-e2e-metal-ipi-virtualmedia
+  spec:
+    containers:
+    - args:
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-password-file=/etc/boskos/password
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-metal-ipi-virtualmedia-cluster-profile
+      - --target=e2e-metal-ipi-virtualmedia
+      - --variant=ocp-4.7
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-metal-ipi-virtualmedia-cluster-profile
+        name: cluster-profile
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-packet
+        - configMap:
+            name: cluster-profile-packet
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: vsphere
+  cron: 0 4,10,16,22 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: ocp-4.7
+    job-release: "4.7"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ocp-4.7-e2e-vsphere
+  spec:
+    containers:
+    - args:
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-password-file=/etc/boskos/password
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-vsphere-cluster-profile
+      - --target=e2e-vsphere
+      - --variant=ocp-4.7
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-vsphere-cluster-profile
+        name: cluster-profile
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-vsphere
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: vsphere
+  cron: 30 4,10,16,22 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: ocp-4.7
+    job-release: "4.7"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ocp-4.7-e2e-vsphere-serial
+  spec:
+    containers:
+    - args:
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-password-file=/etc/boskos/password
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-vsphere-serial-cluster-profile
+      - --target=e2e-vsphere-serial
+      - --variant=ocp-4.7
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-vsphere-serial-cluster-profile
+        name: cluster-profile
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-vsphere
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: vsphere
+  cron: 15 4,10,16,22 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: ocp-4.7
+    job-release: "4.7"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ocp-4.7-e2e-vsphere-upi
+  spec:
+    containers:
+    - args:
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-password-file=/etc/boskos/password
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-vsphere-upi-cluster-profile
+      - --target=e2e-vsphere-upi
+      - --variant=ocp-4.7
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-vsphere-upi-cluster-profile
+        name: cluster-profile
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-vsphere
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: vsphere
+  cron: 45 4,10,16,22 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: ocp-4.7
+    job-release: "4.7"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ocp-4.7-e2e-vsphere-upi-serial
+  spec:
+    containers:
+    - args:
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-password-file=/etc/boskos/password
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-vsphere-upi-serial-cluster-profile
+      - --target=e2e-vsphere-upi-serial
+      - --variant=ocp-4.7
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-vsphere-upi-serial-cluster-profile
+        name: cluster-profile
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-vsphere
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 0 */2 * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: ocp-4.8
+    job-release: "4.8"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ocp-4.8-e2e-aws-proxy
+  spec:
+    containers:
+    - args:
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-password-file=/etc/boskos/password
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-aws-proxy-cluster-profile
+      - --target=e2e-aws-proxy
+      - --variant=ocp-4.8
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-aws-proxy-cluster-profile
+        name: cluster-profile
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: api.ci
+  cron: 30 */6 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: ocp-4.8
+    job-release: "4.8"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ocp-4.8-e2e-aws-workers-rhel7
+  spec:
+    containers:
+    - args:
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-password-file=/etc/boskos/password
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-aws-workers-rhel7-cluster-profile
+      - --target=e2e-aws-workers-rhel7
+      - --variant=ocp-4.8
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-aws-workers-rhel7-cluster-profile
+        name: cluster-profile
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 0 1 1 *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: ocp-4.8
+    job-release: "4.8"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ocp-4.8-e2e-metal-ipi
+  spec:
+    containers:
+    - args:
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-password-file=/etc/boskos/password
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-metal-ipi-cluster-profile
+      - --target=e2e-metal-ipi
+      - --variant=ocp-4.8
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-metal-ipi-cluster-profile
+        name: cluster-profile
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-packet
+        - configMap:
+            name: cluster-profile-packet
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 0 * * 1
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: ocp-4.8
+    job-release: "4.8"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ocp-4.8-e2e-metal-ipi-compact
+  spec:
+    containers:
+    - args:
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-password-file=/etc/boskos/password
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-metal-ipi-compact-cluster-profile
+      - --target=e2e-metal-ipi-compact
+      - --variant=ocp-4.8
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-metal-ipi-compact-cluster-profile
+        name: cluster-profile
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-packet
+        - configMap:
+            name: cluster-profile-packet
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 0 1 1 *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: ocp-4.8
+    job-release: "4.8"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ocp-4.8-e2e-metal-ipi-ovn-dualstack
+  spec:
+    containers:
+    - args:
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-password-file=/etc/boskos/password
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-metal-ipi-ovn-dualstack-cluster-profile
+      - --target=e2e-metal-ipi-ovn-dualstack
+      - --variant=ocp-4.8
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-metal-ipi-ovn-dualstack-cluster-profile
+        name: cluster-profile
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-packet
+        - configMap:
+            name: cluster-profile-packet
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 0 1 1 *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: ocp-4.8
+    job-release: "4.8"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ocp-4.8-e2e-metal-ipi-ovn-ipv6
+  spec:
+    containers:
+    - args:
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-password-file=/etc/boskos/password
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-metal-ipi-ovn-ipv6-cluster-profile
+      - --target=e2e-metal-ipi-ovn-ipv6
+      - --variant=ocp-4.8
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-metal-ipi-ovn-ipv6-cluster-profile
+        name: cluster-profile
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-packet
+        - configMap:
+            name: cluster-profile-packet
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 0 * * 1
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: ocp-4.8
+    job-release: "4.8"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ocp-4.8-e2e-metal-ipi-virtualmedia
+  spec:
+    containers:
+    - args:
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-password-file=/etc/boskos/password
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-metal-ipi-virtualmedia-cluster-profile
+      - --target=e2e-metal-ipi-virtualmedia
+      - --variant=ocp-4.8
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-metal-ipi-virtualmedia-cluster-profile
+        name: cluster-profile
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-packet
+        - configMap:
+            name: cluster-profile-packet
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: vsphere
+  cron: 25 */6 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: ocp-4.8
+    job-release: "4.8"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ocp-4.8-e2e-vsphere
+  spec:
+    containers:
+    - args:
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-password-file=/etc/boskos/password
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-vsphere-cluster-profile
+      - --target=e2e-vsphere
+      - --variant=ocp-4.8
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-vsphere-cluster-profile
+        name: cluster-profile
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-vsphere
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: vsphere
+  cron: 35 */6 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: ocp-4.8
+    job-release: "4.8"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ocp-4.8-e2e-vsphere-serial
+  spec:
+    containers:
+    - args:
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-password-file=/etc/boskos/password
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-vsphere-serial-cluster-profile
+      - --target=e2e-vsphere-serial
+      - --variant=ocp-4.8
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-vsphere-serial-cluster-profile
+        name: cluster-profile
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-vsphere
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: vsphere
+  cron: 30 */6 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: ocp-4.8
+    job-release: "4.8"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ocp-4.8-e2e-vsphere-upi
+  spec:
+    containers:
+    - args:
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-password-file=/etc/boskos/password
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-vsphere-upi-cluster-profile
+      - --target=e2e-vsphere-upi
+      - --variant=ocp-4.8
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-vsphere-upi-cluster-profile
+        name: cluster-profile
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-vsphere
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: vsphere
+  cron: 40 */6 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: ocp-4.8
+    job-release: "4.8"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ocp-4.8-e2e-vsphere-upi-serial
+  spec:
+    containers:
+    - args:
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-password-file=/etc/boskos/password
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-vsphere-upi-serial-cluster-profile
+      - --target=e2e-vsphere-upi-serial
+      - --variant=ocp-4.8
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-vsphere-upi-serial-cluster-profile
+        name: cluster-profile
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-vsphere
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
     - name: result-aggregator
       secret:
         secretName: result-aggregator

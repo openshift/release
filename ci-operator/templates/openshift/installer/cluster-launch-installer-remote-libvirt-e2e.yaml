@@ -59,6 +59,9 @@ parameters:
   required: false
 - name: MULTIARCH_RELEASE_IMAGE_LATEST
   required: true
+- name: USE_LEASE_CLIENT
+- name: LEASED_RESOURCE
+  required: true
 
 objects:
 
@@ -128,7 +131,7 @@ objects:
       # we want to gather the teardown logs no matter what
       ci-operator.openshift.io/wait-for-container-artifacts: teardown
       ci-operator.openshift.io/save-container-logs: "true"
-      ci-operator.openshift.io/container-sub-tests: "lease,setup,test,teardown"
+      ci-operator.openshift.io/container-sub-tests: "setup,test,teardown"
   spec:
     restartPolicy: Never
     activeDeadlineSeconds: 21600
@@ -143,92 +146,6 @@ objects:
         secretName: ${JOB_NAME_SAFE}-cluster-profile
 
     containers:
-
-    - name: lease
-      image: registry.svc.ci.openshift.org/ci/boskoscli:latest
-      terminationMessagePolicy: FallbackToLogsOnError
-      resources:
-        requests:
-          cpu: 10m
-          memory: 10Mi
-        limits:
-          memory: 200Mi
-      volumeMounts:
-      - name: shared-tmp
-        mountPath: /tmp/shared
-      - name: cluster-profile
-        mountPath: /etc/openshift-installer
-      - name: artifacts
-        mountPath: /tmp/artifacts
-      env:
-      - name: ARTIFACT_DIR
-        value: /tmp/artifacts
-      - name: ARCH
-      - name: CLUSTER_TYPE
-      - name: CLUSTER_NAME
-        value: ${NAMESPACE}-${JOB_NAME_HASH}
-      command:
-      - /bin/bash
-      - -c
-      - |
-        #!/bin/bash
-        set -euo pipefail
-
-        trap 'rc=$?; CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi; if test "${rc}" -ne 0; then touch /tmp/shared/exit; fi; exit "${rc}"' EXIT
-
-        # hack for bazel
-        function boskosctl() {
-          /app/boskos/cmd/cli/app.binary "${@}"
-        }
-
-        function acquire_lease() {
-          if [[ "${ARCH}" != "s390x" && "${ARCH}" != "ppc64le" ]]; then
-            resource_name="${CLUSTER_TYPE}-0-0"
-            return
-          fi
-
-          resource="$( boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" acquire --type "${CLUSTER_TYPE}-quota-slice" --state "free" --target-state "leased" --timeout 150m )"
-          resource_name="$(echo "${resource}"|jq .name --raw-output)"
-
-          echo "[INFO] Lease acquired! at $(date --utc)"
-          echo "[INFO] Leased resource: ${resource}"
-          echo "[INFO] Sending heartbeats to retain the lease ${resource_name}"
-          boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" heartbeat --resource "${resource}" &
-          heartbeats_pid=$!
-        }
-
-        echo "[INFO] Acquiring a lease ..."
-        acquire_lease
-
-        # Save name of the env to be used as the base domain
-        cat > /tmp/shared/libvirt-lease.conf <<EOF
-        BASE_DOMAIN="${resource_name}"
-        EOF
-
-        touch /tmp/shared/leased
-
-        function release() {
-            if [[ "${ARCH}" != "s390x" && "${ARCH}" != "ppc64le" ]]; then
-              return
-            fi
-
-            echo "killing heartbeat process "${heartbeats_pid}" at $(date --utc)"
-            kill -9 "${heartbeats_pid}"
-            echo "[INFO] Releasing the lease on resouce ${resource_name}"
-            boskosctl --server-url http://boskos.ci --owner-name "${CLUSTER_NAME}" release --name "${resource_name}" --target-state "free" || true
-        }
-
-        trap "release" EXIT
-        trap "release" TERM
-
-        while true; do
-          if [[ -f /tmp/shared/exit ]]; then
-            echo "Another process exited" 2>&1
-            exit 0
-          fi
-
-          sleep 15 & wait $!
-        done
 
     # Once the cluster is up, executes shared tests
     - name: test
@@ -265,8 +182,8 @@ objects:
 
         export PATH=/usr/libexec/origin:$PATH
 
-        trap 'touch /tmp/shared/exit' EXIT
-        trap 'jobs -p | xargs -r kill; exit 0' TERM
+        trap 'touch /tmp/shared/test-exit' EXIT
+        trap 'jobs -p | xargs -r kill || true; exit 0' TERM
 
         function patch_image_specs() {
           cat <<EOF >samples-patch.yaml
@@ -318,6 +235,10 @@ objects:
 
         # wait for the API to come up
         while true; do
+          if [[ -f /tmp/shared/setup-failed ]]; then
+            echo "Setup reported a failure, do not report test failure" 2>&1
+            exit 0
+          fi
           if [[ -f /tmp/shared/exit ]]; then
             echo "Another process exited" 2>&1
             exit 1
@@ -344,14 +265,9 @@ objects:
         cp /tmp/cluster/ssh-privatekey ~/.ssh/kube_libvirt_rsa || true
         export KUBE_SSH_USER=core
 
-        # ensure lease is acquired
-        if [[ ! -f /tmp/shared/libvirt-lease.conf ]]; then
-          exit 1
-        fi
-
-        # ensure BASE_DOMAIN is set
-        source /tmp/shared/libvirt-lease.conf
-        if [[ -z "$BASE_DOMAIN" ]]; then
+        # ensure LEASED_RESOURCE is set
+        if [[ -z "${LEASED_RESOURCE}" ]]; then
+          echo "Failed to acquire lease"
           exit 1
         fi
 
@@ -367,6 +283,7 @@ objects:
         quayK8sCSI: quay.io/multiarch-k8s-e2e
         k8sCSI: quay.io/multiarch-k8s-e2e
         promoterE2eRegistry: quay.io/multiarch-k8s-e2e
+        sigStorageRegistry: quay.io/multiarch-k8s-e2e
         EOREGISTRY
         export KUBE_TEST_REPO_LIST=/tmp/kube-test-repo-list
 
@@ -429,8 +346,6 @@ objects:
         value: "2"
       - name: INSTALL_INITIAL_RELEASE
       - name: RELEASE_IMAGE_INITIAL
-      - name: REMOTE_LIBVIRT_HOSTNAME
-      - name: REMOTE_LIBVIRT_HOSTNAME_1
       command:
       - /bin/bash
       - -c
@@ -440,21 +355,6 @@ objects:
 
         trap 'rc=$?; if test "${rc}" -eq 0; then touch /tmp/shared/setup-success; else touch /tmp/shared/exit; fi; exit "${rc}"' EXIT
         trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-        # Wait until lease is acquired
-        while true; do
-          if [[ -f /tmp/shared/exit ]]; then
-            echo "Another process exited" 2>&1
-            exit 1
-          fi
-          if [[ -f /tmp/shared/leased ]]; then
-            echo "Lease acquired, installing..."
-
-            # Retrieve lease variables
-            source /tmp/shared/libvirt-lease.conf
-            break
-          fi
-          sleep 15 & wait
-        done
 
         cp "$(command -v openshift-install)" /tmp
         mkdir ${ARTIFACT_DIR}/installer
@@ -488,8 +388,14 @@ objects:
         SUBNETS["${CLUSTER_TYPE}-1-3"]="3"
         SUBNETS["${CLUSTER_TYPE}-1-4"]="4"
 
+        # ensure LEASED_RESOURCE is set
+        if [[ -z "${LEASED_RESOURCE}" ]]; then
+          echo "Failed to acquire lease"
+          exit 1
+        fi
+
         # get cluster subnet or default it to 126
-        cluster_subnet="${SUBNETS[$BASE_DOMAIN]}"
+        cluster_subnet="${SUBNETS[${LEASED_RESOURCE}]}"
         if [[ -z "$cluster_subnet" ]]; then
            cluster_subnet=126
         fi
@@ -505,9 +411,9 @@ objects:
         LIBVIRT_HOSTS["${CLUSTER_TYPE}-1-2"]="${REMOTE_LIBVIRT_HOSTNAME_1}"
         LIBVIRT_HOSTS["${CLUSTER_TYPE}-1-3"]="${REMOTE_LIBVIRT_HOSTNAME_1}"
         LIBVIRT_HOSTS["${CLUSTER_TYPE}-1-4"]="${REMOTE_LIBVIRT_HOSTNAME_1}"
-        
+
         # get cluster libvirt uri or default it the first host
-        remote_libvirt_uri="qemu+tcp://${LIBVIRT_HOSTS[$BASE_DOMAIN]}/system"
+        remote_libvirt_uri="qemu+tcp://${LIBVIRT_HOSTS[${LEASED_RESOURCE}]}/system"
         if [[ -z "$remote_libvirt_uri" ]]; then
            remote_libvirt_uri="qemu+tcp://${REMOTE_LIBVIRT_HOSTNAME}/system"
         fi
@@ -518,7 +424,7 @@ objects:
             subnets="[]"
             cat > ${ARTIFACT_DIR}/installer/install-config.yaml << EOF
         apiVersion: v1
-        baseDomain: ${BASE_DOMAIN}
+        baseDomain: ${LEASED_RESOURCE}
         metadata:
           name: ${CLUSTER_NAME}
         controlPlane:
@@ -543,7 +449,7 @@ objects:
           libvirt:
             URI: ${remote_libvirt_uri}
             network:
-              if: "br${JOB_NAME_HASH}${BUILD_ID: -4}"
+              if: "br$(printf ${LEASED_RESOURCE} | tail -c 3)-${JOB_NAME_HASH}"
         pullSecret: >
           ${PULL_SECRET}
         sshKey: |
@@ -561,7 +467,7 @@ objects:
 
         mock-nss.sh openshift-install create manifests --dir=${ARTIFACT_DIR}/installer
         sed -i '/^  channel:/d' ${ARTIFACT_DIR}/installer/manifests/cvo-overrides.yaml
-        
+
         # Bump the libvirt masters memory to 16GB
         export TF_VAR_libvirt_master_memory=16384
         ls ${ARTIFACT_DIR}/installer/openshift
@@ -569,10 +475,10 @@ objects:
         do
             yq write --inplace ${ARTIFACT_DIR}/installer/openshift/99_openshift-cluster-api_master-machines-${i}.yaml spec.providerSpec.value[domainMemory] 16384
         done
-        
+
         # Bump the libvirt workers memory to 8GB
         yq write --inplace ${ARTIFACT_DIR}/installer/openshift/99_openshift-cluster-api_worker-machineset-0.yaml spec.template.spec.providerSpec.value[domainMemory] 8192
-        
+
         # Bump the libvirt workers disk to to 30GB
         yq write --inplace ${ARTIFACT_DIR}/installer/openshift/99_openshift-cluster-api_worker-machineset-0.yaml spec.template.spec.providerSpec.value.volume[volumeSize] 32212254720
 
@@ -591,12 +497,12 @@ objects:
             if [[ -n "${libvirt_network}" ]]; then
                 cat > ${ARTIFACT_DIR}/installer/worker-hostrecords.xml << EOF
         <host ip='192.168.${cluster_subnet}.51'>
-          <hostname>alertmanager-main-openshift-monitoring.apps.${CLUSTER_NAME}.${BASE_DOMAIN}</hostname>
-          <hostname>console-openshift-console.apps.${CLUSTER_NAME}.${BASE_DOMAIN}</hostname>
-          <hostname>downloads-openshift-console.apps.${CLUSTER_NAME}.${BASE_DOMAIN}</hostname>
-          <hostname>grafana-openshift-monitoring.apps.${CLUSTER_NAME}.${BASE_DOMAIN}</hostname>
-          <hostname>oauth-openshift.apps.${CLUSTER_NAME}.${BASE_DOMAIN}</hostname>
-          <hostname>prometheus-k8s-openshift-monitoring.apps.${CLUSTER_NAME}.${BASE_DOMAIN}</hostname>
+          <hostname>alertmanager-main-openshift-monitoring.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
+          <hostname>console-openshift-console.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
+          <hostname>downloads-openshift-console.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
+          <hostname>grafana-openshift-monitoring.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
+          <hostname>oauth-openshift.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
+          <hostname>prometheus-k8s-openshift-monitoring.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
         </host>
         EOF
                 echo "Libvirt network found. Injecting worker DNS records."
@@ -645,6 +551,8 @@ objects:
       - -c
       - |
         #!/bin/bash
+        set -eo pipefail
+
         function queue() {
           local TARGET="${1}"
           shift
@@ -743,21 +651,27 @@ objects:
           mkdir -p ${ARTIFACT_DIR}/must-gather
           queue ${ARTIFACT_DIR}/must-gather/must-gather.log oc --insecure-skip-tls-verify adm must-gather --dest-dir ${ARTIFACT_DIR}/must-gather
 
+          echo "Gathering audit logs..."
+          mkdir -p ${ARTIFACT_DIR}/audit-logs
+          queue ${ARTIFACT_DIR}/audit-logs/must-gather.log oc --insecure-skip-tls-verify adm must-gather --dest-dir ${ARTIFACT_DIR}/audit-logs -- /usr/bin/gather_audit_logs
+
           echo "Waiting for logs ..."
           wait
 
-          tar -czC ${ARTIFACT_DIR}/must-gather -f ${ARTIFACT_DIR}/must-gather.tar.gz . &&
-          rm -rf ${ARTIFACT_DIR}/must-gather
+          for artifact in must-gather audit-logs ; do
+            tar -czC ${ARTIFACT_DIR}/${artifact} -f ${ARTIFACT_DIR}/${artifact}.tar.gz . &&
+            rm -rf ${ARTIFACT_DIR}/${artifact}
+          done
 
           echo "Deprovisioning cluster ..."
           mock-nss.sh openshift-install --dir ${ARTIFACT_DIR}/installer destroy cluster
         }
 
-        trap 'teardown' EXIT
-        trap 'jobs -p | xargs -r kill; exit 0' TERM
+        trap 'teardown; touch /tmp/shared/teardown-exit; exit 0' EXIT
+        trap 'jobs -p | xargs -r kill || true; touch /tmp/shared/teardown-exit; exit 0' TERM
 
         for i in $(seq 1 220); do
-          if [[ -f /tmp/shared/exit ]]; then
+          if [[ -f /tmp/shared/exit ]] || [[ -f /tmp/shared/test-exit ]]; then
             exit 0
           fi
           sleep 60 & wait

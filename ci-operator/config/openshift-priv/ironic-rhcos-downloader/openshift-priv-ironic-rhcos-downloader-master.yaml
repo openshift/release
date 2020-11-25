@@ -1,24 +1,28 @@
 base_images:
-  base:
-    name: 4.6-priv
-    namespace: ocp-private
-    tag: base
   dev-scripts:
     name: test
     namespace: openshift-kni
     tag: dev-scripts
+  ocp_builder_rhel-8-base-openshift:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-base-openshift
+  ocp_builder_rhel-8-base-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-base-openshift-4.7
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.10
+    tag: golang-1.15
 canonical_go_repository: github.com/openshift/ironic-rhcos-downloader
 images:
 - dockerfile_path: Dockerfile.ocp
-  from: base
+  from: ocp_builder_rhel-8-base-openshift
   to: ironic-machine-os-downloader
 promotion:
-  name: 4.6-priv
+  name: 4.7-priv
   namespace: ocp-private
 resources:
   '*':
@@ -26,7 +30,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: 4.6-priv
+  name: 4.7-priv
   namespace: ocp-private
 tests:
 - as: e2e-metal-ipi

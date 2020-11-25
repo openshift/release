@@ -19,22 +19,7 @@
             },
           }
           for job_name in std.objectFields($._job_failures_config.alerts)
-        ] + [
-          {	
-            alert: '%s-low' % job_name,	
-            expr: |||
-              sum(rate(prowjob_state_transitions{job="prow-controller-manager",job_name="%s",state="success"}[2d]))/sum(rate(prowjob_state_transitions{job="prow-controller-manager",job_name="%s",state=~"success|failure"}[2d])) * 100 < 95
-            ||| % [job_name, job_name],	
-            'for': '10m',	
-            labels: {	
-              severity: 'critical',	
-            },	
-            annotations: {	
-              message: '`%s` jobs are passing at a rate of {{ $value | humanize }}%%, which is below the target (95%%). Check <https://prow.ci.openshift.org/?job=%s|deck-portal>.' % [job_name, job_name],	
-            },	
-          }	
-          for job_name in ['periodic-ci-image-import-to-build01']
-        ],
+        ]
       },
     ],
   },

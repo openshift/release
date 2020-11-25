@@ -1,0 +1,61 @@
+base_images:
+  base:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-base-openshift-4.6
+  ocp_builder_rhel-8-base-openshift:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-base-openshift
+  ocp_builder_rhel-8-base-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-base-openshift-4.6
+  ocp_builder_rhel-8-base-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-base-openshift-4.7
+  openshift_release_rhel-8-release-openshift-4.6:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-openshift-4.6
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-openshift-4.6
+images:
+- dockerfile_path: Dockerfile.rhel
+  from: base
+  inputs:
+    ocp_builder_rhel-8-base-openshift:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-base-openshift
+  to: metering-presto
+promotion:
+  name: "4.8"
+  namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: "2"
+      memory: 2Gi
+  unit:
+    requests:
+      cpu: "1"
+      memory: 4Gi
+tag_specification:
+  name: "4.8"
+  namespace: ocp
+tests:
+- artifact_dir: /tmp/artifacts
+  as: unit
+  commands: |
+    set -x
+    ./test.sh
+  container:
+    from: src
+zz_generated_metadata:
+  branch: release-4.8
+  org: kube-reporting
+  repo: presto

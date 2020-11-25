@@ -5,6 +5,51 @@ presubmits:
     branches:
     - master
     cluster: build01
+    context: ci/prow/ci-index
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ocs-operator-master-ci-index
+    rerun_command: /test ci-index
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --target=ci-index
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ci-index,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: build01
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -41,11 +86,74 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: build01
+    context: ci/prow/ocs-operator-bundle-e2e-aws
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ocs-operator-master-ocs-operator-bundle-e2e-aws
+    rerun_command: /test ocs-operator-bundle-e2e-aws
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-password-file=/etc/boskos/password
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --secret-dir=/usr/local/ocs-operator-bundle-e2e-aws-cluster-profile
+        - --target=ocs-operator-bundle-e2e-aws
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/ocs-operator-bundle-e2e-aws-cluster-profile
+          name: cluster-profile
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ocs-operator-bundle-e2e-aws,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -86,7 +194,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -95,86 +203,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: api.ci
-    context: ci/prow/ocs-operator-e2e-aws
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ocs-operator-master-ocs-operator-e2e-aws
-    optional: true
-    rerun_command: /test ocs-operator-e2e-aws
-    spec:
-      containers:
-      - args:
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
-        - --report-password-file=/etc/report/password.txt
-        - --report-username=ci
-        - --secret-dir=/usr/local/ocs-operator-e2e-aws-cluster-profile
-        - --target=ocs-operator-e2e-aws
-        - --template=/usr/local/ocs-operator-e2e-aws
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: ocs-operator-e2e-aws
-        - name: TEST_COMMAND
-          value: |
-            make functest
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/ocs-operator-e2e-aws-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/ocs-operator-e2e-aws
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: password
-            path: password
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocs-operator-e2e-aws,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/red-hat-storage-ocs-ci-e2e-aws
     decorate: true
     decoration_config:
@@ -194,17 +223,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/red-hat-storage-ocs-ci-e2e-aws-cluster-profile
         - --target=red-hat-storage-ocs-ci-e2e-aws
-        - --template=/usr/local/red-hat-storage-ocs-ci-e2e-aws
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: red-hat-storage-ocs-ci-e2e-aws
-        - name: TEST_COMMAND
-          value: |
-            export REDHAT_OCS_CI_FORCE_TOOL_POD_INSTALL="true" && make cluster-deploy && make red-hat-storage-ocs-ci
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -217,9 +237,6 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/red-hat-storage-ocs-ci-e2e-aws-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/red-hat-storage-ocs-ci-e2e-aws
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -239,12 +256,9 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -253,7 +267,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/verify-latest-csv
     decorate: true
     decoration_config:
@@ -290,7 +304,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator

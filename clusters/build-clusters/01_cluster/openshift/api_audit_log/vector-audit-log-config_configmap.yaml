@@ -12,9 +12,15 @@ data:
       include = ["/host/var/log/openshift-apiserver/audit.log"]
       ignore_older = 86400
 
+    # parse the json so we can filter
+    [transforms.json_parsed]
+      type = "json_parser"
+      inputs = ["kube_apiserver_audit_logs", "openshift_apiserver_audit_logs"]
+      drop_invalid = true
+
     [sinks.aws_cloudwatch_logs]
       type = "aws_cloudwatch_logs"
-      inputs = ["kube_apiserver_audit_logs", "openshift_apiserver_audit_logs"]
+      inputs = ["json_parsed"]
       group_name = "ci-build01-audit-logs"
       region = "us-east-1"
       stream_name = "{{ host }}"
@@ -23,4 +29,3 @@ data:
 metadata:
   name: vector-audit-log-config
   namespace: api-audit-log
-

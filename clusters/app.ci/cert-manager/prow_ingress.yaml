@@ -1,4 +1,4 @@
-apiVersion: extensions/v1beta1
+apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   annotations:
@@ -14,34 +14,69 @@ spec:
         - prow.ci.openshift.org
         - hook.ci.openshift.org
         - bugs.ci.openshift.org
+        - slack.ci.openshift.org
+        - docs.ci.openshift.org
   rules:
-    - host: config.ci.openshift.org
-      http:
-        paths:
-          - backend:
-              serviceName: ci-operator-configresolver
-              servicePort: 80
-    - host: steps.ci.openshift.org
-      http:
-        paths:
-          - backend:
-              serviceName: ci-operator-configresolver
-              servicePort: 8082
-    - host: prow.ci.openshift.org
-      http:
-        paths:
-          - backend:
-              serviceName: deck
-              servicePort: 80
-    - host: hook.ci.openshift.org
-      http:
-        paths:
-          - backend:
-              serviceName: hook
-              servicePort: 8888
-    - host: bugs.ci.openshift.org
-      http:
-        paths:
-          - backend:
-              serviceName: bugzilla-backporter
-              servicePort: 80
+  - host: config.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: ci-operator-configresolver
+            port:
+              number: 80
+        pathType: ImplementationSpecific
+  - host: steps.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: ci-operator-configresolver
+            port:
+              number: 8082
+        pathType: ImplementationSpecific
+  - host: prow.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: deck
+            port:
+              number: 80
+        pathType: ImplementationSpecific
+  - host: hook.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: hook
+            port:
+              number: 8888
+        pathType: ImplementationSpecific
+  - host: bugs.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: bugzilla-backporter
+            port:
+              number: 80
+        pathType: ImplementationSpecific
+  - host: slack.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: slack-bot
+            port:
+              number: 8888
+        pathType: ImplementationSpecific
+  - host: docs.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: ci-docs
+            port:
+              number: 8080
+        pathType: ImplementationSpecific

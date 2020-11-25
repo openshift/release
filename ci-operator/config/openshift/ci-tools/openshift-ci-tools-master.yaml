@@ -1,20 +1,20 @@
 base_images:
-  centos8:
-    name: centos
-    namespace: origin
-    tag: "8"
+  boskos:
+    name: boskos
+    namespace: ci
+    tag: latest
   cli:
-    name: "4.5"
+    name: "4.7"
     namespace: ocp
     tag: cli
   installer:
-    name: "4.5"
+    name: "4.7"
     namespace: ocp
     tag: installer
   os:
     name: centos
-    namespace: openshift
-    tag: "7"
+    namespace: origin
+    tag: "8"
 binary_build_commands: make production-install
 build_root:
   image_stream_tag:
@@ -22,6 +22,14 @@ build_root:
     namespace: openshift
     tag: golang-1.15
 images:
+- context_dir: images/template-deprecator/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/template-deprecator
+  to: template-deprecator
 - context_dir: images/blocking-issue-creator/
   from: os
   inputs:
@@ -86,6 +94,14 @@ images:
       - destination_dir: .
         source_path: /go/bin/pj-rehearse
   to: pj-rehearse
+- context_dir: images/slack-bot/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/slack-bot
+  to: slack-bot
 - context_dir: images/config-shard-validator/
   from: os
   inputs:
@@ -103,7 +119,7 @@ images:
         source_path: /go/bin/config-brancher
   to: config-brancher
 - context_dir: images/dptp-controller-manager
-  from: centos8
+  from: os
   inputs:
     bin:
       paths:
@@ -111,7 +127,7 @@ images:
         source_path: /go/bin/dptp-controller-manager
   to: dptp-controller-manager
 - context_dir: images/autoconfigbrancher/
-  from: centos8
+  from: os
   inputs:
     bin:
       paths:
@@ -129,7 +145,21 @@ images:
         source_path: /go/bin/ci-operator-config-mirror
       - destination_dir: .
         source_path: /go/bin/private-prow-configs-mirror
+      - destination_dir: .
+        source_path: /go/bin/template-deprecator
+      - destination_dir: .
+        source_path: /go/bin/determinize-prow-config
   to: auto-config-brancher
+- context_dir: images/autotestgridgenerator/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/testgrid-config-generator
+      - destination_dir: .
+        source_path: /go/bin/autotestgridgenerator
+  to: auto-testgrid-generator
 - context_dir: images/repo-brancher/
   from: root
   inputs:
@@ -155,7 +185,7 @@ images:
         source_path: /go/bin/determinize-peribolos
   to: determinize-peribolos
 - dockerfile_path: images/ipi-deprovision/Dockerfile
-  from: centos8
+  from: os
   inputs:
     cli:
       paths:
@@ -251,7 +281,7 @@ images:
         source_path: /go/bin/group-auto-updater
   to: group-auto-updater
 - context_dir: images/private-org-sync/
-  from: centos8
+  from: os
   inputs:
     bin:
       paths:
@@ -259,15 +289,27 @@ images:
         source_path: /go/bin/private-org-sync
   to: private-org-sync
 - context_dir: images/ci-secret-bootstrap
-  from: centos8
+  from: os
   inputs:
     bin:
       paths:
       - destination_dir: .
         source_path: /go/bin/ci-secret-bootstrap
   to: ci-secret-bootstrap
+- context_dir: images/ci-secret-generator
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/ci-secret-generator
+    cli:
+      paths:
+      - destination_dir: usr/bin
+        source_path: /usr/bin/oc
+  to: ci-secret-generator
 - context_dir: images/ci-operator-config-mirror
-  from: centos8
+  from: os
   inputs:
     bin:
       paths:
@@ -275,7 +317,7 @@ images:
         source_path: /go/bin/ci-operator-config-mirror
   to: ci-operator-config-mirror
 - context_dir: images/private-prow-configs-mirror/
-  from: centos8
+  from: os
   inputs:
     bin:
       paths:
@@ -283,7 +325,7 @@ images:
         source_path: /go/bin/private-prow-configs-mirror
   to: private-prow-configs-mirror
 - context_dir: images/private-org-peribolos-sync/
-  from: centos8
+  from: os
   inputs:
     bin:
       paths:
@@ -291,7 +333,7 @@ images:
         source_path: /go/bin/private-org-peribolos-sync
   to: private-org-peribolos-sync
 - context_dir: images/autoperibolossync/
-  from: centos8
+  from: os
   inputs:
     bin:
       paths:
@@ -301,7 +343,7 @@ images:
         source_path: /go/bin/private-org-peribolos-sync
   to: auto-peribolos-sync
 - context_dir: images/registry-replacer/
-  from: centos8
+  from: os
   inputs:
     bin:
       paths:
@@ -317,7 +359,7 @@ images:
         source_path: /go/bin/autopublicizeconfig
   to: autopublicizeconfig
 - context_dir: images/generate-registry-metadata/
-  from: centos8
+  from: os
   inputs:
     bin:
       paths:
@@ -325,7 +367,7 @@ images:
         source_path: /go/bin/generate-registry-metadata
   to: generate-registry-metadata
 - context_dir: images/publicize/
-  from: centos8
+  from: os
   inputs:
     bin:
       paths:
@@ -333,13 +375,21 @@ images:
         source_path: /go/bin/publicize
   to: publicize
 - context_dir: images/ocp-build-data-enforcer/
-  from: centos8
+  from: os
   inputs:
     bin:
       paths:
       - destination_dir: .
         source_path: /go/bin/ocp-build-data-enforcer
   to: ocp-build-data-enforcer
+- context_dir: test/images/e2e-bin/
+  from: bin
+  inputs:
+    boskos:
+      paths:
+      - destination_dir: boskos/
+        source_path: /app
+  to: e2e-bin
 promotion:
   namespace: ci
   tag: latest
@@ -351,17 +401,22 @@ resources:
 tests:
 - artifact_dir: /tmp/artifacts
   as: unit
-  commands: ARTIFACT_DIR=/tmp/artifacts make test TESTFLAGS='-count=25'
+  commands: make test TESTFLAGS='-count=25'
+  container:
+    from: src
+- artifact_dir: /tmp/artifacts
+  as: codegen
+  commands: make verify-gen
   container:
     from: src
 - artifact_dir: /tmp/artifacts
   as: format
-  commands: ARTIFACT_DIR=/tmp/artifacts make format
+  commands: make format
   container:
     from: src
 - artifact_dir: /tmp/artifacts
   as: integration
-  commands: ARTIFACT_DIR=/tmp/artifacts make integration
+  commands: make integration
   container:
     from: bin
 - as: e2e
@@ -374,24 +429,27 @@ tests:
         name: ci-operator
         namespace: test-credentials
       - mount_path: /pull
-        name: regcred
+        name: registry-pull-credentials
+        namespace: test-credentials
+      - mount_path: /etc/push-secret
+        name: registry-push-credentials-ci-central
         namespace: test-credentials
       - mount_path: /import
         name: ci-pull-credentials
         namespace: test-credentials
-      from: bin
+      from: e2e-bin
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
 - artifact_dir: /tmp/artifacts
   as: breaking-changes
-  commands: ARTIFACT_DIR=/tmp/artifacts make check-breaking-changes
+  commands: make check-breaking-changes
   container:
     from: bin
 - artifact_dir: /tmp/artifacts
   as: validate-vendor
-  commands: ARTIFACT_DIR=/tmp/artifacts make validate-vendor
+  commands: make validate-vendor
   container:
     from: src
 zz_generated_metadata:

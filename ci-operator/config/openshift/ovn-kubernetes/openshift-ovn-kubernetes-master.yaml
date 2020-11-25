@@ -1,12 +1,32 @@
 base_images:
   base:
-    name: "4.6"
+    name: "4.7"
     namespace: ocp
     tag: base
   dev-scripts:
     name: test
     namespace: openshift-kni
     tag: dev-scripts
+  ocp_4.6_cli:
+    name: "4.7"
+    namespace: ocp
+    tag: cli
+  ocp_4.7_cli:
+    name: "4.7"
+    namespace: ocp
+    tag: cli
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.7
+  ocp_builder_rhel-8-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
 build_root:
   image_stream_tag:
     name: release
@@ -14,9 +34,16 @@ build_root:
     tag: golang-1.13
 images:
 - from: base
+  inputs:
+    ocp_4.7_cli:
+      as:
+      - registry.svc.ci.openshift.org/ocp/4.7:cli
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
   to: ovn-kubernetes
 promotion:
-  name: "4.6"
+  name: "4.7"
   namespace: ocp
 resources:
   '*':
@@ -24,50 +51,62 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: "4.6"
+  name: "4.7"
   namespace: ocp
 tests:
-- as: e2e-metal-ipi
+- as: e2e-metal-ipi-ovn-ipv6
   steps:
     cluster_profile: packet
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
-- as: e2e-metal-ipi-dualstack
+- as: e2e-metal-ipi-ovn-dualstack
   steps:
     cluster_profile: packet
-    pre:
-    - ref: baremetalds-packet-setup
-    - ref: ipi-install-rbac
-    - ref: baremetalds-devscripts-conf-dualstack
-    - ref: baremetalds-devscripts-setup
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
-- as: e2e-metal-ipi-dualstack-periodic
+- as: e2e-metal-ipi-ovn-dualstack-periodic
   cron: 0 0 * * *
   steps:
     cluster_profile: packet
-    pre:
-    - ref: baremetalds-packet-setup
-    - ref: ipi-install-rbac
-    - ref: baremetalds-devscripts-conf-dualstack
-    - ref: baremetalds-devscripts-setup
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
 - as: e2e-ovn-hybrid-step-registry
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-ovn-hybrid
-- as: e2e-windows-hybrid-network
+- as: e2e-aws-ovn-windows
   steps:
     cluster_profile: aws
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-aws-ovn-hybrid
-- as: e2e-vsphere
+- as: e2e-aws-ovn-windows-custom-vxlan
+  steps:
+    cluster_profile: aws
+    test:
+    - ref: windows-e2e-operator-test-with-custom-vxlan-port
+    workflow: ipi-aws-ovn-hybrid-custom-vxlan-port
+- as: e2e-vsphere-ovn
   steps:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere-ovn
-- as: e2e-azure
+- as: e2e-azure-ovn
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-ovn
+- as: e2e-gcp-ovn
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-ovn
 - as: e2e-gcp-ovn-upgrade
   commands: TEST_SUITE=all run-upgrade-tests
   cron: '@yearly'

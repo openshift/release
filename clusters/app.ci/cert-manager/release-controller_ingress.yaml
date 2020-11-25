@@ -1,4 +1,4 @@
-apiVersion: extensions/v1beta1
+apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   annotations:
@@ -14,27 +14,39 @@ spec:
         - s390x.ocp.releases.ci.openshift.org
         - amd64.origin.releases.ci.openshift.org
   rules:
-    - host: amd64.origin.releases.ci.openshift.org
-      http:
-        paths:
-          - backend:
-              serviceName: release-controller
-              servicePort: 80
-    - host: amd64.ocp.releases.ci.openshift.org
-      http:
-        paths:
-          - backend:
-              serviceName: release-controller-ocp
-              servicePort: 80
-    - host: ppc64le.ocp.releases.ci.openshift.org
-      http:
-        paths:
-          - backend:
-              serviceName: release-controller-ocp-ppc64le
-              servicePort: 80
-    - host: s390x.ocp.releases.ci.openshift.org
-      http:
-        paths:
-          - backend:
-              serviceName: release-controller-ocp-s390x
-              servicePort: 80
+  - host: amd64.origin.releases.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: release-controller
+            port:
+              number: 80
+        pathType: ImplementationSpecific
+  - host: amd64.ocp.releases.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: release-controller-ocp
+            port:
+              number: 80
+        pathType: ImplementationSpecific
+  - host: ppc64le.ocp.releases.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: release-controller-ocp-ppc64le
+            port:
+              number: 80
+        pathType: ImplementationSpecific
+  - host: s390x.ocp.releases.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: release-controller-ocp-s390x
+            port:
+              number: 80
+        pathType: ImplementationSpecific

@@ -5,6 +5,51 @@ presubmits:
     branches:
     - master
     cluster: build01
+    context: ci/prow/build-only
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cincinnati-master-build-only
+    rerun_command: /test build-only
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --target=build-only
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )build-only,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: build01
     context: ci/prow/cargo-test
     decorate: true
     decoration_config:
@@ -20,7 +65,6 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/secrets/cincinnati-secrets-cincinnati-credentials
         - --target=cargo-test
         command:
         - ci-operator
@@ -31,9 +75,6 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /secrets/cincinnati-secrets-cincinnati-credentials
-          name: cincinnati-secrets-cincinnati-credentials
-          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -42,12 +83,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: cincinnati-secrets-cincinnati-credentials
-        secret:
-          secretName: cincinnati-secrets-cincinnati-credentials
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -56,7 +94,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/e2e
     decorate: true
     decoration_config:
@@ -75,18 +113,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-cluster-profile
         - --target=e2e
-        - --template=/usr/local/e2e
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: e2e
-        - name: TEST_COMMAND
-          value: env ARTIFACTS_DIR=/tmp/artifacts bash hack/e2e.sh
-        - name: TEST_IMAGESTREAM_TAG
-          value: pipeline:e2e-test
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -99,9 +127,6 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/e2e-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e
-          name: job-definition
-          subPath: cluster-launch-installer-custom-test-image.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -121,12 +146,9 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-custom-test-image
-        name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -171,7 +193,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -181,22 +203,22 @@ presubmits:
     branches:
     - master
     cluster: build01
-    context: ci/prow/rustfmt-1.40.0
+    context: ci/prow/rustfmt-1.46.0
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cincinnati-master-rustfmt-1.40.0
-    rerun_command: /test rustfmt-1.40.0
+    name: pull-ci-openshift-cincinnati-master-rustfmt-1.46.0
+    rerun_command: /test rustfmt-1.46.0
     spec:
       containers:
       - args:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --target=rustfmt-1.40.0
+        - --target=rustfmt-1.46.0
         command:
         - ci-operator
         image: ci-operator:latest
@@ -216,101 +238,11 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rustfmt-1.40.0,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
-    cluster: build01
-    context: ci/prow/rustfmt-1.41.0
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cincinnati-master-rustfmt-1.41.0
-    rerun_command: /test rustfmt-1.41.0
-    spec:
-      containers:
-      - args:
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-password-file=/etc/report/password.txt
-        - --report-username=ci
-        - --target=rustfmt-1.41.0
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rustfmt-1.41.0,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
-    cluster: build01
-    context: ci/prow/rustfmt-1.42.0
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cincinnati-master-rustfmt-1.42.0
-    rerun_command: /test rustfmt-1.42.0
-    spec:
-      containers:
-      - args:
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-password-file=/etc/report/password.txt
-        - --report-username=ci
-        - --target=rustfmt-1.42.0
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: regcred
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rustfmt-1.42.0,?($|\s.*)
+    trigger: (?m)^/test( | .* )rustfmt-1.46.0,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -351,7 +283,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator

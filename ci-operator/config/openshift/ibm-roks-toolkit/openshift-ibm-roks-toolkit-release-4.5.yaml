@@ -3,6 +3,10 @@ base_images:
     name: "4.5"
     namespace: ocp
     tag: base
+  iks:
+    name: iks
+    namespace: ibm-gate-secrets
+    tag: "4.5"
 binary_build_commands: make build
 build_root:
   image_stream_tag:
@@ -15,6 +19,12 @@ images:
 - dockerfile_path: Dockerfile.cpoperator
   from: base
   to: control-plane-operator
+- dockerfile_path: DockerCITest
+  from: iks
+  to: iks-deploy
+- dockerfile_path: Dockerfile.metrics
+  from: base
+  to: metrics
 promotion:
   name: ibm-roks-4.5
   namespace: hypershift-toolkit
@@ -31,6 +41,14 @@ tests:
   commands: make verify
   container:
     from: src
+- artifact_dir: /tmp/publicartifacts
+  as: create-cluster
+  commands: export ARTIFACTS_DIR=/tmp/publicartifacts && ./deploy_ci.sh
+  container:
+    from: iks-deploy
+  secret:
+    mount_path: /usr/ibm-gate-test-secrets/
+    name: ibm-gate-test-secrets
 zz_generated_metadata:
   branch: release-4.5
   org: openshift

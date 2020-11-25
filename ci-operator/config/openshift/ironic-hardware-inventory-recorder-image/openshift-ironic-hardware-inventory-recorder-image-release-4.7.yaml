@@ -3,30 +3,27 @@ base_images:
     name: test
     namespace: openshift-kni
     tag: dev-scripts
-  os:
-    name: ubi
+  ocp_builder_rhel-8-base-openshift:
+    name: builder
     namespace: ocp
-    tag: "8"
+    tag: rhel-8-base-openshift
+  ocp_builder_rhel-8-base-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-base-openshift-4.7
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.12
+    tag: golang-1.15
 images:
 - dockerfile_path: Dockerfile.ocp
-  from: base-os
+  from: ocp_builder_rhel-8-base-openshift
   to: ironic-hardware-inventory-recorder
 promotion:
+  disabled: true
   name: "4.7"
   namespace: ocp
-raw_steps:
-- pipeline_image_cache_step:
-    commands: |
-      rm -rf /etc/yum.repos.d/*
-      curl http://base-4-6-rhel8.ocp.svc > /etc/yum.repos.d/base-4-6-rhel8.repo
-      curl http://base-openstack-4-6.ocp.svc > /etc/yum.repos.d/base-openstack-4-6.repo
-    from: os
-    to: base-os
 resources:
   '*':
     requests:

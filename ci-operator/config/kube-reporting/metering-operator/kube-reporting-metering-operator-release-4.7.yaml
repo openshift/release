@@ -19,31 +19,66 @@ base_images:
     name: "4.7"
     namespace: ocp
     tag: metering-helm
+  ocp_4.7_cli:
+    name: "4.7"
+    namespace: ocp
+    tag: cli
+  ocp_4.7_metering-helm:
+    name: "4.7"
+    namespace: ocp
+    tag: metering-helm
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.7
+  ocp_builder_rhel-8-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
 build_root:
   project_image:
     context_dir: .
     dockerfile_path: Dockerfile.src
 images:
-- dockerfile_path: Dockerfile.reporting-operator.okd
+- dockerfile_path: Dockerfile.reporting-operator.rhel
   from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
   to: metering-reporting-operator
-- dockerfile_path: Dockerfile.metering-ansible-operator
+- dockerfile_path: Dockerfile.metering-ansible-operator.rhel8
   from: ansible-operator
   inputs:
-    ocp_4.4_base:
+    ocp_4.7_cli:
       as:
-      - registry.svc.ci.openshift.org/ocp/4.4:base
-    ocp_4.6_cli:
+      - registry.svc.ci.openshift.org/ocp/4.7:cli
+    ocp_4.7_metering-helm:
       as:
-      - registry.svc.ci.openshift.org/ocp/4.6:cli
-    ocp_4.6_metering-helm:
-      as:
-      - registry.svc.ci.openshift.org/ocp/4.6:metering-helm
+      - registry.svc.ci.openshift.org/ocp/4.7:metering-helm
   to: metering-ansible-operator
-- dockerfile_path: olm_deploy/Dockerfile.registry
-  from: base
-  to: metering-ansible-operator-registry
+operator:
+  bundles:
+  - dockerfile_path: Dockerfile.bundle
+  substitutions:
+  - pullspec: quay.io/openshift/origin-ghostunnel:4.7
+    with: stable:ghostunnel
+  - pullspec: quay.io/openshift/origin-metering-ansible-operator:4.7
+    with: pipeline:metering-ansible-operator
+  - pullspec: quay.io/openshift/origin-metering-hadoop:4.7
+    with: stable:metering-hadoop
+  - pullspec: quay.io/openshift/origin-metering-hive:4.7
+    with: stable:metering-hive
+  - pullspec: quay.io/openshift/origin-metering-presto:4.7
+    with: stable:metering-presto
+  - pullspec: quay.io/openshift/origin-metering-reporting-operator:4.7
+    with: pipeline:metering-reporting-operator
 promotion:
+  disabled: true
   name: "4.7"
   namespace: ocp
 resources:
@@ -84,30 +119,64 @@ tests:
   container:
     from: src
 - as: metering-e2e-aws
-  commands: |
-    set -x
-
-    TEST_ENABLE_MACHINE_AUTOSCALING="true" TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/e2e EXTRA_TEST_FLAGS="-run TestManualMeteringInstall" make e2e
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: e2e
+      commands: |
+        set -x
+        # Patch the default MachineSet instance size (typically m5.large) to m5.xlarge post-install
+        # as the metering stack is resource hungry.
+        kubectl -n openshift-machine-api get machinesets --no-headers | awk '{ print $1 }' | xargs -I{} kubectl -n openshift-machine-api patch machineset {} --type json -p '[{"op": "replace", "path": "/spec/template/spec/providerSpec/value/instanceType", "value": "m5.xlarge"}]'
+
+        METERING_ANSIBLE_OPERATOR_INDEX_IMAGE=${OO_INDEX} TEST_ENABLE_MACHINE_AUTOSCALING="true" TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/e2e EXTRA_TEST_FLAGS="-run TestManualMeteringInstall" make e2e
+      dependencies:
+      - env: OO_INDEX
+        name: ci-index
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 500Mi
+    workflow: ipi-aws
 - as: metering-upgrade-aws
-  commands: |
-    set -x
-    # Increase the size of the machines so that there are machines large enough
-    # to run Presto, and the full metering stack.
-    kubectl -n openshift-machine-api get machinesets -o name | grep worker | cut -d/ -f2 | xargs -I{} kubectl -n openshift-machine-api scale machineset {} --replicas 3
-
-    TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/upgrade EXTRA_TEST_FLAGS="-run TestMeteringUpgrades" make e2e
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: e2e
+      commands: |
+        set -x
+
+        # Patch the default MachineSet instance size (typically m5.large) to m5.xlarge post-install
+        # as the metering stack is resource hungry.
+        kubectl -n openshift-machine-api get machinesets --no-headers | awk '{ print $1 }' | xargs -I{} kubectl -n openshift-machine-api patch machineset {} --type json -p '[{"op": "replace", "path": "/spec/template/spec/providerSpec/value/instanceType", "value": "m5.xlarge"}]'
+
+        METERING_ANSIBLE_OPERATOR_INDEX_IMAGE=${OO_INDEX} TEST_ENABLE_MACHINE_AUTOSCALING="true" TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/upgrade make e2e-upgrade
+      dependencies:
+      - env: OO_INDEX
+        name: ci-index
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 500Mi
+    workflow: ipi-aws
 - as: metering-periodic-aws
-  commands: |
-    set -x
-
-    make e2e EXTRA_TEST_FLAGS="-run TestManualMeteringInstall" TEST_ENABLE_MACHINE_AUTOSCALING="true" TEST_RUN_ALL_INSTALL_TESTS="true" TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/e2e
   cron: '@daily'
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        set -x
+
+        make e2e EXTRA_TEST_FLAGS="-run TestManualMeteringInstall" TEST_ENABLE_MACHINE_AUTOSCALING="true" TEST_RUN_ALL_INSTALL_TESTS="true" TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: release-4.7
   org: kube-reporting

@@ -9,7 +9,7 @@ images:
   from: root
   to: kubefed-operator
 promotion:
-  name: 4.6-priv
+  name: 4.7-priv
   namespace: ocp-private
 resources:
   '*':
@@ -17,7 +17,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: 4.6-priv
+  name: 4.7-priv
   namespace: ocp-private
 tests:
 - as: vet
@@ -31,10 +31,18 @@ tests:
   container:
     from: src
 - as: olm-e2e
-  commands: |
-    make -f Makefile.ci olm-e2e
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make -f Makefile.ci olm-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: openshift-priv

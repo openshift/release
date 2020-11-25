@@ -8,9 +8,9 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: golang-1.14
 promotion:
-  name: "4.6"
+  name: "4.7"
   namespace: ocp
 resources:
   '*':
@@ -18,7 +18,7 @@ resources:
       cpu: "3"
       memory: 8Gi
 tag_specification:
-  name: "4.6"
+  name: "4.7"
   namespace: ocp
 test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
 tests:
@@ -40,10 +40,18 @@ tests:
     from: test-bin
 - artifact_dir: /tmp/artifacts
   as: e2e-aws-encryption
-  commands: |
-    make test-e2e-encryption JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e-encryption JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: openshift

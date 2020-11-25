@@ -4,7 +4,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build01
+    cluster: build02
     context: ci/prow/ci
     decorate: true
     decoration_config:
@@ -40,7 +40,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -49,7 +49,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/e2e-gcp
     decorate: true
     decoration_config:
@@ -68,16 +68,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-gcp-cluster-profile
         - --target=e2e-gcp
-        - --template=/usr/local/e2e-gcp
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: gcp
-        - name: JOB_NAME_SAFE
-          value: e2e-gcp
-        - name: TEST_COMMAND
-          value: make functests-on-ci
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -90,9 +82,6 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/e2e-gcp-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-gcp
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -114,12 +103,9 @@ presubmits:
               name: cluster-secrets-gcp
           - configMap:
               name: cluster-profile-gcp
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -128,17 +114,16 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: api.ci
-    context: ci/prow/e2e-gcp-origin
+    cluster: build02
+    context: ci/prow/e2e-gcp-ovn
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-kni-cnf-features-deploy-master-e2e-gcp-origin
-    optional: true
-    rerun_command: /test e2e-gcp-origin
+    name: pull-ci-openshift-kni-cnf-features-deploy-master-e2e-gcp-ovn
+    rerun_command: /test e2e-gcp-ovn
     spec:
       containers:
       - args:
@@ -146,18 +131,10 @@ presubmits:
         - --lease-server-password-file=/etc/boskos/password
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/usr/local/e2e-gcp-origin-cluster-profile
-        - --target=e2e-gcp-origin
-        - --template=/usr/local/e2e-gcp-origin
+        - --secret-dir=/usr/local/e2e-gcp-ovn-cluster-profile
+        - --target=e2e-gcp-ovn
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: gcp
-        - name: JOB_NAME_SAFE
-          value: e2e-gcp-origin
-        - name: TEST_COMMAND
-          value: RUN_ORIGIN_TESTS=true make functests-on-ci
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -168,11 +145,8 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/e2e-gcp-origin-cluster-profile
+        - mountPath: /usr/local/e2e-gcp-ovn-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-gcp-origin
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -194,108 +168,18 @@ presubmits:
               name: cluster-secrets-gcp
           - configMap:
               name: cluster-profile-gcp
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-gcp-origin,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
-    cluster: api.ci
-    context: ci/prow/e2e-gcp-ovn
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-kni-cnf-features-deploy-master-e2e-gcp-ovn
-    optional: true
-    rerun_command: /test e2e-gcp-ovn
-    spec:
-      containers:
-      - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
-        - --lease-server-password-file=/etc/boskos/password
-        - --lease-server-username=ci
-        - --lease-server=https://boskos-ci.svc.ci.openshift.org
-        - --secret-dir=/usr/local/e2e-gcp-ovn-cluster-profile
-        - --target=e2e-gcp-ovn
-        - --template=/usr/local/e2e-gcp-ovn
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: gcp
-        - name: CLUSTER_VARIANT
-          value: ovn
-        - name: JOB_NAME_SAFE
-          value: e2e-gcp-ovn
-        - name: TEST_COMMAND
-          value: make functests-on-ci
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/e2e-gcp-ovn-cluster-profile
-          name: cluster-profile
-        - mountPath: /usr/local/e2e-gcp-ovn
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
-      - name: boskos
-        secret:
-          items:
-          - key: password
-            path: password
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
-      - name: pull-secret
-        secret:
-          secretName: regcred
     trigger: (?m)^/test( | .* )e2e-gcp-ovn,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - master
-    cluster: build01
+    cluster: build02
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -331,7 +215,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator

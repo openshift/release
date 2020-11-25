@@ -1,6 +1,6 @@
 SHELL=/usr/bin/env bash -o errexit
 
-.PHONY: help check check-core check-services dry-core core dry-services services all
+.PHONY: help check check-boskos check-core check-services dry-core core dry-services services all
 
 CONTAINER_ENGINE ?= docker
 
@@ -9,8 +9,12 @@ help:
 
 all: core services
 
-check: check-core check-services
+check: check-core check-services check-boskos
 	@echo "Service config check: PASS"
+
+check-boskos:
+	hack/validate-boskos.sh
+	@echo "Boskos config check: PASS"
 
 check-core:
 	core-services/_hack/validate-core-services.sh core-services
@@ -38,8 +42,14 @@ services:
 update:
 	$(MAKE) jobs
 	$(MAKE) ci-operator-config
+	$(MAKE) boskos-config
 	$(MAKE) prow-config
 	$(MAKE) registry-metadata
+	$(MAKE) template-allowlist
+
+template-allowlist:
+	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/template-deprecator:latest
+	$(CONTAINER_ENGINE) run --rm -v  "$(CURDIR):/release:z" registry.svc.ci.openshift.org/ci/template-deprecator:latest --prow-jobs-dir /release/ci-operator/jobs --prow-config-path /release/core-services/prow/02_config/_config.yaml --prow-plugin-config-path /release/core-services/prow/02_config/_plugins.yaml --allowlist-path /release/core-services/template-deprecation/_allowlist.yaml
 
 release-controllers:
 	./hack/generators/release-controllers/generate-release-controllers.py .
@@ -58,6 +68,10 @@ ci-operator-config:
 registry-metadata:
 	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/generate-registry-metadata:latest
 	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR)/ci-operator/step-registry:/ci-operator/step-registry:z" registry.svc.ci.openshift.org/ci/generate-registry-metadata:latest --registry /ci-operator/step-registry
+
+boskos-config:
+	cd core-services/prow/02_config && ./generate-boskos.py
+.PHONY: boskos-config
 
 prow-config:
 	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/determinize-prow-config:latest
@@ -124,7 +138,6 @@ openshift-ns:
 .PHONY: openshift-ns
 
 prow-jobs: prow-artifacts
-	$(MAKE) apply WHAT=projects/prometheus/test/build.yaml
 	$(MAKE) apply WHAT=ci-operator/templates/os.yaml
 .PHONY: prow-jobs
 
@@ -181,21 +194,9 @@ origin-release:
 	oc tag docker.io/centos/ruby-25-centos7:latest --scheduled openshift/release:ruby-25
 .PHONY: origin-release
 
-prometheus: node-exporter alert-buffer
-	$(MAKE) apply WHAT=projects/prometheus/prometheus.yaml
-.PHONY: prometheus
-
-node-exporter:
-	$(MAKE) apply WHAT=projects/prometheus/node_exporter.yaml
-.PHONY: node-exporter
-
 service-idler:
 	$(MAKE) apply WHAT=projects/service-idler/pipeline.yaml
 .PHONY: service-idler
-
-alert-buffer:
-	$(MAKE) apply WHAT=projects/prometheus/alert-buffer.yaml
-.PHONY: alert-buffer
 
 cluster-operator-roles:
 	oc create ns openshift-cluster-operator --dry-run -o yaml | oc apply -f -
@@ -249,7 +250,6 @@ job:
 	hack/job.sh "$(JOB)"
 .PHONY: job
 
-
 kerberos_id ?= dptp
 dry_run ?= true
 force ?= false
@@ -268,6 +268,19 @@ ci-secret-bootstrap:
 		--bw-password-path=/_bw_password --bw-user $(kerberos_id)@redhat.com --config=/_config.yaml --kubeconfig=/_kubeconfig --dry-run=$(dry_run) --force=$(force) --cluster=$(cluster) --as=system:admin
 .PHONY: ci-secret-bootstrap
 
+ci-secret-generator:
+	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/ci-secret-generator:latest
+	@# This needs a bunch of stuff from the host for auth so just copy it there
+	$(eval ID = $(shell $(CONTAINER_ENGINE) create registry.svc.ci.openshift.org/ci/ci-secret-generator))
+	$(CONTAINER_ENGINE) cp $(ID):/usr/bin/ci-secret-generator /tmp/secret-generator
+	$(CONTAINER_ENGINE) rm $(ID)
+	/tmp/secret-generator --bw-password-path=$(bw_password_path) --bw-user $(kerberos_id)@redhat.com \
+		--config=$(CURDIR)/core-services/ci-secret-generator/_config.yaml \
+		--bootstrap-config=$(CURDIR)/core-services/ci-secret-bootstrap/_config.yaml \
+		--dry-run=$(dry_run)
+	rm /tmp/secret-generator
+.PHONY: ci-secret-generator
+
 verify-app-ci:
 	true
 
@@ -275,3 +288,13 @@ mixins:
 	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/dashboards-validation:latest
 	$(CONTAINER_ENGINE) run --user=$(UID) --rm -v "$(CURDIR):/release:z" registry.svc.ci.openshift.org/ci/dashboards-validation:latest make -C /release/clusters/app.ci/prow-monitoring/mixins install all
 .PHONY: mixins
+
+# Runs e2e secrets generation and sync to clusters.
+#
+# Example:
+# First execute the following
+# echo -n "bw_password" > /tmp/bw_password
+# make kerberos_id=<your_kerberos_id> secrets
+secrets:
+	hack/secrets.sh $(kerberos_id) $(kubeconfig_path) $(bw_password_path)
+.PHONY: secrets

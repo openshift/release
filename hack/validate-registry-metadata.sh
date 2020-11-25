@@ -22,7 +22,7 @@ cp -r "${step_registry_dir}" "${workdir}"
 
 generate-registry-metadata --registry="${workdir}/step-registry"
 
-if ! diff -Naupr "${step_registry_dir}/metadata.json" "${workdir}/step-registry/metadata.json"> "${workdir}/diff"; then
+if ! diff -Naupr "${step_registry_dir}" "${workdir}/step-registry"> "${workdir}/diff"; then
 	cat << EOF
 ERROR: This check enforces that the step registry metadata is generated correctly.
 ERROR: We have automation in place that generates this metadata and new changes to

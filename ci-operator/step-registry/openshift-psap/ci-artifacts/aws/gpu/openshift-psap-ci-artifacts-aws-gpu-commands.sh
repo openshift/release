@@ -38,9 +38,9 @@ set -o errexit
 # Wait until the new node is provisioned by the control plane
 set +o errexit
 gpu_machine_state=$(oc get machines -n openshift-machine-api |grep $instance_type |awk '{ print $2 }')
-while [ ${gpu_machine_state} != "Running" ]; do
+while [ "${gpu_machine_state}" != "Running" ]; do
   sleep 5s
-  gpu_machine_state=$(oc get machines -n openshift-machine-api |grep $instance_type |awk '{ print $2 }')
+  gpu_machine_state=$(oc get machines -n openshift-machine-api |grep "$instance_type" |awk '{ print $2 }')
 done
 set -o errexit
 set +x

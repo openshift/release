@@ -193,6 +193,7 @@ def _add_osd_rc_deployment(gendoc):
                                         '--github-token-path=/etc/github/oauth',
                                         '--github-endpoint=http://ghproxy',
                                         '--github-graphql-endpoint=http://ghproxy/graphql',
+                                        '--github-throttle=250',
                                         '--bugzilla-endpoint=https://bugzilla.redhat.com',
                                         '--bugzilla-api-key-path=/etc/bugzilla/api',
                                         '--plugin-config=/etc/plugins/plugins.yaml',

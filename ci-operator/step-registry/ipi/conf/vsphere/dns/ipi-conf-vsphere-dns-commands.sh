@@ -10,7 +10,29 @@ cluster_name=${NAMESPACE}-${JOB_NAME_HASH}
 base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
 cluster_domain="${cluster_name}.${base_domain}"
 
-export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred 
+export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
+export AWS_MAX_ATTEMPTS=7
+export AWS_RETRY_MODE=adaptive
+export HOME=/tmp
+
+if ! command -v aws &> /dev/null
+then
+
+    echo "$(date -u --rfc-3339=seconds) - Install AWS cli..."
+    python_version=$(python -c 'import sys;print(sys.version_info.major)')
+    export PATH="${HOME}/.local/bin:${PATH}"
+    if [[ $python_version -eq 2 ]]
+    then
+        easy_install --user pip  # our Python 2.7.5 is even too old for ensurepip
+        pip install --user awscli
+    elif [[ $python_version -eq 3 ]]
+    then
+        pip3 install --user awscli
+    else
+        echo "$(date -u --rfc-3339=seconds) - No pip available exiting..."
+        exit 1
+    fi
+fi
 
 # Load array created in setup-vips:
 # 0: API
@@ -24,6 +46,8 @@ hosted_zone_id="$(aws route53 list-hosted-zones-by-name \
             --output text)"
 echo "${hosted_zone_id}" > "${SHARED_DIR}/hosted-zone.txt"
 
+# api-int record is needed just for Windows nodes
+# TODO: Remove the api-int entry in future
 echo "Creating DNS records..."
 cat > "${SHARED_DIR}"/dns-create.json <<EOF
 {
@@ -39,6 +63,14 @@ cat > "${SHARED_DIR}"/dns-create.json <<EOF
     },{
     "Action": "UPSERT",
     "ResourceRecordSet": {
+      "Name": "api-int.$cluster_domain.",
+      "Type": "A",
+      "TTL": 60,
+      "ResourceRecords": [{"Value": "${vips[0]}"}]
+      }
+    },{
+    "Action": "UPSERT",
+    "ResourceRecordSet": {
       "Name": "*.apps.$cluster_domain.",
       "Type": "A",
       "TTL": 60,
@@ -47,6 +79,8 @@ cat > "${SHARED_DIR}"/dns-create.json <<EOF
 }]}
 EOF
 
+# api-int record is needed for Windows nodes
+# TODO: Remove the api-int entry in future
 echo "Creating batch file to destroy DNS records"
 
 cat > "${SHARED_DIR}"/dns-delete.json <<EOF
@@ -56,6 +90,14 @@ cat > "${SHARED_DIR}"/dns-delete.json <<EOF
     "Action": "DELETE",
     "ResourceRecordSet": {
       "Name": "api.$cluster_domain.",
+      "Type": "A",
+      "TTL": 60,
+      "ResourceRecords": [{"Value": "${vips[0]}"}]
+      }
+    },{
+    "Action": "DELETE",
+    "ResourceRecordSet": {
+      "Name": "api-int.$cluster_domain.",
       "Type": "A",
       "TTL": 60,
       "ResourceRecords": [{"Value": "${vips[0]}"}]

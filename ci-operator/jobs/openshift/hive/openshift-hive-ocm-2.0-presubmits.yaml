@@ -4,7 +4,7 @@ presubmits:
     always_run: true
     branches:
     - ocm-2.0
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/e2e
     decorate: true
     decoration_config:
@@ -23,16 +23,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-cluster-profile
         - --target=e2e
-        - --template=/usr/local/e2e
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: e2e
-        - name: TEST_COMMAND
-          value: CLOUD=aws make test-e2e
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -45,9 +37,6 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/e2e-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -67,12 +56,9 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -81,7 +67,7 @@ presubmits:
     always_run: false
     branches:
     - ocm-2.0
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/e2e-azure
     decorate: true
     decoration_config:
@@ -101,16 +87,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-azure-cluster-profile
         - --target=e2e-azure
-        - --template=/usr/local/e2e-azure
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: azure4
-        - name: JOB_NAME_SAFE
-          value: e2e-azure
-        - name: TEST_COMMAND
-          value: CLOUD=azure make test-e2e
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -123,9 +101,6 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/e2e-azure-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-azure
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -145,12 +120,9 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-azure4
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -159,7 +131,7 @@ presubmits:
     always_run: false
     branches:
     - ocm-2.0
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/e2e-gcp
     decorate: true
     decoration_config:
@@ -179,16 +151,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-gcp-cluster-profile
         - --target=e2e-gcp
-        - --template=/usr/local/e2e-gcp
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: gcp
-        - name: JOB_NAME_SAFE
-          value: e2e-gcp
-        - name: TEST_COMMAND
-          value: CLOUD=gcp make test-e2e
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -201,9 +165,6 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/e2e-gcp-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-gcp
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -225,12 +186,9 @@ presubmits:
               name: cluster-secrets-gcp
           - configMap:
               name: cluster-profile-gcp
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -239,7 +197,7 @@ presubmits:
     always_run: true
     branches:
     - ocm-2.0
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -275,7 +233,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -284,7 +242,7 @@ presubmits:
     always_run: true
     branches:
     - ocm-2.0
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/integration
     decorate: true
     decoration_config:
@@ -320,7 +278,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -329,7 +287,7 @@ presubmits:
     always_run: true
     branches:
     - ocm-2.0
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -365,7 +323,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -374,7 +332,7 @@ presubmits:
     always_run: true
     branches:
     - ocm-2.0
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/verify
     decorate: true
     decoration_config:
@@ -410,7 +368,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator

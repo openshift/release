@@ -1,0 +1,137 @@
+base_images:
+  base:
+    name: 4.8-priv
+    namespace: ocp-private
+    tag: base
+  ocp_builder_golang-1.13:
+    name: builder
+    namespace: ocp
+    tag: golang-1.13
+  ocp_builder_golang-1.14:
+    name: builder
+    namespace: ocp
+    tag: golang-1.14
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.7
+  ocp_builder_rhel-8-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
+binary_build_commands: make build --warn-undefined-variables
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.14
+canonical_go_repository: github.com/openshift/cluster-kube-apiserver-operator
+images:
+- dockerfile_path: Dockerfile.rhel7
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
+  to: cluster-kube-apiserver-operator
+promotion:
+  name: 4.8-priv
+  namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: "3"
+      memory: 3Gi
+tag_specification:
+  name: 4.8-priv
+  namespace: ocp-private
+test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
+tests:
+- as: verify
+  commands: |
+    make verify -k --warn-undefined-variables
+  container:
+    from: bin
+- as: verify-deps
+  commands: |
+    make verify-deps -k --warn-undefined-variables
+  container:
+    from: src
+- artifact_dir: /tmp/artifacts
+  as: unit
+  commands: |
+    make test-unit JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
+  container:
+    from: test-bin
+- artifact_dir: /tmp/artifacts
+  as: k8s-e2e-gcp
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-kubernetes-e2e-gcp
+- artifact_dir: /tmp/artifacts
+  as: k8s-e2e-gcp-serial
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-kubernetes-e2e-gcp-serial
+- as: e2e-aws
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-loki
+- artifact_dir: /tmp/artifacts
+  as: e2e-aws-operator
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- artifact_dir: /tmp/artifacts
+  as: e2e-aws-operator-encryption
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e-encryption JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-upgrade
+  steps:
+    cluster_profile: aws
+    workflow: openshift-upgrade-aws-loki
+- artifact_dir: /tmp/artifacts
+  as: e2e-aws-operator-encryption-perf
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e-encryption-perf JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-serial
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-serial
+zz_generated_metadata:
+  branch: release-4.8
+  org: openshift-priv
+  repo: cluster-kube-apiserver-operator

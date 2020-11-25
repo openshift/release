@@ -195,7 +195,6 @@ openshift_pull_secret_path={{ pull_secret_path }}
 ansible_ssh_common_args="-o IdentityFile={{ private_key_path }} -o StrictHostKeyChecking=no -o ProxyCommand=\"ssh -o IdentityFile={{ private_key_path }} -o ConnectTimeout=30 -o ConnectionAttempts=100 -o StrictHostKeyChecking=no -W %h:%p -q core@{{ ssh_bastion }}\""
 ansible_user={{ platform_type_dict[platform_type].username }}
 ansible_become=True
-ci_version_override=True
 
 [new_workers]
 # hostnames must be listed by what `hostname -f` returns on the host

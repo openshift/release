@@ -3,10 +3,18 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-base-openshift-4.6
+  ocp_builder_rhel-8-base-openshift:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-base-openshift
   ocp_builder_rhel-8-base-openshift-4.6:
     name: builder
     namespace: ocp
     tag: rhel-8-base-openshift-4.6
+  ocp_builder_rhel-8-base-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-base-openshift-4.7
   openshift_release_rhel-8-release-openshift-4.6:
     name: release
     namespace: openshift
@@ -20,12 +28,12 @@ images:
 - dockerfile_path: Dockerfile.rhel
   from: base
   inputs:
-    ocp_builder_rhel-8-base-openshift-4.6:
+    ocp_builder_rhel-8-base-openshift:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-base-openshift-4.6
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-base-openshift
   to: metering-presto
 promotion:
-  name: "4.6"
+  name: "4.7"
   namespace: ocp
 resources:
   '*':
@@ -37,14 +45,13 @@ resources:
       cpu: "1"
       memory: 4Gi
 tag_specification:
-  name: "4.6"
+  name: "4.7"
   namespace: ocp
 tests:
 - artifact_dir: /tmp/artifacts
   as: unit
   commands: |
     set -x
-    export ARTIFACT_DIR=/tmp/artifacts
     ./test.sh
   container:
     from: src

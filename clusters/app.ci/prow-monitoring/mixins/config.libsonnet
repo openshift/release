@@ -5,6 +5,7 @@
       'build_cop.json': '6829209d59479d48073d09725ce807fa',
       'boskos.json': '628a36ebd9ef30d67e28576a5d5201fd',
       'boskos_http.json': 'd9f6dbcf30d14a12061638d2eb8e61ea8a5dd6b0',
+      'boskos_acquire.json': '40efe201ce7f1e7a1fd247c13425534c757712ff',
       'canary.json': '247fa71a76bb8c5c12c0389b5d532941',
       'dptp.json': '8ce131e226b7fd2901c2fce45d4e21c1',
       'e2e_template_jobs.json': 'af88e642a76f37342fb52d475d52d965',

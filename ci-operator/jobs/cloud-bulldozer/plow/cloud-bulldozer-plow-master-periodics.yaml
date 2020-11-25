@@ -22,18 +22,8 @@ periodics:
       - --report-username=ci
       - --secret-dir=/usr/local/etcd-azure-perf-test-daily-cluster-profile
       - --target=etcd-azure-perf-test-daily
-      - --template=/usr/local/etcd-azure-perf-test-daily
       command:
       - ci-operator
-      env:
-      - name: CLUSTER_TYPE
-        value: azure4
-      - name: JOB_NAME_SAFE
-        value: etcd-azure-perf-test-daily
-      - name: TEST_COMMAND
-        value: |
-          TEST_OUTPUT_PATH=/tmp/artifacts/etcd-azure-perf-test-daily.log
-          workloads/etcd-perf/run_etcd_tests_fromgit.sh >> ${TEST_OUTPUT_PATH}
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -46,9 +36,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/etcd-azure-perf-test-daily-cluster-profile
         name: cluster-profile
-      - mountPath: /usr/local/etcd-azure-perf-test-daily
-        name: job-definition
-        subPath: cluster-launch-installer-src.yaml
       - mountPath: /etc/pull-secret
         name: pull-secret
         readOnly: true
@@ -68,12 +55,9 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-azure4
-    - configMap:
-        name: prow-job-cluster-launch-installer-src
-      name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
     - name: result-aggregator
       secret:
         secretName: result-aggregator

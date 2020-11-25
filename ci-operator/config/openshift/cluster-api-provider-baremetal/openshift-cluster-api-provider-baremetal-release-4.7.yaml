@@ -7,6 +7,18 @@ base_images:
     name: test
     namespace: openshift-kni
     tag: dev-scripts
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.7
+  ocp_builder_rhel-8-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
   openshift_release_golang-1.13:
     name: release
     namespace: openshift
@@ -18,13 +30,15 @@ build_root:
     namespace: openshift
     tag: golang-1.13
 images:
-- from: base
+- dockerfile_path: Dockerfile.rhel
+  from: base
   inputs:
-    openshift_release_golang-1.13:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
       as:
-      - registry.svc.ci.openshift.org/openshift/release:golang-1.13
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
   to: baremetal-machine-controllers
 promotion:
+  disabled: true
   name: "4.7"
   namespace: ocp
 resources:
@@ -36,6 +50,10 @@ tag_specification:
   name: "4.7"
   namespace: ocp
 tests:
+- as: unit
+  commands: ./hack/ci-test.sh
+  container:
+    from: src
 - as: e2e-metal-ipi
   steps:
     cluster_profile: packet
@@ -46,6 +64,10 @@ tests:
     from: src
 - as: govet
   commands: make vet
+  container:
+    from: src
+- as: generate-check
+  commands: make generate-check
   container:
     from: src
 zz_generated_metadata:

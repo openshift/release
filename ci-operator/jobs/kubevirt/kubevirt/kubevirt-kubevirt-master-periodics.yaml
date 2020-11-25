@@ -12,8 +12,9 @@ periodics:
     repo: kubevirt
   labels:
     ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: 0.34_4.6
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-kubevirt-kubevirt-master-e2e-periodic-azure-nested-virt
+  name: periodic-ci-kubevirt-kubevirt-master-0.34_4.6-e2e
   spec:
     containers:
     - args:
@@ -21,57 +22,11 @@ periodics:
       - --lease-server-password-file=/etc/boskos/password
       - --report-password-file=/etc/report/password.txt
       - --report-username=ci
-      - --secret-dir=/usr/local/e2e-periodic-azure-nested-virt-cluster-profile
-      - --target=e2e-periodic-azure-nested-virt
-      - --template=/usr/local/e2e-periodic-azure-nested-virt
+      - --secret-dir=/usr/local/e2e-cluster-profile
+      - --target=e2e
+      - --variant=0.34_4.6
       command:
       - ci-operator
-      env:
-      - name: CLUSTER_TYPE
-        value: azure4
-      - name: JOB_NAME_SAFE
-        value: e2e-periodic-azure-nested-virt
-      - name: TEST_COMMAND
-        value: |
-          set -euo pipefail
-
-          release_base_url="https://gcsweb.apps.ovirt.org/gcs/kubevirt-prow/devel/nightly/release/kubevirt/kubevirt"
-          release_date=$(curl -L "${release_base_url}/latest")
-          release_url="${release_base_url}/${release_date}"
-          commit=$(curl -L "${release_url}/commit")
-
-          export DOCKER_PREFIX='kubevirtnightlybuilds'
-          DOCKER_TAG="${release_date}_$(echo ${commit} | cut -c 1-9)"
-          export DOCKER_TAG
-
-          echo "deploying kubevirt from nightly build"
-          oc create -f "${release_url}/kubevirt-operator.yaml"
-          oc create -f "${release_url}/kubevirt-cr.yaml"
-
-          echo "Deploying test infrastructure"
-          for testinfra_file in $(curl -L "${release_url}/testing/" | grep -oE 'https://[^"]*\.yaml'); do
-              oc create -f ${testinfra_file}
-          done
-
-          set +e
-          oc wait -n kubevirt kv kubevirt --for condition=Available --timeout 15m
-          return_code=$?
-          set -e
-          if [ ${return_code} -ne 0 ]; then
-              echo "Dumping KubeVirt state"
-              hack/dump.sh
-              exit ${return_code}
-          fi
-
-          echo "calling cluster-up to prepare config and check whether cluster is reachable"
-          export KUBEVIRT_PROVIDER=external
-          ./cluster-up/up.sh
-
-          echo "testing"
-          mkdir -p "$ARTIFACT_DIR"
-          FUNC_TEST_ARGS='--ginkgo.noColor --ginkgo.succinct -ginkgo.slowSpecThreshold=60 --ginkgo.focus=\[crit:high\] --ginkgo.skip=(Slirp\sNetworking)|(with\sCPU\sspec)|(with\sTX\soffload\sdisabled)|(with\scni\sflannel\sand\sptp\splugin\sinterface)|(with\sovs-cni\splugin)|(test_id:1752)|(SRIOV)|(with\sEFI)|(Operator)|(GPU)|(DataVolume\sIntegration)|(test_id:3468)|(test_id:3466)|(test_id:1015)|(rfe_id:393)|(test_id:1631) --junit-output='"${ARTIFACT_DIR}"'/junit.functest.xml' ./hack/functests.sh
-      - name: TEST_IMAGESTREAM_TAG
-        value: pipeline:kubevirt-test
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -82,11 +37,8 @@ periodics:
       - mountPath: /etc/boskos
         name: boskos
         readOnly: true
-      - mountPath: /usr/local/e2e-periodic-azure-nested-virt-cluster-profile
+      - mountPath: /usr/local/e2e-cluster-profile
         name: cluster-profile
-      - mountPath: /usr/local/e2e-periodic-azure-nested-virt
-        name: job-definition
-        subPath: cluster-launch-installer-custom-test-image.yaml
       - mountPath: /etc/pull-secret
         name: pull-secret
         readOnly: true
@@ -106,12 +58,139 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-azure4
-    - configMap:
-        name: prow-job-cluster-launch-installer-custom-test-image
-      name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: api.ci
+  cron: 2 3 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: kubevirt
+    path_alias: kubevirt.io/kubevirt
+    repo: kubevirt
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: "4.4"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-kubevirt-kubevirt-master-4.4-e2e
+  spec:
+    containers:
+    - args:
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-password-file=/etc/boskos/password
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --secret-dir=/usr/local/e2e-cluster-profile
+      - --target=e2e
+      - --variant=4.4
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/e2e-cluster-profile
+        name: cluster-profile
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-azure4
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: api.ci
+  cron: 2 3 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: kubevirt
+    path_alias: kubevirt.io/kubevirt
+    repo: kubevirt
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: "4.8"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-kubevirt-kubevirt-master-4.8-e2e
+  spec:
+    containers:
+    - args:
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-password-file=/etc/boskos/password
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --secret-dir=/usr/local/e2e-cluster-profile
+      - --target=e2e
+      - --variant=4.8
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/e2e-cluster-profile
+        name: cluster-profile
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-azure4
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
     - name: result-aggregator
       secret:
         secretName: result-aggregator

@@ -3,6 +3,22 @@ base_images:
     name: ubi
     namespace: ocp
     tag: "8"
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.7
+  ocp_builder_rhel-8-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
+  ocp_builder_rhel-8-golang-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.7
 base_rpm_images:
   rpm:
     name: ubi
@@ -20,18 +36,22 @@ images:
   to: kuryr-tester
 - dockerfile_path: openshift-kuryr-cni-rhel8.Dockerfile
   from: rpm-os
+  inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
   to: kuryr-cni
 - dockerfile_path: openshift-kuryr-controller-rhel8.Dockerfile
   from: rpm-os
   to: kuryr-controller
 promotion:
-  name: "4.6"
+  name: "4.7"
   namespace: ocp
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
-      curl http://base-4-6-rhel8.ocp.svc > /etc/yum.repos.d/base-4-6-rhel8.repo
-      curl http://base-openstack-4-6.ocp.svc > /etc/yum.repos.d/base-openstack-4-6.repo
+      curl http://base-4-7-rhel8.ocp.svc > /etc/yum.repos.d/base-4-7-rhel8.repo
+      curl http://base-openstack-4-7.ocp.svc > /etc/yum.repos.d/base-openstack-4-7.repo
     from: rpm
     to: rpm-os
 resources:
@@ -39,10 +59,10 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-rpm_build_commands: tools/build-rpm-rhel8.sh 4.6.0
+rpm_build_commands: tools/build-rpm-rhel8.sh 4.7.0
 rpm_build_location: _output/RPMS/noarch
 tag_specification:
-  name: "4.6"
+  name: "4.7"
   namespace: ocp
 tests:
 - as: unit

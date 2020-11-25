@@ -1,0 +1,48 @@
+postsubmits:
+  openshift/osd-metrics-exporter:
+  - agent: kubernetes
+    branches:
+    - ^main$
+    cluster: build02
+    decorate: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+    max_concurrency: 1
+    name: branch-ci-openshift-osd-metrics-exporter-main-publish-coverage
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --secret-dir=/secrets/osd-metrics-exporter-codecov-token
+        - --target=publish-coverage
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/osd-metrics-exporter-codecov-token
+          name: osd-metrics-exporter-codecov-token
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: osd-metrics-exporter-codecov-token
+        secret:
+          secretName: osd-metrics-exporter-codecov-token
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator

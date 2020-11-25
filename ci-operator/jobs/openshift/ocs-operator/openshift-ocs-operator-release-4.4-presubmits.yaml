@@ -41,7 +41,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -86,7 +86,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -95,7 +95,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.4
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/ocs-operator-e2e-aws
     decorate: true
     decoration_config:
@@ -115,17 +115,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/ocs-operator-e2e-aws-cluster-profile
         - --target=ocs-operator-e2e-aws
-        - --template=/usr/local/ocs-operator-e2e-aws
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: ocs-operator-e2e-aws
-        - name: TEST_COMMAND
-          value: |
-            make functest
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -138,9 +129,6 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/ocs-operator-e2e-aws-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/ocs-operator-e2e-aws
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -160,12 +148,9 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -174,7 +159,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.4
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/red-hat-storage-ocs-ci-e2e-aws
     decorate: true
     decoration_config:
@@ -194,17 +179,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/red-hat-storage-ocs-ci-e2e-aws-cluster-profile
         - --target=red-hat-storage-ocs-ci-e2e-aws
-        - --template=/usr/local/red-hat-storage-ocs-ci-e2e-aws
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: red-hat-storage-ocs-ci-e2e-aws
-        - name: TEST_COMMAND
-          value: |
-            export REDHAT_OCS_CI_FORCE_TOOL_POD_INSTALL="true" && make cluster-deploy && make red-hat-storage-ocs-ci
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -217,9 +193,6 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/red-hat-storage-ocs-ci-e2e-aws-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/red-hat-storage-ocs-ci-e2e-aws
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -239,12 +212,9 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator

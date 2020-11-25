@@ -1,0 +1,45 @@
+base_images:
+  base:
+    name: "4.6"
+    namespace: ocp
+    tag: base
+  openshift_release_golang-1.14:
+    name: release
+    namespace: openshift
+    tag: golang-1.14
+binary_build_commands: go build cmd/openstack-cinder-csi-driver-operator/main.go
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.14
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  inputs:
+    openshift_release_golang-1.14:
+      as:
+      - registry.svc.ci.openshift.org/openshift/release:golang-1.14
+  to: openstack-cinder-csi-driver-operator
+promotion:
+  name: "4.6"
+  namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.6"
+  namespace: ocp
+tests:
+- as: verify
+  commands: make verify
+  container:
+    from: src
+zz_generated_metadata:
+  branch: release-4.6
+  org: openshift
+  repo: openstack-cinder-csi-driver-operator

@@ -40,7 +40,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -85,7 +85,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -94,7 +94,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/e2e-gcp-console
     decorate: true
     decoration_config:
@@ -113,16 +113,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-gcp-console-cluster-profile
         - --target=e2e-gcp-console
-        - --template=/usr/local/e2e-gcp-console
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: gcp
-        - name: JOB_NAME_SAFE
-          value: e2e-gcp-console
-        - name: TEST_COMMAND
-          value: ./test-prow-e2e.sh
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -135,9 +127,6 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/e2e-gcp-console-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-gcp-console
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -159,12 +148,9 @@ presubmits:
               name: cluster-secrets-gcp
           - configMap:
               name: cluster-profile-gcp
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -209,7 +195,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -256,8 +242,94 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - master
+    cluster: build01
+    context: ci/prow/kubevirt-plugin
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-console-master-kubevirt-plugin
+    rerun_command: /test kubevirt-plugin
+    run_if_changed: frontend/packages/kubevirt-plugin
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-password-file=/etc/boskos/password
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --secret-dir=/usr/local/kubevirt-plugin-cluster-profile
+        - --target=kubevirt-plugin
+        - --template=/usr/local/kubevirt-plugin
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: azure4
+        - name: JOB_NAME_SAFE
+          value: kubevirt-plugin
+        - name: TEST_COMMAND
+          value: |2
+
+            # Deploy Kubevirt
+            source ./frontend/packages/kubevirt-plugin/integration-tests/deploy-kubevirt-gating.sh
+
+            # Run kubevirt-plugin gating suite
+            ./test-prow-e2e.sh kubevirt-gating
+        - name: TEST_IMAGESTREAM_TAG
+          value: pipeline:src
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/kubevirt-plugin-cluster-profile
+          name: cluster-profile
+        - mountPath: /usr/local/kubevirt-plugin
+          name: job-definition
+          subPath: cluster-launch-installer-custom-test-image.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-azure4
+      - configMap:
+          name: prow-job-cluster-launch-installer-custom-test-image
+        name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )kubevirt-plugin,?($|\s.*)

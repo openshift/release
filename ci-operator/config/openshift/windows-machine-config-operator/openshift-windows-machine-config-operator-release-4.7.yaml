@@ -1,13 +1,11 @@
 binary_build_commands: make build
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.13
+  from_repository: true
 images:
 - dockerfile_path: build/Dockerfile.ci
   to: windows-machine-config-operator-test
 promotion:
+  disabled: true
   name: "4.7"
   namespace: ocp
 resources:
@@ -16,7 +14,7 @@ resources:
       memory: 4Gi
     requests:
       cpu: 100m
-      memory: 200Mi
+      memory: 600Mi
 tag_specification:
   name: "4.7"
   namespace: ocp
@@ -33,18 +31,30 @@ tests:
   commands: make unit
   container:
     from: src
-- as: e2e-operator
+- as: aws-e2e-operator
   steps:
     cluster_profile: aws
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-aws-ovn-hybrid
-- as: e2e-operator-with-custom-vxlan-port
+- as: azure-e2e-operator
+  steps:
+    cluster_profile: azure4
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: ipi-azure-ovn-hybrid
+- as: aws-e2e-operator-with-custom-vxlan-port
   steps:
     cluster_profile: aws
     test:
     - ref: windows-e2e-operator-test-with-custom-vxlan-port
     workflow: ipi-aws-ovn-hybrid-custom-vxlan-port
+- as: vsphere-e2e-operator
+  steps:
+    cluster_profile: vsphere
+    test:
+    - ref: windows-e2e-operator-test-with-custom-vxlan-port
+    workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
 zz_generated_metadata:
   branch: release-4.7
   org: openshift

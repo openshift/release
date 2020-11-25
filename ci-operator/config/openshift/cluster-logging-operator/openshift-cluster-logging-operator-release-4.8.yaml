@@ -1,0 +1,90 @@
+base_images:
+  base:
+    name: "4.8"
+    namespace: ocp
+    tag: base
+  elasticsearch-operator-src:
+    name: "4.8"
+    namespace: ocp
+    tag: elasticsearch-operator-src
+  ocp_4.6_cli:
+    name: "4.8"
+    namespace: ocp
+    tag: cli
+  ocp_4.7_cli:
+    name: "4.8"
+    namespace: ocp
+    tag: cli
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.7
+  ocp_builder_rhel-8-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
+  openshift_release_golang-1.13:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+  openshift_release_golang-1.14:
+    name: release
+    namespace: openshift
+    tag: golang-1.14
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.14
+images:
+- from: base
+  inputs:
+    ocp_4.7_cli:
+      as:
+      - registry.svc.ci.openshift.org/ocp/4.7:cli
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
+  to: cluster-logging-operator
+- dockerfile_path: olm_deploy/operatorregistry/Dockerfile
+  from: base
+  to: cluster-logging-operator-registry
+- dockerfile_path: Dockerfile.e2e
+  from: elasticsearch-operator-src
+  to: cluster-logging-operator-e2e
+promotion:
+  name: "4.8"
+  namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 200Mi
+tag_specification:
+  name: "4.8"
+  namespace: ocp
+tests:
+- as: unit
+  commands: make test-unit
+  container:
+    from: src
+- artifact_dir: /tmp/artifacts
+  as: e2e-operator
+  commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=/tmp/artifacts/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts make test-e2e-olm
+  openshift_installer_custom_test_image:
+    cluster_profile: aws
+    from: stable:cluster-logging-operator-e2e
+- artifact_dir: /tmp/artifacts
+  as: functional
+  commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=/tmp/artifacts/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts make test-functional
+  openshift_installer_custom_test_image:
+    cluster_profile: aws
+    from: stable:cluster-logging-operator-e2e
+zz_generated_metadata:
+  branch: release-4.8
+  org: openshift
+  repo: cluster-logging-operator

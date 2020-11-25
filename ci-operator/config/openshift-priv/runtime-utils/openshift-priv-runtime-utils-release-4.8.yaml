@@ -1,0 +1,40 @@
+base_images:
+  os:
+    name: centos
+    namespace: openshift
+    tag: "7"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+canonical_go_repository: github.com/openshift/runtime-utils
+promotion:
+  name: 4.8-priv
+  namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: "3"
+      memory: 8Gi
+tag_specification:
+  name: 4.8-priv
+  namespace: ocp-private
+tests:
+- as: verify
+  commands: |
+    make build
+    make verify
+  container:
+    from: src
+- artifact_dir: /tmp/artifacts
+  as: unit
+  commands: |
+    mkdir -p /tmp/artifacts
+    make test-unit JUNITFILE=/tmp/artifacts/junit_report.xml
+  container:
+    from: src
+zz_generated_metadata:
+  branch: release-4.8
+  org: openshift-priv
+  repo: runtime-utils

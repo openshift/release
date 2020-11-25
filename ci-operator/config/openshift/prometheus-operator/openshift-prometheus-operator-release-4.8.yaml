@@ -1,0 +1,79 @@
+base_images:
+  base:
+    name: "4.8"
+    namespace: ocp
+    tag: base
+  ocp_builder_golang-1.12:
+    name: builder
+    namespace: ocp
+    tag: golang-1.12
+  ocp_builder_golang-1.13:
+    name: builder
+    namespace: ocp
+    tag: golang-1.13
+  ocp_builder_golang-1.14:
+    name: builder
+    namespace: ocp
+    tag: golang-1.14
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.7
+  ocp_builder_rhel-8-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.14
+canonical_go_repository: github.com/coreos/prometheus-operator
+images:
+- dockerfile_path: Dockerfile.ocp
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
+  to: prometheus-operator
+- dockerfile_path: Dockerfile.config-reloader.ocp
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
+  to: prometheus-config-reloader
+promotion:
+  name: "4.8"
+  namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.8"
+  namespace: ocp
+tests:
+- as: vendor
+  commands: go mod vendor && git diff --exit-code
+  container:
+    from: src
+- as: e2e-aws
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- as: e2e-aws-upgrade
+  commands: TEST_SUITE=all run-upgrade-tests
+  openshift_installer:
+    cluster_profile: aws
+    upgrade: true
+zz_generated_metadata:
+  branch: release-4.8
+  org: openshift
+  repo: prometheus-operator

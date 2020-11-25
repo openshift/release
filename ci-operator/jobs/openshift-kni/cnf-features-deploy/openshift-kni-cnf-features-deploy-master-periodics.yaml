@@ -10,8 +10,9 @@ periodics:
     org: openshift-kni
     repo: cnf-features-deploy
   labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-kni-cnf-features-deploy-master-cnf-e2e-gcp-periodic
+  name: periodic-ci-openshift-kni-cnf-features-deploy-master-e2e-gcp-ovn-periodic
   spec:
     containers:
     - args:
@@ -19,20 +20,10 @@ periodics:
       - --lease-server-password-file=/etc/boskos/password
       - --report-password-file=/etc/report/password.txt
       - --report-username=ci
-      - --secret-dir=/usr/local/cnf-e2e-gcp-periodic-cluster-profile
-      - --target=cnf-e2e-gcp-periodic
-      - --template=/usr/local/cnf-e2e-gcp-periodic
+      - --secret-dir=/usr/local/e2e-gcp-ovn-periodic-cluster-profile
+      - --target=e2e-gcp-ovn-periodic
       command:
       - ci-operator
-      env:
-      - name: CLUSTER_TYPE
-        value: gcp
-      - name: CLUSTER_VARIANT
-        value: ovn
-      - name: JOB_NAME_SAFE
-        value: cnf-e2e-gcp-periodic
-      - name: TEST_COMMAND
-        value: make functests-on-ci
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -43,11 +34,8 @@ periodics:
       - mountPath: /etc/boskos
         name: boskos
         readOnly: true
-      - mountPath: /usr/local/cnf-e2e-gcp-periodic-cluster-profile
+      - mountPath: /usr/local/e2e-gcp-ovn-periodic-cluster-profile
         name: cluster-profile
-      - mountPath: /usr/local/cnf-e2e-gcp-periodic
-        name: job-definition
-        subPath: cluster-launch-installer-src.yaml
       - mountPath: /etc/pull-secret
         name: pull-secret
         readOnly: true
@@ -69,12 +57,73 @@ periodics:
             name: cluster-secrets-gcp
         - configMap:
             name: cluster-profile-gcp
-    - configMap:
-        name: prow-job-cluster-launch-installer-src
-      name: job-definition
     - name: pull-secret
       secret:
-        secretName: regcred
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: api.ci
+  cron: '* */8 * * *'
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift-kni
+    repo: cnf-features-deploy
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-kni-cnf-features-deploy-master-e2e-gcp-periodic
+  spec:
+    containers:
+    - args:
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-password-file=/etc/boskos/password
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --secret-dir=/usr/local/e2e-gcp-periodic-cluster-profile
+      - --target=e2e-gcp-periodic
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/e2e-gcp-periodic-cluster-profile
+        name: cluster-profile
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-gcp
+        - configMap:
+            name: cluster-profile-gcp
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
     - name: result-aggregator
       secret:
         secretName: result-aggregator

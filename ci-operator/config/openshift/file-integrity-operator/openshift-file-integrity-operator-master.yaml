@@ -7,20 +7,24 @@ base_images:
     name: builder
     namespace: ocp
     tag: golang-1.13
+  ocp_builder_golang-1.14:
+    name: builder
+    namespace: ocp
+    tag: golang-1.14
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: golang-1.14
 images:
 - dockerfile_path: Dockerfile.ci
   inputs:
-    ocp_builder_golang-1.13:
+    ocp_builder_golang-1.14:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
+      - registry.svc.ci.openshift.org/ocp/builder:golang-1.14
   to: file-integrity-operator
 promotion:
-  name: "4.6"
+  name: "4.7"
   namespace: ocp
 resources:
   '*':
@@ -28,7 +32,7 @@ resources:
       cpu: 200m
       memory: 400Mi
 tag_specification:
-  name: "4.6"
+  name: "4.7"
   namespace: ocp
 tests:
 - as: go-build
@@ -44,9 +48,17 @@ tests:
   container:
     from: src
 - as: e2e-aws
-  commands: make e2e
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: openshift

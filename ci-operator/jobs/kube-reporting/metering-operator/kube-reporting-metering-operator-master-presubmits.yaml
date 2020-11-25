@@ -4,7 +4,52 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: build01
+    context: ci/prow/ci-index
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-kube-reporting-metering-operator-master-ci-index
+    rerun_command: /test ci-index
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --target=ci-index
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ci-index,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: build01
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -41,7 +86,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -50,7 +95,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/metering-e2e-aws
     decorate: true
     decoration_config:
@@ -69,19 +114,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/metering-e2e-aws-cluster-profile
         - --target=metering-e2e-aws
-        - --template=/usr/local/metering-e2e-aws
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: metering-e2e-aws
-        - name: TEST_COMMAND
-          value: |
-            set -x
-
-            TEST_ENABLE_MACHINE_AUTOSCALING="true" TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/e2e EXTRA_TEST_FLAGS="-run TestManualMeteringInstall" make e2e
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -94,9 +128,6 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/metering-e2e-aws-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/metering-e2e-aws
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -116,12 +147,9 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -130,7 +158,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/metering-upgrade-aws
     decorate: true
     decoration_config:
@@ -149,22 +177,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/metering-upgrade-aws-cluster-profile
         - --target=metering-upgrade-aws
-        - --template=/usr/local/metering-upgrade-aws
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: metering-upgrade-aws
-        - name: TEST_COMMAND
-          value: |
-            set -x
-            # Increase the size of the machines so that there are machines large enough
-            # to run Presto, and the full metering stack.
-            kubectl -n openshift-machine-api get machinesets -o name | grep worker | cut -d/ -f2 | xargs -I{} kubectl -n openshift-machine-api scale machineset {} --replicas 3
-
-            TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/upgrade EXTRA_TEST_FLAGS="-run TestMeteringUpgrades" make e2e
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -177,9 +191,6 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/metering-upgrade-aws-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/metering-upgrade-aws
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -199,12 +210,9 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -213,7 +221,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -249,7 +257,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -258,7 +266,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/vendor
     decorate: true
     decoration_config:
@@ -294,7 +302,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -303,7 +311,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/verify
     decorate: true
     decoration_config:
@@ -339,7 +347,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator

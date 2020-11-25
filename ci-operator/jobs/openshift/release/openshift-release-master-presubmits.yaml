@@ -1,25 +1,6 @@
 presubmits:
   openshift/release:
   - agent: kubernetes
-    always_run: false
-    cluster: api.ci
-    context: ci/openshift/promrules
-    decorate: true
-    name: check_prometheus_rules
-    rerun_command: /test promrules
-    run_if_changed: ^(projects/prometheus/prometheus.rules.yaml)$
-    spec:
-      containers:
-      - command:
-        - /go/entrypoint.sh
-        image: registry.svc.ci.openshift.org/ci/promrules:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-    trigger: ((?m)^/test promrules,?(\s+|$))
-  - agent: kubernetes
     always_run: true
     branches:
     - master
@@ -61,7 +42,54 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
+    context: ci/prow/boskos-config
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-boskos-config
+    rerun_command: /test boskos-config
+    spec:
+      containers:
+      - args:
+        - --config
+        - core-services/prow/02_config/_boskos.yaml
+        command:
+        - /app
+        image: gcr.io/k8s-staging-boskos/checkconfig:v20201124-9da8944
+        imagePullPolicy: IfNotPresent
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )boskos-config,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: build02
+    context: ci/prow/boskos-config-generation
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-boskos-config-generation
+    rerun_command: /test boskos-config-generation
+    spec:
+      containers:
+      - command:
+        - hack/validate-boskos.sh
+        image: registry.svc.ci.openshift.org/ci/python-validation
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )boskos-config-generation,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: app.ci
     context: ci/build-farm/build01-dry
     decorate: true
     labels:
@@ -79,16 +107,6 @@ presubmits:
         command:
         - applyconfig
         env:
-        - name: build01_build01_reg_auth_value
-          valueFrom:
-            secretKeyRef:
-              key: build01_build01_reg_auth_value.txt
-              name: build-farm-credentials
-        - name: build01_ci_reg_auth_value
-          valueFrom:
-            secretKeyRef:
-              key: build01_ci_reg_auth_value.txt
-              name: build-farm-credentials
         - name: github_client_id
           valueFrom:
             secretKeyRef:
@@ -145,16 +163,6 @@ presubmits:
         command:
         - applyconfig
         env:
-        - name: build01_build02_reg_auth_value
-          valueFrom:
-            secretKeyRef:
-              key: build01_build02_reg_auth_value.txt
-              name: build-farm-credentials
-        - name: build01_ci_reg_auth_value
-          valueFrom:
-            secretKeyRef:
-              key: build01_ci_reg_auth_value.txt
-              name: build-farm-credentials
         - name: github_client_id
           valueFrom:
             secretKeyRef:
@@ -193,7 +201,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/ci-operator-config
     decorate: true
     labels:
@@ -218,7 +226,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/ci-operator-config-metadata
     decorate: true
     labels:
@@ -242,7 +250,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/ci-operator-registry
     decorate: true
     labels:
@@ -269,10 +277,38 @@ presubmits:
             cpu: 10m
     trigger: (?m)^/test( | .* )ci-operator-registry,?($|\s.*)
   - agent: kubernetes
+    always_run: false
+    branches:
+    - master
+    cluster: build02
+    context: ci/prow/ci-testgrid-allow-list
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-ci-testgrid-allow-list
+    rerun_command: /test ci-testgrid-allow-list
+    spec:
+      containers:
+      - args:
+        - --validate=true
+        - --allow-list
+        - ./core-services/testgrid-config-generator/_allow-list.yaml
+        - --release-config
+        - ./core-services/release-controller/_releases
+        command:
+        - testgrid-config-generator
+        image: testgrid-config-generator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )ci-testgrid-allow-list,?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/config
     decorate: true
     labels:
@@ -295,7 +331,7 @@ presubmits:
         - mismatched-tide-lenient
         command:
         - /checkconfig
-        image: gcr.io/k8s-prow/checkconfig:v20200826-f9138eb980
+        image: gcr.io/k8s-prow/checkconfig:v20201124-061f85d859
         imagePullPolicy: Always
         name: ""
         resources:
@@ -306,7 +342,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: app.ci
     context: ci/prow/core-dry
     decorate: true
     labels:
@@ -318,15 +354,14 @@ presubmits:
       - args:
         - --config-dir
         - core-services
+        - --config-dir
+        - clusters/build-clusters/common
+        - --kubeconfig
+        - /etc/build-farm-credentials/kubeconfig
         - --as=
         command:
         - applyconfig
         env:
-        - name: build01_ci_reg_auth_value
-          valueFrom:
-            secretKeyRef:
-              key: build01_ci_reg_auth_value.txt
-              name: build-farm-credentials
         - name: slack_api_url
           valueFrom:
             secretKeyRef:
@@ -338,13 +373,24 @@ presubmits:
         resources:
           requests:
             cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
       serviceAccountName: config-updater
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.api.ci.config
+            path: kubeconfig
+          secretName: build-farm-credentials
     trigger: (?m)^/test( | .* )core-dry,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - master
-    cluster: build01
+    cluster: build02
     context: ci/prow/core-valid
     decorate: true
     decoration_config:
@@ -380,7 +426,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -389,7 +435,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/correctly-sharded-config
     decorate: true
     labels:
@@ -413,7 +459,31 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
+    context: ci/prow/deprecate-templates
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-deprecate-templates
+    rerun_command: /test deprecate-templates
+    spec:
+      containers:
+      - args:
+        - ./
+        command:
+        - hack/validate-template-deprecation.sh
+        image: registry.svc.ci.openshift.org/ci/template-deprecator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )deprecate-templates,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: build02
     context: ci/prow/generated-config
     decorate: true
     labels:
@@ -437,7 +507,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/generated-dashboards
     decorate: true
     labels:
@@ -461,7 +531,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/ordered-prow-config
     decorate: true
     labels:
@@ -485,7 +555,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/owners
     decorate: true
     labels:
@@ -510,7 +580,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/pj-rehearse
     decorate: true
     extra_refs:
@@ -527,13 +597,12 @@ presubmits:
         - --debug-log
         - $(ARTIFACTS)/debug-log.txt
         - --dry-run=false
-        - --rehearsal-limit=45
         - --prowjob-kubeconfig=/var/kubeconfigs/sa.pj-rehearse.app.ci.config
         command:
         - ./hack/pj-rehearse.sh
         env:
         - name: KUBECONFIG
-          value: /var/kubeconfigs/sa.ci-operator.build01.config:/var/kubeconfigs/sa.ci-operator.build02.config:/var/kubeconfigs/sa.pj-rehearse.app.ci.config:/var/kubeconfigs/sa.ci-operator.vsphere.config
+          value: /var/kubeconfigs/sa.ci-operator.build01.config:/var/kubeconfigs/sa.ci-operator.build02.config:/var/kubeconfigs/sa.pj-rehearse.app.ci.config:/var/kubeconfigs/sa.ci-operator.vsphere.config:/var/kubeconfigs/sa.ci-operator.api.ci.config
         image: pj-rehearse:latest
         imagePullPolicy: Always
         name: ""
@@ -553,7 +622,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/prow-config
     decorate: true
     labels:
@@ -577,7 +646,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/prow-config-filenames
     decorate: true
     labels:
@@ -602,7 +671,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/prow-config-semantics
     decorate: true
     labels:
@@ -626,7 +695,31 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
+    context: ci/prow/release-config
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-release-config
+    rerun_command: /test release-config
+    spec:
+      containers:
+      - args:
+        - --validate-configs=core-services/release-controller/_releases
+        command:
+        - release-controller
+        image: registry.svc.ci.openshift.org/ci/release-controller
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )release-config,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: build02
     context: ci/prow/release-controller-config
     decorate: true
     labels:
@@ -650,7 +743,33 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
+    context: ci/prow/secret-generator-config-valid
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-secret-generator-config-valid
+    rerun_command: /test secret-generator-config-valid
+    spec:
+      containers:
+      - args:
+        - --config=core-services/ci-secret-generator/_config.yaml
+        - --bootstrap-config=core-services/ci-secret-bootstrap/_config.yaml
+        - --validate-only=true
+        command:
+        - /usr/bin/ci-secret-generator
+        image: ci-secret-generator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )secret-generator-config-valid,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: app.ci
     context: ci/prow/services-dry
     decorate: true
     labels:
@@ -662,6 +781,8 @@ presubmits:
       - args:
         - --config-dir
         - services
+        - --kubeconfig
+        - /etc/build-farm-credentials/kubeconfig
         - --as=
         command:
         - applyconfig
@@ -671,13 +792,24 @@ presubmits:
         resources:
           requests:
             cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
       serviceAccountName: config-updater
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.api.ci.config
+            path: kubeconfig
+          secretName: build-farm-credentials
     trigger: (?m)^/test( | .* )services-dry,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - master
-    cluster: build01
+    cluster: build02
     context: ci/prow/services-valid
     decorate: true
     decoration_config:
@@ -713,7 +845,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -722,7 +854,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/step-registry-metadata
     decorate: true
     labels:
@@ -746,7 +878,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/step-registry-shellcheck
     decorate: true
     labels:
@@ -787,17 +919,6 @@ presubmits:
         - --as=
         command:
         - applyconfig
-        env:
-        - name: build01_ci_reg_auth_value
-          valueFrom:
-            secretKeyRef:
-              key: build01_ci_reg_auth_value.txt
-              name: build-farm-credentials
-        - name: build01_vsphere_reg_auth_value
-          valueFrom:
-            secretKeyRef:
-              key: build01_vsphere_reg_auth_value.txt
-              name: build-farm-credentials
         image: registry.svc.ci.openshift.org/ci/applyconfig:latest
         imagePullPolicy: Always
         name: ""
@@ -821,7 +942,7 @@ presubmits:
     always_run: false
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/pylint
     decorate: true
     labels:
@@ -845,3 +966,31 @@ presubmits:
           requests:
             cpu: 10m
     trigger: (?m)^/test( | .* )pylint,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: build02
+    context: ci/prow/yamllint
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-yamllint
+    rerun_command: /test yamllint
+    spec:
+      containers:
+      - args:
+        - -c
+        - services/yamllint/_yamllint.conf
+        - ci-operator/jobs
+        - clusters
+        - core-services
+        command:
+        - yamllint
+        image: quay.io/kubermatic/yamllint:0.1
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )yamllint,?($|\s.*)

@@ -50,6 +50,7 @@ function gather_bootstrap_and_fail() {
     source "${SHARED_DIR}/govc.sh"
     # list all the virtual machines in the folder/rp
     clustervms=$(govc ls "/${GOVC_DATACENTER}/vm/${cluster_name}")
+    GATHER_BOOTSTRAP_ARGS=()
     for ipath in $clustervms; do
       # split on /
       # shellcheck disable=SC2162
@@ -68,15 +69,11 @@ function gather_bootstrap_and_fail() {
       declare "${hostname//-/_}_ip"="$(govc vm.ip -wait=1m -vm.ipath="$ipath" | awk -F',' '{print $1}')"
     done
 
-    # shellcheck disable=SC2154
-    GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --bootstrap ${bootstrap_0_ip}"
-    # shellcheck disable=SC2154
-    GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --master ${control_plane_0_ip} --master ${control_plane_1_ip} --master ${control_plane_2_ip}"
+    GATHER_BOOTSTRAP_ARGS+=('--bootstrap' "${bootstrap_0_ip}")
+    GATHER_BOOTSTRAP_ARGS+=('--master' "${control_plane_0_ip}" '--master' "${control_plane_1_ip}" '--master' "${control_plane_2_ip}")
 
     set -e
-  if test -n "${GATHER_BOOTSTRAP_ARGS}"; then
-    openshift-install --dir=/tmp/artifacts/installer gather bootstrap --key "${SSH_PRIVATE_KEY_PATH}" "${GATHER_BOOTSTRAP_ARGS}"
-  fi
+    openshift-install --dir=/tmp/artifacts/installer gather bootstrap --key "${SSH_PRIV_KEY_PATH}" "${GATHER_BOOTSTRAP_ARGS[@]}"
 
   return 1
 }

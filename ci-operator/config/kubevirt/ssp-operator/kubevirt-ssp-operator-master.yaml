@@ -1,0 +1,41 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- dockerfile_path: Dockerfile
+  to: ssp-operator-container
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.7"
+  namespace: ocp
+tests:
+- as: e2e-functests
+  steps:
+    cluster_profile: aws
+    test:
+    - as: e2e-functests
+      cli: latest
+      commands: |
+        export component=ssp-operator-container
+        export IMG=$(echo $IMAGE_FORMAT | envsubst)
+        export GOFLAGS=
+        export NO_CLEANUP_AFTER_TESTS=true
+        make deploy functest
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: master
+  org: kubevirt
+  repo: ssp-operator

@@ -1,0 +1,85 @@
+base_images:
+  base:
+    name: 4.8-priv
+    namespace: ocp-private
+    tag: base
+  openshift_release_golang-1.12:
+    name: release
+    namespace: openshift
+    tag: golang-1.12
+binary_build_commands: make build --warn-undefined-variables
+build_root:
+  project_image:
+    dockerfile_path: images/ci/Dockerfile.build.root
+canonical_go_repository: github.com/openshift/cluster-resource-override-admission-operator
+images:
+- dockerfile_path: images/ci/Dockerfile
+  from: base
+  inputs:
+    openshift_release_golang-1.12:
+      as:
+      - registry.svc.ci.openshift.org/openshift/release:golang-1.12
+  to: cluster-resource-override-admission-operator
+- dockerfile_path: images/operator-registry/Dockerfile.registry.ci
+  from: base
+  inputs:
+    openshift_release_golang-1.12:
+      as:
+      - registry.svc.ci.openshift.org/openshift/release:golang-1.12
+  to: cluster-resource-override-admission-operator-registry
+promotion:
+  name: 4.8-priv
+  namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: "3"
+      memory: 1Gi
+tag_specification:
+  name: 4.8-priv
+  namespace: ocp-private
+test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
+tests:
+- artifact_dir: /tmp/artifacts
+  as: unit
+  commands: |
+    mkdir -p /tmp/artifacts
+    make test-unit JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
+  container:
+    from: test-bin
+- as: verify
+  commands: make verify
+  container:
+    from: src
+- as: e2e-aws
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- as: e2e-aws-operator
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make e2e-ci
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-olm
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make e2e-olm-ci
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-4.8
+  org: openshift-priv
+  repo: cluster-resource-override-admission-operator

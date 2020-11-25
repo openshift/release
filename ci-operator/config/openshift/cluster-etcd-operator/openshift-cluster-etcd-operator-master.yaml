@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: "4.6"
+    name: "4.7"
     namespace: ocp
     tag: base
   dev-scripts:
@@ -11,22 +11,38 @@ base_images:
     name: builder
     namespace: ocp
     tag: golang-1.13
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.7
+  ocp_builder_rhel-8-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
+  ocp_builder_rhel-8-golang-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.7
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: golang-1.15
 images:
 - dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
-    ocp_builder_golang-1.13:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
   to: cluster-etcd-operator
 promotion:
-  name: "4.6"
+  name: "4.7"
   namespace: ocp
 resources:
   '*':
@@ -34,7 +50,7 @@ resources:
       cpu: "3"
       memory: 1Gi
 tag_specification:
-  name: "4.6"
+  name: "4.7"
   namespace: ocp
 test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
 tests:
@@ -54,19 +70,36 @@ tests:
     make test-unit JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
   container:
     from: test-bin
+- as: e2e-agnostic
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-loki
+- as: e2e-agnostic-upgrade
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-upgrade-gcp-loki
+- as: e2e-disruptive
+  commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer:
+    cluster_profile: aws
+- artifact_dir: /tmp/artifacts
+  as: e2e-operator
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: e2e-aws
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-loki
-- as: e2e-gcp-upgrade
-  commands: TEST_SUITE=all run-upgrade-tests
-  openshift_installer:
-    cluster_profile: gcp
-    upgrade: true
-- as: e2e-aws-disruptive
-  commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_SUITE=openshift/conformance/parallel run-tests
-  openshift_installer:
-    cluster_profile: aws
 - as: e2e-azure
   steps:
     cluster_profile: azure4
@@ -79,12 +112,10 @@ tests:
   steps:
     cluster_profile: packet
     workflow: baremetalds-e2e
-- artifact_dir: /tmp/artifacts
-  as: e2e-aws-operator
-  commands: |
-    make test-e2e JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
-  openshift_installer_src:
-    cluster_profile: aws
+- as: e2e-metal-assisted
+  steps:
+    cluster_profile: packet
+    workflow: baremetalds-assisted
 zz_generated_metadata:
   branch: master
   org: openshift

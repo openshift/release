@@ -4,7 +4,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/e2e-ovirt
     decorate: true
     decoration_config:
@@ -22,6 +22,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
         - --repo=cluster-api-provider-ovirt
+        - --secret-dir=/etc/boskos
         - --secret-dir=/usr/local/e2e-ovirt-cluster-profile
         - --target=e2e-ovirt
         - --template=/usr/local/e2e-ovirt
@@ -46,6 +47,9 @@ presubmits:
         - mountPath: /etc/apici
           name: apici-ci-operator-credentials
           readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /usr/local/e2e-ovirt-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/e2e-ovirt
@@ -62,6 +66,12 @@ presubmits:
           - key: sa.ci-operator.apici.config
             path: kubeconfig
           secretName: apici-ci-operator-credentials
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -76,13 +86,13 @@ presubmits:
         name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
     trigger: (?m)^/test( | .* )e2e-ovirt,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - master
-    cluster: build01
+    cluster: build02
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -119,7 +129,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator

@@ -7,6 +7,18 @@ base_images:
     name: 4.6-priv
     namespace: ocp-private
     tag: must-gather
+  ocp_builder_rhel-7-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-7-golang-1.15-openshift-4.6
+  ocp_builder_rhel-7-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-7-golang-openshift-4.6
+  ocp_builder_rhel-8-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
   openshift_release_golang-1.13:
     name: release
     namespace: openshift
@@ -30,9 +42,9 @@ images:
 - dockerfile_path: images/cli/Dockerfile.rhel
   from: base
   inputs:
-    openshift_release_golang-1.14:
+    ocp_builder_rhel-7-golang-1.15-openshift-4.6:
       as:
-      - registry.svc.ci.openshift.org/openshift/release:golang-1.14
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-7-golang-1.15-openshift-4.6
   to: cli
 - context_dir: images/tools
   from: cli
@@ -40,16 +52,16 @@ images:
 - dockerfile_path: images/cli/Dockerfile.rhel
   from: tests-base
   inputs:
-    openshift_release_golang-1.14:
+    ocp_builder_rhel-7-golang-1.15-openshift-4.6:
       as:
-      - registry.svc.ci.openshift.org/openshift/release:golang-1.14
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-7-golang-1.15-openshift-4.6
   to: tests
 - dockerfile_path: images/cli/Dockerfile.rhel
   from: must-gather-base
   inputs:
-    openshift_release_golang-1.14:
+    ocp_builder_rhel-7-golang-1.15-openshift-4.6:
       as:
-      - registry.svc.ci.openshift.org/openshift/release:golang-1.14
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-7-golang-1.15-openshift-4.6
   to: must-gather
 - context_dir: images/deployer
   dockerfile_path: Dockerfile.rhel
@@ -58,9 +70,9 @@ images:
 - dockerfile_path: images/cli-artifacts/Dockerfile.rhel
   from: cli
   inputs:
-    openshift_release_golang-1.14:
+    ocp_builder_rhel-7-golang-1.15-openshift-4.6:
       as:
-      - registry.svc.ci.openshift.org/openshift/release:golang-1.14
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-7-golang-1.15-openshift-4.6
   to: cli-artifacts
 - context_dir: images/recycler/
   dockerfile_path: Dockerfile.rhel
@@ -69,7 +81,6 @@ images:
 promotion:
   additional_images:
     oc-rpms: rpms
-  disabled: true
   excluded_images:
   - tests
   - must-gather
@@ -96,7 +107,7 @@ rpm_build_commands: |-
   tar -czf "${TMPDIR}/openshift-clients-0.0.1.tar.gz" --exclude='.git' --transform='s|^.|openshift-clients-0.0.1|' --exclude='openshift-clients-0.0.1.tar.gz' ./
   cp ./oc.spec "${RPMBUILD_DIR}/SPECS/"
   cp "${TMPDIR}/openshift-clients-0.0.1.tar.gz" "${RPMBUILD_DIR}/SOURCES/"
-  rpmbuild -ba --nodeps --define "_topdir $( pwd )/${RPMBUILD_DIR}" ${RPMBUILD_DIR}/SPECS/oc.spec --define 'os_git_vars ignore'
+  rpmbuild -ba --nodeps --define "_topdir $( pwd )/${RPMBUILD_DIR}" ${RPMBUILD_DIR}/SPECS/oc.spec --define "os_git_vars OS_GIT_VERSION='0.0.0' OS_GIT_COMMIT='${OPENSHIFT_BUILD_COMMIT::8}' OS_GIT_MAJOR='' OS_GIT_MINOR='' OS_GIT_TREE_STATE=''"
 rpm_build_location: _rpmbuild/RPMS/
 tag_specification:
   name: 4.6-priv
@@ -133,7 +144,7 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
-- as: e2e-cmd
+- as: e2e-agnostic-cmd
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-cmd

@@ -4,7 +4,7 @@ presubmits:
     always_run: true
     branches:
     - release-1.1
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/hco-e2e-aws
     decorate: true
     decoration_config:
@@ -23,17 +23,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/hco-e2e-aws-cluster-profile
         - --target=hco-e2e-aws
-        - --template=/usr/local/hco-e2e-aws
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: hco-e2e-aws
-        - name: TEST_COMMAND
-          value: |
-            make start && make functest
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -46,9 +37,6 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/hco-e2e-aws-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/hco-e2e-aws
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -68,12 +56,9 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -82,7 +67,7 @@ presubmits:
     always_run: true
     branches:
     - release-1.1
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/hco-e2e-azure
     decorate: true
     decoration_config:
@@ -101,17 +86,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/hco-e2e-azure-cluster-profile
         - --target=hco-e2e-azure
-        - --template=/usr/local/hco-e2e-azure
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: azure4
-        - name: JOB_NAME_SAFE
-          value: hco-e2e-azure
-        - name: TEST_COMMAND
-          value: |
-            make start && make functest
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -124,9 +100,6 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/hco-e2e-azure-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/hco-e2e-azure
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -146,12 +119,9 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-azure4
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -160,7 +130,7 @@ presubmits:
     always_run: true
     branches:
     - release-1.1
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/hco-e2e-upgrade-aws
     decorate: true
     decoration_config:
@@ -179,17 +149,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/hco-e2e-upgrade-aws-cluster-profile
         - --target=hco-e2e-upgrade-aws
-        - --template=/usr/local/hco-e2e-upgrade-aws
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: hco-e2e-upgrade-aws
-        - name: TEST_COMMAND
-          value: |
-            RELEASE_DELTA=1 make upgrade-test
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -202,9 +163,6 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/hco-e2e-upgrade-aws-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/hco-e2e-upgrade-aws
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -224,12 +182,9 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -238,7 +193,7 @@ presubmits:
     always_run: true
     branches:
     - release-1.1
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/hco-e2e-upgrade-azure
     decorate: true
     decoration_config:
@@ -257,17 +212,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/hco-e2e-upgrade-azure-cluster-profile
         - --target=hco-e2e-upgrade-azure
-        - --template=/usr/local/hco-e2e-upgrade-azure
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: azure4
-        - name: JOB_NAME_SAFE
-          value: hco-e2e-upgrade-azure
-        - name: TEST_COMMAND
-          value: |
-            RELEASE_DELTA=1 make upgrade-test
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -280,9 +226,6 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/hco-e2e-upgrade-azure-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/hco-e2e-upgrade-azure
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -302,12 +245,9 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-azure4
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -316,7 +256,7 @@ presubmits:
     always_run: true
     branches:
     - release-1.1
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/hco-e2e-upgrade-prev-aws
     decorate: true
     decoration_config:
@@ -335,17 +275,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/hco-e2e-upgrade-prev-aws-cluster-profile
         - --target=hco-e2e-upgrade-prev-aws
-        - --template=/usr/local/hco-e2e-upgrade-prev-aws
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: hco-e2e-upgrade-prev-aws
-        - name: TEST_COMMAND
-          value: |
-            RELEASE_DELTA=2 PREV=true make upgrade-test
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -358,9 +289,6 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/hco-e2e-upgrade-prev-aws-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/hco-e2e-upgrade-prev-aws
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -380,12 +308,9 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -394,7 +319,7 @@ presubmits:
     always_run: true
     branches:
     - release-1.1
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/hco-e2e-upgrade-prev-azure
     decorate: true
     decoration_config:
@@ -413,17 +338,8 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/hco-e2e-upgrade-prev-azure-cluster-profile
         - --target=hco-e2e-upgrade-prev-azure
-        - --template=/usr/local/hco-e2e-upgrade-prev-azure
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: azure4
-        - name: JOB_NAME_SAFE
-          value: hco-e2e-upgrade-prev-azure
-        - name: TEST_COMMAND
-          value: |
-            RELEASE_DELTA=2 PREV=true make upgrade-test
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -436,9 +352,6 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/hco-e2e-upgrade-prev-azure-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/hco-e2e-upgrade-prev-azure
-          name: job-definition
-          subPath: cluster-launch-installer-src.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -458,12 +371,9 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-azure4
-      - configMap:
-          name: prow-job-cluster-launch-installer-src
-        name: job-definition
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
@@ -472,7 +382,7 @@ presubmits:
     always_run: true
     branches:
     - release-1.1
-    cluster: api.ci
+    cluster: build01
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -510,7 +420,7 @@ presubmits:
       volumes:
       - name: pull-secret
         secret:
-          secretName: regcred
+          secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator

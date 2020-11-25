@@ -1,4 +1,8 @@
 base_images:
+  base-os-8:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-base-openshift-4.6
   builder:
     name: builder
     namespace: ocp
@@ -7,14 +11,18 @@ base_images:
     name: builder
     namespace: ocp
     tag: golang-1.10
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
   os-7:
     name: ubi
     namespace: ocp
     tag: "7"
-  os-8:
-    name: ubi
-    namespace: ocp
-    tag: "8"
 build_root:
   image_stream_tag:
     name: release
@@ -32,9 +40,9 @@ images:
 - dockerfile_path: pod/Dockerfile.rhel
   from: os-7
   inputs:
-    ocp_builder_golang-1.10:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:golang-1.10
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
   to: pod
 - context_dir: egress/router
   from: base-8
@@ -50,10 +58,9 @@ images:
   to: keepalived-ipfailover
 promotion:
   additional_images:
-    base: base-7
+    base: base-8
     base-7: base-7
     base-8: base-8
-  disabled: true
   name: "4.6"
   namespace: ocp
 raw_steps:
@@ -63,12 +70,6 @@ raw_steps:
       curl http://base-4-6.ocp.svc > /etc/yum.repos.d/content.repo
     from: os-7
     to: base-os-7
-- pipeline_image_cache_step:
-    commands: |
-      rm -rf /etc/yum.repos.d/*
-      curl http://base-4-6-rhel8.ocp.svc > /etc/yum.repos.d/content.repo
-    from: os-8
-    to: base-os-8
 resources:
   '*':
     requests:

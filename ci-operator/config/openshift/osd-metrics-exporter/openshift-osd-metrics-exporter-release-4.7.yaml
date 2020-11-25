@@ -1,0 +1,41 @@
+base_images:
+  base:
+    name: "4.7"
+    namespace: ocp
+    tag: base
+  openshift_release_golang-1.13:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- dockerfile_path: build/Dockerfile
+  from: base
+  to: osd-metrics-exporter
+promotion:
+  disabled: true
+  name: "4.7"
+  namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.7"
+  namespace: ocp
+tests:
+- as: unit
+  commands: make test
+  container:
+    from: src
+zz_generated_metadata:
+  branch: release-4.7
+  org: openshift
+  repo: osd-metrics-exporter

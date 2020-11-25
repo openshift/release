@@ -171,9 +171,12 @@ Use [generate-bw-items.sh](./hack/generate-bw-items.sh) to generate those files,
 
 Use [ci-secret-bootstrap](../../../core-services/ci-secret-bootstrap/README.md).
 
-## OpenShift Image Registry: Manual
+## OpenShift Image Registry: 
 
-* Expose registry service: see [readme](../openshift-image-registry/README.md). We need to run the command only once.
+It is automated by config-updater:
+
+* customized URL
+* `replicas=3`
 
 ## OpenShift-Monitoring
 
@@ -184,9 +187,13 @@ It is automated by config-updater:
 
 ## Upgrade the cluster
 
-### Updating between minor versions
+### Upgrading inside the same minor version
 
-Upgrade channel configuration, e.g., from OCP 4.3 to 4.4:
+Upgrading inside the same minor version of `build01` is automated by [periodic-build01-upgrade](https://github.com/openshift/release/blob/67d13e6adaa3a061b18839176c2e26b3547a924d/ci-operator/jobs/infra-periodics.yaml#L8).
+
+### Upgrading between minor versions
+
+Modify channel configuration, e.g., from OCP 4.3 to 4.4:
 
 ```
 oc --as system:admin --context build01 patch clusterversion version --type json -p '[{"op": "add", "path": "/spec/channel", "value": "candidate-4.4"}]'
@@ -194,25 +201,10 @@ oc --as system:admin --context build01 patch clusterversion version --type json 
 
 ### Run the upgrade command
 
-Choose on the [release page](https://openshift-release.svc.ci.openshift.org/) the version to upgrade to, for example
-[4.4.0-rc.12](https://openshift-release.svc.ci.openshift.org/releasestream/4-stable/release/4.4.0-rc.12):
+For example, upgrade to 4.5.4
 
 ```
-$ bash clusters/build-clusters/01_cluster/hack/upgrade-cluster.sh quay.io/openshift-release-dev/ocp-release:4.4.0-rc.12-x86_64
---as system:admin --context build01 adm upgrade --allow-explicit-upgrade --to-image quay.io/openshift-release-dev/ocp-release@sha256:674200aaa1cc940782aa4b109ebfeaf7206bb57c3e01d62ec8e0b3d5ca910e8f
-```
-
-Double-check the SHA with:
-
-```
-$ curl -s https://mirror.openshift.com/pub/openshift-v4/clients/ocp/4.4.0-rc.12/release.txt | grep Pull
-Pull From: quay.io/openshift-release-dev/ocp-release@sha256:674200aaa1cc940782aa4b109ebfeaf7206bb57c3e01d62ec8e0b3d5ca910e8f
-```
-
-Then, run the script with `DRY_RUN=false`:
-
-```
-DRY_RUN=false bash clusters/build-clusters/01_cluster/hack/upgrade-cluster.sh quay.io/openshift-release-dev/ocp-release:4.4.0-rc.12-x86_64
+oc --as system:admin --context build01 adm upgrade --to=4.5.4
 ```
 
 ## Destroy the cluster
