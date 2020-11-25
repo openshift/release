@@ -1,0 +1,156 @@
+base_images:
+  base:
+    name: "4.6"
+    namespace: ocp
+    tag: base
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+canonical_go_repository: kubevirt.io/kubevirt
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.6"
+  namespace: ocp
+tests:
+- artifact_dir: /tmp/artifacts
+  as: e2e
+  cron: 2 3 * * *
+  steps:
+    cluster_profile: azure4
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        set -ex
+
+        # disable default catalog source
+        oc patch OperatorHub cluster --type json -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
+
+        authfile=/tmp/authfile
+        # get authfile from cluster
+        oc get secret/pull-secret -n openshift-config -o json | jq -r '.data.".dockerconfigjson"' | base64 -d > "$authfile"
+
+        # login into brew image registry
+        docker login --username "$BREW_IMAGE_REGISTRY_USERNAME" --password-stdin brew.registry.redhat.io < $BREW_IMAGE_REGISTRY_TOKEN_PATH
+
+        # update authfile with credentials from docker config
+        jq -c '.auths + '"$(jq '{"brew.registry.redhat.io": .auths."brew.registry.redhat.io" }' $HOME/.docker/config.json)"' | {"auths": .}' "$authfile" > "${authfile}.new"
+
+        # update cluster secret
+        oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson="${authfile}.new"
+
+        # install imageContentSourcePolicy
+        oc create -f - << EOF
+        apiVersion: operator.openshift.io/v1alpha1
+        kind: ImageContentSourcePolicy
+        metadata:
+          name: brew-registry
+        spec:
+          repositoryDigestMirrors:
+          - mirrors:
+            - brew.registry.redhat.io
+            source: registry.redhat.io
+          - mirrors:
+            - brew.registry.redhat.io
+            source: registry.stage.redhat.io
+          - mirrors:
+            - brew.registry.redhat.io
+            source: registry-proxy.engineering.redhat.com
+        EOF
+
+        # wait for machineconfigpool to get updated
+        oc wait mcp/master --for condition=updated --timeout=600s
+        oc wait mcp/worker --for condition=updated --timeout=600s
+
+        # install index image
+        oc create -f - << EOF
+        apiVersion: operators.coreos.com/v1alpha1
+        kind: CatalogSource
+        metadata:
+          name: brew-catalog-source
+          namespace: openshift-marketplace
+        spec:
+          sourceType: grpc
+          image: brew.registry.redhat.io/rh-osbs/iib-pub-pending:v$CNV_VERSION
+          displayName: Brew Catalog Source
+          publisher: grpc
+        EOF
+
+        # deploy operator
+        oc create -f - << EOF
+        apiVersion: hco.kubevirt.io/v1beta1
+        kind: HyperConverged
+        metadata:
+          name: kubevirt-hyperconverged
+          namespace: openshift-cnv
+        spec:
+          BareMetalPlatform: true
+        EOF
+
+        export BIN_DIR="$(pwd)/_out" && mkdir -p "${BIN_DIR}"
+
+        release="v0.34.2"
+        TESTS_BINARY="$BIN_DIR/tests.test"
+        curl -Lo "$TESTS_BINARY" "https://github.com/kubevirt/kubevirt/releases/download/${release}/tests.test"
+        chmod +x "$TESTS_BINARY"
+
+        testing_infra_url="https://gcsweb.apps.ovirt.org/gcs/kubevirt-prow/devel/release/kubevirt/kubevirt/${release}/manifests/testing/"
+        for testinfra_file in $(curl -L "${testing_infra_url}" | grep -oE 'https://[^"]*\.yaml'); do
+          curl -L ${testinfra_file} | oc create -n openshift-cnv -f -
+        done
+
+        oc wait -n openshift-cnv HyperConverged kubevirt-hyperconverged --for condition=Available --timeout 20m
+
+        cat << EOF > /tmp/kv-testconfig.json
+        {
+          "storageClassLocal": "hostpath-provisioner",
+          "storageClassHostPath": "hostpath-provisioner",
+          "storageClassRhel": "hostpath-provisioner",
+          "storageClassWindows": "hostpath-provisioner",
+          "manageStorageClasses": false
+        }
+        EOF
+
+        ${TESTS_BINARY} \
+          -installed-namespace="$TARGET_NAMESPACE" \
+          -cdi-namespace="$TARGET_NAMESPACE" \
+          -config=/tmp/kv-testconfig.json \
+          -kubeconfig="$KUBECONFIG" \
+          -ginkgo.focus='(rfe_id:1177)|(rfe_id:273)|(rfe_id:151)' \
+          -ginkgo.skip='(Slirp Networking)|(with CPU spec)|(with TX offload disabled)|(with cni flannel and ptp plugin interface)|(with ovs-cni plugin)|(test_id:1752)|(SRIOV)|(with EFI)|(Operator)|(GPU)|(DataVolume Integration)|(test_id:3468)|(test_id:3466)|(test_id:1015)|(rfe_id:393)' \
+          -junit-output="${ARTIFACTS_DIR}/junit.functest.xml" \
+          -ginkgo.seed=0
+      credentials:
+      - mount_path: /var/run/cnv-ci-brew-pull-secret
+        name: cnv-ci-brew-pull-secret
+        namespace: test-credentials
+      env:
+      - default: '|7820aea2-0d75-11e7-9259-28d244ea5a6d.hhav.f63e13'
+        name: BREW_IMAGE_REGISTRY_USERNAME
+      - default: /var/run/cnv-ci-brew-pull-secret/token
+        name: BREW_IMAGE_REGISTRY_TOKEN_PATH
+      - default: "4.6"
+        name: CNV_VERSION
+      - default: /tmp/artifacts
+        name: ARTIFACTS_DIR
+      - default: openshift-cnv
+        name: TARGET_NAMESPACE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-azure
+zz_generated_metadata:
+  branch: master
+  org: kubevirt
+  repo: kubevirt
+  variant: cnv2.5_4.6
