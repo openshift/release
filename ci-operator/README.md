@@ -55,7 +55,8 @@ End-to-end tests
 
 > :warning: This section describes the legacy approach to end-to-end tests.
 > Whenever possible, the current *"multi-stage"* tests should be used instead.
-> You can find the documentation for multi-stage tests [here](https://steps.ci.openshift.org/help).
+> You can find the documentation for multi-stage tests
+> [here](https://docs.ci.openshift.org/docs/architecture/step-registry/).
 
 This section describes how to configure end-to-end tests using ci-operator.  In
 this context, "end-to-end" means the functionality of the application is being
