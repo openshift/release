@@ -153,8 +153,18 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-console-login-cluster-profile
         - --target=e2e-console-login
+        - --template=/usr/local/e2e-console-login
         command:
         - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: gcp
+        - name: JOB_NAME_SAFE
+          value: e2e-console-login
+        - name: TEST_COMMAND
+          value: ./test-prow-e2e.sh login
+        - name: TEST_IMAGESTREAM_TAG
+          value: stable:console-tests
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -167,6 +177,9 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/e2e-console-login-cluster-profile
           name: cluster-profile
+        - mountPath: /usr/local/e2e-console-login
+          name: job-definition
+          subPath: cluster-launch-installer-custom-test-image.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -188,6 +201,9 @@ presubmits:
               name: cluster-secrets-gcp
           - configMap:
               name: cluster-profile-gcp
+      - configMap:
+          name: prow-job-cluster-launch-installer-custom-test-image
+        name: job-definition
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
