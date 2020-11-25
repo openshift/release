@@ -35,6 +35,26 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-aws
+- as: e2e-upgrade-functests
+  steps:
+    cluster_profile: aws
+    test:
+    - as: e2e-upgrade-functests
+      cli: latest
+      commands: |
+        ./hack/deploy-kubevirt # Should deploy Kubevirt and CDI and wait for their CRs to report 'Available'
+        ./hack/deploy-kubevirt-ssp-operator # Should deploy kubevirt-ssp-operator (https://github.com/kubevirt/kubevirt-ssp-operator) and wait for its 4 CRs to report 'Available'
+        export component=ssp-operator-container
+        export IMG=$(echo $IMAGE_FORMAT | envsubst)
+        export GOFLAGS=
+        export NO_CLEANUP_AFTER_TESTS=true
+        make deploy functest
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: kubevirt
