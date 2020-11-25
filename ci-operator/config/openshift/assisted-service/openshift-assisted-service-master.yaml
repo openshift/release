@@ -20,9 +20,59 @@ images:
       as:
       - registry.svc.ci.openshift.org/openshift/release:golang-1.14
   to: assisted-service
+- dockerfile_path: Dockerfile
+  from: src-dockerfile
+  inputs:
+    openshift_release_golang-1.14:
+      as:
+      - registry.svc.ci.openshift.org/openshift/release:golang-1.14
+    src-dockerfile:
+      paths:
+      - destination_dir: .
+        source_path: /opt/Dockerfile
+    ubi8:
+      as:
+      - registry.access.redhat.com/ubi8/ubi-minimal
+  to: assisted-iso-create
 promotion:
   name: "4.7"
   namespace: ocp
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      INSTALL_PKGS="which tar wget hostname sysvinit-tools util-linux socat tree findutils lsof bind-utils shadow-utils"
+      cat <<DOCKERFILE > /opt/Dockerfile
+      FROM quay.io/coreos/coreos-installer:v0.7.0 AS installer-image
+
+      # Build binaries
+      FROM registry.svc.ci.openshift.org/openshift/release:golang-1.14 as builder
+      COPY . .
+      RUN CGO_ENABLED=0 GOFLAGS="" GO111MODULE=on go build -o /build/assisted-iso-create assisted-iso-create/main.go
+
+      FROM registry.access.redhat.com/ubi8/ubi-minimal
+
+      ARG WORK_DIR=/data
+      ARG OS_IMAGE=https://releases-art-rhcos.svc.ci.openshift.org/art/storage/releases/rhcos-4.6/46.82.202009222340-0/x86_64/rhcos-46.82.202009222340-0-live.x86_64.iso
+      ENV COREOS_IMAGE=$WORK_DIR/livecd.iso
+
+      ENV WORK_DIR=$WORK_DIR
+      ENV BASE_OS_IMAGE=$OS_IMAGE
+
+      RUN mkdir $WORK_DIR
+      RUN chmod 775 $WORK_DIR
+
+      RUN curl -L -k  --fail ${BASE_OS_IMAGE} -o $WORK_DIR/livecd.iso
+      RUN chmod 644 $WORK_DIR/livecd.iso
+
+      COPY --from=installer-image /usr/sbin/coreos-installer $WORK_DIR
+
+      COPY --from=builder /build/assisted-iso-create $WORK_DIR
+
+      ENV COMMMAND_LINE=$WORK_DIR/assisted-iso-create
+      ENTRYPOINT exec $COMMMAND_LINE
+      DOCKERFILE
+    from: src
+    to: src-dockerfile
 resources:
   '*':
     requests:
