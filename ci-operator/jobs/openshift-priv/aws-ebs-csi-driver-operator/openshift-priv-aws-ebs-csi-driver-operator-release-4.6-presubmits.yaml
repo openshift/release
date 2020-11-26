@@ -5,7 +5,7 @@ presubmits:
     branches:
     - release-4.6
     cluster: build02
-    context: ci/prow/e2e-operator
+    context: ci/prow/e2e-aws-csi
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -13,9 +13,9 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-aws-ebs-csi-driver-operator-release-4.6-e2e-operator
+    name: pull-ci-openshift-priv-aws-ebs-csi-driver-operator-release-4.6-e2e-aws-csi
     path_alias: github.com/openshift/aws-ebs-csi-driver-operator
-    rerun_command: /test e2e-operator
+    rerun_command: /test e2e-aws-csi
     spec:
       containers:
       - args:
@@ -24,21 +24,10 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/usr/local/e2e-operator-cluster-profile
-        - --target=e2e-operator
-        - --template=/usr/local/e2e-operator
+        - --secret-dir=/usr/local/e2e-aws-csi-cluster-profile
+        - --target=e2e-aws-csi
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: e2e-operator
-        - name: TEST_COMMAND
-          value: |
-            make test-e2e
-        - name: TEST_IMAGESTREAM_TAG
-          value: stable:aws-ebs-csi-driver-operator-test
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -49,14 +38,11 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/e2e-operator-cluster-profile
+        - mountPath: /usr/local/e2e-aws-csi-cluster-profile
           name: cluster-profile
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
-        - mountPath: /usr/local/e2e-operator
-          name: job-definition
-          subPath: cluster-launch-installer-custom-test-image.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -79,16 +65,13 @@ presubmits:
       - name: github-credentials-openshift-ci-robot-private-git-cloner
         secret:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
-      - configMap:
-          name: prow-job-cluster-launch-installer-custom-test-image
-        name: job-definition
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-operator,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-csi,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
