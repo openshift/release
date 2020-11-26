@@ -47,15 +47,29 @@ tests:
   container:
     from: src
 - as: cluster-logging-operator-e2e
-  commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=/tmp/artifacts/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts make test-e2e-olm
-  openshift_installer_custom_test_image:
+  steps:
     cluster_profile: aws
-    from: stable:cluster-logging-operator-e2e
+    test:
+    - as: test
+      cli: latest
+      commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=/tmp/artifacts/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts make test-e2e-olm
+      from: stable:cluster-logging-operator-e2e
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: elasticsearch-operator-e2e
-  commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=/tmp/artifacts/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts make test-e2e-olm
-  openshift_installer_custom_test_image:
+  steps:
     cluster_profile: aws
-    from: stable:elasticsearch-operator-src
+    test:
+    - as: test
+      cli: latest
+      commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=/tmp/artifacts/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts make test-e2e-olm
+      from: stable:elasticsearch-operator-src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: release-4.8
   org: openshift-priv

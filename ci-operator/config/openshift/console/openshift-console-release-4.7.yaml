@@ -74,16 +74,23 @@ tests:
     workflow: ipi-gcp
 - artifact_dir: /tmp/artifacts
   as: kubevirt-plugin
-  commands: |2
-
-    # Deploy Kubevirt
-    source ./frontend/packages/kubevirt-plugin/integration-tests/deploy-kubevirt-gating.sh
-
-    # Run kubevirt-plugin gating suite
-    ./test-prow-e2e.sh kubevirt-gating
-  openshift_installer_custom_test_image:
+  steps:
     cluster_profile: azure4
-    from: pipeline:src
+    test:
+    - as: test
+      cli: latest
+      commands: |2
+
+        # Deploy Kubevirt
+        source ./frontend/packages/kubevirt-plugin/integration-tests/deploy-kubevirt-gating.sh
+
+        # Run kubevirt-plugin gating suite
+        ./test-prow-e2e.sh kubevirt-gating
+      from: pipeline:src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-azure
 zz_generated_metadata:
   branch: release-4.7
   org: openshift
