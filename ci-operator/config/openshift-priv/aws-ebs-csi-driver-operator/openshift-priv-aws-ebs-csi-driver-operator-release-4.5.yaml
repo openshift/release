@@ -51,11 +51,18 @@ tests:
   container:
     from: src
 - as: e2e-operator
-  commands: |
-    make test-e2e
-  openshift_installer_custom_test_image:
+  steps:
     cluster_profile: aws
-    from: stable:aws-ebs-csi-driver-operator-test
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e
+      from: stable:aws-ebs-csi-driver-operator-test
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: release-4.5
   org: openshift-priv

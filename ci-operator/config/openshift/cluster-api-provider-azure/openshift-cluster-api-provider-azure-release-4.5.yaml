@@ -61,10 +61,17 @@ tests:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
 - as: e2e-azure-operator
-  commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e
-  openshift_installer_custom_test_image:
+  steps:
     cluster_profile: azure4
-    from: stable:cluster-api-actuator-pkg
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e
+      from: stable:cluster-api-actuator-pkg
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-azure
 - as: git-history
   commands: ./hack/verify_history.sh
   container:
