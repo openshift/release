@@ -51,11 +51,26 @@ tests:
   container:
     from: src
 - as: e2e-operator
-  commands: |
-    make test-e2e
-  openshift_installer_custom_test_image:
+  steps:
     cluster_profile: aws
-    from: stable:aws-ebs-csi-driver-operator-test
+    env:
+      TEST_CSI_DRIVER_MANIFEST: manifest-aws-ebs.yaml
+      TEST_SUITE: openshift/csi
+    test:
+    - as: operator-install
+      cli: latest
+      commands: |
+        # Install the operator
+        hack/start.sh
+        # Copy the manifest for the next step
+        cp -v test/e2e/manifest.yaml $SHARED_DIR/$TEST_CSI_DRIVER_MANIFEST
+        cp -v test/e2e/storageclass.yaml $SHARED_DIR/
+      from: stable:aws-ebs-csi-driver-operator-test
+      resources:
+        requests:
+          cpu: 100m
+    - ref: openshift-e2e-test
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: release-4.5
   org: openshift-priv
