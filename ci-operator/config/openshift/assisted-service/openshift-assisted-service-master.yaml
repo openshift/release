@@ -4,7 +4,7 @@ base_images:
     namespace: openshift
     tag: golang-1.14
   ubi8:
-    name: ubi # Should we use ubi-minimal ?
+    name: ubi
     namespace: ocp
     tag: "8"
 build_root:
@@ -20,9 +20,71 @@ images:
       as:
       - registry.svc.ci.openshift.org/openshift/release:golang-1.14
   to: assisted-service
+- dockerfile_path: Dockerfile
+  from: src-dockerfile
+  inputs:
+    openshift_release_golang-1.14:
+      as:
+      - registry.svc.ci.openshift.org/openshift/release:golang-1.14
+    src-dockerfile:
+      paths:
+      - destination_dir: .
+        source_path: /opt/Dockerfile
+      - destination_dir: .
+        source_path: /opt/livecd.iso
+    ubi8:
+      as:
+      - registry.access.redhat.com/ubi8/ubi-minimal
+  to: assisted-iso-create
 promotion:
   name: "4.7"
   namespace: ocp
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      RHCOS_VERSION=46.82.202009222340-0
+      BASE_OS_IMAGE=https://releases-art-rhcos.svc.ci.openshift.org/art/storage/releases/rhcos-4.6/${RHCOS_VERSION}/x86_64/rhcos-${RHCOS_VERSION}-live.x86_64.iso
+
+      curl -L -k  --fail ${BASE_OS_IMAGE} -o /opt/livecd.iso
+
+      # TODO: move to in-repo dockerfile
+      WORK_DIR=/data
+      COMMMAND_LINE=${WORK_DIR}/assisted-iso-create
+
+      cat <<DOCKERFILE > /opt/Dockerfile
+      FROM quay.io/coreos/coreos-installer:v0.7.0 AS installer-image
+
+      # Build binaries
+      FROM registry.svc.ci.openshift.org/openshift/release:golang-1.14 as builder
+      COPY . .
+      RUN CGO_ENABLED=0 GOFLAGS="" GO111MODULE=on go build -o /build/assisted-iso-create assisted-iso-create/main.go
+
+      FROM registry.access.redhat.com/ubi8/ubi-minimal
+
+      # TODO: uncomment for in-repo dockerfile
+      # ENV WORK_DIR=/data
+
+      RUN mkdir ${WORK_DIR}
+      RUN chmod 775 ${WORK_DIR}
+
+      COPY ./livecd.iso ${WORK_DIR}/livecd.iso
+      RUN chmod 644 ${WORK_DIR}/livecd.iso
+
+      COPY --from=installer-image /usr/sbin/coreos-installer ${WORK_DIR}
+
+      COPY --from=builder /build/assisted-iso-create ${WORK_DIR}
+
+      # TODO: uncomment for in-repo dockerfile
+      # ENV COMMMAND_LINE=$WORK_DIR/assisted-iso-create
+      ENTRYPOINT exec ${COMMMAND_LINE}
+      DOCKERFILE
+    from: src
+    to: src-dockerfile
+releases:
+  mycli:
+    release:
+      channel: stable
+      version: "4.6"
 resources:
   '*':
     requests:
@@ -31,6 +93,33 @@ resources:
 tag_specification:
   name: "4.7"
   namespace: ocp
+tests:
+- as: sanity-assisted-service
+  commands: echo "hello assisted-service"
+  container:
+    from: assisted-service
+- as: sanity-src
+  commands: echo "hello src"
+  container:
+    from: src
+- as: assisted-e2e
+  steps:
+    cluster_profile: aws
+    test:
+    - as: e2e-test
+      commands: |
+        # TODO: Also on multistage test the shared directory is currently
+        # read-only, so some oc commands might fail to read the kubeconfig file.
+        ASSISTED_SHARED_DIR=/tmp/shared_dir
+        mkdir -p $ASSISTED_SHARED_DIR
+        cp -f ${SHARED_DIR}/* ${ASSISTED_SHARED_DIR}
+        export KUBECONFIG=${ASSISTED_SHARED_DIR}/kubeconfig
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: assisted-e2e
 zz_generated_metadata:
   branch: master
   org: openshift
