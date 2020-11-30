@@ -38,7 +38,6 @@ tests:
     - chain: ipi-azure-pre
     - as: kata-containers-e2e-pre
       commands: |
-        sleep 7200
         KATA_WORKDIR=/go/src/github.com/kata-containers/tests
         LOCAL_SHARED_DIR=${KATA_WORKDIR}/shared_dir
         mkdir -p $LOCAL_SHARED_DIR
@@ -61,7 +60,10 @@ tests:
         oc version || die "Test cluster is unreachable"
         info "Install and configure kata into the test cluster"
         .ci/openshift-ci/cluster/install_kata.sh || die "Failed to install kata-containers"
-        export tests_repo="$KATA_WORKDIR"
+        # It seems this script is called with nounset=on and sourcing lib.sh
+        # will fail. So let's turn nounset=off
+        set +o nounset
+        export tests_dir="$KATA_WORKDIR"
         source integration/openshift/lib.sh
         configure_cluster || die "Failed to configure the cluster"
         info "Run a smoke test to check the installation"
