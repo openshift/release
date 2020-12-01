@@ -26,7 +26,7 @@ cat "${installer_artifact_dir}"/manifests/cluster-infrastructure-02-config.yml
 
 export KUBECONFIG="${installer_artifact_dir}"/auth/kubeconfig
 
-//TODO: MOVE THIS TO THE FUNCTION
+#TODO: MOVE THIS TO THE FUNCTION
 rchos_image=$(cat "${installer_artifact_dir}"/.openshift_install_state.json | /tmp/bin/jq '."*rhcos.Image"')
 
 #notify oVirt infrastucture that ocp installation started

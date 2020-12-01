@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-//TODO: replace the resource_name
+#TODO: replace the resource_name
 lease_path="${CLUSTER_PROFILE_DIR}/${resource_name}.json"
 
 function extract_leases_info() {
