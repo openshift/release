@@ -103,6 +103,20 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: openshift-e2e-gcp
+- as: e2e-bastion-periodic
+  cluster: build01
+  cron: 0 0 * * *
+  steps:
+    test:
+    - as: e2e-bastion-periodic
+      commands: KUBECONFIG=$SHARED_DIR/kubeconfig make setup-test-cluster && make
+        feature-deploy && make feature-wait && make functests
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: telco-bastion
 zz_generated_metadata:
   branch: master
   org: openshift-kni
