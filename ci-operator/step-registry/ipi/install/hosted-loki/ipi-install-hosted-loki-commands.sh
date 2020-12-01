@@ -331,33 +331,6 @@ data:
       http_listen_port: 3101
     target_config:
       sync_period: 10s
-  sso.py: |
-    from oauthlib.oauth2 import BackendApplicationClient
-    from requests_oauthlib import OAuth2Session
-    from time import sleep
-    from datetime import datetime
-    import os
-
-    creds = {
-        'client_id': os.environ["CLIENT_ID"].strip(),
-        'client_secret': os.environ["CLIENT_SECRET"].strip(),
-        'token_url': "https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token"
-    }
-    timeout = 600
-
-    client = BackendApplicationClient(**creds)
-    oauth = OAuth2Session(client=client)
-    token = None
-    while True:
-        if not token:
-            token = oauth.fetch_token(**creds)
-        else:
-            token = oauth.refresh_token(refresh_token=token['refresh_token'], **creds)
-        print("Refreshed token at %s" % datetime.now().strftime("%H:%M:%S"))
-        with open("/tmp/shared/bearer_token", "w") as f:
-            f.write(token["access_token"])
-
-        sleep(timeout)
 EOF
 cat >> "${SHARED_DIR}/manifest_creds.yml" << EOF
 apiVersion: v1
@@ -392,10 +365,12 @@ spec:
         app.kubernetes.io/version: ${LOKI_VERSION}
     spec:
       containers:
-      - command:
-        - sh
-        - -c
-        - pip install oauthlib requests_oauthlib && python /etc/promtail/sso.py
+      - args:
+        - --oidc.client-id=\$(CLIENT_ID)
+        - --oidc.client-secret=\$(CLIENT_SECRET)
+        - --oidc.issuer-url=https://sso.redhat.com/auth/realms/redhat-external
+        - --margin=10m
+        - --file=/tmp/shared/bearer_token
         name: bearer-token
         env:
           - name: CLIENT_ID
@@ -411,9 +386,7 @@ spec:
         volumeMounts:
         - mountPath: "/tmp/shared"
           name: shared-data
-        - mountPath: "/etc/promtail"
-          name: config
-        image: registry.access.redhat.com/ubi8/python-36
+        image: quay.io/observatorium/token-refresher
       - command:
         - sh
         - -c
