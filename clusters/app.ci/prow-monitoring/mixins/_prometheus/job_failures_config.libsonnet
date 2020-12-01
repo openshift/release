@@ -28,8 +28,8 @@
       'release-openshift-ocp-installer-elasticsearch-operator-e2e-4.5': {
         receiver: 'openshift-logging',
       },
-      'periodic-ci-redhat-developer-service-binding-operator-master-dev-release': {
-        receiver: 'openshift-dev-services',
+      'periodic-ci-redhat-developer-service-binding-operator-master-4.6-validate-master-build': {
+        receiver: 'openshift-app-services',
       },
       'periodic-ci-operator-framework-operator-lifecycle-managment-master-rhoperator-metric-e2e-aws-olm-master-daily': {
         receiver: 'OLM-rh-operators',
