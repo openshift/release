@@ -88,19 +88,19 @@ objects:
       - |
         #!/bin/bash
         set -euo pipefail
-        
-        # fetch the oc binary so we can talk to the cluster.  
+
+        # fetch the oc binary so we can talk to the cluster.
         export PATH=$PATH:/tmp/shared/bin
         mkdir /tmp/shared/bin
         curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.5/linux/oc.tar.gz | tar xvzf - -C /tmp/shared/bin/ oc
         chmod ug+x /tmp/shared/bin/oc
 
-        # setup the persisted metadata.json and kubeconfig files that 
+        # setup the persisted metadata.json and kubeconfig files that
         # correspond to the endurance cluster so we can interact with it.
         # (endurance cluster credentials injected by ci-operator)
         mkdir -p /tmp/shared/auth
         mkdir -p ${ARTIFACT_DIR}/installer
-        
+
         # files may not exist if cluster is brand new
         set +e
         cp /tmp/cluster-credentials/metadata.json ${ARTIFACT_DIR}/installer
@@ -118,8 +118,8 @@ objects:
         fi
 
         # check if all the operators are reporting available. If anything
-        # goes wrong or any operator is not reporting available, we will 
-        # gather artifacts, tear down the endurance cluster, install a new one, 
+        # goes wrong or any operator is not reporting available, we will
+        # gather artifacts, tear down the endurance cluster, install a new one,
         # and fail this job.
         echo "Fetching cluster operator status...."
         oc get clusteroperators > /tmp/operators.out
@@ -138,8 +138,8 @@ objects:
           echo "Some operators are not available, collecting must-gather from cluster"
           touch /tmp/shared/mustgather
           exit 0
-        fi          
-       
+        fi
+
         echo "Fetching node status...."
         oc get nodes > /tmp/nodes.out
         rc=$?
@@ -157,7 +157,7 @@ objects:
           echo "Some nodes are not available, collecting must-gather from cluster"
           touch /tmp/shared/mustgather
           exit 0
-        fi          
+        fi
         set -e
 
         echo "Cluster appears healthy"
@@ -284,8 +284,8 @@ objects:
 
           while IFS= read -r i; do
             file="$( echo "$i" | cut -d ' ' -f 3 | tr -s ' ' '_' )"
-            queue ${ARTIFACT_DIR}/metrics/${file}-heap oc --insecure-skip-tls-verify exec $i -- /bin/bash -c 'oc --insecure-skip-tls-verify get --raw /debug/pprof/heap --server "https://$( hostname ):8443" --config /etc/origin/master/admin.kubeconfig'
-            queue ${ARTIFACT_DIR}/metrics/${file}-controllers-heap oc --insecure-skip-tls-verify exec $i -- /bin/bash -c 'oc --insecure-skip-tls-verify get --raw /debug/pprof/heap --server "https://$( hostname ):8444" --config /etc/origin/master/admin.kubeconfig'
+            queue ${ARTIFACT_DIR}/metrics/${file}-heap oc --insecure-skip-tls-verify exec $i -- /bin/bash -c 'oc --insecure-skip-tls-verify get --raw /debug/pprof/heap --server "https://$( hostname ):8443" --kubeconfig /etc/origin/master/admin.kubeconfig'
+            queue ${ARTIFACT_DIR}/metrics/${file}-controllers-heap oc --insecure-skip-tls-verify exec $i -- /bin/bash -c 'oc --insecure-skip-tls-verify get --raw /debug/pprof/heap --server "https://$( hostname ):8444" --kubeconfig /etc/origin/master/admin.kubeconfig'
           done < /tmp/pods-api
 
           while IFS= read -r i; do
@@ -470,17 +470,17 @@ objects:
         echo "##################### start cluster metadata.json ##########################"
         cat ${ARTIFACT_DIR}/installer/metadata.json
         echo
-        echo "##################### end cluster metadata.json ############################"       
+        echo "##################### end cluster metadata.json ############################"
 
         echo "Confirming cluster is up"
-        oc --config ${ARTIFACT_DIR}/installer/auth/kubeconfig get clusteroperators
+        oc --kubeconfig ${ARTIFACT_DIR}/installer/auth/kubeconfig get clusteroperators
         rc=$?
         if [ ! $rc -eq 0 ]; then
           echo "Failed to communicate with newly installed cluster"
           exit 1
         fi
         echo "Successfully pinged new cluster"
-        
+
         # the ci-operator pod will copy this secret into the ci namespace to persist
         # it for future jobs to use when accessing the long lived cluster.
         oc create secret generic endurance-cluster-credentials-${CLUSTER_TYPE}-new -n ${NAMESPACE} --from-file=kubeconfig=${ARTIFACT_DIR}/installer/auth/kubeconfig --from-file=metadata.json=${ARTIFACT_DIR}/installer/metadata.json --from-file=kubeadmin=${ARTIFACT_DIR}/installer/auth/kubeadmin-password

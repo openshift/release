@@ -144,7 +144,7 @@ objects:
 
         function run-upgrade-tests() {
           current=$(oc get clusterversion/version -o jsonpath='{.status.history[0].version}')
-          new=$(oc adm release info -a /tmp/ci-credentials/pull-secret ${RELEASE_IMAGE_LATEST} | grep Version: | awk '{print $2}')          
+          new=$(oc adm release info -a /tmp/ci-credentials/pull-secret ${RELEASE_IMAGE_LATEST} | grep Version: | awk '{print $2}')
           if [ $new == $current ]; then
             echo "Skipping upgrade test because cluster is already at the latest version: $current (current) == $new (new)"
             return 0
@@ -293,8 +293,8 @@ objects:
 
           while IFS= read -r i; do
             file="$( echo "$i" | cut -d ' ' -f 3 | tr -s ' ' '_' )"
-            queue ${ARTIFACT_DIR}/metrics/${file}-heap oc --insecure-skip-tls-verify exec $i -- /bin/bash -c 'oc --insecure-skip-tls-verify get --raw /debug/pprof/heap --server "https://$( hostname ):8443" --config /etc/origin/master/admin.kubeconfig'
-            queue ${ARTIFACT_DIR}/metrics/${file}-controllers-heap oc --insecure-skip-tls-verify exec $i -- /bin/bash -c 'oc --insecure-skip-tls-verify get --raw /debug/pprof/heap --server "https://$( hostname ):8444" --config /etc/origin/master/admin.kubeconfig'
+            queue ${ARTIFACT_DIR}/metrics/${file}-heap oc --insecure-skip-tls-verify exec $i -- /bin/bash -c 'oc --insecure-skip-tls-verify get --raw /debug/pprof/heap --server "https://$( hostname ):8443" --kubeconfig /etc/origin/master/admin.kubeconfig'
+            queue ${ARTIFACT_DIR}/metrics/${file}-controllers-heap oc --insecure-skip-tls-verify exec $i -- /bin/bash -c 'oc --insecure-skip-tls-verify get --raw /debug/pprof/heap --server "https://$( hostname ):8444" --kubeconfig /etc/origin/master/admin.kubeconfig'
           done < /tmp/pods-api
 
           while IFS= read -r i; do

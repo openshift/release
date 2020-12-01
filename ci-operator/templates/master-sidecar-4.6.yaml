@@ -1366,7 +1366,7 @@ objects:
           # flatten the kubeconfig files to make them self contained
           username=$(id -u)
           /usr/bin/env bash -e <<EOF
-          oc --config="${dest_dir}/${client_id}.kubeconfig" config view --minify --flatten > "/tmp/${client_id}.kubeconfig"
+          oc --kubeconfig="${dest_dir}/${client_id}.kubeconfig" config view --minify --flatten > "/tmp/${client_id}.kubeconfig"
           mv -f "/tmp/${client_id}.kubeconfig" "${dest_dir}/${client_id}.kubeconfig"
           chown ${username} "${dest_dir}/${client_id}.kubeconfig"
       EOF
@@ -1839,7 +1839,7 @@ objects:
             public_address=$( ifconfig | sed -En 's/127.0.0.1//;s/.*inet (addr:)?(([0-9]*\.){3}[0-9]*).*/\2/p' | head -1 )
           fi
           for filename in ${base}/apiservice-*.yaml; do
-              sed "s/NON_LOOPBACK_HOST/${public_address}/g" ${filename} | oc --config=${LOCALUP_CONFIG}/kube-apiserver/admin.kubeconfig apply -f -
+              sed "s/NON_LOOPBACK_HOST/${public_address}/g" ${filename} | oc --kubeconfig=${LOCALUP_CONFIG}/kube-apiserver/admin.kubeconfig apply -f -
           done
       }
 
@@ -1870,11 +1870,11 @@ objects:
           tstamp=$(date +%s)
           set +e
           while (( $(date +%s) - $tstamp < 160 )); do
-              oc get --config="${LOCALUP_CONFIG}/kube-apiserver/admin.kubeconfig" --raw /apis/security.openshift.io/v1/securitycontextconstraints 2>/dev/null 1>&2 && break
+              oc get --kubeconfig="${LOCALUP_CONFIG}/kube-apiserver/admin.kubeconfig" --raw /apis/security.openshift.io/v1/securitycontextconstraints 2>/dev/null 1>&2 && break
               sleep 0.25
           done
           set -e
-          oc get --config="${LOCALUP_CONFIG}/kube-apiserver/admin.kubeconfig" --raw /apis/security.openshift.io/v1/securitycontextconstraints 2>/dev/null 1>&2 || bash
+          oc get --kubeconfig="${LOCALUP_CONFIG}/kube-apiserver/admin.kubeconfig" --raw /apis/security.openshift.io/v1/securitycontextconstraints 2>/dev/null 1>&2 || bash
       }
 
       function local::master::start_openshiftapiserver() {
