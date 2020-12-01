@@ -80,6 +80,11 @@ raw_steps:
       DOCKERFILE
     from: src
     to: src-dockerfile
+releases:
+  mycli:
+    release:
+      channel: stable
+      version: "4.6"
 resources:
   '*':
     requests:
@@ -97,6 +102,22 @@ tests:
   commands: echo "hello src"
   container:
     from: src
+- as: sanity-oc
+  steps:
+    cluster_profile: aws
+    test:
+    - as: oc-check
+      cli: mycli
+      commands: |
+        echo "test"
+        oc whoami
+        cat /etc/os-release
+        oc get pods -o wide
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 zz_generated_metadata:
   branch: master
   org: openshift
