@@ -1,0 +1,49 @@
+base_images:
+  cli:
+    name: "4.7"
+    namespace: ocp
+    tag: cli
+  cli-jq:
+    name: cli-jq
+    namespace: ocp
+    tag: latest
+build_root:
+  project_image:
+    dockerfile_path: .ci/openshift-ci/Dockerfile
+operator:
+  bundles:
+  - dockerfile_path: deploy/olm-catalog/eclipse-che-preview-openshift/bundle.Dockerfile
+  - context_dir: deploy/olm-catalog/eclipse-che-preview-openshift/
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.7"
+  namespace: ocp
+tests:
+- as: che-operator-update
+  steps:
+    cluster_profile: aws
+    env:
+      OO_CHANNEL: nightly
+      OO_INSTALL_NAMESPACE: che
+      OO_PACKAGE: eclipse-che-preview-openshift
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: test
+      cli: latest
+      commands: .ci/oci-nightly-olm.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: catalog
+  org: eclipse
+  repo: che-operator
+  variant: v7
