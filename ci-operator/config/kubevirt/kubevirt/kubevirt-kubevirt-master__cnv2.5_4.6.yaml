@@ -29,22 +29,21 @@ tests:
     - as: test
       cli: latest
       commands: |
-        set -ex
+        set -e
 
         # disable default catalog source
         oc patch OperatorHub cluster --type json -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
 
         authfile=/tmp/authfile
+        trap 'rm -rf /tmp/authfile*' EXIT SIGINT SIGTERM
+
         # get authfile from cluster
         oc get secret/pull-secret -n openshift-config -o json | jq -r '.data.".dockerconfigjson"' | base64 -d > "$authfile"
 
-        # login into brew image registry
-        docker login --username "$BREW_IMAGE_REGISTRY_USERNAME" --password-stdin brew.registry.redhat.io < $BREW_IMAGE_REGISTRY_TOKEN_PATH
+        # inject credentials for brew image registry into authfile
+        jq -c '.auths + '"$(echo '{"brew.registry.redhat.io": { "auth": "'"$( echo "$BREW_IMAGE_REGISTRY_USERNAME:$(< $BREW_IMAGE_REGISTRY_TOKEN_PATH)" | tr -d '\n' | base64 -i -w 0 )"'" } }')"' | {"auths": .}' "$authfile" > "${authfile}.new"
 
-        # update authfile with credentials from docker config
-        jq -c '.auths + '"$(jq '{"brew.registry.redhat.io": .auths."brew.registry.redhat.io" }' $HOME/.docker/config.json)"' | {"auths": .}' "$authfile" > "${authfile}.new"
-
-        # update cluster secret
+        # update cluster pull secret from authfile
         oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson="${authfile}.new"
 
         # install imageContentSourcePolicy
@@ -66,8 +65,17 @@ tests:
             source: registry-proxy.engineering.redhat.com
         EOF
 
+        # wait for update to start
+        sleep 30
+
         # wait for machineconfigpool to get updated
-        oc wait mcp --all --for condition=updated --timeout=30m
+        return_code=0
+        counter=3
+        for i in $(seq 1 $counter); do
+            set +e
+            oc wait mcp --all --for condition=updated --timeout=30m && break
+            set -e
+        done
 
         # apply brew catalog source
         oc create -f - << EOF
@@ -117,9 +125,10 @@ tests:
           startingCSV: kubevirt-hyperconverged-operator.v2.5.1
         EOF
 
+        # wait for operator pods to be ready
         oc wait pods -n openshift-cnv --all --for condition=Ready --timeout=10m
 
-        # deploy operator
+        # deploy operator custom resource
         oc create -f - << EOF
         apiVersion: hco.kubevirt.io/v1beta1
         kind: HyperConverged
@@ -130,6 +139,9 @@ tests:
           BareMetalPlatform: true
         EOF
 
+        # wait for hco to be available
+        oc wait -n openshift-cnv HyperConverged kubevirt-hyperconverged --for condition=Available --timeout=20m
+
         export BIN_DIR="$(pwd)/_out" && mkdir -p "${BIN_DIR}"
 
         release="v0.34.2"
@@ -138,8 +150,6 @@ tests:
         chmod +x "$TESTS_BINARY"
 
         curl -L "https://raw.githubusercontent.com/kubevirt/hyperconverged-cluster-operator/ab76935d6cc918a17585563fd3f646717e7d2c4c/deploy/nightly-bundle/kubevirt-testing-infra.yaml" | oc create -n openshift-cnv -f -
-
-        oc wait -n openshift-cnv HyperConverged kubevirt-hyperconverged --for condition=Available --timeout=20m
 
         cat << EOF > /tmp/kv-testconfig.json
         {
