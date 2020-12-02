@@ -11,7 +11,7 @@ CONFIG = {
         'default': 30,
     },
     'gcp-quota-slice': {
-        'default': 120,
+        'default': 80,
     },
     'libvirt-s390x-quota-slice': {},
     'libvirt-ppc64le-quota-slice': {},
