@@ -67,10 +67,9 @@ tests:
         EOF
 
         # wait for machineconfigpool to get updated
-        oc wait mcp/master --for condition=updated --timeout=600s
-        oc wait mcp/worker --for condition=updated --timeout=600s
+        oc wait mcp --all --for condition=updated --timeout=30m
 
-        # install index image
+        # apply brew catalog source
         oc create -f - << EOF
         apiVersion: operators.coreos.com/v1alpha1
         kind: CatalogSource
@@ -83,6 +82,42 @@ tests:
           displayName: Brew Catalog Source
           publisher: grpc
         EOF
+
+        oc wait pods -n "openshift-marketplace" -l olm.catalogSource="brew-catalog-source" --for condition=Ready --timeout=60s
+
+        oc create ns openshift-cnv
+
+        # create operator group
+        oc create -f - << EOF
+        apiVersion: operators.coreos.com/v1
+        kind: OperatorGroup
+        metadata:
+          name: "openshift-cnv-group"
+          namespace: "openshift-cnv"
+        spec:
+          targetNamespaces:
+          - "openshift-cnv"
+        EOF
+
+        # create subscription
+        oc create -f - << EOF
+        apiVersion: operators.coreos.com/v1alpha1
+        kind: Subscription
+        metadata:
+          name: kubevirt-hyperconverged
+          namespace: openshift-cnv
+          labels:
+            operators.coreos.com/kubevirt-hyperconverged.openshift-cnv: ''
+        spec:
+          channel: stable
+          installPlanApproval: Automatic
+          name: kubevirt-hyperconverged
+          source: brew-catalog-source
+          sourceNamespace: openshift-marketplace
+          startingCSV: kubevirt-hyperconverged-operator.v2.5.1
+        EOF
+
+        oc wait pods -n openshift-cnv --all --for condition=Ready --timeout=10m
 
         # deploy operator
         oc create -f - << EOF
@@ -102,12 +137,9 @@ tests:
         curl -Lo "$TESTS_BINARY" "https://github.com/kubevirt/kubevirt/releases/download/${release}/tests.test"
         chmod +x "$TESTS_BINARY"
 
-        testing_infra_url="https://gcsweb.apps.ovirt.org/gcs/kubevirt-prow/devel/release/kubevirt/kubevirt/${release}/manifests/testing/"
-        for testinfra_file in $(curl -L "${testing_infra_url}" | grep -oE 'https://[^"]*\.yaml'); do
-          curl -L ${testinfra_file} | oc create -n openshift-cnv -f -
-        done
+        curl -L "https://raw.githubusercontent.com/kubevirt/hyperconverged-cluster-operator/ab76935d6cc918a17585563fd3f646717e7d2c4c/deploy/nightly-bundle/kubevirt-testing-infra.yaml" | oc create -n openshift-cnv -f -
 
-        oc wait -n openshift-cnv HyperConverged kubevirt-hyperconverged --for condition=Available --timeout 20m
+        oc wait -n openshift-cnv HyperConverged kubevirt-hyperconverged --for condition=Available --timeout=20m
 
         cat << EOF > /tmp/kv-testconfig.json
         {
