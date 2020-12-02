@@ -31,22 +31,22 @@ tests:
       commands: |
         set -e
 
-        # disable default catalog source
+        echo "disabling default catalog source"
         oc patch OperatorHub cluster --type json -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
 
         authfile=/tmp/authfile
         trap 'rm -rf /tmp/authfile*' EXIT SIGINT SIGTERM
 
-        # get authfile from cluster
+        echo "getting authfile from cluster"
         oc get secret/pull-secret -n openshift-config -o json | jq -r '.data.".dockerconfigjson"' | base64 -d > "$authfile"
 
-        # inject credentials for brew image registry into authfile
+        echo "injecting credentials for brew image registry into authfile"
         jq -c '.auths + '"$(echo '{"brew.registry.redhat.io": { "auth": "'"$( echo "$BREW_IMAGE_REGISTRY_USERNAME:$(< $BREW_IMAGE_REGISTRY_TOKEN_PATH)" | tr -d '\n' | base64 -i -w 0 )"'" } }')"' | {"auths": .}' "$authfile" > "${authfile}.new"
 
-        # update cluster pull secret from authfile
+        echo "updating cluster pull secret from authfile"
         oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson="${authfile}.new"
 
-        # install imageContentSourcePolicy
+        echo "creating imageContentSourcePolicy"
         oc create -f - << EOF
         apiVersion: operator.openshift.io/v1alpha1
         kind: ImageContentSourcePolicy
@@ -65,19 +65,20 @@ tests:
             source: registry-proxy.engineering.redhat.com
         EOF
 
-        # wait for update to start
-        sleep 30
+        echo "waiting for update to start"
+        oc wait mcp --all --for condition=updating --timeout=5m
 
-        # wait for machineconfigpool to get updated
+        echo "waiting for machineconfigpool to get updated"
         return_code=0
         counter=3
+        set +e
         for i in $(seq 1 $counter); do
-            set +e
             oc wait mcp --all --for condition=updated --timeout=30m && break
-            set -e
+            sleep 5
         done
+        set -e
 
-        # apply brew catalog source
+        echo "creating brew catalog source"
         oc create -f - << EOF
         apiVersion: operators.coreos.com/v1alpha1
         kind: CatalogSource
@@ -95,19 +96,7 @@ tests:
 
         oc create ns openshift-cnv
 
-        # create operator group
-        oc create -f - << EOF
-        apiVersion: operators.coreos.com/v1
-        kind: OperatorGroup
-        metadata:
-          name: "openshift-cnv-group"
-          namespace: "openshift-cnv"
-        spec:
-          targetNamespaces:
-          - "openshift-cnv"
-        EOF
-
-        # create subscription
+        echo "creating subscription"
         oc create -f - << EOF
         apiVersion: operators.coreos.com/v1alpha1
         kind: Subscription
@@ -125,10 +114,36 @@ tests:
           startingCSV: kubevirt-hyperconverged-operator.v2.5.1
         EOF
 
-        # wait for operator pods to be ready
-        oc wait pods -n openshift-cnv --all --for condition=Ready --timeout=10m
+        echo "creating operator group"
+        oc create -f - << EOF
+        apiVersion: operators.coreos.com/v1
+        kind: OperatorGroup
+        metadata:
+          name: "openshift-cnv-group"
+          namespace: "openshift-cnv"
+        spec:
+          targetNamespaces:
+          - "openshift-cnv"
+        EOF
 
-        # deploy operator custom resource
+        echo "waiting for operator pods to be created"
+        while [ $( oc get pods -n openshift-cnv --no-headers | wc -l ) -lt 5 ]; do
+            sleep 5
+        done
+
+        echo "waiting for operator pods to be ready"
+        counter=3
+        for i in $(seq 1 $counter); do
+            oc wait pods -n openshift-cnv --all --for condition=Ready --timeout=10m
+            sleep 5
+        done
+
+        echo "waiting for HyperConverged operator crd to be created"
+        while [ $( oc get crd -n openshift-cnv hyperconvergeds.hco.kubevirt.io --no-headers | wc -l ) -eq 0 ]; do
+            sleep 5
+        done
+
+        echo "creating HyperConverged operator custom resource"
         oc create -f - << EOF
         apiVersion: hco.kubevirt.io/v1beta1
         kind: HyperConverged
@@ -139,9 +154,10 @@ tests:
           BareMetalPlatform: true
         EOF
 
-        # wait for hco to be available
+        echo "waiting for HyperConverged operator to be available"
         oc wait -n openshift-cnv HyperConverged kubevirt-hyperconverged --for condition=Available --timeout=20m
 
+        echo "downloading the test binary"
         export BIN_DIR="$(pwd)/_out" && mkdir -p "${BIN_DIR}"
 
         release="v0.34.2"
@@ -161,6 +177,7 @@ tests:
         }
         EOF
 
+        echo "starting tests"
         ${TESTS_BINARY} \
           -installed-namespace="$TARGET_NAMESPACE" \
           -cdi-namespace="$TARGET_NAMESPACE" \
