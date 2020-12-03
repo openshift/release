@@ -457,6 +457,12 @@ objects:
         if has_variant "compact" || has_variant "multisocket"; then
           workers=0
         fi
+
+        masters=3
+        if has_variant "sno"; then
+          masters=1
+        fi
+
         if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
             master_type=null
             if has_variant "multisocket"; then
@@ -508,7 +514,7 @@ objects:
           name: ${CLUSTER_NAME}
         controlPlane:
           name: master
-          replicas: 3
+          replicas: ${masters}
           platform:
             aws:
               type: ${master_type}
@@ -567,7 +573,7 @@ objects:
           name: ${CLUSTER_NAME}
         controlPlane:
           name: master
-          replicas: 3
+          replicas: ${masters}
         compute:
         - name: worker
           replicas: ${workers}
@@ -624,7 +630,7 @@ objects:
           name: ${CLUSTER_NAME}
         controlPlane:
           name: master
-          replicas: 3
+          replicas: ${masters}
           platform:
             gcp:
               type: ${master_type}
@@ -792,6 +798,10 @@ objects:
 
         if has_variant "preserve-bootstrap"; then
           export OPENSHIFT_INSTALL_PRESERVE_BOOTSTRAP=true
+        fi
+
+        if has_variant "sno"; then
+          export OPENSHIFT_INSTALL_EXPERIMENTAL_CLUSTER_PROFILE="single-node-production-edge"
         fi
 
         openshift-install --dir=${ARTIFACT_DIR}/installer/ create manifests &
