@@ -393,6 +393,11 @@ images:
 promotion:
   namespace: ci
   tag: latest
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.6"
 resources:
   '*':
     requests:
@@ -453,6 +458,20 @@ tests:
   commands: make validate-vendor
   container:
     from: src
+- artifact_dir: /tmp/artifacts
+  as: validate-vendor-multi-stage
+  cron: '@daily'
+  steps:
+    cluster_profile: aws
+    test:
+    - as: yada
+      commands: make validate-vendor
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: openshift
