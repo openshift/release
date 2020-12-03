@@ -11,7 +11,7 @@ CONFIG = {
         'default': 30,
     },
     'gcp-quota-slice': {
-        'default': 120,
+        'default': 80,
     },
     'libvirt-s390x-quota-slice': {},
     'libvirt-ppc64le-quota-slice': {},
@@ -29,7 +29,7 @@ CONFIG = {
     'openstack-ppc64le-quota-slice': {},
     'ovirt-quota-slice': {},
     'packet-quota-slice': {
-        'default': 20,
+        'default': 30,
     },
     'vsphere-quota-slice': {
         'default': 10,
