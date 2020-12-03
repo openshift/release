@@ -619,6 +619,503 @@ periodics:
         secretName: ci-pull-credentials
 - agent: kubernetes
   cluster: api.ci
+  cron: 0 4,16 * * *
+  decorate: true
+  labels:
+    dptp.openshift.io/ssh-bastion: "true"
+    job-env: remote-libvirt
+    job-release: "4.7"
+    job-test: e2e
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: release-openshift-origin-installer-e2e-remote-libvirt-s390x-4.7
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --secret-dir=/usr/local/e2e-remote-libvirt-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-remote-libvirt
+      - --template=/usr/local/e2e-remote-libvirt
+      command:
+      - ci-operator
+      env:
+      - name: ARCH
+        value: s390x
+      - name: BASTION_SVC_0_1_IP
+        value: 172.30.60.61
+      - name: BASTION_SVC_0_2_IP
+        value: 172.30.135.156
+      - name: BASTION_SVC_0_3_IP
+        value: 172.30.63.176
+      - name: BASTION_SVC_0_4_IP
+        value: 172.30.62.128
+      - name: BASTION_SVC_1_0_IP
+        value: 172.30.28.119
+      - name: BASTION_SVC_1_1_IP
+        value: 172.30.227.115
+      - name: BASTION_SVC_1_2_IP
+        value: 172.30.210.45
+      - name: BASTION_SVC_1_3_IP
+        value: 172.30.198.47
+      - name: BASTION_SVC_1_4_IP
+        value: 172.30.220.83
+      - name: BASTION_SVC_IP
+        value: 172.30.20.161
+      - name: BRANCH
+        value: "4.7"
+      - name: CLUSTER_TYPE
+        value: libvirt-s390x
+      - name: CONFIG_SPEC
+        value: |
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tag_specification:
+            name: "$(BRANCH)"
+            namespace: ocp
+          tests:
+          - as: e2e-$(CLUSTER_TYPE)-all
+            commands: $(TEST_COMMAND)
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+      - name: JOB_NAME_SAFE
+        value: e2e-remote-libvirt
+      - name: MULTIARCH_RELEASE_IMAGE_LATEST
+        value: registry.svc.ci.openshift.org/ocp-s390x/release-s390x:4.7
+      - name: RELEASE_IMAGE_LATEST
+        value: registry.svc.ci.openshift.org/ocp/release:4.7
+      - name: REMOTE_LIBVIRT_HOSTNAME
+        value: ocponz
+      - name: REMOTE_LIBVIRT_HOSTNAME_1
+        value: ocponz2
+      - name: TEST_COMMAND
+        value: |
+          # these tests are not able to run in CI due to
+          # missing test image dependencies.  They must be
+          # run manually
+          cat > invert_excluded.py <<EOSCRIPT
+          #!/usr/libexec/platform-python
+          import sys
+          all_tests = set()
+          excluded_tests = set()
+          for l in sys.stdin.readlines():
+            all_tests.add(l.strip())
+          with open(sys.argv[1], "r") as f:
+            for l in f.readlines():
+              excluded_tests.add(l.strip())
+          test_suite = all_tests - excluded_tests
+          for t in test_suite:
+            print(t)
+          EOSCRIPT
+          chmod +x invert_excluded.py
+          cat > excluded_tests <<EOEXCLUDE
+            "[sig-instrumentation] Prometheus when installed on the cluster should provide named network metrics [Suite:openshift/conformance/parallel]"
+            "[sig-imageregistry][Feature:Image] oc tag should preserve image reference for external images [Suite:openshift/conformance/parallel]"
+            "[sig-network] Networking Granular Checks: Services should function for client IP based session affinity: http [LinuxOnly] [Skipped:Network/OVNKubernetes] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-builds][Feature:Builds] Optimized image builds should succeed [Suite:openshift/conformance/parallel]"
+            "[sig-instrumentation] Prometheus when installed on the cluster should have non-Pod host cAdvisor metrics [Suite:openshift/conformance/parallel]"
+            "[sig-imageregistry][Feature:ImageInfo] Image info should display information about images [Suite:openshift/conformance/parallel]"
+            "[sig-instrumentation] Prometheus when installed on the cluster should have a AlertmanagerReceiversNotConfigured alert in firing state [Suite:openshift/conformance/parallel]"
+            "[sig-network] Networking Granular Checks: Services should be able to handle large requests: udp [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-network] Networking Granular Checks: Pods should function for intra-pod communication: http [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-builds][Feature:Builds] oc new-app should succeed with a --name of 58 characters [Suite:openshift/conformance/parallel]"
+            "[sig-network] Services should be able to switch session affinity for NodePort service [LinuxOnly] [Conformance] [Skipped:Network/OVNKubernetes] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (default fs)] subPath should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-network] Networking Granular Checks: Services should function for endpoint-Service: http [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the token request URL [Suite:openshift/conformance/parallel]"
+            "[sig-network] Networking Granular Checks: Services should update endpoints: udp [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-network] Networking Granular Checks: Services should update endpoints: http [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-imageregistry][Feature:ImageLookup] Image policy should update standard Kube object image fields when local names are on [Suite:openshift/conformance/parallel]"
+            "[sig-builds][Feature:Builds] oc new-app should succeed with an imagestream [Suite:openshift/conformance/parallel]"
+            "[sig-cli] oc debug ensure it works with image streams [Suite:openshift/conformance/parallel]"
+            "[sig-auth][Feature:OAuthServer] [Token Expiration] Using a OAuth client with a non-default token max age to generate tokens that expire shortly works as expected when using a token authorization flow [Suite:openshift/conformance/parallel]"
+            "[sig-network] Networking Granular Checks: Services should function for pod-Service: udp [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-imageregistry][Feature:ImageExtract] Image extract should extract content from an image [Suite:openshift/conformance/parallel]"
+            "[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the logout URL [Suite:openshift/conformance/parallel]"
+            "[sig-network] Networking Granular Checks: Services should function for client IP based session affinity: udp [LinuxOnly] [Skipped:Network/OVNKubernetes] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-builds][Feature:Builds] oc new-app should fail with a --name longer than 58 characters [Suite:openshift/conformance/parallel]"
+            "[sig-network] Networking Granular Checks: Services should be able to handle large requests: http [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the login URL for the bootstrap IDP [Suite:openshift/conformance/parallel]"
+            "[sig-cli] oc rsh rsh specific flags should work well when access to a remote shell [Suite:openshift/conformance/parallel]"
+            "[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the authorize URL [Suite:openshift/conformance/parallel]"
+            "[sig-auth][Feature:HTPasswdAuth] HTPasswd IDP should successfully configure htpasswd and be responsive [Suite:openshift/conformance/parallel]"
+            "[sig-builds][Feature:Builds] Multi-stage image builds should succeed [Suite:openshift/conformance/parallel]"
+            "[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the login URL for the allow all IDP [Suite:openshift/conformance/parallel]"
+            "[sig-auth][Feature:OAuthServer] [Token Expiration] Using a OAuth client with a non-default token max age to generate tokens that do not expire works as expected when using a code authorization flow [Suite:openshift/conformance/parallel]"
+            "[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the login URL for when there is only one IDP [Suite:openshift/conformance/parallel]"
+            "[sig-auth][Feature:OAuthServer] [Token Expiration] Using a OAuth client with a non-default token max age to generate tokens that do not expire works as expected when using a token authorization flow [Suite:openshift/conformance/parallel]"
+            "[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the grant URL [Suite:openshift/conformance/parallel]"
+            "[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the root URL [Suite:openshift/conformance/parallel]"
+            "[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the token URL [Suite:openshift/conformance/parallel]"
+            "[sig-builds][Feature:Builds] clone repository using git:// protocol should clone using git:// if no proxy is configured [Suite:openshift/conformance/parallel]"
+            "[sig-network] multicast when using one of the plugins 'redhat/openshift-ovs-multitenant, redhat/openshift-ovs-networkpolicy' should allow multicast traffic in namespaces where it is enabled [Suite:openshift/conformance/parallel]"
+            "[sig-auth][Feature:OAuthServer] [Token Expiration] Using a OAuth client with a non-default token max age to generate tokens that expire shortly works as expected when using a code authorization flow [Suite:openshift/conformance/parallel]"
+            "[sig-network] Networking Granular Checks: Services should function for node-Service: udp [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-network] Networking Granular Checks: Services should function for pod-Service: http [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-network] Networking Granular Checks: Services should function for node-Service: http [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-network] Networking Granular Checks: Services should function for endpoint-Service: udp [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-builds][Feature:Builds] custom build with buildah being created from new-build should complete build with custom builder image [Suite:openshift/conformance/parallel]"
+            "[sig-network] pods should successfully create sandboxes by writing child"
+            "[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] listing mutating webhooks should work [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] listing validating webhooks should work [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] patching/updating a mutating webhook should work [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] patching/updating a validating webhook should work [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should be able to deny attaching pod [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should be able to deny custom resource creation, update and deletion [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should be able to deny pod and configmap creation [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should deny crd creation [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should honor timeout [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should mutate configmap [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should mutate custom resource [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should mutate custom resource with different stored version [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should mutate custom resource with pruning [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should mutate pod and apply defaults after mutation [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should not be able to mutate or prevent deletion of webhook configuration objects [Conformance] [Suite:openshift/conformance/parallel/minimal][Suite:k8s]"
+            "[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] should unconditionally reject operations on fail closed webhook [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-api-machinery] CustomResourceConversionWebhook [Privileged:ClusterAdmin] should be able to convert a non homogeneous list of CRs [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-api-machinery] CustomResourceConversionWebhook [Privileged:ClusterAdmin] should be able to convert from CR v1 to CR v2 [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic] should have a working scale subresource [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-apps][Feature:DeploymentConfig] deploymentconfigs when tagging images should successfully tag the deployed image [Suite:openshift/conformance/parallel]"
+            "[sig-arch] Managed cluster should have no crashlooping pods in core namespaces over four minutes [Suite:openshift/conformance/parallel]"
+            "[sig-auth][Feature:LDAP] LDAP IDP should authenticate against an ldap server [Suite:openshift/conformance/parallel]"
+            "[sig-auth][Feature:LDAP] LDAP should start an OpenLDAP test server [Suite:openshift/conformance/parallel]"
+            "[sig-auth][Feature:ProjectAPI]  TestScopedProjectAccess should succeed [Suite:openshift/conformance/parallel]"
+            "[sig-builds][Feature:Builds] build can reference a cluster service  with a build being created from new-build should be able to run a build that references a cluster service [Suite:openshift/conformance/parallel]"
+            "[sig-builds][Feature:Builds] build have source revision metadata  started build should contain source revision information [Suite:openshift/conformance/parallel]"
+            "[sig-builds][Feature:Builds] build with empty source  started build should build even with an empty source in build config [Suite:openshift/conformance/parallel]"
+            "[sig-builds][Feature:Builds] build without output image  building from templates should create an image from a S2i template without an output image reference defined [Suite:openshift/conformance/parallel]"
+            "[sig-builds][Feature:Builds] result image should have proper labels set  S2I build from a template should create a image from \"test-s2i-build.json\" template with proper Docker labels [Suite:openshift/conformance/parallel]"
+            "[sig-builds][Feature:Builds] s2i build with a quota  Building from a template should create an s2i build with a quota and run it [Suite:openshift/conformance/parallel]"
+            "[sig-builds][Feature:Builds] s2i build with a root user image should create a root build and pass with a privileged SCC [Suite:openshift/conformance/parallel]"
+            "[sig-builds][Feature:Builds][timing] capture build stages and durations  should record build stages and durations for s2i [Suite:openshift/conformance/parallel]"
+            "[sig-builds][Feature:Builds][valueFrom] process valueFrom in build strategy environment variables  should successfully resolve valueFrom in s2i build environment variables [Suite:openshift/conformance/parallel]"
+            "[sig-cli] Kubectl client Simple pod should return command exit codes [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-devex][Feature:Templates] templateinstance readiness test  should report ready soon after all annotated objects are ready [Suite:openshift/conformance/parallel]"
+            "[sig-instrumentation] Prometheus when installed on the cluster shouldn't report any alerts in firing state apart from Watchdog and AlertmanagerReceiversNotConfigured [Early] [Suite:openshift/conformance/parallel]"
+            "[sig-network] Networking should provide Internet connection for containers [Feature:Networking-IPv4] [Skipped:azure] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-network][Feature:Router] The HAProxy router should expose prometheus metrics for a route [Suite:openshift/conformance/parallel]"
+            "[sig-network][Feature:Router] The HAProxy router should override the route host for overridden domains with a custom value [Suite:openshift/conformance/parallel]"
+            "[sig-network][Feature:Router] The HAProxy router should override the route host with a custom value [Suite:openshift/conformance/parallel]"
+            "[sig-network][Feature:Router] The HAProxy router should run even if it has no access to update status [Suite:openshift/conformance/parallel]"
+            "[sig-network][Feature:Router] The HAProxy router should serve a route that points to two services and respect weights [Suite:openshift/conformance/parallel]"
+            "[sig-network][Feature:Router] The HAProxy router should serve routes that were created from an ingress [Suite:openshift/conformance/parallel]"
+            "[sig-network][Feature:Router] The HAProxy router should serve the correct routes when scoped to a single namespace and label set [Suite:openshift/conformance/parallel]"
+            "[sig-operator] an end user can use OLM can subscribe to the operator [Suite:openshift/conformance/parallel]"
+            "[sig-storage] CSI mock volume CSI Volume expansion should expand volume by restarting pod if attach=on, nodeExpansion=on [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] Dynamic Provisioning [k8s.io] GlusterDynamicProvisioner should create and delete persistent volumes [fast] [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-cli] oc debug deployment configs from a build [Suite:openshift/conformance/parallel]"
+            "[sig-imageregistry][Feature:ImageTriggers] Annotation trigger reconciles after the image is overwritten [Suite:openshift/conformance/parallel]"
+            "[sig-imageregistry][Feature:ImageAppend] Image append should create images by appending them [Suite:openshift/conformance/parallel]"
+            "[sig-imageregistry][Feature:ImageLookup] Image policy should perform lookup when the Deployment gets the resolve-names annotation later [Suite:openshift/conformance/parallel]"
+            "[sig-builds][Feature:Builds][valueFrom] process valueFrom in build strategy environment variables should successfully resolve valueFrom in docker build environment variables [Suite:openshift/conformance/parallel]"
+            "[sig-builds][Feature:Builds] custom build with buildah being created from new-build should complete build with custom builder image [Suite:openshift/conformance/parallel]"
+            "[sig-imageregistry][Feature:ImageLayers] Image layer subresource should return layers from tagged images [Suite:openshift/conformance/parallel]"
+            "[sig-apps][Feature:Jobs] Users should be able to create and run a job in a user project [Suite:openshift/conformance/parallel]"
+            "[sig-cluster-lifecycle] Pods cannot access the /config/master API endpoint [Suite:openshift/conformance/parallel]"
+            "[sig-network][Feature:Router] The HAProxy router should support reencrypt to services backed by a serving certificate automatically [Suite:openshift/conformance/parallel]"
+            "[sig-api-machinery][Feature:APIServer][Late] kube-apiserver terminates within graceful termination period [Suite:openshift/conformance/parallel]"
+            "[sig-builds][Feature:Builds] Multi-stage image builds should succeed [Suite:openshift/conformance/parallel]"
+            "[sig-builds][Feature:Builds] Optimized image builds should succeed [Suite:openshift/conformance/parallel]"
+            "[k8s.io] [sig-node] Pods Extended [k8s.io] Pods Set QOS Class should be set on Pods with matching resource requests and limits for memory and cpu [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[k8s.io] [sig-node] Security Context should support pod.Spec.SecurityContext.RunAsUser [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-api-machinery] CustomResourcePublishOpenAPI [Privileged:ClusterAdmin] works for CRD without validation schema [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-api-machinery] CustomResourcePublishOpenAPI [Privileged:ClusterAdmin] works for multiple CRDs of same group but different versions [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-api-machinery] Garbage collector should not be blocked by dependency circle [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-api-machinery] ResourceQuota [Feature:PodPriority] should verify ResourceQuota's multiple priority class scope (quota set to pod count: 2) against 2 pods with same priority classes. [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-api-machinery] ResourceQuota [Feature:PodPriority] should verify ResourceQuota's priority class scope (quota set to pod count: 1) against 2 pods with different priority class. [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-api-machinery] Servers with support for Table transformation should return chunks of table results for list calls [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-api-machinery] health handlers should contain necessary checks [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-apps] Deployment deployment should delete old replica sets [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-apps] Deployment iterative rollouts should eventually progress [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic] should not deadlock when a pod's predecessor fails [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic] should perform canary updates and phased rolling updates of template modifications [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-arch][Early] Managed cluster should start all core operators [Suite:openshift/conformance/parallel]"
+            "[sig-auth][Feature:OAuthServer] ClientSecretWithPlus should create oauthclient [Suite:openshift/conformance/parallel]"
+            "[sig-builds][Feature:Builds] Multi-stage image builds  should succeed [Suite:openshift/conformance/parallel]"
+            "[sig-builds][Feature:Builds] Optimized image builds  should succeed [Suite:openshift/conformance/parallel]"
+            "[sig-builds][Feature:Builds] custom build with buildah  being created from new-build should complete build with custom builder image [Suite:openshift/conformance/parallel]"
+            "[sig-cli] CLI can run inside of a busybox container [Suite:openshift/conformance/parallel]"
+            "[sig-cli] Kubectl client Kubectl client-side validation should create/apply a valid CR for CRD with validation schema [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-cli] Kubectl client Kubectl copy should copy a file from a running Pod [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-cli] Kubectl client Kubectl run pod should create a pod from an image when restart is Never  [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-cli] oc adm groups [Suite:openshift/conformance/parallel]"
+            "[sig-cli] oc adm node-logs [Suite:openshift/conformance/parallel]"
+            "[sig-imageregistry][Feature:ImageTriggers] Image change build triggers TestSimpleImageChangeBuildTriggerFromImageStreamTagCustomWithConfigChange [Suite:openshift/conformance/parallel]"
+            "[sig-imageregistry][Feature:Image] signature TestImageRemoveSignature [Suite:openshift/conformance/parallel]"
+            "[sig-instrumentation] Events API should ensure that an event can be fetched, patched, deleted, and listed [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-instrumentation] Prometheus when installed on the cluster should have important platform topology metrics [Suite:openshift/conformance/parallel]"
+            "[sig-instrumentation] Prometheus when installed on the cluster should provide ingress metrics [Suite:openshift/conformance/parallel]"
+            "[sig-instrumentation] Prometheus when installed on the cluster should report telemetry if a cloud.openshift.com token is present [Late] [Suite:openshift/conformance/parallel]"
+            "[sig-instrumentation][Late] Alerts should have a Watchdog alert in firing state the entire cluster run [Suite:openshift/conformance/parallel]"
+            "[sig-instrumentation][Late] Alerts shouldn't exceed the 500 series limit of total series sent via telemetry from each cluster [Suite:openshift/conformance/parallel]"
+            "[sig-instrumentation][Late] Alerts shouldn't report any alerts in firing state apart from Watchdog and AlertmanagerReceiversNotConfigured [Suite:openshift/conformance/parallel]"
+            "[sig-network] DNS should resolve DNS of partial qualified names for the cluster [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-network] DNS should support configurable pod DNS nameservers [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-network] EndpointSlice should have Endpoints and EndpointSlices pointing to API Server [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should support allow-all policy [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-network] Services should be rejected when no endpoints exist [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-network][Feature:Router] The HAProxy router converges when multiple routers are writing conflicting status [Suite:openshift/conformance/parallel]"
+            "[sig-scheduling] LimitRange should create a LimitRange with defaults and ensure pod has those defaults applied. [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with pvc data source [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (default fs)] subPath should be able to unmount after the subpath directory is deleted [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (immediate binding)] topology should provision a volume and schedule a pod with AllowedTopologies [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic Snapshot (retain policy)] snapshottable[Feature:VolumeSnapshotDataSource] volume snapshot controller  should create snapshot objects correctly [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic Snapshot (retain policy)] snapshottable[Feature:VolumeSnapshotDataSource] volume snapshot controller  should restore from snapshot with saved data after modifying source data [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should store data [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] Downward API volume should provide container's memory limit [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-storage] EmptyDir volumes should support (root,0644,tmpfs) [LinuxOnly] [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-storage] GCP Volumes GlusterFS should be mountable [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should be able to unmount after the subpath directory is deleted [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (immediate binding)] topology should provision a volume and schedule a pod with AllowedTopologies [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Inline-volume (default fs)] subPath should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (block volmode)(allowExpansion)] volume-expand should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Pre-provisioned PV (ext3)] volumes should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Pre-provisioned PV (ext4)] volumes should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (default fs)] volumes should store data [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with mount options [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (default fs)] subPath should support existing directory [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (default fs)] subPath should support existing directories when readOnly specified in the volumeSource [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (ext3)] volumes should store data [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Inline-volume (default fs)] volumes should store data [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Inline-volume (ext4)] volumes should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Pre-provisioned PV (default fs)] subPath should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with mount options [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Inline-volume (default fs)] subPath should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Inline-volume (default fs)] volumes should store data [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Pre-provisioned PV (default fs)] subPath should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (default fs)] subPath should be able to unmount after the subpath directory is deleted [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ext3)] volumes should store data [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ext4)] volumes should store data [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Pre-provisioned PV (block volmode)] volumes should store data [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Inline-volume (ext4)] volumes should store data [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Pre-provisioned PV (default fs)] volumes should store data [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (default fs)] subPath should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Pre-provisioned PV (default fs)] subPath should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (delayed binding)] topology should fail to schedule a pod which has topologies that conflict with AllowedTopologies [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (block volmode)] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Pre-provisioned PV (default fs)] subPath should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should store data [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (block volmode)] volumeMode should not mount / map unused volumes in a pod [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Pre-provisioned PV (default fs)] subPath should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Pre-provisioned PV (default fs)] volumes should store data [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with mount options [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Inline-volume (default fs)] subPath should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should store data [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] PersistentVolumes NFS with multiple PVs and PVCs all in same ns should create 3 PVs and 3 PVCs: test write access [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] PersistentVolumes-local  [Volume type: block] Two pods mounting a local volume at the same time should be able to write from pod1 and read from pod2 [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] PersistentVolumes-local  [Volume type: blockfswithoutformat] Two pods mounting a local volume one after the other should be able to write from pod1 and read from pod2 [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] PersistentVolumes-local  [Volume type: dir-link] Two pods mounting a local volume at the same time should be able to write from pod1 and read from pod2 [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] Pod Disks should be able to delete a non-existent PD without error [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] Projected configMap optional updates should be reflected in volume [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-storage] Projected configMap should be consumable from pods in volume with defaultMode set [LinuxOnly] [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-storage] Projected downwardAPI should set DefaultMode on files [LinuxOnly] [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-builds][Feature:Builds] clone repository using git:// protocol  should clone using git:// if no proxy is configured [Suite:openshift/conformance/parallel]"
+            "[sig-builds][Feature:Builds] oc new-app  should fail with a --name longer than 58 characters [Suite:openshift/conformance/parallel]"
+            "[sig-builds][Feature:Builds] oc new-app  should succeed with a --name of 58 characters [Suite:openshift/conformance/parallel]"
+            "[sig-builds][Feature:Builds] oc new-app  should succeed with an imagestream [Suite:openshift/conformance/parallel]"
+            "[sig-etcd] etcd leader changes are not excessive [Suite:openshift/conformance/parallel]"
+            "[sig-instrumentation] Prometheus when installed on the cluster should start and expose a secured proxy and unsecured metrics [Suite:openshift/conformance/parallel]"
+            "[sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should not allow access by TCP when a policy specifies only SCTP [Feature:NetworkPolicy] [Feature:SCTP] [Skipped:Network/OpenShiftSDN/Multitenant] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] Zone Support [Feature:vsphere] Verify a PVC creation fails when multiple zones are specified in the storage class without shared datastores among the zones in waitForFirstConsumer binding mode [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[k8s.io] Container Lifecycle Hook when create a pod with lifecycle hook should execute prestop exec hook properly [NodeConformance] [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[k8s.io] Security Context when creating containers with AllowPrivilegeEscalation should allow privilege escalation when not explicitly set and uid != 0 [LinuxOnly] [NodeConformance] [sig-node] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[k8s.io] Security Context when creating containers with AllowPrivilegeEscalation should allow privilege escalation when true [LinuxOnly] [NodeConformance] [sig-node] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[k8s.io] Security Context when creating containers with AllowPrivilegeEscalation should not allow privilege escalation when false [LinuxOnly] [NodeConformance] [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-auth] [Feature:NodeAuthenticator] The kubelet can delegate ServiceAccount tokens to the API server [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-auth] [Feature:NodeAuthenticator] The kubelet's main port 10250 should reject requests with no credentials [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-cli] oc adm must-gather runs successfully [Suite:openshift/conformance/parallel]"
+            "[sig-cli] oc observe works as expected [Suite:openshift/conformance/parallel]"
+            "[sig-instrumentation] Prometheus when installed on the cluster shouldn't have failing rules evaluation [Suite:openshift/conformance/parallel]"
+            "[sig-network] DNS should provide /etc/hosts entries for the cluster [LinuxOnly] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-network] DNS should provide DNS for ExternalName services [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-network] DNS should provide DNS for pods for Hostname [LinuxOnly] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-network] DNS should provide DNS for pods for Subdomain [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-network] DNS should provide DNS for services  [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-network] DNS should provide DNS for the cluster  [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-network] DNS should resolve DNS of partial qualified names for services [LinuxOnly] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-network] DNS should support configurable pod resolv.conf [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-network] Internal connectivity for TCP and UDP on ports 9000-9999 is allowed [Suite:openshift/conformance/parallel]"
+            "[sig-network] Networking Granular Checks: Pods should function for intra-pod communication: udp [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-network] Networking Granular Checks: Pods should function for node-pod communication: http [LinuxOnly] [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-network] Services should allow pods to hairpin back to themselves through services [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-network] Services should be able to change the type from ExternalName to ClusterIP [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-network] Services should be able to change the type from ExternalName to NodePort [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-network] Services should be able to create a functioning NodePort service [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-network] Services should be able to switch session affinity for service with type clusterIP [LinuxOnly] [Conformance] [Skipped:Network/OVNKubernetes] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-network] Services should be able to update service type to NodePort listening on same port number but different protocols [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-network] Services should create endpoints for unready pods [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-network] Services should have session affinity timeout work for NodePort service [LinuxOnly] [Conformance] [Skipped:Network/OVNKubernetes] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-network] Services should have session affinity timeout work for service with type clusterIP [LinuxOnly] [Conformance] [Skipped:Network/OVNKubernetes] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-network] Services should have session affinity work for NodePort service [LinuxOnly] [Conformance] [Skipped:Network/OVNKubernetes] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-network] Services should have session affinity work for service with type clusterIP [LinuxOnly] [Conformance] [Skipped:Network/OVNKubernetes] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+            "[sig-network] Services should preserve source pod IP for traffic thru service cluster IP [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-network][Feature:Router] The HAProxy router should enable openshift-monitoring to pull metrics [Suite:openshift/conformance/parallel]"
+            "[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: CSI Ephemeral-volume (default fs)] ephemeral should create read-only inline ephemeral volume [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: CSI Ephemeral-volume (default fs)] ephemeral should create read/write inline ephemeral volume [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: CSI Ephemeral-volume (default fs)] ephemeral should support multiple inline ephemeral volumes [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: CSI Ephemeral-volume (default fs)] ephemeral should support two pods which share the same volume [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (block volmode)(allowExpansion)] volume-expand Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (block volmode)(allowExpansion)] volume-expand should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (block volmode)] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (block volmode)] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (block volmode)] volumeMode should not mount / map unused volumes in a pod [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (block volmode)] volumes should store data [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (default fs)] provisioning should provision storage with pvc data source [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (default fs)] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (default fs)] subPath should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (default fs)] subPath should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (default fs)] subPath should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (default fs)] subPath should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (default fs)] subPath should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (default fs)] subPath should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (default fs)] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (default fs)] volumes should store data [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (filesystem volmode)] volumeMode should not mount / map unused volumes in a pod [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic Snapshot (delete policy)] snapshottable[Feature:VolumeSnapshotDataSource] volume snapshot controller  should create snapshot objects correctly [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic Snapshot (delete policy)] snapshottable[Feature:VolumeSnapshotDataSource] volume snapshot controller  should delete the VolumeSnapshotContent according to its deletion policy [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic Snapshot (delete policy)] snapshottable[Feature:VolumeSnapshotDataSource] volume snapshot controller  should restore from snapshot with saved data after modifying source data [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic Snapshot (retain policy)] snapshottable[Feature:VolumeSnapshotDataSource] volume snapshot controller  should delete the VolumeSnapshotContent according to its deletion policy [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI mock volume CSI Volume expansion should expand volume by restarting pod if attach=off, nodeExpansion=on [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI mock volume CSI Volume expansion should expand volume without restarting pod if nodeExpansion=off [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI mock volume CSI Volume expansion should not expand volume if resizingOnDriver=off, resizingOnSC=on [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI mock volume CSI attach test using mock driver should not require VolumeAttach for drivers without attachment [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI mock volume CSI attach test using mock driver should preserve attachment policy when no CSIDriver present [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI mock volume CSI attach test using mock driver should require VolumeAttach for drivers with attachment [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI mock volume CSI online volume expansion should expand volume without restarting pod if attach=off, nodeExpansion=on [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI mock volume CSI online volume expansion should expand volume without restarting pod if attach=on, nodeExpansion=on [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI mock volume CSI workload information using mock driver contain ephemeral=true when using inline volume [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI mock volume CSI workload information using mock driver should be passed when podInfoOnMount=true [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI mock volume CSI workload information using mock driver should not be passed when CSIDriver does not exist [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI mock volume CSI workload information using mock driver should not be passed when podInfoOnMount=false [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI mock volume CSI workload information using mock driver should not be passed when podInfoOnMount=nil [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI mock volume storage capacity exhausted, immediate binding [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI mock volume storage capacity exhausted, late binding, no topology [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI mock volume storage capacity exhausted, late binding, with topology [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] CSI mock volume storage capacity unlimited [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] GCP Volumes NFSv3 should be mountable for NFSv3 [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] GCP Volumes NFSv4 should be mountable for NFSv4 [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Inline-volume (default fs)] subPath should be able to unmount after the subpath directory is deleted [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Inline-volume (default fs)] subPath should support existing directories when readOnly specified in the volumeSource [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Inline-volume (default fs)] subPath should support existing directory [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Inline-volume (default fs)] subPath should support existing single file [LinuxOnly] [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Inline-volume (default fs)] subPath should support file as subpath [LinuxOnly] [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Inline-volume (default fs)] subPath should support non-existent path [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Inline-volume (default fs)] subPath should support readOnly directory specified in the volumeMount [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Inline-volume (default fs)] subPath should support readOnly file specified in the volumeMount [LinuxOnly] [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Inline-volume (default fs)] volumes should allow exec of files on the volume [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Inline-volume (default fs)] volumes should store data [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (default fs)] subPath should be able to unmount after the subpath directory is deleted [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (default fs)] subPath should support existing directory [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (default fs)] subPath should support existing single file [LinuxOnly] [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (default fs)] subPath should support file as subpath [LinuxOnly] [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (default fs)] subPath should support non-existent path [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (default fs)] subPath should support readOnly directory specified in the volumeMount [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (default fs)] subPath should support readOnly file specified in the volumeMount [LinuxOnly] [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (default fs)] volumes should allow exec of files on the volume [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (default fs)] volumes should store data [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (filesystem volmode)] volumeMode should not mount / map unused volumes in a pod [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] provisioning should provision storage with mount options [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] subPath should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] subPath should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] subPath should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] subPath should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] subPath should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] subPath should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] subPath should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] volumes should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] volumes should store data [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (filesystem volmode)] volumeMode should not mount / map unused volumes in a pod [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Inline-volume (default fs)] volumes should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Inline-volume (default fs)] volumes should store data [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Pre-provisioned PV (default fs)] volumes should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Pre-provisioned PV (filesystem volmode)] volumeMode should not mount / map unused volumes in a pod [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] PersistentVolumes NFS when invoking the Recycle reclaim policy should test that a PV becomes Available and is clean after the PVC is deleted. [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] PersistentVolumes NFS with Single PV - PVC pairs create a PV and a pre-bound PVC: test write access [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] PersistentVolumes NFS with Single PV - PVC pairs create a PVC and a pre-bound PV: test write access [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] PersistentVolumes NFS with Single PV - PVC pairs create a PVC and non-pre-bound PV: test write access [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] PersistentVolumes NFS with Single PV - PVC pairs should create a non-pre-bound PV and PVC: test write access  [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] PersistentVolumes NFS with multiple PVs and PVCs all in same ns should create 2 PVs and 4 PVCs: test write access [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-storage] PersistentVolumes-local  [Volume type: dir-link-bindmounted] One pod requesting one prebound PVC should be able to mount volume and write from pod1 [Suite:openshift/conformance/parallel] [Suite:k8s]"
+          EOEXCLUDE
+          export PATH=/usr/libexec/origin:$PATH
+          openshift-tests run openshift/conformance/parallel --dry-run | ./invert_excluded.py excluded_tests > test-suite.txt
+          TEST_SUITE="--file=test-suite.txt" run-tests
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/e2e-remote-libvirt-cluster-profile
+        name: cluster-profile
+      - mountPath: /usr/local/e2e-remote-libvirt
+        name: job-definition
+        subPath: cluster-launch-installer-remote-libvirt-e2e.yaml
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+    serviceAccountName: ci-operator
+    volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-metal
+    - configMap:
+        name: prow-job-cluster-launch-installer-remote-libvirt-e2e
+      name: job-definition
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+- agent: kubernetes
+  cluster: api.ci
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -7635,6 +8132,142 @@ periodics:
         secretName: ci-pull-credentials
 - agent: kubernetes
   cluster: api.ci
+  cron: 0 6,18 * * *
+  decorate: true
+  labels:
+    ci.openshift.io/release-type: informing
+    dptp.openshift.io/ssh-bastion: "true"
+    job-env: remote-libvirt
+    job-release: "4.7"
+    job-test: e2e
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: release-openshift-origin-installer-e2e-remote-libvirt-image-ecosystem-s390x-4.7
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --secret-dir=/usr/local/image-ecosystem-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-remote-libvirt
+      - --template=/usr/local/e2e-remote-libvirt
+      command:
+      - ci-operator
+      env:
+      - name: ARCH
+        value: s390x
+      - name: BASTION_SVC_0_1_IP
+        value: 172.30.60.61
+      - name: BASTION_SVC_0_2_IP
+        value: 172.30.135.156
+      - name: BASTION_SVC_0_3_IP
+        value: 172.30.63.176
+      - name: BASTION_SVC_0_4_IP
+        value: 172.30.62.128
+      - name: BASTION_SVC_1_0_IP
+        value: 172.30.28.119
+      - name: BASTION_SVC_1_1_IP
+        value: 172.30.227.115
+      - name: BASTION_SVC_1_2_IP
+        value: 172.30.210.45
+      - name: BASTION_SVC_1_3_IP
+        value: 172.30.198.47
+      - name: BASTION_SVC_1_4_IP
+        value: 172.30.220.83
+      - name: BASTION_SVC_IP
+        value: 172.30.20.161
+      - name: BRANCH
+        value: "4.7"
+      - name: CLUSTER_TYPE
+        value: libvirt-s390x
+      - name: CONFIG_SPEC
+        value: |
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tag_specification:
+            name: "$(BRANCH)"
+            namespace: ocp
+          tests:
+          - as: e2e-$(CLUSTER_TYPE)-all
+            commands: $(TEST_COMMAND)
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+      - name: JOB_NAME_SAFE
+        value: image-ecosystem
+      - name: MULTIARCH_RELEASE_IMAGE_LATEST
+        value: registry.svc.ci.openshift.org/ocp-s390x/release-s390x:4.7
+      - name: RELEASE_IMAGE_LATEST
+        value: registry.svc.ci.openshift.org/ocp/release:4.7
+      - name: REMOTE_LIBVIRT_HOSTNAME
+        value: ocponz
+      - name: REMOTE_LIBVIRT_HOSTNAME_1
+        value: ocponz2
+      - name: TEST_COMMAND
+        value: TEST_SUITE=openshift/image-ecosystem run-tests
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/image-ecosystem-cluster-profile
+        name: cluster-profile
+      - mountPath: /usr/local/e2e-remote-libvirt
+        name: job-definition
+        subPath: cluster-launch-installer-remote-libvirt-e2e.yaml
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+    serviceAccountName: ci-operator
+    volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-metal
+    - configMap:
+        name: prow-job-cluster-launch-installer-remote-libvirt-e2e
+      name: job-definition
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+- agent: kubernetes
+  cluster: api.ci
   cron: 0 0,12 * * *
   decorate: true
   labels:
@@ -7712,6 +8345,142 @@ periodics:
         value: c155f2u33
       - name: REMOTE_LIBVIRT_HOSTNAME_1
         value: c155f2u31
+      - name: TEST_COMMAND
+        value: TEST_SUITE=openshift/jenkins-e2e-rhel-only run-tests
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/jenkins-e2e-cluster-profile
+        name: cluster-profile
+      - mountPath: /usr/local/e2e-remote-libvirt
+        name: job-definition
+        subPath: cluster-launch-installer-remote-libvirt-e2e.yaml
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+    serviceAccountName: ci-operator
+    volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-metal
+    - configMap:
+        name: prow-job-cluster-launch-installer-remote-libvirt-e2e
+      name: job-definition
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 6,18 * * *
+  decorate: true
+  labels:
+    ci.openshift.io/release-type: informing
+    dptp.openshift.io/ssh-bastion: "true"
+    job-env: remote-libvirt
+    job-release: "4.7"
+    job-test: e2e
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: release-openshift-origin-installer-e2e-remote-libvirt-jenkins-e2e-s390x-4.7
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --secret-dir=/usr/local/jenkins-e2e-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-remote-libvirt
+      - --template=/usr/local/e2e-remote-libvirt
+      command:
+      - ci-operator
+      env:
+      - name: ARCH
+        value: s390x
+      - name: BASTION_SVC_0_1_IP
+        value: 172.30.60.61
+      - name: BASTION_SVC_0_2_IP
+        value: 172.30.135.156
+      - name: BASTION_SVC_0_3_IP
+        value: 172.30.63.176
+      - name: BASTION_SVC_0_4_IP
+        value: 172.30.62.128
+      - name: BASTION_SVC_1_0_IP
+        value: 172.30.28.119
+      - name: BASTION_SVC_1_1_IP
+        value: 172.30.227.115
+      - name: BASTION_SVC_1_2_IP
+        value: 172.30.210.45
+      - name: BASTION_SVC_1_3_IP
+        value: 172.30.198.47
+      - name: BASTION_SVC_1_4_IP
+        value: 172.30.220.83
+      - name: BASTION_SVC_IP
+        value: 172.30.20.161
+      - name: BRANCH
+        value: "4.7"
+      - name: CLUSTER_TYPE
+        value: libvirt-s390x
+      - name: CONFIG_SPEC
+        value: |
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tag_specification:
+            name: "$(BRANCH)"
+            namespace: ocp
+          tests:
+          - as: e2e-$(CLUSTER_TYPE)-all
+            commands: $(TEST_COMMAND)
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+      - name: JOB_NAME_SAFE
+        value: jenkins-e2e
+      - name: MULTIARCH_RELEASE_IMAGE_LATEST
+        value: registry.svc.ci.openshift.org/ocp-s390x/release-s390x:4.7
+      - name: RELEASE_IMAGE_LATEST
+        value: registry.svc.ci.openshift.org/ocp/release:4.7
+      - name: REMOTE_LIBVIRT_HOSTNAME
+        value: ocponz
+      - name: REMOTE_LIBVIRT_HOSTNAME_1
+        value: ocponz2
       - name: TEST_COMMAND
         value: TEST_SUITE=openshift/jenkins-e2e-rhel-only run-tests
       image: ci-operator:latest
