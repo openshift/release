@@ -14,6 +14,9 @@ base_images:
 build_root:
   project_image:
     dockerfile_path: .ci/openshift-ci/Dockerfile
+images:
+- dockerfile_path: Dockerfile
+  to: che-operator-image
 operator:
   bundles:
   - context_dir: deploy/olm-catalog/eclipse-che-preview-openshift
@@ -49,6 +52,9 @@ tests:
         oc get pods -n eclipse-che
         pwd
         /bin/bash .ci/oci-nightly-olm.sh
+      dependencies:
+      - env: CI_CHE_OPERATOR_IMAGE
+        name: che-operator-image
       from: src
       resources:
         requests:
