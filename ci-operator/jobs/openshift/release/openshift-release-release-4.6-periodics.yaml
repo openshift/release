@@ -8597,7 +8597,7 @@ periodics:
         namespace=$(grep "Creating namespace" /tmp/ci-operator.log | awk '{print $NF}')
         # copy the cluster credentials secret that was created in the job namespace, into the ci namespace
         # so it is persisted for future runs.
-        oc get --export secret endurance-cluster-credentials-aws-new -n $namespace -o yaml | grep -v namespace: > /tmp/secret.yaml
+        oc get secret endurance-cluster-credentials-aws-new -n $namespace -o yaml | grep -vE "namespace:|resourceVersion:|creationTimestamp:|uid:" > /tmp/secret.yaml
         sed -i s/endurance-cluster-credentials-aws-new/endurance-cluster-credentials-4.6-aws/ /tmp/secret.yaml
         oc apply -f /tmp/secret.yaml -n ci
         exit $rc
