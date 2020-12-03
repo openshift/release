@@ -34,15 +34,19 @@ tests:
     cluster_profile: aws
     env:
       OO_CHANNEL: nightly
-      OO_INSTALL_NAMESPACE: che
+      OO_INSTALL_NAMESPACE: eclipse-che
       OO_PACKAGE: eclipse-che-preview-openshift
       OO_TARGET_NAMESPACES: '!install'
     test:
     - as: stable-updates
       commands: |
-        ls -lrtha
-        ls -lrtha .ci/
+        export PATH=$PATH:/tmp/bin
+        mkdir -p /tmp/bin
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.6/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
+        chmod ug+x /tmp/bin/oc
+
         cat .ci/oci-nightly-olm.sh
+        oc get pods -n eclipse-che
         /bin/bash .ci/oci-nightly-olm.sh
       from: src
       resources:
