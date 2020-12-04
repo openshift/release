@@ -42,33 +42,6 @@ tests:
   commands: make verify-all --warn-undefined-variables
   container:
     from: src
-- as: unit-wni
-  commands: make test-unit-wni
-  container:
-    from: src
-- as: e2e-wni
-  steps:
-    cluster_profile: aws
-    test:
-    - as: e2e-wni
-      commands: |-
-        #!/bin/bash
-
-        set -o nounset
-        set -o errexit
-        set -o pipefail
-
-        cluster_profile=/var/run/secrets/ci.openshift.io/cluster-profile
-        export AWS_SHARED_CREDENTIALS_FILE=${cluster_profile}/.awscred
-        export KUBE_SSH_KEY_PATH=${cluster_profile}/ssh-privatekey
-
-        make test-e2e-tools
-      from: src
-      resources:
-        requests:
-          cpu: 1000m
-          memory: 600Mi
-    workflow: ipi-aws-ovn-hybrid
 - as: e2e-wmcb
   steps:
     cluster_profile: aws
