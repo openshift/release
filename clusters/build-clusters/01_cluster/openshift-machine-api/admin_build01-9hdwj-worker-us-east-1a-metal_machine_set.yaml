@@ -1,0 +1,69 @@
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineSet
+metadata:
+  labels:
+    machine.openshift.io/cluster-api-cluster: build01-9hdwj
+  name: build01-9hdwj-worker-us-east-1a-metal
+  namespace: openshift-machine-api
+spec:
+  replicas: 1
+  deletePolicy: Oldest
+  selector:
+    matchLabels:
+      machine.openshift.io/cluster-api-cluster: build01-9hdwj
+      machine.openshift.io/cluster-api-machineset: build01-9hdwj-worker-us-east-1a-metal
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        machine.openshift.io/cluster-api-cluster: build01-9hdwj
+        machine.openshift.io/cluster-api-machine-role: worker
+        machine.openshift.io/cluster-api-machine-type: worker
+        machine.openshift.io/cluster-api-machineset: build01-9hdwj-worker-us-east-1a-metal
+    spec:
+      metadata:
+        creationTimestamp: null
+        labels:
+          ci.openshift.io/ci-metal: "true"
+# Commented out for now
+#      taints:
+#      - effect: NoSchedule
+#        key: ci.openshift.io/ci-metal
+#        value: "true"
+      providerSpec:
+        value:
+          ami:
+            id: ami-06f85a7940faa3217
+          apiVersion: awsproviderconfig.openshift.io/v1beta1
+          blockDevices:
+          - ebs:
+              volumeSize: 1500
+              volumeType: gp2
+          credentialsSecret:
+            name: aws-cloud-credentials
+          deviceIndex: 0
+          iamInstanceProfile:
+            id: build01-9hdwj-worker-profile
+          instanceType: m5.metal
+          kind: AWSMachineProviderConfig
+          metadata:
+            creationTimestamp: null
+          placement:
+            availabilityZone: us-east-1a
+            region: us-east-1
+          publicIp: null
+          securityGroups:
+          - filters:
+            - name: tag:Name
+              values:
+              - build01-9hdwj-worker-sg
+          subnet:
+            filters:
+            - name: tag:Name
+              values:
+              - build01-9hdwj-private-us-east-1a
+          tags:
+          - name: kubernetes.io/cluster/build01-9hdwj
+            value: owned
+          userDataSecret:
+            name: worker-user-data
