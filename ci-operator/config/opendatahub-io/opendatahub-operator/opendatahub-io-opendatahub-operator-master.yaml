@@ -1,4 +1,8 @@
 base_images:
+  odh-tests:
+    name: odh-manifests-tests
+    namespace: ocp
+    tag: latest
   os:
     name: centos
     namespace: origin
@@ -43,6 +47,22 @@ tests:
   container:
     from: src
   cron: 30 0 * * *
+- as: operator-e2e
+  steps:
+    cluster_profile: aws
+    env:
+      OO_CHANNEL: beta
+      OO_PACKAGE: opendatahub-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: e2e
+      commands: $HOME/peak/installandtest.sh
+      from: odh-tests
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-aws
 zz_generated_metadata:
   branch: master
   org: opendatahub-io
