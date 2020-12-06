@@ -41,6 +41,19 @@ tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/assisted.tar.gz"
 # Prepare configuration and run
 scp "${SSHOPTS[@]}" "${CLUSTER_PROFILE_DIR}/pull-secret" "root@${IP}:pull-secret"
 
+# Additional mechanism to inject assisted additional variables directly
+# from a multistage step configuration.
+# Backward compatible with the previous approach based on creating the
+# assisted-additional-config file from a multistage step command
+if [[ -n "${ASSISTED_CONFIG:-}" ]]; then
+  readarray -t config <<< "${ASSISTED_CONFIG}"
+  for var in "${config[@]}"; do
+    if [[ ! -z "${var}" ]]; then
+      echo "export ${var}" >> "${SHARED_DIR}/assisted-additional-config"
+    fi
+  done
+fi
+
 if [[ -e "${SHARED_DIR}/assisted-additional-config" ]]
 then
   scp "${SSHOPTS[@]}" "${SHARED_DIR}/assisted-additional-config" "root@${IP}:assisted-additional-config"
@@ -74,6 +87,7 @@ set +x
 echo "export PULL_SECRET='\$(cat /root/pull-secret)'" >> /root/config
 echo "export OPENSHIFT_INSTALL_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}" >> /root/config
 echo "export PUBLIC_CONTAINER_REGISTRIES=quay.io,\$(echo ${RELEASE_IMAGE_LATEST} | cut -d'/' -f1)" >> /root/config
+echo "export ASSISTED_SERVICE_HOST=${IP}" >> /root/config
 set -x
 
 if [[ -e /root/assisted-additional-config ]]
