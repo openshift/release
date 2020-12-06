@@ -26,6 +26,7 @@ tag_specification:
 tests:
 - as: sanity-oc
   steps:
+    cluster_profile: aws
     test:
     - as: oc-check
       cli: latest
@@ -33,12 +34,21 @@ tests:
         echo "starting test..."
         echo "linking oc --> kubectl"
         ln -s $(which oc) "$(dirname $(which oc))"/kubectl
-        pip3 install pyyaml functools typing
+        pip3 install pyyaml
+        echo "make deploy-wiremock"
+        make deploy-wiremock
+        echo "oc get pods"
+        oc get pods
+        echo "sleep 60"
+        sleep 60
+        echo "oc get pods"
+        oc get pods
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: openshift
