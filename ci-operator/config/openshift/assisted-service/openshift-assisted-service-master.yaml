@@ -23,6 +23,9 @@ resources:
 tag_specification:
   name: "4.7"
   namespace: ocp
+test_binary_build_commands: |
+  set -eo pipefail
+  pip3 install pyyaml
 tests:
 - as: sanity-oc
   steps:
@@ -33,11 +36,9 @@ tests:
         echo "starting test..."
         echo "linking oc --> kubectl"
         ln -s $(which oc) "$(dirname $(which oc))"/kubectl
-        echo "yum install -y python3-devel"
-        yum install -y python3-devel
-        echo "pip3 install pyyaml"
-        pip3 install pyyaml
-      from: src
+        echo "make deploy-wiremock"
+        make deploy-wiremock
+      from: test-bin
       resources:
         requests:
           cpu: 100m
