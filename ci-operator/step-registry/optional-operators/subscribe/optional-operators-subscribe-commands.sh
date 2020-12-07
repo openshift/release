@@ -14,8 +14,9 @@ OO_PACKAGE="$OO_PACKAGE"
 # The name of the operator channel to track. Required.
 OO_CHANNEL="$OO_CHANNEL"
 
-# The namespace into which the operator and catalog will be
-# installed. If empty, a new namespace will be created.
+# The namespace into which the operator and catalog will be installed.
+# If the specified namespace doesn't exist, it will be created.
+# If empty, a new namespace will be created with a generated name.
 OO_INSTALL_NAMESPACE="${OO_INSTALL_NAMESPACE:-}"
 
 # A comma-separated list of namespaces the operator will target. If
@@ -37,9 +38,24 @@ metadata:
   generateName: oo-
 EOF
     )
+    echo "Created namespace: \"$OO_INSTALL_NAMESPACE\""
 else
     echo "OO_INSTALL_NAMESPACE is set: testing whether it exists:'"
-    oc get namespace "$OO_INSTALL_NAMESPACE"
+    INSTALL_NAMESPACE=$(oc get namespace "$OO_INSTALL_NAMESPACE" -o jsonpath='{.metadata.name}' || true)
+    if [[ -n "$INSTALL_NAMESPACE" ]]; then
+        echo "The namespace \"$OO_INSTALL_NAMESPACE\" already exists."
+    else
+        echo "The namespace \"$OO_INSTALL_NAMESPACE\" doesn't exist, creating"
+        OO_INSTALL_NAMESPACE=$(
+        oc create -f - -o jsonpath='{.metadata.name}' <<EOF
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: $OO_INSTALL_NAMESPACE
+EOF
+        )
+        echo "Created namespace: \"$OO_INSTALL_NAMESPACE\""
+    fi
 fi
 
 echo "Installing \"$OO_PACKAGE\" in namespace \"$OO_INSTALL_NAMESPACE\""
