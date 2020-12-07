@@ -34,9 +34,20 @@ tests:
       cli: latest
       commands: |
         echo "starting test..."
+
         echo "linking oc --> kubectl"
         ln -s $(which oc) "$(dirname $(which oc))"/kubectl
-        echo "make deploy-wiremock"
+
+        echo 'pointing assisted-service git to fork'
+        git remote add -t master origin https://github.com/yftacherzog/assisted-service.git
+        echo 'pulling forked changes'
+        git pull
+
+        echo 'setting environment variables'
+        export TARGET='oc'
+        export PROFILE='openshift-ci'
+
+        echo "deploying wiremock"
         make deploy-wiremock
       from: test-bin
       resources:
