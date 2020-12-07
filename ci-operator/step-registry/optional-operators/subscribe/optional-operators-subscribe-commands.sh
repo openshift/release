@@ -15,38 +15,47 @@ OO_PACKAGE="$OO_PACKAGE"
 OO_CHANNEL="$OO_CHANNEL"
 
 # The namespace into which the operator and catalog will be
-# installed. If empty, a new namespace will be created.
-OO_INSTALL_NAMESPACE="${OO_INSTALL_NAMESPACE:-}"
+# installed. Special value `!create` means that a new namespace will be created.
+OO_INSTALL_NAMESPACE="${OO_INSTALL_NAMESPACE}"
 
-# A comma-separated list of namespaces the operator will target. If
-# empty, all namespaces will be targeted.  If no OperatorGroup exists
-# in $OO_INSTALL_NAMESPACE, a new one will be created with its target
-# namespaces set to $OO_TARGET_NAMESPACES, otherwise the existing
-# OperatorGroup's target namespace set will be replaced. The special
-# value "!install" will set the target namespace to the operator's
-# installation namespace.
-OO_TARGET_NAMESPACES="${OO_TARGET_NAMESPACES:-}"
+# A comma-separated list of namespaces the operator will target. Special, value
+# `!all` means that all namespaces will be targeted. If no OperatorGroup exists
+# in $OO_INSTALL_NAMESPACE, a new one will be created with its target namespaces
+# set to $OO_TARGET_NAMESPACES, otherwise the existing OperatorGroup's target
+# namespace set will be replaced. The special value "!install" will set the
+# target namespace to the operator's installation namespace.
 
-if [[ -z "$OO_INSTALL_NAMESPACE" ]]; then
-    echo "OO_INSTALL_NAMESPACE not set: creating new namespace"
+OO_TARGET_NAMESPACES="${OO_TARGET_NAMESPACES}"
+
+if [[ "$OO_INSTALL_NAMESPACE" == "!create" ]]; then
+    echo "OO_INSTALL_NAMESPACE is '!create': creating new namespace"
+    NS_NAMESTANZA="generateName: oo-"
+elif ! oc get namespace "$OO_INSTALL_NAMESPACE"; then
+    echo "OO_INSTALL_NAMESPACE is '$OO_INSTALL_NAMESPACE' which does not exist: creating"
+    NS_NAMESTANZA="name: $OO_INSTALL_NAMESPACE"
+else
+    echo "OO_INSTALL_NAMESPACE is '$OO_INSTALL_NAMESPACE'"
+fi
+
+if [[ -n "${NS_NAMESTANZA:-}" ]]; then
     OO_INSTALL_NAMESPACE=$(
         oc create -f - -o jsonpath='{.metadata.name}' <<EOF
 apiVersion: v1
 kind: Namespace
 metadata:
-  generateName: oo-
+  $NS_NAMESTANZA
 EOF
     )
-else
-    echo "OO_INSTALL_NAMESPACE is set: testing whether it exists:'"
-    oc get namespace "$OO_INSTALL_NAMESPACE"
 fi
 
 echo "Installing \"$OO_PACKAGE\" in namespace \"$OO_INSTALL_NAMESPACE\""
 
 if [[ "$OO_TARGET_NAMESPACES" == "!install" ]]; then
-    echo "Targeting operator installation namespace ($OO_INSTALL_NAMESPACE)"
+    echo "OO_TARGET_NAMESPACES is '!install': targeting operator installation namespace ($OO_INSTALL_NAMESPACE)"
     OO_TARGET_NAMESPACES="$OO_INSTALL_NAMESPACE"
+elif [[ "$OO_TARGET_NAMESPACES" == "!all" ]]; then
+    echo "OO_TARGET_NAMESPACES is '!all': all namespaces will be targeted"
+    OO_TARGET_NAMESPACES=""
 fi
 
 OPERATORGROUP=$(oc -n "$OO_INSTALL_NAMESPACE" get operatorgroup -o jsonpath="{.items[*].metadata.name}" || true)
