@@ -2404,8 +2404,8 @@ periodics:
         secretName: ci-pull-credentials
 - agent: kubernetes
   cluster: api.ci
+  cron: '@yearly'
   decorate: true
-  interval: 24h
   labels:
     job-env: aws
     job-release: "4.2"
@@ -2424,39 +2424,7 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       command:
-      - /bin/bash
-      - -c
-      - |
-        #!/bin/bash
-        set -euo pipefail
-
-        initial=$(ARTIFACTS)/release-initial.json
-        latest=$(ARTIFACTS)/release-latest.json
-        if ! curl -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest --data-urlencode 'in=>4.2.0-0 <4.3.0-0' > ${initial}; then
-          echo "error: Could not find a stable version"
-          exit 1
-        fi
-        if ! curl -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.2.0-0.nightly/latest > ${latest}; then
-          echo "error: Could not find newest version"
-          exit 1
-        fi
-
-        from=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${initial}" )
-        to=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${latest}" )
-        export RELEASE_IMAGE_INITIAL=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${initial}" )
-        export RELEASE_IMAGE_LATEST=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${latest}" )
-
-        # prow doesn't allow init containers or a second container
-        export PATH=$PATH:/tmp/bin
-        mkdir /tmp/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.3/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
-        chmod ug+x /tmp/bin/oc
-
-        # annotate the information about this job so that the release controller adds it to the upgrade graph
-        oc --kubeconfig /etc/appci/sa.release-bot.app.ci.config annotate pj/${PROW_JOB_ID} "release.openshift.io/from-tag=${from}" "release.openshift.io/tag=${to}" "release.openshift.io/source=ocp/$(BRANCH)"
-
-        ci-operator $@
-      - ""
+      - ci-operator
       env:
       - name: BRANCH
         value: "4.2"
@@ -2994,8 +2962,8 @@ periodics:
         secretName: ci-pull-credentials
 - agent: kubernetes
   cluster: api.ci
+  cron: '@yearly'
   decorate: true
-  interval: 4h
   labels:
     job-env: aws
     job-release: "4.2"
@@ -3015,39 +2983,7 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       command:
-      - /bin/bash
-      - -c
-      - |
-        #!/bin/bash
-        set -euo pipefail
-
-        initial=$(ARTIFACTS)/release-initial.json
-        latest=$(ARTIFACTS)/release-latest.json
-        if ! curl -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest --data-urlencode 'in=>4.1.0-0 <4.2.0-0' > ${initial}; then
-          echo "error: Could not find a stable version"
-          exit 1
-        fi
-        if ! curl -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.2.0-0.ci/latest > ${latest}; then
-          echo "error: Could not find newest version"
-          exit 1
-        fi
-
-        from=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${initial}" )
-        to=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${latest}" )
-        export RELEASE_IMAGE_INITIAL=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${initial}" )
-        export RELEASE_IMAGE_LATEST=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${latest}" )
-
-        # prow doesn't allow init containers or a second container
-        export PATH=$PATH:/tmp/bin
-        mkdir /tmp/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.3/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
-        chmod ug+x /tmp/bin/oc
-
-        # annotate the information about this job so that the release controller adds it to the upgrade graph
-        oc --kubeconfig /etc/appci/sa.release-bot.app.ci.config annotate pj/${PROW_JOB_ID} "release.openshift.io/from-tag=${from}" "release.openshift.io/tag=${to}" "release.openshift.io/source=ocp/$(BRANCH)"
-
-        ci-operator $@
-      - ""
+      - ci-operator
       env:
       - name: BRANCH
         value: "4.1"
@@ -3136,8 +3072,8 @@ periodics:
         secretName: ci-pull-credentials
 - agent: kubernetes
   cluster: api.ci
+  cron: '@yearly'
   decorate: true
-  interval: 12h
   labels:
     job-env: aws
     job-release: "4.2"
@@ -3156,39 +3092,7 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       command:
-      - /bin/bash
-      - -c
-      - |
-        #!/bin/bash
-        set -euo pipefail
-
-        initial=$(ARTIFACTS)/release-initial.json
-        latest=$(ARTIFACTS)/release-latest.json
-        if ! curl -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest --data-urlencode 'in=>4.1.0-0 <4.2.0-0' > ${initial}; then
-          echo "error: Could not find a stable version"
-          exit 1
-        fi
-        if ! curl -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.2.0-0.ci/latest > ${latest}; then
-          echo "error: Could not find newest version"
-          exit 1
-        fi
-
-        from=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${initial}" )
-        to=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${latest}" )
-        export RELEASE_IMAGE_INITIAL=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${initial}" )
-        export RELEASE_IMAGE_LATEST=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${latest}" )
-
-        # prow doesn't allow init containers or a second container
-        export PATH=$PATH:/tmp/bin
-        mkdir /tmp/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.3/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
-        chmod ug+x /tmp/bin/oc
-
-        # annotate the information about this job so that we can query for it
-        oc --kubeconfig /etc/appci/sa.release-bot.app.ci.config annotate pj/${PROW_JOB_ID} "release.openshift.io/from-tag=${from}" "release.openshift.io/tag=${to}" "release.openshift.io/source=ocp/$(BRANCH)"
-
-        ci-operator $@
-      - ""
+      - ci-operator
       env:
       - name: BRANCH
         value: "4.1"
@@ -3265,8 +3169,8 @@ periodics:
         secretName: build-farm-credentials
 - agent: kubernetes
   cluster: api.ci
+  cron: '@yearly'
   decorate: true
-  interval: 12h
   labels:
     job-env: aws
     job-release: "4.2"
@@ -3285,39 +3189,7 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       command:
-      - /bin/bash
-      - -c
-      - |
-        #!/bin/bash
-        set -euo pipefail
-
-        initial=$(ARTIFACTS)/release-initial.json
-        latest=$(ARTIFACTS)/release-latest.json
-        if ! curl -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.2.0-0.ci/latest --data-urlencode 'rel=1' > ${initial}; then
-          echo "error: Could not find a stable version"
-          exit 1
-        fi
-        if ! curl -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.2.0-0.ci/latest > ${latest}; then
-          echo "error: Could not find newest version"
-          exit 1
-        fi
-
-        from=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${initial}" )
-        to=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${latest}" )
-        export RELEASE_IMAGE_INITIAL=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${initial}" )
-        export RELEASE_IMAGE_LATEST=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${latest}" )
-
-        # prow doesn't allow init containers or a second container
-        export PATH=$PATH:/tmp/bin
-        mkdir /tmp/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.3/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
-        chmod ug+x /tmp/bin/oc
-
-        # annotate the information about this job so that we can query for it
-        oc --kubeconfig /etc/appci/sa.release-bot.app.ci.config annotate pj/${PROW_JOB_ID} "release.openshift.io/from-tag=${from}" "release.openshift.io/tag=${to}" "release.openshift.io/source=ocp/$(BRANCH)"
-
-        ci-operator $@
-      - ""
+      - ci-operator
       env:
       - name: BRANCH
         value: "4.2"
@@ -3501,8 +3373,8 @@ periodics:
         secretName: ci-pull-credentials
 - agent: kubernetes
   cluster: api.ci
+  cron: '@yearly'
   decorate: true
-  interval: 12h
   labels:
     job-env: gcp
     job-release: "4.2"
@@ -3521,39 +3393,7 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       command:
-      - /bin/bash
-      - -c
-      - |
-        #!/bin/bash
-        set -euo pipefail
-
-        initial=$(ARTIFACTS)/release-initial.json
-        latest=$(ARTIFACTS)/release-latest.json
-        if ! curl -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.2.0-0.ci/latest --data-urlencode 'rel=1' > ${initial}; then
-          echo "error: Could not find a stable version"
-          exit 1
-        fi
-        if ! curl -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.2.0-0.ci/latest > ${latest}; then
-          echo "error: Could not find newest version"
-          exit 1
-        fi
-
-        from=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${initial}" )
-        to=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${latest}" )
-        export RELEASE_IMAGE_INITIAL=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${initial}" )
-        export RELEASE_IMAGE_LATEST=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${latest}" )
-
-        # prow doesn't allow init containers or a second container
-        export PATH=$PATH:/tmp/bin
-        mkdir /tmp/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.3/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
-        chmod ug+x /tmp/bin/oc
-
-        # annotate the information about this job so that we can query for it
-        oc --kubeconfig /etc/appci/sa.release-bot.app.ci.config annotate pj/${PROW_JOB_ID} "release.openshift.io/from-tag=${from}" "release.openshift.io/tag=${to}" "release.openshift.io/source=ocp/$(BRANCH)"
-
-        ci-operator $@
-      - ""
+      - ci-operator
       env:
       - name: BRANCH
         value: "4.2"
@@ -3630,8 +3470,8 @@ periodics:
         secretName: build-farm-credentials
 - agent: kubernetes
   cluster: api.ci
+  cron: '@yearly'
   decorate: true
-  interval: 12h
   labels:
     job-env: azure
     job-release: "4.2"
@@ -3650,39 +3490,7 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       command:
-      - /bin/bash
-      - -c
-      - |
-        #!/bin/bash
-        set -euo pipefail
-
-        initial=$(ARTIFACTS)/release-initial.json
-        latest=$(ARTIFACTS)/release-latest.json
-        if ! curl -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.2.0-0.ci/latest --data-urlencode 'rel=1' > ${initial}; then
-          echo "error: Could not find a stable version"
-          exit 1
-        fi
-        if ! curl -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.2.0-0.ci/latest > ${latest}; then
-          echo "error: Could not find newest version"
-          exit 1
-        fi
-
-        from=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${initial}" )
-        to=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${latest}" )
-        export RELEASE_IMAGE_INITIAL=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${initial}" )
-        export RELEASE_IMAGE_LATEST=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${latest}" )
-
-        # prow doesn't allow init containers or a second container
-        export PATH=$PATH:/tmp/bin
-        mkdir /tmp/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.3/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
-        chmod ug+x /tmp/bin/oc
-
-        # annotate the information about this job so that we can query for it
-        oc --kubeconfig /etc/appci/sa.release-bot.app.ci.config annotate pj/${PROW_JOB_ID} "release.openshift.io/from-tag=${from}" "release.openshift.io/tag=${to}" "release.openshift.io/source=ocp/$(BRANCH)"
-
-        ci-operator $@
-      - ""
+      - ci-operator
       env:
       - name: BRANCH
         value: "4.2"
