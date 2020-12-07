@@ -1,33 +1,13 @@
-tag_specification:
-  name: '4.1'
-  namespace: ocp
-promotion:
-  cluster: https://api.ci.openshift.org
-  namespace: openshift
-  name: release-v0.19.0
 base_images:
   base:
-    name: '4.1'
+    name: "4.1"
     namespace: ocp
     tag: base
+binary_build_commands: make install
 build_root:
   project_image:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
 canonical_go_repository: knative.dev/serving
-binary_build_commands: make install
-test_binary_build_commands: make test-install
-tests:
-- as: e2e-aws
-  commands: "make test-e2e"
-  openshift_installer_src:
-    cluster_profile: aws
-resources:
-  '*':
-    limits:
-      memory: 4Gi
-    requests:
-      cpu: 100m
-      memory: 200Mi
 images:
 - dockerfile_path: openshift/ci-operator/knative-images/autoscaler-hpa/Dockerfile
   from: base
@@ -261,3 +241,27 @@ images:
       - destination_dir: .
         source_path: /go/bin/flaky
   to: knative-serving-test-flaky
+promotion:
+  name: release-v0.19.0
+  namespace: openshift
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.1"
+  namespace: ocp
+test_binary_build_commands: make test-install
+tests:
+- as: e2e-aws
+  commands: make test-e2e
+  openshift_installer_src:
+    cluster_profile: aws
+zz_generated_metadata:
+  branch: release-v0.19.0
+  org: openshift
+  repo: knative-serving
+  variant: "4.6"
