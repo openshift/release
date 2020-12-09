@@ -187,6 +187,7 @@ def _add_osd_rc_deployment(gendoc):
                                         '--listen=' + ('127.0.0.1:8080' if context.private else ':8080'),
                                         f'--prow-namespace={context.config.rc_deployment_namespace}',
                                         '--non-prow-job-kubeconfig=/etc/kubeconfig/kubeconfig',
+                                        '--releases-kubeconfig=/etc/kubeconfig/releases-kubeconfig',
                                         f'--job-namespace={context.jobs_namespace}',
                                         f'--tools-image-stream-tag=release-controller-bootstrap:tests',
                                         '-v=6',
@@ -278,10 +279,15 @@ def _add_osd_rc_deployment(gendoc):
                         {
                             'name': 'release-controller-kubeconfigs',
                             'secret': {
-                                'items': [{
-                                    'key': f'sa.release-controller-{context.is_namespace}.api.ci.config',
-                                    'path': 'kubeconfig'
-                                }],
+                                'items': [
+                                    {
+                                        'key': f'sa.release-controller-{context.is_namespace}.api.ci.config',
+                                        'path': 'kubeconfig'
+                                    },
+                                    {
+                                        'key': f'sa.release-controller-{context.is_namespace}.app.ci.config',
+                                        'path': 'releases-kubeconfig'
+                                    }],
                                 'secretName': 'release-controller-kubeconfigs'
                             }
                         },
