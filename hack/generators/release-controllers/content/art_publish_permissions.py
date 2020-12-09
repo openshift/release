@@ -55,7 +55,7 @@ in 3.11).''')
                 }
             })
 
-            for major_minor in config.releases_4x:
+            for major_minor in config.releases:
                 gendoc.append({
                     'apiVersion': 'v1',
                     'kind': 'ImageStream',
@@ -84,7 +84,7 @@ in 3.11).''')
                     'apiGroups': ['image.openshift.io'],
                     'resourceNames': [f'release{config.get_suffix(arch, private)}',
                                       *[f'{major_minor}-art-latest{config.get_suffix(arch, private)}' for major_minor in
-                                        config.releases_4x],
+                                        config.releases],
                                       'builder-base',
                                       'builder'],
                     'resources': ['imagestreams'],
