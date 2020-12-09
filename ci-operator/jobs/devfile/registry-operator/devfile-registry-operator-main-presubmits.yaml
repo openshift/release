@@ -5,15 +5,63 @@ presubmits:
     branches:
     - main
     cluster: build01
-    context: ci/prow/e2e-test
+    context: ci/prow/v4.5-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: v4.5
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-devfile-registry-operator-main-e2e-test
-    rerun_command: /test e2e-test
+    name: pull-ci-devfile-registry-operator-main-v4.5-images
+    rerun_command: /test v4.5-images
+    spec:
+      containers:
+      - args:
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --target=[images]
+        - --variant=v4.5
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )v4.5-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - main
+    cluster: build01
+    context: ci/prow/v4.5-registry-operator-integration-test
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: v4.5
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-devfile-registry-operator-main-v4.5-registry-operator-integration-test
+    rerun_command: /test v4.5-registry-operator-integration-test
     spec:
       containers:
       - args:
@@ -21,9 +69,9 @@ presubmits:
         - --lease-server-password-file=/etc/boskos/password
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-test-cluster-profile
-        - --target=e2e-test
+        - --secret-dir=/usr/local/registry-operator-integration-test-cluster-profile
+        - --target=registry-operator-integration-test
+        - --variant=v4.5
         command:
         - ci-operator
         image: ci-operator:latest
@@ -36,10 +84,7 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-test-cluster-profile
+        - mountPath: /usr/local/registry-operator-integration-test-cluster-profile
           name: cluster-profile
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -55,9 +100,6 @@ presubmits:
           - key: password
             path: password
           secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -69,4 +111,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-test,?($|\s.*)
+    trigger: (?m)^/test( | .* )v4.5-registry-operator-integration-test,?($|\s.*)
