@@ -434,7 +434,7 @@ objects:
 
         function create_manifest_files() {
           echo "Creating manifest files"
-          TF_LOG=debug openshift-install --dir=${ASSETS_DIR} create manifests  --log-level=debug 2>&1 | grep --line-buffered -v password
+          TF_LOG=debug openshift-install --dir=${ASSETS_DIR} create manifests  --log-level=debug 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:'
 
           sed -i '/^  channel:/d' "${ASSETS_DIR}/manifests/cvo-overrides.yaml"
 
@@ -450,7 +450,7 @@ objects:
 
         function create_ignition_configs_and_jsons() {
           echo "Creating ignition-configs"
-          TF_LOG=debug openshift-install --dir=${ASSETS_DIR} create ignition-configs --log-level=debug 2>&1 | grep --line-buffered -v password &
+          TF_LOG=debug openshift-install --dir=${ASSETS_DIR} create ignition-configs --log-level=debug 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
           wait "$!"
           export INFRA_ID=$(sed -n 's|.*"infraID":"\([^"]*\)".*|\1|p' ${ASSETS_DIR}/metadata.json )
 
@@ -713,7 +713,7 @@ objects:
           signal_oc_bootstrap_started
           echo "Waiting for bootstrap to complete"
           date
-          TF_LOG=debug openshift-install --dir=${ASSETS_DIR} wait-for bootstrap-complete --log-level=debug 2>&1 | grep --line-buffered -v password &
+          TF_LOG=debug openshift-install --dir=${ASSETS_DIR} wait-for bootstrap-complete --log-level=debug 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
           wait "$!"
         }
 
@@ -779,7 +779,7 @@ objects:
 
         function wait_for_install_complete() {
           echo "Completing UPI setup"
-          TF_LOG=debug openshift-install --dir=${ASSETS_DIR} wait-for install-complete --log-level=debug 2>&1 | grep --line-buffered -v password &
+          TF_LOG=debug openshift-install --dir=${ASSETS_DIR} wait-for install-complete --log-level=debug 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
           wait "$!"
 
           # Password for the cluster gets leaked in the installer logs and hence removing them.
@@ -1312,7 +1312,7 @@ objects:
 
         function destroy_cluster() {
           # This is UPI setup so we don't destroy the cluster using "destroy cluster"
-          #TF_LOG=debug openshift-install  --dir ${ASSETS_DIR} destroy cluster --log-level=debug 2>&1 | grep --line-buffered -v password
+          #TF_LOG=debug openshift-install  --dir ${ASSETS_DIR} destroy cluster --log-level=debug 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:'
           echo openshift-install destroy cluster NOT used
         }
 

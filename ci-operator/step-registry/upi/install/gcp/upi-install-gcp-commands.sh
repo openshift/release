@@ -512,7 +512,7 @@ fi
 
 ## Monitor for cluster completion
 echo "$(date -u --rfc-3339=seconds) - Monitoring for cluster completion..."
-openshift-install --dir="${dir}" wait-for install-complete 2>&1 | grep --line-buffered -v password &
+openshift-install --dir="${dir}" wait-for install-complete 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
 
 set +e
 wait "$!"
