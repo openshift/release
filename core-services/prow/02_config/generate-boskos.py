@@ -31,10 +31,8 @@ CONFIG = {
     'packet-quota-slice': {
         'default': 30,
     },
-    'vsphere-quota-slice': {
-        'default': 10,
-    },
     'kubevirt-quota-slice':{},
+    'vsphere-quota-slice':{},
 }
 
 for i in range(2):
@@ -56,6 +54,9 @@ for i in range(10, 18):
 
 for i in range(1, 4):
     CONFIG['kubevirt-quota-slice']['tenant-cluster-{}'.format(i)] = 1
+
+for i in range(0,10):
+    CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 config = {
     'resources': [],
