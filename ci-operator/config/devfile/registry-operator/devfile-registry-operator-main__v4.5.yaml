@@ -27,7 +27,12 @@ tests:
     cluster_profile: aws
     test:
     - as: registry-operator-integration-test-steps
-      commands: .ci/openshift_integration.sh
+      commands: |
+        export PATH=$PATH:/tmp/bin
+        mkdir /tmp/bin
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.5/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
+        chmod ug+x /tmp/bin/oc
+        .ci/openshift_integration.sh
       dependencies:
       - env: REGISTRY_OPERATOR
         name: registry-operator
