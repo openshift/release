@@ -90,7 +90,7 @@ tag_specification:
   namespace: ocp
 test_binary_build_commands: |
   set -eo pipefail
-  pip3 install pyyaml
+  pip3 install pyyaml waiting
 tests:
 - as: sanity-oc
   steps:
@@ -113,35 +113,12 @@ tests:
         export TARGET='oc'
         export PROFILE='openshift-ci'
 
+        echo "make openshift-ci-deploy-for-subsystem"
+        make openshift-ci-deploy-for-subsystem
+
+        sleep 60
         echo "oc get pods"
         oc get pods
-
-        echo "deploying wiremock"
-        make deploy-wiremock
-
-        echo "sleep + oc get pods again"
-        sleep 60
-        oc get pods
-
-        echo "deploying postgres"
-        make deploy-postgres
-
-        echo "sleep + oc get pods again"
-        sleep 60
-        oc get pods
-
-        echo "deploying deploy-s3"
-        make deploy-s3
-
-        echo "sleep + oc get pods again"
-        sleep 60
-        oc get pods
-
-        echo "deploying deploy-ocm-secret"
-        make deploy-ocm-secret
-
-        echo "deploy-route53"
-        make deploy-route53
       from: test-bin
       resources:
         requests:
