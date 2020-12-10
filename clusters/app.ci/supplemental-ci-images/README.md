@@ -14,3 +14,4 @@ These resources provide some supplemental images to be used in CI builds.
 - `manage-clonerefs.yaml`: Used by [ProwJob/periodic-manage-clonerefs](https://github.com/openshift/release/blob/968b1dca270336a548f87ccca6d96c9fd7940fbe/ci-operator/jobs/infra-periodics.yaml#L8)
 - `opm-builder.yaml`: Used by [openshift-kni/performance-addon-operators](../../../ci-operator/config/openshift-kni/performance-addon-operators)
 - `rhscl-nodejs10.yaml`: Used by [openshift/origin-aggregated-logging](../../../ci-operator/config/openshift/origin-aggregated-logging)
+- `ubuntu.yaml`: Used by [kata-containers](../../../ci-operator/config/kata-containers)
