@@ -105,7 +105,7 @@ applyTemplate:
 	oc process -f $(WHAT) | oc apply -f -
 .PHONY: applyTemplate
 
-postsubmit-update: origin-release origin-stable cincinnati prow-release-controller-definitions
+postsubmit-update: origin-release origin-stable cincinnati
 .PHONY: postsubmit-update
 
 all: roles prow projects
