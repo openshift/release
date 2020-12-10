@@ -12,6 +12,18 @@ export SSH_PRIV_KEY_PATH="${CLUSTER_PROFILE_DIR}/ssh-privatekey"
 export OPENSHIFT_INSTALL_INVOKER="openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD_ID}"
 
 echo "$(date -u --rfc-3339=seconds) - Configuring gcloud..."
+
+if ! gcloud --version; then
+  GCLOUD_TAR="google-cloud-sdk-256.0.0-linux-x86_64.tar.gz"
+  GCLOUD_URL="https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/$GCLOUD_TAR"
+  echo "$(date -u --rfc-3339=seconds) - gcloud not installed: installing from $GCLOUD_URL"
+  pushd ${HOME}
+  curl -O "$GCLOUD_URL"
+  tar -xzf "$GCLOUD_TAR"
+  export PATH=${HOME}/google-cloud-sdk/bin:${PATH}
+  popd
+fi
+
 export GOOGLE_CLOUD_KEYFILE_JSON="${CLUSTER_PROFILE_DIR}/gce.json"
 gcloud auth activate-service-account --key-file="${GOOGLE_CLOUD_KEYFILE_JSON}"
 gcloud config set project "$(jq -r .gcp.projectID "${SHARED_DIR}/metadata.json")"
