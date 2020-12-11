@@ -27,6 +27,7 @@ rules:
   - services
   - endpoints
   - pods
+  - configmaps
   verbs:
   - get
   - watch
@@ -392,7 +393,7 @@ spec:
         - -c
         - |
           promtail \
-            -client.external-labels=_id=\$(cat /tmp/shared/cluster-id),host=\$(HOSTNAME) \
+            -client.external-labels=_id=\$(cat /tmp/shared/cluster-id),host=\$(HOSTNAME),invoker=\$(cat /tmp/shared/cluster-invoker) \
             -config.file=/etc/promtail/promtail.yaml
         env:
         - name: HOSTNAME
@@ -436,12 +437,12 @@ spec:
       - command:
         - sh
         - "-c"
-        - oc get clusterversion/version -o=jsonpath='{.spec.clusterID}' > /tmp/shared/cluster-id
+        - oc get clusterversion/version -o=jsonpath='{.spec.clusterID}' > /tmp/shared/cluster-id && oc get cm openshift-install -n openshift-config -o=jsonpath='{.data.invoker}' > /tmp/shared/cluster-invoker
         volumeMounts:
           - mountPath: "/tmp/shared"
             name: shared-data
         image: quay.io/openshift/origin-cli:4.6.0
-        name: fetch-cluster-id
+        name: fetch-cluster-data
       serviceAccountName: loki-promtail
       tolerations:
       - effect: NoSchedule
