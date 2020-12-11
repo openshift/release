@@ -334,6 +334,22 @@ data:
         labels:
           job: systemd-journal
       relabel_configs:
+        - action: drop
+          regex: ''
+          source_labels:
+          - __journal__exe
+          - __journal__machine_id
+          - __journal__source_realtime_timestamp
+          - __journal__systemd_slice
+          - __journal__comm
+          - __journal__systemd_cgroup
+          - __journal__transport
+          - __journal__uid
+          - __journal__gid
+          - __journal__pid
+          - __journal__cap_effective
+          - __journal__cmdline
+          - __journal__selinux_context
         - action: labelmap
           regex: __journal__(.+)
     server:
