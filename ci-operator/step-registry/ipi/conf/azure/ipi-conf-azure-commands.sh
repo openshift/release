@@ -6,8 +6,18 @@ set -o pipefail
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
-REGION="${LEASED_RESOURCE}"
-echo "Azure region: ${REGION}"
+case $((RANDOM % 8)) in
+0) AZURE_REGION=centralus;;
+1) AZURE_REGION=centralus;;
+2) AZURE_REGION=centralus;;
+3) AZURE_REGION=centralus;;
+4) AZURE_REGION=centralus;;
+5) AZURE_REGION=centralus;;
+6) AZURE_REGION=eastus2;;
+7) AZURE_REGION=westus;;
+*) echo >&2 "invalid Azure region index"; exit 1;;
+esac
+echo "Azure region: ${AZURE_REGION}"
 
 cat >> "${CONFIG}" << EOF
 baseDomain: ci.azure.devcluster.openshift.com
@@ -19,5 +29,5 @@ compute:
 platform:
   azure:
     baseDomainResourceGroupName: os4-common
-    region: ${REGION}
+    region: ${AZURE_REGION}
 EOF
