@@ -328,6 +328,14 @@ data:
         - __meta_kubernetes_pod_annotation_kubernetes_io_config_mirror
         - __meta_kubernetes_pod_container_name
         target_label: __path__
+    - job_name: journal
+      journal:
+        path: /var/log/journal
+        labels:
+          job: systemd-journal
+      relabel_configs:
+        - action: labelmap
+          regex: __journal__(.+)
     server:
       http_listen_port: 3101
     target_config:
@@ -433,6 +441,9 @@ spec:
           readOnly: true
         - mountPath: "/tmp/shared"
           name: shared-data
+        - mountPath: "/var/log/journal"
+          name: journal
+          readOnly: true
       initContainers:
       - command:
         - sh
@@ -461,6 +472,9 @@ spec:
       - hostPath:
           path: "/var/log/pods"
         name: pods
+      - hostPath:
+          path: "/var/log/journal"
+        name: journal
       - emptyDir: {}
         name: shared-data
   updateStrategy:
