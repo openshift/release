@@ -9,17 +9,29 @@ spec:
   selector:
     matchLabels:
       app: blackbox-prober
-  replicas: 1
+  replicas: 2
   template:
     metadata:
       labels:
         app: blackbox-prober
     spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - blackbox-prober
+              topologyKey: "kubernetes.io/hostname"
       containers:
       - name: blackbox-prober
         args:
         - --config.file=/etc/config/prober.yaml
-        image: prom/blackbox-exporter:v0.15.1
+        image: quay.io/prometheus/blackbox-exporter:v0.18.0
         volumeMounts:
         - name: config
           mountPath: /etc/config/
