@@ -334,8 +334,8 @@ data:
         labels:
           job: systemd-journal
       relabel_configs:
-        - action: labelmap
-          regex: __journal__(.+)
+      - action: labelmap
+        regex: __journal__(boot_id|systemd_unit)
     server:
       http_listen_port: 3101
     target_config:
