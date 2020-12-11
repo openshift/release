@@ -16,7 +16,6 @@ CONFIG = {
         # and each cluster needs three of public IPs: https://docs.openshift.com/container-platform/4.5/installing/installing_azure/installing-azure-account.html#installation-azure-limits_installing-azure-account
         'centralus': 16,
         # Wild guesses.  We'll see when we hit quota issues
-        'eastus1': 10,
         'eastus2': 10,
         'westus': 10
     },
