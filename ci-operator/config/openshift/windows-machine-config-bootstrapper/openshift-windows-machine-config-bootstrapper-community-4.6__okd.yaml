@@ -1,0 +1,71 @@
+base_images:
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.15
+images:
+- dockerfile_path: Dockerfile.tools
+  inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
+  to: windows-machine-config-bootstrapper-tests
+promotion:
+  name: "4.6"
+  namespace: okd
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.6"
+  namespace: origin
+test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
+tests:
+- as: build
+  commands: |
+    make build --warn-undefined-variables
+    make build-tools --warn-undefined-variables
+  container:
+    from: src
+- as: verify
+  commands: make verify-all --warn-undefined-variables
+  container:
+    from: src
+- as: e2e-wmcb
+  steps:
+    cluster_profile: aws
+    test:
+    - as: e2e-wmcb
+      commands: |-
+        #!/bin/bash
+
+        set -o nounset
+        set -o errexit
+        set -o pipefail
+
+        cluster_profile=/var/run/secrets/ci.openshift.io/cluster-profile
+        export AWS_SHARED_CREDENTIALS_FILE=${cluster_profile}/.awscred
+        export KUBE_SSH_KEY_PATH=${cluster_profile}/ssh-privatekey
+
+        make run-wmcb-ci-e2e-test
+      dependencies:
+      - env: WMCB_IMAGE
+        name: windows-machine-config-bootstrapper-tests
+      from: src
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 600Mi
+    workflow: ipi-aws-ovn-hybrid
+zz_generated_metadata:
+  branch: community-4.6
+  org: openshift
+  repo: windows-machine-config-bootstrapper
+  variant: okd
