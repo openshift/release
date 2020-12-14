@@ -8,7 +8,7 @@ CONFIG="${SHARED_DIR}/install-config.yaml"
 
 GCP_BASE_DOMAIN="origin-ci-int-gce.dev.openshift.com"
 GCP_PROJECT="openshift-gce-devel-ci"
-GCP_REGION="us-east1"
+GCP_REGION="${LEASED_RESOURCE}"
 
 cat >> "${CONFIG}" << EOF
 baseDomain: ${GCP_BASE_DOMAIN}
