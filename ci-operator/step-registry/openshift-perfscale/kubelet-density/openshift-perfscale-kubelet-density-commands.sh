@@ -26,6 +26,16 @@ for label in ${control_plane_labels}; do
   oc wait pod --for=condition=Ready -A -l "${label}" --timeout=300s
 done
 
+# Scale worker nodes
+ms_number=$(oc get machineset -n openshift-machine-api -o name | wc -l)
+ms_replicas=10
+for ms in $(oc get machineset -n openshift-machine-api -o name); do
+  oc scale -n openshift-machine-api ${ms} --replicas=${ms_replicas}
+done
+while [[ "$(oc get node -l node-role.kubernetes.io/worker= | grep -c ' Ready')" != $((ms_number*ms_replicas)) ]]; do
+  sleep 10
+done
+
 # Warm-up
 ./bin/kube-burner init -c ${warmup} -u "${prometheus_url}" -t "${token}" -a https://raw.githubusercontent.com/rsevilla87/cluster-perf-ci/master/alert-profiles/generalistic.yml --uuid "$(uuidgen)"
 
