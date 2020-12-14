@@ -17,6 +17,9 @@ build_root:
 images:
 - dockerfile_path: Dockerfile
   to: che-operator-image
+- context_dir: olm/eclipse-che-preview-openshift
+  dockerfile_path: Dockerfile
+  to: catalog-source-image
 operator:
   bundles:
   - context_dir: deploy/olm-catalog/eclipse-che-preview-openshift
@@ -90,6 +93,28 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: optional-operators-ci-aws
+- as: che-operator-update
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export PATH=$PATH:/tmp/bin
+        mkdir -p /tmp/bin
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.6/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
+        chmod ug+x /tmp/bin/oc
+        echo -e "[INFO] Test script content:"
+        cat .ci/cico_updates_openshift.sh
+        /bin/bash .ci/cico_updates_openshift.sh
+      dependencies:
+      - env: CI_CATALOG_SOURCE_IMAGE
+        name: catalog-source-image
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: eclipse
