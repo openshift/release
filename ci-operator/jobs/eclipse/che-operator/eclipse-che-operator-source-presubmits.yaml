@@ -3,18 +3,18 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - source
     cluster: build01
-    context: ci/prow/v7-che-operator-olm-nightly-deployment
+    context: ci/prow/v6-che-operator-olm-nightly-deployment
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: v7
+      ci-operator.openshift.io/variant: v6
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-eclipse-che-operator-master-v7-che-operator-olm-nightly-deployment
-    rerun_command: /test v7-che-operator-olm-nightly-deployment
+    name: pull-ci-eclipse-che-operator-source-v6-che-operator-olm-nightly-deployment
+    rerun_command: /test v6-che-operator-olm-nightly-deployment
     spec:
       containers:
       - args:
@@ -25,7 +25,7 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/che-operator-olm-nightly-deployment-cluster-profile
         - --target=che-operator-olm-nightly-deployment
-        - --variant=v7
+        - --variant=v6
         command:
         - ci-operator
         image: ci-operator:latest
@@ -68,22 +68,22 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )v7-che-operator-olm-nightly-deployment,?($|\s.*)
+    trigger: (?m)^/test( | .* )v6-che-operator-olm-nightly-deployment,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - source
     cluster: build01
-    context: ci/prow/v7-che-operator-single-host-nightly-deployment
+    context: ci/prow/v6-che-operator-single-host-nightly-deployment
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: v7
+      ci-operator.openshift.io/variant: v6
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-eclipse-che-operator-master-v7-che-operator-single-host-nightly-deployment
-    rerun_command: /test v7-che-operator-single-host-nightly-deployment
+    name: pull-ci-eclipse-che-operator-source-v6-che-operator-single-host-nightly-deployment
+    rerun_command: /test v6-che-operator-single-host-nightly-deployment
     spec:
       containers:
       - args:
@@ -94,7 +94,7 @@ presubmits:
         - --report-username=ci
         - --secret-dir=/usr/local/che-operator-single-host-nightly-deployment-cluster-profile
         - --target=che-operator-single-host-nightly-deployment
-        - --variant=v7
+        - --variant=v6
         command:
         - ci-operator
         image: ci-operator:latest
@@ -137,22 +137,91 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )v7-che-operator-single-host-nightly-deployment,?($|\s.*)
+    trigger: (?m)^/test( | .* )v6-che-operator-single-host-nightly-deployment,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - source
     cluster: build01
-    context: ci/prow/v7-ci-index
+    context: ci/prow/v6-che-operator-update
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: v7
+      ci-operator.openshift.io/variant: v6
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-eclipse-che-operator-master-v7-ci-index
-    rerun_command: /test v7-ci-index
+    name: pull-ci-eclipse-che-operator-source-v6-che-operator-update
+    rerun_command: /test v6-che-operator-update
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-password-file=/etc/boskos/password
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --secret-dir=/usr/local/che-operator-update-cluster-profile
+        - --target=che-operator-update
+        - --variant=v6
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/che-operator-update-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )v6-che-operator-update,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - source
+    cluster: build01
+    context: ci/prow/v6-ci-index
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: v6
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-eclipse-che-operator-source-v6-ci-index
+    rerun_command: /test v6-ci-index
     spec:
       containers:
       - args:
@@ -161,7 +230,7 @@ presubmits:
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --target=ci-index
-        - --variant=v7
+        - --variant=v6
         command:
         - ci-operator
         image: ci-operator:latest
@@ -188,22 +257,22 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )v7-ci-index,?($|\s.*)
+    trigger: (?m)^/test( | .* )v6-ci-index,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - source
     cluster: build01
-    context: ci/prow/v7-images
+    context: ci/prow/v6-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: v7
+      ci-operator.openshift.io/variant: v6
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-eclipse-che-operator-master-v7-images
-    rerun_command: /test v7-images
+    name: pull-ci-eclipse-che-operator-source-v6-images
+    rerun_command: /test v6-images
     spec:
       containers:
       - args:
@@ -212,7 +281,7 @@ presubmits:
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --target=[images]
-        - --variant=v7
+        - --variant=v6
         command:
         - ci-operator
         image: ci-operator:latest
@@ -239,4 +308,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )v7-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )v6-images,?($|\s.*)
