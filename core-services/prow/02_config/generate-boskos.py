@@ -64,7 +64,7 @@ for i in range(10, 18):
 for i in range(1, 4):
     CONFIG['kubevirt-quota-slice']['tenant-cluster-{}'.format(i)] = 1
 
-for i in range(0,10):
+for i in range(0,6):
     CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 config = {
