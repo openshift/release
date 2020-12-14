@@ -71,11 +71,11 @@ data:
   promtail.yaml: |-
     client:
       backoff_config:
-        max_period: 5s
+        max_period: 5m
         max_retries: 20
-        min_period: 100ms
+        min_period: 1s
       batchsize: 102400
-      batchwait: 1s
+      batchwait: 10s
       bearer_token_file: /tmp/shared/bearer_token
       timeout: 10s
       url: ${LOKI_ENDPOINT}/push
@@ -334,8 +334,8 @@ data:
         labels:
           job: systemd-journal
       relabel_configs:
-        - action: labelmap
-          regex: __journal__(.+)
+      - action: labelmap
+        regex: __journal__(boot_id|systemd_unit)
     server:
       http_listen_port: 3101
     target_config:
