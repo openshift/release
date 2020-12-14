@@ -1802,12 +1802,13 @@ presubmits:
     always_run: false
     branches:
     - release-4.7
-    cluster: build02
+    cluster: ovirt
     context: ci/prow/e2e-ovirt
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.7-e2e-ovirt
     optional: true
@@ -1820,22 +1821,12 @@ presubmits:
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
-        - --repo=installer
-        - --secret-dir=/etc/boskos
+        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-username=ci
         - --secret-dir=/usr/local/e2e-ovirt-cluster-profile
         - --target=e2e-ovirt
-        - --template=/usr/local/e2e-ovirt
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: ovirt
-        - name: JOB_NAME_SAFE
-          value: e2e-ovirt
-        - name: LEASE_TYPE
-          value: minimal
-        - name: TEST_COMMAND
-          value: run-minimal-tests
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -1851,9 +1842,6 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/e2e-ovirt-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-ovirt
-          name: job-definition
-          subPath: cluster-launch-installer-ovirt-e2e.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -1880,9 +1868,6 @@ presubmits:
               name: ovirt-infra-secrets
           - configMap:
               name: cluster-profile-ovirt
-      - configMap:
-          name: prow-job-cluster-launch-installer-ovirt-e2e
-        name: job-definition
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
