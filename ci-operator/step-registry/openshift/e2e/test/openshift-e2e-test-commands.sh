@@ -43,7 +43,9 @@ gcp)
     export KUBE_SSH_USER=core
     mkdir -p ~/.ssh
     cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/google_compute_engine || true
-    export TEST_PROVIDER='{"type":"gce","region":"us-east1","multizone": true,"multimaster":true,"projectid":"openshift-gce-devel-ci"}'
+    # TODO: make openshift-tests auto-discover this from cluster config
+    REGION="$(oc get -o jsonpath='{.status.platformStatus.gcp.region}' infrastructure cluster)"
+    export TEST_PROVIDER="{\"type\":\"gce\",\"region\":\"${REGION}\",\"multizone\": true,\"multimaster\":true,\"projectid\":\"openshift-gce-devel-ci\"}"
     ;;
 aws)
     mkdir -p ~/.ssh
