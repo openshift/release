@@ -30,9 +30,15 @@ presubmits:
         - ci-operator
         env:
         - name: CLUSTER_TYPE
-          value: openstack
+          value: openstack-vexxhost
         - name: JOB_NAME_SAFE
           value: e2e-openstack
+        - name: OPENSTACK_EXTERNAL_NETWORK
+          value: public
+        - name: OPENSTACK_FLAVOR
+          value: v1-standard-4
+        - name: OS_CLOUD
+          value: openstack
         - name: TEST_COMMAND
           value: run-no-tests
         image: ci-operator:latest
@@ -74,6 +80,20 @@ presubmits:
         projected:
           sources:
           - secret:
+              items:
+              - key: clouds.yaml
+                path: clouds.yaml
+              name: cluster-secrets-openstack-vexxhost
+          - secret:
+              items:
+              - key: .awscred
+                path: .awscred
+              - key: ssh-privatekey
+                path: ssh-privatekey
+              - key: ssh-publickey
+                path: ssh-publickey
+              - key: pull-secret
+                path: pull-secret
               name: cluster-secrets-openstack
       - configMap:
           name: prow-job-cluster-launch-installer-openstack-e2e
