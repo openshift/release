@@ -157,9 +157,8 @@ tests:
     cluster_profile: aws
     test:
     - as: test
-      cli: latest
       commands: RELEASE_DELTA=1 make upgrade-test
-      from: src
+      from: hco-oc-bin-image
       resources:
         requests:
           cpu: 500m
@@ -169,9 +168,8 @@ tests:
     cluster_profile: aws
     test:
     - as: test
-      cli: latest
       commands: RELEASE_DELTA=2 PREV=true make upgrade-test
-      from: src
+      from: hco-oc-bin-image
       resources:
         requests:
           cpu: 500m
@@ -181,9 +179,8 @@ tests:
     cluster_profile: azure4
     test:
     - as: test
-      cli: latest
       commands: make start && make functest
-      from: src
+      from: hco-oc-bin-image
       resources:
         requests:
           cpu: 500m
@@ -193,9 +190,8 @@ tests:
     cluster_profile: azure4
     test:
     - as: test
-      cli: latest
       commands: RELEASE_DELTA=1 make upgrade-test
-      from: src
+      from: hco-oc-bin-image
       resources:
         requests:
           cpu: 500m
@@ -205,9 +201,8 @@ tests:
     cluster_profile: azure4
     test:
     - as: test
-      cli: latest
       commands: RELEASE_DELTA=2 PREV=true make upgrade-test
-      from: src
+      from: hco-oc-bin-image
       resources:
         requests:
           cpu: 500m
@@ -218,7 +213,6 @@ tests:
     cluster_profile: aws
     test:
     - as: test
-      cli: latest
       commands: |
         latest_build=$(curl -sL https://storage.googleapis.com/kubevirt-prow/devel/nightly/release/kubevirt/hyperconverged-cluster-operator/latest)
         latest_bundle=$(curl -sL https://storage.googleapis.com/kubevirt-prow/devel/nightly/release/kubevirt/hyperconverged-cluster-operator/${latest_build}/hco-bundle-image)
@@ -226,7 +220,7 @@ tests:
         sed -i "s#15m#30m#g" ./deploy/kustomize/deploy_kustomize.sh
         CONTENT_ONLY=false MARKETPLACE_MODE=false ./deploy/kustomize/deploy_kustomize.sh ||
         oc adm must-gather --image=quay.io/kubevirt/must-gather:latest --dest-dir=${ARTIFACT_DIR} --timeout=10
-      from: src
+      from: hco-oc-bin-image
       resources:
         requests:
           cpu: 500m
