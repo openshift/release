@@ -54,7 +54,7 @@ sed -i '/^  channel:/d' ${dir}/manifests/cvo-overrides.yaml
 # Bump the libvirt masters memory to 16GB
 export TF_VAR_libvirt_master_memory=16384
 ls ${dir}/openshift
-for ((i=0; i<$MASTER_REPLICAS; i++))
+for ((i=0; i<${MASTER_REPLICAS}; i++))
 do
   yq write --inplace ${dir}/openshift/99_openshift-cluster-api_master-machines-${i}.yaml spec.providerSpec.value[domainMemory] 16384
 done
@@ -76,7 +76,7 @@ openshift_install="$!"
 sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
 
 # Password for the cluster gets leaked in the installer logs and hence removing them.
-sed -i 's/password: .*/password: REDACTED"/g' ${ARTIFACT_DIR}/installer/.openshift_install.log
+sed -i 's/password: .*/password: REDACTED"/g' ${dir}/.openshift_install.log
 # While openshift-install is running...
 i=0
 while kill -0 $openshift_install 2> /dev/null; do

@@ -25,7 +25,7 @@ read -d '#' INCL << EOF
 [sig-auth][Feature:LDAP] LDAP should start an OpenLDAP test server [Suite:openshift/conformance/parallel]
 [sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the authorize URL [Suite:openshift/conformance/parallel]
 [sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the grant URL [Suite:openshift/conformance/parallel]
-            
+
 #
 EOF
 

@@ -56,7 +56,7 @@ if [[ -z "${REMOTE_LIBVIRT_URI}" ]]; then
   REMOTE_LIBVIRT_URI="qemu+tcp://${REMOTE_LIBVIRT_HOSTNAME}/system"
 fi
 echo "Remote Libvirt=${REMOTE_LIBVIRT_URI}"
-      
+
 NETWORK_NAME="br$(printf ${LEASED_RESOURCE} | tail -c 3)"
 CLUSTER_NAME="ocp-${LEASED_RESOURCE}"
 ssh_pub_key=$(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")
@@ -89,12 +89,12 @@ compute:
 platform:
   libvirt:
     URI: ${REMOTE_LIBVIRT_URI}
-    network: 
+    network:
       if: ${NETWORK_NAME}
 pullSecret: >
   ${pull_secret}
 sshKey: |
-  ${ssh_pub_key}      
+  ${ssh_pub_key}
 EOF
 
 cat ${CONFIG}
