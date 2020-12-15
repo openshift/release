@@ -53,7 +53,7 @@ def _add_osd_rc_service(gendoc):
 def _get_dynamic_rc_volume_mounts(context):
     prow_volume_mounts = []
 
-    for major_minor in context.config.releases_4x:
+    for major_minor in context.config.releases:
         prow_volume_mounts.append({
             'mountPath': f'/etc/job-config/{major_minor}',
             'name': f'job-config-{major_minor.replace(".", "")}',  # e.g. job-config-45
@@ -81,7 +81,7 @@ def _get_dynamic_deployment_volumes(context):
             }
         })
 
-    for major_minor in context.config.releases_4x:
+    for major_minor in context.config.releases:
         prow_volumes.append({
             'configMap': {
                 'defaultMode': 420,
