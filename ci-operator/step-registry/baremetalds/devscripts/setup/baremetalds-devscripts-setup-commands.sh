@@ -6,9 +6,6 @@ set -o pipefail
 
 echo "************ baremetalds devscripts setup command ************"
 
-# TODO: Remove once OpenShift CI will be upgraded to 4.2 (see https://access.redhat.com/articles/4859371)
-~/fix_uid.sh
-
 # Initial check
 if [ "${CLUSTER_TYPE}" != "packet" ] ; then
     echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"
