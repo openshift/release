@@ -485,7 +485,6 @@ objects:
         else
           PXE_KERNEL_ARGS="coreos.inst.image_url=${PXE_OS_IMAGE_URL}"
         fi
-        PXE_KERNEL_ARGS="${PXE_KERNEL_ARGS},rd.live.ram=1"
         # 4.3 unified 'metal-bios' and 'metal-uefi' into just 'metal', unused in 4.6
         cat > ${ARTIFACT_DIR}/terraform/terraform.tfvars <<-EOF
         cluster_id = "${CLUSTER_NAME}"
@@ -519,6 +518,13 @@ objects:
         rc=1
         for r in {1..5}; do (cd ${ARTIFACT_DIR}/terraform && terraform apply -auto-approve) && rc=0 && break ; done
         if test "${rc}" -eq 1; then echo "failed to create the infra resources"; exit 1; fi
+
+        echo "Waiting for bootstrap to complete"
+        rc=1
+        for r in {1..2}; do openshift-install --dir=${ARTIFACT_DIR}/installer wait-for bootstrap-complete && rc=0 && break ; done
+        if test "${rc}" -eq 1; then echo "failed to bootstrap"; exit 1; fi
+        echo "Removing bootstrap host from control plane api pool"
+        (cd ${ARTIFACT_DIR}/terraform && terraform apply -auto-approve=true -var=bootstrap_dns="false")
 
         function approve_csrs() {
           while [[ ! -f /tmp/setup-failed ]] && [[ ! -f /tmp/setup-success ]]; do
