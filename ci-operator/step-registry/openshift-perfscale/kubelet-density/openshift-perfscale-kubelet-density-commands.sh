@@ -36,6 +36,8 @@ while [[ "$(oc get node -l node-role.kubernetes.io/worker= | grep -c ' Ready')" 
   sleep 10
 done
 
+sleep 330s
+
 # Warm-up
 ./bin/kube-burner init -c ${warmup} -u "${prometheus_url}" -t "${token}" -a https://raw.githubusercontent.com/rsevilla87/cluster-perf-ci/master/alert-profiles/generalistic.yml --uuid "$(uuidgen)"
 
