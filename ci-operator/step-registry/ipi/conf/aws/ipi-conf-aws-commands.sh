@@ -32,6 +32,7 @@ compute:
 - name: worker
   platform:
     aws:
+      type: ${COMPUTE_NODE_TYPE}
       zones:
       - ${zone_1:-${aws_region}a}
       - ${zone_2:-${aws_region}b}
