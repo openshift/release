@@ -56,7 +56,7 @@ presubmits:
         - core-services/prow/02_config/_boskos.yaml
         command:
         - /app
-        image: gcr.io/k8s-staging-boskos/checkconfig:v20201124-9da8944
+        image: gcr.io/k8s-staging-boskos/checkconfig:v20201215-12c1342
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -331,7 +331,7 @@ presubmits:
         - mismatched-tide-lenient
         command:
         - /checkconfig
-        image: gcr.io/k8s-prow/checkconfig:v20201207-6650343833
+        image: gcr.io/k8s-prow/checkconfig:v20201215-dcdd66d1f5
         imagePullPolicy: Always
         name: ""
         resources:
@@ -403,6 +403,7 @@ presubmits:
     spec:
       containers:
       - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
@@ -416,6 +417,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -822,6 +826,7 @@ presubmits:
     spec:
       containers:
       - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
@@ -835,6 +840,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -992,5 +1000,5 @@ presubmits:
         name: ""
         resources:
           requests:
-            cpu: 10m
+            cpu: "1"
     trigger: (?m)^/test( | .* )yamllint,?($|\s.*)

@@ -10,19 +10,20 @@ postsubmits:
     labels:
       ci-operator.openshift.io/is-promotion: "true"
       ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: "4.3"
+      ci-operator.openshift.io/variant: "4.4"
     max_concurrency: 1
-    name: branch-ci-openshift-knative-serverless-operator-release-1.7-4.3-images
+    name: branch-ci-openshift-knative-serverless-operator-release-1.7-4.4-images
     spec:
       containers:
       - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
         - --promote
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --target=[images]
-        - --variant=4.3
+        - --variant=4.4
         command:
         - ci-operator
         image: ci-operator:latest
@@ -32,6 +33,9 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true

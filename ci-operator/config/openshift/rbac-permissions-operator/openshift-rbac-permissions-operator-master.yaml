@@ -1,26 +1,47 @@
-base_images:
-  base:
-    name: ubi-minimal
-    namespace: ocp
-    tag: "8"
-  openshift_release_golang-1.13:
-    name: release
-    namespace: openshift
-    tag: golang-1.13
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.13
+  from_repository: true
 images:
 - dockerfile_path: build/Dockerfile
-  from: base
-  to: rbac-permissions-operator
+  to: unused
 resources:
   '*':
+    limits:
+      memory: 4Gi
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- as: coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  secret:
+    mount_path: /tmp/secret
+    name: rbac-permissions-operator-codecov-token
+- as: publish-coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  postsubmit: true
+  secret:
+    mount_path: /tmp/secret
+    name: rbac-permissions-operator-codecov-token
+- as: lint
+  commands: make lint
+  container:
+    from: src
+- as: test
+  commands: make test
+  container:
+    from: src
+- as: validate
+  commands: make validate
+  container:
+    from: src
 zz_generated_metadata:
   branch: master
   org: openshift

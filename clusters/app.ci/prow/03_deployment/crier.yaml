@@ -45,7 +45,7 @@ items:
         serviceAccountName: crier
         containers:
         - name: crier
-          image: gcr.io/k8s-prow/crier:v20201207-6650343833
+          image: gcr.io/k8s-prow/crier:v20201215-dcdd66d1f5
           args:
           - --github-workers=50
           - --config-path=/etc/config/config.yaml
@@ -53,6 +53,7 @@ items:
           - --github-token-path=/etc/github/oauth
           - --github-endpoint=http://ghproxy
           - --github-endpoint=https://api.github.com
+          - --github-disabled-repo=openshift/ci-tools
           - --blob-storage-workers=10
           - --gcs-credentials-file=/etc/service-account/service-account.json
           - --kubernetes-blob-storage-workers=10
@@ -119,6 +120,172 @@ items:
         - name: oauth
           secret:
             secretName: github-credentials-openshift-merge-robot
+        - name: slack
+          secret:
+            secretName: slack-credentials-prow
+        - name: config
+          configMap:
+            name: config
+        - name: job-config-misc
+          configMap:
+            name: job-config-misc
+        - name: job-config-master
+          configMap:
+            name: job-config-master
+        - name: job-config-3x
+          configMap:
+            name: job-config-3.x
+        - name: job-config-41
+          configMap:
+            name: job-config-4.1
+        - name: job-config-42
+          configMap:
+            name: job-config-4.2
+        - name: job-config-43
+          configMap:
+            name: job-config-4.3
+        - name: job-config-44
+          configMap:
+            name: job-config-4.4
+        - name: job-config-45
+          configMap:
+            name: job-config-4.5
+        - name: job-config-46
+          configMap:
+            name: job-config-4.6
+        - name: job-config-47
+          configMap:
+            name: job-config-4.7
+        - name: job-config-48
+          configMap:
+            name: job-config-4.8
+        - name: build-farm-credentials
+          secret:
+            items:
+            - key: sa.crier.api.ci.config
+              path: api.ci.kubeconfig
+            - key: sa.crier.build01.config
+              path: build01.kubeconfig
+            - key: sa.crier.app.ci.config
+              path: app.ci.kubeconfig
+            - key: sa.crier.build02.config
+              path: build02.kubeconfig
+            - key: sa.crier.vsphere.config
+              path: vsphere.kubeconfig
+            secretName: build-farm-credentials
+        - name: service-account
+          secret:
+            secretName: gce-sa-credentials-gcs-crier-publisher
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    namespace: ci
+    name: crier-apps-auth
+    labels:
+      app: prow
+      component: crier
+  spec:
+    # Do not scale up.
+    replicas: 1
+    revisionHistoryLimit: 2
+    strategy:
+      type: Recreate
+    selector:
+      matchLabels:
+        app: prow
+        component: crier
+        flavor: apps-auth
+    template:
+      metadata:
+        labels:
+          app: prow
+          component: crier
+          flavor: apps-auth
+      spec:
+        serviceAccountName: crier
+        containers:
+        - name: crier
+          image: gcr.io/k8s-prow/crier:v20201215-dcdd66d1f5
+          args:
+          - --github-workers=50
+          - --config-path=/etc/config/config.yaml
+          - --job-config-path=/etc/job-config
+          - --github-app-id=$(GITHUB_APP_ID)
+          - --github-app-private-key-path=/etc/github/cert
+          - --github-endpoint=http://ghproxy
+          - --github-endpoint=https://api.github.com
+          - --github-enabled-repo=openshift/ci-tools
+          - --blob-storage-workers=10
+          - --gcs-credentials-file=/etc/service-account/service-account.json
+          - --kubernetes-blob-storage-workers=10
+          - --slack-workers=5
+          - --slack-token-file=/etc/slack/oauth
+          env:
+          # Multiple configs can only be passed via the env var and not via the flag
+          - name: KUBECONFIG
+            value: /etc/build-farm-credentials/api.ci.kubeconfig:/etc/build-farm-credentials/build01.kubeconfig:/etc/build-farm-credentials/app.ci.kubeconfig:/etc/build-farm-credentials/build02.kubeconfig:/etc/build-farm-credentials/vsphere.kubeconfig
+          - name: GITHUB_APP_ID
+            valueFrom:
+              secretKeyRef:
+                name: openshift-prow-github-app
+                key: appid
+          volumeMounts:
+          - name: github-app-credentials
+            mountPath: /etc/github
+            readOnly: true
+          - name: slack
+            mountPath: /etc/slack
+            readOnly: true
+          - name: config
+            mountPath: /etc/config
+            readOnly: true
+          - name: job-config-misc
+            mountPath: /etc/job-config/misc
+            readOnly: true
+          - name: job-config-master
+            mountPath: /etc/job-config/master
+            readOnly: true
+          - name: job-config-3x
+            mountPath: /etc/job-config/3.x
+            readOnly: true
+          - name: job-config-41
+            mountPath: /etc/job-config/4.1
+            readOnly: true
+          - name: job-config-42
+            mountPath: /etc/job-config/4.2
+            readOnly: true
+          - name: job-config-43
+            mountPath: /etc/job-config/4.3
+            readOnly: true
+          - name: job-config-44
+            mountPath: /etc/job-config/4.4
+            readOnly: true
+          - name: job-config-45
+            mountPath: /etc/job-config/4.5
+            readOnly: true
+          - name: job-config-46
+            mountPath: /etc/job-config/4.6
+            readOnly: true
+          - name: job-config-47
+            mountPath: /etc/job-config/4.7
+            readOnly: true
+          - name: job-config-48
+            mountPath: /etc/job-config/4.8
+            readOnly: true
+          - mountPath: /etc/build-farm-credentials
+            name: build-farm-credentials
+            readOnly: true
+          - name: service-account
+            mountPath: /etc/service-account
+            readOnly: true
+          resources:
+            requests:
+              memory: "4Gi"
+              cpu: "600m"
+        volumes:
+        - name: github-app-credentials
+          secret:
+            secretName: openshift-prow-github-app
         - name: slack
           secret:
             secretName: slack-credentials-prow

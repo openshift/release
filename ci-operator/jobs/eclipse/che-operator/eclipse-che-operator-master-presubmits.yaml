@@ -5,26 +5,27 @@ presubmits:
     branches:
     - master
     cluster: build01
-    context: ci/prow/v3-che-operator-update
+    context: ci/prow/v6-che-operator-olm-nightly-deployment
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: v3
+      ci-operator.openshift.io/variant: v6
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-eclipse-che-operator-master-v3-che-operator-update
-    rerun_command: /test v3-che-operator-update
+    name: pull-ci-eclipse-che-operator-master-v6-che-operator-olm-nightly-deployment
+    rerun_command: /test v6-che-operator-olm-nightly-deployment
     spec:
       containers:
       - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-password-file=/etc/boskos/password
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/usr/local/che-operator-update-cluster-profile
-        - --target=che-operator-update
-        - --variant=v3
+        - --secret-dir=/usr/local/che-operator-olm-nightly-deployment-cluster-profile
+        - --target=che-operator-olm-nightly-deployment
+        - --variant=v6
         command:
         - ci-operator
         image: ci-operator:latest
@@ -37,8 +38,11 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/che-operator-update-cluster-profile
+        - mountPath: /usr/local/che-operator-olm-nightly-deployment-cluster-profile
           name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -64,32 +68,33 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )v3-che-operator-update,?($|\s.*)
+    trigger: (?m)^/test( | .* )v6-che-operator-olm-nightly-deployment,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - master
     cluster: build01
-    context: ci/prow/v4-che-operator-update
+    context: ci/prow/v6-che-operator-single-host-nightly-deployment
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: v4
+      ci-operator.openshift.io/variant: v6
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-eclipse-che-operator-master-v4-che-operator-update
-    rerun_command: /test v4-che-operator-update
+    name: pull-ci-eclipse-che-operator-master-v6-che-operator-single-host-nightly-deployment
+    rerun_command: /test v6-che-operator-single-host-nightly-deployment
     spec:
       containers:
       - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-password-file=/etc/boskos/password
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/usr/local/che-operator-update-cluster-profile
-        - --target=che-operator-update
-        - --variant=v4
+        - --secret-dir=/usr/local/che-operator-single-host-nightly-deployment-cluster-profile
+        - --target=che-operator-single-host-nightly-deployment
+        - --variant=v6
         command:
         - ci-operator
         image: ci-operator:latest
@@ -102,8 +107,11 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/che-operator-update-cluster-profile
+        - mountPath: /usr/local/che-operator-single-host-nightly-deployment-cluster-profile
           name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -129,32 +137,31 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )v4-che-operator-update,?($|\s.*)
+    trigger: (?m)^/test( | .* )v6-che-operator-single-host-nightly-deployment,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - master
     cluster: build01
-    context: ci/prow/v5-che-operator-olm-latest-changes-tests
+    context: ci/prow/v6-ci-index
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: v5
+      ci-operator.openshift.io/variant: v6
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-eclipse-che-operator-master-v5-che-operator-olm-latest-changes-tests
-    rerun_command: /test v5-che-operator-olm-latest-changes-tests
+    name: pull-ci-eclipse-che-operator-master-v6-ci-index
+    rerun_command: /test v6-ci-index
     spec:
       containers:
       - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/usr/local/che-operator-olm-latest-changes-tests-cluster-profile
-        - --target=che-operator-olm-latest-changes-tests
-        - --variant=v5
+        - --target=ci-index
+        - --variant=v6
         command:
         - ci-operator
         image: ci-operator:latest
@@ -164,11 +171,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
           readOnly: true
-        - mountPath: /usr/local/che-operator-olm-latest-changes-tests-cluster-profile
-          name: cluster-profile
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -177,49 +182,90 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: password
-            path: password
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )v5-che-operator-olm-latest-changes-tests,?($|\s.*)
+    trigger: (?m)^/test( | .* )v6-ci-index,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - master
     cluster: build01
-    context: ci/prow/v5-che-operator-update
+    context: ci/prow/v6-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: v5
+      ci-operator.openshift.io/variant: v6
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-eclipse-che-operator-master-v5-che-operator-update
-    rerun_command: /test v5-che-operator-update
+    name: pull-ci-eclipse-che-operator-master-v6-images
+    rerun_command: /test v6-images
     spec:
       containers:
       - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --target=[images]
+        - --variant=v6
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )v6-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: build01
+    context: ci/prow/v7-che-operator-olm-nightly-deployment
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: v7
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-eclipse-che-operator-master-v7-che-operator-olm-nightly-deployment
+    rerun_command: /test v7-che-operator-olm-nightly-deployment
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-password-file=/etc/boskos/password
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/usr/local/che-operator-update-cluster-profile
-        - --target=che-operator-update
-        - --variant=v5
+        - --secret-dir=/usr/local/che-operator-olm-nightly-deployment-cluster-profile
+        - --target=che-operator-olm-nightly-deployment
+        - --variant=v7
         command:
         - ci-operator
         image: ci-operator:latest
@@ -232,8 +278,11 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/che-operator-update-cluster-profile
+        - mountPath: /usr/local/che-operator-olm-nightly-deployment-cluster-profile
           name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -259,4 +308,175 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )v5-che-operator-update,?($|\s.*)
+    trigger: (?m)^/test( | .* )v7-che-operator-olm-nightly-deployment,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: build01
+    context: ci/prow/v7-che-operator-single-host-nightly-deployment
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: v7
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-eclipse-che-operator-master-v7-che-operator-single-host-nightly-deployment
+    rerun_command: /test v7-che-operator-single-host-nightly-deployment
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-password-file=/etc/boskos/password
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --secret-dir=/usr/local/che-operator-single-host-nightly-deployment-cluster-profile
+        - --target=che-operator-single-host-nightly-deployment
+        - --variant=v7
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/che-operator-single-host-nightly-deployment-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )v7-che-operator-single-host-nightly-deployment,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: build01
+    context: ci/prow/v7-ci-index
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: v7
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-eclipse-che-operator-master-v7-ci-index
+    rerun_command: /test v7-ci-index
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --target=ci-index
+        - --variant=v7
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )v7-ci-index,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: build01
+    context: ci/prow/v7-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: v7
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-eclipse-che-operator-master-v7-images
+    rerun_command: /test v7-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --target=[images]
+        - --variant=v7
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )v7-images,?($|\s.*)

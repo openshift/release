@@ -5,13 +5,23 @@ import yaml
 
 CONFIG = {
     'aws-quota-slice': {
-        'default': 150,
+        # Wild guesses.  We'll see when we hit quota issues
+        'us-east-1': 50,
+        'us-east-2': 50,
+        'us-west-1': 50,
+        'us-west-2': 50,
     },
     'azure4-quota-slice': {
-        'default': 30,
+        # Cannot create more than 50 public IP addresses for this subscription in this region.
+        # and each cluster needs three of public IPs: https://docs.openshift.com/container-platform/4.5/installing/installing_azure/installing-azure-account.html#installation-azure-limits_installing-azure-account
+        'centralus': 16,
+        # Wild guesses.  We'll see when we hit quota issues
+        'eastus': 10,
+        'eastus2': 10,
+        'westus': 10
     },
     'gcp-quota-slice': {
-        'default': 80,
+        'us-east1': 80,
     },
     'libvirt-s390x-quota-slice': {},
     'libvirt-ppc64le-quota-slice': {},
@@ -31,10 +41,8 @@ CONFIG = {
     'packet-quota-slice': {
         'default': 30,
     },
-    'vsphere-quota-slice': {
-        'default': 10,
-    },
     'kubevirt-quota-slice':{},
+    'vsphere-quota-slice':{},
 }
 
 for i in range(2):
@@ -56,6 +64,9 @@ for i in range(10, 18):
 
 for i in range(1, 4):
     CONFIG['kubevirt-quota-slice']['tenant-cluster-{}'.format(i)] = 1
+
+for i in range(0,6):
+    CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 config = {
     'resources': [],

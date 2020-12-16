@@ -39,6 +39,18 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
+- as: e2e-agnostic-operator
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: e2e-test
+      commands: hack/test-integration.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-gcp
 - as: e2e-agnostic-upgrade
   steps:
     cluster_profile: gcp
@@ -46,7 +58,7 @@ tests:
       TEST_COMMAND: run-upgrade
       TEST_OPTIONS: abort-at=100
       TEST_SUITE: all
-    workflow: openshift-upgrade-gcp-loki
+    workflow: openshift-upgrade-gcp
 zz_generated_metadata:
   branch: release-4.5
   org: openshift

@@ -1,24 +1,20 @@
 base_images:
   dev-scripts:
     name: test
-    namespace: openshift-kni
+    namespace: ocp-kni
     tag: dev-scripts
   ocp_builder_rhel-8-base-openshift-4.6:
     name: builder
     namespace: ocp
     tag: rhel-8-base-openshift-4.6
-  os:
-    name: ubi
-    namespace: ocp
-    tag: "8"
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.12
+    tag: golang-1.15
 images:
 - dockerfile_path: Dockerfile.ocp
-  from: base-os
+  from: ocp_builder_rhel-8-base-openshift-4.6
   inputs:
     ocp_builder_rhel-8-base-openshift-4.6:
       as:
@@ -27,14 +23,6 @@ images:
 promotion:
   name: "4.6"
   namespace: ocp
-raw_steps:
-- pipeline_image_cache_step:
-    commands: |
-      rm -rf /etc/yum.repos.d/*
-      curl http://base-4-6-rhel8.ocp.svc > /etc/yum.repos.d/base-4-6-rhel8.repo
-      curl http://base-openstack-4-6.ocp.svc > /etc/yum.repos.d/base-openstack-4-6.repo
-    from: os
-    to: base-os
 resources:
   '*':
     requests:

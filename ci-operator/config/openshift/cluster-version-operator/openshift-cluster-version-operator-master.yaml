@@ -1,16 +1,16 @@
 base_images:
   assisted-test-infra:
     name: assisted-test
-    namespace: openshift-kni
+    namespace: ocp-kni
     tag: assisted-test-infra
-  base:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp_4.7_base:
     name: "4.7"
     namespace: ocp
     tag: base
-  dev-scripts:
-    name: test
-    namespace: openshift-kni
-    tag: dev-scripts
   ocp_builder_rhel-8-golang-1.15-openshift-4.7:
     name: builder
     namespace: ocp
@@ -22,8 +22,10 @@ build_root:
     tag: golang-1.15
 images:
 - dockerfile_path: Dockerfile.rhel
-  from: base
   inputs:
+    ocp_4.7_base:
+      as:
+      - registry.svc.ci.openshift.org/ocp/4.7:base
     ocp_builder_rhel-8-golang-1.15-openshift-4.7:
       as:
       - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
@@ -52,6 +54,18 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
+- as: e2e-agnostic-operator
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: e2e-test
+      commands: hack/test-integration.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-gcp
 - as: e2e-agnostic-upgrade
   steps:
     cluster_profile: gcp
@@ -59,7 +73,7 @@ tests:
       TEST_COMMAND: run-upgrade
       TEST_OPTIONS: abort-at=100
       TEST_SUITE: all
-    workflow: openshift-upgrade-gcp-loki
+    workflow: openshift-upgrade-gcp
 - as: e2e-metal-assisted
   steps:
     cluster_profile: packet

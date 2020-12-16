@@ -27,6 +27,7 @@ rules:
   - services
   - endpoints
   - pods
+  - configmaps
   verbs:
   - get
   - watch
@@ -70,11 +71,11 @@ data:
   promtail.yaml: |-
     client:
       backoff_config:
-        max_period: 5s
+        max_period: 5m
         max_retries: 20
-        min_period: 100ms
+        min_period: 1s
       batchsize: 102400
-      batchwait: 1s
+      batchwait: 10s
       bearer_token_file: /tmp/shared/bearer_token
       timeout: 10s
       url: ${LOKI_ENDPOINT}/push
@@ -327,6 +328,14 @@ data:
         - __meta_kubernetes_pod_annotation_kubernetes_io_config_mirror
         - __meta_kubernetes_pod_container_name
         target_label: __path__
+    - job_name: journal
+      journal:
+        path: /var/log/journal
+        labels:
+          job: systemd-journal
+      relabel_configs:
+      - action: labelmap
+        regex: __journal__(boot_id|systemd_unit)
     server:
       http_listen_port: 3101
     target_config:
@@ -392,7 +401,7 @@ spec:
         - -c
         - |
           promtail \
-            -client.external-labels=_id=\$(cat /tmp/shared/cluster-id),host=\$(HOSTNAME) \
+            -client.external-labels=_id=\$(cat /tmp/shared/cluster-id),host=\$(HOSTNAME),invoker=\$(cat /tmp/shared/cluster-invoker) \
             -config.file=/etc/promtail/promtail.yaml
         env:
         - name: HOSTNAME
@@ -432,16 +441,19 @@ spec:
           readOnly: true
         - mountPath: "/tmp/shared"
           name: shared-data
+        - mountPath: "/var/log/journal"
+          name: journal
+          readOnly: true
       initContainers:
       - command:
         - sh
         - "-c"
-        - oc get clusterversion/version -o=jsonpath='{.spec.clusterID}' > /tmp/shared/cluster-id
+        - oc get clusterversion/version -o=jsonpath='{.spec.clusterID}' > /tmp/shared/cluster-id && oc get cm openshift-install -n openshift-config -o=jsonpath='{.data.invoker}' > /tmp/shared/cluster-invoker
         volumeMounts:
           - mountPath: "/tmp/shared"
             name: shared-data
         image: quay.io/openshift/origin-cli:4.6.0
-        name: fetch-cluster-id
+        name: fetch-cluster-data
       serviceAccountName: loki-promtail
       tolerations:
       - effect: NoSchedule
@@ -460,6 +472,9 @@ spec:
       - hostPath:
           path: "/var/log/pods"
         name: pods
+      - hostPath:
+          path: "/var/log/journal"
+        name: journal
       - emptyDir: {}
         name: shared-data
   updateStrategy:
