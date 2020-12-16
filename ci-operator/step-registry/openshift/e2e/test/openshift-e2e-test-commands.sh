@@ -94,6 +94,8 @@ if [[ -n "${TEST_SKIPS}" ]]; then
     TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
 fi
 
+# using set -x so we will see the full openshift-tests command in the log. disable right after.
+set -x
 openshift-tests "${TEST_COMMAND}" "${TEST_SUITE}" ${TEST_ARGS:-} \
     --provider "${TEST_PROVIDER}" \
     -o /tmp/artifacts/e2e.log \
