@@ -23,8 +23,12 @@ CONFIG = {
     'gcp-quota-slice': {
         'us-east1': 80,
     },
-    'libvirt-s390x-quota-slice': {},
-    'libvirt-ppc64le-quota-slice': {},
+    'libvirt-s390x-quota-slice': {
+        'max-count': 10,
+    },
+    'libvirt-ppc64le-quota-slice': {
+        'max-count': 8,
+    },
     'metal-quota-slice': {
         # Wild guesses.  We'll see when we hit quota issues
         'default': 1000,
@@ -77,11 +81,18 @@ for typeName, data in sorted(CONFIG.items()):
         'type': typeName,
         'state': 'free',
     }
+
+    configVars = [ 'max-count', 'min-count' ]
+
     if set(data.keys()) == {'default'}:
         resource['min-count'] = resource['max-count'] = data['default']
     else:
         resource['names'] = []
         for name, count in sorted(data.items()):
+            # pass through config var overrides
+            if name in configVars:
+               resource[name] = data[name]
+               continue
             if '--' in name:
                 raise ValueError('double-dashes are used internally, so {!r} is invalid'.format(name))
             if count > 1:
