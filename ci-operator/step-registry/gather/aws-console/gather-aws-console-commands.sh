@@ -23,7 +23,6 @@ then
 	wait "$!"
 else
 	echo "No kubeconfig; skipping providerID extraction."
-	exit 0
 fi
 
 if test -f "${SHARED_DIR}/aws-instance-ids.txt"
