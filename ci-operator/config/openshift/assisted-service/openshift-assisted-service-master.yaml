@@ -20,9 +20,68 @@ images:
       as:
       - registry.svc.ci.openshift.org/openshift/release:golang-1.14
   to: assisted-service
+- dockerfile_path: Dockerfile
+  from: src-dockerfile
+  inputs:
+    openshift_release_golang-1.14:
+      as:
+      - registry.svc.ci.openshift.org/openshift/release:golang-1.14
+    src-dockerfile:
+      paths:
+      - destination_dir: .
+        source_path: /opt/Dockerfile
+      - destination_dir: .
+        source_path: /opt/livecd.iso
+    ubi8:
+      as:
+      - registry.access.redhat.com/ubi8/ubi-minimal
+  to: assisted-iso-create
 promotion:
   name: "4.7"
   namespace: ocp
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      # TODO: compare to Dockerfile.assisted-iso-create when moving to in-repo dockerfile
+      RHCOS_VERSION=46.82.202009222340-0
+      BASE_OS_IMAGE=https://releases-art-rhcos.svc.ci.openshift.org/art/storage/releases/rhcos-4.6/${RHCOS_VERSION}/x86_64/rhcos-${RHCOS_VERSION}-live.x86_64.iso
+
+      curl -L -k  --fail ${BASE_OS_IMAGE} -o /opt/livecd.iso
+
+      # TODO: move to in-repo dockerfile
+      WORK_DIR=/data
+      COMMMAND_LINE=${WORK_DIR}/assisted-iso-create
+
+      cat <<DOCKERFILE > /opt/Dockerfile
+      FROM quay.io/coreos/coreos-installer:v0.7.0 AS installer-image
+
+      # Build binaries
+      FROM registry.svc.ci.openshift.org/openshift/release:golang-1.14 as builder
+      COPY . .
+      RUN CGO_ENABLED=0 GOFLAGS="" GO111MODULE=on go build -o /build/assisted-iso-create assisted-iso-create/main.go
+
+      FROM registry.access.redhat.com/ubi8/ubi-minimal
+
+      ENV COREOS_IMAGE=${WORK_DIR}/livecd.iso
+
+      ENV WORK_DIR=${WORK_DIR}
+      ENV BASE_OS_IMAGE=${BASE_OS_IMAGE}
+
+      RUN mkdir ${WORK_DIR}
+      RUN chmod 775 ${WORK_DIR}
+
+      COPY ./livecd.iso ${WORK_DIR}/livecd.iso
+      RUN chmod 644 ${WORK_DIR}/livecd.iso
+
+      COPY --from=installer-image /usr/sbin/coreos-installer ${WORK_DIR}
+
+      COPY --from=builder /build/assisted-iso-create ${WORK_DIR}
+
+      ENV COMMMAND_LINE=${WORK_DIR}/assisted-iso-create
+      ENTRYPOINT exec ${COMMMAND_LINE}
+      DOCKERFILE
+    from: src
+    to: src-dockerfile
 resources:
   '*':
     requests:
@@ -31,6 +90,43 @@ resources:
 tag_specification:
   name: "4.7"
   namespace: ocp
+test_binary_build_commands: |
+  set -eo pipefail
+  pip3 install pyyaml waiting
+tests:
+- as: sanity-oc
+  steps:
+    cluster_profile: aws
+    test:
+    - as: oc-check
+      cli: latest
+      commands: |
+        echo "starting test..."
+
+        echo "linking oc --> kubectl"
+        ln -s $(which oc) "$(dirname $(which oc))"/kubectl
+
+        echo 'pointing assisted-service git to fork'
+        git remote add -t master origin https://github.com/yftacherzog/assisted-service.git
+        echo 'pulling forked changes'
+        git pull
+
+        echo 'setting environment variables'
+        export TARGET='oc'
+        export PROFILE='openshift-ci'
+
+        echo "make openshift-ci-deploy-for-subsystem"
+        unset GOFLAGS && make openshift-ci-deploy-for-subsystem
+
+        sleep 60
+        echo "oc get pods"
+        oc get pods
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: openshift
