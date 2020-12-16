@@ -3,6 +3,10 @@ base_images:
     name: 4.8-priv
     namespace: ocp-private
     tag: base
+  insights-operator-tests:
+    name: insights-operator-tests
+    namespace: ci
+    tag: latest
   ocp_builder_rhel-8-golang-1.15-openshift-4.6:
     name: builder
     namespace: ocp
@@ -84,6 +88,22 @@ tests:
       cli: latest
       commands: make test-e2e
       from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- as: insights-operator-tests-periodic
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: gcp
+    pre:
+    - chain: ipi-gcp-pre
+    - ref: insights-live
+    test:
+    - as: test
+      cli: latest
+      commands: pytest.sh
+      from: insights-operator-tests
       resources:
         requests:
           cpu: 100m
