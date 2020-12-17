@@ -834,7 +834,7 @@ periodics:
   labels:
     job-release: "4.7"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: promote-release-openshift-okd-machine-os-content-e2e-gcp-4.7
+  name: promote-release-openshift-okd-machine-os-content-e2e-aws-4.7
   spec:
     containers:
     - args:
@@ -844,7 +844,7 @@ periodics:
       - --kubeconfig=/etc/apici/kubeconfig
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
-      - --secret-dir=/usr/local/e2e-gcp-cluster-profile
+      - --secret-dir=/usr/local/e2e-aws-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       command:
       - /bin/bash
@@ -989,7 +989,7 @@ periodics:
       - name: TAG_SOURCE
         value: $(TAG):$(BRANCH)
       - name: CLUSTER_TYPE
-        value: gcp
+        value: aws
       - name: UNRESOLVED_CONFIG
         value: |
           tag_specification:
@@ -1013,12 +1013,12 @@ periodics:
                 cpu: 100m
                 memory: 200Mi
           tests:
-          - as: e2e-gcp
+          - as: e2e-aws
             steps:
-              cluster_profile: gcp
-              workflow: openshift-e2e-gcp
+              cluster_profile: aws
+              workflow: openshift-e2e-aws
       - name: JOB_NAME_SAFE
-        value: e2e-gcp
+        value: e2e-aws
       - name: TEST_COMMAND
         value: TEST_SUITE=openshift/conformance/parallel run-tests
       image: ci-operator:latest
@@ -1034,7 +1034,7 @@ periodics:
       - mountPath: /etc/boskos
         name: boskos
         readOnly: true
-      - mountPath: /usr/local/e2e-gcp-cluster-profile
+      - mountPath: /usr/local/e2e-aws-cluster-profile
         name: cluster-profile
       - mountPath: /etc/pull-secret
         name: pull-secret
@@ -1059,7 +1059,7 @@ periodics:
       projected:
         sources:
         - secret:
-            name: cluster-secrets-gcp
+            name: cluster-secrets-aws
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
