@@ -12,10 +12,7 @@ CONFIG = {
         'us-west-2': 50,
     },
     'azure4-quota-slice': {
-        # Cannot create more than 50 public IP addresses for this subscription in this region.
-        # and each cluster needs three of public IPs: https://docs.openshift.com/container-platform/4.5/installing/installing_azure/installing-azure-account.html#installation-azure-limits_installing-azure-account
-        'centralus': 16,
-        # Wild guesses.  We'll see when we hit quota issues
+        'centralus': 33,
         'eastus': 10,
         'eastus2': 10,
         'westus': 10
