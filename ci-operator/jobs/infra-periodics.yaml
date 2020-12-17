@@ -1288,6 +1288,74 @@ periodics:
   interval: 12h
   labels:
     ci.openshift.io/role: infra-internal
+  name: periodic-ci-secret-generator
+  spec:
+    containers:
+    - args:
+      - --bw-password-path=/etc/ci-secret-bootstrap-bitwarden/bw_password
+      - --bw-user=openshift-dev-infra+ci-bitwarden-bot@redhat.com
+      - --bootstrap-config=/etc/ci-secret-bootstrap/_config.yaml
+      - --config=/etc/ci-secret-generator/_config.yaml
+      - --dry-run=true
+      command:
+      - /usr/bin/ci-secret-generator
+      env:
+      - name: KUBECONFIG
+        value: /etc/build-farm-credentials/sa.config-updater.api.ci.config:/etc/build-farm-credentials/sa.config-updater.app.ci.config:/etc/build-farm-credentials/sa.config-updater.build01.config:/etc/build-farm-credentials/sa.config-updater.build02.config:/etc/build-farm-credentials/sa.config-updater.vsphere.config
+      image: registry.svc.ci.openshift.org/ci/ci-secret-generator:latest
+      imagePullPolicy: Always
+      name: ci-secret-bootstrap
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/ci-secret-bootstrap-bitwarden
+        name: ci-secret-bootstrap-bitwarden
+        readOnly: true
+      - mountPath: /etc/ci-secret-bootstrap
+        name: ci-secret-bootstrap
+      - mountPath: /etc/build-farm-credentials
+        name: build-farm-credentials
+        readOnly: true
+      - mountPath: /etc/ci-secret-generator
+        name: ci-secret-generator
+    volumes:
+    - name: ci-secret-bootstrap-bitwarden
+      secret:
+        secretName: bitwarden-credentials-openshift-ci-bitwarden-bot
+    - configMap:
+        name: ci-secret-generator
+      name: ci-secret-generator
+    - configMap:
+        name: ci-secret-bootstrap
+      name: ci-secret-bootstrap
+    - name: build-farm-credentials
+      secret:
+        items:
+        - key: sa.config-updater.api.ci.config
+          path: sa.config-updater.api.ci.config
+        - key: sa.config-updater.app.ci.config
+          path: sa.config-updater.app.ci.config
+        - key: sa.config-updater.build01.config
+          path: sa.config-updater.build01.config
+        - key: sa.config-updater.build02.config
+          path: sa.config-updater.build02.config
+        - key: sa.config-updater.vsphere.config
+          path: sa.config-updater.vsphere.config
+        secretName: build-farm-credentials
+- agent: kubernetes
+  cluster: app.ci
+  decorate: true
+  decoration_config:
+    gcs_configuration:
+      bucket: origin-ci-private
+      mediaTypes:
+        log: text/plain
+    gcs_credentials_secret: gce-sa-credentials-gcs-private
+  hidden: true
+  interval: 12h
+  labels:
+    ci.openshift.io/role: infra-internal
   name: periodic-ci-secret-bootstrap
   spec:
     containers:
