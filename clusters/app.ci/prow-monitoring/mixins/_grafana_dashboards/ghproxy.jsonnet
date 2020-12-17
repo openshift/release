@@ -208,8 +208,12 @@ dashboard.new(
         legend_values=true,
         legend_current=true,
         min='0',
-        max='5000',
+        max='12500',
     ) + legendConfig)
+    .addTarget(prometheus.target(
+        'sum(github_token_usage{token_hash=~"openshift.*"}) by (token_hash, api_version)',
+         legendFormat='{{token_hash}} : {{api_version}}',
+    ))
     .addTarget(prometheus.target(
         'sum(github_token_usage * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login)) by (api_version, login)',
          legendFormat='{{login}} : {{api_version}}',
