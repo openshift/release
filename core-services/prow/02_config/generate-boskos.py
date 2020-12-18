@@ -40,6 +40,9 @@ CONFIG = {
     },
     'kubevirt-quota-slice':{},
     'vsphere-quota-slice':{},
+    'aws-cpaas-quota-slice': {
+        'us-east-1': 5,
+    },
 }
 
 for i in range(2):
