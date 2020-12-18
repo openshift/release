@@ -157,7 +157,7 @@ def _add_osd_rc_deployment(gendoc):
             'namespace': context.config.rc_deployment_namespace,
         },
         'spec': {
-            'replicas': 0,
+            'replicas': 1,
             'selector': {
                 'matchLabels': {
                     'app': context.rc_service_name
