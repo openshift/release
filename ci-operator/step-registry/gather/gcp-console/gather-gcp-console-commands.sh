@@ -33,7 +33,7 @@ then
 	cat "${SHARED_DIR}/gcp-instance-ids.txt" >> "${TMPDIR}/node-provider-IDs.txt"
 fi
 
-cat "${TMPDIR}/node-provider-IDs.txt" | sort | uniq | while read -r INSTANCE_ID
+cat "${TMPDIR}/node-provider-IDs.txt" | sort | grep . | uniq | while read -r INSTANCE_ID
 do
 	echo "Finding the zone for ${INSTANCE_ID}"
 	ZONE="$(
@@ -43,6 +43,7 @@ do
 	if test -z "${ZONE}"
 	then
 		echo "No zone found for ${INSTANCE_ID}, so not attempting to gather console logs"
+		continue
 	fi
 	echo "Gathering console logs for ${INSTANCE_ID} from ${ZONE}"
 	gcloud --format json compute instances get-serial-port-output --zone "${ZONE}" "${INSTANCE_ID}" > "${ARTIFACT_DIR}/${INSTANCE_ID}.json" &
