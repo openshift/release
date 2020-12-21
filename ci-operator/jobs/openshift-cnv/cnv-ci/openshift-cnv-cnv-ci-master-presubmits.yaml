@@ -5,15 +5,16 @@ presubmits:
     branches:
     - master
     cluster: build02
-    context: ci/prow/e2e-test-presubmit
+    context: ci/prow/cnv2.6_4.7-e2e
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: cnv2.6_4.7
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cnv-cnv-ci-master-e2e-test-presubmit
-    rerun_command: /test e2e-test-presubmit
+    name: pull-ci-openshift-cnv-cnv-ci-master-cnv2.6_4.7-e2e
+    rerun_command: /test cnv2.6_4.7-e2e
     spec:
       containers:
       - args:
@@ -22,8 +23,9 @@ presubmits:
         - --lease-server-password-file=/etc/boskos/password
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/usr/local/e2e-test-presubmit-cluster-profile
-        - --target=e2e-test-presubmit
+        - --secret-dir=/usr/local/e2e-cluster-profile
+        - --target=e2e
+        - --variant=cnv2.6_4.7
         command:
         - ci-operator
         image: ci-operator:latest
@@ -36,7 +38,7 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/e2e-test-presubmit-cluster-profile
+        - mountPath: /usr/local/e2e-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -59,13 +61,11 @@ presubmits:
         projected:
           sources:
           - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
+              name: cluster-secrets-azure4
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-test-presubmit,?($|\s.*)
+    trigger: (?m)^/test( | .* )cnv2.6_4.7-e2e,?($|\s.*)

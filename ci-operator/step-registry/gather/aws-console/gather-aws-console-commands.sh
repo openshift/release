@@ -19,7 +19,7 @@ then
 	oc --request-timeout=5s get nodes -o jsonpath --template '{range .items[*]}{.spec.providerID}{"\n"}{end}' | sed 's|.*/||' > "${TMPDIR}/node-provider-IDs.txt" &
 	wait "$!"
 
-	oc --request-timeout=5s -n openshift-machine-api get machines -o jsonpath --template '{range .items[*]}{.spec.providerID}{"\n"}{end}' | sed 's|.*/||' >> "${TMPDIR}/node-provider-IDs" &
+	oc --request-timeout=5s -n openshift-machine-api get machines -o jsonpath --template '{range .items[*]}{.spec.providerID}{"\n"}{end}' | sed 's|.*/||' >> "${TMPDIR}/node-provider-IDs.txt" &
 	wait "$!"
 else
 	echo "No kubeconfig; skipping providerID extraction."

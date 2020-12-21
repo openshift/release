@@ -136,7 +136,7 @@ NAME               TYPE                DATA   AGE
 apps-build01-tls   kubernetes.io/tls   3      6d23h
 ```
 
-Use the secret in apiserver's config:
+Use the secret in apiserver's config: manual step only for test, see [default_ingresscontroller.yaml](openshift-ingress-operator/default_ingresscontroller.yaml)
 
 > oc patch ingresscontroller.operator default \
      --type=merge -p \

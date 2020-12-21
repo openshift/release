@@ -1,18 +1,19 @@
 periodics:
 - agent: kubernetes
   cluster: api.ci
-  cron: 0 */6 * * *
+  cron: 0 0 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
   extra_refs:
   - base_ref: master
-    org: openshift-cnv
-    repo: cnv-ci
+    org: redhat-developer
+    repo: service-binding-operator
   labels:
     ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: "4.6"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-cnv-cnv-ci-master-e2e-test-cron
+  name: periodic-ci-redhat-developer-service-binding-operator-master-4.6-validate-master-build
   spec:
     containers:
     - args:
@@ -21,8 +22,9 @@ periodics:
       - --lease-server-password-file=/etc/boskos/password
       - --report-password-file=/etc/report/password.txt
       - --report-username=ci
-      - --secret-dir=/usr/local/e2e-test-cron-cluster-profile
-      - --target=e2e-test-cron
+      - --secret-dir=/usr/local/validate-master-build-cluster-profile
+      - --target=validate-master-build
+      - --variant=4.6
       command:
       - ci-operator
       image: ci-operator:latest
@@ -35,7 +37,7 @@ periodics:
       - mountPath: /etc/boskos
         name: boskos
         readOnly: true
-      - mountPath: /usr/local/e2e-test-cron-cluster-profile
+      - mountPath: /usr/local/validate-master-build-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -58,9 +60,7 @@ periodics:
       projected:
         sources:
         - secret:
-            name: cluster-secrets-gcp
-        - configMap:
-            name: cluster-profile-gcp
+            name: cluster-secrets-aws
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
