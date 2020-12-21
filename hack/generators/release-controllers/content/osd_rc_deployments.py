@@ -10,7 +10,7 @@ def _add_osd_rc_route(gendoc):
             'namespace': context.config.rc_deployment_namespace,
         },
         'spec': {
-            'host': f'{context.rc_hostname}.{context.config.rc_deployment_domain}',
+            'host': f'{context.rc_app_url}',
             'tls': {
                 'insecureEdgeTerminationPolicy': 'Redirect',
                 'termination': 'Reencrypt' if context.private else 'Edge'
@@ -157,7 +157,7 @@ def _add_osd_rc_deployment(gendoc):
             'namespace': context.config.rc_deployment_namespace,
         },
         'spec': {
-            'replicas': 1,
+            'replicas': 0,
             'selector': {
                 'matchLabels': {
                     'app': context.rc_service_name
@@ -183,7 +183,7 @@ def _add_osd_rc_deployment(gendoc):
                                         *extra_rc_args,
                                         '--prow-config=/etc/config/config.yaml',
                                         '--job-config=/etc/job-config',
-                                        f'--artifacts={context.hostname_artifacts}.{context.config.rc_release_domain}',
+                                        f'--artifacts={context.fc_app_url}',
                                         '--listen=' + ('127.0.0.1:8080' if context.private else ':8080'),
                                         f'--prow-namespace={context.config.rc_deployment_namespace}',
                                         '--non-prow-job-kubeconfig=/etc/kubeconfig/kubeconfig',
@@ -278,7 +278,7 @@ def _add_osd_rc_deployment(gendoc):
                             'name': 'release-controller-kubeconfigs',
                             'secret': {
                                 'items': [{
-                                    'key': f'sa.release-controller-{context.is_namespace}.api.ci.config',
+                                    'key': f'sa.release-controller-{context.is_namespace}.app.ci.config',
                                     'path': 'kubeconfig'
                                 }],
                                 'secretName': 'release-controller-kubeconfigs'

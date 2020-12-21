@@ -53,7 +53,7 @@ metadata:
   name: release-controller-ocp-ppc64le
   namespace: ci
 spec:
-  replicas: 1
+  replicas: 0
   selector:
     matchLabels:
       app: release-controller-ocp-ppc64le
@@ -68,7 +68,7 @@ spec:
         - --release-namespace=ocp-ppc64le
         - --prow-config=/etc/config/config.yaml
         - --job-config=/etc/job-config
-        - --artifacts=openshift-release-artifacts-ppc64le.svc.ci.openshift.org
+        - --artifacts=openshift-release-artifacts-ppc64le.apps.ci.l2s4.p1.openshiftapps.com
         - --listen=:8080
         - --prow-namespace=ci
         - --non-prow-job-kubeconfig=/etc/kubeconfig/kubeconfig
@@ -190,7 +190,7 @@ spec:
       - name: release-controller-kubeconfigs
         secret:
           items:
-          - key: sa.release-controller-ocp-ppc64le.api.ci.config
+          - key: sa.release-controller-ocp-ppc64le.app.ci.config
             path: kubeconfig
           secretName: release-controller-kubeconfigs
       - name: oauth
@@ -202,3 +202,58 @@ spec:
       - configMap:
           name: plugins
         name: plugins
+---
+#---------------------------------------------------------------------------------
+# osd_files_cache_rbac.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: release-controller-jobs-binding
+  namespace: ocp-ppc64le
+roleRef:
+  kind: ClusterRole
+  name: edit
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: ci-release-ppc64le
+---
+#---------------------------------------------------------------------------------
+# osd_files_cache_resources.py added the following resource
+#---------------------------------------------------------------------------------
+
+# Resources required to deploy resources for the files-cache on
+# the app.ci clusters.
+# The release controller creates a files cache stateful set in each ci-release namespace
+# used by a release controller. Create a service and a route to this public instance.
+apiVersion: v1
+kind: Service
+metadata:
+  name: files-cache
+  namespace: ci-release-ppc64le
+spec:
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: files-cache
+---
+#---------------------------------------------------------------------------------
+# osd_files_cache_resources.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: v1
+kind: Route
+metadata:
+  name: files-cache
+  namespace: ci-release-ppc64le
+spec:
+  host: openshift-release-artifacts-ppc64le.apps.ci.l2s4.p1.openshiftapps.com
+  tls:
+    insecureEdgeTerminationPolicy: Redirect
+    termination: Edge
+  to:
+    kind: Service
+    name: files-cache
