@@ -54,7 +54,7 @@ metadata:
   name: release-controller-ocp-priv
   namespace: ci
 spec:
-  replicas: 1
+  replicas: 0
   selector:
     matchLabels:
       app: release-controller-ocp-priv
@@ -100,7 +100,7 @@ spec:
         - --release-namespace=ocp-priv
         - --prow-config=/etc/config/config.yaml
         - --job-config=/etc/job-config
-        - --artifacts=openshift-release-artifacts-priv.svc.ci.openshift.org
+        - --artifacts=openshift-release-artifacts-priv.apps.ci.l2s4.p1.openshiftapps.com
         - --listen=127.0.0.1:8080
         - --prow-namespace=ci
         - --non-prow-job-kubeconfig=/etc/kubeconfig/kubeconfig
@@ -228,7 +228,7 @@ spec:
       - name: release-controller-kubeconfigs
         secret:
           items:
-          - key: sa.release-controller-ocp-priv.api.ci.config
+          - key: sa.release-controller-ocp-priv.app.ci.config
             path: kubeconfig
           secretName: release-controller-kubeconfigs
       - name: oauth
@@ -240,3 +240,164 @@ spec:
       - configMap:
           name: plugins
         name: plugins
+---
+#---------------------------------------------------------------------------------
+# osd_files_cache_rbac.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  annotations:
+    serviceaccounts.openshift.io/oauth-redirectreference.files-cache-oauth-proxy: '{"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{"kind":"Route","name":"files-cache-oauth-proxy"}}'
+  name: files-cache-oauth
+  namespace: ci-release-priv
+---
+#---------------------------------------------------------------------------------
+# osd_files_cache_rbac.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: files-cache-oauth-priv
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: files-cache-oauth-priv
+subjects:
+- kind: ServiceAccount
+  name: files-cache-oauth
+  namespace: ci-release-priv
+---
+#---------------------------------------------------------------------------------
+# osd_files_cache_rbac.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: release-controller-jobs-binding
+  namespace: ocp-priv
+roleRef:
+  kind: ClusterRole
+  name: edit
+subjects:
+- kind: ServiceAccount
+  name: default
+  namespace: ci-release-priv
+---
+#---------------------------------------------------------------------------------
+# osd_files_cache_resources.py added the following resource
+#---------------------------------------------------------------------------------
+
+# Resources required to deploy resources for the files-cache on
+# the app.ci clusters.
+# The release controller creates a files cache stateful set in each ci-release namespace
+#         used by a release controller. This is a private instance and we need to place and oauth
+#         proxy in front of the normal service.
+apiVersion: v1
+kind: Service
+metadata:
+  name: files-cache
+  namespace: ci-release-priv
+spec:
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: files-cache
+---
+#---------------------------------------------------------------------------------
+# osd_files_cache_resources.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    service.alpha.openshift.io/serving-cert-secret-name: files-cache-oauth-proxy-tls
+  name: files-cache-oauth-proxy
+  namespace: ci-release-priv
+spec:
+  ports:
+  - port: 443
+    targetPort: 8443
+  selector:
+    app: files-cache-oauth-proxy
+---
+#---------------------------------------------------------------------------------
+# osd_files_cache_resources.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: v1
+kind: Route
+metadata:
+  name: files-cache-oauth-proxy
+  namespace: ci-release-priv
+spec:
+  host: openshift-release-artifacts-priv.apps.ci.l2s4.p1.openshiftapps.com
+  tls:
+    insecureEdgeTerminationPolicy: Redirect
+    termination: Reencrypt
+  to:
+    kind: Service
+    name: files-cache-oauth-proxy
+---
+#---------------------------------------------------------------------------------
+# osd_files_cache_resources.py added the following resource
+#---------------------------------------------------------------------------------
+
+# Oauth proxy instance that protects to the private files cache for this private release controller
+# instance.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: files-cache-oauth-proxy
+  namespace: ci-release-priv
+spec:
+  selector:
+    matchLabels:
+      app: files-cache-oauth-proxy
+  template:
+    metadata:
+      labels:
+        app: files-cache-oauth-proxy
+    spec:
+      containers:
+      - args:
+        - -provider=openshift
+        - -https-address=:8443
+        - -http-address=
+        - -email-domain=*
+        - -upstream=http://files-cache.ci-release-priv:80
+        - -client-id=system:serviceaccount:ci-release-priv:files-cache-oauth
+        - -openshift-ca=/etc/pki/tls/cert.pem
+        - -openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        - '-openshift-sar={"verb": "get", "resource": "imagestreams", "namespace":
+          "ocp-priv"}'
+        - '-openshift-delegate-urls={"/": {"verb": "get", "resource": "imagestreams",
+          "namespace": "ocp-priv"}}'
+        - -client-secret-file=/var/run/secrets/kubernetes.io/serviceaccount/token
+        - -cookie-secret-file=/etc/proxy/secrets/session_secret
+        - -tls-cert=/etc/tls/private/tls.crt
+        - -tls-key=/etc/tls/private/tls.key
+        image: openshift/oauth-proxy:latest
+        imagePullPolicy: IfNotPresent
+        name: oauth-proxy
+        ports:
+        - containerPort: 8443
+          name: web
+        volumeMounts:
+        - mountPath: /etc/tls/private
+          name: internal-tls
+        - mountPath: /etc/proxy/secrets
+          name: session-secret
+      serviceAccountName: files-cache-oauth
+      volumes:
+      - name: session-secret
+        secret:
+          secretName: files-cache-session-secret
+      - name: internal-tls
+        secret:
+          secretName: files-cache-oauth-proxy-tls

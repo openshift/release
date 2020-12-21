@@ -5,7 +5,7 @@
 
 
 #---------------------------------------------------------------------------------
-# redirect_and_files_cache_resources.py added the following resource
+# redirect_resources.py added the following resource
 #---------------------------------------------------------------------------------
 
 # Bootstrap the environment for the amd64 tests image.  The caches require an amd64 "tests" image to execute on
@@ -30,7 +30,7 @@ spec:
       type: Source
 ---
 #---------------------------------------------------------------------------------
-# redirect_and_files_cache_resources.py added the following resource
+# redirect_resources.py added the following resource
 #---------------------------------------------------------------------------------
 
 apiVersion: v1
@@ -48,7 +48,7 @@ spec:
     name: release-controller-ocp-ppc64le-priv-redirect
 ---
 #---------------------------------------------------------------------------------
-# redirect_and_files_cache_resources.py added the following resource
+# redirect_resources.py added the following resource
 #---------------------------------------------------------------------------------
 
 apiVersion: v1
@@ -61,7 +61,7 @@ metadata:
   namespace: ci
 ---
 #---------------------------------------------------------------------------------
-# redirect_and_files_cache_resources.py added the following resource
+# redirect_resources.py added the following resource
 #---------------------------------------------------------------------------------
 
 apiVersion: apps/v1
@@ -104,7 +104,7 @@ spec:
         name: config
 ---
 #---------------------------------------------------------------------------------
-# redirect_and_files_cache_resources.py added the following resource
+# redirect_resources.py added the following resource
 #---------------------------------------------------------------------------------
 
 apiVersion: v1
@@ -127,114 +127,98 @@ spec:
   type: ClusterIP
 ---
 #---------------------------------------------------------------------------------
-# redirect_and_files_cache_resources.py added the following resource
-#---------------------------------------------------------------------------------
-
-# The release controller creates a files cache stateful set in each ci-release namespace
-#         used by a release controller. This is a private instance and we need to place and oauth
-#         proxy in front of the normal service.
-apiVersion: v1
-kind: Service
-metadata:
-  name: files-cache
-  namespace: ci-release-ppc64le-priv
-spec:
-  ports:
-  - port: 80
-    targetPort: 8080
-  selector:
-    app: files-cache
----
-#---------------------------------------------------------------------------------
-# redirect_and_files_cache_resources.py added the following resource
-#---------------------------------------------------------------------------------
-
-apiVersion: v1
-kind: Service
-metadata:
-  annotations:
-    service.alpha.openshift.io/serving-cert-secret-name: files-cache-oauth-proxy-tls
-  name: files-cache-oauth-proxy
-  namespace: ci-release-ppc64le-priv
-spec:
-  ports:
-  - port: 443
-    targetPort: 8443
-  selector:
-    app: files-cache-oauth-proxy
----
-#---------------------------------------------------------------------------------
-# redirect_and_files_cache_resources.py added the following resource
+# redirect_resources.py added the following resource
 #---------------------------------------------------------------------------------
 
 apiVersion: v1
 kind: Route
 metadata:
-  name: files-cache-oauth-proxy
+  name: release-controller-files-cache-ocp-ppc64le-priv
   namespace: ci-release-ppc64le-priv
 spec:
   host: openshift-release-artifacts-ppc64le-priv.svc.ci.openshift.org
   tls:
     insecureEdgeTerminationPolicy: Redirect
-    termination: Reencrypt
+    termination: Edge
   to:
     kind: Service
-    name: files-cache-oauth-proxy
+    name: release-controller-files-cache-ocp-ppc64le-priv-redirect
 ---
 #---------------------------------------------------------------------------------
-# redirect_and_files_cache_resources.py added the following resource
+# redirect_resources.py added the following resource
 #---------------------------------------------------------------------------------
 
-# Oauth proxy instance that protects to the private files cache for this private release controller
-# instance.
+apiVersion: v1
+data:
+  default.conf: "server {\n  listen 8080;\n  return 302 https://openshift-release-artifacts-ppc64le-priv.apps.ci.l2s4.p1.openshiftapps.com$request_uri;\n\
+    }\n"
+kind: ConfigMap
+metadata:
+  name: release-controller-files-cache-ocp-ppc64le-priv-redirect-config
+  namespace: ci-release-ppc64le-priv
+---
+#---------------------------------------------------------------------------------
+# redirect_resources.py added the following resource
+#---------------------------------------------------------------------------------
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: files-cache-oauth-proxy
+  labels:
+    app: release-controller-files-cache-ocp-ppc64le-priv-redirect
+  name: release-controller-files-cache-ocp-ppc64le-priv-redirect
   namespace: ci-release-ppc64le-priv
 spec:
+  replicas: 2
   selector:
     matchLabels:
-      app: files-cache-oauth-proxy
+      component: release-controller-files-cache-ocp-ppc64le-priv-redirect
   template:
     metadata:
       labels:
-        app: files-cache-oauth-proxy
+        app: prow
+        component: release-controller-files-cache-ocp-ppc64le-priv-redirect
     spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: component
+                operator: In
+                values:
+                - release-controller-files-cache-ocp-ppc64le-priv-redirect
+            topologyKey: kubernetes.io/hostname
       containers:
-      - args:
-        - -provider=openshift
-        - -https-address=:8443
-        - -http-address=
-        - -email-domain=*
-        - -upstream=http://files-cache.ci-release-ppc64le-priv:80
-        - -client-id=system:serviceaccount:ci-release-ppc64le-priv:files-cache-oauth
-        - -openshift-ca=/etc/pki/tls/cert.pem
-        - -openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-        - '-openshift-sar={"verb": "get", "resource": "imagestreams", "namespace":
-          "ocp-ppc64le-priv"}'
-        - '-openshift-delegate-urls={"/": {"verb": "get", "resource": "imagestreams",
-          "namespace": "ocp-ppc64le-priv"}}'
-        - -client-secret-file=/var/run/secrets/kubernetes.io/serviceaccount/token
-        - -cookie-secret-file=/etc/proxy/secrets/session_secret
-        - -tls-cert=/etc/tls/private/tls.crt
-        - -tls-key=/etc/tls/private/tls.key
-        image: openshift/oauth-proxy:latest
-        imagePullPolicy: IfNotPresent
-        name: oauth-proxy
-        ports:
-        - containerPort: 8443
-          name: web
+      - image: nginxinc/nginx-unprivileged:1.17
+        name: nginx
         volumeMounts:
-        - mountPath: /etc/tls/private
-          name: internal-tls
-        - mountPath: /etc/proxy/secrets
-          name: session-secret
-      serviceAccountName: files-cache-oauth
+        - mountPath: /etc/nginx/conf.d
+          name: config
       volumes:
-      - name: session-secret
-        secret:
-          secretName: files-cache-session-secret
-      - name: internal-tls
-        secret:
-          secretName: files-cache-oauth-proxy-tls
+      - configMap:
+          name: release-controller-files-cache-ocp-ppc64le-priv-redirect-config
+        name: config
+---
+#---------------------------------------------------------------------------------
+# redirect_resources.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: prow
+    component: release-controller-files-cache-ocp-ppc64le-priv-redirect
+  name: release-controller-files-cache-ocp-ppc64le-priv-redirect
+  namespace: ci-release-ppc64le-priv
+spec:
+  ports:
+  - name: main
+    port: 80
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    component: release-controller-files-cache-ocp-ppc64le-priv-redirect
+  sessionAffinity: None
+  type: ClusterIP
