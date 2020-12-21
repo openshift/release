@@ -27,7 +27,7 @@ the cluster.  This imagestream is used as a commandline parameter to the release
                 {
                     'from': {
                         'kind': 'DockerImage',
-                        'name': 'registry.svc.ci.openshift.org/ocp/4.6:tests'
+                        'name': 'registry.ci.openshift.org/ocp/4.6:tests'
                     },
                     'importPolicy': {
                         'scheduled': True
