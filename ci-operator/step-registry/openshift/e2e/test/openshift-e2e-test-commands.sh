@@ -60,6 +60,7 @@ vsphere) export TEST_PROVIDER=vsphere;;
 openstack) export TEST_PROVIDER='{"type":"openstack"}';;
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
 openstack-vexxhost) export TEST_PROVIDER='{"type":"openstack"}';;
+kubevirt) export TEST_PROVIDER='{"type":"kubevirt"}';;
 *) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"; exit 1;;
 esac
 
