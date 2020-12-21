@@ -48,9 +48,9 @@
         channel: '#forum-logging',
         notify: 'aoslogging',
       },
-      'openshift-dev-services': {
-        team: 'openshift-dev-services',
-        channel: '#forum-os-dev-services',
+      'openshift-app-services': {
+        team: 'openshift-app-services',
+        channel: '#forum-app-services',
         notify: 'openshift-app-services',
       },
       'OLM-rh-operators': {
