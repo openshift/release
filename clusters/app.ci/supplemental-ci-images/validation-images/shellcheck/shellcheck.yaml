@@ -4,21 +4,23 @@ items:
 - apiVersion: v1
   kind: ImageStream
   metadata:
-    name: python-validation
+    name: shellcheck
     namespace: ci
 - apiVersion: v1
   kind: BuildConfig
   metadata:
-    name: python-validation
+    name: shellcheck
     namespace: ci
     labels:
       ci.openshift.io/source-repo: release
   spec:
+    triggers:
+    - type: "ConfigChange"
     failedBuildsHistoryLimit: 2
     output:
       to:
         kind: ImageStreamTag
-        name: python-validation:latest
+        name: shellcheck:latest
     runPolicy: Serial
     source:
       git:
@@ -27,4 +29,4 @@ items:
     strategy:
       dockerStrategy:
         imageOptimizationPolicy: SkipLayers
-        dockerfilePath: services/validation-images/python/Dockerfile
+        dockerfilePath: clusters/app.ci/supplemental-ci-images/validation-images/shellcheck/Dockerfile
