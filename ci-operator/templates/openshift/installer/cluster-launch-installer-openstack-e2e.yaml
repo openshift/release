@@ -397,7 +397,11 @@ objects:
         wait "$!"
 
         # Password for the cluster gets leaked in the installer logs and hence removing them.
-        sed -i 's/password: .*/password: REDACTED"/g' ${ARTIFACT_DIR}/installer/.openshift_install.log
+        sed -i '
+          s/password: .*/password: REDACTED/;
+          s/X-Auth-Token.*/X-Auth-Token REDACTED/;
+          s/UserData:.*,/UserData: REDACTED,/;
+          ' "${ARTIFACT_DIR}/installer/.openshift_install.log"
 
         INGRESS_PORT=$(openstack port list --format value -c Name | awk "/${CLUSTER_NAME}.*-ingress-port/ {print}")
         if [ -n "$INGRESS_PORT" ]; then
