@@ -56,7 +56,12 @@ ret="$?"
 cp "${dir}"/log-bundle-*.tar.gz "${ARTIFACT_DIR}/" 2>/dev/null
 set -e
 
-sed 's/password: .*/password: REDACTED/' "${dir}/.openshift_install.log" >"${ARTIFACT_DIR}/.openshift_install.log"
+sed '
+  s/password: .*/password: REDACTED/;
+  s/X-Auth-Token.*/X-Auth-Token REDACTED/;
+  s/UserData:.*,/UserData: REDACTED,/;
+  ' "${dir}/.openshift_install.log" > "${ARTIFACT_DIR}/.openshift_install.log"
+
 cp \
     -t "${SHARED_DIR}" \
     "${dir}/auth/kubeconfig" \
