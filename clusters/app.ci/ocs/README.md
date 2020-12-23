@@ -2,7 +2,7 @@
 
 ## Generating an Image Pull Credential
 
-First, log in to [the cluster](https://api.ci.openshift.org/console/catalog). Then, run:
+First, log in to [the cluster](https://console-openshift-console.apps.ci.l2s4.p1.openshiftapps.com/topology/all-namespaces/graph). Then, run:
 
 
 ```sh
