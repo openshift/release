@@ -36,6 +36,7 @@ cat << EOF > ~/ocp-install.yml
     retries: 5
   - name: Remove last run
     shell: kcli delete plan --yes upstream_ci
+    ignore_errors: yes
   - name: Run deployment
     shell: timeout 2h kcli create plan --paramfile /home/tester/kcli_parameters.yml upstream_ci $KCLI_PARAM --wait
     args:
