@@ -1,4 +1,4 @@
-FROM centos
+FROM centos:7
 
 # Install required packages
 RUN yum update -y; yum clean all
