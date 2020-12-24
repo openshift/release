@@ -1,15 +1,22 @@
 base_images:
   base:
-    name: "4.4"
+    name: "4.7"
     namespace: ocp
     tag: base
-binary_build_commands: make
 build_root:
   project_image:
     dockerfile_path: openshift/Dockerfile
-canonical_go_repository: github.com/tektoncd/cli
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  inputs:
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/tektoncd-catalog/task/s2i/0.1/.
+  to: tektoncd-catalog-s2i
 promotion:
-  name: tektoncd-next-4.4
+  name: tektoncd-next-4.7
   namespace: openshift
 resources:
   '*':
@@ -17,7 +24,7 @@ resources:
       cpu: 100m
       memory: 250Mi
 tag_specification:
-  name: "4.4"
+  name: "4.7"
   namespace: ocp
 tests:
 - as: e2e
@@ -26,7 +33,7 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: make -C openshift test-e2e-downstream-nightly
+      commands: make -C openshift test-e2e-downstream-stable
       from: src
       resources:
         requests:
@@ -35,5 +42,5 @@ tests:
 zz_generated_metadata:
   branch: release-next
   org: openshift
-  repo: tektoncd-cli
-  variant: "4.4"
+  repo: tektoncd-catalog
+  variant: "4.7"
