@@ -1,0 +1,189 @@
+base_images:
+  base:
+    name: "4.7"
+    namespace: ocp
+    tag: base
+  cli:
+    name: "4.7"
+    namespace: ocp
+    tag: cli
+  operator-registry:
+    name: "4.7"
+    namespace: ocp
+    tag: operator-registry
+binary_build_commands: make install
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.15
+images:
+- dockerfile_path: build/Dockerfile.okd
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/hyperconverged-cluster-operator
+  to: hyperconverged-cluster-operator
+- dockerfile_path: build/Dockerfile.wh.okd
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/hyperconverged-cluster-webhook
+  to: hyperconverged-cluster-webhook
+- dockerfile_path: deploy/Dockerfile.registry.intermediate
+  from: operator-registry
+  to: operator-registry-base
+- dockerfile_path: deploy/Dockerfile.registry.ci
+  from: operator-registry-base
+  to: hco-registry
+- dockerfile_path: deploy/Dockerfile.registry.upgrade
+  from: operator-registry-base
+  to: hco-registry-upgrade
+- dockerfile_path: deploy/Dockerfile.registry.upgrade-prev
+  from: operator-registry-base
+  to: hco-registry-upgrade-prev
+- dockerfile_path: deploy/Dockerfile.src.ci
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: hco-oc-bin-image
+operator:
+  bundles:
+  - context_dir: deploy/index-image
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: +IMAGE_TO_REPLACE+
+    with: hyperconverged-cluster-operator
+  - pullspec: +WEBHOOK_IMAGE_TO_REPLACE+
+    with: hyperconverged-cluster-webhook
+promotion:
+  additional_images:
+    hyperconverged-cluster-operator-tests: src
+  excluded_images:
+  - operator-registry-base
+  - hco-registry
+  - hco-registry-upgrade
+  - hco-registry-upgrade-prev
+  name: hco1.3_4.7
+  namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 500m
+      memory: 1Gi
+tag_specification:
+  name: "4.7"
+  namespace: ocp
+tests:
+- as: hco-e2e-image-index-azure
+  steps:
+    cluster_profile: azure4
+    env:
+      OO_CHANNEL: 1.3.0
+      OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
+      OO_PACKAGE: kubevirt-hyperconverged
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: e2e-test
+      commands: |
+        make deploy_cr
+        make functest
+      from: hco-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-azure
+- as: hco-e2e-image-index-aws
+  steps:
+    cluster_profile: aws
+    env:
+      OO_CHANNEL: 1.3.0
+      OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
+      OO_PACKAGE: kubevirt-hyperconverged
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: e2e-test
+      commands: |
+        KVM_EMULATION=true make deploy_cr
+        make functest
+      from: hco-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-aws
+- as: hco-e2e-image-index-gcp
+  steps:
+    cluster_profile: gcp
+    env:
+      OO_CHANNEL: 1.3.0
+      OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
+      OO_PACKAGE: kubevirt-hyperconverged
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: e2e-test
+      commands: |
+        make deploy_cr
+        make functest
+      from: hco-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-gcp
+- as: hco-e2e-upgrade-aws
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      commands: RELEASE_DELTA=1 make upgrade-test
+      from: hco-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+    workflow: ipi-aws
+- as: hco-e2e-upgrade-prev-aws
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      commands: RELEASE_DELTA=2 PREV=true make upgrade-test
+      from: hco-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+    workflow: ipi-aws
+- as: hco-e2e-upgrade-azure
+  steps:
+    cluster_profile: azure4
+    test:
+    - as: test
+      commands: RELEASE_DELTA=1 make upgrade-test
+      from: hco-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+    workflow: ipi-azure
+- as: hco-e2e-upgrade-prev-azure
+  steps:
+    cluster_profile: azure4
+    test:
+    - as: test
+      commands: RELEASE_DELTA=2 PREV=true make upgrade-test
+      from: hco-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+    workflow: ipi-azure
+zz_generated_metadata:
+  branch: release-1.3
+  org: kubevirt
+  repo: hyperconverged-cluster-operator
