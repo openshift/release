@@ -106,6 +106,6 @@ echo "export KUBECONFIG=\${REPO_DIR}/build/kubeconfig" >> /root/.bashrc
 
 source /root/config
 
-timeout -s 9 105m make create_full_environment deploy_ibip wait_for_ibip_installation_completion
+timeout -s 9 105m make create_full_environment deploy_ibip
 
 EOF

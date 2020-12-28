@@ -52,6 +52,6 @@ source /root/config
 # Get sosreport including sar data
 sosreport --ticket-number "\${HOSTNAME}" --batch -o container_log,filesys,kvm,libvirt,logs,networkmanager,podman,processor,rpm,sar,virsh,yum --tmp-dir /tmp/artifacts
 
-# TODO: Get sno logs
+cp -r /home/sno/build/ /tmp/artifacts/
 
 EOF
