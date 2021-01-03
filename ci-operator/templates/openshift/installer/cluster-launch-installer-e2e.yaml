@@ -453,10 +453,16 @@ objects:
         mkdir -p ~/.ssh
         cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/
 
+        masters=3
+        if has_variant "single-node" ;then
+          masters=1
+        fi
+
         workers=3
-        if has_variant "compact" || has_variant "multisocket"; then
+        if has_variant "compact" || has_variant "multisocket" || has_variant "single-node"; then
           workers=0
         fi
+
         if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
             master_type=null
             if has_variant "multisocket"; then
@@ -508,7 +514,7 @@ objects:
           name: ${CLUSTER_NAME}
         controlPlane:
           name: master
-          replicas: 3
+          replicas: ${masters}
           platform:
             aws:
               type: ${master_type}
