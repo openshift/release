@@ -5,7 +5,7 @@ set -o errexit
 set -o pipefail
 
 #OVIRT_LEASED_RESOURCE can be a list so we want the name of the first param from the list
-lease_path="${CLUSTER_PROFILE_DIR}/${OVIRT_LEASED_RESOURCE%%,*}.json"
+lease_path="${CLUSTER_PROFILE_DIR}/${LEASED_RESOURCE%%,*}.json"
 
 function extract_leases_info() {
     echo "$( jq ."${1}" --raw-output "${2}" )"
