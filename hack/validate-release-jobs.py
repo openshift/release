@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import sys
 import argparse
 import json
 import logging
@@ -19,8 +20,7 @@ def raise_on_duplicates(ordered_pairs):
     for k, v in ordered_pairs:
         if k in d:
             raise ValueError("Duplicate key: %r for value: %r" % (k, v))
-        else:
-            d[k] = v
+        d[k] = v
     return d
 
 
@@ -86,7 +86,7 @@ def main(git_repo_path):
     for source, verification, name in missing_jobs:
         logger.error('Unable to locate job definition for: %s:%s:%s', source, verification, name)
 
-    exit(len(missing_jobs))
+    sys.exit(len(missing_jobs))
 
 
 if __name__ == '__main__':
@@ -101,9 +101,9 @@ if __name__ == '__main__':
 
     if not os.path.exists(opts.release_repo_path):
         logger.error('Release repository path does not exist: %s', opts.release_repo_path)
-        exit(-1)
+        sys.exit(-1)
     elif not os.path.exists(os.path.join(opts.release_repo_path, 'hack', 'validate-release-jobs.py')):
         logger.error('Invalid release repository specified: %s', opts.release_repo_path)
-        exit(-1)
+        sys.exit(-1)
 
     main(opts.release_repo_path)
