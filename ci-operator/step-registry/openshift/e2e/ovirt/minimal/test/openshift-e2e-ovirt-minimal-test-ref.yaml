@@ -1,0 +1,39 @@
+ref:
+  as: openshift-e2e-ovirt-minimal-test
+  from: tests
+  commands: openshift-e2e-ovirt-minimal-test-commands.sh
+  active_deadline_seconds: 7200
+  env:
+    - name: TEST_COMMAND
+      default: run
+      documentation: The test command to run.  Use 'openshift-test --help' to list available commands.
+    - name: TEST_SUITE
+      default: openshift/conformance/parallel
+      documentation: The test suite to run.  Use 'openshift-test TEST_COMMAND --help' to list available suites.
+    - name: TEST_SKIPS
+      default: ""
+      documentation: Regular expression (POSIX basic regular expression) of tests to skip.
+    - name: TEST_OPTIONS
+      default: ""
+      documentation: The test command options. Use 'openshift-test TEST_COMMAND --help' to list available options.
+    - name: TEST_INSTALL_CSI_DRIVERS
+      default: ""
+      documentation: The CSI driver(s) to use.  Used by the `openshift-tests` program, see its documentation for details.
+    - name: TEST_CSI_DRIVER_MANIFEST
+      default: ""
+      documentation: |-
+        Name of the CSI driver manifest file to use.  Used by the `openshift-tests`
+        program as TEST_CSI_DRIVER_FILES env. var., see its documentation for
+        details. The file must be present in ${SHARED_DIR}.
+  dependencies:
+    - name: "release:latest"
+      env: OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE
+  resources:
+    requests:
+      cpu: "3"
+      memory: 600Mi
+    limits:
+      memory: 4Gi
+  documentation: |-
+    The Openshift E2E step executes the common end-to-end test suite - this step will become a PR to the general e2e
+    tests script, created this step to avoid triggering all e2e jobs.
