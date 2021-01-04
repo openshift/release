@@ -62,7 +62,7 @@ def add_imagestream_namespace_rbac(gendoc):
         'apiVersion': 'authorization.openshift.io/v1',
         'kind': 'Role',
         'metadata': {
-            'name': f'release-controller-modify',
+            'name': 'release-controller-modify',
             'namespace': context.is_namespace
         },
         'rules': [
@@ -128,7 +128,7 @@ def add_imagestream_namespace_rbac(gendoc):
         'apiVersion': 'authorization.openshift.io/v1',
         'kind': 'Role',
         'metadata': {
-            'name': f'release-controller-import-ocp',
+            'name': 'release-controller-import-ocp',
             'namespace': context.is_namespace
         },
         'rules': [{
@@ -167,7 +167,7 @@ def add_imagestream_namespace_rbac(gendoc):
         },
         'roleRef': {
             'kind': 'Role',
-            'name': f'release-controller-modify'
+            'name': 'release-controller-modify'
         },
         'subjects': [{
             'kind': 'ServiceAccount',
@@ -262,7 +262,7 @@ def add_imagestream_namespace_rbac(gendoc):
         'apiVersion': 'rbac.authorization.k8s.io/v1',
         'kind': 'RoleBinding',
         'metadata': {
-            'name': f'release-controller-binding-ocp',
+            'name': 'release-controller-binding-ocp',
             'namespace': context.jobs_namespace,
         },
         'roleRef': {
@@ -303,7 +303,7 @@ def add_imagestream_namespace_rbac(gendoc):
         },
         'roleRef': {
             'kind': 'Role',
-            'name': f'release-controller-import-ocp',
+            'name': 'release-controller-import-ocp',
             'namespace': context.is_namespace,
         },
         'subjects': [{

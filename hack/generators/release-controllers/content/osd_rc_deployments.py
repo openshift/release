@@ -188,7 +188,7 @@ def _add_osd_rc_deployment(gendoc):
                                         f'--prow-namespace={context.config.rc_deployment_namespace}',
                                         '--non-prow-job-kubeconfig=/etc/kubeconfig/kubeconfig',
                                         f'--job-namespace={context.jobs_namespace}',
-                                        f'--tools-image-stream-tag=release-controller-bootstrap:tests',
+                                        '--tools-image-stream-tag=release-controller-bootstrap:tests',
                                         '-v=6',
                                         '--github-token-path=/etc/github/oauth',
                                         '--github-endpoint=http://ghproxy',
