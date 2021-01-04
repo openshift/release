@@ -283,7 +283,7 @@ def validate_resources(path, data):
                     logger.error("%s: ci-operator job %s should set the pod's CPU requests and limits to %s", path, job["name"], resources)
                     out = False
                     continue
-                elif null_cpu_request:
+                if null_cpu_request:
                     logger.error("%s: ci-operator job %s should set the pod's CPU requests", path, job["name"])
                     out = False
                     continue
