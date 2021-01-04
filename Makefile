@@ -54,6 +54,9 @@ release-controllers:
 	./hack/generators/release-controllers/generate-release-controllers.py .
 .PHONY: release-controllers
 
+checkconfig:
+	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR):/release:z" gcr.io/k8s-prow/checkconfig:v20210104-12dd8ae74d --config-path /release/core-services/prow/02_config/_config.yaml --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
+
 jobs:
 	$(CONTAINER_ENGINE) pull registry.svc.ci.openshift.org/ci/ci-operator-prowgen:latest
 	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR):/go/src/github.com/openshift/release:z" -e GOPATH=/go registry.svc.ci.openshift.org/ci/ci-operator-prowgen:latest --from-release-repo --to-release-repo
