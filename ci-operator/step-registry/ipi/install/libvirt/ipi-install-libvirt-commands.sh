@@ -48,6 +48,12 @@ cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/
 export TF_LOG=DEBUG
 export TF_LOG_PATH=${ARTIFACT_DIR}/terraform.log
 
+# Mocknss
+NSS_GROUPNAME=${NSS_GROUPNAME}
+NSS_USERNAME=${NSS_USERNAME}
+NSS_WRAPPER_GROUP=${NSS_WRAPPER_GROUP}
+NSS_WRAPPER_PASSWD=${NSS_WRAPPER_PASSWD}
+
 echo "Creating manifest"
 mock-nss.sh openshift-install create manifests --dir=${dir}
 sed -i '/^  channel:/d' ${dir}/manifests/cvo-overrides.yaml
