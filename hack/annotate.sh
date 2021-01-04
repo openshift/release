@@ -31,7 +31,7 @@ function annotate() {
 			fi
 		fi
 
-		oc --context=app.ci annotate -n "${namespace}" "is/${name}" "release.openshift.io/config=$( cat "${conf}" )" --overwrite
+		oc annotate -n "${namespace}" "is/${name}" "release.openshift.io/config=$( cat "${conf}" )" --overwrite
 	fi
 }
 
