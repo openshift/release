@@ -1,4 +1,5 @@
 # pylint: disable=R0801
+# pylint: disable=E0401
 
 from .osd_rc_deployments import add_osd_rc_deployments
 from .osd_rc_rbac import add_osd_rc_service_account_resources

@@ -145,7 +145,7 @@ def run(git_clone_dir, bump=False):
     with genlib.GenDoc(config.paths.path_rc_release_resources.joinpath('admin_deploy-ocp-publish-art.yaml'), context=config) as gendoc:
         content.add_art_publish(gendoc)
 
-    with genlib.GenDoc(config.paths.path_rc_release_resources.joinpath(f'rpms-ocp-3.11.yaml'), context=config) as gendoc:
+    with genlib.GenDoc(config.paths.path_rc_release_resources.joinpath('rpms-ocp-3.11.yaml'), context=config) as gendoc:
         content.add_rpm_mirror_service(gendoc, git_clone_dir, '3.11')
 
     for major_minor in config.releases:
@@ -154,7 +154,7 @@ def run(git_clone_dir, bump=False):
 
         # If there is an annotation defined for the public release controller, use it as a template
         # for the private annotations.
-        for annotation_path in config.paths.path_rc_annotations.glob(f'release-ocp-*.json'):
+        for annotation_path in config.paths.path_rc_annotations.glob('release-ocp-*.json'):
             if annotation_path.name.endswith('ci.json'):  # There are no CI annotations for the private controllers
                 continue
             if '-stable' in annotation_path.name:  # There are no stable streams in private release controllers

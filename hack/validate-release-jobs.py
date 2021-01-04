@@ -19,8 +19,7 @@ def raise_on_duplicates(ordered_pairs):
     for k, v in ordered_pairs:
         if k in d:
             raise ValueError("Duplicate key: %r for value: %r" % (k, v))
-        else:
-            d[k] = v
+        d[k] = v
     return d
 
 

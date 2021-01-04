@@ -40,7 +40,7 @@ def add_osd_files_cache_service_account_resources(gendoc):
         'apiVersion': 'rbac.authorization.k8s.io/v1',
         'kind': 'RoleBinding',
         'metadata': {
-            'name': f'release-controller-jobs-binding',
+            'name': 'release-controller-jobs-binding',
             'namespace': context.is_namespace,
         },
         'roleRef': {
