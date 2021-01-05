@@ -52,6 +52,26 @@ tests:
   commands: GOFLAGS= make test-local
   container:
     from: src
+- as: react-app-test
+  commands: |
+    nodejs_version=v10.23.1
+    nodejs_platform=linux-x64
+    nodejs="node-${nodejs_version}-${nodejs_platform}"
+
+    cd /tmp
+    curl -LO "https://nodejs.org/download/release/${nodejs_version}/${nodejs}.tar.gz"
+    tar xf "${nodejs}.tar.gz"
+
+    export NODEJS_HOME="/tmp/${nodejs}"
+    export PATH=$PATH:$NODEJS_HOME/bin
+
+    HOME=/tmp npm install yarn
+    export PATH=$PATH:/tmp/node_modules/.bin
+    cd -
+
+    make react-app-test
+  container:
+    from: src
 - as: e2e-aws
   steps:
     cluster_profile: aws
