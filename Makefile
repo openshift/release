@@ -108,7 +108,7 @@ applyTemplate:
 	oc process -f $(WHAT) | oc apply -f -
 .PHONY: applyTemplate
 
-postsubmit-update: origin-release origin-stable cincinnati
+postsubmit-update: origin-release origin-stable
 .PHONY: postsubmit-update
 
 all: roles prow projects
@@ -239,10 +239,6 @@ metering:
 coreos:
 	$(MAKE) apply WHAT=projects/coreos/coreos.yaml
 .PHONY: coreos
-
-cincinnati:
-	$(MAKE) apply WHAT=projects/cincinnati/cincinnati.yaml
-.PHONY: cincinnati
 
 bump-pr:
 	$(MAKE) job JOB=periodic-prow-image-autobump
