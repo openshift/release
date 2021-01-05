@@ -67,10 +67,11 @@
   - cmd: |-
       oc --context api.ci get secrets --namespace ci -o json | jq '.items[] | select(.type=="kubernetes.io/dockercfg") | select(.metadata.annotations["kubernetes.io/service-account.name"]=="image-puller") | .data[".dockercfg"]' --raw-output | base64 --decode | jq '.["docker-registry.default.svc:5000"].auth' --raw-output | tr -d '\n'
     name: token_image-puller_ci_reg_auth_value.txt
-- item_name: jenkins-ci-provisioner
-  attachments:
-  - cmd: gcloud iam service-accounts keys create /dev/stdout --iam-account do-not-delete-ci-provisioner@openshift-gce-devel-ci.iam.gserviceaccount.com
-    name: credentials.json
+# This is not idempotent, so we can not run it by default
+#- item_name: jenkins-ci-provisioner
+#  attachments:
+#  - cmd: gcloud iam service-accounts keys create /dev/stdout --iam-account do-not-delete-ci-provisioner@openshift-gce-devel-ci.iam.gserviceaccount.com
+#    name: credentials.json
 - item_name: build_farm
   attachments:
   - cmd: |-
