@@ -79,26 +79,48 @@ if [[ "${CLUSTER_TYPE}" == gcp ]]; then
     popd
 fi
 
-if [[ -n "${TEST_OPTIONS}" ]]; then
-    TEST_ARGS="--options=${TEST_OPTIONS}"
+case "${TEST_TYPE}" in
+upgrade-conformance)
+    export SHOULD_TEST=1
+    export SHOULD_UPGRADE=1
+    export TEST_SUITE=openshift/conformance/parallel # TODO: switch to openshift/conformance after we assess test time
+    ;;
+upgrade)
+    export SHOULD_UPGRADE=1
+    ;;
+suite)
+    export SHOULD_TEST=1
+    ;;
+*)
+    echo >&2 "Unsupported test type '${TEST_TYPE}'"
+    exit 1
+    ;;
+esac
+
+if [[ -n "${SHOULD_UPGRADE-}" ]]; then
+    set -x
+    openshift-tests run-upgrade all \
+        --to-image "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}" \
+        --options "${TEST_UPGRADE_OPTIONS-}" \
+        --provider "${TEST_PROVIDER}" \
+        -o /tmp/artifacts/e2e.log \
+        --junit-dir /tmp/artifacts/junit
+    set +x
 fi
 
-if [[ "${TEST_COMMAND}" == "run-upgrade" && -n "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}" ]]; then
-    # OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE is a pullspec of release:latest imagestreamtag
-    TEST_ARGS="${TEST_ARGS:-} --to-image=${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"
-fi
+if [[ -n "${SHOULD_TEST-}" ]]; then
+    if [[ -n "${TEST_SKIPS}" ]]; then
+        TESTS="$(openshift-tests "${TEST_COMMAND}" --dry-run "${TEST_SUITE}")"
+        echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests
+        echo "Skipping tests:"
+        echo "${TESTS}" | grep "${TEST_SKIPS}"
+        TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
+    fi
 
-if [[ -n "${TEST_SKIPS}" ]]; then
-    TESTS="$(openshift-tests "${TEST_COMMAND}" --dry-run "${TEST_SUITE}")"
-    echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests
-    echo "Skipping tests:"
-    echo "${TESTS}" | grep "${TEST_SKIPS}"
-    TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
+    set -x
+    openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-} \
+        --provider "${TEST_PROVIDER}" \
+        -o /tmp/artifacts/e2e.log \
+        --junit-dir /tmp/artifacts/junit
+    set +x
 fi
-
-# using set -x so we will see the full openshift-tests command in the log. disable right after.
-set -x
-openshift-tests "${TEST_COMMAND}" "${TEST_SUITE}" ${TEST_ARGS:-} \
-    --provider "${TEST_PROVIDER}" \
-    -o /tmp/artifacts/e2e.log \
-    --junit-dir /tmp/artifacts/junit
