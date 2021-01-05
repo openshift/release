@@ -1,0 +1,75 @@
+# this is the Namespace in which your ServiceAccount will live
+apiVersion: v1
+kind: Namespace
+metadata:
+  annotations:
+    openshift.io/description: Automation ServiceAccounts for OCP QE
+    openshift.io/display-name: OCP QE
+  name: ocp-qe
+---
+# this is the ServiceAccount whose credentials you will use
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: image-puller
+  namespace: ocp-qe
+---
+# this grants your ServiceAccount rights to pull images
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ocp-qe-image-puller-binding
+  # the namespace from which you will pull images
+  namespace: ocp
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: system:image-puller
+subjects:
+  - kind: ServiceAccount
+    namespace: ocp-qe
+    name: image-puller
+---
+# the Group of people who should be able to manage this ServiceAccount
+kind: Group
+apiVersion: v1
+metadata:
+  name: ocp-qe-admins
+users:
+  # these names are GitHub usernames
+  - akostadi
+  - jianlinliu
+  - pruan
+---
+# this grants the right to read the ServiceAccount's credentials
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: secret-reader
+  namespace: ocp-qe
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - serviceaccounts
+      - secrets
+    verbs:
+      - get
+      - list
+---
+# this allows the group of people admin access to the Namespace
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ocp-qe-admins-binding
+  namespace: ocp-qe
+roleRef:
+  kind: Role
+  apiGroup: rbac.authorization.k8s.io
+  name: secret-reader
+  namespace: ocp-qe
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: ocp-qe-admins
+    namespace: ocp-qe
