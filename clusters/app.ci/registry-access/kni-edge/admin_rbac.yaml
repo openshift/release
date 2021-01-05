@@ -35,33 +35,17 @@ users:
 - mcornea
 - yprokule
 ---
-# this grants the right to read the ServiceAccount's credentials
-kind: Role
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: secret-reader
-  namespace: edge
-rules:
-  - apiGroups:
-      - ""
-    resources:
-      - serviceaccounts
-      - secrets
-    verbs:
-      - get
-      - list
----
-# this allows the group of people admin access to the Namespace
+# this grants the right to read the ServiceAccount's credentials and pull
+# images to the admins.
 kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: edge-admins-binding
   namespace: edge
 roleRef:
-  kind: Role
+  kind: ClusterRole
   apiGroup: rbac.authorization.k8s.io
-  name: secret-reader
-  namespace: edge
+  name: pull-secret-namespace-manager
 subjects:
   - kind: Group
     apiGroup: rbac.authorization.k8s.io
