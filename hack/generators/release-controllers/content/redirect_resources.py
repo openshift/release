@@ -7,39 +7,6 @@ def _add_redirect_resources(gendoc):
     """
     context = gendoc.context
 
-    gendoc.add_comments("""
-Bootstrap the environment for the amd64 tests image.  The caches require an amd64 "tests" image to execute on
-the cluster.  This imagestream is used as a commandline parameter to the release-controller...
-     --tools-image-stream-tag=release-controller-bootstrap:tests
-    """)
-    gendoc.append({
-        'apiVersion': 'image.openshift.io/v1',
-        'kind': 'ImageStream',
-        'metadata': {
-            'name': 'release-controller-bootstrap',
-            'namespace': context.is_namespace
-        },
-        'spec': {
-            'lookupPolicy': {
-                'local': False
-            },
-            'tags': [
-                {
-                    'from': {
-                        'kind': 'DockerImage',
-                        'name': 'image-registry.openshift-image-registry.svc:5000/ocp/4.6:tests'
-                    },
-                    'importPolicy': {
-                        'scheduled': True
-                    },
-                    'name': 'tests',
-                    'referencePolicy': {
-                        'type': 'Source'
-                    }
-                }]
-        }
-    })
-
     gendoc.append({
         'apiVersion': 'v1',
         'kind': 'Route',
