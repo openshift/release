@@ -1,0 +1,74 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  annotations:
+    openshift.io/description: Automation ServiceAccounts for ovirt
+    openshift.io/display-name: ovirt
+  name: ovirt
+---
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: image-puller
+  namespace: ovirt
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ovirt-image-puller-binding
+  # the namespace from which you will pull images
+  namespace: ocp
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: system:image-puller
+subjects:
+  - kind: ServiceAccount
+    namespace: ovirt
+    name: image-puller
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ovirt-public-access-image-puller
+  namespace: ovirt
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: system:image-puller
+subjects:
+  - kind: SystemGroup
+    name: system:authenticated
+  - kind: SystemGroup
+    name: system:unauthenticated
+---
+# Group of people who should be able to manage this ServiceAccount
+kind: Group
+apiVersion: v1
+metadata:
+  name: ovirt-admins
+users:
+  - rgolangh
+  - bennyz
+  - Gal-Zaidman
+  - dougsland
+  - eslutsky
+  - janoszen
+  - sandrobonazzola
+---
+# this grants the right to read the ServiceAccount's credentials and pull
+# images to the admins.
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ovirt-admins-binding
+  namespace: ovirt
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: pull-secret-namespace-manager
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: ovirt-admins
+    namespace: ovirt
