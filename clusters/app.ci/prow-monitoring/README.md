@@ -99,29 +99,4 @@ We can `make mixins` at the root level of this repo, _or_
 
 ## Add an alert on Prow job failures
 
-For DPTP-developer, we can still create/edit `jsonnet`s to add more alerts. For CI-cluster users, there is a more convenient way if users want to be notified via our slack when some Prow job fails.
-
-For example, getting notifications for `my-cool-job-name`:
-
-* Add this snippet into [`job_failures_config.libsonnet`](./mixins/prometheus/job_failures_config.libsonnet):
-
-
-    ```
-    'cool-job-name': { 
-        receiver: '<receiver_name>', 
-        }, 
-    ```
-
-* `<receiver_name>` above has to be defined in [`config.libsonnet`](./mixins/config.libsonnet):
-
-```
- alertManagerReceivers: { 
-   '<receiver_name>': { 
-     team: '<team_name>', // used as in a alert label for alertmanager's routing, should avoid using names from other teams
-     channel: '#<channel_name>', // start with '#'
-     notify: '<team|person_slack_user_name>', // NO @ needed 
-   }, 
- }
-```
-
-* `make generate-mixins` and `git-diff` on [`prometheus_rule_prow.yaml`](./mixins/prometheus_out/prometheus_rule_prow.yaml) for the new alert. Create PR if it looks good.
+For DPTP-developer, we can still create/edit `jsonnet`s to add more alerts. For CI-cluster users, there is [a more convenient way](https://docs.ci.openshift.org/docs/how-tos/notification/) if users want to be notified via our slack when some Prow job fails.
