@@ -33,6 +33,21 @@
         ],
       },
       {
+        name: 'cluster-client-creation-failure',
+        rules: [
+          {
+            alert: 'component-failed-to-construct-a-client',
+            expr: 'kubernetes_failed_client_creations > 0',
+            labels: {
+              severity: 'critical',
+            },
+            annotations: {
+              message: 'Component {{ $labels.service }} failed to construct a client. Search for "failed to construct {manager,client} for cluster <<clustername>>" in the beginning of the pod log. If the cluster unavailability was transient, a restart of the pod will fix the issue.',
+            },
+          },
+        ],
+      },
+      {
         name: 'ci-operator-infra-error',
         rules: [
           {
