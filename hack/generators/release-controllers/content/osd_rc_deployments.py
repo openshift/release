@@ -1,5 +1,42 @@
 
 
+def _add_osd_rc_bootstrap(gendoc):
+    context = gendoc.context
+
+    gendoc.add_comments("""
+    Bootstrap the environment for the amd64 tests image.  The caches require an amd64 "tests" image to execute on
+    the cluster.  This imagestream is used as a commandline parameter to the release-controller...
+         --tools-image-stream-tag=release-controller-bootstrap:tests
+        """)
+    gendoc.append({
+        'apiVersion': 'image.openshift.io/v1',
+        'kind': 'ImageStream',
+        'metadata': {
+            'name': 'release-controller-bootstrap',
+            'namespace': context.is_namespace
+        },
+        'spec': {
+            'lookupPolicy': {
+                'local': False
+            },
+            'tags': [
+                {
+                    'from': {
+                        'kind': 'DockerImage',
+                        'name': 'image-registry.openshift-image-registry.svc:5000/ocp/4.6:tests'
+                    },
+                    'importPolicy': {
+                        'scheduled': True
+                    },
+                    'name': 'tests',
+                    'referencePolicy': {
+                        'type': 'Source'
+                    }
+                }]
+        }
+    })
+
+
 def _add_osd_rc_route(gendoc):
     context = gendoc.context
     gendoc.append({
@@ -313,6 +350,7 @@ def add_osd_rc_deployments(gendoc):
 Resources required to deploy release controller instances on
 the app.ci clusters.
 """)
+    _add_osd_rc_bootstrap(gendoc)
     _add_osd_rc_route(gendoc)
     _add_osd_rc_service(gendoc)
     _add_osd_rc_deployment(gendoc)
