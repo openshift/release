@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-echo "************ baremetalds sno setup command ************"
+echo "************ baremetalds single-node setup command ************"
 
 # Ensure our UID, which is randomly generated, is in /etc/passwd. This is required
 # to be able to SSH.
@@ -35,7 +35,7 @@ for x in $(seq 10) ; do
     sleep 10
 done
 
-# Copy sno source from current directory to the remote server
+# Copy assisted-test-infra source from current directory to the remote server
 tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/sno.tar.gz"
 
 # Prepare configuration and run
