@@ -567,7 +567,7 @@ periodics:
           EOEXCLUDE
           export PATH=/usr/libexec/origin:$PATH
           openshift-tests run openshift/conformance/parallel --dry-run | ./invert_excluded.py excluded_tests > test-suite.txt
-          TEST_SUITE="--file=test-suite.txt" TEST_OPTIONS="--from-repository=quay.io/multi-arch/community-e2e-images" run-tests
+          TEST_SUITE="--file=test-suite.txt" TEST_UPGRADE_OPTIONS="--from-repository=quay.io/multi-arch/community-e2e-images" run-tests
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -768,7 +768,7 @@ periodics:
           EOEXCLUDE
           export PATH=/usr/libexec/origin:$PATH
           openshift-tests run openshift/conformance/parallel --dry-run | ./invert_excluded.py excluded_tests > test-suite.txt
-          TEST_SUITE="--file=test-suite.txt" TEST_OPTIONS="--from-repository=quay.io/multi-arch/community-e2e-images" run-tests
+          TEST_SUITE="--file=test-suite.txt" TEST_UPGRADE_OPTIONS="--from-repository=quay.io/multi-arch/community-e2e-images" run-tests
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -5391,10 +5391,9 @@ periodics:
             steps:
               cluster_profile: "$(CLUSTER_TYPE)"
               env:
-                TEST_COMMAND: "run-upgrade"
-                TEST_SUITE: "all"
+                TEST_TYPE: upgrade
+                TEST_UPGRADE_OPTIONS: "abort-at=99"
                 DELETE_MC: "false"
-                TEST_OPTIONS: "abort-at=99"
               workflow: openshift-upgrade-aws
       image: ci-operator:latest
       imagePullPolicy: Always
@@ -5494,7 +5493,7 @@ periodics:
                 memory: 200Mi
           tests:
           - as: e2e-$(CLUSTER_TYPE)-upgrade
-            commands: TEST_SUITE=all TEST_OPTIONS=abort-at=random run-upgrade-tests
+            commands: TEST_SUITE=all TEST_UPGRADE_OPTIONS=abort-at=random run-upgrade-tests
             openshift_installer:
               cluster_profile: "$(CLUSTER_TYPE)"
               upgrade: true
