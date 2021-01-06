@@ -118,25 +118,7 @@ if [[ "${CLUSTER_TYPE}" == gcp ]]; then
     popd
 fi
 
-case "${TEST_TYPE}" in
-upgrade-conformance)
-    export SHOULD_TEST=1
-    export SHOULD_UPGRADE=1
-    export TEST_SUITE=openshift/conformance/parallel # TODO: switch to openshift/conformance after we assess test time
-    ;;
-upgrade)
-    export SHOULD_UPGRADE=1
-    ;;
-suite)
-    export SHOULD_TEST=1
-    ;;
-*)
-    echo >&2 "Unsupported test type '${TEST_TYPE}'"
-    exit 1
-    ;;
-esac
-
-if [[ -n "${SHOULD_UPGRADE-}" ]]; then
+function upgrade() {
     set -x
     openshift-tests run-upgrade all \
         --to-image "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}" \
@@ -145,9 +127,9 @@ if [[ -n "${SHOULD_UPGRADE-}" ]]; then
         -o /tmp/artifacts/e2e.log \
         --junit-dir /tmp/artifacts/junit
     set +x
-fi
+}
 
-if [[ -n "${SHOULD_TEST-}" ]]; then
+function suite() {
     if [[ -n "${TEST_SKIPS}" ]]; then
         TESTS="$(openshift-tests "${TEST_COMMAND}" --dry-run "${TEST_SUITE}")"
         echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests
@@ -162,4 +144,25 @@ if [[ -n "${SHOULD_TEST-}" ]]; then
         -o /tmp/artifacts/e2e.log \
         --junit-dir /tmp/artifacts/junit
     set +x
-fi
+}
+
+case "${TEST_TYPE}" in
+upgrade-conformance)
+    upgrade
+    TEST_SUITE=openshift/conformance/parallel suite
+    ;;
+upgrade)
+    upgrade
+    ;;
+suite-conformance)
+    suite
+    TEST_SUITE=openshift/conformance/parallel suite
+    ;;
+suite)
+    suite
+    ;;
+*)
+    echo >&2 "Unsupported test type '${TEST_TYPE}'"
+    exit 1
+    ;;
+esac
