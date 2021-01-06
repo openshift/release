@@ -48,11 +48,6 @@
         channel: '#forum-logging',
         notify: 'aoslogging',
       },
-      'openshift-app-services': {
-        team: 'openshift-app-services',
-        channel: '#forum-app-services',
-        notify: 'openshift-app-services',
-      },
       'OLM-rh-operators': {
         team: 'OLM',
         channel: '#operator-test',
