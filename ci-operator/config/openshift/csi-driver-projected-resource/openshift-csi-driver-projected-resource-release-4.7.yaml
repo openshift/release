@@ -52,6 +52,45 @@ tests:
     make test JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
   container:
     from: src
+- artifact_dir: /tmp/artifacts
+  as: e2e-aws-operator
+  steps:
+    cluster_profile: aws
+    test:
+      - as: test
+        cli: latest
+        commands: make test-e2e
+        from: src
+        resources:
+          requests:
+            cpu: 100m
+    workflow: ipi-aws
+- artifact_dir: /tmp/artifacts
+  as: e2e-aws-operator-disruptive
+  steps:
+    cluster_profile: aws
+    test:
+      - as: test
+        cli: latest
+        commands: make test-e2e-disruptive
+        from: src
+        resources:
+          requests:
+            cpu: 100m
+    workflow: ipi-aws
+- artifact_dir: /tmp/artifacts
+  as: e2e-aws-operator-slow
+  steps:
+    cluster_profile: aws
+    test:
+      - as: test
+        cli: latest
+        commands: make test-e2e-slow
+        from: src
+        resources:
+          requests:
+            cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: release-4.7
   org: openshift
