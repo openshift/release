@@ -131,7 +131,7 @@ function upgrade() {
 
 function suite() {
     if [[ -n "${TEST_SKIPS}" ]]; then
-        TESTS="$(openshift-tests "${TEST_COMMAND}" --dry-run "${TEST_SUITE}")"
+        TESTS="$(openshift-tests run --dry-run "${TEST_SUITE}")"
         echo "${TESTS}" | grep "${TEST_SKIPS}" >/tmp/tests
         echo "Skipping tests:"
         echo "${TESTS}" | grep "${TEST_SKIPS}"
