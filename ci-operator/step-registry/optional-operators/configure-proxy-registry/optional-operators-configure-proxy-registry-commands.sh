@@ -44,7 +44,8 @@ oc patch OperatorHub cluster --type json -p '[{"op": "add", "path": "/spec/disab
 sleep 120
 # Query the node state until all of the nodes are ready
 for i in {1..60}; do
-    NODE_STATE=$(oc get nodes || NODE_STATE_RESULT=$?)
+    NODE_STATE="$(oc get nodes)"
+    NODE_STATE_RESULT=$?
     if [[ ${NODE_STATE} == *"NotReady"*  || ${NODE_STATE} == *"SchedulingDisabled"* ]]; then
         echo "Not all of the nodes have finished restarting - waiting for 30 seconds, attempt ${i}"
         sleep 30
