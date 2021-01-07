@@ -149,14 +149,14 @@ function suite() {
 case "${TEST_TYPE}" in
 upgrade-conformance)
     upgrade
-    TEST_SUITE=openshift/conformance/parallel suite
+    TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/conformance/parallel suite
     ;;
 upgrade)
     upgrade
     ;;
 suite-conformance)
     suite
-    TEST_SUITE=openshift/conformance/parallel suite
+    TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/conformance/parallel suite
     ;;
 suite)
     suite
