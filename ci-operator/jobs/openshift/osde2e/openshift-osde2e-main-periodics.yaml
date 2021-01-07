@@ -1896,11 +1896,11 @@ periodics:
     repo: osde2e
   labels:
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-moa-prod-cleanup
+  name: osde2e-rosa-prod-cleanup
   spec:
     containers:
     - args:
-      - set -o pipefail; ./scripts/clean-up-moa.sh /usr/local/osde2e-moa-production
+      - set -o pipefail; ./scripts/clean-up-rosa.sh /usr/local/osde2e-rosa-production
       command:
       - /bin/bash
       - -c
@@ -1911,14 +1911,14 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /usr/local/osde2e-moa-production
-        name: osde2e-moa-production
+      - mountPath: /usr/local/osde2e-rosa-production
+        name: osde2e-rosa-production
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: osde2e-moa-production
+    - name: osde2e-rosa-production
       secret:
-        secretName: osde2e-moa-production
+        secretName: osde2e-rosa-production
 - agent: kubernetes
   cluster: api.ci
   cron: 0 4 * * *
@@ -1929,11 +1929,11 @@ periodics:
     repo: osde2e
   labels:
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-moa-stage-cleanup
+  name: osde2e-rosa-stage-cleanup
   spec:
     containers:
     - args:
-      - set -o pipefail; ./scripts/clean-up-moa.sh /usr/local/osde2e-moa-staging
+      - set -o pipefail; ./scripts/clean-up-rosa.sh /usr/local/osde2e-rosa-staging
       command:
       - /bin/bash
       - -c
@@ -1944,14 +1944,14 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /usr/local/osde2e-moa-staging
-        name: osde2e-moa-staging
+      - mountPath: /usr/local/osde2e-rosa-staging
+        name: osde2e-rosa-staging
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: osde2e-moa-staging
+    - name: osde2e-rosa-staging
       secret:
-        secretName: osde2e-moa-staging
+        secretName: osde2e-rosa-staging
 - agent: kubernetes
   cluster: api.ci
   cron: 0 4 * * *
@@ -1962,11 +1962,11 @@ periodics:
     repo: osde2e
   labels:
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-moa-int-cleanup
+  name: osde2e-rosa-int-cleanup
   spec:
     containers:
     - args:
-      - set -o pipefail; ./scripts/clean-up-moa.sh /usr/local/osde2e-moa-integration
+      - set -o pipefail; ./scripts/clean-up-rosa.sh /usr/local/osde2e-rosa-integration
       command:
       - /bin/bash
       - -c
@@ -1977,14 +1977,14 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /usr/local/osde2e-moa-integration
-        name: osde2e-moa-integration
+      - mountPath: /usr/local/osde2e-rosa-integration
+        name: osde2e-rosa-integration
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: osde2e-moa-integration
+    - name: osde2e-rosa-integration
       secret:
-        secretName: osde2e-moa-integration
+        secretName: osde2e-rosa-integration
 - agent: kubernetes
   cluster: api.ci
   cron: 0 */8 * * *
@@ -1995,7 +1995,7 @@ periodics:
     repo: osde2e
   labels:
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-int-moa-e2e-osd-default-plus-one-nightly
+  name: osde2e-int-rosa-e2e-osd-default-plus-one-nightly
   spec:
     containers:
     - args:
@@ -2007,12 +2007,12 @@ periodics:
       command:
       - /osde2e
       env:
-      - name: MOA_ENV
+      - name: ROSA_ENV
         value: int
       - name: SECRET_LOCATIONS
-        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-moa-integration
+        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-rosa-integration
       - name: CONFIGS
-        value: moa,e2e-suite,one-release-from-prod-default,region-random
+        value: rosa,e2e-suite,one-release-from-prod-default,region-random
       image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
@@ -2026,8 +2026,8 @@ periodics:
       - mountPath: /usr/local/osde2e-credentials
         name: osde2e-credentials
         readOnly: true
-      - mountPath: /usr/local/osde2e-moa-integration
-        name: osde2e-moa-integration
+      - mountPath: /usr/local/osde2e-rosa-integration
+        name: osde2e-rosa-integration
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -2037,9 +2037,9 @@ periodics:
     - name: osde2e-credentials
       secret:
         secretName: osde2e-credentials
-    - name: osde2e-moa-integration
+    - name: osde2e-rosa-integration
       secret:
-        secretName: osde2e-moa-integration
+        secretName: osde2e-rosa-integration
 - agent: kubernetes
   cluster: api.ci
   cron: 0 */8 * * *
@@ -2050,7 +2050,7 @@ periodics:
     repo: osde2e
   labels:
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-int-moa-e2e-osd-default-plus-two-nightly
+  name: osde2e-int-rosa-e2e-osd-default-plus-two-nightly
   spec:
     containers:
     - args:
@@ -2062,12 +2062,12 @@ periodics:
       command:
       - /osde2e
       env:
-      - name: MOA_ENV
+      - name: ROSA_ENV
         value: int
       - name: SECRET_LOCATIONS
-        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-moa-integration
+        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-rosa-integration
       - name: CONFIGS
-        value: moa,e2e-suite,two-releases-from-prod-default,region-random
+        value: rosa,e2e-suite,two-releases-from-prod-default,region-random
       image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
@@ -2081,8 +2081,8 @@ periodics:
       - mountPath: /usr/local/osde2e-credentials
         name: osde2e-credentials
         readOnly: true
-      - mountPath: /usr/local/osde2e-moa-integration
-        name: osde2e-moa-integration
+      - mountPath: /usr/local/osde2e-rosa-integration
+        name: osde2e-rosa-integration
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -2092,9 +2092,9 @@ periodics:
     - name: osde2e-credentials
       secret:
         secretName: osde2e-credentials
-    - name: osde2e-moa-integration
+    - name: osde2e-rosa-integration
       secret:
-        secretName: osde2e-moa-integration
+        secretName: osde2e-rosa-integration
 - agent: kubernetes
   cluster: api.ci
   cron: 0 */8 * * *
@@ -2387,7 +2387,7 @@ periodics:
     repo: osde2e
   labels:
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-stage-moa-e2e-default
+  name: osde2e-stage-rosa-e2e-default
   spec:
     containers:
     - args:
@@ -2399,12 +2399,12 @@ periodics:
       command:
       - /osde2e
       env:
-      - name: MOA_ENV
+      - name: ROSA_ENV
         value: stage
       - name: SECRET_LOCATIONS
-        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-moa-staging
+        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-rosa-staging
       - name: CONFIGS
-        value: moa,e2e-suite,region-random
+        value: rosa,e2e-suite,region-random
       image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
@@ -2418,8 +2418,8 @@ periodics:
       - mountPath: /usr/local/osde2e-credentials
         name: osde2e-credentials
         readOnly: true
-      - mountPath: /usr/local/osde2e-moa-staging
-        name: osde2e-moa-staging
+      - mountPath: /usr/local/osde2e-rosa-staging
+        name: osde2e-rosa-staging
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -2429,9 +2429,9 @@ periodics:
     - name: osde2e-credentials
       secret:
         secretName: osde2e-credentials
-    - name: osde2e-moa-staging
+    - name: osde2e-rosa-staging
       secret:
-        secretName: osde2e-moa-staging
+        secretName: osde2e-rosa-staging
 - agent: kubernetes
   cluster: api.ci
   cron: 0 */8 * * *
@@ -2442,7 +2442,7 @@ periodics:
     repo: osde2e
   labels:
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-stage-moa-e2e-next-y
+  name: osde2e-stage-rosa-e2e-next-y
   spec:
     containers:
     - args:
@@ -2454,12 +2454,12 @@ periodics:
       command:
       - /osde2e
       env:
-      - name: MOA_ENV
+      - name: ROSA_ENV
         value: stage
       - name: SECRET_LOCATIONS
-        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-moa-staging
+        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-rosa-staging
       - name: CONFIGS
-        value: moa,e2e-suite,region-random,latest-y-from-prod-default
+        value: rosa,e2e-suite,region-random,latest-y-from-prod-default
       image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
@@ -2473,8 +2473,8 @@ periodics:
       - mountPath: /usr/local/osde2e-credentials
         name: osde2e-credentials
         readOnly: true
-      - mountPath: /usr/local/osde2e-moa-staging
-        name: osde2e-moa-staging
+      - mountPath: /usr/local/osde2e-rosa-staging
+        name: osde2e-rosa-staging
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -2484,9 +2484,9 @@ periodics:
     - name: osde2e-credentials
       secret:
         secretName: osde2e-credentials
-    - name: osde2e-moa-staging
+    - name: osde2e-rosa-staging
       secret:
-        secretName: osde2e-moa-staging
+        secretName: osde2e-rosa-staging
 - agent: kubernetes
   cluster: api.ci
   cron: 0 */8 * * *
@@ -2497,7 +2497,7 @@ periodics:
     repo: osde2e
   labels:
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-stage-moa-e2e-next-z
+  name: osde2e-stage-rosa-e2e-next-z
   spec:
     containers:
     - args:
@@ -2509,12 +2509,12 @@ periodics:
       command:
       - /osde2e
       env:
-      - name: MOA_ENV
+      - name: ROSA_ENV
         value: stage
       - name: SECRET_LOCATIONS
-        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-moa-staging
+        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-rosa-staging
       - name: CONFIGS
-        value: moa,e2e-suite,region-random,latest-z-from-prod-default
+        value: rosa,e2e-suite,region-random,latest-z-from-prod-default
       image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
@@ -2528,8 +2528,8 @@ periodics:
       - mountPath: /usr/local/osde2e-credentials
         name: osde2e-credentials
         readOnly: true
-      - mountPath: /usr/local/osde2e-moa-staging
-        name: osde2e-moa-staging
+      - mountPath: /usr/local/osde2e-rosa-staging
+        name: osde2e-rosa-staging
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -2539,9 +2539,9 @@ periodics:
     - name: osde2e-credentials
       secret:
         secretName: osde2e-credentials
-    - name: osde2e-moa-staging
+    - name: osde2e-rosa-staging
       secret:
-        secretName: osde2e-moa-staging
+        secretName: osde2e-rosa-staging
 - agent: kubernetes
   cluster: api.ci
   cron: 0 */8 * * *
@@ -2789,7 +2789,7 @@ periodics:
     repo: osde2e
   labels:
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-prod-moa-e2e-default
+  name: osde2e-prod-rosa-e2e-default
   spec:
     containers:
     - args:
@@ -2801,12 +2801,12 @@ periodics:
       command:
       - /osde2e
       env:
-      - name: MOA_ENV
+      - name: ROSA_ENV
         value: prod
       - name: SECRET_LOCATIONS
-        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-moa-production
+        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-rosa-production
       - name: CONFIGS
-        value: moa,e2e-suite,region-random
+        value: rosa,e2e-suite,region-random
       image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
@@ -2820,8 +2820,8 @@ periodics:
       - mountPath: /usr/local/osde2e-credentials
         name: osde2e-credentials
         readOnly: true
-      - mountPath: /usr/local/osde2e-moa-production
-        name: osde2e-moa-production
+      - mountPath: /usr/local/osde2e-rosa-production
+        name: osde2e-rosa-production
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -2831,9 +2831,9 @@ periodics:
     - name: osde2e-credentials
       secret:
         secretName: osde2e-credentials
-    - name: osde2e-moa-production
+    - name: osde2e-rosa-production
       secret:
-        secretName: osde2e-moa-production
+        secretName: osde2e-rosa-production
 - agent: kubernetes
   cluster: api.ci
   cron: 0 */8 * * *
@@ -2844,7 +2844,7 @@ periodics:
     repo: osde2e
   labels:
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-prod-moa-e2e-next
+  name: osde2e-prod-rosa-e2e-next
   spec:
     containers:
     - args:
@@ -2856,14 +2856,14 @@ periodics:
       command:
       - /osde2e
       env:
-      - name: MOA_ENV
+      - name: ROSA_ENV
         value: prod
       - name: USE_LATEST_VERSION_FOR_INSTALL
         value: "true"
       - name: SECRET_LOCATIONS
-        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-moa-production
+        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-rosa-production
       - name: CONFIGS
-        value: moa,e2e-suite,region-random
+        value: rosa,e2e-suite,region-random
       image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
@@ -2877,8 +2877,8 @@ periodics:
       - mountPath: /usr/local/osde2e-credentials
         name: osde2e-credentials
         readOnly: true
-      - mountPath: /usr/local/osde2e-moa-production
-        name: osde2e-moa-production
+      - mountPath: /usr/local/osde2e-rosa-production
+        name: osde2e-rosa-production
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -2888,6 +2888,6 @@ periodics:
     - name: osde2e-credentials
       secret:
         secretName: osde2e-credentials
-    - name: osde2e-moa-production
+    - name: osde2e-rosa-production
       secret:
-        secretName: osde2e-moa-production
+        secretName: osde2e-rosa-production
