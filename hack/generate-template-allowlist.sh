@@ -12,8 +12,8 @@ if [[ -n ${BLOCKER:-} ]]; then
     ARGS="--block-new-jobs=$BLOCKER"
 fi
 
-${CONTAINER_ENGINE} pull registry.svc.ci.openshift.org/ci/template-deprecator:latest
-${CONTAINER_ENGINE} run --rm -v "$PWD:/release:z" registry.svc.ci.openshift.org/ci/template-deprecator:latest \
+${CONTAINER_ENGINE} pull registry.ci.openshift.org/ci/template-deprecator:latest
+${CONTAINER_ENGINE} run --rm -v "$PWD:/release:z" registry.ci.openshift.org/ci/template-deprecator:latest \
     ${ARGS:-} \
     --prow-jobs-dir /release/ci-operator/jobs \
     --prow-config-path /release/core-services/prow/02_config/_config.yaml \
