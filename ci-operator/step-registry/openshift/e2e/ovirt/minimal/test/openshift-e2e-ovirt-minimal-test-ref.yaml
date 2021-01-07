@@ -4,9 +4,27 @@ ref:
   commands: openshift-e2e-ovirt-minimal-test-commands.sh
   active_deadline_seconds: 7200
   env:
-    - name: TEST_COMMAND
-      default: run
-      documentation: The test command to run.  Use 'openshift-test --help' to list available commands.
+    - name: TEST_TYPE
+      default: "suite"
+      documentation: |
+        The type of test to perform.
+
+        * 'suite' - Run the test suite defined by TEST_SUITE. By default this executes the
+                    OpenShift parallel conformance suite. All product components must run the
+                    default suite on pull requests prior to merge.
+        * 'suite-conformance' - Runs the test suite defined by TEST_SUITE, then runs the product conformance
+                    suite to verify the cluster is still functional. This is typically used for testing
+                    disruption from one suite, then confirming that the disruption did not degrade the
+                    product.
+        * 'upgrade' - Perform an upgrade to the image defined by OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE.
+                    The TEST_UPGRADE_OPTIONS flag may be optionally set. All product components
+                    must run the default upgrade test (verify an upgrade completes) on pull requests
+                    prior to merge.
+        * 'upgrade-conformance' - Performs the 'upgrade' test and then executes the full conformance
+                    suite after upgrade completes. Does not honor TEST_SUITE but will respect
+                    TEST_UPGRADE_OPTIONS. All product releases must pass the conformance suite after
+                    an upgrade completes or have explicit logic in their test to tolerate behavior after
+                    upgrade.
     - name: TEST_SUITE
       default: openshift/conformance/parallel
       documentation: The test suite to run.  Use 'openshift-test TEST_COMMAND --help' to list available suites.
