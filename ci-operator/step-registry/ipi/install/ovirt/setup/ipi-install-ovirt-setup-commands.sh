@@ -13,7 +13,8 @@ source "${CLUSTER_PROFILE_DIR}/ovirt.conf"
 # shellcheck source=/dev/null
 source "${CLUSTER_PROFILE_DIR}/send-event-to-ovirt.sh"
 
-installer_artifact_dir=${ARTIFACT_DIR}/installer
+installer_artifact_dir=/tmp/installer
+
 mkdir ${installer_artifact_dir}
 
 cp "${SHARED_DIR}"/* "${installer_artifact_dir}/"
