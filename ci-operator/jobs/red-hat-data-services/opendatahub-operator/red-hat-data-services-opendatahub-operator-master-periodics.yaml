@@ -1,31 +1,26 @@
 periodics:
 - agent: kubernetes
   cluster: api.ci
-  cron: 2 3 * * *
+  cron: 30 0 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
   extra_refs:
   - base_ref: master
-    org: kubevirt
-    path_alias: kubevirt.io/kubevirt
-    repo: kubevirt
+    org: red-hat-data-services
+    repo: opendatahub-operator
   labels:
     ci-operator.openshift.io/prowgen-controlled: "true"
-    ci-operator.openshift.io/variant: 0.34_4.6
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-kubevirt-kubevirt-master-0.34_4.6-e2e
+  name: periodic-ci-red-hat-data-services-opendatahub-operator-master-modh-opendatahub-operator-nightly
   spec:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-password-file=/etc/boskos/password
       - --report-password-file=/etc/report/password.txt
       - --report-username=ci
-      - --secret-dir=/usr/local/e2e-cluster-profile
-      - --target=e2e
-      - --variant=0.34_4.6
+      - --target=modh-opendatahub-operator-nightly
       command:
       - ci-operator
       image: ci-operator:latest
@@ -35,11 +30,6 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/e2e-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -51,17 +41,6 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: password
-          path: password
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-azure4
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -70,20 +49,18 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: api.ci
-  cron: 2 3 * * *
+  cron: 30 3 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
   extra_refs:
   - base_ref: master
-    org: kubevirt
-    path_alias: kubevirt.io/kubevirt
-    repo: kubevirt
+    org: red-hat-data-services
+    repo: opendatahub-operator
   labels:
     ci-operator.openshift.io/prowgen-controlled: "true"
-    ci-operator.openshift.io/variant: "4.8"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-kubevirt-kubevirt-master-4.8-e2e
+  name: periodic-ci-red-hat-data-services-opendatahub-operator-master-modh-operator-e2e-nightly
   spec:
     containers:
     - args:
@@ -92,9 +69,8 @@ periodics:
       - --lease-server-password-file=/etc/boskos/password
       - --report-password-file=/etc/report/password.txt
       - --report-username=ci
-      - --secret-dir=/usr/local/e2e-cluster-profile
-      - --target=e2e
-      - --variant=4.8
+      - --secret-dir=/usr/local/modh-operator-e2e-nightly-cluster-profile
+      - --target=modh-operator-e2e-nightly
       command:
       - ci-operator
       image: ci-operator:latest
@@ -107,7 +83,7 @@ periodics:
       - mountPath: /etc/boskos
         name: boskos
         readOnly: true
-      - mountPath: /usr/local/e2e-cluster-profile
+      - mountPath: /usr/local/modh-operator-e2e-nightly-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -130,7 +106,9 @@ periodics:
       projected:
         sources:
         - secret:
-            name: cluster-secrets-azure4
+            name: cluster-secrets-gcp
+        - configMap:
+            name: cluster-profile-gcp
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials

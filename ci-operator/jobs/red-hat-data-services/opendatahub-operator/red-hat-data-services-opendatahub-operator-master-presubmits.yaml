@@ -1,32 +1,127 @@
 presubmits:
-  openshift-priv/kube-state-metrics:
+  red-hat-data-services/opendatahub-operator:
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.7
+    - master
     cluster: build02
-    context: ci/prow/e2e-aws
+    context: ci/prow/ci-index
     decorate: true
     decoration_config:
       skip_cloning: true
-    hidden: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-kube-state-metrics-release-4.7-e2e-aws
-    path_alias: k8s.io/kube-state-metrics
-    rerun_command: /test e2e-aws
+    name: pull-ci-red-hat-data-services-opendatahub-operator-master-ci-index
+    rerun_command: /test ci-index
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --target=ci-index
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ci-index,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: build02
+    context: ci/prow/images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-red-hat-data-services-opendatahub-operator-master-images
+    rerun_command: /test images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --target=[images]
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: build02
+    context: ci/prow/modh-operator-e2e
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-red-hat-data-services-opendatahub-operator-master-modh-operator-e2e
+    rerun_command: /test modh-operator-e2e
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-password-file=/etc/boskos/password
-        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/usr/local/e2e-aws-cluster-profile
-        - --target=e2e-aws
+        - --secret-dir=/usr/local/modh-operator-e2e-cluster-profile
+        - --target=modh-operator-e2e
         command:
         - ci-operator
         image: ci-operator:latest
@@ -39,13 +134,10 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/e2e-aws-cluster-profile
+        - mountPath: /usr/local/modh-operator-e2e-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
-          readOnly: true
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -65,42 +157,38 @@ presubmits:
         projected:
           sources:
           - secret:
-              name: cluster-secrets-aws
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws,?($|\s.*)
+    trigger: (?m)^/test( | .* )modh-operator-e2e,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.7
+    - master
     cluster: build02
-    context: ci/prow/images
+    context: ci/prow/modh-unit-tests
     decorate: true
     decoration_config:
       skip_cloning: true
-    hidden: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-kube-state-metrics-release-4.7-images
-    path_alias: k8s.io/kube-state-metrics
-    rerun_command: /test images
+    name: pull-ci-red-hat-data-services-opendatahub-operator-master-modh-unit-tests
+    rerun_command: /test modh-unit-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --target=[images]
+        - --target=modh-unit-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -113,9 +201,6 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
-          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -124,129 +209,10 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )images,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-4.7
-    cluster: build02
-    context: ci/prow/test-unit
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    hidden: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-kube-state-metrics-release-4.7-test-unit
-    path_alias: k8s.io/kube-state-metrics
-    rerun_command: /test test-unit
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --oauth-token-path=/usr/local/github-credentials/oauth
-        - --report-password-file=/etc/report/password.txt
-        - --report-username=ci
-        - --target=test-unit
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )test-unit,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-4.7
-    cluster: build02
-    context: ci/prow/vendor
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    hidden: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-kube-state-metrics-release-4.7-vendor
-    path_alias: k8s.io/kube-state-metrics
-    rerun_command: /test vendor
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --oauth-token-path=/usr/local/github-credentials/oauth
-        - --report-password-file=/etc/report/password.txt
-        - --report-username=ci
-        - --target=vendor
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )vendor,?($|\s.*)
+    trigger: (?m)^/test( | .* )modh-unit-tests,?($|\s.*)
