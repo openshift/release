@@ -243,7 +243,7 @@ TAGS="Key=expirationDate,Value=${EXPIRATION_DATE}"
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
-PROXY_IMAGE=registry.svc.ci.openshift.org/origin/4.5:egress-http-proxy
+PROXY_IMAGE=registry.ci.openshift.org/origin/4.5:egress-http-proxy
 
 PROXY_NAME="$(/tmp/yq r "${CONFIG}" 'metadata.name')"
 REGION="$(/tmp/yq r "${CONFIG}" 'platform.aws.region')"

@@ -1221,14 +1221,14 @@ periodics:
 
         # create namespace and craft a release image without the machine operator
         namespace="ci-op-$( echo "${JOB_NAME}-${BUILD_ID}" | md5sum -t | cut -c 1-8 )"
-        export RELEASE_IMAGE_INITIAL=registry.svc.ci.openshift.org/ocp/release:$(FROM_BRANCH)
-        export RELEASE_IMAGE_LATEST=registry.svc.ci.openshift.org/${namespace}/release:upgrade
-        export IMAGE_TESTS=registry.svc.ci.openshift.org/${namespace}/stable-initial:tests # use the older version of the payload
+        export RELEASE_IMAGE_INITIAL=registry.ci.openshift.org/ocp/release:$(FROM_BRANCH)
+        export RELEASE_IMAGE_LATEST=registry.ci.openshift.org/${namespace}/release:upgrade
+        export IMAGE_TESTS=registry.ci.openshift.org/${namespace}/stable-initial:tests # use the older version of the payload
         oc registry login
         oc new-project ${namespace}
         oc policy add-role-to-group system:image-puller -n ${namespace} system:unauthenticated system:authenticated
-        oc adm release new --from-release=registry.svc.ci.openshift.org/ocp/release:$(BRANCH) \
-          --to-image=registry.svc.ci.openshift.org/${namespace}/release:upgrade \
+        oc adm release new --from-release=registry.ci.openshift.org/ocp/release:$(BRANCH) \
+          --to-image=registry.ci.openshift.org/${namespace}/release:upgrade \
           --exclude=machine-config-operator
 
         # execute the test
@@ -3506,7 +3506,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/origin/release:4.6
+        value: registry.ci.openshift.org/origin/release:4.6
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
