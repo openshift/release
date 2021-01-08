@@ -54,7 +54,7 @@
 - item_name: build_farm
   attachments:
   - cmd: |-
-      oc --context $(cluster) get secrets --namespace ci -o json | jq '.items[] | select(.type=="kubernetes.io/dockercfg") | select(.metadata.annotations["kubernetes.io/service-account.name"]=="image-puller") | .data[".dockercfg"]' --raw-output | base64 --decode | jq '.["image-registry.openshift-image-registry.svc:5000"].auth' --raw-output | tr -d '\n'
+      oc --context $(cluster) get secrets --sort-by=.metadata.creationTimestamp --namespace ci -o json | jq '.items[] | select(.type=="kubernetes.io/dockercfg") | select(.metadata.annotations["kubernetes.io/service-account.name"]=="image-puller")'| jq --slurp '.[-1] | .data[".dockercfg"]' --raw-output | base64 --decode | jq '.["image-registry.openshift-image-registry.svc:5000"].auth' --raw-output | tr -d '\n'
     name: token_image-puller_$(cluster)_reg_auth_value.txt
   params:
     cluster:
@@ -65,7 +65,7 @@
 - item_name: build_farm
   attachments:
   - cmd: |-
-      oc --context api.ci get secrets --namespace ci -o json | jq '.items[] | select(.type=="kubernetes.io/dockercfg") | select(.metadata.annotations["kubernetes.io/service-account.name"]=="image-puller") | .data[".dockercfg"]' --raw-output | base64 --decode | jq '.["docker-registry.default.svc:5000"].auth' --raw-output | tr -d '\n'
+      oc --context api.ci get secrets --sort-by=.metadata.creationTimestamp --namespace ci -o json | jq '.items[] | select(.type=="kubernetes.io/dockercfg") | select(.metadata.annotations["kubernetes.io/service-account.name"]=="image-puller")' | jq --slurp '.[-1] | .data[".dockercfg"]' --raw-output | base64 --decode | jq '.["docker-registry.default.svc:5000"].auth' --raw-output | tr -d '\n'
     name: token_image-puller_ci_reg_auth_value.txt
 # This is not idempotent, so we can not run it by default
 #- item_name: jenkins-ci-provisioner
@@ -75,7 +75,7 @@
 - item_name: build_farm
   attachments:
   - cmd: |-
-      oc --context $(cluster) get secrets --namespace ci -o json | jq '.items[] | select(.type=="kubernetes.io/dockercfg") | select(.metadata.annotations["kubernetes.io/service-account.name"]=="image-pusher") | .data[".dockercfg"]' --raw-output | base64 --decode | jq '.["docker-registry.default.svc:5000"].auth' --raw-output | tr -d '\n'
+      oc --context $(cluster) get secrets --sort-by=.metadata.creationTimestamp --namespace ci -o json | jq '.items[] | select(.type=="kubernetes.io/dockercfg") | select(.metadata.annotations["kubernetes.io/service-account.name"]=="image-pusher")' | jq --slurp '.[-1] | .data[".dockercfg"]' --raw-output | base64 --decode | jq '.["docker-registry.default.svc:5000"].auth' --raw-output | tr -d '\n'
     name: token_image-pusher_$(cluster)_reg_auth_value.txt
   params:
     cluster:
@@ -83,8 +83,8 @@
 - item_name: build_farm
   attachments:
   - cmd: |-
-      oc --context $(cluster) get secrets --namespace ci -o json | jq '.items[] | select(.type=="kubernetes.io/dockercfg") | select(.metadata.annotations["kubernetes.io/service-account.name"]=="image-pusher") | .data[".dockercfg"]' --raw-output | base64 --decode | jq '.["image-registry.openshift-image-registry.svc:5000"].auth' --raw-output | tr -d '\n'
+      oc --context $(cluster) get secrets --sort-by=.metadata.creationTimestamp --namespace ci -o json | jq '.items[] | select(.type=="kubernetes.io/dockercfg") | select(.metadata.annotations["kubernetes.io/service-account.name"]=="image-pusher")' | jq --slurp '.[-1] | .data[".dockercfg"]' --raw-output | base64 --decode | jq '.["image-registry.openshift-image-registry.svc:5000"].auth' --raw-output | tr -d '\n'
     name: token_image-pusher_$(cluster)_reg_auth_value.txt
   params:
     cluster:
-    - app.ci
+    - api.ci
