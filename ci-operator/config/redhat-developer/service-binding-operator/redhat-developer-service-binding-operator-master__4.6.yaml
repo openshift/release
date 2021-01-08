@@ -7,6 +7,13 @@ binary_build_commands: make build
 build_root:
   project_image:
     dockerfile_path: openshift-ci/Dockerfile.tools
+images:
+- from: ubi
+  to: sbo-test-operator
+operator:
+  bundles:
+  - context_dir: .
+    dockerfile_path: Dockerfile.rhel
 resources:
   '*':
     requests:
@@ -15,17 +22,15 @@ resources:
 tag_specification:
   name: "4.6"
   namespace: ocp
-images:
-- from: ubi
-  to: sbo-test-operator
-operator:
-  bundles:
-  - dockerfile_path: Dockerfile.rhel
-    context_dir: .
 tests:
 - as: acceptance
   steps:
     cluster_profile: aws
+    env:
+      OO_CHANNEL: beta
+      OO_INSTALL_NAMESPACE: openshift-operators
+      OO_PACKAGE: service-binding-operator
+      OO_TARGET_NAMESPACES: '!all'
     test:
     - as: test
       cli: latest
@@ -35,11 +40,6 @@ tests:
         requests:
           cpu: 100m
     workflow: optional-operators-ci-aws
-    env:
-      OO_CHANNEL: "beta"
-      OO_INSTALL_NAMESPACE: "openshift-operators"
-      OO_PACKAGE: "service-binding-operator"
-      OO_TARGET_NAMESPACES: '!all'
 - as: validate-master-build
   cron: 0 0 * * *
   steps:
