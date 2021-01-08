@@ -15,6 +15,10 @@ resources:
 tag_specification:
   name: "4.6"
   namespace: ocp
+operator:
+  bundles:
+  - dockerfile_path: Dockerfile.rhel
+    context_dir: .
 tests:
 - as: acceptance
   steps:
@@ -22,12 +26,17 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: VERBOSE=2 make -k test-acceptance test-acceptance-artifacts
+      commands: VERBOSE=2 make TEST_ACCEPTANCE_START_SBO=remote -k test-acceptance test-acceptance-artifacts
       from: src
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    workflow: optional-operators-ci-aws
+    env:
+      OO_CHANNEL: "beta"
+      OO_INSTALL_NAMESPACE: "openshift-operators"
+      OO_PACKAGE: "service-binding-operator"
+      OO_TARGET_NAMESPACES: '!all'
 - as: validate-master-build
   cron: 0 0 * * *
   steps:
