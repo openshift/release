@@ -3,12 +3,20 @@ base_images:
     name: ubi
     namespace: ocp
     tag: "7"
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
 binary_build_commands: make build
 build_root:
   project_image:
     dockerfile_path: openshift-ci/Dockerfile.tools
 images:
-- from: ubi
+- from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
   to: sbo-test-operator
 operator:
   bundles:
