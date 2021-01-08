@@ -415,6 +415,7 @@ objects:
         SUBNETS["${CLUSTER_TYPE}-1-4"]="4"
 
         # ensure LEASED_RESOURCE is set
+        echo "LEASED_RESOURCE=${LEASED_RESOURCE}"
         if [[ -z "${LEASED_RESOURCE}" ]]; then
           echo "Failed to acquire lease"
           exit 1
@@ -422,6 +423,7 @@ objects:
 
         # get cluster subnet or default it to 126
         cluster_subnet="${SUBNETS[${LEASED_RESOURCE}]}"
+        echo "cluster_subnet=${cluster_subnet}"
         if [[ -z "$cluster_subnet" ]]; then
            cluster_subnet=126
         fi
@@ -481,6 +483,10 @@ objects:
           echo "Conflicting networks: $CONFLICTING_NETWORKS"
           exit 1
         fi
+
+        echo "JOB_NAME_HASH=${JOB_NAME_HASH}"
+        echo 'network:'
+        echo '  if: "br'$(printf ${LEASED_RESOURCE} | tail -c 3)'-'${JOB_NAME_HASH}'"'
 
         if [[ "${ARCH}" = "s390x" || "${ARCH}" = "ppc64le" ]]; then
             master_type=null
@@ -548,6 +554,14 @@ objects:
 
         # Bump the libvirt workers disk to to 30GB
         yq write --inplace ${ARTIFACT_DIR}/installer/openshift/99_openshift-cluster-api_worker-machineset-0.yaml spec.template.spec.providerSpec.value.volume[volumeSize] 32212254720
+
+        # @HACK
+        mock-nss.sh openshift-install create ignition-configs --dir=${ARTIFACT_DIR}/installer
+        ls -l ${ARTIFACT_DIR}/installer/bootstrap* || true
+        cp ${ARTIFACT_DIR}/installer/bootstrap.ign ${ARTIFACT_DIR}/installer/bootstrap.ign.old
+        python -c 'import json, sys; j = json.load(sys.stdin); j[u"passwd"][u"users"][0][u"passwordHash"] = u"$6$G5bp7Q6hyW0qLDiu$AXggCdlUXWCyOAd2CuRI1g8.fysX1Wh78O/n1NdModz25yMuJHstsynz1f9MD2cQQFCdHgQC7mSXBbB5/kDGU/"; json.dump(j, sys.stdout)' < ${ARTIFACT_DIR}/installer/bootstrap.ign.old > ${ARTIFACT_DIR}/installer/bootstrap.ign.new
+        cp ${ARTIFACT_DIR}/installer/bootstrap.ign.new ${ARTIFACT_DIR}/installer/bootstrap.ign
+        ls -l ${ARTIFACT_DIR}/installer/bootstrap* || true
 
         mock-nss.sh openshift-install create cluster --dir=${ARTIFACT_DIR}/installer --log-level=debug 2>&1 | sed 's/password: .*/password: REDACTED"/g' || true &
         openshift_install="$!"
@@ -742,12 +756,18 @@ objects:
         trap 'teardown; touch /tmp/shared/teardown-exit; exit 0' EXIT
         trap 'jobs -p | xargs -r kill || true; touch /tmp/shared/teardown-exit; exit 0' TERM
 
-        for i in $(seq 1 220); do
+        TRIES=0
+        while (( ${TRIES} <= 240 ))
+        do
+          (( TRIES += 1 ))
           if [[ -f /tmp/shared/exit ]] || [[ -f /tmp/shared/test-exit ]]; then
-            exit 0
+              if [[ ! -f /tmp/shared/debug ]]; then
+                exit 0
+              fi
           fi
           sleep 60 & wait
         done
+
     hostAliases:
     - ip: "${BASTION_SVC_IP}"
       hostnames:
