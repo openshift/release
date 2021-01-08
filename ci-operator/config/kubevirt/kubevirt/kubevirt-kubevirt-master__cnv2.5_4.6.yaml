@@ -41,7 +41,7 @@ tests:
         oc get secret/pull-secret -n openshift-config -o json | jq -r '.data.".dockerconfigjson"' | base64 -d > "$authfile"
 
         echo "injecting credentials for brew image registry into authfile"
-        jq -c '.auths + '"$(echo '{"brew.registry.redhat.io": { "auth": "'"$( echo "$BREW_IMAGE_REGISTRY_USERNAME:$(< $BREW_IMAGE_REGISTRY_TOKEN_PATH)" | tr -d '\n' | base64 -i -w 0 )"'" } }')"' | {"auths": .}' "$authfile" > "${authfile}.new"
+        jq -c '.auths + '"$(echo '{"registry-proxy.engineering.redhat.com": { "auth": "'"$( echo "$BREW_IMAGE_REGISTRY_USERNAME:$(< $BREW_IMAGE_REGISTRY_TOKEN_PATH)" | tr -d '\n' | base64 -i -w 0 )"'" } }')"' | {"auths": .}' "$authfile" > "${authfile}.new"
 
         echo "updating cluster pull secret from authfile"
         oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson="${authfile}.new"
@@ -63,6 +63,9 @@ tests:
           - mirrors:
             - brew.registry.redhat.io
             source: registry-proxy.engineering.redhat.com
+          - mirrors:
+              - brew.registry.redhat.io
+            source: registry-proxy-stage.engineering.redhat.com
         EOF
 
         echo "waiting for update to start"
@@ -87,7 +90,7 @@ tests:
           namespace: openshift-marketplace
         spec:
           sourceType: grpc
-          image: brew.registry.redhat.io/rh-osbs/iib-pub-pending:v$CNV_VERSION
+          image: registry-proxy.engineering.redhat.com/rh-osbs/iib-pub-pending:v$CNV_VERSION
           displayName: Brew Catalog Source
           publisher: grpc
         EOF
