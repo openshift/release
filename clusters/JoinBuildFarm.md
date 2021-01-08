@@ -86,11 +86,11 @@ Cluster admin:
 
 [comment]: <> (The integration of a cluster will be much easier if we do the followings)
 
-* Ensure that `secret/pull-secret` in `openshift-config` contains a valid auth entry of `registry.svc.ci.openshift.org`.
+* Ensure that `secret/pull-secret` in `openshift-config` contains a valid auth entry of `registry.ci.openshift.org`.
   Note that it is suggested to use a token from a SA to prevent expiration.
 
   ```
-  oc get secret -n openshift-config pull-secret -o yaml | yq -r '.data.".dockerconfigjson"' | base64 -d | jq -r '.auths."registry.svc.ci.openshift.org".auth' | base64 -d
+  oc get secret -n openshift-config pull-secret -o yaml | yq -r '.data.".dockerconfigjson"' | base64 -d | jq -r '.auths."registry.ci.openshift.org".auth' | base64 -d
   ```
 
 * [Expose the image-registry securely](https://docs.openshift.com/container-platform/4.5/registry/securing-exposing-registry.html).
