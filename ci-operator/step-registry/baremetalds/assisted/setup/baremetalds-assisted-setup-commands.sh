@@ -85,7 +85,10 @@ cd "\${REPO_DIR}"
 
 set +x
 echo "export PULL_SECRET='\$(cat /root/pull-secret)'" >> /root/config
-echo "export OPENSHIFT_INSTALL_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}" >> /root/config
+
+if [ "\${OPENSHIFT_INSTALL_RELEASE_IMAGE:-}" = "" ]; then
+    echo "export OPENSHIFT_INSTALL_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}" >> /root/config
+fi
 echo "export PUBLIC_CONTAINER_REGISTRIES=quay.io,\$(echo ${RELEASE_IMAGE_LATEST} | cut -d'/' -f1)" >> /root/config
 echo "export ASSISTED_SERVICE_HOST=${IP}" >> /root/config
 set -x
