@@ -1,7 +1,5 @@
 #!/bin/bash
 
-set -o nounset
-set -o errexit
 set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
@@ -63,7 +61,8 @@ cp \
     -t "${SHARED_DIR}" \
     "${installer_artifact_dir}/auth/kubeconfig" \
     "${installer_artifact_dir}/auth/kubeadmin-password" \
-    "${installer_artifact_dir}/metadata.json"
+    "${installer_artifact_dir}/metadata.json" \
+    "${installer_artifact_dir}"/terraform.*
 
 if test "${install_exit_status}" -eq 0 ; then
   send_event_to_ovirt "Success"
