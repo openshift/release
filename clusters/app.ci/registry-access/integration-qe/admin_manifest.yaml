@@ -1,0 +1,59 @@
+# this is the Namespace in which your ServiceAccount will live
+apiVersion: v1
+kind: Namespace
+metadata:
+  annotations:
+    openshift.io/description: Automation ServiceAccounts for Integration QE
+    openshift.io/display-name: Integration QE
+  name: integration-qe
+---
+# this is the ServiceAccount whose credentials you will use
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: image-puller
+  namespace: integration-qe
+---
+# this grants your ServiceAccount rights to pull images
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: integration-qe-image-puller-binding
+  # the namespace from which you will pull images
+  namespace: ocp
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: system:image-puller
+subjects:
+  - kind: ServiceAccount
+    namespace: integration-qe
+    name: image-puller
+---
+# the Group of people who should be able to manage this ServiceAccount
+kind: Group
+apiVersion: v1
+metadata:
+  name: integration-qe-admins
+users:
+  # these names are GitHub usernames
+  - apodhrad
+  - mijaros
+  - granzoto
+---
+# this grants the right to read the ServiceAccount's credentials and pull
+# images to the admins.
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: integration-qe-admins-binding
+  namespace: integration-qe
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: pull-secret-namespace-manager
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: integration-qe-admins
+    namespace: integration-qe-admins
