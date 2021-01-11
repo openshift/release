@@ -1,4 +1,5 @@
 
+import sys
 import glob
 
 from os import path
@@ -10,7 +11,7 @@ def _get_previous_version(version):
 
     if len(pieces) > 2:
         print(f'Unable to determine previous version number from version: {version}')
-        exit(1)
+        sys.exit(1)
 
     pieces[1] = str(int(pieces[1])-1)
 
@@ -22,7 +23,7 @@ def _get_next_version(version):
 
     if len(pieces) > 2:
         print(f'Unable to determine next version number from version: {version}')
-        exit(1)
+        sys.exit(1)
 
     pieces[1] = str(int(pieces[1])+1)
 

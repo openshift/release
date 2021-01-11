@@ -163,7 +163,7 @@ NAME               TYPE                DATA   AGE
 apps-build02-tls   kubernetes.io/tls   3      25m
 ```
 
-* Use the secret in `openshift-ingress-operator`:
+* Use the secret in `openshift-ingress-operator`: manual step only for test, see [default_ingresscontroller.yaml](openshift-ingress-operator/default_ingresscontroller.yaml)
 
 ```
 $ oc --as system:admin patch ingresscontroller.operator default \

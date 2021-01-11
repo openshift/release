@@ -27,7 +27,7 @@ periodics:
       env:
       - name: HOME
         value: /home/mirror
-      image: registry.svc.ci.openshift.org/ocp/4.7:cli
+      image: image-registry.openshift-image-registry.svc:5000/ocp/4.7:cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -75,7 +75,7 @@ periodics:
       env:
       - name: HOME
         value: /home/mirror
-      image: registry.svc.ci.openshift.org/ocp/4.7:cli
+      image: image-registry.openshift-image-registry.svc:5000/ocp/4.7:cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -92,6 +92,54 @@ periodics:
     - name: push
       secret:
         secretName: registry-push-credentials-quay.io-open-cluster-management
+    - configMap:
+        name: image-mirror-mappings
+      name: config
+- agent: kubernetes
+  cluster: app.ci
+  cron: '@hourly'
+  decorate: true
+  labels:
+    ci.openshift.io/area: openshift-azure
+    ci.openshift.io/role: image-mirroring
+  name: periodic-image-mirroring-openshift-azure
+  spec:
+    containers:
+    - args:
+      - -c
+      - |
+        set -o errexit
+        failures=0
+        for mapping in /etc/imagemirror/mapping_openshift_azure*; do
+          echo "Running: oc image mirror -f=$mapping --skip-multiple-scopes"
+          if ! oc image mirror -f="$mapping" --skip-multiple-scopes; then
+            echo "ERROR: Failed to mirror images from $mapping"
+            failures=$((failures+1))
+          fi
+        done
+        exit $failures
+      command:
+      - /bin/bash
+      env:
+      - name: HOME
+        value: /home/mirror
+      image: quay.io/openshift/origin-cli:4.3
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /home/mirror/.docker/config.json
+        name: push
+        readOnly: true
+        subPath: .dockerconfigjson
+      - mountPath: /etc/imagemirror
+        name: config
+    volumes:
+    - name: push
+      secret:
+        secretName: registry-push-credentials-quay.io-openshift-azure
     - configMap:
         name: image-mirror-mappings
       name: config
@@ -133,7 +181,7 @@ periodics:
       env:
       - name: HOME
         value: /home/mirror
-      image: registry.svc.ci.openshift.org/ocp/4.7:cli
+      image: image-registry.openshift-image-registry.svc:5000/ocp/4.7:cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -181,7 +229,7 @@ periodics:
       env:
       - name: HOME
         value: /home/mirror
-      image: registry.svc.ci.openshift.org/ocp/4.7:cli
+      image: image-registry.openshift-image-registry.svc:5000/ocp/4.7:cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -229,7 +277,7 @@ periodics:
       env:
       - name: HOME
         value: /home/mirror
-      image: registry.svc.ci.openshift.org/ocp/4.7:cli
+      image: image-registry.openshift-image-registry.svc:5000/ocp/4.7:cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -277,7 +325,7 @@ periodics:
       env:
       - name: HOME
         value: /home/mirror
-      image: registry.svc.ci.openshift.org/ocp/4.7:cli
+      image: image-registry.openshift-image-registry.svc:5000/ocp/4.7:cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -325,7 +373,7 @@ periodics:
       env:
       - name: HOME
         value: /home/mirror
-      image: registry.svc.ci.openshift.org/ocp/4.7:cli
+      image: image-registry.openshift-image-registry.svc:5000/ocp/4.7:cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -373,7 +421,7 @@ periodics:
       env:
       - name: HOME
         value: /home/mirror
-      image: registry.svc.ci.openshift.org/ocp/4.7:cli
+      image: image-registry.openshift-image-registry.svc:5000/ocp/4.7:cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -421,7 +469,7 @@ periodics:
       env:
       - name: HOME
         value: /home/mirror
-      image: registry.svc.ci.openshift.org/ocp/4.7:cli
+      image: image-registry.openshift-image-registry.svc:5000/ocp/4.7:cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -469,7 +517,7 @@ periodics:
       env:
       - name: HOME
         value: /home/mirror
-      image: registry.svc.ci.openshift.org/ocp/4.7:cli
+      image: image-registry.openshift-image-registry.svc:5000/ocp/4.7:cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -520,7 +568,7 @@ periodics:
       env:
       - name: HOME
         value: /home/mirror
-      image: registry.svc.ci.openshift.org/ocp/4.7:cli
+      image: image-registry.openshift-image-registry.svc:5000/ocp/4.7:cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -571,7 +619,7 @@ periodics:
       env:
       - name: HOME
         value: /home/mirror
-      image: registry.svc.ci.openshift.org/ocp/4.7:cli
+      image: image-registry.openshift-image-registry.svc:5000/ocp/4.7:cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -622,7 +670,7 @@ periodics:
       env:
       - name: HOME
         value: /home/mirror
-      image: registry.svc.ci.openshift.org/ocp/4.7:cli
+      image: image-registry.openshift-image-registry.svc:5000/ocp/4.7:cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -673,7 +721,7 @@ periodics:
       env:
       - name: HOME
         value: /home/mirror
-      image: registry.svc.ci.openshift.org/ocp/4.7:cli
+      image: image-registry.openshift-image-registry.svc:5000/ocp/4.7:cli
       imagePullPolicy: Always
       name: ""
       resources:

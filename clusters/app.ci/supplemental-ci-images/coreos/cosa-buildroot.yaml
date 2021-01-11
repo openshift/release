@@ -1,0 +1,40 @@
+# See https://github.com/coreos/coreos-assembler/pull/730
+# This creates a "buildroot" container used by e.g. rpm-ostree CI.
+apiVersion: v1
+kind: List
+items:
+- kind: ImageStream
+  apiVersion: v1
+  metadata:
+    name: cosa-buildroot
+    namespace: coreos
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    name: cosa-buildroot
+    namespace: coreos
+    labels:
+      ci.openshift.io/source-repo: coreos-assembler
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: cosa-buildroot:latest
+    source:
+      git:
+        uri: https://github.com/coreos/coreos-assembler
+    strategy:
+      dockerStrategy:
+        from:
+          kind: "ImageStreamTag"
+          name: "coreos-assembler:latest"
+        dockerfilePath: Dockerfile.buildroot
+    triggers:
+    - type: ConfigChange
+    - imageChange:
+        from:
+          kind: ImageStreamTag
+          name: coreos-assembler:latest
+      type: ImageChange

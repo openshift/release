@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  annotations:
+    openshift.io/description: Automation ServiceAccounts for CNF CI
+    openshift.io/display-name: CNF CI
+  name: cnf-ci
+---
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: image-puller
+  namespace: cnf-ci
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: cnf-ci-image-puller-binding
+  namespace: ocp
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: system:image-puller
+subjects:
+  - kind: ServiceAccount
+    namespace: cnf-ci
+    name: image-puller
+---
+kind: Group
+apiVersion: v1
+metadata:
+  name: cnf-ci-admins
+users:
+  - sabinaaledort
+  - yuvalk
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: cnf-ci-admins-binding
+  namespace: cnf-ci
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: pull-secret-namespace-manager
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: cnf-ci-admins
+    namespace: cnf-ci

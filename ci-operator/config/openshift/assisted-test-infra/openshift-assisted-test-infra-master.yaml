@@ -24,12 +24,25 @@ tag_specification:
   name: "4.7"
   namespace: ocp
 tests:
+- as: unit
+  steps:
+    cluster_profile: packet
+    env:
+      ASSISTED_CONFIG: |
+        MAKEFILE_TARGET="create_full_environment run test_parallel"
+    post:
+    - ref: baremetalds-assisted-gather
+    - ref: baremetalds-packet-teardown
+    pre:
+    - ref: baremetalds-packet-setup
+    - ref: ipi-install-rbac
+    - ref: baremetalds-assisted-setup
 - as: e2e-metal-assisted-onprem
   steps:
     cluster_profile: packet
     env:
       ASSISTED_CONFIG: |
-        DEPLOY_TARGET=podman-localhost
+        DEPLOY_TARGET=onprem
     post:
     - ref: baremetalds-assisted-gather
     - ref: baremetalds-packet-teardown
@@ -52,6 +65,19 @@ tests:
   steps:
     cluster_profile: packet
     workflow: baremetalds-assisted
+- as: e2e-metal-assisted-single-node-periodic
+  cron: '@daily'
+  steps:
+    cluster_profile: packet
+    env:
+      ASSISTED_CONFIG: |
+        NUM_MASTERS=1
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=quay.io/eranco74/ocp-release:bootstrap-in-place
+    workflow: baremetalds-assisted
+- as: e2e-metal-single-node-live-iso
+  steps:
+    cluster_profile: packet
+    workflow: baremetalds-sno
 zz_generated_metadata:
   branch: master
   org: openshift

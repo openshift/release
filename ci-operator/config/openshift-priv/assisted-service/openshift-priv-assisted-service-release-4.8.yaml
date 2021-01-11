@@ -1,21 +1,13 @@
 base_images:
-  openshift_release_golang-1.14:
-    name: release
-    namespace: openshift
-    tag: golang-1.14
   openshift_release_golang-1.15:
     name: release
     namespace: openshift
     tag: golang-1.15
-  ubi8:
-    name: ubi
-    namespace: ocp
-    tag: "8"
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.14
+    tag: golang-1.15
 canonical_go_repository: github.com/openshift/assisted-service
 images:
 - dockerfile_path: Dockerfile.assisted-service
@@ -36,6 +28,25 @@ resources:
 tag_specification:
   name: 4.8-priv
   namespace: ocp-private
+test_binary_build_commands: |
+  make build-openshift-ci-test-bin
+tests:
+- as: assisted-service-aws
+  steps:
+    cluster_profile: aws
+    test:
+    - as: subsystem-deploy-and-run
+      cli: latest
+      commands: |
+        export SERVICE=$(echo "$IMAGE_FORMAT" | component=assisted-service envsubst)
+        make deploy-on-openshift-ci
+        make test-on-openshift-ci
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: release-4.8
   org: openshift-priv

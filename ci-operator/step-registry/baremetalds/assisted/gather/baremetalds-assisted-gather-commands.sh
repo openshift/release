@@ -41,7 +41,7 @@ function getlogs() {
 trap getlogs EXIT
 
 echo "### Gathering logs..."
-timeout -s 9 15m ssh "${SSHOPTS[@]}" "root@${IP}" bash - <<EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
+timeout -s 9 30m ssh "${SSHOPTS[@]}" "root@${IP}" bash - <<EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
 
 set -xeuo pipefail
 
@@ -54,7 +54,7 @@ sosreport --ticket-number "\${HOSTNAME}" --batch -o container_log,filesys,kvm,li
 
 # Get assisted logs
 
-if [ "\${DEPLOY_TARGET:-}" = "podman-localhost" ]; then
+if [ "\${DEPLOY_TARGET:-}" = "onprem" ]; then
   make download_all_logs LOGS_DEST=/tmp/artifacts REMOTE_SERVICE_URL=http://localhost:8090
 else
   make download_all_logs LOGS_DEST=/tmp/artifacts REMOTE_SERVICE_URL=\$(KUBECONFIG=\${HOME}/.kube/config minikube service assisted-service -n assisted-installer --url)

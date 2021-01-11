@@ -172,7 +172,7 @@ objects:
       - name: KUBECONFIG
         value: /tmp/artifacts/installer/auth/kubeconfig
       - name: MIRROR_BASE
-        value: registry.svc.ci.openshift.org/${NAMESPACE}/release
+        value: registry.ci.openshift.org/${NAMESPACE}/release
       command:
       - /bin/bash
       - -c
@@ -291,14 +291,14 @@ objects:
 
         function run-upgrade-tests() {
           openshift-tests run-upgrade "${TEST_SUITE}" --to-image "${IMAGE:-${RELEASE_IMAGE_LATEST}}" \
-            --options "${TEST_OPTIONS:-}" \
+            --options "${TEST_UPGRADE_OPTIONS:-}" \
             --provider "${TEST_PROVIDER:-}" -o ${ARTIFACT_DIR}/e2e.log --junit-dir ${ARTIFACT_DIR}/junit
         }
 
         function run-tests() {
           # Avoid unbound variable error
-          TEST_OPTIONS=${TEST_OPTIONS:-}
-          openshift-tests run "${TEST_SUITE}" "${TEST_OPTIONS}" \
+          TEST_UPGRADE_OPTIONS=${TEST_UPGRADE_OPTIONS:-}
+          openshift-tests run "${TEST_SUITE}" "${TEST_UPGRADE_OPTIONS}" \
             --provider "${TEST_PROVIDER:-}" -o ${ARTIFACT_DIR}/e2e.log --junit-dir ${ARTIFACT_DIR}/junit
         }
 
@@ -319,7 +319,7 @@ objects:
       - name: ARTIFACT_DIR
         value: /tmp/artifacts
       - name: CLUSTER_NAME
-        value: ${NAMESPACE}-${JOB_NAME_HASH}
+        value: ${LEASED_RESOURCE}-${JOB_NAME_HASH}
       - name: SSH_PRIV_KEY_PATH
         value: /etc/openshift-installer/ssh-privatekey
       - name: SSH_PUB_KEY_PATH
@@ -343,7 +343,7 @@ objects:
       - name: NSS_GROUPNAME
         value: test
       - name: MIRROR_BASE
-        value: registry.svc.ci.openshift.org/${NAMESPACE}/release
+        value: registry.ci.openshift.org/${NAMESPACE}/release
       - name: MASTER_REPLICAS
         value: "3"
       - name: WORKER_REPLICAS
@@ -423,6 +423,43 @@ objects:
         fi
         echo $remote_libvirt_uri
 
+        # Assume lease hasn't been cleaned
+        CONNECT=$remote_libvirt_uri
+
+        # Remove conflicting domains
+        for DOMAIN in $(mock-nss.sh virsh -c "${CONNECT}" list --all --name | grep "${LEASED_RESOURCE}")
+        do
+          mock-nss.sh virsh -c "${CONNECT}" destroy "${DOMAIN}" || true
+          mock-nss.sh virsh -c "${CONNECT}" undefine "${DOMAIN}" || true
+        done
+
+        # Remove conflicting pools
+        for POOL in $(mock-nss.sh virsh -c "${CONNECT}" pool-list --all --name | grep "${LEASED_RESOURCE}")
+        do
+          mock-nss.sh virsh -c "${CONNECT}" pool-destroy "${POOL}" || true
+          mock-nss.sh virsh -c "${CONNECT}" pool-undefine "${POOL}" || true
+        done
+
+        # Remove conflicting networks
+        for NET in $(mock-nss.sh virsh -c "${CONNECT}" net-list --all --name | grep "${LEASED_RESOURCE}")
+        do
+          mock-nss.sh virsh -c "${CONNECT}" net-destroy "${NET}" || true
+          mock-nss.sh virsh -c "${CONNECT}" net-undefine "${NET}" || true
+        done
+
+        # Detect conflicts
+        CONFLICTING_DOMAINS=$(mock-nss.sh virsh -c "${CONNECT}" list --all --name | grep "${LEASED_RESOURCE}" || true)
+        CONFLICTING_POOLS=$(mock-nss.sh virsh -c "${CONNECT}" pool-list --all --name | grep "${LEASED_RESOURCE}" || true)
+        CONFLICTING_NETWORKS=$(mock-nss.sh virsh -c "${CONNECT}" net-list --all --name | grep "${LEASED_RESOURCE}" || true)
+
+        if [ ! -z "$CONFLICTING_DOMAINS" ] || [ ! -z "$CONFLICTING_POOLS" ] || [ ! -z "$CONFLICTING_NETWORKS" ]; then
+          echo "Could not ensure clean state for lease ${LEASED_RESOURCE}"
+          echo "Conflicting domains: $CONFLICTING_DOMAINS"
+          echo "Conflicting pools: $CONFLICTING_POOLS"
+          echo "Conflicting networks: $CONFLICTING_NETWORKS"
+          exit 1
+        fi
+
         if [[ "${ARCH}" = "s390x" || "${ARCH}" = "ppc64le" ]]; then
             master_type=null
             subnets="[]"
@@ -497,7 +534,7 @@ objects:
         while kill -0 $openshift_install 2> /dev/null; do
             sleep 60
             echo "Polling libvirt for network, attempt #$((++i))"
-            libvirt_network=$(mock-nss.sh virsh --connect "${remote_libvirt_uri}" net-list --name | grep "${NAMESPACE}-${JOB_NAME_HASH}" || true)
+            libvirt_network=$(mock-nss.sh virsh --connect "${remote_libvirt_uri}" net-list --name | grep "${CLUSTER_NAME::21}" || true)
             if [[ -n "${libvirt_network}" ]]; then
                 cat > ${ARTIFACT_DIR}/installer/worker-hostrecords.xml << EOF
         <host ip='192.168.${cluster_subnet}.51'>
@@ -536,7 +573,7 @@ objects:
       - name: ARTIFACT_DIR
         value: /tmp/artifacts
       - name: INSTANCE_PREFIX
-        value: ${NAMESPACE}-${JOB_NAME_HASH}
+        value: ${LEASED_RESOURCE}-${JOB_NAME_HASH}
       - name: KUBECONFIG
         value: /tmp/artifacts/installer/auth/kubeconfig
       - name: USER
@@ -685,102 +722,102 @@ objects:
     - ip: "${BASTION_SVC_IP}"
       hostnames:
       - "${REMOTE_LIBVIRT_HOSTNAME}"
-      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-0"
-      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-0"
-      - "canary-openshift-ingress-canary.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-0"
-      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-0"
-      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-0"
-      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-0"
-      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-0"
-      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-0"
+      - "alertmanager-main-openshift-monitoring.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-0"
+      - "api.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-0"
+      - "canary-openshift-ingress-canary.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-0"
+      - "console-openshift-console.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-0"
+      - "downloads-openshift-console.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-0"
+      - "grafana-openshift-monitoring.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-0"
+      - "oauth-openshift.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-0"
+      - "prometheus-k8s-openshift-monitoring.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-0"
     - ip: "${BASTION_SVC_0_1_IP}"
       hostnames:
-      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-1"
-      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-1"
-      - "canary-openshift-ingress-canary.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-1"
-      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-1"
-      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-1"
-      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-1"
-      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-1"
-      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-1"
+      - "alertmanager-main-openshift-monitoring.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-1"
+      - "api.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-1"
+      - "canary-openshift-ingress-canary.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-1"
+      - "console-openshift-console.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-1"
+      - "downloads-openshift-console.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-1"
+      - "grafana-openshift-monitoring.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-1"
+      - "oauth-openshift.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-1"
+      - "prometheus-k8s-openshift-monitoring.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-1"
     - ip: "${BASTION_SVC_0_2_IP}"
       hostnames:
-      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-2"
-      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-2"
-      - "canary-openshift-ingress-canary.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-2"
-      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-2"
-      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-2"
-      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-2"
-      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-2"
-      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-2"
+      - "alertmanager-main-openshift-monitoring.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-2"
+      - "api.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-2"
+      - "canary-openshift-ingress-canary.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-2"
+      - "console-openshift-console.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-2"
+      - "downloads-openshift-console.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-2"
+      - "grafana-openshift-monitoring.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-2"
+      - "oauth-openshift.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-2"
+      - "prometheus-k8s-openshift-monitoring.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-2"
     - ip: "${BASTION_SVC_0_3_IP}"
       hostnames:
-      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-3"
-      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-3"
-      - "canary-openshift-ingress-canary.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-3"
-      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-3"
-      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-3"
-      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-3"
-      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-3"
-      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-3"
+      - "alertmanager-main-openshift-monitoring.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-3"
+      - "api.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-3"
+      - "canary-openshift-ingress-canary.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-3"
+      - "console-openshift-console.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-3"
+      - "downloads-openshift-console.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-3"
+      - "grafana-openshift-monitoring.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-3"
+      - "oauth-openshift.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-3"
+      - "prometheus-k8s-openshift-monitoring.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-3"
     - ip: "${BASTION_SVC_0_4_IP}"
       hostnames:
-      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-4"
-      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-4"
-      - "canary-openshift-ingress-canary.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-4"
-      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-4"
-      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-4"
-      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-4"
-      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-4"
-      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-4"
+      - "alertmanager-main-openshift-monitoring.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-4"
+      - "api.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-4"
+      - "canary-openshift-ingress-canary.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-4"
+      - "console-openshift-console.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-4"
+      - "downloads-openshift-console.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-4"
+      - "grafana-openshift-monitoring.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-4"
+      - "oauth-openshift.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-4"
+      - "prometheus-k8s-openshift-monitoring.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-0-4"
     - ip: "${BASTION_SVC_1_0_IP}"
       hostnames:
       - "${REMOTE_LIBVIRT_HOSTNAME_1}"
-      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-0"
-      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-0"
-      - "canary-openshift-ingress-canary.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-0"
-      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-0"
-      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-0"
-      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-0"
-      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-0"
-      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-0"
+      - "alertmanager-main-openshift-monitoring.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-0"
+      - "api.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-0"
+      - "canary-openshift-ingress-canary.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-0"
+      - "console-openshift-console.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-0"
+      - "downloads-openshift-console.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-0"
+      - "grafana-openshift-monitoring.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-0"
+      - "oauth-openshift.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-0"
+      - "prometheus-k8s-openshift-monitoring.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-0"
     - ip: "${BASTION_SVC_1_1_IP}"
       hostnames:
-      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-1"
-      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-1"
-      - "canary-openshift-ingress-canary.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-1"
-      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-1"
-      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-1"
-      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-1"
-      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-1"
-      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-1"
+      - "alertmanager-main-openshift-monitoring.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-1"
+      - "api.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-1"
+      - "canary-openshift-ingress-canary.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-1"
+      - "console-openshift-console.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-1"
+      - "downloads-openshift-console.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-1"
+      - "grafana-openshift-monitoring.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-1"
+      - "oauth-openshift.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-1"
+      - "prometheus-k8s-openshift-monitoring.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-1"
     - ip: "${BASTION_SVC_1_2_IP}"
       hostnames:
-      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-2"
-      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-2"
-      - "canary-openshift-ingress-canary.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-2"
-      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-2"
-      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-2"
-      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-2"
-      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-2"
-      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-2"
+      - "alertmanager-main-openshift-monitoring.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-2"
+      - "api.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-2"
+      - "canary-openshift-ingress-canary.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-2"
+      - "console-openshift-console.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-2"
+      - "downloads-openshift-console.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-2"
+      - "grafana-openshift-monitoring.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-2"
+      - "oauth-openshift.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-2"
+      - "prometheus-k8s-openshift-monitoring.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-2"
     - ip: "${BASTION_SVC_1_3_IP}"
       hostnames:
-      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-3"
-      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-3"
-      - "canary-openshift-ingress-canary.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-3"
-      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-3"
-      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-3"
-      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-3"
-      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-3"
-      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-3"
+      - "alertmanager-main-openshift-monitoring.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-3"
+      - "api.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-3"
+      - "canary-openshift-ingress-canary.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-3"
+      - "console-openshift-console.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-3"
+      - "downloads-openshift-console.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-3"
+      - "grafana-openshift-monitoring.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-3"
+      - "oauth-openshift.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-3"
+      - "prometheus-k8s-openshift-monitoring.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-3"
     - ip: "${BASTION_SVC_1_4_IP}"
       hostnames:
-      - "alertmanager-main-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-4"
-      - "api.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-4"
-      - "canary-openshift-ingress-canary.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-4"
-      - "console-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-4"
-      - "downloads-openshift-console.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-4"
-      - "grafana-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-4"
-      - "oauth-openshift.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-4"
-      - "prometheus-k8s-openshift-monitoring.apps.${NAMESPACE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-4"
+      - "alertmanager-main-openshift-monitoring.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-4"
+      - "api.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-4"
+      - "canary-openshift-ingress-canary.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-4"
+      - "console-openshift-console.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-4"
+      - "downloads-openshift-console.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-4"
+      - "grafana-openshift-monitoring.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-4"
+      - "oauth-openshift.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-4"
+      - "prometheus-k8s-openshift-monitoring.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-4"

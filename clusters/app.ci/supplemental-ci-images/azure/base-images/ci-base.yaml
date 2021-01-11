@@ -1,0 +1,100 @@
+kind: List
+apiVersion: v1
+items:
+- apiVersion: image.openshift.io/v1
+  kind: ImageStream
+  metadata:
+    name: ci-base
+    namespace: azure
+
+- kind: BuildConfig
+  apiVersion: v1
+  metadata:
+    name: ci-base
+    namespace: azure
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: ci-base:latest
+    source:
+      git:
+        uri: "https://github.com/openshift/release"
+        ref: "master"
+      contextDir: "clusters/app.ci/supplemental-ci-images/azure/base-images/ci-base"
+      dockerfile: |
+        FROM docker.io/centos:7
+
+        RUN yum -y update
+
+        RUN yum -y install epel-release
+
+        RUN rpm --import https://packages.microsoft.com/keys/microsoft.asc
+        RUN sh -c 'echo -e "[azure-cli]\nname=Azure CLI\nbaseurl=https://packages.microsoft.com/yumrepos/azure-cli\nenabled=1\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" >/etc/yum.repos.d/azure-cli.repo'
+
+        RUN yum -y install --setopt=skip_missing_names_on_install=False \
+            azure-cli \
+            gcc \
+            git \
+            jq \
+            lsof \
+            make \
+            net-tools \
+            PyYAML \
+            tar \
+            wget \
+            which \
+            sudo \
+            chromedriver \
+            chromium-headless
+        # Install software collections and ruby packages for verification tests
+        RUN yum install -y --enablerepo=centosplus centos-release-scl scl-utils-build scl-utils
+        RUN yum install -y --enablerepo=centosplus rh-ruby24 rh-ror50-rubygem-nokogiri rh-ruby24-ruby-devel rh-git29 bsdtar
+        RUN ln -s /usr/lib64/chromium-browser/headless_shell /bin/chrome
+        RUN BRANCH=v3 VERIFICATION_TESTS_GIT=https://github.com/openshift/verification-tests.git && \
+        git clone --branch $BRANCH $VERIFICATION_TESTS_GIT
+        RUN scl enable rh-ror50 /verification-tests/tools/install_os_deps.sh
+        RUN scl enable rh-ror50 /verification-tests/tools/hack_bundle.rb
+
+        RUN rm -rf /verification-tests && yum clean all
+
+        ENV HOME=/home/prow
+
+        # install golang-1.12
+        RUN curl -s https://storage.googleapis.com/golang/go1.12.15.linux-amd64.tar.gz | tar -C /usr/local -xz
+        ENV PATH=$PATH:/usr/local/go/bin
+
+        RUN go get golang.org/x/tools/cmd/goyacc
+        RUN go get github.com/golang/mock/mockgen
+        RUN go get github.com/Masterminds/glide
+        RUN go get github.com/onsi/ginkgo/ginkgo
+        RUN go get github.com/go-bindata/go-bindata/go-bindata
+        RUN go get golang.org/x/tools/cmd/goimports
+
+        RUN mv $HOME/go/bin/* /usr/local/bin
+
+        # enable git clone with random user (glide dependency)
+        RUN git config --system core.logallrefupdates false
+
+        # install oc client for tests
+        RUN curl -sL https://github.com/openshift/origin/releases/download/v3.11.0/openshift-origin-client-tools-v3.11.0-0cbc58b-linux-64bit.tar.gz | tar -C /tmp -xz
+        RUN mv /tmp/openshift-origin-client-tools-v3.11.0-0cbc58b-linux-64bit/{oc,kubectl} /usr/local/bin
+
+        RUN shopt -s dotglob && rm -rf $HOME/* /tmp/*
+        RUN chmod -R g+w /etc/passwd /home
+
+        COPY entrypoint /usr/local/bin
+        ENTRYPOINT [ "/usr/local/bin/entrypoint" ]
+        WORKDIR $HOME
+        USER 1001
+      type: Dockerfile
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: docker.io/centos:7
+        imageOptimizationPolicy: SkipLayers
+    triggers:
+    - type: ConfigChange
