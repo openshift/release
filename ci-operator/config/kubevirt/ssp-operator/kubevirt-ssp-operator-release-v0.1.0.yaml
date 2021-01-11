@@ -1,0 +1,72 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- dockerfile_path: Dockerfile
+  to: ssp-operator-container
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.7"
+  namespace: ocp
+tests:
+- as: unittests
+  steps:
+    test:
+    - as: unittests
+      commands: export GOFLAGS= && make unittest
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: e2e-functests
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: e2e-functests
+      cli: latest
+      commands: |
+        ./hack/deploy-kubevirt-and-cdi.sh
+        export component=ssp-operator-container
+        export IMG=$(echo $IMAGE_FORMAT | envsubst)
+        export GOFLAGS=
+        export SKIP_CLEANUP_AFTER_TESTS=true
+        make deploy functest
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: e2e-upgrade-functests
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: e2e-upgrade-functests
+      cli: latest
+      commands: |
+        ./hack/deploy-kubevirt-and-cdi.sh
+        ./hack/deploy-old-ssp-operator.sh
+        export component=ssp-operator-container
+        export IMG=$(echo $IMAGE_FORMAT | envsubst)
+        export GOFLAGS=
+        export SKIP_CLEANUP_AFTER_TESTS=true
+        make deploy functest
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+zz_generated_metadata:
+  branch: release-v0.1.0
+  org: kubevirt
+  repo: ssp-operator
