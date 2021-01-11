@@ -32,6 +32,7 @@ def add_art_publish(gendoc):
             'namespace': 'ci'
         },
         'roleRef': {
+            'apiGroup': 'rbac.authorization.k8s.io',
             'kind': 'Role',
             'name': 'art-manage-art-equivalent-buildconfigs'
         },
@@ -110,6 +111,7 @@ in 3.11).''')
                     'namespace': f'ocp{config.get_suffix(arch, private)}'
                 },
                 'roleRef': {
+                    'apiGroup': 'rbac.authorization.k8s.io',
                     'kind': 'Role',
                     'name': 'art-publish-modify-release'
                 },
@@ -128,6 +130,7 @@ in 3.11).''')
                     'namespace': f'ocp{config.get_suffix(arch, private)}'
                 },
                 'roleRef': {
+                    'apiGroup': 'rbac.authorization.k8s.io',
                     'kind': 'ClusterRole',
                     'name': 'system:image-builder'
                 },

@@ -44,6 +44,7 @@ def add_osd_files_cache_service_account_resources(gendoc):
             'namespace': context.is_namespace,
         },
         'roleRef': {
+            'apiGroup': 'rbac.authorization.k8s.io',
             'kind': 'ClusterRole',
             'name': 'edit'
         },
