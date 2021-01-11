@@ -1,0 +1,37 @@
+base_images:
+  base:
+    name: "4.7"
+    namespace: ocp
+    tag: base
+binary_build_commands: go build cmd/cluster-cloud-controller-manager-operator/main.go
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.15
+promotion:
+  name: "4.7"
+  namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.7"
+  namespace: ocp
+tests:
+- as: e2e-aws
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- as: vendor
+  commands: make vendor
+  container:
+    from: src
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: cluster-cloud-controller-manager-operator
