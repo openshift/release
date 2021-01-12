@@ -1,0 +1,96 @@
+base_images:
+  base:
+    name: "4.7"
+    namespace: ocp
+    tag: base
+  operator-registry:
+    name: "4.7"
+    namespace: ocp
+    tag: operator-registry
+  os:
+    name: ubi
+    namespace: ocp
+    tag: "7"
+binary_build_commands: make build
+build_root:
+  project_image:
+    dockerfile_path: openshift-ci/Dockerfile.tools
+images:
+- context_dir: .
+  dockerfile_path: cnf-tests/Dockerfile.openshift
+  from: base
+  to: cnf-tests
+- context_dir: tools/s2i-dpdk/
+  dockerfile_path: Dockerfile
+  from: base
+  to: dpdk
+promotion:
+  name: "4.7"
+  namespace: ocp-kni
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.7"
+  namespace: ocp
+tests:
+- as: ci
+  commands: make ci-job
+  container:
+    from: src
+- as: e2e-gcp
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: e2e-gcp
+      commands: make functests-on-ci
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-gcp
+- as: e2e-gcp-ovn
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: e2e-gcp-ovn
+      commands: make functests-on-ci
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-gcp-ovn
+- as: e2e-gcp-ovn-periodic
+  cron: '* */8 * * *'
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: e2e-gcp-ovn-periodic
+      commands: make functests-on-ci
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-gcp-ovn
+- as: e2e-gcp-periodic
+  cron: '* */8 * * *'
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: e2e-gcp-periodic
+      commands: make functests-on-ci
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-gcp
+zz_generated_metadata:
+  branch: release-4.7
+  org: openshift-kni
+  repo: cnf-features-deploy

@@ -32,6 +32,7 @@ def add_art_publish(gendoc):
             'namespace': 'ci'
         },
         'roleRef': {
+            'apiGroup': 'rbac.authorization.k8s.io',
             'kind': 'Role',
             'name': 'art-manage-art-equivalent-buildconfigs'
         },
@@ -82,13 +83,23 @@ in 3.11).''')
                 },
                 'rules': [{
                     'apiGroups': ['image.openshift.io'],
-                    'resourceNames': [f'release{config.get_suffix(arch, private)}',
-                                      *[f'{major_minor}-art-latest{config.get_suffix(arch, private)}' for major_minor in
-                                        config.releases],
-                                      'builder-base',
-                                      'builder'],
                     'resources': ['imagestreams'],
                     'verbs': ['get', 'list', 'watch', 'update', 'patch']
+                }]
+            })
+
+            gendoc.append({
+                'apiVersion': 'authorization.openshift.io/v1',
+                'kind': 'Role',
+                'metadata': {
+                    'name': 'art-backup-upgrade-graph',
+                    'namespace': f'ocp{config.get_suffix(arch, private)}'
+                },
+                'rules': [{
+                    'apiGroups': [''],
+                    'resourceNames': ['release-upgrade-graph'],
+                    'resources': ['secrets'],
+                    'verbs': ['get']
                 }]
             })
 
@@ -100,6 +111,7 @@ in 3.11).''')
                     'namespace': f'ocp{config.get_suffix(arch, private)}'
                 },
                 'roleRef': {
+                    'apiGroup': 'rbac.authorization.k8s.io',
                     'kind': 'Role',
                     'name': 'art-publish-modify-release'
                 },
@@ -118,6 +130,7 @@ in 3.11).''')
                     'namespace': f'ocp{config.get_suffix(arch, private)}'
                 },
                 'roleRef': {
+                    'apiGroup': 'rbac.authorization.k8s.io',
                     'kind': 'ClusterRole',
                     'name': 'system:image-builder'
                 },

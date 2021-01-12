@@ -50,7 +50,7 @@ rules:
   - list
 ---
 kind: ClusterRoleBinding
-apiVersion: rbac.authorization.k8s.io/v1beta1
+apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: dptp-controller-manager-app-ci
 roleRef:
@@ -112,7 +112,7 @@ spec:
         - --github-endpoint=http://ghproxy
         - --github-token-path=/etc/github/oauth
         - --registry-cluster-name=app.ci
-        - --testImagesDistributorOptions.imagePullSecretPath=/etc/regcred/.dockerconfigjson
+        - --testImagesDistributorOptions.imagePullSecretPath=/etc/registry-pull-credentials/.dockerconfigjson
         - --testImagesDistributorOptions.additional-image-stream-tag=ocp/builder:golang-1.10
         - --testImagesDistributorOptions.additional-image-stream-tag=ocp/builder:golang-1.11
         - --testImagesDistributorOptions.additional-image-stream-tag=ocp/builder:golang-1.12
@@ -141,10 +141,22 @@ spec:
         - --registrySyncerOptions.denied-image-stream=ocp-ppc64le-priv/release-ppc64le-priv
         - --registrySyncerOptions.denied-image-stream=ocp-s390x/release-s390x
         - --registrySyncerOptions.denied-image-stream=ocp-s390x-priv/release-s390x-priv
-        - --registrySyncerOptions.imagePullSecretPath=/etc/regcred/.dockerconfigjson
+        - --registrySyncerOptions.denied-image-stream=ocp/release-controller-bootstrap
+        - --registrySyncerOptions.denied-image-stream=ocp-priv/release-controller-bootstrap
+        - --registrySyncerOptions.denied-image-stream=ocp-s390x/release-controller-bootstrap
+        - --registrySyncerOptions.denied-image-stream=ocp-s390x-priv/release-controller-bootstrap
+        - --registrySyncerOptions.denied-image-stream=ocp-ppc64le/release-controller-bootstrap
+        - --registrySyncerOptions.denied-image-stream=ocp-ppc64le-priv/release-controller-bootstrap
+        - --registrySyncerOptions.imagePullSecretPath=/etc/registry-pull-credentials/.dockerconfigjson
         - --registrySyncerOptions.image-stream-prefix=openshift/knative-
         - --registrySyncerOptions.image-stream-prefix=openshift/kubefed-operator-
         - --registrySyncerOptions.image-stream-prefix=openshift/tektoncd-
+        - --registrySyncerOptions.image-stream-prefix=openshift/origin-v4.0
+        - --registrySyncerOptions.image-stream-prefix=openshift/origin-v3.10
+        - --registrySyncerOptions.image-stream-prefix=openshift/origin-v3.11
+        - --enable-controller=serviceaccount_secret_refresher
+        - --serviceAccountRefresherOptions.enabled-namespace=ci
+        - --serviceAccountRefresherOptions.remove-old-secrets=false
         - --dry-run=false
         env:
         - name: KUBECONFIG
@@ -156,8 +168,8 @@ spec:
         - name: oauth
           mountPath: /etc/github
           readOnly: true
-        - name: regcred
-          mountPath: /etc/regcred
+        - name: registry-pull-credentials
+          mountPath: /etc/registry-pull-credentials
           readOnly: true
         - name: kubeconfigs
           mountPath: /var/kubeconfigs
@@ -251,7 +263,7 @@ spec:
       - name: kubeconfigs
         secret:
           secretName: dptp-controller-manager
-      - name: regcred
+      - name: registry-pull-credentials
         secret:
           secretName: registry-pull-credentials
       - name: registry
@@ -333,7 +345,7 @@ spec:
         configMap:
           name: job-config-4.8
 ---
-apiVersion: apiextensions.k8s.io/v1beta1
+apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
@@ -349,42 +361,41 @@ spec:
     singular: testimagestreamtagimport
   preserveUnknownFields: false
   scope: Namespaced
-  validation:
-    openAPIV3Schema:
-      description: TestImageStreamTagImport can be used to request an ImageStreamTag
-        import
-      properties:
-        apiVersion:
-          description: 'APIVersion defines the versioned schema of this representation
-            of an object. Servers should convert recognized schemas to the latest
-            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
-          type: string
-        kind:
-          description: 'Kind is a string value representing the REST resource this
-            object represents. Servers may infer this from the endpoint the client
-            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
-          type: string
-        metadata:
-          type: object
-        spec:
-          properties:
-            clusterName:
-              description: ClusterName is the name of the cluster in which the import
-                should be created
-              type: string
-            name:
-              description: Name is the name of the imagestreamtag
-              type: string
-            namespace:
-              description: Namespace is the namespace of the imagestreamtag
-              type: string
-          type: object
-      required:
-      - metadata
-      - spec
-      type: object
-  version: v1
   versions:
   - name: v1
     served: true
     storage: true
+    schema:
+      openAPIV3Schema:
+        description: TestImageStreamTagImport can be used to request an ImageStreamTag
+          import
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            properties:
+              clusterName:
+                description: ClusterName is the name of the cluster in which the import
+                  should be created
+                type: string
+              name:
+                description: Name is the name of the imagestreamtag
+                type: string
+              namespace:
+                description: Namespace is the namespace of the imagestreamtag
+                type: string
+            type: object
+        required:
+        - metadata
+        - spec
+        type: object

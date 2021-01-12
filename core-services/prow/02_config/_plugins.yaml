@@ -88,15 +88,9 @@ approve:
   require_self_approval: true
 - commandHelpLink: https://go.k8s.io/bot-commands
   ignore_review_state: true
-  lgtm_acts_as_approve: true
   repos:
   - shipwright-io/build
   - shipwright-io/website
-  require_self_approval: true
-- commandHelpLink: https://go.k8s.io/bot-commands
-  ignore_review_state: false
-  repos:
-  - fabric8-services/toolchain-operator
   require_self_approval: true
 - commandHelpLink: https://go.k8s.io/bot-commands
   ignore_review_state: false
@@ -107,7 +101,6 @@ approve:
   - codeready-toolchain/registration-service
   - codeready-toolchain/toolchain-common
   - codeready-toolchain/toolchain-e2e
-  - codeready-toolchain/toolchain-operator
   require_self_approval: false
 - commandHelpLink: https://go.k8s.io/bot-commands
   ignore_review_state: false
@@ -231,7 +224,6 @@ approve:
   repos:
   - openshift-priv/kubernetes-nmstate
   - openshift/kubernetes-nmstate
-  - redhat-integration/rhi-operator
   require_self_approval: false
 - commandHelpLink: https://go.k8s.io/bot-commands
   repos:
@@ -838,6 +830,11 @@ config_updater:
         app.ci:
         - ci
       name: ci-operator-misc-configs
+    ci-operator/config/**/windows-machine-config-bootstrapper/*windows-machine-config-bootstrapper-community-*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      name: ci-operator-misc-configs
     ci-operator/config/**/windows-machine-config-operator/*-community-*.yaml:
       clusters:
         app.ci:
@@ -1223,6 +1220,14 @@ config_updater:
       gzip: true
       name: job-config-misc
     ci-operator/jobs/**/tektoncd-pipeline-operator/openshift-tektoncd-pipeline-operator-v*.yaml:
+      clusters:
+        api.ci:
+        - ci
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
+    ci-operator/jobs/**/windows-machine-config-bootstrapper/*windows-machine-config-bootstrapper-community-*.yaml:
       clusters:
         api.ci:
         - ci
@@ -1836,6 +1841,11 @@ config_updater:
         app.ci:
         - ci
       name: ci-secret-bootstrap
+    core-services/ci-secret-generator/_config.yaml:
+      clusters:
+        app.ci:
+        - ci
+      name: ci-secret-generator
     core-services/image-mirroring/**/mapping_*:
       clusters:
         api.ci:
@@ -1890,6 +1900,8 @@ config_updater:
     core-services/release-controller/_repos/*:
       clusters:
         api.ci:
+        - ocp
+        app.ci:
         - ocp
         build01:
         - ocp
@@ -2083,15 +2095,6 @@ external_plugins:
     events:
     - pull_request
     name: needs-rebase
-  codeready-toolchain/toolchain-operator:
-  - endpoint: http://refresh
-    events:
-    - issue_comment
-    name: refresh
-  - endpoint: http://needs-rebase
-    events:
-    - pull_request
-    name: needs-rebase
   containers/buildah:
   - endpoint: http://refresh
     events:
@@ -2206,15 +2209,6 @@ external_plugins:
     - pull_request
     - issue_comment
     name: cherrypick
-  - endpoint: http://needs-rebase
-    events:
-    - pull_request
-    name: needs-rebase
-  fabric8-services/toolchain-operator:
-  - endpoint: http://refresh
-    events:
-    - issue_comment
-    name: refresh
   - endpoint: http://needs-rebase
     events:
     - pull_request
@@ -2700,6 +2694,15 @@ external_plugins:
     events:
     - pull_request
     name: needs-rebase
+  red-hat-data-services/opendatahub-operator:
+  - endpoint: http://needs-rebase
+    events:
+    - pull_request
+    name: needs-rebase
+  - endpoint: http://refresh
+    events:
+    - issue_comment
+    name: refresh
   redhat-developer/gitops-operator:
   - endpoint: http://refresh
     events:
@@ -2759,20 +2762,6 @@ external_plugins:
     events:
     - issue_comment
     name: refresh
-  - endpoint: http://needs-rebase
-    events:
-    - pull_request
-    name: needs-rebase
-  redhat-integration/rhi-operator:
-  - endpoint: http://refresh
-    events:
-    - issue_comment
-    name: refresh
-  - endpoint: http://cherrypick
-    events:
-    - issue_comment
-    - pull_request
-    name: cherrypick
   - endpoint: http://needs-rebase
     events:
     - pull_request
@@ -2843,6 +2832,8 @@ goose:
 heart:
   adorees:
   - openshift-merge-robot
+help:
+  help_guidelines_url: https://git.k8s.io/community/contributors/guide/help-wanted.md
 label:
   additional_labels:
   - platform/aws
@@ -2864,6 +2855,9 @@ lgtm:
   - opendatahub-io/manifests
   - opendatahub-io/odh-manifests
   - opendatahub-io/opendatahub-operator
+  review_acts_as_lgtm: true
+- repos:
+  - red-hat-data-services/opendatahub-operator
   review_acts_as_lgtm: true
 - repos:
   - openshift/odo
@@ -2940,7 +2934,6 @@ lgtm:
 - repos:
   - openshift-priv/kubernetes-nmstate
   - openshift/kubernetes-nmstate
-  - redhat-integration/rhi-operator
   review_acts_as_lgtm: true
 - repos:
   - openshift-priv/cincinnati-operator
@@ -3338,27 +3331,6 @@ plugins:
   - wip
   - yuks
   - approve
-  codeready-toolchain/toolchain-operator:
-  - assign
-  - blunderbuss
-  - cat
-  - dog
-  - heart
-  - golint
-  - help
-  - hold
-  - label
-  - lgtm
-  - lifecycle
-  - override
-  - shrug
-  - sigmention
-  - skip
-  - trigger
-  - verify-owners
-  - wip
-  - yuks
-  - approve
   containers/buildah:
   - approve
   - assign
@@ -3601,27 +3573,6 @@ plugins:
   - trigger
   - verify-owners
   - owners-label
-  - wip
-  - yuks
-  - approve
-  fabric8-services/toolchain-operator:
-  - assign
-  - blunderbuss
-  - cat
-  - dog
-  - heart
-  - golint
-  - help
-  - hold
-  - label
-  - lgtm
-  - lifecycle
-  - override
-  - shrug
-  - sigmention
-  - skip
-  - trigger
-  - verify-owners
   - wip
   - yuks
   - approve
@@ -4490,8 +4441,6 @@ plugins:
   - approve
   openshift-priv/csi-operator:
   - approve
-  openshift-priv/debug-network:
-  - approve
   openshift-priv/egress-router-cni:
   - approve
   openshift-priv/elasticsearch-operator:
@@ -5006,8 +4955,6 @@ plugins:
   - approve
   openshift/deadmanssnitch-operator:
   - approve
-  openshift/debug-network:
-  - approve
   openshift/dedicated-admin-operator:
   - approve
   openshift/docker-distribution:
@@ -5241,7 +5188,7 @@ plugins:
   - approve
   openshift/osd-metrics-exporter:
   - approve
-  openshift/osd-utils-cli:
+  openshift/osdctl:
   - approve
   openshift/osde2e:
   - approve
@@ -5364,8 +5311,6 @@ plugins:
   - approve
   openshift/windows-machine-config-operator:
   - approve
-  openvswitch:
-  - trigger
   operator-framework:
   - assign
   - blunderbuss
@@ -5424,6 +5369,27 @@ plugins:
   - verify-owners
   - wip
   - yuks
+  red-hat-data-services/opendatahub-operator:
+  - approve
+  - assign
+  - blunderbuss
+  - golint
+  - heart
+  - help
+  - hold
+  - label
+  - lgtm
+  - lifecycle
+  - milestone
+  - milestonestatus
+  - owners-label
+  - override
+  - retitle
+  - shrug
+  - trigger
+  - verify-owners
+  - wip
+  - yuks
   redhat-developer:
   - assign
   - blunderbuss
@@ -5470,32 +5436,6 @@ plugins:
   redhat-developer/openshift-jenkins-operator:
   - approve
   redhat-developer/service-binding-operator:
-  - approve
-  redhat-integration/rhi-operator:
-  - assign
-  - blunderbuss
-  - bugzilla
-  - cat
-  - dog
-  - heart
-  - golint
-  - goose
-  - help
-  - hold
-  - label
-  - lgtm
-  - lifecycle
-  - override
-  - pony
-  - retitle
-  - shrug
-  - sigmention
-  - skip
-  - trigger
-  - verify-owners
-  - owners-label
-  - wip
-  - yuks
   - approve
   redhat-operator-ecosystem:
   - assign

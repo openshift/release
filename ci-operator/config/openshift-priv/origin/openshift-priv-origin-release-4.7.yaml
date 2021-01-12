@@ -111,11 +111,11 @@ tests:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-builds
 - as: e2e-aws-disruptive
-  commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_SUITE=openshift/conformance/parallel run-tests
+  commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
     cluster_profile: aws
 - as: e2e-gcp-disruptive
-  commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_SUITE=openshift/conformance/parallel run-tests
+  commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
     cluster_profile: gcp
 - as: e2e-aws-proxy
@@ -145,10 +145,9 @@ tests:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-csi
 - as: e2e-aws-upgrade
-  commands: TEST_SUITE=all run-upgrade-tests
-  openshift_installer:
+  steps:
     cluster_profile: aws
-    upgrade: true
+    workflow: openshift-upgrade-aws
 - as: e2e-aws-serial
   steps:
     cluster_profile: aws

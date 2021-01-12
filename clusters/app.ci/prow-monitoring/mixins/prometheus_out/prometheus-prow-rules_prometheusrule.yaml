@@ -209,6 +209,17 @@ spec:
       for: 1m
       labels:
         severity: critical
+  - name: cluster-client-creation-failure
+    rules:
+    - alert: component-failed-to-construct-a-client
+      annotations:
+        message: Component {{ $labels.service }} failed to construct a client. Search
+          for "failed to construct {manager,client} for cluster <<clustername>>" in
+          the beginning of the pod log. If the cluster unavailability was transient,
+          a restart of the pod will fix the issue.
+      expr: kubernetes_failed_client_creations > 0
+      labels:
+        severity: critical
   - name: ci-operator-infra-error
     rules:
     - alert: high-ci-operator-infra-error-rate
@@ -393,16 +404,6 @@ spec:
       labels:
         severity: critical
         team: OLM
-    - alert: periodic-ci-redhat-developer-service-binding-operator-master-dev-release-failures
-      annotations:
-        message: '@openshift-app-services Prow job periodic-ci-redhat-developer-service-binding-operator-master-dev-release
-          has failures. Check on <https://prow.ci.openshift.org/?type=periodic&job=periodic-ci-redhat-developer-service-binding-operator-master-dev-release|deck>'
-      expr: |
-        rate(prowjob_state_transitions{job_name="periodic-ci-redhat-developer-service-binding-operator-master-dev-release",state="failure"}[5m]) > 0
-      for: 1m
-      labels:
-        severity: critical
-        team: openshift-dev-services
     - alert: periodic-openshift-library-import-failures
       annotations:
         message: '@devex Prow job periodic-openshift-library-import has failures.

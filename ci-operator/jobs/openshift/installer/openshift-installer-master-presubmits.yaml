@@ -512,6 +512,89 @@ presubmits:
     branches:
     - master
     cluster: build02
+    context: ci/prow/e2e-aws-single-node
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-master-e2e-aws-single-node
+    optional: true
+    rerun_command: /test e2e-aws-single-node
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-password-file=/etc/boskos/password
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --secret-dir=/usr/local/e2e-aws-single-node-cluster-profile
+        - --target=e2e-aws-single-node
+        - --template=/usr/local/e2e-aws-single-node
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: CLUSTER_VARIANT
+          value: single-node
+        - name: JOB_NAME_SAFE
+          value: e2e-aws-single-node
+        - name: TEST_COMMAND
+          value: TEST_SUITE=openshift/conformance/parallel run-tests
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-aws-single-node-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-aws-single-node
+          name: job-definition
+          subPath: cluster-launch-installer-e2e.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-e2e
+        name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-single-node,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - master
+    cluster: build02
     context: ci/prow/e2e-aws-upgrade
     decorate: true
     decoration_config:
@@ -944,7 +1027,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-azure-upi,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - master
     cluster: build02
@@ -2127,7 +2210,7 @@ presubmits:
     name: pull-ci-openshift-installer-master-e2e-openstack-upi
     optional: true
     rerun_command: /test e2e-openstack-upi
-    run_if_changed: ^upi/openstack/.*
+    run_if_changed: (^upi/openstack/.*)|(^images/openstack/Dockerfile.ci$)
     spec:
       containers:
       - args:
@@ -2208,34 +2291,23 @@ presubmits:
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-master-e2e-ovirt
-    optional: true
     rerun_command: /test e2e-ovirt
     run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
     spec:
       containers:
       - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
-        - --repo=installer
-        - --secret-dir=/etc/boskos
+        - --lease-server-password-file=/etc/boskos/password
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
         - --secret-dir=/usr/local/e2e-ovirt-cluster-profile
         - --target=e2e-ovirt
-        - --template=/usr/local/e2e-ovirt
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: ovirt
-        - name: JOB_NAME_SAFE
-          value: e2e-ovirt
-        - name: LEASE_TYPE
-          value: minimal
-        - name: TEST_COMMAND
-          value: run-minimal-tests
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -2243,28 +2315,22 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
         - mountPath: /usr/local/e2e-ovirt-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-ovirt
-          name: job-definition
-          subPath: cluster-launch-installer-ovirt-e2e.yaml
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
       - name: boskos
         secret:
           items:
@@ -2276,16 +2342,14 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-ovirt
-          - secret:
-              name: ovirt-infra-secrets
           - configMap:
               name: cluster-profile-ovirt
-      - configMap:
-          name: prow-job-cluster-launch-installer-ovirt-e2e
-        name: job-definition
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-ovirt,?($|\s.*)
   - agent: kubernetes
     always_run: false

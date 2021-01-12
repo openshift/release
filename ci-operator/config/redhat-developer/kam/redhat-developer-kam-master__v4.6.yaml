@@ -1,0 +1,61 @@
+base_images:
+  cli:
+    name: "4.6"
+    namespace: ocp
+    tag: cli
+binary_build_commands: make bin
+build_root:
+  project_image:
+    dockerfile_path: openshift-ci/build-root/Dockerfile
+images:
+- context_dir: openshift-ci/build-root/source-image
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: oc-bin-image
+resources:
+  '*':
+    requests:
+      cpu: 800m
+      memory: 6Gi
+tag_specification:
+  name: "4.6"
+  namespace: ocp
+tests:
+- as: integration-e2e
+  steps:
+    cluster_profile: aws
+    test:
+    - as: integration-e2e-steps
+      commands: scripts/openshiftci-presubmit-all-tests.sh
+      credentials:
+      - mount_path: /var/run/kam-data/kam-test-secrets
+        name: kam-test-secrets
+        namespace: test-credentials
+      env:
+      - default: /var/run/kam-data/kam-test-secrets/github-token.txt
+        name: KAM_GITHUB_TOKEN_FILE
+      - default: /var/run/kam-data/kam-test-secrets/github-username.txt
+        name: KAM_GITHUB_USER_NAME_FILE
+      - default: /var/run/kam-data/kam-test-secrets/github-password.txt
+        name: KAM_GITHUB_PASSWORD_FILE
+      - default: /var/run/kam-data/kam-test-secrets/kam-bot-kambot-auth.json
+        name: KAM_QUAY_DOCKER_CONF_SECRET_FILE
+      - default: /var/run/kam-data/kam-test-secrets/id_rsa
+        name: KAM_SSH_PRIVATE_KEY_FILE
+      - default: /var/run/kam-data/kam-test-secrets/id_rsa.pub
+        name: KAM_SSH_PUBLIC_KEY_FILE
+      from: oc-bin-image
+      resources:
+        requests:
+          cpu: "2"
+          memory: 6Gi
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: master
+  org: redhat-developer
+  repo: kam
+  variant: v4.6

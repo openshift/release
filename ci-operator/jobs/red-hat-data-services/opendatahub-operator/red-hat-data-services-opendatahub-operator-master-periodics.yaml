@@ -1,0 +1,117 @@
+periodics:
+- agent: kubernetes
+  cluster: api.ci
+  cron: 30 0 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: red-hat-data-services
+    repo: opendatahub-operator
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-red-hat-data-services-opendatahub-operator-master-modh-opendatahub-operator-nightly
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --target=modh-opendatahub-operator-nightly
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: api.ci
+  cron: 30 3 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: red-hat-data-services
+    repo: opendatahub-operator
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-red-hat-data-services-opendatahub-operator-master-modh-operator-e2e-nightly
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-password-file=/etc/boskos/password
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --secret-dir=/usr/local/modh-operator-e2e-nightly-cluster-profile
+      - --target=modh-operator-e2e-nightly
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/modh-operator-e2e-nightly-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-gcp
+        - configMap:
+            name: cluster-profile-gcp
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator

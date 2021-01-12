@@ -3,28 +3,16 @@ base_images:
     name: "4.7"
     namespace: ocp
     tag: base
-  ocp_builder_rhel-7-golang-1.13:
-    name: builder
-    namespace: ocp
-    tag: rhel-7-golang-1.13
-  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.15-openshift-4.6
   ocp_builder_rhel-8-golang-1.15-openshift-4.7:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.15-openshift-4.7
-  ocp_builder_rhel-8-golang-openshift-4.6:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-openshift-4.6
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: golang-1.15
 images:
 - dockerfile_path: Dockerfile.rhel
   from: base
@@ -64,10 +52,9 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws
 - as: e2e-aws-upgrade
-  commands: TEST_SUITE=all run-upgrade-tests
-  openshift_installer:
+  steps:
     cluster_profile: aws
-    upgrade: true
+    workflow: openshift-upgrade-aws
 - as: e2e-aws-builds
   steps:
     cluster_profile: aws

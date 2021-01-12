@@ -182,7 +182,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.1-ci
+        value: registry.ci.openshift.org/ocp/release:4.1-ci
       - name: BRANCH
         value: "4.1"
       - name: CLUSTER_TYPE
@@ -299,7 +299,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.1-ci
+        value: registry.ci.openshift.org/ocp/release:4.1-ci
       - name: BRANCH
         value: "4.1"
       - name: CLUSTER_TYPE
@@ -415,7 +415,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.1
+        value: registry.ci.openshift.org/ocp/release:4.1
       - name: BRANCH
         value: "4.1"
       - name: CLUSTER_TYPE
@@ -531,7 +531,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.1
+        value: registry.ci.openshift.org/ocp/release:4.1
       - name: BRANCH
         value: "4.1"
       - name: CLUSTER_TYPE
@@ -642,6 +642,7 @@ periodics:
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       command:
       - ci-operator
       env:
@@ -699,6 +700,9 @@ periodics:
       - mountPath: /etc/appci
         name: appci-release-bot-credentials
         readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -750,6 +754,7 @@ periodics:
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       command:
       - ci-operator
       env:
@@ -771,7 +776,7 @@ periodics:
                 memory: 200Mi
           tests:
           - as: e2e-$(CLUSTER_TYPE)-upgrade
-            commands: TEST_SUITE=all TEST_OPTIONS=abort-at=random run-upgrade-tests
+            commands: TEST_SUITE=all TEST_UPGRADE_OPTIONS=abort-at=random run-upgrade-tests
             openshift_installer:
               cluster_profile: "$(CLUSTER_TYPE)"
               upgrade: true
@@ -794,6 +799,9 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/appci
         name: appci-release-bot-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
