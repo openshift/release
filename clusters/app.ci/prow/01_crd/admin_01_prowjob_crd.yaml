@@ -1,10 +1,9 @@
-apiVersion: apiextensions.k8s.io/v1beta1
+apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: prowjobs.prow.k8s.io
 spec:
   group: prow.k8s.io
-  version: v1
   scope: Namespaced
   names:
     plural: prowjobs
@@ -13,73 +12,77 @@ spec:
     listKind: ProwJobList
     shortNames:
     - pj
-  validation:
-    openAPIV3Schema:
-      properties:
-        spec:
-          properties:
-            max_concurrency:
-              type: integer
-              minimum: 0
-            type:
-              type: string
-              enum:
-              - "presubmit"
-              - "postsubmit"
-              - "periodic"
-              - "batch"
-        status:
-          properties:
-            state:
-              type: string
-              enum:
-              - "triggered"
-              - "pending"
-              - "success"
-              - "failure"
-              - "aborted"
-              - "error"
-          anyOf:
-          - not:
-              properties:
-                state:
-                  type: string
-                  enum:
-                  - "success"
-                  - "failure"
-                  - "error"
-          - required:
-            - completionTime
-  additionalPrinterColumns:
-  - name: Job
-    type: string
-    description: The name of the job being run.
-    JSONPath: .spec.job
-  - name: BuildId
-    type: string
-    description: The ID of the job being run.
-    JSONPath: .status.build_id
-  - name: Type
-    type: string
-    description: The type of job being run.
-    JSONPath: .spec.type
-  - name: Org
-    type: string
-    description: The org for which the job is running.
-    JSONPath: .spec.refs.org
-  - name: Repo
-    type: string
-    description: The repo for which the job is running.
-    JSONPath: .spec.refs.repo
-  - name: Pulls
-    type: string
-    description: The pulls for which the job is running.
-    JSONPath: ".spec.refs.pulls[*].number"
-  - name: StartTime
-    type: date
-    description: When the job started running.
-    JSONPath: .status.startTime
-  - name: CompletionTime
-    type: date
-    description: When the job finished running.
-    JSONPath: .status.completionTime
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        properties:
+          spec:
+            properties:
+              max_concurrency:
+                minimum: 0
+                type: integer
+              type:
+                enum:
+                - presubmit
+                - postsubmit
+                - periodic
+                - batch
+                type: string
+          status:
+            anyOf:
+            - not:
+                properties:
+                  state:
+                    enum:
+                    - success
+                    - failure
+                    - error
+                    type: string
+            - required:
+              - completionTime
+            properties:
+              state:
+                enum:
+                - triggered
+                - pending
+                - success
+                - failure
+                - aborted
+                - error
+                type: string
+    additionalPrinterColumns:
+    - description: The name of the job being run.
+      jsonPath: .spec.job
+      name: Job
+      type: string
+    - description: The ID of the job being run.
+      jsonPath: .status.build_id
+      name: BuildId
+      type: string
+    - description: The type of job being run.
+      jsonPath: .spec.type
+      name: Type
+      type: string
+    - description: The org for which the job is running.
+      jsonPath: .spec.refs.org
+      name: Org
+      type: string
+    - description: The repo for which the job is running.
+      jsonPath: .spec.refs.repo
+      name: Repo
+      type: string
+    - description: The pulls for which the job is running.
+      jsonPath: .spec.refs.pulls[*].number
+      name: Pulls
+      type: string
+    - description: When the job started running.
+      jsonPath: .status.startTime
+      name: StartTime
+      type: date
+    - description: When the job finished running.
+      jsonPath: .status.completionTime
+      name: CompletionTime
+      type: date

@@ -121,6 +121,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-aws-cluster-profile
         name: cluster-profile
+      - mountPath: /usr/local/e2e-aws
+        name: job-definition
+        subPath: cluster-launch-installer-e2e.yaml
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
     serviceAccountName: ci-operator
@@ -142,6 +145,9 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
+    - configMap:
+        name: prow-job-cluster-launch-installer-e2e
+      name: job-definition
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -563,8 +569,8 @@ periodics:
               name: pipeline:machine-os-content
           source:
             dockerfile: |
-              FROM registry.svc.ci.openshift.org/${TAG_NS}/${BRANCH}@${origin_artifacts_id} AS artifacts
-              FROM registry.svc.ci.openshift.org/${TAG_NS}/${BRANCH}@${origin_machine_config_operator_rpms_id} AS machine_config_operator_rpms
+              FROM registry.ci.openshift.org/${TAG_NS}/${BRANCH}@${origin_artifacts_id} AS artifacts
+              FROM registry.ci.openshift.org/${TAG_NS}/${BRANCH}@${origin_machine_config_operator_rpms_id} AS machine_config_operator_rpms
 
               FROM quay.io/coreos-assembler/coreos-assembler:latest AS build
               USER 0
@@ -793,9 +799,9 @@ periodics:
       - name: JOB_NAME_SAFE
         value: e2e-remote-libvirt
       - name: MULTIARCH_RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp-s390x/release-s390x:4.5
+        value: registry.ci.openshift.org/ocp-s390x/release-s390x:4.5
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5
+        value: registry.ci.openshift.org/ocp/release:4.5
       - name: REMOTE_LIBVIRT_HOSTNAME
         value: ocponz
       - name: REMOTE_LIBVIRT_HOSTNAME_1
@@ -1127,14 +1133,14 @@ periodics:
 
         # create namespace and craft a release image without the machine operator
         namespace="ci-op-$( echo "${JOB_NAME}-${BUILD_ID}" | md5sum -t | cut -c 1-8 )"
-        export RELEASE_IMAGE_INITIAL=registry.svc.ci.openshift.org/ocp/release:$(FROM_BRANCH)
-        export RELEASE_IMAGE_LATEST=registry.svc.ci.openshift.org/${namespace}/release:upgrade
-        export IMAGE_TESTS=registry.svc.ci.openshift.org/${namespace}/stable-initial:tests # use the older version of the payload
+        export RELEASE_IMAGE_INITIAL=registry.ci.openshift.org/ocp/release:$(FROM_BRANCH)
+        export RELEASE_IMAGE_LATEST=registry.ci.openshift.org/${namespace}/release:upgrade
+        export IMAGE_TESTS=registry.ci.openshift.org/${namespace}/stable-initial:tests # use the older version of the payload
         oc registry login
         oc new-project ${namespace}
         oc policy add-role-to-group system:image-puller -n ${namespace} system:unauthenticated system:authenticated
-        oc adm release new --from-release=registry.svc.ci.openshift.org/ocp/release:$(BRANCH) \
-          --to-image=registry.svc.ci.openshift.org/${namespace}/release:upgrade \
+        oc adm release new --from-release=registry.ci.openshift.org/ocp/release:$(BRANCH) \
+          --to-image=registry.ci.openshift.org/${namespace}/release:upgrade \
           --exclude=machine-config-operator
 
         # execute the test
@@ -1244,7 +1250,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5-ci
+        value: registry.ci.openshift.org/ocp/release:4.5-ci
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -1358,7 +1364,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5
+        value: registry.ci.openshift.org/ocp/release:4.5
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -1463,7 +1469,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5
+        value: registry.ci.openshift.org/ocp/release:4.5
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -1569,7 +1575,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5
+        value: registry.ci.openshift.org/ocp/release:4.5
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -1675,7 +1681,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5
+        value: registry.ci.openshift.org/ocp/release:4.5
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -1781,7 +1787,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5
+        value: registry.ci.openshift.org/ocp/release:4.5
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -1887,7 +1893,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5
+        value: registry.ci.openshift.org/ocp/release:4.5
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -1993,7 +1999,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5
+        value: registry.ci.openshift.org/ocp/release:4.5
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -2101,7 +2107,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5
+        value: registry.ci.openshift.org/ocp/release:4.5
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -2211,7 +2217,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5
+        value: registry.ci.openshift.org/ocp/release:4.5
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -2319,7 +2325,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5
+        value: registry.ci.openshift.org/ocp/release:4.5
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -2421,7 +2427,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5
+        value: registry.ci.openshift.org/ocp/release:4.5
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -2525,7 +2531,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5
+        value: registry.ci.openshift.org/ocp/release:4.5
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -2633,7 +2639,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5-ci
+        value: registry.ci.openshift.org/ocp/release:4.5-ci
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -2743,7 +2749,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5
+        value: registry.ci.openshift.org/ocp/release:4.5
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -2853,7 +2859,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5
+        value: registry.ci.openshift.org/ocp/release:4.5
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -2965,7 +2971,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5
+        value: registry.ci.openshift.org/ocp/release:4.5
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -3075,7 +3081,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5
+        value: registry.ci.openshift.org/ocp/release:4.5
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -3185,7 +3191,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5
+        value: registry.ci.openshift.org/ocp/release:4.5
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -3295,7 +3301,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5
+        value: registry.ci.openshift.org/ocp/release:4.5
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -3409,7 +3415,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5-ci
+        value: registry.ci.openshift.org/ocp/release:4.5-ci
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -3528,7 +3534,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5-ci
+        value: registry.ci.openshift.org/ocp/release:4.5-ci
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -3649,7 +3655,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/origin/release:4.5
+        value: registry.ci.openshift.org/origin/release:4.5
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -3768,7 +3774,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5-ci
+        value: registry.ci.openshift.org/ocp/release:4.5-ci
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -3887,7 +3893,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5-ci
+        value: registry.ci.openshift.org/ocp/release:4.5-ci
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -4008,7 +4014,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5-ci
+        value: registry.ci.openshift.org/ocp/release:4.5-ci
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -4127,7 +4133,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5-ci
+        value: registry.ci.openshift.org/ocp/release:4.5-ci
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -4248,7 +4254,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5-ci
+        value: registry.ci.openshift.org/ocp/release:4.5-ci
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -4367,7 +4373,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5-ci
+        value: registry.ci.openshift.org/ocp/release:4.5-ci
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -4475,7 +4481,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5-ci
+        value: registry.ci.openshift.org/ocp/release:4.5-ci
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -4583,7 +4589,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5-ci
+        value: registry.ci.openshift.org/ocp/release:4.5-ci
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -4689,7 +4695,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5-ci
+        value: registry.ci.openshift.org/ocp/release:4.5-ci
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -4807,7 +4813,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5-ci
+        value: registry.ci.openshift.org/ocp/release:4.5-ci
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -4926,7 +4932,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5
+        value: registry.ci.openshift.org/ocp/release:4.5
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -5033,7 +5039,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5
+        value: registry.ci.openshift.org/ocp/release:4.5
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -5150,7 +5156,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5
+        value: registry.ci.openshift.org/ocp/release:4.5
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -5267,7 +5273,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5
+        value: registry.ci.openshift.org/ocp/release:4.5
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -5511,6 +5517,7 @@ periodics:
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       command:
       - ci-operator
       env:
@@ -5554,6 +5561,9 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/appci
         name: appci-release-bot-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -5609,6 +5619,7 @@ periodics:
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       command:
       - ci-operator
       env:
@@ -5655,6 +5666,9 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/appci
         name: appci-release-bot-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -5709,6 +5723,7 @@ periodics:
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       command:
       - ci-operator
       env:
@@ -5730,7 +5745,7 @@ periodics:
                 memory: 200Mi
           tests:
           - as: e2e-$(CLUSTER_TYPE)-upgrade
-            commands: TEST_SUITE=all TEST_OPTIONS=abort-at=99 run-upgrade-tests
+            commands: TEST_SUITE=all TEST_UPGRADE_OPTIONS=abort-at=99 run-upgrade-tests
             openshift_installer:
               cluster_profile: "$(CLUSTER_TYPE)"
               upgrade: true
@@ -5753,6 +5768,9 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/appci
         name: appci-release-bot-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -5807,6 +5825,7 @@ periodics:
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       command:
       - ci-operator
       env:
@@ -5828,7 +5847,7 @@ periodics:
                 memory: 200Mi
           tests:
           - as: e2e-$(CLUSTER_TYPE)-upgrade
-            commands: TEST_SUITE=all TEST_OPTIONS=abort-at=random run-upgrade-tests
+            commands: TEST_SUITE=all TEST_UPGRADE_OPTIONS=abort-at=random run-upgrade-tests
             openshift_installer:
               cluster_profile: "$(CLUSTER_TYPE)"
               upgrade: true
@@ -5851,6 +5870,9 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/appci
         name: appci-release-bot-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -5912,7 +5934,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5-ci
+        value: registry.ci.openshift.org/ocp/release:4.5-ci
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -6013,6 +6035,7 @@ periodics:
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       command:
       - ci-operator
       env:
@@ -6036,7 +6059,7 @@ periodics:
           - as: e2e-$(CLUSTER_TYPE)-upgrade
             steps:
               cluster_profile: "$(CLUSTER_TYPE)"
-              workflow: "openshift-upgrade-$(CLUSTER_TYPE)-loki"
+              workflow: "openshift-upgrade-$(CLUSTER_TYPE)"
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -6056,6 +6079,9 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/appci
         name: appci-release-bot-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -6112,6 +6138,7 @@ periodics:
       - --target=e2e-azure-upgrade
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       command:
       - ci-operator
       env:
@@ -6155,6 +6182,9 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/appci
         name: appci-release-bot-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -6218,7 +6248,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5
+        value: registry.ci.openshift.org/ocp/release:4.5
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -6422,7 +6452,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5
+        value: registry.ci.openshift.org/ocp/release:4.5
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -6532,7 +6562,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5
+        value: registry.ci.openshift.org/ocp/release:4.5
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -6639,7 +6669,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5-ci
+        value: registry.ci.openshift.org/ocp/release:4.5-ci
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -6748,7 +6778,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5
+        value: registry.ci.openshift.org/ocp/release:4.5
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -6855,7 +6885,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5
+        value: registry.ci.openshift.org/ocp/release:4.5
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -6964,7 +6994,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5
+        value: registry.ci.openshift.org/ocp/release:4.5
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -7067,6 +7097,7 @@ periodics:
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       command:
       - ci-operator
       env:
@@ -7090,7 +7121,7 @@ periodics:
           - as: e2e-$(CLUSTER_TYPE)-upgrade
             steps:
               cluster_profile: "$(CLUSTER_TYPE)"
-              workflow: "openshift-upgrade-$(CLUSTER_TYPE)-loki"
+              workflow: "openshift-upgrade-$(CLUSTER_TYPE)"
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -7110,6 +7141,9 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/appci
         name: appci-release-bot-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -7162,6 +7196,7 @@ periodics:
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       command:
       - ci-operator
       env:
@@ -7208,6 +7243,9 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/appci
         name: appci-release-bot-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -7260,6 +7298,7 @@ periodics:
       - --target=e2e-azure-upgrade
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       command:
       - ci-operator
       env:
@@ -7303,6 +7342,9 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/appci
         name: appci-release-bot-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -7355,6 +7397,7 @@ periodics:
       - --target=e2e-azure-upgrade
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       command:
       - ci-operator
       env:
@@ -7401,6 +7444,9 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/appci
         name: appci-release-bot-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -7458,7 +7504,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5
+        value: registry.ci.openshift.org/ocp/release:4.5
       - name: BRANCH
         value: "4.5"
       - name: CLUSTER_TYPE
@@ -7730,9 +7776,9 @@ periodics:
       - name: JOB_NAME_SAFE
         value: e2e-remote-libvirt
       - name: MULTIARCH_RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp-ppc64le/release-ppc64le:4.5
+        value: registry.ci.openshift.org/ocp-ppc64le/release-ppc64le:4.5
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5
+        value: registry.ci.openshift.org/ocp/release:4.5
       - name: REMOTE_LIBVIRT_HOSTNAME
         value: c155f2u33
       - name: REMOTE_LIBVIRT_HOSTNAME_1
@@ -8004,6 +8050,7 @@ periodics:
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       command:
       - ci-operator
       env:
@@ -8050,6 +8097,9 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/appci
         name: appci-release-bot-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -8108,6 +8158,7 @@ periodics:
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       command:
       - ci-operator
       env:
@@ -8154,6 +8205,9 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/appci
         name: appci-release-bot-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -8265,9 +8319,9 @@ periodics:
       - name: JOB_NAME_SAFE
         value: image-ecosystem
       - name: MULTIARCH_RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp-s390x/release-s390x:4.5
+        value: registry.ci.openshift.org/ocp-s390x/release-s390x:4.5
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5
+        value: registry.ci.openshift.org/ocp/release:4.5
       - name: REMOTE_LIBVIRT_HOSTNAME
         value: ocponz
       - name: REMOTE_LIBVIRT_HOSTNAME_1
@@ -8397,9 +8451,9 @@ periodics:
       - name: JOB_NAME_SAFE
         value: image-ecosystem
       - name: MULTIARCH_RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp-ppc64le/release-ppc64le:4.5
+        value: registry.ci.openshift.org/ocp-ppc64le/release-ppc64le:4.5
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5
+        value: registry.ci.openshift.org/ocp/release:4.5
       - name: REMOTE_LIBVIRT_HOSTNAME
         value: c155f2u33
       - name: REMOTE_LIBVIRT_HOSTNAME_1
@@ -8533,9 +8587,9 @@ periodics:
       - name: JOB_NAME_SAFE
         value: jenkins-e2e
       - name: MULTIARCH_RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp-s390x/release-s390x:4.5
+        value: registry.ci.openshift.org/ocp-s390x/release-s390x:4.5
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5
+        value: registry.ci.openshift.org/ocp/release:4.5
       - name: REMOTE_LIBVIRT_HOSTNAME
         value: ocponz
       - name: REMOTE_LIBVIRT_HOSTNAME_1
@@ -8665,9 +8719,9 @@ periodics:
       - name: JOB_NAME_SAFE
         value: jenkins-e2e
       - name: MULTIARCH_RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp-ppc64le/release-ppc64le:4.5
+        value: registry.ci.openshift.org/ocp-ppc64le/release-ppc64le:4.5
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.5
+        value: registry.ci.openshift.org/ocp/release:4.5
       - name: REMOTE_LIBVIRT_HOSTNAME
         value: c155f2u33
       - name: REMOTE_LIBVIRT_HOSTNAME_1

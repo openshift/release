@@ -1,0 +1,46 @@
+base_images:
+  base:
+    name: "4.7"
+    namespace: ocp
+    tag: base
+build_root:
+  project_image:
+    dockerfile_path: openshift/Dockerfile
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  inputs:
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/tektoncd-catalog/task/s2i/0.1/.
+  to: tektoncd-catalog-s2i
+promotion:
+  name: tektoncd-next-4.7
+  namespace: openshift
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 250Mi
+tag_specification:
+  name: "4.7"
+  namespace: ocp
+tests:
+- as: e2e
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make -C openshift test-e2e-downstream-stable
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-next
+  org: openshift
+  repo: tektoncd-catalog
+  variant: "4.7"

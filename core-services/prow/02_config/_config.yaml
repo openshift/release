@@ -38,8 +38,6 @@ branch-protection:
           protect: false
         toolchain-e2e:
           protect: false
-        toolchain-operator:
-          protect: false
     containers:
       repos:
         podman:
@@ -50,13 +48,13 @@ branch-protection:
       required_status_checks:
         contexts:
         - dco
+    devfile:
+      repos:
+        devworkspace-operator:
+          protect: false
     eclipse:
       repos:
         che-operator:
-          protect: false
-    fabric8-services:
-      repos:
-        toolchain-operator:
           protect: false
     freeipa:
       repos:
@@ -99,6 +97,8 @@ branch-protection:
               protect: false
             release-0.7:
               protect: false
+            release-0.8:
+              protect: false
         ssp-operator:
           protect: false
     monstorak:
@@ -136,9 +136,6 @@ branch-protection:
           branches:
             master:
               protect: true
-              required_status_checks:
-                contexts:
-                - continuous-integration/jenkins/pr-merge
           protect: false
         aws-account-operator:
           required_status_checks:
@@ -381,6 +378,8 @@ branch-protection:
           protect: true
         kam:
           protect: false
+        service-binding-operator:
+          protect: false
     tmckayus:
       repos:
         perceptilabs-test:
@@ -552,10 +551,10 @@ plank:
             memory: 250Mi
       timeout: 4h0m0s
       utility_images:
-        clonerefs: gcr.io/k8s-prow/clonerefs:v20201215-dcdd66d1f5
-        entrypoint: gcr.io/k8s-prow/entrypoint:v20201215-dcdd66d1f5
-        initupload: gcr.io/k8s-prow/initupload:v20201215-dcdd66d1f5
-        sidecar: gcr.io/k8s-prow/sidecar:v20201215-dcdd66d1f5
+        clonerefs: gcr.io/k8s-prow/clonerefs:v20210112-5eaf960e10
+        entrypoint: gcr.io/k8s-prow/entrypoint:v20210112-5eaf960e10
+        initupload: gcr.io/k8s-prow/initupload:v20210112-5eaf960e10
+        sidecar: gcr.io/k8s-prow/sidecar:v20210112-5eaf960e10
     openshift-priv:
       gcs_configuration:
         bucket: origin-ci-private
@@ -636,7 +635,6 @@ tide:
     codeready-toolchain/registration-service: squash
     codeready-toolchain/toolchain-common: squash
     codeready-toolchain/toolchain-e2e: squash
-    codeready-toolchain/toolchain-operator: squash
     coreos/bootupd: rebase
     coreos/coreos-assembler: rebase
     coreos/rpm-ostree: rebase
@@ -703,6 +701,7 @@ tide:
     openshift/template-service-broker-operator: squash
     openshift/verification-tests: squash
     operator-framework/operator-lib: squash
+    red-hat-data-services/opendatahub-operator: rebase
     redhat-developer/gitops-operator: squash
     redhat-developer/jenkins-operator: rebase
     redhat-developer/jenkins-operator-bundle: rebase
@@ -726,335 +725,6 @@ tide:
     - 'dco-signoff: no'
     orgs:
     - cri-o
-  - includedBranches:
-    - master
-    labels:
-    - lgtm
-    - approved
-    - bugzilla/valid-bug
-    missingLabels:
-    - needs-rebase
-    - do-not-merge/hold
-    - do-not-merge/work-in-progress
-    - do-not-merge/invalid-owners-file
-    - bugzilla/invalid-bug
-    repos:
-    - ansible-collections/community.okd
-    - kube-reporting/ghostunnel
-    - kube-reporting/hadoop
-    - kube-reporting/helm
-    - kube-reporting/hive
-    - kube-reporting/metering-operator
-    - kube-reporting/presto
-    - openshift-priv/ansible-service-broker
-    - openshift-priv/api
-    - openshift-priv/apiserver-library-go
-    - openshift-priv/aws-ebs-csi-driver
-    - openshift-priv/aws-ebs-csi-driver-operator
-    - openshift-priv/aws-pod-identity-webhook
-    - openshift-priv/baremetal-operator
-    - openshift-priv/baremetal-runtimecfg
-    - openshift-priv/builder
-    - openshift-priv/cincinnati-operator
-    - openshift-priv/client-go
-    - openshift-priv/cloud-credential-operator
-    - openshift-priv/cloud-provider-openstack
-    - openshift-priv/cluster-api-actuator-pkg
-    - openshift-priv/cluster-api-provider-aws
-    - openshift-priv/cluster-api-provider-azure
-    - openshift-priv/cluster-api-provider-baremetal
-    - openshift-priv/cluster-api-provider-gcp
-    - openshift-priv/cluster-api-provider-kubemark
-    - openshift-priv/cluster-api-provider-kubevirt
-    - openshift-priv/cluster-api-provider-libvirt
-    - openshift-priv/cluster-api-provider-openstack
-    - openshift-priv/cluster-api-provider-ovirt
-    - openshift-priv/cluster-authentication-operator
-    - openshift-priv/cluster-autoscaler-operator
-    - openshift-priv/cluster-baremetal-operator
-    - openshift-priv/cluster-bootstrap
-    - openshift-priv/cluster-config-operator
-    - openshift-priv/cluster-csi-snapshot-controller-operator
-    - openshift-priv/cluster-dns-operator
-    - openshift-priv/cluster-etcd-operator
-    - openshift-priv/cluster-image-registry-operator
-    - openshift-priv/cluster-ingress-operator
-    - openshift-priv/cluster-kube-apiserver-operator
-    - openshift-priv/cluster-kube-controller-manager-operator
-    - openshift-priv/cluster-kube-descheduler-operator
-    - openshift-priv/cluster-kube-scheduler-operator
-    - openshift-priv/cluster-kube-storage-version-migrator-operator
-    - openshift-priv/cluster-logging-operator
-    - openshift-priv/cluster-machine-approver
-    - openshift-priv/cluster-monitoring-operator
-    - openshift-priv/cluster-network-operator
-    - openshift-priv/cluster-nfd-operator
-    - openshift-priv/cluster-node-tuning-operator
-    - openshift-priv/cluster-openshift-apiserver-operator
-    - openshift-priv/cluster-openshift-controller-manager-operator
-    - openshift-priv/cluster-policy-controller
-    - openshift-priv/cluster-resource-override-admission
-    - openshift-priv/cluster-resource-override-admission-operator
-    - openshift-priv/cluster-samples-operator
-    - openshift-priv/cluster-storage-operator
-    - openshift-priv/cluster-svcat-apiserver-operator
-    - openshift-priv/cluster-svcat-controller-manager-operator
-    - openshift-priv/cluster-update-keys
-    - openshift-priv/cluster-version-operator
-    - openshift-priv/compliance-operator
-    - openshift-priv/configmap-reload
-    - openshift-priv/console
-    - openshift-priv/console-operator
-    - openshift-priv/coredns
-    - openshift-priv/csi-cluster-driver-registrar
-    - openshift-priv/csi-driver-nfs
-    - openshift-priv/csi-driver-registrar
-    - openshift-priv/csi-external-attacher
-    - openshift-priv/csi-external-provisioner
-    - openshift-priv/csi-external-resizer
-    - openshift-priv/csi-external-snapshotter
-    - openshift-priv/csi-livenessprobe
-    - openshift-priv/csi-node-driver-registrar
-    - openshift-priv/csi-operator
-    - openshift-priv/egress-router-cni
-    - openshift-priv/elasticsearch-operator
-    - openshift-priv/elasticsearch-proxy
-    - openshift-priv/etcd
-    - openshift-priv/external-storage
-    - openshift-priv/federation-v2-operator
-    - openshift-priv/file-integrity-operator
-    - openshift-priv/gcp-pd-csi-driver
-    - openshift-priv/gcp-pd-csi-driver-operator
-    - openshift-priv/grafana
-    - openshift-priv/ib-sriov-cni
-    - openshift-priv/image-registry
-    - openshift-priv/images
-    - openshift-priv/insights-operator
-    - openshift-priv/installer
-    - openshift-priv/ironic-hardware-inventory-recorder-image
-    - openshift-priv/ironic-image
-    - openshift-priv/ironic-inspector-image
-    - openshift-priv/ironic-ipa-downloader
-    - openshift-priv/ironic-rhcos-downloader
-    - openshift-priv/ironic-static-ip-manager
-    - openshift-priv/jenkins
-    - openshift-priv/k8s-prometheus-adapter
-    - openshift-priv/kube-rbac-proxy
-    - openshift-priv/kube-state-metrics
-    - openshift-priv/kubecsr
-    - openshift-priv/kubernetes-autoscaler
-    - openshift-priv/kubernetes-kube-storage-version-migrator
-    - openshift-priv/kuryr-kubernetes
-    - openshift-priv/leader-elector
-    - openshift-priv/linuxptp-daemon
-    - openshift-priv/local-storage-operator
-    - openshift-priv/loki
-    - openshift-priv/machine-api-operator
-    - openshift-priv/machine-config-operator
-    - openshift-priv/mdns-publisher
-    - openshift-priv/metal3-smart-exporter
-    - openshift-priv/multus-cni
-    - openshift-priv/must-gather
-    - openshift-priv/node-feature-discovery
-    - openshift-priv/node-problem-detector
-    - openshift-priv/node-problem-detector-operator
-    - openshift-priv/node_exporter
-    - openshift-priv/oauth-apiserver
-    - openshift-priv/oauth-proxy
-    - openshift-priv/oauth-server
-    - openshift-priv/oc
-    - openshift-priv/openshift-ansible
-    - openshift-priv/openshift-apiserver
-    - openshift-priv/openshift-controller-manager
-    - openshift-priv/openshift-state-metrics
-    - openshift-priv/openshift-tuned
-    - openshift-priv/openstack-cinder-csi-driver-operator
-    - openshift-priv/origin-aggregated-logging
-    - openshift-priv/ovirt-csi-driver
-    - openshift-priv/ovirt-csi-driver-operator
-    - openshift-priv/ovn-kubernetes
-    - openshift-priv/prom-label-proxy
-    - openshift-priv/prometheus
-    - openshift-priv/prometheus-alertmanager
-    - openshift-priv/prometheus-operator
-    - openshift-priv/ptp-operator
-    - openshift-priv/route-override-cni
-    - openshift-priv/router
-    - openshift-priv/runtime-utils
-    - openshift-priv/sdn
-    - openshift-priv/service-ca-operator
-    - openshift-priv/service-catalog
-    - openshift-priv/sig-storage-local-static-provisioner
-    - openshift-priv/special-resource-operator
-    - openshift-priv/sriov-cni
-    - openshift-priv/sriov-dp-admission-controller
-    - openshift-priv/sriov-network-device-plugin
-    - openshift-priv/sriov-network-operator
-    - openshift-priv/telemeter
-    - openshift-priv/template-service-broker
-    - openshift-priv/template-service-broker-operator
-    - openshift-priv/thanos
-    - openshift-priv/vertical-pod-autoscaler-operator
-    - openshift-priv/vsphere-problem-detector
-    - openshift-priv/whereabouts-cni
-    - openshift/ansible-service-broker
-    - openshift/api
-    - openshift/apiserver-library-go
-    - openshift/aws-ebs-csi-driver
-    - openshift/aws-ebs-csi-driver-operator
-    - openshift/aws-pod-identity-webhook
-    - openshift/baremetal-operator
-    - openshift/baremetal-runtimecfg
-    - openshift/builder
-    - openshift/cincinnati
-    - openshift/cincinnati-operator
-    - openshift/client-go
-    - openshift/cloud-credential-operator
-    - openshift/cloud-provider-openstack
-    - openshift/cluster-api-actuator-pkg
-    - openshift/cluster-api-provider-aws
-    - openshift/cluster-api-provider-azure
-    - openshift/cluster-api-provider-baremetal
-    - openshift/cluster-api-provider-gcp
-    - openshift/cluster-api-provider-kubemark
-    - openshift/cluster-api-provider-kubevirt
-    - openshift/cluster-api-provider-libvirt
-    - openshift/cluster-api-provider-openstack
-    - openshift/cluster-api-provider-ovirt
-    - openshift/cluster-authentication-operator
-    - openshift/cluster-autoscaler-operator
-    - openshift/cluster-baremetal-operator
-    - openshift/cluster-bootstrap
-    - openshift/cluster-config-operator
-    - openshift/cluster-csi-snapshot-controller-operator
-    - openshift/cluster-dns-operator
-    - openshift/cluster-etcd-operator
-    - openshift/cluster-image-registry-operator
-    - openshift/cluster-ingress-operator
-    - openshift/cluster-kube-apiserver-operator
-    - openshift/cluster-kube-controller-manager-operator
-    - openshift/cluster-kube-descheduler-operator
-    - openshift/cluster-kube-scheduler-operator
-    - openshift/cluster-kube-storage-version-migrator-operator
-    - openshift/cluster-logging-operator
-    - openshift/cluster-machine-approver
-    - openshift/cluster-monitoring-operator
-    - openshift/cluster-network-operator
-    - openshift/cluster-nfd-operator
-    - openshift/cluster-node-tuning-operator
-    - openshift/cluster-openshift-apiserver-operator
-    - openshift/cluster-openshift-controller-manager-operator
-    - openshift/cluster-policy-controller
-    - openshift/cluster-resource-override-admission
-    - openshift/cluster-resource-override-admission-operator
-    - openshift/cluster-samples-operator
-    - openshift/cluster-storage-operator
-    - openshift/cluster-svcat-apiserver-operator
-    - openshift/cluster-svcat-controller-manager-operator
-    - openshift/cluster-update-keys
-    - openshift/cluster-version-operator
-    - openshift/compliance-operator
-    - openshift/configmap-reload
-    - openshift/console
-    - openshift/console-operator
-    - openshift/coredns
-    - openshift/coredns-mdns
-    - openshift/csi-cluster-driver-registrar
-    - openshift/csi-driver-nfs
-    - openshift/csi-driver-registrar
-    - openshift/csi-external-attacher
-    - openshift/csi-external-provisioner
-    - openshift/csi-external-resizer
-    - openshift/csi-external-snapshotter
-    - openshift/csi-livenessprobe
-    - openshift/csi-node-driver-registrar
-    - openshift/csi-operator
-    - openshift/custom-resource-status
-    - openshift/egress-router-cni
-    - openshift/elasticsearch-operator
-    - openshift/elasticsearch-proxy
-    - openshift/etcd
-    - openshift/external-storage
-    - openshift/federation-v2-operator
-    - openshift/file-integrity-operator
-    - openshift/gcp-pd-csi-driver
-    - openshift/gcp-pd-csi-driver-operator
-    - openshift/grafana
-    - openshift/ib-sriov-cni
-    - openshift/image-registry
-    - openshift/images
-    - openshift/insights-operator
-    - openshift/installer
-    - openshift/ironic-hardware-inventory-recorder-image
-    - openshift/ironic-image
-    - openshift/ironic-inspector-image
-    - openshift/ironic-ipa-downloader
-    - openshift/ironic-rhcos-downloader
-    - openshift/ironic-static-ip-manager
-    - openshift/jenkins
-    - openshift/k8s-prometheus-adapter
-    - openshift/kube-rbac-proxy
-    - openshift/kube-state-metrics
-    - openshift/kubecsr
-    - openshift/kubernetes-autoscaler
-    - openshift/kubernetes-kube-storage-version-migrator
-    - openshift/kuryr-kubernetes
-    - openshift/leader-elector
-    - openshift/linuxptp-daemon
-    - openshift/local-storage-operator
-    - openshift/loki
-    - openshift/machine-api-operator
-    - openshift/machine-config-operator
-    - openshift/mdns-publisher
-    - openshift/metal3-smart-exporter
-    - openshift/multus-cni
-    - openshift/must-gather
-    - openshift/node-feature-discovery
-    - openshift/node-problem-detector
-    - openshift/node-problem-detector-operator
-    - openshift/node_exporter
-    - openshift/oauth-apiserver
-    - openshift/oauth-proxy
-    - openshift/oauth-server
-    - openshift/oc
-    - openshift/okd-machine-os
-    - openshift/openshift-ansible
-    - openshift/openshift-apiserver
-    - openshift/openshift-controller-manager
-    - openshift/openshift-state-metrics
-    - openshift/openshift-tuned
-    - openshift/openstack-cinder-csi-driver-operator
-    - openshift/origin-aggregated-logging
-    - openshift/ovirt-csi-driver
-    - openshift/ovirt-csi-driver-operator
-    - openshift/ovn-kubernetes
-    - openshift/prom-label-proxy
-    - openshift/prometheus
-    - openshift/prometheus-alertmanager
-    - openshift/prometheus-operator
-    - openshift/ptp-operator
-    - openshift/route-override-cni
-    - openshift/router
-    - openshift/runtime-utils
-    - openshift/sdn
-    - openshift/service-ca-operator
-    - openshift/service-catalog
-    - openshift/sig-storage-local-static-provisioner
-    - openshift/special-resource-operator
-    - openshift/sriov-cni
-    - openshift/sriov-dp-admission-controller
-    - openshift/sriov-network-device-plugin
-    - openshift/sriov-network-operator
-    - openshift/telemeter
-    - openshift/template-service-broker
-    - openshift/template-service-broker-operator
-    - openshift/thanos
-    - openshift/vertical-pod-autoscaler-operator
-    - openshift/vsphere-problem-detector
-    - openshift/whereabouts-cni
-    - operator-framework/operator-lifecycle-manager
-    - operator-framework/operator-marketplace
-    - operator-framework/operator-registry
   - excludedBranches:
     - release-3.11
     - release-4.0
@@ -1732,6 +1402,330 @@ tide:
     - operator-framework/operator-lifecycle-manager
     - operator-framework/operator-marketplace
     - operator-framework/operator-registry
+  - includedBranches:
+    - master
+    labels:
+    - lgtm
+    - approved
+    - bugzilla/valid-bug
+    missingLabels:
+    - needs-rebase
+    - do-not-merge/hold
+    - do-not-merge/work-in-progress
+    - do-not-merge/invalid-owners-file
+    - bugzilla/invalid-bug
+    repos:
+    - ansible-collections/community.okd
+    - kube-reporting/ghostunnel
+    - kube-reporting/hadoop
+    - kube-reporting/helm
+    - kube-reporting/hive
+    - kube-reporting/metering-operator
+    - kube-reporting/presto
+    - openshift-priv/ansible-service-broker
+    - openshift-priv/api
+    - openshift-priv/apiserver-library-go
+    - openshift-priv/aws-ebs-csi-driver
+    - openshift-priv/aws-ebs-csi-driver-operator
+    - openshift-priv/aws-pod-identity-webhook
+    - openshift-priv/baremetal-operator
+    - openshift-priv/baremetal-runtimecfg
+    - openshift-priv/builder
+    - openshift-priv/cincinnati-operator
+    - openshift-priv/client-go
+    - openshift-priv/cloud-credential-operator
+    - openshift-priv/cloud-provider-openstack
+    - openshift-priv/cluster-api-actuator-pkg
+    - openshift-priv/cluster-api-provider-aws
+    - openshift-priv/cluster-api-provider-azure
+    - openshift-priv/cluster-api-provider-baremetal
+    - openshift-priv/cluster-api-provider-gcp
+    - openshift-priv/cluster-api-provider-kubemark
+    - openshift-priv/cluster-api-provider-kubevirt
+    - openshift-priv/cluster-api-provider-libvirt
+    - openshift-priv/cluster-api-provider-openstack
+    - openshift-priv/cluster-api-provider-ovirt
+    - openshift-priv/cluster-authentication-operator
+    - openshift-priv/cluster-autoscaler-operator
+    - openshift-priv/cluster-baremetal-operator
+    - openshift-priv/cluster-bootstrap
+    - openshift-priv/cluster-config-operator
+    - openshift-priv/cluster-csi-snapshot-controller-operator
+    - openshift-priv/cluster-dns-operator
+    - openshift-priv/cluster-etcd-operator
+    - openshift-priv/cluster-image-registry-operator
+    - openshift-priv/cluster-ingress-operator
+    - openshift-priv/cluster-kube-apiserver-operator
+    - openshift-priv/cluster-kube-controller-manager-operator
+    - openshift-priv/cluster-kube-descheduler-operator
+    - openshift-priv/cluster-kube-scheduler-operator
+    - openshift-priv/cluster-kube-storage-version-migrator-operator
+    - openshift-priv/cluster-logging-operator
+    - openshift-priv/cluster-machine-approver
+    - openshift-priv/cluster-monitoring-operator
+    - openshift-priv/cluster-network-operator
+    - openshift-priv/cluster-nfd-operator
+    - openshift-priv/cluster-node-tuning-operator
+    - openshift-priv/cluster-openshift-apiserver-operator
+    - openshift-priv/cluster-openshift-controller-manager-operator
+    - openshift-priv/cluster-policy-controller
+    - openshift-priv/cluster-resource-override-admission
+    - openshift-priv/cluster-resource-override-admission-operator
+    - openshift-priv/cluster-samples-operator
+    - openshift-priv/cluster-storage-operator
+    - openshift-priv/cluster-svcat-apiserver-operator
+    - openshift-priv/cluster-svcat-controller-manager-operator
+    - openshift-priv/cluster-update-keys
+    - openshift-priv/cluster-version-operator
+    - openshift-priv/compliance-operator
+    - openshift-priv/configmap-reload
+    - openshift-priv/coredns
+    - openshift-priv/csi-cluster-driver-registrar
+    - openshift-priv/csi-driver-nfs
+    - openshift-priv/csi-driver-registrar
+    - openshift-priv/csi-external-attacher
+    - openshift-priv/csi-external-provisioner
+    - openshift-priv/csi-external-resizer
+    - openshift-priv/csi-external-snapshotter
+    - openshift-priv/csi-livenessprobe
+    - openshift-priv/csi-node-driver-registrar
+    - openshift-priv/csi-operator
+    - openshift-priv/egress-router-cni
+    - openshift-priv/elasticsearch-operator
+    - openshift-priv/elasticsearch-proxy
+    - openshift-priv/etcd
+    - openshift-priv/external-storage
+    - openshift-priv/federation-v2-operator
+    - openshift-priv/file-integrity-operator
+    - openshift-priv/gcp-pd-csi-driver
+    - openshift-priv/gcp-pd-csi-driver-operator
+    - openshift-priv/grafana
+    - openshift-priv/ib-sriov-cni
+    - openshift-priv/image-registry
+    - openshift-priv/images
+    - openshift-priv/insights-operator
+    - openshift-priv/installer
+    - openshift-priv/ironic-hardware-inventory-recorder-image
+    - openshift-priv/ironic-image
+    - openshift-priv/ironic-inspector-image
+    - openshift-priv/ironic-ipa-downloader
+    - openshift-priv/ironic-rhcos-downloader
+    - openshift-priv/ironic-static-ip-manager
+    - openshift-priv/jenkins
+    - openshift-priv/k8s-prometheus-adapter
+    - openshift-priv/kube-rbac-proxy
+    - openshift-priv/kube-state-metrics
+    - openshift-priv/kubecsr
+    - openshift-priv/kubernetes-autoscaler
+    - openshift-priv/kubernetes-kube-storage-version-migrator
+    - openshift-priv/kuryr-kubernetes
+    - openshift-priv/leader-elector
+    - openshift-priv/linuxptp-daemon
+    - openshift-priv/local-storage-operator
+    - openshift-priv/loki
+    - openshift-priv/machine-api-operator
+    - openshift-priv/machine-config-operator
+    - openshift-priv/mdns-publisher
+    - openshift-priv/metal3-smart-exporter
+    - openshift-priv/multus-cni
+    - openshift-priv/must-gather
+    - openshift-priv/node-feature-discovery
+    - openshift-priv/node-problem-detector
+    - openshift-priv/node-problem-detector-operator
+    - openshift-priv/node_exporter
+    - openshift-priv/oauth-apiserver
+    - openshift-priv/oauth-proxy
+    - openshift-priv/oauth-server
+    - openshift-priv/oc
+    - openshift-priv/openshift-ansible
+    - openshift-priv/openshift-apiserver
+    - openshift-priv/openshift-controller-manager
+    - openshift-priv/openshift-state-metrics
+    - openshift-priv/openshift-tuned
+    - openshift-priv/openstack-cinder-csi-driver-operator
+    - openshift-priv/origin-aggregated-logging
+    - openshift-priv/ovirt-csi-driver
+    - openshift-priv/ovirt-csi-driver-operator
+    - openshift-priv/ovn-kubernetes
+    - openshift-priv/prom-label-proxy
+    - openshift-priv/prometheus
+    - openshift-priv/prometheus-alertmanager
+    - openshift-priv/prometheus-operator
+    - openshift-priv/ptp-operator
+    - openshift-priv/route-override-cni
+    - openshift-priv/router
+    - openshift-priv/runtime-utils
+    - openshift-priv/sdn
+    - openshift-priv/service-ca-operator
+    - openshift-priv/service-catalog
+    - openshift-priv/sig-storage-local-static-provisioner
+    - openshift-priv/special-resource-operator
+    - openshift-priv/sriov-cni
+    - openshift-priv/sriov-dp-admission-controller
+    - openshift-priv/sriov-network-device-plugin
+    - openshift-priv/sriov-network-operator
+    - openshift-priv/telemeter
+    - openshift-priv/template-service-broker
+    - openshift-priv/template-service-broker-operator
+    - openshift-priv/thanos
+    - openshift-priv/vertical-pod-autoscaler-operator
+    - openshift-priv/vsphere-problem-detector
+    - openshift-priv/whereabouts-cni
+    - openshift/ansible-service-broker
+    - openshift/api
+    - openshift/apiserver-library-go
+    - openshift/aws-ebs-csi-driver
+    - openshift/aws-ebs-csi-driver-operator
+    - openshift/aws-pod-identity-webhook
+    - openshift/baremetal-operator
+    - openshift/baremetal-runtimecfg
+    - openshift/builder
+    - openshift/cincinnati
+    - openshift/cincinnati-operator
+    - openshift/client-go
+    - openshift/cloud-credential-operator
+    - openshift/cloud-provider-openstack
+    - openshift/cluster-api-actuator-pkg
+    - openshift/cluster-api-provider-aws
+    - openshift/cluster-api-provider-azure
+    - openshift/cluster-api-provider-baremetal
+    - openshift/cluster-api-provider-gcp
+    - openshift/cluster-api-provider-kubemark
+    - openshift/cluster-api-provider-kubevirt
+    - openshift/cluster-api-provider-libvirt
+    - openshift/cluster-api-provider-openstack
+    - openshift/cluster-api-provider-ovirt
+    - openshift/cluster-authentication-operator
+    - openshift/cluster-autoscaler-operator
+    - openshift/cluster-baremetal-operator
+    - openshift/cluster-bootstrap
+    - openshift/cluster-config-operator
+    - openshift/cluster-csi-snapshot-controller-operator
+    - openshift/cluster-dns-operator
+    - openshift/cluster-etcd-operator
+    - openshift/cluster-image-registry-operator
+    - openshift/cluster-ingress-operator
+    - openshift/cluster-kube-apiserver-operator
+    - openshift/cluster-kube-controller-manager-operator
+    - openshift/cluster-kube-descheduler-operator
+    - openshift/cluster-kube-scheduler-operator
+    - openshift/cluster-kube-storage-version-migrator-operator
+    - openshift/cluster-logging-operator
+    - openshift/cluster-machine-approver
+    - openshift/cluster-monitoring-operator
+    - openshift/cluster-network-operator
+    - openshift/cluster-nfd-operator
+    - openshift/cluster-node-tuning-operator
+    - openshift/cluster-openshift-apiserver-operator
+    - openshift/cluster-openshift-controller-manager-operator
+    - openshift/cluster-policy-controller
+    - openshift/cluster-resource-override-admission
+    - openshift/cluster-resource-override-admission-operator
+    - openshift/cluster-samples-operator
+    - openshift/cluster-storage-operator
+    - openshift/cluster-svcat-apiserver-operator
+    - openshift/cluster-svcat-controller-manager-operator
+    - openshift/cluster-update-keys
+    - openshift/cluster-version-operator
+    - openshift/compliance-operator
+    - openshift/configmap-reload
+    - openshift/coredns
+    - openshift/coredns-mdns
+    - openshift/csi-cluster-driver-registrar
+    - openshift/csi-driver-nfs
+    - openshift/csi-driver-registrar
+    - openshift/csi-external-attacher
+    - openshift/csi-external-provisioner
+    - openshift/csi-external-resizer
+    - openshift/csi-external-snapshotter
+    - openshift/csi-livenessprobe
+    - openshift/csi-node-driver-registrar
+    - openshift/csi-operator
+    - openshift/custom-resource-status
+    - openshift/egress-router-cni
+    - openshift/elasticsearch-operator
+    - openshift/elasticsearch-proxy
+    - openshift/etcd
+    - openshift/external-storage
+    - openshift/federation-v2-operator
+    - openshift/file-integrity-operator
+    - openshift/gcp-pd-csi-driver
+    - openshift/gcp-pd-csi-driver-operator
+    - openshift/grafana
+    - openshift/ib-sriov-cni
+    - openshift/image-registry
+    - openshift/images
+    - openshift/insights-operator
+    - openshift/installer
+    - openshift/ironic-hardware-inventory-recorder-image
+    - openshift/ironic-image
+    - openshift/ironic-inspector-image
+    - openshift/ironic-ipa-downloader
+    - openshift/ironic-rhcos-downloader
+    - openshift/ironic-static-ip-manager
+    - openshift/jenkins
+    - openshift/k8s-prometheus-adapter
+    - openshift/kube-rbac-proxy
+    - openshift/kube-state-metrics
+    - openshift/kubecsr
+    - openshift/kubernetes-autoscaler
+    - openshift/kubernetes-kube-storage-version-migrator
+    - openshift/kuryr-kubernetes
+    - openshift/leader-elector
+    - openshift/linuxptp-daemon
+    - openshift/local-storage-operator
+    - openshift/loki
+    - openshift/machine-api-operator
+    - openshift/machine-config-operator
+    - openshift/mdns-publisher
+    - openshift/metal3-smart-exporter
+    - openshift/multus-cni
+    - openshift/must-gather
+    - openshift/node-feature-discovery
+    - openshift/node-problem-detector
+    - openshift/node-problem-detector-operator
+    - openshift/node_exporter
+    - openshift/oauth-apiserver
+    - openshift/oauth-proxy
+    - openshift/oauth-server
+    - openshift/oc
+    - openshift/openshift-ansible
+    - openshift/openshift-apiserver
+    - openshift/openshift-controller-manager
+    - openshift/openshift-state-metrics
+    - openshift/openshift-tuned
+    - openshift/openstack-cinder-csi-driver-operator
+    - openshift/origin-aggregated-logging
+    - openshift/ovirt-csi-driver
+    - openshift/ovirt-csi-driver-operator
+    - openshift/ovn-kubernetes
+    - openshift/prom-label-proxy
+    - openshift/prometheus
+    - openshift/prometheus-alertmanager
+    - openshift/prometheus-operator
+    - openshift/ptp-operator
+    - openshift/route-override-cni
+    - openshift/router
+    - openshift/runtime-utils
+    - openshift/sdn
+    - openshift/service-ca-operator
+    - openshift/service-catalog
+    - openshift/sig-storage-local-static-provisioner
+    - openshift/special-resource-operator
+    - openshift/sriov-cni
+    - openshift/sriov-dp-admission-controller
+    - openshift/sriov-network-device-plugin
+    - openshift/sriov-network-operator
+    - openshift/telemeter
+    - openshift/template-service-broker
+    - openshift/template-service-broker-operator
+    - openshift/thanos
+    - openshift/vertical-pod-autoscaler-operator
+    - openshift/vsphere-problem-detector
+    - openshift/whereabouts-cni
+    - operator-framework/operator-lifecycle-manager
+    - operator-framework/operator-marketplace
+    - operator-framework/operator-registry
   - labels:
     - lgtm
     - approved
@@ -1753,7 +1747,6 @@ tide:
     - openshift-priv/build-machinery-go
     - openshift-priv/cloud-provider-openstack
     - openshift-priv/csi-driver-manila-operator
-    - openshift-priv/debug-network
     - openshift-priv/elasticsearch-proxy
     - openshift-priv/kubernetes-nmstate
     - openshift-priv/library-go
@@ -1761,8 +1754,6 @@ tide:
     - openshift-priv/openshift-tests-private
     - openshift-priv/osd-metrics-exporter
     - openshift-priv/osin
-    - openshift-priv/windows-machine-config-bootstrapper
-    - openshift-priv/windows-machine-config-operator
     - openshift-psap/ci-artifacts
     - openshift-psap/special-resource-operator
     - openshift-psap/wireguard-worker
@@ -1788,7 +1779,6 @@ tide:
     - openshift/csi-driver-manila-operator
     - openshift/custom-domains-operator
     - openshift/deadmanssnitch-operator
-    - openshift/debug-network
     - openshift/dedicated-admin-operator
     - openshift/docker-distribution
     - openshift/elasticsearch-proxy
@@ -1816,13 +1806,14 @@ tide:
     - openshift/managed-upgrade-operator
     - openshift/managed-velero-operator
     - openshift/must-gather-operator
+    - openshift/okd-machine-os
     - openshift/online-registration
     - openshift/openshift-gitops-examples
     - openshift/openshift-tests
     - openshift/openshift-tests-private
     - openshift/os
     - openshift/osd-metrics-exporter
-    - openshift/osd-utils-cli
+    - openshift/osdctl
     - openshift/osde2e
     - openshift/osde2e-private-providers
     - openshift/ose
@@ -1848,8 +1839,6 @@ tide:
     - openshift/tektoncd-pipeline-operator
     - openshift/tektoncd-triggers
     - openshift/verification-tests
-    - openshift/windows-machine-config-bootstrapper
-    - openshift/windows-machine-config-operator
   - labels:
     - lgtm
     - approved
@@ -1865,7 +1854,6 @@ tide:
     - codeready-toolchain/registration-service
     - codeready-toolchain/toolchain-common
     - codeready-toolchain/toolchain-e2e
-    - codeready-toolchain/toolchain-operator
     - containers/buildah
     - containers/common
     - containers/conmon
@@ -1874,7 +1862,6 @@ tide:
     - coreos/bootupd
     - coreos/coreos-assembler
     - coreos/rpm-ostree
-    - fabric8-services/toolchain-operator
     - integr8ly/ansible-tower-configuration
     - integr8ly/application-monitoring-operator
     - integr8ly/cloud-resource-operator
@@ -1908,6 +1895,7 @@ tide:
     - openshift/odo-init-image
     - operator-framework/operator-lib
     - ostreedev/ostree
+    - red-hat-data-services/opendatahub-operator
     - redhat-developer/gitops-operator
     - redhat-developer/jenkins-operator
     - redhat-developer/jenkins-operator-bundle
@@ -2193,6 +2181,22 @@ tide:
     - openshift/ocp-release-operator-sdk
     - openshift/service-ca-operator
   - includedBranches:
+    - master
+    labels:
+    - lgtm
+    - approved
+    missingLabels:
+    - needs-rebase
+    - do-not-merge/hold
+    - do-not-merge/work-in-progress
+    - do-not-merge/invalid-owners-file
+    - bugzilla/invalid-bug
+    repos:
+    - openshift-priv/console
+    - openshift-priv/console-operator
+    - openshift/console
+    - openshift/console-operator
+  - includedBranches:
     - release-4.0
     - release-4.1
     - release-4.2
@@ -2222,7 +2226,6 @@ tide:
     - openshift/gcp-pd-csi-driver
     - openshift/gcp-pd-csi-driver-operator
     - openshift/kubernetes
-    - openshift/okd-machine-os
     - openshift/special-resource-operator
     - openshift/vsphere-problem-detector
   - excludedBranches:
@@ -2401,6 +2404,37 @@ tide:
     repos:
     - openshift-priv/ocs-operator
     - openshift/ocs-operator
+  - excludedBranches:
+    - community-4.6
+    labels:
+    - lgtm
+    - approved
+    missingLabels:
+    - needs-rebase
+    - do-not-merge/hold
+    - do-not-merge/work-in-progress
+    - do-not-merge/invalid-owners-file
+    - bugzilla/invalid-bug
+    repos:
+    - openshift-priv/windows-machine-config-bootstrapper
+    - openshift-priv/windows-machine-config-operator
+    - openshift/windows-machine-config-bootstrapper
+    - openshift/windows-machine-config-operator
+  - includedBranches:
+    - community-4.6
+    labels:
+    - lgtm
+    - approved
+    missingLabels:
+    - needs-rebase
+    - do-not-merge/hold
+    - do-not-merge/work-in-progress
+    - do-not-merge/invalid-owners-file
+    repos:
+    - openshift-priv/windows-machine-config-bootstrapper
+    - openshift-priv/windows-machine-config-operator
+    - openshift/windows-machine-config-bootstrapper
+    - openshift/windows-machine-config-operator
   - labels:
     - lgtm
     missingLabels:

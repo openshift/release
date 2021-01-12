@@ -4,7 +4,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: codecov
     decorate: true
     name: pull-ci-azure-master-codecov
@@ -14,16 +14,15 @@ presubmits:
       containers:
       - args:
         - hack/tests/codecov.sh
-        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        image: registry.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources: {}
-      serviceAccountName: ci-operator
     trigger: (?m)^/test( | .* )codecov,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: e2e-applysecurityupdates
     decorate: true
     name: pull-ci-azure-master-e2e-applysecurityupdates
@@ -37,16 +36,22 @@ presubmits:
           value: \[ApplySecurityUpdates\]
         - name: TIMEOUT
           value: 120m
-        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        image: registry.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources: {}
-      serviceAccountName: ci-operator
+        volumeMounts:
+        - mountPath: /secrets
+          name: secrets
+      volumes:
+      - name: secrets
+        secret:
+          secretName: cluster-secrets-azure
     trigger: (?m)^/test( | .* )e2e-applysecurityupdates,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: conformance
     decorate: true
     name: pull-ci-azure-master-e2e-azure-conformance
@@ -64,18 +69,24 @@ presubmits:
           value: "30"
         - name: TEST_SUITE
           value: openshift/conformance/parallel/minimal
-        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        image: registry.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources:
           requests:
             cpu: 10m
-      serviceAccountName: ci-operator
+        volumeMounts:
+        - mountPath: /secrets
+          name: secrets
+      volumes:
+      - name: secrets
+        secret:
+          secretName: cluster-secrets-azure
     trigger: (?m)^/test( | .* )conformance,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: e2e-carotation
     decorate: true
     name: pull-ci-azure-master-e2e-carotation
@@ -87,16 +98,22 @@ presubmits:
         env:
         - name: FOCUS
           value: \[CaRotation\]
-        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        image: registry.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources: {}
-      serviceAccountName: ci-operator
+        volumeMounts:
+        - mountPath: /secrets
+          name: secrets
+      volumes:
+      - name: secrets
+        secret:
+          secretName: cluster-secrets-azure
     trigger: (?m)^/test( | .* )e2e-carotation,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: e2e-changeloglevel
     decorate: true
     name: pull-ci-azure-master-e2e-changeloglevel
@@ -110,16 +127,22 @@ presubmits:
           value: \[ChangeLogLevel\]
         - name: TIMEOUT
           value: 90m
-        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        image: registry.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources: {}
-      serviceAccountName: ci-operator
+        volumeMounts:
+        - mountPath: /secrets
+          name: secrets
+      volumes:
+      - name: secrets
+        secret:
+          secretName: cluster-secrets-azure
     trigger: (?m)^/test( | .* )e2e-changeloglevel,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: e2e-create-20190430
     decorate: true
     name: pull-ci-azure-master-e2e-create-20190430
@@ -133,16 +156,22 @@ presubmits:
           value: "2019-04-30"
         - name: FOCUS
           value: \[EveryPR\]
-        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        image: registry.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources: {}
-      serviceAccountName: ci-operator
+        volumeMounts:
+        - mountPath: /secrets
+          name: secrets
+      volumes:
+      - name: secrets
+        secret:
+          secretName: cluster-secrets-azure
     trigger: (?m)^/test( | .* )e2e-create-20190430,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: e2e-create-20190930
     decorate: true
     name: pull-ci-azure-master-e2e-create-20190930
@@ -156,16 +185,22 @@ presubmits:
           value: 2019-09-30-preview
         - name: FOCUS
           value: \[EveryPR\]
-        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        image: registry.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources: {}
-      serviceAccountName: ci-operator
+        volumeMounts:
+        - mountPath: /secrets
+          name: secrets
+      volumes:
+      - name: secrets
+        secret:
+          secretName: cluster-secrets-azure
     trigger: (?m)^/test( | .* )e2e-create-20190930,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: e2e-create-20191027-private
     decorate: true
     name: pull-ci-azure-master-e2e-create-20191027-private
@@ -181,16 +216,22 @@ presubmits:
           value: \[EveryPR\]
         - name: PRIVATE_API_SERVER
           value: "true"
-        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        image: registry.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources: {}
-      serviceAccountName: ci-operator
+        volumeMounts:
+        - mountPath: /secrets
+          name: secrets
+      volumes:
+      - name: secrets
+        secret:
+          secretName: cluster-secrets-azure
     trigger: (?m)^/test( | .* )e2e-create-20191027-private,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: e2e-create-20191027-public
     decorate: true
     name: pull-ci-azure-master-e2e-create-20191027-public
@@ -204,16 +245,22 @@ presubmits:
           value: 2019-10-27-preview
         - name: FOCUS
           value: \[EveryPR\]
-        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        image: registry.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources: {}
-      serviceAccountName: ci-operator
+        volumeMounts:
+        - mountPath: /secrets
+          name: secrets
+      volumes:
+      - name: secrets
+        secret:
+          secretName: cluster-secrets-azure
     trigger: (?m)^/test( | .* )e2e-create-20191027-public,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: e2e-etcdbackuprecovery
     decorate: true
     name: pull-ci-azure-master-e2e-etcdbackuprecovery
@@ -225,16 +272,22 @@ presubmits:
         env:
         - name: FOCUS
           value: \[EtcdBackupRecovery\]
-        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        image: registry.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources: {}
-      serviceAccountName: ci-operator
+        volumeMounts:
+        - mountPath: /secrets
+          name: secrets
+      volumes:
+      - name: secrets
+        secret:
+          secretName: cluster-secrets-azure
     trigger: (?m)^/test( | .* )e2e-etcdbackuprecovery,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: e2e-forceupdate
     decorate: true
     name: pull-ci-azure-master-e2e-forceupdate
@@ -246,16 +299,22 @@ presubmits:
         env:
         - name: FOCUS
           value: \[ForceUpdate\]
-        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        image: registry.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources: {}
-      serviceAccountName: ci-operator
+        volumeMounts:
+        - mountPath: /secrets
+          name: secrets
+      volumes:
+      - name: secrets
+        secret:
+          secretName: cluster-secrets-azure
     trigger: (?m)^/test( | .* )e2e-forceupdate,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: e2e-keyrotation
     decorate: true
     name: pull-ci-azure-master-e2e-keyrotation
@@ -267,16 +326,22 @@ presubmits:
         env:
         - name: FOCUS
           value: \[KeyRotation\]
-        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        image: registry.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources: {}
-      serviceAccountName: ci-operator
+        volumeMounts:
+        - mountPath: /secrets
+          name: secrets
+      volumes:
+      - name: secrets
+        secret:
+          secretName: cluster-secrets-azure
     trigger: (?m)^/test( | .* )e2e-keyrotation,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: e2e-reimagevm
     decorate: true
     name: pull-ci-azure-master-e2e-reimagevm
@@ -288,16 +353,22 @@ presubmits:
         env:
         - name: FOCUS
           value: \[ReimageVM\]
-        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        image: registry.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources: {}
-      serviceAccountName: ci-operator
+        volumeMounts:
+        - mountPath: /secrets
+          name: secrets
+      volumes:
+      - name: secrets
+        secret:
+          secretName: cluster-secrets-azure
     trigger: (?m)^/test( | .* )e2e-reimagevm,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: e2e-scaleupdown
     decorate: true
     name: pull-ci-azure-master-e2e-scaleupdown
@@ -309,16 +380,22 @@ presubmits:
         env:
         - name: FOCUS
           value: \[ScaleUpDown\]
-        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        image: registry.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources: {}
-      serviceAccountName: ci-operator
+        volumeMounts:
+        - mountPath: /secrets
+          name: secrets
+      volumes:
+      - name: secrets
+        secret:
+          secretName: cluster-secrets-azure
     trigger: (?m)^/test( | .* )e2e-scaleupdown,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: unit
     decorate: true
     name: pull-ci-azure-master-unit
@@ -328,16 +405,15 @@ presubmits:
       - args:
         - make
         - unit
-        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        image: registry.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources: {}
-      serviceAccountName: ci-operator
     trigger: (?m)^/test( | .* )unit,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: upgrade-private-v15.0
     decorate: true
     name: pull-ci-azure-master-upgrade-private-v15.0
@@ -352,16 +428,22 @@ presubmits:
           value: 2019-10-27-preview
         - name: PRIVATE_API_SERVER
           value: "true"
-        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        image: registry.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources: {}
-      serviceAccountName: ci-operator
+        volumeMounts:
+        - mountPath: /secrets
+          name: secrets
+      volumes:
+      - name: secrets
+        secret:
+          secretName: cluster-secrets-azure
     trigger: (?m)^/test( | .* )upgrade-private-v15.0,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: upgrade-private-v16.1
     decorate: true
     name: pull-ci-azure-master-upgrade-private-v16.1
@@ -376,16 +458,22 @@ presubmits:
           value: 2019-10-27-preview
         - name: PRIVATE_API_SERVER
           value: "true"
-        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        image: registry.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources: {}
-      serviceAccountName: ci-operator
+        volumeMounts:
+        - mountPath: /secrets
+          name: secrets
+      volumes:
+      - name: secrets
+        secret:
+          secretName: cluster-secrets-azure
     trigger: (?m)^/test( | .* )upgrade-private-v16.1,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: upgrade-private-v17.0
     decorate: true
     name: pull-ci-azure-master-upgrade-private-v17.0
@@ -400,16 +488,22 @@ presubmits:
           value: 2019-10-27-preview
         - name: PRIVATE_API_SERVER
           value: "true"
-        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        image: registry.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources: {}
-      serviceAccountName: ci-operator
+        volumeMounts:
+        - mountPath: /secrets
+          name: secrets
+      volumes:
+      - name: secrets
+        secret:
+          secretName: cluster-secrets-azure
     trigger: (?m)^/test( | .* )upgrade-private-v17.0,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: upgrade-private-v19.0
     decorate: true
     name: pull-ci-azure-master-upgrade-private-v19.0
@@ -424,16 +518,22 @@ presubmits:
           value: 2019-10-27-preview
         - name: PRIVATE_API_SERVER
           value: "true"
-        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        image: registry.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources: {}
-      serviceAccountName: ci-operator
+        volumeMounts:
+        - mountPath: /secrets
+          name: secrets
+      volumes:
+      - name: secrets
+        secret:
+          secretName: cluster-secrets-azure
     trigger: (?m)^/test( | .* )upgrade-private-v19.0,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: upgrade-private-v20.0
     decorate: true
     name: pull-ci-azure-master-upgrade-private-v20.0
@@ -448,16 +548,22 @@ presubmits:
           value: 2019-10-27-preview
         - name: PRIVATE_API_SERVER
           value: "true"
-        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        image: registry.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources: {}
-      serviceAccountName: ci-operator
+        volumeMounts:
+        - mountPath: /secrets
+          name: secrets
+      volumes:
+      - name: secrets
+        secret:
+          secretName: cluster-secrets-azure
     trigger: (?m)^/test( | .* )upgrade-private-v20.0,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: upgrade-v15.0
     decorate: true
     name: pull-ci-azure-master-upgrade-v15.0
@@ -467,16 +573,22 @@ presubmits:
       - args:
         - hack/tests/e2e-upgrade.sh
         - v15.0
-        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        image: registry.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources: {}
-      serviceAccountName: ci-operator
+        volumeMounts:
+        - mountPath: /secrets
+          name: secrets
+      volumes:
+      - name: secrets
+        secret:
+          secretName: cluster-secrets-azure
     trigger: (?m)^/test( | .* )upgrade-v15.0,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: upgrade-v16.1
     decorate: true
     name: pull-ci-azure-master-upgrade-v16.1
@@ -486,16 +598,22 @@ presubmits:
       - args:
         - hack/tests/e2e-upgrade.sh
         - v16.1
-        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        image: registry.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources: {}
-      serviceAccountName: ci-operator
+        volumeMounts:
+        - mountPath: /secrets
+          name: secrets
+      volumes:
+      - name: secrets
+        secret:
+          secretName: cluster-secrets-azure
     trigger: (?m)^/test( | .* )upgrade-v16.1,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: upgrade-v17.0
     decorate: true
     name: pull-ci-azure-master-upgrade-v17.0
@@ -505,16 +623,22 @@ presubmits:
       - args:
         - hack/tests/e2e-upgrade.sh
         - v17.0
-        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        image: registry.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources: {}
-      serviceAccountName: ci-operator
+        volumeMounts:
+        - mountPath: /secrets
+          name: secrets
+      volumes:
+      - name: secrets
+        secret:
+          secretName: cluster-secrets-azure
     trigger: (?m)^/test( | .* )upgrade-v17.0,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: upgrade-v19.0
     decorate: true
     name: pull-ci-azure-master-upgrade-v19.0
@@ -524,16 +648,22 @@ presubmits:
       - args:
         - hack/tests/e2e-upgrade.sh
         - v19.0
-        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        image: registry.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources: {}
-      serviceAccountName: ci-operator
+        volumeMounts:
+        - mountPath: /secrets
+          name: secrets
+      volumes:
+      - name: secrets
+        secret:
+          secretName: cluster-secrets-azure
     trigger: (?m)^/test( | .* )upgrade-v19.0,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: upgrade-v20.0
     decorate: true
     name: pull-ci-azure-master-upgrade-v20.0
@@ -543,16 +673,22 @@ presubmits:
       - args:
         - hack/tests/e2e-upgrade.sh
         - v20.0
-        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        image: registry.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources: {}
-      serviceAccountName: ci-operator
+        volumeMounts:
+        - mountPath: /secrets
+          name: secrets
+      volumes:
+      - name: secrets
+        secret:
+          secretName: cluster-secrets-azure
     trigger: (?m)^/test( | .* )upgrade-v20.0,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: vmimage
     decorate: true
     name: pull-ci-azure-master-vmimage
@@ -562,16 +698,22 @@ presubmits:
       - args:
         - make
         - vmimage
-        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        image: registry.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources: {}
-      serviceAccountName: ci-operator
+        volumeMounts:
+        - mountPath: /secrets
+          name: secrets
+      volumes:
+      - name: secrets
+        secret:
+          secretName: cluster-secrets-azure
     trigger: (?m)^/test( | .* )vmimage,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -629,8 +771,7 @@ presubmits:
       - args:
         - make
         - verify
-        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        image: registry.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources: {}
-      serviceAccountName: ci-operator
     trigger: (?m)^/test( | .* )verify,?($|\s.*)

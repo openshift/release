@@ -16,17 +16,6 @@ tag_specification:
   name: "4.6"
   namespace: ocp
 tests:
-- as: lint
-  commands: VERBOSE=2 make lint
-  container:
-    from: src
-- as: unit
-  commands: VERBOSE=2 make test-unit-with-coverage upload-codecov-report
-  container:
-    from: src
-  secret:
-    mount_path: /usr/local/redhat-developer-service-binding-operator-codecov-token
-    name: redhat-developer-service-binding-operator-codecov-token
 - as: acceptance
   steps:
     cluster_profile: aws
@@ -34,6 +23,19 @@ tests:
     - as: test
       cli: latest
       commands: VERBOSE=2 make -k test-acceptance test-acceptance-artifacts
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: validate-master-build
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: VERBOSE=2 make -k test-acceptance-with-bundle test-acceptance-artifacts
       from: src
       resources:
         requests:

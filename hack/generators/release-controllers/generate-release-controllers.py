@@ -101,6 +101,24 @@ class Context:
         self.rc_route_name = f'release-controller-{self.is_namespace}'
         self.rc_service_name = self.rc_route_name
 
+        # Routes on the api.ci cluster
+        # release-controller
+        self.rc_api_url = f'{self.rc_hostname}.{self.config.rc_release_domain}'
+        # files-cache
+        self.fc_api_url = f'{self.hostname_artifacts}.{self.config.rc_release_domain}'
+
+        # Routes on the app.ci cluster
+        # release-controller
+        self.rc_app_url = f'{self.rc_hostname}.{self.config.rc_deployment_domain}'
+        # files-cache
+        self.fc_app_url = f'{self.hostname_artifacts}.{self.config.rc_deployment_domain}'
+
+    def get_supported_architecture_name(self):
+        name = 'amd64'
+        if self.arch not in ('amd64', 'x86_64'):
+            name = self.arch
+        return name
+
 
 def run(git_clone_dir, bump=False):
 
@@ -115,6 +133,8 @@ def run(git_clone_dir, bump=False):
 
             with genlib.GenDoc(config.paths.path_rc_deployments.joinpath(f'deploy-{context.is_namespace}-controller.yaml'), context) as gendoc:
                 content.add_osd_rc_deployments(gendoc)
+                content.add_osd_files_cache_service_account_resources(gendoc)
+                content.add_osd_files_cache_resources(gendoc)
 
             with genlib.GenDoc(config.paths.path_rc_release_resources.joinpath(f'admin_config_updater_rbac{context.suffix}.yaml'), context) as gendoc:
                 content.add_art_namespace_config_updater_rbac(gendoc)
@@ -123,7 +143,7 @@ def run(git_clone_dir, bump=False):
                 content.add_imagestream_namespace_rbac(gendoc)
 
             with genlib.GenDoc(config.paths.path_rc_release_resources.joinpath(f'deploy-{context.is_namespace}-controller.yaml'), context) as gendoc:
-                content.add_redirect_and_files_cache_resources(gendoc)
+                content.add_redirect_resources(gendoc)
 
     with genlib.GenDoc(config.paths.path_rc_deployments.joinpath('serviceaccount.yaml'), context=config) as gendoc:
         content.add_osd_rc_service_account_resources(gendoc)
@@ -131,7 +151,10 @@ def run(git_clone_dir, bump=False):
     with genlib.GenDoc(config.paths.path_rc_release_resources.joinpath('admin_deploy-ocp-publish-art.yaml'), context=config) as gendoc:
         content.add_art_publish(gendoc)
 
-    with genlib.GenDoc(config.paths.path_rc_release_resources.joinpath(f'rpms-ocp-3.11.yaml'), context=config) as gendoc:
+    with genlib.GenDoc(config.paths.path_rc_deployments.joinpath('admin_deploy-ocp-publish-art.yaml'), context=config) as gendoc:
+        content.add_art_publish(gendoc)
+
+    with genlib.GenDoc(config.paths.path_rc_release_resources.joinpath('rpms-ocp-3.11.yaml'), context=config) as gendoc:
         content.add_rpm_mirror_service(gendoc, git_clone_dir, '3.11')
 
     for major_minor in config.releases:
@@ -140,7 +163,7 @@ def run(git_clone_dir, bump=False):
 
         # If there is an annotation defined for the public release controller, use it as a template
         # for the private annotations.
-        for annotation_path in config.paths.path_rc_annotations.glob(f'release-ocp-*.json'):
+        for annotation_path in config.paths.path_rc_annotations.glob('release-ocp-*.json'):
             if annotation_path.name.endswith('ci.json'):  # There are no CI annotations for the private controllers
                 continue
             if '-stable' in annotation_path.name:  # There are no stable streams in private release controllers
