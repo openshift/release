@@ -188,14 +188,34 @@ tag_specification:
 test_binary_build_commands: make test-install
 tests:
 - as: e2e-aws-ocp-47
-  commands: make test-e2e
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    env:
+      COMPUTE_NODE_TYPE: m4.xlarge
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: e2e-aws-ocp-47-continuous
-  commands: make test-e2e
   cron: 0 */12 * * 1-5
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    env:
+      COMPUTE_NODE_TYPE: m4.xlarge
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: release-v0.18.0
   org: openshift
