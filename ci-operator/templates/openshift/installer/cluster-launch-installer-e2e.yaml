@@ -28,6 +28,8 @@ parameters:
   required: false
 - name: CLUSTER_VARIANT
 - name: USE_LEASE_CLIENT
+- name: KUBELET_LOG_LEVEL
+  required: false
 
 objects:
 
@@ -385,6 +387,8 @@ objects:
         value: ${CLUSTER_VARIANT}
       - name: BASE_DOMAIN
         value: ${BASE_DOMAIN}
+      - name: KUBELET_LOG_LEVEL
+        value: ${KUBELET_LOG_LEVEL}
       - name: SSH_PRIV_KEY_PATH
         value: /etc/openshift-installer/ssh-privatekey
       - name: SSH_PUB_KEY_PATH
@@ -804,6 +808,34 @@ objects:
         wait "$!"
 
         manifests=${ARTIFACT_DIR}/installer/manifests/
+
+        if [[ -n "${KUBELET_LOG_LEVEL}" ]]; then
+          # masters
+          cat > ${manifests}/99-kubelet-loglevel-masters.yml <<EOF
+          apiVersion: machineconfiguration.openshift.io/v1
+          kind: KubeletConfig
+          metadata:
+            name: set-kubelet-log-level-master
+          spec:
+            logLevel: ${KUBELET_LOG_LEVEL}
+            machineConfigPoolSelector:
+              matchLabels:
+                pools.operator.machineconfiguration.openshift.io/master: ""
+        EOF
+
+          # workers
+          cat > ${manifests}/99-kubelet-loglevel-workers.yml <<EOF
+          apiVersion: machineconfiguration.openshift.io/v1
+          kind: KubeletConfig
+          metadata:
+            name: set-kubelet-log-level-worker
+          spec:
+            logLevel: ${KUBELET_LOG_LEVEL}
+            machineConfigPoolSelector:
+              matchLabels:
+                pools.operator.machineconfiguration.openshift.io/worker: ""
+        EOF
+        fi
 
         sed -i '/^  channel:/d' ${manifests}/cvo-overrides.yaml
 
