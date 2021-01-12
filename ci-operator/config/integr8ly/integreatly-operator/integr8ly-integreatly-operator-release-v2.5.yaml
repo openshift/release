@@ -62,9 +62,19 @@ tests:
   container:
     from: src
 - as: e2e
-  commands: make test/e2e/prow
-  openshift_installer_src:
+  steps:
     cluster_profile: aws
+    env:
+      COMPUTE_NODE_TYPE: m4.xlarge
+    test:
+    - as: test
+      cli: latest
+      commands: make test/e2e/prow
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: manifest
   commands: make manifest/check
   container:
