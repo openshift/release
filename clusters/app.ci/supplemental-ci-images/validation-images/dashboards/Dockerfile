@@ -1,4 +1,4 @@
-FROM registry.svc.ci.openshift.org/openshift/release:golang-1.13
+FROM registry.ci.openshift.org/openshift/release:golang-1.13
 
 # Install jsonnet
 RUN yum install -y yum-plugin-copr && yum copr enable paulfantom/jsonnet -y && \
