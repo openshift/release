@@ -9,7 +9,7 @@ curl -sSL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/opens
 export HOME=/tmp
 export PATH=${PATH}:/tmp
 export JOB_TIMEOUT=${JOB_TIMEOUT:-1800}
-export REMOTE_CONFIG=https://github.com/cloud-bulldozer/cluster-perf-ci/raw/master/configmap-scale.yml
+export REMOTE_CONFIG=https://raw.githubusercontent.com/cloud-bulldozer/cluster-perf-ci/master/configmap-scale.yml
 export REMOTE_METRIC_PROFILE=https://raw.githubusercontent.com/cloud-bulldozer/cluster-perf-ci/master/metric-profiles/etcdapi.yml
 export REMOTE_ALERT_PROFILE=https://raw.githubusercontent.com/cloud-bulldozer/cluster-perf-ci/master/alert-profiles/etcdapi-alerts.yml
 
