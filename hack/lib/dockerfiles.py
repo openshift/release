@@ -113,12 +113,12 @@ for root, dirs, files in os.walk(base):
         lines = ["%s" % line for line in existing]
         extra = [
           "",
-          "FROM registry.svc.ci.openshift.org/%s/%s:%s AS builder" % (builder["namespace"], builder["name"], builder["tag"]),
+          "FROM registry.ci.openshift.org/%s/%s:%s AS builder" % (builder["namespace"], builder["name"], builder["tag"]),
           "WORKDIR /go/src/%s" % cfg["canonical_go_repository"],
           "COPY . .",
           "RUN # go build -o BINARY ./PATH",
           "",
-          "FROM registry.svc.ci.openshift.org/%s/%s:%s" % (base_image["namespace"], base_image["name"], base_image["tag"]),
+          "FROM registry.ci.openshift.org/%s/%s:%s" % (base_image["namespace"], base_image["name"], base_image["tag"]),
           "RUN INSTALL_PKGS=\" \\",
           "      \\",
           "      \" && \\",

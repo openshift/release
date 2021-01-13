@@ -15,7 +15,7 @@ compute:
 - name: worker
   platform:
     azure:
-      type: Standard_D4s_v3
+      type: ${COMPUTE_NODE_TYPE}
 platform:
   azure:
     baseDomainResourceGroupName: os4-common

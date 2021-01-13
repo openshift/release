@@ -47,6 +47,7 @@ def add_imagestream_namespace_rbac(gendoc):
         'apiVersion': 'rbac.authorization.k8s.io/v1beta1',
         'kind': 'RoleBinding',
         'metadata': {
+            'apiGroup': 'rbac.authorization.k8s.io',
             'name': 'user-viewer',
             'namespace': context.is_namespace
         },
@@ -166,6 +167,7 @@ def add_imagestream_namespace_rbac(gendoc):
             'namespace': context.is_namespace,
         },
         'roleRef': {
+            'apiGroup': 'rbac.authorization.k8s.io',
             'kind': 'Role',
             'name': 'release-controller-modify'
         },
@@ -186,6 +188,7 @@ def add_imagestream_namespace_rbac(gendoc):
                 'namespace': 'openshift'
             },
             'roleRef': {
+                'apiGroup': 'rbac.authorization.k8s.io',
                 'kind': 'Role',
                 'name': 'release-controller-modify-ocp'
             },
@@ -204,6 +207,7 @@ def add_imagestream_namespace_rbac(gendoc):
                 'namespace': 'origin'
             },
             'roleRef': {
+                'apiGroup': 'rbac.authorization.k8s.io',
                 'kind': 'Role',
                 'name': 'release-controller-modify-ocp'
             },
@@ -222,6 +226,7 @@ def add_imagestream_namespace_rbac(gendoc):
             'namespace': context.is_namespace
         },
         'roleRef': {
+            'apiGroup': 'rbac.authorization.k8s.io',
             'kind': 'ClusterRole',
             'name': 'view'
         },
@@ -240,6 +245,7 @@ def add_imagestream_namespace_rbac(gendoc):
             'namespace': context.config.rc_deployment_namespace
         },
         'roleRef': {
+            'apiGroup': 'rbac.authorization.k8s.io',
             'kind': 'Role',
             'name': f'release-controller{context.suffix}-prowjob'
         },
@@ -266,6 +272,7 @@ def add_imagestream_namespace_rbac(gendoc):
             'namespace': context.jobs_namespace,
         },
         'roleRef': {
+            'apiGroup': 'rbac.authorization.k8s.io',
             'kind': 'ClusterRole',
             'name': 'edit'
         },
@@ -284,6 +291,7 @@ def add_imagestream_namespace_rbac(gendoc):
             'namespace': context.is_namespace,
         },
         'roleRef': {
+            'apiGroup': 'rbac.authorization.k8s.io',
             'kind': 'ClusterRole',
             'name': 'system:image-builder'
         },
@@ -302,6 +310,7 @@ def add_imagestream_namespace_rbac(gendoc):
             'namespace': context.is_namespace,
         },
         'roleRef': {
+            'apiGroup': 'rbac.authorization.k8s.io',
             'kind': 'Role',
             'name': 'release-controller-import-ocp',
             'namespace': context.is_namespace,
