@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  annotations:
+    image.openshift.io/triggers: |
+      [
+        {"from":{"kind":"ImageStreamTag","name":"kvm-device-plugin:bin"},"fieldPath":"spec.template.spec.containers[?(@.name==\"kvm-device-plugin\")].image"}
+      ]
+  labels:
+    app: kvm-device-plugin
+  name: kvm-device-plugin
+  namespace: kvm-device-plugin
+spec:
+  selector:
+    matchLabels:
+      name: kvm-device-plugin
+  template:
+    metadata:
+      labels:
+        name: kvm-device-plugin
+    spec:
+      containers:
+      - name: kvm-device-plugin
+        image: kvm-device-plugin:latest
+        securityContext:
+          privileged: true
+        volumeMounts:
+          - name: device-plugin
+            mountPath: /var/lib/kubelet/device-plugins
+      volumes:
+        - name: device-plugin
+          hostPath:
+            path: /var/lib/kubelet/device-plugins
