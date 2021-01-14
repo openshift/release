@@ -90,6 +90,7 @@ items:
           - --jira-endpoint=https://issues.redhat.com
           - --jira-username=dptp-bot
           - --jira-password-file=/etc/jira/password
+          - --projected-token-file=/var/sa-token/token
           env:
           # Multiple configs can only be passed via the env var and not via the flag
           - name: KUBECONFIG
@@ -100,6 +101,8 @@ items:
             - name: metrics
               containerPort: 9090
           volumeMounts:
+          - name: service-account-token
+            mountPath: /var/sa-token
           - name: hmac
             mountPath: /etc/webhook
             readOnly: true
@@ -174,6 +177,11 @@ items:
               path: /healthz/ready
               port: 8081
         volumes:
+        - name: service-account-token
+          projected:
+            sources:
+            - serviceAccountToken:
+                path: token
         - name: hmac
           secret:
             secretName: github-webhook-credentials

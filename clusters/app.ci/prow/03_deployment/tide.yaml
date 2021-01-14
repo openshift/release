@@ -60,12 +60,15 @@ items:
           - --gcs-credentials-file=/etc/service-account/service-account.json
           - --history-uri=gs://openshift-prow/tide-history.json
           - --status-path=gs://openshift-prow/tide-status-checkpoint.yaml
+          - --projected-token-file=/var/sa-token/token
           ports:
           - name: main
             containerPort: 8888
           - name: metrics
             containerPort: 9090
           volumeMounts:
+          - name: service-account-token
+            mountPath: /var/sa-token
           - name: oauth
             mountPath: /etc/github
             readOnly: true
@@ -115,6 +118,11 @@ items:
               memory: "3Gi"
               cpu: "750m"
         volumes:
+        - name: service-account-token
+          projected:
+            sources:
+            - serviceAccountToken:
+                path: token
         - name: oauth
           secret:
             secretName: github-credentials-openshift-merge-robot

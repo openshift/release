@@ -66,12 +66,15 @@ items:
           - --dry-run=false
           - --skip-report=true
           - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+          - --projected-token-file=/var/sa-token/token
           ports:
           - name: main
             containerPort: 8080
           - name: metrics
             containerPort: 9090
           volumeMounts:
+          - name: service-account-token
+            mountPath: /var/sa-token
           - mountPath: /etc/jenkins
             name: jenkins
             readOnly: true
@@ -113,6 +116,11 @@ items:
               memory: "250Mi"
               cpu: "100m"
         volumes:
+        - name: service-account-token
+          projected:
+            sources:
+            - serviceAccountToken:
+                path: token
         - name: jenkins
           secret:
             defaultMode: 420

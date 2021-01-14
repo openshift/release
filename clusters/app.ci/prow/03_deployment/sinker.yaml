@@ -29,6 +29,7 @@ items:
           args:
           - --config-path=/etc/config/config.yaml
           - --job-config-path=/etc/job-config
+          - --projected-token-file=/var/sa-token/token
           - --dry-run=false
           env:
           # Multiple configs can only be passed via the env var and not via the flag
@@ -38,6 +39,8 @@ items:
           - name: metrics
             containerPort: 9090
           volumeMounts:
+          - name: service-account-token
+            mountPath: /var/sa-token
           - name: config
             mountPath: /etc/config
             readOnly: true
@@ -82,6 +85,11 @@ items:
               memory: "1.8Gi"
               cpu: "50m"
         volumes:
+        - name: service-account-token
+          projected:
+            sources:
+            - serviceAccountToken:
+                path: token
         - name: config
           configMap:
             name: config

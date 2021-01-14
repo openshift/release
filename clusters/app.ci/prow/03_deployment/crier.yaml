@@ -89,11 +89,14 @@ items:
           - --kubernetes-blob-storage-workers=10
           - --slack-workers=5
           - --slack-token-file=/etc/slack/oauth
+          - --projected-token-file=/var/sa-token/token
           env:
           # Multiple configs can only be passed via the env var and not via the flag
           - name: KUBECONFIG
             value: /etc/build-farm-credentials/api.ci.kubeconfig:/etc/build-farm-credentials/build01.kubeconfig:/etc/build-farm-credentials/app.ci.kubeconfig:/etc/build-farm-credentials/build02.kubeconfig:/etc/build-farm-credentials/vsphere.kubeconfig
           volumeMounts:
+          - name: service-account-token
+            mountPath: /var/sa-token
           - name: oauth
             mountPath: /etc/github
             readOnly: true
@@ -147,6 +150,11 @@ items:
               memory: "4Gi"
               cpu: "600m"
         volumes:
+        - name: service-account-token
+          projected:
+            sources:
+            - serviceAccountToken:
+                path: token
         - name: oauth
           secret:
             secretName: github-credentials-openshift-merge-robot
@@ -280,6 +288,7 @@ items:
           - --kubernetes-blob-storage-workers=10
           - --slack-workers=5
           - --slack-token-file=/etc/slack/oauth
+          - --projected-token-file=/var/sa-token/token
           env:
           # Multiple configs can only be passed via the env var and not via the flag
           - name: KUBECONFIG
@@ -290,6 +299,8 @@ items:
                 name: openshift-prow-github-app
                 key: appid
           volumeMounts:
+          - name: service-account-token
+            mountPath: /var/sa-token
           - name: github-app-credentials
             mountPath: /etc/github
             readOnly: true
@@ -343,6 +354,11 @@ items:
               memory: "4Gi"
               cpu: "600m"
         volumes:
+        - name: service-account-token
+          projected:
+            sources:
+            - serviceAccountToken:
+                path: token
         - name: github-app-credentials
           secret:
             secretName: openshift-prow-github-app

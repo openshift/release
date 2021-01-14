@@ -28,9 +28,12 @@ items:
           args:
           - --config-path=/etc/config/config.yaml
           - --job-config-path=/etc/job-config
+          - --projected-token-file=/var/sa-token/token
           - --dry-run=false
           image: gcr.io/k8s-prow/horologium:v20210114-14c707557a
           volumeMounts:
+          - name: service-account-token
+            mountPath: /var/sa-token
           - name: config
             mountPath: /etc/config
             readOnly: true
@@ -72,6 +75,11 @@ items:
               memory: "1.5Gi"
               cpu: "150m"
         volumes:
+        - name: service-account-token
+          projected:
+            sources:
+            - serviceAccountToken:
+                path: token
         - name: config
           configMap:
             name: config
