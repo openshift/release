@@ -935,58 +935,58 @@ presubmits:
     rerun_command: /test e2e-ovirt
     spec:
       containers:
-        - args:
-            - --gcs-upload-secret=/secrets/gcs/service-account.json
-            - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-            - --lease-server-password-file=/etc/boskos/password
-            - --report-password-file=/etc/report/password.txt
-            - --report-username=ci
-            - --secret-dir=/usr/local/e2e-ovirt-cluster-profile
-            - --target=e2e-ovirt
-          command:
-            - ci-operator
-          image: ci-operator:latest
-          imagePullPolicy: Always
-          name: ""
-          resources:
-            requests:
-              cpu: 10m
-          volumeMounts:
-            - mountPath: /etc/boskos
-              name: boskos
-              readOnly: true
-            - mountPath: /usr/local/e2e-ovirt-cluster-profile
-              name: cluster-profile
-            - mountPath: /secrets/gcs
-              name: gcs-credentials
-              readOnly: true
-            - mountPath: /etc/pull-secret
-              name: pull-secret
-              readOnly: true
-            - mountPath: /etc/report
-              name: result-aggregator
-              readOnly: true
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-password-file=/etc/boskos/password
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --secret-dir=/usr/local/e2e-ovirt-cluster-profile
+        - --target=e2e-ovirt
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-ovirt-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
       serviceAccountName: ci-operator
       volumes:
-        - name: boskos
-          secret:
-            items:
-              - key: password
-                path: password
-            secretName: boskos-credentials
-        - name: cluster-profile
-          projected:
-            sources:
-              - secret:
-                  name: cluster-secrets-ovirt
-              - configMap:
-                  name: cluster-profile-ovirt
-        - name: pull-secret
-          secret:
-            secretName: registry-pull-credentials
-        - name: result-aggregator
-          secret:
-            secretName: result-aggregator
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-ovirt
+          - configMap:
+              name: cluster-profile-ovirt
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-ovirt,?($|\s.*)
   - agent: kubernetes
     always_run: true
