@@ -100,6 +100,7 @@ objects:
           - --oauth-url=/github-login
           - --job-config-path=/etc/job-config
           - --spyglass=true
+          - --projected-token-file=/var/sa-token/token
           - --rerun-creates-job=true
           env:
           # Multiple configs can only be passed via the env var and not via the flag
@@ -124,6 +125,8 @@ objects:
             periodSeconds: 10
             timeoutSeconds: 600
           volumeMounts:
+          - name: service-account-token
+            mountPath: /var/sa-token
           - name: config
             mountPath: /etc/config
             readOnly: true
@@ -180,6 +183,11 @@ objects:
               memory: "5Gi"
               cpu: "500m"
         volumes:
+        - name: service-account-token
+          projected:
+            sources:
+            - serviceAccountToken:
+                path: token
         - name: config
           configMap:
             name: config
@@ -345,6 +353,7 @@ objects:
           - --spyglass=true
           - --cookie-secret=/etc/proxy/secrets/session_secret
           - --gcs-credentials-file=/etc/gce-sa-credentials-gcs-private/service-account.json
+          - --projected-token-file=/var/sa-token/token
           - --rerun-creates-job=true
           ports:
             - name: http
@@ -353,6 +362,8 @@ objects:
           - name: KUBECONFIG
             value: /etc/build-farm-credentials/api.ci.kubeconfig:/etc/build-farm-credentials/build01.kubeconfig:/etc/build-farm-credentials/app.ci.kubeconfig:/etc/build-farm-credentials/build02.kubeconfig:/etc/build-farm-credentials/vsphere.kubeconfig
           volumeMounts:
+          - name: service-account-token
+            mountPath: /var/sa-token
           - name: gce-sa-credentials-gcs-private
             mountPath: /etc/gce-sa-credentials-gcs-private
             readOnly: true
@@ -411,6 +422,11 @@ objects:
               memory: "3Gi"
               cpu: "600m"
         volumes:
+        - name: service-account-token
+          projected:
+            sources:
+            - serviceAccountToken:
+                path: token
         - name: config
           configMap:
             name: config

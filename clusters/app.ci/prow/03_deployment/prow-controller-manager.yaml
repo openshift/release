@@ -51,6 +51,7 @@ items:
           - --github-endpoint=http://ghproxy
           - --github-endpoint=https://api.github.com
           - --github-graphql-endpoint=http://ghproxy/graphql
+          - --projected-token-file=/var/sa-token/token
           env:
           # Multiple configs can only be passed via the env var and not via the flag
           - name: KUBECONFIG
@@ -59,6 +60,8 @@ items:
           - name: metrics
             containerPort: 9090
           volumeMounts:
+          - name: service-account-token
+            mountPath: /var/sa-token
           - name: oauth
             mountPath: /etc/github
             readOnly: true
@@ -106,6 +109,11 @@ items:
               memory: "4Gi"
               cpu: "600m"
         volumes:
+        - name: service-account-token
+          projected:
+            sources:
+            - serviceAccountToken:
+                path: token
         - name: oauth
           secret:
             secretName: github-credentials-openshift-ci-robot
