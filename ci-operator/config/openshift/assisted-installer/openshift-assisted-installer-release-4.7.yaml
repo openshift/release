@@ -1,0 +1,61 @@
+base_images:
+  openshift_release_golang-1.15:
+    name: release
+    namespace: openshift
+    tag: golang-1.15
+binary_build_commands: go mod vendor
+build_root:
+  project_image:
+    dockerfile_path: Dockerfile.assisted-installer-build
+images:
+- dockerfile_path: Dockerfile.assisted-installer
+  from: openshift_release_golang-1.15
+  inputs:
+    openshift_release_golang-1.15:
+      as:
+      - registry.svc.ci.openshift.org/openshift/release:golang-1.15
+  to: assisted-installer
+- dockerfile_path: Dockerfile.assisted-installer-controller
+  from: openshift_release_golang-1.15
+  inputs:
+    openshift_release_golang-1.15:
+      as:
+      - registry.svc.ci.openshift.org/openshift/release:golang-1.15
+  to: assisted-installer-controller
+- dockerfile_path: Dockerfile.assisted-installer-controller-ocp
+  from: openshift_release_golang-1.15
+  inputs:
+    openshift_release_golang-1.15:
+      as:
+      - registry.svc.ci.openshift.org/openshift/release:golang-1.15
+  to: assisted-installer-controller-ocp
+promotion:
+  disabled: true
+  name: "4.7"
+  namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.7"
+  namespace: ocp
+tests:
+- as: lint
+  commands: export GOLANGCI_LINT_CACHE=/tmp/golangci-cache make lint
+  container:
+    from: bin
+- as: format-check
+  commands: make format-check
+  container:
+    from: bin
+- artifact_dir: /tmp/reports
+  as: unit-test
+  commands: make REPORTS=${ARTIFACT_DIR} unit-test
+  container:
+    from: bin
+zz_generated_metadata:
+  branch: release-4.7
+  org: openshift
+  repo: assisted-installer
