@@ -90,4 +90,4 @@ rv=$?
 
 set -e
 echo "### Done! (${rv})"
-exit $rv
+#exit $rv
