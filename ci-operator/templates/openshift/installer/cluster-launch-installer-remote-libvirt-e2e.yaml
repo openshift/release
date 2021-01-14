@@ -517,8 +517,12 @@ objects:
             yq write --inplace ${ARTIFACT_DIR}/installer/openshift/99_openshift-cluster-api_master-machines-${i}.yaml spec.providerSpec.value[domainMemory] 16384
         done
 
-        # Bump the libvirt workers memory to 8GB
-        yq write --inplace ${ARTIFACT_DIR}/installer/openshift/99_openshift-cluster-api_worker-machineset-0.yaml spec.template.spec.providerSpec.value[domainMemory] 8192
+        # Bump the libvirt workers memory to 16GB on Z, but default to 8GB
+        worker_memory=8192
+        if [[ "${ARCH}" = "s390x" ]]; then
+            worker_memory=16384
+        fi
+        yq write --inplace ${ARTIFACT_DIR}/installer/openshift/99_openshift-cluster-api_worker-machineset-0.yaml spec.template.spec.providerSpec.value[domainMemory] ${worker_memory}
 
         # Bump the libvirt workers disk to to 30GB
         yq write --inplace ${ARTIFACT_DIR}/installer/openshift/99_openshift-cluster-api_worker-machineset-0.yaml spec.template.spec.providerSpec.value.volume[volumeSize] 32212254720
