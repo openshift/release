@@ -225,8 +225,6 @@ objects:
         value: test
       - name: HOME
         value: /tmp
-      - name: MIRROR_BASE
-        value: registry.ci.openshift.org/${NAMESPACE}/release
       - name: INSTALL_INITIAL_RELEASE
       - name: RELEASE_IMAGE_INITIAL
       command:
@@ -256,6 +254,7 @@ objects:
           # mirror the release image and override the release image to point to the mirrored one
           mkdir /tmp/.docker && cp /etc/openshift-installer/pull-secret /tmp/.docker/config.json
           oc registry login
+          MIRROR_BASE=$( oc get is release -o 'jsonpath={.status.publicDockerImageRepository}' )
           oc adm release new --from-release ${RELEASE_IMAGE_LATEST} --to-image ${MIRROR_BASE}-scratch:release --mirror ${MIRROR_BASE}-scratch || echo 'ignore: the release could not be reproduced from its inputs'
           oc adm release mirror --from ${MIRROR_BASE}-scratch:release --to ${MIRROR_BASE} --to-release-image ${MIRROR_BASE}:mirrored
           RELEASE_PAYLOAD_IMAGE_SHA=$(oc get istag ${MIRROR_BASE##*/}:mirrored -o=jsonpath="{.image.metadata.name}")
