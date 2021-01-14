@@ -1,0 +1,52 @@
+postsubmits:
+  openshift/rbac-permissions-operator:
+  - agent: kubernetes
+    branches:
+    - ^master$
+    cluster: build02
+    decorate: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+    max_concurrency: 1
+    name: branch-ci-openshift-rbac-permissions-operator-master-publish-coverage
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --secret-dir=/secrets/rbac-permissions-operator-codecov-token
+        - --target=publish-coverage
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /secrets/rbac-permissions-operator-codecov-token
+          name: rbac-permissions-operator-codecov-token
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: rbac-permissions-operator-codecov-token
+        secret:
+          secretName: rbac-permissions-operator-codecov-token
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator

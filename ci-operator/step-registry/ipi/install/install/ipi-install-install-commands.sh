@@ -25,7 +25,7 @@ kubevirt) export KUBEVIRT_KUBECONFIG=${HOME}/.kube/config;;
 vsphere) ;;
 openstack) export OS_CLIENT_CONFIG_FILE=${CLUSTER_PROFILE_DIR}/clouds.yaml ;;
 openstack-vexxhost) export OS_CLIENT_CONFIG_FILE=${CLUSTER_PROFILE_DIR}/clouds.yaml ;;
-*) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"
+*) >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}'"
 esac
 
 dir=/tmp/installer
@@ -48,7 +48,7 @@ do
   cp "${item}" "${dir}/manifests/${manifest##manifest_}"
 done <   <( find "${SHARED_DIR}" -name "manifest_*.yml" -print0)
 
-TF_LOG=debug openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v password &
+TF_LOG=debug openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
 
 set +e
 wait "$!"
@@ -56,7 +56,12 @@ ret="$?"
 cp "${dir}"/log-bundle-*.tar.gz "${ARTIFACT_DIR}/" 2>/dev/null
 set -e
 
-sed 's/password: .*/password: REDACTED/' "${dir}/.openshift_install.log" >"${ARTIFACT_DIR}/.openshift_install.log"
+sed '
+  s/password: .*/password: REDACTED/;
+  s/X-Auth-Token.*/X-Auth-Token REDACTED/;
+  s/UserData:.*,/UserData: REDACTED,/;
+  ' "${dir}/.openshift_install.log" > "${ARTIFACT_DIR}/.openshift_install.log"
+
 cp \
     -t "${SHARED_DIR}" \
     "${dir}/auth/kubeconfig" \

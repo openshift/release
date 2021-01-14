@@ -5,121 +5,6 @@ presubmits:
     branches:
     - release-next
     cluster: build01
-    context: ci/prow/46-e2e-aws-ocp-46
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: "46"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-eventing-release-next-46-e2e-aws-ocp-46
-    path_alias: knative.dev/eventing
-    rerun_command: /test 46-e2e-aws-ocp-46
-    spec:
-      containers:
-      - args:
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
-        - --report-password-file=/etc/report/password.txt
-        - --report-username=ci
-        - --secret-dir=/usr/local/e2e-aws-ocp-46-cluster-profile
-        - --target=e2e-aws-ocp-46
-        - --variant=46
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/e2e-aws-ocp-46-cluster-profile
-          name: cluster-profile
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: password
-            path: password
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )46-e2e-aws-ocp-46,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-next
-    cluster: build01
-    context: ci/prow/46-images
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: "46"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-eventing-release-next-46-images
-    path_alias: knative.dev/eventing
-    rerun_command: /test 46-images
-    spec:
-      containers:
-      - args:
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-password-file=/etc/report/password.txt
-        - --report-username=ci
-        - --target=[images]
-        - --target=src
-        - --variant=46
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )46-images,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - release-next
-    cluster: build01
     context: ci/prow/47-e2e-aws-ocp-47
     decorate: true
     decoration_config:
@@ -134,6 +19,7 @@ presubmits:
     spec:
       containers:
       - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-password-file=/etc/boskos/password
         - --report-password-file=/etc/report/password.txt
@@ -155,6 +41,9 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/e2e-aws-ocp-47-cluster-profile
           name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -200,6 +89,7 @@ presubmits:
     spec:
       containers:
       - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
@@ -215,6 +105,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true

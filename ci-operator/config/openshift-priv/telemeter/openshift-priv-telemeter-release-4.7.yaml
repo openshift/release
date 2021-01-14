@@ -50,6 +50,10 @@ tests:
   commands: make lint test-unit
   container:
     from: src
+- as: format
+  commands: make test-format
+  container:
+    from: src
 - as: integration
   commands: make test-integration
   container:
@@ -59,10 +63,9 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws
 - as: e2e-aws-upgrade
-  commands: TEST_SUITE=all run-upgrade-tests
-  openshift_installer:
+  steps:
     cluster_profile: aws
-    upgrade: true
+    workflow: openshift-upgrade-aws
 - as: benchmark
   steps:
     cluster_profile: aws

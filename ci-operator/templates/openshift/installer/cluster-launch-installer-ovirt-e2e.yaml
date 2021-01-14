@@ -93,7 +93,7 @@ objects:
     containers:
 
     - name: lease
-      image: registry.svc.ci.openshift.org/ci/boskoscli:latest
+      image: registry.ci.openshift.org/ci/boskoscli:latest
       terminationMessagePolicy: FallbackToLogsOnError
       resources:
         requests:
@@ -246,6 +246,14 @@ objects:
 
         mkdir -p "${HOME}"
 
+        # Override the upstream docker.io registry due to issues with rate limiting
+        # https://bugzilla.redhat.com/show_bug.cgi?id=1895107
+        export KUBE_TEST_REPO_LIST=${HOME}/repo_list.yaml
+        cat << EOF > ${KUBE_TEST_REPO_LIST}
+        dockerLibraryRegistry: quay.io/sjenning
+        dockerGluster: quay.io/sjenning
+        EOF
+
         # Share oc with other containers
         cp "$(command -v oc)" /tmp/shared
 
@@ -282,13 +290,13 @@ objects:
         cd /tmp/output
 
         function run-upgrade-tests() {
-          openshift-tests run-upgrade "${TEST_SUITE}" --to-image "${IMAGE:-${RELEASE_IMAGE_LATEST}}" \
-            --options "${TEST_OPTIONS:-}" \
+          KUBE_TEST_REPO_LIST="${KUBE_TEST_REPO_LIST}" openshift-tests run-upgrade "${TEST_SUITE}" --to-image "${IMAGE:-${RELEASE_IMAGE_LATEST}}" \
+            --options "${TEST_UPGRADE_OPTIONS:-}" \
             --provider "${TEST_PROVIDER:-}" -o ${ARTIFACT_DIR}/e2e.log --junit-dir ${ARTIFACT_DIR}/junit
         }
 
         function run-tests() {
-          openshift-tests run "${TEST_SUITE}" \
+          KUBE_TEST_REPO_LIST="${KUBE_TEST_REPO_LIST}" openshift-tests run "${TEST_SUITE}" \
             --provider "${TEST_PROVIDER:-}" -o ${ARTIFACT_DIR}/e2e.log --junit-dir ${ARTIFACT_DIR}/junit
         }
 
@@ -301,8 +309,8 @@ objects:
         }
 
         function run-csi-tests() {
-          TEST_CSI_DRIVER_FILES="${TEST_CSI_DRIVER_FILES}" openshift-tests run "${TEST_SUITE}" \
-            --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
+          TEST_CSI_DRIVER_FILES="${TEST_CSI_DRIVER_FILES}" KUBE_TEST_REPO_LIST="${KUBE_TEST_REPO_LIST}" \
+          openshift-tests run "${TEST_SUITE}" --provider "${TEST_PROVIDER:-}" -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
         }
 
         # https://bugzilla.redhat.com/show_bug.cgi?id=1839463

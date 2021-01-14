@@ -9,18 +9,15 @@ build_root:
     name: release
     namespace: openshift
     tag: golang-1.13
-images:
-- dockerfile_path: openshift-ci/build-root/Dockerfile
-  from: bin
-  inputs:
-    cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-  to: oc-bin-image
 promotion:
   name: "4.6"
   namespace: ocp
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.6"
 resources:
   '*':
     limits:
@@ -36,18 +33,20 @@ resources:
     requests:
       cpu: "4"
       memory: 4Gi
-tag_specification:
-  name: "4.6"
-  namespace: ocp
 test_binary_build_commands: make test
 tests:
+- as: title-check
+  commands: make name-check
+  container:
+    from: src
 - as: e2e-aws
   steps:
     cluster_profile: aws
     test:
-    - as: e2e-test
+    - as: bin-test
+      cli: latest
       commands: ./bin/extended-platform-tests run openshift/conformance/parallel --run "High-24829"
-      from: oc-bin-image
+      from: bin
       resources:
         requests:
           cpu: "2"

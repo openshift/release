@@ -1,0 +1,97 @@
+base_images:
+  cli:
+    name: "4.7"
+    namespace: ocp
+    tag: cli
+  cli-jq:
+    name: cli-jq
+    namespace: ocp
+    tag: latest
+  operator-registry:
+    name: "4.7"
+    namespace: ocp
+    tag: operator-registry
+build_root:
+  project_image:
+    dockerfile_path: .ci/openshift-ci/Dockerfile
+images:
+- dockerfile_path: Dockerfile
+  to: che-operator-image
+operator:
+  bundles:
+  - context_dir: deploy/olm-catalog/eclipse-che-preview-openshift
+    dockerfile_path: bundle.Dockerfile
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.7"
+  namespace: ocp
+tests:
+- as: che-operator-olm-nightly-deployment
+  steps:
+    cluster_profile: aws
+    env:
+      OO_CHANNEL: nightly
+      OO_INSTALL_NAMESPACE: eclipse-che
+      OO_PACKAGE: eclipse-che-preview-openshift
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: olm-nightly-deployment
+      commands: |
+        export PATH=$PATH:/tmp/bin
+        mkdir -p /tmp/bin
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.6/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
+        chmod ug+x /tmp/bin/oc
+
+        echo -e "[INFO] Test script content:"
+        cat .ci/oci-nightly-olm.sh
+
+        /bin/bash .ci/oci-nightly-olm.sh
+      dependencies:
+      - env: CI_CHE_OPERATOR_IMAGE
+        name: che-operator-image
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-aws
+- as: che-operator-single-host-nightly-deployment
+  steps:
+    cluster_profile: aws
+    env:
+      OO_CHANNEL: nightly
+      OO_INSTALL_NAMESPACE: eclipse-che
+      OO_PACKAGE: eclipse-che-preview-openshift
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: single-host-deployment
+      commands: |
+        export PATH=$PATH:/tmp/bin
+        mkdir -p /tmp/bin
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.6/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
+        chmod ug+x /tmp/bin/oc
+
+        echo -e "[INFO] Test script content:"
+        cat .ci/oci-single-host.sh
+
+        /bin/bash .ci/oci-single-host.sh
+      dependencies:
+      - env: CI_CHE_OPERATOR_IMAGE
+        name: che-operator-image
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-aws
+zz_generated_metadata:
+  branch: master
+  org: eclipse
+  repo: che-operator
+  variant: v7

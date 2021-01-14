@@ -1,5 +1,42 @@
 
 
+def _add_osd_rc_bootstrap(gendoc):
+    context = gendoc.context
+
+    gendoc.add_comments("""
+    Bootstrap the environment for the amd64 tests image.  The caches require an amd64 "tests" image to execute on
+    the cluster.  This imagestream is used as a commandline parameter to the release-controller...
+         --tools-image-stream-tag=release-controller-bootstrap:tests
+        """)
+    gendoc.append({
+        'apiVersion': 'image.openshift.io/v1',
+        'kind': 'ImageStream',
+        'metadata': {
+            'name': 'release-controller-bootstrap',
+            'namespace': context.is_namespace
+        },
+        'spec': {
+            'lookupPolicy': {
+                'local': False
+            },
+            'tags': [
+                {
+                    'from': {
+                        'kind': 'DockerImage',
+                        'name': 'image-registry.openshift-image-registry.svc:5000/ocp/4.6:tests'
+                    },
+                    'importPolicy': {
+                        'scheduled': True
+                    },
+                    'name': 'tests',
+                    'referencePolicy': {
+                        'type': 'Source'
+                    }
+                }]
+        }
+    })
+
+
 def _add_osd_rc_route(gendoc):
     context = gendoc.context
     gendoc.append({
@@ -10,7 +47,7 @@ def _add_osd_rc_route(gendoc):
             'namespace': context.config.rc_deployment_namespace,
         },
         'spec': {
-            'host': f'{context.rc_hostname}.{context.config.rc_deployment_domain}',
+            'host': f'{context.rc_app_url}',
             'tls': {
                 'insecureEdgeTerminationPolicy': 'Redirect',
                 'termination': 'Reencrypt' if context.private else 'Edge'
@@ -53,7 +90,7 @@ def _add_osd_rc_service(gendoc):
 def _get_dynamic_rc_volume_mounts(context):
     prow_volume_mounts = []
 
-    for major_minor in context.config.releases_4x:
+    for major_minor in context.config.releases:
         prow_volume_mounts.append({
             'mountPath': f'/etc/job-config/{major_minor}',
             'name': f'job-config-{major_minor.replace(".", "")}',  # e.g. job-config-45
@@ -81,7 +118,7 @@ def _get_dynamic_deployment_volumes(context):
             }
         })
 
-    for major_minor in context.config.releases_4x:
+    for major_minor in context.config.releases:
         prow_volumes.append({
             'configMap': {
                 'defaultMode': 420,
@@ -183,12 +220,13 @@ def _add_osd_rc_deployment(gendoc):
                                         *extra_rc_args,
                                         '--prow-config=/etc/config/config.yaml',
                                         '--job-config=/etc/job-config',
-                                        f'--artifacts={context.hostname_artifacts}.{context.config.rc_release_domain}',
+                                        f'--artifacts={context.fc_app_url}',
                                         '--listen=' + ('127.0.0.1:8080' if context.private else ':8080'),
                                         f'--prow-namespace={context.config.rc_deployment_namespace}',
                                         '--non-prow-job-kubeconfig=/etc/kubeconfig/kubeconfig',
                                         f'--job-namespace={context.jobs_namespace}',
-                                        f'--tools-image-stream-tag=release-controller-bootstrap:tests',
+                                        '--tools-image-stream-tag=release-controller-bootstrap:tests',
+                                        f'--release-architecture={context.get_supported_architecture_name()}',
                                         '-v=6',
                                         '--github-token-path=/etc/github/oauth',
                                         '--github-endpoint=http://ghproxy',
@@ -278,7 +316,7 @@ def _add_osd_rc_deployment(gendoc):
                             'name': 'release-controller-kubeconfigs',
                             'secret': {
                                 'items': [{
-                                    'key': f'sa.release-controller-{context.is_namespace}.api.ci.config',
+                                    'key': f'sa.release-controller-{context.is_namespace}.app.ci.config',
                                     'path': 'kubeconfig'
                                 }],
                                 'secretName': 'release-controller-kubeconfigs'
@@ -313,6 +351,7 @@ def add_osd_rc_deployments(gendoc):
 Resources required to deploy release controller instances on
 the app.ci clusters.
 """)
+    _add_osd_rc_bootstrap(gendoc)
     _add_osd_rc_route(gendoc)
     _add_osd_rc_service(gendoc)
     _add_osd_rc_deployment(gendoc)

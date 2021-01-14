@@ -19,6 +19,7 @@ presubmits:
     spec:
       containers:
       - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-password-file=/etc/boskos/password
         - --oauth-token-path=/usr/local/github-credentials/oauth
@@ -40,6 +41,9 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/e2e-agnostic-upgrade-cluster-profile
           name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
@@ -93,6 +97,7 @@ presubmits:
     spec:
       containers:
       - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-password-file=/etc/boskos/password
         - --oauth-token-path=/usr/local/github-credentials/oauth
@@ -114,6 +119,9 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/e2e-aws-ovn-windows-cluster-profile
           name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
@@ -165,6 +173,7 @@ presubmits:
     spec:
       containers:
       - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-password-file=/etc/boskos/password
         - --oauth-token-path=/usr/local/github-credentials/oauth
@@ -186,6 +195,9 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/e2e-aws-ovn-windows-custom-vxlan-cluster-profile
           name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
@@ -237,6 +249,7 @@ presubmits:
     spec:
       containers:
       - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-password-file=/etc/boskos/password
         - --oauth-token-path=/usr/local/github-credentials/oauth
@@ -258,6 +271,9 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/e2e-aws-sdn-multi-cluster-profile
           name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
@@ -309,6 +325,7 @@ presubmits:
     spec:
       containers:
       - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-password-file=/etc/boskos/password
         - --oauth-token-path=/usr/local/github-credentials/oauth
@@ -330,6 +347,9 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/e2e-azure-ovn-cluster-profile
           name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
@@ -381,6 +401,7 @@ presubmits:
     spec:
       containers:
       - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-password-file=/etc/boskos/password
         - --oauth-token-path=/usr/local/github-credentials/oauth
@@ -402,6 +423,9 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/e2e-gcp-cluster-profile
           name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
@@ -441,6 +465,84 @@ presubmits:
     branches:
     - master
     cluster: build02
+    context: ci/prow/e2e-gcp-ovn
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    hidden: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-cluster-network-operator-master-e2e-gcp-ovn
+    path_alias: github.com/openshift/cluster-network-operator
+    rerun_command: /test e2e-gcp-ovn
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-password-file=/etc/boskos/password
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --secret-dir=/usr/local/e2e-gcp-ovn-cluster-profile
+        - --target=e2e-gcp-ovn
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-gcp-ovn-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-gcp-ovn,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: build02
     context: ci/prow/e2e-metal-ipi-ovn-ipv6
     decorate: true
     decoration_config:
@@ -455,6 +557,7 @@ presubmits:
     spec:
       containers:
       - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-password-file=/etc/boskos/password
         - --oauth-token-path=/usr/local/github-credentials/oauth
@@ -476,6 +579,9 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/e2e-metal-ipi-ovn-ipv6-cluster-profile
           name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
@@ -529,6 +635,7 @@ presubmits:
     spec:
       containers:
       - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-password-file=/etc/boskos/password
         - --oauth-token-path=/usr/local/github-credentials/oauth
@@ -550,6 +657,9 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/e2e-ovn-hybrid-step-registry-cluster-profile
           name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
@@ -587,6 +697,82 @@ presubmits:
     branches:
     - master
     cluster: build02
+    context: ci/prow/e2e-ovn-ipsec-step-registry
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    hidden: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-cluster-network-operator-master-e2e-ovn-ipsec-step-registry
+    path_alias: github.com/openshift/cluster-network-operator
+    rerun_command: /test e2e-ovn-ipsec-step-registry
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-password-file=/etc/boskos/password
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --secret-dir=/usr/local/e2e-ovn-ipsec-step-registry-cluster-profile
+        - --target=e2e-ovn-ipsec-step-registry
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-ovn-ipsec-step-registry-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-ovn-ipsec-step-registry,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: build02
     context: ci/prow/e2e-ovn-step-registry
     decorate: true
     decoration_config:
@@ -601,6 +787,7 @@ presubmits:
     spec:
       containers:
       - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-password-file=/etc/boskos/password
         - --oauth-token-path=/usr/local/github-credentials/oauth
@@ -622,6 +809,9 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/e2e-ovn-step-registry-cluster-profile
           name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
@@ -673,6 +863,7 @@ presubmits:
     spec:
       containers:
       - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-password-file=/etc/boskos/password
         - --oauth-token-path=/usr/local/github-credentials/oauth
@@ -694,6 +885,9 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/e2e-vsphere-ovn-cluster-profile
           name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
@@ -745,6 +939,7 @@ presubmits:
     spec:
       containers:
       - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-password-file=/etc/report/password.txt
@@ -759,6 +954,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
@@ -799,6 +997,7 @@ presubmits:
     spec:
       containers:
       - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-password-file=/etc/report/password.txt
@@ -813,6 +1012,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
@@ -853,6 +1055,7 @@ presubmits:
     spec:
       containers:
       - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-password-file=/etc/report/password.txt
@@ -867,6 +1070,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true

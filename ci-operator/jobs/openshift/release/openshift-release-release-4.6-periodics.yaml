@@ -263,9 +263,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-aws-cluster-profile
         name: cluster-profile
-      - mountPath: /usr/local/e2e-aws
-        name: job-definition
-        subPath: cluster-launch-installer-e2e.yaml
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
     serviceAccountName: ci-operator
@@ -287,9 +284,6 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
-    - configMap:
-        name: prow-job-cluster-launch-installer-e2e
-      name: job-definition
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -405,9 +399,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-aws-cluster-profile
         name: cluster-profile
-      - mountPath: /usr/local/e2e-aws
-        name: job-definition
-        subPath: cluster-launch-installer-e2e.yaml
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
     serviceAccountName: ci-operator
@@ -429,9 +420,6 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
-    - configMap:
-        name: prow-job-cluster-launch-installer-e2e
-      name: job-definition
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -509,9 +497,9 @@ periodics:
       - name: JOB_NAME_SAFE
         value: e2e-remote-libvirt
       - name: MULTIARCH_RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp-ppc64le/release-ppc64le:4.6
+        value: registry.ci.openshift.org/ocp-ppc64le/release-ppc64le:4.6
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6
+        value: registry.ci.openshift.org/ocp/release:4.6
       - name: REMOTE_LIBVIRT_HOSTNAME
         value: c155f2u33
       - name: REMOTE_LIBVIRT_HOSTNAME_1
@@ -597,6 +585,8 @@ periodics:
             "[sig-network] Networking Granular Checks: Pods should function for intra-pod communication: udp [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
             "[sig-storage] Dynamic Provisioning [k8s.io] GlusterDynamicProvisioner should create and delete persistent volumes [fast] [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
             "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Inline-volume (default fs)] subPath should support file as subpath [LinuxOnly] [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+            "[sig-network] multicast when using one of the plugins 'redhat/openshift-ovs-multitenant, redhat/openshift-ovs-networkpolicy' should allow multicast traffic in namespaces where it is enabled [Suite:openshift/conformance/parallel]"
+            "[sig-network] multicast when using one of the plugins 'redhat/openshift-ovs-multitenant, redhat/openshift-ovs-networkpolicy' should block multicast traffic in namespaces where it is disabled [Suite:openshift/conformance/parallel]"
             "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (default fs)] subPath should support existing directories when readOnly specified in the volumeSource [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
             "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (default fs)] subPath should support existing directory [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
             "[sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (default fs)] subPath should support readOnly file specified in the volumeMount [LinuxOnly] [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
@@ -665,7 +655,7 @@ periodics:
     org: openshift
     repo: origin
     workdir: true
-  interval: 2h
+  interval: 24h
   labels:
     job-release: "4.6"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -712,7 +702,7 @@ periodics:
         # export JOB_SPEC="$( echo "${JOB_SPEC}" | jq -r ".extra_refs[0].base_sha = \"${origin_commit_id}\"" )"
 
         # fetch fcos release info and check whether we've already built this image
-        stream=next-devel
+        stream=stable
         build_url="https://builds.coreos.fedoraproject.org/prod/streams/${stream}/builds"
         curl "${build_url}/builds.json" 2>/dev/null >${dir}/builds.json
         build_id="$( <"${dir}/builds.json" jq -r '.builds[0].id' )"
@@ -871,9 +861,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-aws-cluster-profile
         name: cluster-profile
-      - mountPath: /usr/local/e2e-aws
-        name: job-definition
-        subPath: cluster-launch-installer-e2e.yaml
       - mountPath: /etc/pull-secret
         name: pull-secret
         readOnly: true
@@ -898,9 +885,6 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
-    - configMap:
-        name: prow-job-cluster-launch-installer-e2e
-      name: job-definition
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -982,9 +966,9 @@ periodics:
       - name: JOB_NAME_SAFE
         value: e2e-remote-libvirt
       - name: MULTIARCH_RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp-s390x/release-s390x:4.6
+        value: registry.ci.openshift.org/ocp-s390x/release-s390x:4.6
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6
+        value: registry.ci.openshift.org/ocp/release:4.6
       - name: REMOTE_LIBVIRT_HOSTNAME
         value: ocponz
       - name: REMOTE_LIBVIRT_HOSTNAME_1
@@ -1239,14 +1223,14 @@ periodics:
 
         # create namespace and craft a release image without the machine operator
         namespace="ci-op-$( echo "${JOB_NAME}-${BUILD_ID}" | md5sum -t | cut -c 1-8 )"
-        export RELEASE_IMAGE_INITIAL=registry.svc.ci.openshift.org/ocp/release:$(FROM_BRANCH)
-        export RELEASE_IMAGE_LATEST=registry.svc.ci.openshift.org/${namespace}/release:upgrade
-        export IMAGE_TESTS=registry.svc.ci.openshift.org/${namespace}/stable-initial:tests # use the older version of the payload
+        export RELEASE_IMAGE_INITIAL=registry.ci.openshift.org/ocp/release:$(FROM_BRANCH)
+        export RELEASE_IMAGE_LATEST=registry.ci.openshift.org/${namespace}/release:upgrade
+        export IMAGE_TESTS=registry.ci.openshift.org/${namespace}/stable-initial:tests # use the older version of the payload
         oc registry login
         oc new-project ${namespace}
         oc policy add-role-to-group system:image-puller -n ${namespace} system:unauthenticated system:authenticated
-        oc adm release new --from-release=registry.svc.ci.openshift.org/ocp/release:$(BRANCH) \
-          --to-image=registry.svc.ci.openshift.org/${namespace}/release:upgrade \
+        oc adm release new --from-release=registry.ci.openshift.org/ocp/release:$(BRANCH) \
+          --to-image=registry.ci.openshift.org/${namespace}/release:upgrade \
           --exclude=machine-config-operator
 
         # execute the test
@@ -1356,7 +1340,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6-ci
+        value: registry.ci.openshift.org/ocp/release:4.6-ci
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
@@ -1470,7 +1454,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6
+        value: registry.ci.openshift.org/ocp/release:4.6
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
@@ -1576,7 +1560,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6
+        value: registry.ci.openshift.org/ocp/release:4.6
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
@@ -1682,7 +1666,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6
+        value: registry.ci.openshift.org/ocp/release:4.6
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
@@ -1788,7 +1772,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6
+        value: registry.ci.openshift.org/ocp/release:4.6
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
@@ -1894,7 +1878,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6
+        value: registry.ci.openshift.org/ocp/release:4.6
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
@@ -2000,7 +1984,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6-ci
+        value: registry.ci.openshift.org/ocp/release:4.6-ci
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
@@ -2108,7 +2092,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6
+        value: registry.ci.openshift.org/ocp/release:4.6
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
@@ -2216,7 +2200,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6
+        value: registry.ci.openshift.org/ocp/release:4.6
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
@@ -2326,7 +2310,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6
+        value: registry.ci.openshift.org/ocp/release:4.6
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
@@ -2434,7 +2418,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6
+        value: registry.ci.openshift.org/ocp/release:4.6
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
@@ -2536,7 +2520,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6
+        value: registry.ci.openshift.org/ocp/release:4.6
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
@@ -2640,7 +2624,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6
+        value: registry.ci.openshift.org/ocp/release:4.6
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
@@ -2748,7 +2732,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6-ci
+        value: registry.ci.openshift.org/ocp/release:4.6-ci
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
@@ -2858,7 +2842,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6
+        value: registry.ci.openshift.org/ocp/release:4.6
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
@@ -2968,7 +2952,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6
+        value: registry.ci.openshift.org/ocp/release:4.6
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
@@ -3080,7 +3064,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6
+        value: registry.ci.openshift.org/ocp/release:4.6
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
@@ -3190,7 +3174,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6
+        value: registry.ci.openshift.org/ocp/release:4.6
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
@@ -3300,7 +3284,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6
+        value: registry.ci.openshift.org/ocp/release:4.6
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
@@ -3410,7 +3394,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6
+        value: registry.ci.openshift.org/ocp/release:4.6
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
@@ -3524,7 +3508,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/origin/release:4.6
+        value: registry.ci.openshift.org/origin/release:4.6
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
@@ -3643,7 +3627,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6-ci
+        value: registry.ci.openshift.org/ocp/release:4.6-ci
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
@@ -3762,7 +3746,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6-ci
+        value: registry.ci.openshift.org/ocp/release:4.6-ci
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
@@ -3883,7 +3867,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6-ci
+        value: registry.ci.openshift.org/ocp/release:4.6-ci
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
@@ -4002,7 +3986,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6-ci
+        value: registry.ci.openshift.org/ocp/release:4.6-ci
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
@@ -4123,7 +4107,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6-ci
+        value: registry.ci.openshift.org/ocp/release:4.6-ci
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
@@ -4242,7 +4226,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6-ci
+        value: registry.ci.openshift.org/ocp/release:4.6-ci
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
@@ -4350,7 +4334,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6-ci
+        value: registry.ci.openshift.org/ocp/release:4.6-ci
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
@@ -4458,7 +4442,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6-ci
+        value: registry.ci.openshift.org/ocp/release:4.6-ci
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
@@ -4564,7 +4548,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6-ci
+        value: registry.ci.openshift.org/ocp/release:4.6-ci
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
@@ -4682,7 +4666,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6-ci
+        value: registry.ci.openshift.org/ocp/release:4.6-ci
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
@@ -4801,7 +4785,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6
+        value: registry.ci.openshift.org/ocp/release:4.6
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
@@ -4908,7 +4892,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6
+        value: registry.ci.openshift.org/ocp/release:4.6
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
@@ -5025,7 +5009,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6
+        value: registry.ci.openshift.org/ocp/release:4.6
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
@@ -5142,7 +5126,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6
+        value: registry.ci.openshift.org/ocp/release:4.6
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
@@ -5364,8 +5348,8 @@ periodics:
         secretName: ci-pull-credentials
 - agent: kubernetes
   cluster: api.ci
+  cron: '@yearly'
   decorate: true
-  interval: 2h
   labels:
     job-env: aws
     job-release: "4.6"
@@ -5385,40 +5369,9 @@ periodics:
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       command:
-      - /bin/bash
-      - -c
-      - |
-        #!/bin/bash
-        set -euo pipefail
-
-        initial=$(ARTIFACTS)/release-initial.json
-        latest=$(ARTIFACTS)/release-latest.json
-        if ! curl --fail -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest --data-urlencode 'in=>4.5.0-0 <4.6.0-0' > ${initial}; then
-          echo "error: Could not find a stable version"
-          exit 1
-        fi
-        if ! curl --fail -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.6.0-0.ci/latest > ${latest}; then
-          echo "error: Could not find newest version"
-          exit 1
-        fi
-
-        from=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${initial}" )
-        to=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${latest}" )
-        export RELEASE_IMAGE_INITIAL=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${initial}" )
-        export RELEASE_IMAGE_LATEST=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${latest}" )
-
-        # prow doesn't allow init containers or a second container
-        export PATH=$PATH:/tmp/bin
-        mkdir /tmp/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.5/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
-        chmod ug+x /tmp/bin/oc
-
-        # annotate the information about this job so that the release controller adds it to the upgrade graph
-        oc --kubeconfig /etc/appci/sa.release-bot.app.ci.config annotate pj/${PROW_JOB_ID} "release.openshift.io/from-tag=${from}" "release.openshift.io/tag=${to}" "release.openshift.io/source=ocp/$(BRANCH)"
-
-        ci-operator $@
-      - ""
+      - ci-operator
       env:
       - name: BRANCH
         value: "4.5"
@@ -5440,7 +5393,7 @@ periodics:
           - as: e2e-$(CLUSTER_TYPE)-upgrade
             steps:
               cluster_profile: "$(CLUSTER_TYPE)"
-              workflow: openshift-upgrade-$(CLUSTER_TYPE)-loki
+              workflow: openshift-upgrade-$(CLUSTER_TYPE)-hosted-loki
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -5460,6 +5413,9 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/appci
         name: appci-release-bot-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -5494,8 +5450,8 @@ periodics:
         secretName: build-farm-credentials
 - agent: kubernetes
   cluster: api.ci
+  cron: '@yearly'
   decorate: true
-  interval: 2h
   labels:
     job-env: aws
     job-release: "4.6"
@@ -5515,40 +5471,9 @@ periodics:
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       command:
-      - /bin/bash
-      - -c
-      - |
-        #!/bin/bash
-        set -euo pipefail
-
-        initial=$(ARTIFACTS)/release-initial.json
-        latest=$(ARTIFACTS)/release-latest.json
-        if ! curl --fail -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest --data-urlencode 'in=>4.5.0-0 <4.6.0-0' > ${initial}; then
-          echo "error: Could not find a stable version"
-          exit 1
-        fi
-        if ! curl --fail -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.6.0-0.ci/latest > ${latest}; then
-          echo "error: Could not find newest version"
-          exit 1
-        fi
-
-        from=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${initial}" )
-        to=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${latest}" )
-        export RELEASE_IMAGE_INITIAL=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${initial}" )
-        export RELEASE_IMAGE_LATEST=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${latest}" )
-
-        # prow doesn't allow init containers or a second container
-        export PATH=$PATH:/tmp/bin
-        mkdir /tmp/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.5/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
-        chmod ug+x /tmp/bin/oc
-
-        # annotate the information about this job so that the release controller adds it to the upgrade graph
-        oc --kubeconfig /etc/appci/sa.release-bot.app.ci.config annotate pj/${PROW_JOB_ID} "release.openshift.io/from-tag=${from}" "release.openshift.io/tag=${to}" "release.openshift.io/source=ocp/$(BRANCH)"
-
-        ci-operator $@
-      - ""
+      - ci-operator
       env:
       - name: BRANCH
         value: "4.5"
@@ -5594,6 +5519,9 @@ periodics:
       - mountPath: /etc/appci
         name: appci-release-bot-credentials
         readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -5627,8 +5555,8 @@ periodics:
         secretName: build-farm-credentials
 - agent: kubernetes
   cluster: api.ci
+  cron: '@yearly'
   decorate: true
-  interval: 24h
   labels:
     job-env: aws
     job-release: "4.6"
@@ -5647,40 +5575,9 @@ periodics:
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       command:
-      - /bin/bash
-      - -c
-      - |
-        #!/bin/bash
-        set -euo pipefail
-
-        initial=$(ARTIFACTS)/release-initial.json
-        latest=$(ARTIFACTS)/release-latest.json
-        if ! curl --fail -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest --data-urlencode 'in=>4.5.0-0 <4.6.0-0' > ${initial}; then
-          echo "error: Could not find a stable version"
-          exit 1
-        fi
-        if ! curl --fail -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.6.0-0.ci/latest > ${latest}; then
-          echo "error: Could not find newest version"
-          exit 1
-        fi
-
-        from=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${initial}" )
-        to=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${latest}" )
-        export RELEASE_IMAGE_INITIAL=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${initial}" )
-        export RELEASE_IMAGE_LATEST=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${latest}" )
-
-        # prow doesn't allow init containers or a second container
-        export PATH=$PATH:/tmp/bin
-        mkdir /tmp/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.5/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
-        chmod ug+x /tmp/bin/oc
-
-        # annotate the information about this job so that we can query for it
-        oc --kubeconfig /etc/appci/sa.release-bot.app.ci.config annotate pj/${PROW_JOB_ID} "release.openshift.io/from-tag=${from}" "release.openshift.io/tag=${to}" "release.openshift.io/source=ocp/$(BRANCH)"
-
-        ci-operator $@
-      - ""
+      - ci-operator
       env:
       - name: BRANCH
         value: "4.5"
@@ -5700,7 +5597,7 @@ periodics:
                 memory: 200Mi
           tests:
           - as: e2e-$(CLUSTER_TYPE)-upgrade
-            commands: TEST_SUITE=all TEST_OPTIONS=abort-at=99 run-upgrade-tests
+            commands: TEST_SUITE=all TEST_UPGRADE_OPTIONS=abort-at=99 run-upgrade-tests
             openshift_installer:
               cluster_profile: "$(CLUSTER_TYPE)"
               upgrade: true
@@ -5723,6 +5620,9 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/appci
         name: appci-release-bot-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -5757,8 +5657,8 @@ periodics:
         secretName: build-farm-credentials
 - agent: kubernetes
   cluster: api.ci
+  cron: '@yearly'
   decorate: true
-  interval: 24h
   labels:
     job-env: aws
     job-release: "4.6"
@@ -5777,40 +5677,9 @@ periodics:
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       command:
-      - /bin/bash
-      - -c
-      - |
-        #!/bin/bash
-        set -euo pipefail
-
-        initial=$(ARTIFACTS)/release-initial.json
-        latest=$(ARTIFACTS)/release-latest.json
-        if ! curl --fail -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.6.0-0.ci/latest --data-urlencode 'rel=1' > ${initial}; then
-          echo "error: Could not find a stable version"
-          exit 1
-        fi
-        if ! curl --fail -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.6.0-0.ci/latest > ${latest}; then
-          echo "error: Could not find newest version"
-          exit 1
-        fi
-
-        from=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${initial}" )
-        to=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${latest}" )
-        export RELEASE_IMAGE_INITIAL=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${initial}" )
-        export RELEASE_IMAGE_LATEST=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${latest}" )
-
-        # prow doesn't allow init containers or a second container
-        export PATH=$PATH:/tmp/bin
-        mkdir /tmp/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.5/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
-        chmod ug+x /tmp/bin/oc
-
-        # annotate the information about this job so that we can query for it
-        oc --kubeconfig /etc/appci/sa.release-bot.app.ci.config annotate pj/${PROW_JOB_ID} "release.openshift.io/from-tag=${from}" "release.openshift.io/tag=${to}" "release.openshift.io/source=ocp/$(BRANCH)"
-
-        ci-operator $@
-      - ""
+      - ci-operator
       env:
       - name: BRANCH
         value: "4.6"
@@ -5830,7 +5699,7 @@ periodics:
                 memory: 200Mi
           tests:
           - as: e2e-$(CLUSTER_TYPE)-upgrade
-            commands: TEST_SUITE=all TEST_OPTIONS=abort-at=random run-upgrade-tests
+            commands: TEST_SUITE=all TEST_UPGRADE_OPTIONS=abort-at=random run-upgrade-tests
             openshift_installer:
               cluster_profile: "$(CLUSTER_TYPE)"
               upgrade: true
@@ -5853,6 +5722,9 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/appci
         name: appci-release-bot-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -5914,7 +5786,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6-ci
+        value: registry.ci.openshift.org/ocp/release:4.6-ci
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
@@ -5995,8 +5867,8 @@ periodics:
         secretName: ci-pull-credentials
 - agent: kubernetes
   cluster: api.ci
+  cron: '@yearly'
   decorate: true
-  interval: 6h
   labels:
     job-env: gcp
     job-release: "4.6"
@@ -6015,40 +5887,9 @@ periodics:
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       command:
-      - /bin/bash
-      - -c
-      - |
-        #!/bin/bash
-        set -euo pipefail
-
-        initial=$(ARTIFACTS)/release-initial.json
-        latest=$(ARTIFACTS)/release-latest.json
-        if ! curl --fail -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.6.0-0.ci/latest --data-urlencode 'rel=1' > ${initial}; then
-          echo "error: Could not find a stable version"
-          exit 1
-        fi
-        if ! curl --fail -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.6.0-0.ci/latest > ${latest}; then
-          echo "error: Could not find newest version"
-          exit 1
-        fi
-
-        from=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${initial}" )
-        to=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${latest}" )
-        export RELEASE_IMAGE_INITIAL=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${initial}" )
-        export RELEASE_IMAGE_LATEST=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${latest}" )
-
-        # prow doesn't allow init containers or a second container
-        export PATH=$PATH:/tmp/bin
-        mkdir /tmp/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.5/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
-        chmod ug+x /tmp/bin/oc
-
-        # annotate the information about this job so that we can query for it
-        oc --kubeconfig /etc/appci/sa.release-bot.app.ci.config annotate pj/${PROW_JOB_ID} "release.openshift.io/from-tag=${from}" "release.openshift.io/tag=${to}" "release.openshift.io/source=ocp/$(BRANCH)"
-
-        ci-operator $@
-      - ""
+      - ci-operator
       env:
       - name: BRANCH
         value: "4.6"
@@ -6070,7 +5911,7 @@ periodics:
           - as: e2e-$(CLUSTER_TYPE)-upgrade
             steps:
               cluster_profile: $(CLUSTER_TYPE)
-              workflow: openshift-upgrade-$(CLUSTER_TYPE)-loki
+              workflow: openshift-upgrade-$(CLUSTER_TYPE)
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -6090,6 +5931,9 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/appci
         name: appci-release-bot-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -6126,8 +5970,8 @@ periodics:
         secretName: build-farm-credentials
 - agent: kubernetes
   cluster: api.ci
+  cron: '@yearly'
   decorate: true
-  interval: 6h
   labels:
     job-env: azure
     job-release: "4.6"
@@ -6146,40 +5990,9 @@ periodics:
       - --target=e2e-azure-upgrade
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       command:
-      - /bin/bash
-      - -c
-      - |
-        #!/bin/bash
-        set -euo pipefail
-
-        initial=$(ARTIFACTS)/release-initial.json
-        latest=$(ARTIFACTS)/release-latest.json
-        if ! curl --fail -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.6.0-0.ci/latest --data-urlencode 'rel=1' > ${initial}; then
-          echo "error: Could not find a stable version"
-          exit 1
-        fi
-        if ! curl --fail -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.6.0-0.ci/latest > ${latest}; then
-          echo "error: Could not find newest version"
-          exit 1
-        fi
-
-        from=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${initial}" )
-        to=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${latest}" )
-        export RELEASE_IMAGE_INITIAL=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${initial}" )
-        export RELEASE_IMAGE_LATEST=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${latest}" )
-
-        # prow doesn't allow init containers or a second container
-        export PATH=$PATH:/tmp/bin
-        mkdir /tmp/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.5/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
-        chmod ug+x /tmp/bin/oc
-
-        # annotate the information about this job so that we can query for it
-        oc --kubeconfig /etc/appci/sa.release-bot.app.ci.config annotate pj/${PROW_JOB_ID} "release.openshift.io/from-tag=${from}" "release.openshift.io/tag=${to}" "release.openshift.io/source=ocp/$(BRANCH)"
-
-        ci-operator $@
-      - ""
+      - ci-operator
       env:
       - name: BRANCH
         value: "4.6"
@@ -6201,7 +6014,7 @@ periodics:
           - as: e2e-azure-upgrade
             steps:
               cluster_profile: "$(CLUSTER_TYPE)"
-              workflow: openshift-upgrade-azure-loki
+              workflow: openshift-upgrade-azure
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -6221,6 +6034,9 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/appci
         name: appci-release-bot-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -6255,7 +6071,7 @@ periodics:
         secretName: build-farm-credentials
 - agent: kubernetes
   cluster: api.ci
-  cron: 0 0,8,16 * * *
+  cron: 0 0,8 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -6284,7 +6100,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6
+        value: registry.ci.openshift.org/ocp/release:4.6
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
@@ -6385,7 +6201,7 @@ periodics:
         secretName: ci-pull-credentials
 - agent: kubernetes
   cluster: api.ci
-  cron: 0 4,12,20 * * *
+  cron: 0 4,12 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -6414,7 +6230,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6
+        value: registry.ci.openshift.org/ocp/release:4.6
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
@@ -6544,7 +6360,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6
+        value: registry.ci.openshift.org/ocp/release:4.6
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
@@ -6651,7 +6467,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6-ci
+        value: registry.ci.openshift.org/ocp/release:4.6-ci
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
@@ -6757,7 +6573,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6
+        value: registry.ci.openshift.org/ocp/release:4.6
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
@@ -6864,7 +6680,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6
+        value: registry.ci.openshift.org/ocp/release:4.6
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
@@ -6973,7 +6789,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6
+        value: registry.ci.openshift.org/ocp/release:4.6
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
@@ -7056,8 +6872,8 @@ periodics:
         secretName: ci-pull-credentials
 - agent: kubernetes
   cluster: api.ci
+  cron: '@yearly'
   decorate: true
-  interval: 6h
   labels:
     job-env: gcp
     job-release: "4.6"
@@ -7076,40 +6892,9 @@ periodics:
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       command:
-      - /bin/bash
-      - -c
-      - |
-        #!/bin/bash
-        set -euo pipefail
-
-        initial=$(ARTIFACTS)/release-initial.json
-        latest=$(ARTIFACTS)/release-latest.json
-        if ! curl --fail -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest --data-urlencode 'in=>4.5.0-0 <4.6.0-0' > ${initial}; then
-          echo "error: Could not find a stable version"
-          exit 1
-        fi
-        if ! curl --fail -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.6.0-0.ci/latest > ${latest}; then
-          echo "error: Could not find newest version"
-          exit 1
-        fi
-
-        from=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${initial}" )
-        to=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${latest}" )
-        export RELEASE_IMAGE_INITIAL=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${initial}" )
-        export RELEASE_IMAGE_LATEST=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${latest}" )
-
-        # prow doesn't allow init containers or a second container
-        export PATH=$PATH:/tmp/bin
-        mkdir /tmp/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.6/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
-        chmod ug+x /tmp/bin/oc
-
-        # annotate the information about this job so that the release controller adds it to the upgrade graph
-        oc --kubeconfig /etc/appci/sa.release-bot.app.ci.config annotate pj/${PROW_JOB_ID} "release.openshift.io/from-tag=${from}" "release.openshift.io/tag=${to}" "release.openshift.io/source=ocp/$(BRANCH)"
-
-        ci-operator $@
-      - ""
+      - ci-operator
       env:
       - name: BRANCH
         value: "4.5"
@@ -7131,7 +6916,7 @@ periodics:
           - as: e2e-$(CLUSTER_TYPE)-upgrade
             steps:
               cluster_profile: "$(CLUSTER_TYPE)"
-              workflow: openshift-upgrade-$(CLUSTER_TYPE)-loki
+              workflow: openshift-upgrade-$(CLUSTER_TYPE)
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -7151,6 +6936,9 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/appci
         name: appci-release-bot-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -7183,8 +6971,8 @@ periodics:
         secretName: build-farm-credentials
 - agent: kubernetes
   cluster: api.ci
+  cron: '@yearly'
   decorate: true
-  interval: 6h
   labels:
     job-env: gcp
     job-release: "4.6"
@@ -7203,40 +6991,9 @@ periodics:
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       command:
-      - /bin/bash
-      - -c
-      - |
-        #!/bin/bash
-        set -euo pipefail
-
-        initial=$(ARTIFACTS)/release-initial.json
-        latest=$(ARTIFACTS)/release-latest.json
-        if ! curl --fail -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest --data-urlencode 'in=>4.5.0-0 <4.6.0-0' > ${initial}; then
-          echo "error: Could not find a stable version"
-          exit 1
-        fi
-        if ! curl --fail -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.6.0-0.ci/latest > ${latest}; then
-          echo "error: Could not find newest version"
-          exit 1
-        fi
-
-        from=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${initial}" )
-        to=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${latest}" )
-        export RELEASE_IMAGE_INITIAL=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${initial}" )
-        export RELEASE_IMAGE_LATEST=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${latest}" )
-
-        # prow doesn't allow init containers or a second container
-        export PATH=$PATH:/tmp/bin
-        mkdir /tmp/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.6/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
-        chmod ug+x /tmp/bin/oc
-
-        # annotate the information about this job so that the release controller adds it to the upgrade graph
-        oc --kubeconfig /etc/appci/sa.release-bot.app.ci.config annotate pj/${PROW_JOB_ID} "release.openshift.io/from-tag=${from}" "release.openshift.io/tag=${to}" "release.openshift.io/source=ocp/$(BRANCH)"
-
-        ci-operator $@
-      - ""
+      - ci-operator
       env:
       - name: BRANCH
         value: "4.5"
@@ -7282,6 +7039,9 @@ periodics:
       - mountPath: /etc/appci
         name: appci-release-bot-credentials
         readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -7313,8 +7073,8 @@ periodics:
         secretName: build-farm-credentials
 - agent: kubernetes
   cluster: api.ci
+  cron: '@yearly'
   decorate: true
-  interval: 6h
   labels:
     job-env: azure
     job-release: "4.6"
@@ -7333,40 +7093,9 @@ periodics:
       - --target=e2e-azure-upgrade
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       command:
-      - /bin/bash
-      - -c
-      - |
-        #!/bin/bash
-        set -euo pipefail
-
-        initial=$(ARTIFACTS)/release-initial.json
-        latest=$(ARTIFACTS)/release-latest.json
-        if ! curl --fail -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest --data-urlencode 'in=>4.5.0-0 <4.6.0-0' > ${initial}; then
-          echo "error: Could not find a stable version"
-          exit 1
-        fi
-        if ! curl --fail -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.6.0-0.ci/latest > ${latest}; then
-          echo "error: Could not find newest version"
-          exit 1
-        fi
-
-        from=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${initial}" )
-        to=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${latest}" )
-        export RELEASE_IMAGE_INITIAL=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${initial}" )
-        export RELEASE_IMAGE_LATEST=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${latest}" )
-
-        # prow doesn't allow init containers or a second container
-        export PATH=$PATH:/tmp/bin
-        mkdir /tmp/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.6/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
-        chmod ug+x /tmp/bin/oc
-
-        # annotate the information about this job so that the release controller adds it to the upgrade graph
-        oc --kubeconfig /etc/appci/sa.release-bot.app.ci.config annotate pj/${PROW_JOB_ID} "release.openshift.io/from-tag=${from}" "release.openshift.io/tag=${to}" "release.openshift.io/source=ocp/$(BRANCH)"
-
-        ci-operator $@
-      - ""
+      - ci-operator
       env:
       - name: BRANCH
         value: "4.5"
@@ -7388,7 +7117,7 @@ periodics:
           - as: e2e-azure-upgrade
             steps:
               cluster_profile: "$(CLUSTER_TYPE)"
-              workflow: openshift-upgrade-azure-loki
+              workflow: openshift-upgrade-azure
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -7408,6 +7137,9 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/appci
         name: appci-release-bot-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -7440,8 +7172,8 @@ periodics:
         secretName: build-farm-credentials
 - agent: kubernetes
   cluster: api.ci
+  cron: '@yearly'
   decorate: true
-  interval: 6h
   labels:
     job-env: azure
     job-release: "4.6"
@@ -7460,40 +7192,9 @@ periodics:
       - --target=e2e-azure-upgrade
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       command:
-      - /bin/bash
-      - -c
-      - |
-        #!/bin/bash
-        set -euo pipefail
-
-        initial=$(ARTIFACTS)/release-initial.json
-        latest=$(ARTIFACTS)/release-latest.json
-        if ! curl --fail -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest --data-urlencode 'in=>4.5.0-0 <4.6.0-0' > ${initial}; then
-          echo "error: Could not find a stable version"
-          exit 1
-        fi
-        if ! curl --fail -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.6.0-0.ci/latest > ${latest}; then
-          echo "error: Could not find newest version"
-          exit 1
-        fi
-
-        from=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${initial}" )
-        to=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${latest}" )
-        export RELEASE_IMAGE_INITIAL=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${initial}" )
-        export RELEASE_IMAGE_LATEST=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${latest}" )
-
-        # prow doesn't allow init containers or a second container
-        export PATH=$PATH:/tmp/bin
-        mkdir /tmp/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.6/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
-        chmod ug+x /tmp/bin/oc
-
-        # annotate the information about this job so that the release controller adds it to the upgrade graph
-        oc --kubeconfig /etc/appci/sa.release-bot.app.ci.config annotate pj/${PROW_JOB_ID} "release.openshift.io/from-tag=${from}" "release.openshift.io/tag=${to}" "release.openshift.io/source=ocp/$(BRANCH)"
-
-        ci-operator $@
-      - ""
+      - ci-operator
       env:
       - name: BRANCH
         value: "4.5"
@@ -7538,6 +7239,9 @@ periodics:
         name: release-pull-secret
       - mountPath: /etc/appci
         name: appci-release-bot-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -7595,7 +7299,7 @@ periodics:
       - ci-operator
       env:
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6
+        value: registry.ci.openshift.org/ocp/release:4.6
       - name: BRANCH
         value: "4.6"
       - name: CLUSTER_TYPE
@@ -7677,10 +7381,10 @@ periodics:
         secretName: ci-pull-credentials
 - agent: kubernetes
   cluster: api.ci
+  cron: '@yearly'
   decorate: true
   decoration_config:
     skip_cloning: true
-  interval: 12h
   labels:
     job-env: ovirt
     job-release: "4.6"
@@ -7702,43 +7406,7 @@ periodics:
       - --target=e2e-ovirt
       - --template=/usr/local/e2e-ovirt
       command:
-      - /bin/bash
-      - -c
-      - |
-        #!/bin/bash
-        set -euo pipefail
-
-        initial=$(ARTIFACTS)/release-initial.json
-        latest=$(ARTIFACTS)/release-latest.json
-        if ! curl --fail -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4-stable/latest --data-urlencode 'in=>4.5.0-0 <4.6.0-0' > ${initial}; then
-          echo "error: Could not find a stable version"
-          exit 1
-        fi
-        if ! curl --fail -X GET -G --location https://openshift-release.svc.ci.openshift.org/api/v1/releasestream/4.6.0-0.ci/latest > ${latest}; then
-          echo "error: Could not find newest version"
-          exit 1
-        fi
-
-        #TODO remove hardcoded version and release image
-        #from=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${initial}" )
-        from="4.5.18"
-        to=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["name"])' "${latest}" )
-        #export RELEASE_IMAGE_INITIAL=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${initial}" )
-        export RELEASE_IMAGE_INITIAL="quay.io/openshift-release-dev/ocp-release:4.5.18-x86_64"
-        export RELEASE_IMAGE_LATEST=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${latest}" )
-        export INSTALL_INITIAL_RELEASE="true"
-
-        # prow doesn't allow init containers or a second container
-        export PATH=$PATH:/tmp/bin
-        mkdir /tmp/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.6/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
-        chmod ug+x /tmp/bin/oc
-
-        # annotate the information about this job so that the release controller adds it to the upgrade graph
-        oc --kubeconfig /etc/appci/sa.release-bot.app.ci.config annotate pj/${PROW_JOB_ID} "release.openshift.io/from-tag=${from}" "release.openshift.io/tag=${to}" "release.openshift.io/source=ocp/$(BRANCH)"
-
-        ci-operator $@
-      - ""
+      - ci-operator
       env:
       - name: BRANCH
         value: "4.5"
@@ -7746,6 +7414,8 @@ periodics:
         value: ovirt
       - name: LEASE_TYPE
         value: conformance
+      - name: INSTALL_INITIAL_RELEASE
+        value: "true"
       - name: CONFIG_SPEC
         value: |
           resources:
@@ -7906,9 +7576,9 @@ periodics:
       - name: JOB_NAME_SAFE
         value: image-ecosystem
       - name: MULTIARCH_RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp-s390x/release-s390x:4.6
+        value: registry.ci.openshift.org/ocp-s390x/release-s390x:4.6
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6
+        value: registry.ci.openshift.org/ocp/release:4.6
       - name: REMOTE_LIBVIRT_HOSTNAME
         value: ocponz
       - name: REMOTE_LIBVIRT_HOSTNAME_1
@@ -8038,9 +7708,9 @@ periodics:
       - name: JOB_NAME_SAFE
         value: image-ecosystem
       - name: MULTIARCH_RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp-ppc64le/release-ppc64le:4.6
+        value: registry.ci.openshift.org/ocp-ppc64le/release-ppc64le:4.6
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6
+        value: registry.ci.openshift.org/ocp/release:4.6
       - name: REMOTE_LIBVIRT_HOSTNAME
         value: c155f2u33
       - name: REMOTE_LIBVIRT_HOSTNAME_1
@@ -8174,9 +7844,9 @@ periodics:
       - name: JOB_NAME_SAFE
         value: jenkins-e2e
       - name: MULTIARCH_RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp-s390x/release-s390x:4.6
+        value: registry.ci.openshift.org/ocp-s390x/release-s390x:4.6
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6
+        value: registry.ci.openshift.org/ocp/release:4.6
       - name: REMOTE_LIBVIRT_HOSTNAME
         value: ocponz
       - name: REMOTE_LIBVIRT_HOSTNAME_1
@@ -8306,9 +7976,9 @@ periodics:
       - name: JOB_NAME_SAFE
         value: jenkins-e2e
       - name: MULTIARCH_RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp-ppc64le/release-ppc64le:4.6
+        value: registry.ci.openshift.org/ocp-ppc64le/release-ppc64le:4.6
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6
+        value: registry.ci.openshift.org/ocp/release:4.6
       - name: REMOTE_LIBVIRT_HOSTNAME
         value: c155f2u33
       - name: REMOTE_LIBVIRT_HOSTNAME_1
@@ -8388,13 +8058,14 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --target=endurance-test
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       command:
       - ci-operator
       env:
       - name: BRANCH
         value: "4.6"
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6
+        value: registry.ci.openshift.org/ocp/release:4.6
       - name: CLUSTER_TYPE
         value: aws
       - name: CONFIG_SPEC
@@ -8439,6 +8110,9 @@ periodics:
         name: endurance-cluster-credentials-aws
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -8493,13 +8167,14 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --target=endurance-test
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       command:
       - ci-operator
       env:
       - name: BRANCH
         value: "4.6"
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6
+        value: registry.ci.openshift.org/ocp/release:4.6
       - name: CLUSTER_TYPE
         value: aws
       - name: CONFIG_SPEC
@@ -8544,6 +8219,9 @@ periodics:
         name: endurance-cluster-credentials-aws
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -8598,6 +8276,7 @@ periodics:
       - --target=endurance-install
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       command:
       - /bin/bash
       - -c
@@ -8615,7 +8294,7 @@ periodics:
         namespace=$(grep "Creating namespace" /tmp/ci-operator.log | awk '{print $NF}')
         # copy the cluster credentials secret that was created in the job namespace, into the ci namespace
         # so it is persisted for future runs.
-        oc get --export secret endurance-cluster-credentials-aws-new -n $namespace -o yaml | grep -v namespace: > /tmp/secret.yaml
+        oc get secret endurance-cluster-credentials-aws-new -n $namespace -o yaml | grep -vE "namespace:|resourceVersion:|creationTimestamp:|uid:" > /tmp/secret.yaml
         sed -i s/endurance-cluster-credentials-aws-new/endurance-cluster-credentials-4.6-aws/ /tmp/secret.yaml
         oc apply -f /tmp/secret.yaml -n ci
         exit $rc
@@ -8624,7 +8303,7 @@ periodics:
       - name: BRANCH
         value: "4.6"
       - name: RELEASE_IMAGE_LATEST
-        value: registry.svc.ci.openshift.org/ocp/release:4.6
+        value: registry.ci.openshift.org/ocp/release:4.6
       - name: CLUSTER_TYPE
         value: aws
       - name: CONFIG_SPEC
@@ -8670,6 +8349,9 @@ periodics:
         name: endurance-cluster-credentials-aws
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials

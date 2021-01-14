@@ -17,25 +17,15 @@ presubmits:
     spec:
       containers:
       - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-password-file=/etc/boskos/password
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-operator-cluster-profile
         - --target=e2e-operator
-        - --template=/usr/local/e2e-operator
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: JOB_NAME_SAFE
-          value: e2e-operator
-        - name: TEST_COMMAND
-          value: |
-            make test-e2e
-        - name: TEST_IMAGESTREAM_TAG
-          value: stable:aws-ebs-csi-driver-operator-test
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -48,9 +38,9 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/e2e-operator-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-operator
-          name: job-definition
-          subPath: cluster-launch-installer-custom-test-image.yaml
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -70,9 +60,6 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-custom-test-image
-        name: job-definition
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -97,6 +84,7 @@ presubmits:
     spec:
       containers:
       - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
@@ -111,6 +99,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -143,6 +134,7 @@ presubmits:
     spec:
       containers:
       - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
@@ -156,6 +148,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -188,6 +183,7 @@ presubmits:
     spec:
       containers:
       - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
@@ -201,6 +197,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true

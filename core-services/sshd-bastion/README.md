@@ -93,7 +93,7 @@ spec:
     - /usr/bin/curl
     args:
     - sshd.bastion-${environment}
-    image: registry.svc.ci.openshift.org/origin/centos:8
+    image: registry.ci.openshift.org/origin/centos:8
 EOF | oc apply -f -
 $ oc logs --pod-running-timeout=10m "bastion-${environment}"
 $ oc delete pod "bastion-${environment}"

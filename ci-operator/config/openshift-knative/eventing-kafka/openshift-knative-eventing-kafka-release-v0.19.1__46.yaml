@@ -1,0 +1,144 @@
+base_images:
+  base:
+    name: "4.6"
+    namespace: ocp
+    tag: base
+binary_build_commands: make install
+build_root:
+  project_image:
+    dockerfile_path: openshift/ci-operator/build-image/Dockerfile
+canonical_go_repository: knative.dev/eventing-kafka
+images:
+- dockerfile_path: openshift/ci-operator/knative-images/consolidated_controller/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/consolidated_controller
+  to: knative-eventing-kafka-consolidated-controller
+- dockerfile_path: openshift/ci-operator/knative-images/consolidated_dispatcher/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/consolidated_dispatcher
+  to: knative-eventing-kafka-consolidated-dispatcher
+- dockerfile_path: openshift/ci-operator/knative-images/distributed_controller/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/distributed_controller
+  to: knative-eventing-kafka-distributed-controller
+- dockerfile_path: openshift/ci-operator/knative-images/distributed_dispatcher/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/distributed_dispatcher
+  to: knative-eventing-kafka-distributed-dispatcher
+- dockerfile_path: openshift/ci-operator/knative-images/receive_adapter/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/receive_adapter
+  to: knative-eventing-kafka-receive-adapter
+- dockerfile_path: openshift/ci-operator/knative-images/receiver/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/receiver
+  to: knative-eventing-kafka-receiver
+- dockerfile_path: openshift/ci-operator/knative-images/source_controller/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/source_controller
+  to: knative-eventing-kafka-source-controller
+- dockerfile_path: openshift/ci-operator/knative-images/webhook/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/webhook
+  to: knative-eventing-kafka-webhook
+- dockerfile_path: openshift/ci-operator/knative-test-images/kafka-publisher/Dockerfile
+  from: base
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/kafka-publisher
+  to: knative-eventing-kafka-test-kafka-publisher
+- dockerfile_path: openshift/ci-operator/knative-test-images/kafka_performance/Dockerfile
+  from: base
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/kafka_performance
+  to: knative-eventing-kafka-test-kafka-performance
+promotion:
+  additional_images:
+    knative-eventing-kafka-src: src
+  name: knative-v0.19.1
+  namespace: openshift
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: "4"
+      memory: 6Gi
+  bin:
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: "4"
+      memory: 6Gi
+tag_specification:
+  name: "4.6"
+  namespace: ocp
+test_binary_build_commands: make test-install
+tests:
+- as: e2e-aws-ocp-46
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-ocp-46-continuous
+  cron: 0 */12 * * 1-5
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-v0.19.1
+  org: openshift-knative
+  repo: eventing-kafka
+  variant: "46"

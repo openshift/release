@@ -72,9 +72,18 @@ cat > create-machines.yaml <<-'EOF'
 
   - include_tasks: create_machineset.yaml
     loop: "{{ (machineset.stdout | from_json)['items'] }}"
+    loop_control:
+      loop_var: machineset_obj
     when:
-    - item.status.replicas is defined
-    - item.status.replicas != 0
+    - machineset_obj.status.replicas is defined
+    - machineset_obj.status.replicas != 0
+
+  - name: Fail if new_workers_list is empty
+    fail:
+      msg: >
+        No new_workers created, check replica count for existing machinesets.
+    when:
+    - new_workers_list | length == 0
 
   - name: Get ssh bastion address
     command: >
@@ -101,11 +110,11 @@ cat > create_machineset.yaml <<-'EOF'
 ---
 - name: Create machineset_name
   set_fact:
-    machineset_name: "{{ item.metadata.name ~ '-' ~ platform_type }}"
+    machineset_name: "{{ machineset_obj.metadata.name ~ '-' ~ platform_type }}"
 
 - name: Update machineset definition
   set_fact:
-    machineset: "{{ item | combine(dict_edit, recursive=True) }}"
+    machineset: "{{ machineset_obj | combine(dict_edit, recursive=True) }}"
   vars:
     dict_edit:
       metadata:

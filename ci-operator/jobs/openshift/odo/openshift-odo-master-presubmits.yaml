@@ -1,7 +1,7 @@
 presubmits:
   openshift/odo:
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - master
     cluster: build02
@@ -14,9 +14,11 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-odo-master-unit
     rerun_command: /test unit
+    run_if_changed: ^(?:[^d]+|d(?:$|[^o]|o(?:$|[^c]|c(?:$|[^s]))))*$
     spec:
       containers:
       - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
@@ -30,6 +32,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -63,6 +68,7 @@ presubmits:
     spec:
       containers:
       - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
@@ -77,6 +83,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -110,6 +119,7 @@ presubmits:
     spec:
       containers:
       - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
@@ -124,6 +134,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -157,6 +170,7 @@ presubmits:
     spec:
       containers:
       - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
@@ -171,6 +185,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -204,6 +221,7 @@ presubmits:
     spec:
       containers:
       - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
@@ -218,6 +236,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -234,30 +255,83 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )v4.5-images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - master
     cluster: build02
-    context: ci/prow/v4.5-integration-e2e
+    context: ci/prow/v4.6-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: v4.5
+      ci-operator.openshift.io/variant: v4.6
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-odo-master-v4.5-integration-e2e
-    rerun_command: /test v4.5-integration-e2e
+    name: pull-ci-openshift-odo-master-v4.6-images
+    rerun_command: /test v4.6-images
     spec:
       containers:
       - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --target=[images]
+        - --variant=v4.6
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )v4.6-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - master
+    cluster: build02
+    context: ci/prow/v4.6-integration-e2e
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: v4.6
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-odo-master-v4.6-integration-e2e
+    rerun_command: /test v4.6-integration-e2e
+    run_if_changed: ^(?:[^d]+|d(?:$|[^o]|o(?:$|[^c]|c(?:$|[^s]))))*$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-password-file=/etc/boskos/password
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --secret-dir=/usr/local/integration-e2e-cluster-profile
         - --target=integration-e2e
-        - --variant=v4.5
+        - --variant=v4.6
         command:
         - ci-operator
         image: ci-operator:latest
@@ -272,6 +346,9 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/integration-e2e-cluster-profile
           name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -297,4 +374,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )v4.5-integration-e2e,?($|\s.*)
+    trigger: (?m)^/test( | .* )v4.6-integration-e2e,?($|\s.*)

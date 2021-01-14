@@ -22,6 +22,14 @@ build_root:
     namespace: openshift
     tag: golang-1.15
 images:
+- context_dir: images/cvp-trigger/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/cvp-trigger
+  to: cvp-trigger
 - context_dir: images/template-deprecator/
   from: os
   inputs:
@@ -383,7 +391,7 @@ images:
         source_path: /go/bin/ocp-build-data-enforcer
   to: ocp-build-data-enforcer
 - context_dir: test/images/e2e-bin/
-  from: bin
+  from: test-bin
   inputs:
     boskos:
       paths:
@@ -391,6 +399,8 @@ images:
         source_path: /app
   to: e2e-bin
 promotion:
+  excluded_images:
+  - e2e-bin
   namespace: ci
   tag: latest
 resources:
@@ -398,6 +408,7 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+test_binary_build_commands: make race-install
 tests:
 - artifact_dir: /tmp/artifacts
   as: unit
@@ -418,23 +429,24 @@ tests:
   as: integration
   commands: make integration
   container:
-    from: bin
+    from: test-bin
 - as: e2e
   steps:
     test:
     - as: e2e
-      commands: IMPORT_SECRET_DIR=/import PULL_SECRET_DIR=/pull KUBECONFIG=/auth/kubeconfig make e2e
+      commands: |
+        REMOTE_REGISTRY_SECRET_DIR=/tmp/import-secret LOCAL_REGISTRY_SECRET_DIR=/tmp/pull-secret IMPORT_SECRET_DIR=/tmp/import-secret PULL_SECRET_DIR=/tmp/pull-secret KUBECONFIG=/auth/kubeconfig make e2e
       credentials:
       - mount_path: /auth
         name: ci-operator
         namespace: test-credentials
-      - mount_path: /pull
+      - mount_path: /tmp/pull-secret
         name: registry-pull-credentials
         namespace: test-credentials
       - mount_path: /etc/push-secret
         name: registry-push-credentials-ci-central
         namespace: test-credentials
-      - mount_path: /import
+      - mount_path: /tmp/import-secret
         name: ci-pull-credentials
         namespace: test-credentials
       from: e2e-bin
@@ -446,7 +458,7 @@ tests:
   as: breaking-changes
   commands: make check-breaking-changes
   container:
-    from: bin
+    from: test-bin
 - artifact_dir: /tmp/artifacts
   as: validate-vendor
   commands: make validate-vendor

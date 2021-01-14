@@ -145,7 +145,7 @@ objects:
       - name: KUBECONFIG
         value: /tmp/artifacts/installer/auth/kubeconfig
       - name: MIRROR_BASE
-        value: registry.svc.ci.openshift.org/${NAMESPACE}/release
+        value: registry.ci.openshift.org/${NAMESPACE}/release
       command:
       - /bin/bash
       - -c
@@ -340,7 +340,7 @@ objects:
 
         function run-upgrade-tests() {
           openshift-tests run-upgrade "${TEST_SUITE}" --to-image "${IMAGE:-${RELEASE_IMAGE_LATEST}}" \
-            --options "${TEST_OPTIONS:-}" \
+            --options "${TEST_UPGRADE_OPTIONS:-}" \
             --provider "${TEST_PROVIDER:-}" -o ${ARTIFACT_DIR}/e2e.log --junit-dir ${ARTIFACT_DIR}/junit
         }
 
@@ -400,7 +400,7 @@ objects:
       - name: HOME
         value: /tmp
       - name: MIRROR_BASE
-        value: registry.svc.ci.openshift.org/${NAMESPACE}/release
+        value: registry.ci.openshift.org/${NAMESPACE}/release
       - name: INSTALL_INITIAL_RELEASE
       - name: RELEASE_IMAGE_INITIAL
       command:
@@ -453,10 +453,16 @@ objects:
         mkdir -p ~/.ssh
         cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/
 
+        masters=3
+        if has_variant "single-node" ;then
+          masters=1
+        fi
+
         workers=3
-        if has_variant "compact" || has_variant "multisocket"; then
+        if has_variant "compact" || has_variant "multisocket" || has_variant "single-node"; then
           workers=0
         fi
+
         if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
             master_type=null
             if has_variant "multisocket"; then
@@ -508,7 +514,7 @@ objects:
           name: ${CLUSTER_NAME}
         controlPlane:
           name: master
-          replicas: 3
+          replicas: ${masters}
           platform:
             aws:
               type: ${master_type}

@@ -40,5 +40,19 @@ echo "Configuring proxy registry : \"$OO_CONFIGURE_PROXY_REGISTRY\""
 # step-3: Disable the default OperatorSources/Sources (for redhat-operators, certified-operators, and community-operators) on your 4.5 cluster (or default CatalogSources in 4.6+) with the following command:
 oc patch OperatorHub cluster --type json -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
 
-# Sleep for 2 minutes to allow for the nodes to restart
+# Sleep for 2 minutes to allow for the nodes to begin restarting
 sleep 120
+# Query the node state until all of the nodes are ready
+for i in {1..60}; do
+    NODE_STATE="$(oc get nodes || echo "ERROR")"
+    if [[ ${NODE_STATE} == *"NotReady"*  || ${NODE_STATE} == *"SchedulingDisabled"* ]]; then
+        echo "Not all of the nodes have finished restarting - waiting for 30 seconds, attempt ${i}"
+        sleep 30
+    elif [[ ${NODE_STATE} == "ERROR" ]]; then
+        echo "Encountered an issue querying the OpenShift API - waiting for 30 seconds, attempt ${i}"
+        sleep 30
+    else
+        echo "All nodes ready"
+        break
+    fi
+done

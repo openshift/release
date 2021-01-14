@@ -5,7 +5,7 @@ base_images:
     tag: base
   dev-scripts:
     name: test
-    namespace: openshift-kni
+    namespace: ocp-kni
     tag: dev-scripts
   ocp_builder_golang-1.12:
     name: builder
@@ -71,15 +71,14 @@ tests:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
 - as: e2e-gcp-ovn-upgrade
-  commands: TEST_SUITE=all run-upgrade-tests
   cron: '@yearly'
-  openshift_installer:
+  steps:
     cluster_profile: gcp
-    upgrade: true
+    workflow: openshift-upgrade-gcp
 - as: e2e-agnostic-upgrade
   steps:
     cluster_profile: gcp
-    workflow: openshift-upgrade-gcp-loki
+    workflow: openshift-upgrade-gcp
 - as: e2e-aws-sdn-multi
   steps:
     cluster_profile: aws
@@ -92,6 +91,10 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-ovn-hybrid
+- as: e2e-ovn-ipsec-step-registry
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-ovn-ipsec
 - as: e2e-metal-ipi-ovn-ipv6
   steps:
     cluster_profile: packet
@@ -120,6 +123,10 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-ovn
+- as: e2e-gcp-ovn
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-ovn
 zz_generated_metadata:
   branch: release-4.7
   org: openshift

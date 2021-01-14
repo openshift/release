@@ -5,13 +5,20 @@ import yaml
 
 CONFIG = {
     'aws-quota-slice': {
-        'default': 150,
+        # Wild guesses.  We'll see when we hit quota issues
+        'us-east-1': 50,
+        'us-east-2': 35,
+        'us-west-1': 35,
+        'us-west-2': 35,
     },
     'azure4-quota-slice': {
-        'default': 30,
+        'centralus': 33,
+        'eastus': 10,
+        'eastus2': 10,
+        'westus': 10
     },
     'gcp-quota-slice': {
-        'default': 120,
+        'us-east1': 80,
     },
     'libvirt-s390x-quota-slice': {},
     'libvirt-ppc64le-quota-slice': {},
@@ -29,12 +36,10 @@ CONFIG = {
     'openstack-ppc64le-quota-slice': {},
     'ovirt-quota-slice': {},
     'packet-quota-slice': {
-        'default': 20,
-    },
-    'vsphere-quota-slice': {
-        'default': 10,
+        'default': 30,
     },
     'kubevirt-quota-slice':{},
+    'vsphere-quota-slice':{},
 }
 
 for i in range(2):
@@ -56,6 +61,9 @@ for i in range(10, 18):
 
 for i in range(1, 4):
     CONFIG['kubevirt-quota-slice']['tenant-cluster-{}'.format(i)] = 1
+
+for i in range(0,10):
+    CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 config = {
     'resources': [],

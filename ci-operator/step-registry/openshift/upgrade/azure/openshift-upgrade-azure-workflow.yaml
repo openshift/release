@@ -1,16 +1,22 @@
 workflow:
   as: openshift-upgrade-azure
   steps:
+    allow_best_effort_post_steps: true
     pre:
-    - chain: ipi-azure-pre
+    - ref: ipi-install-monitoringpvc
+    - ref: ipi-install-loki
+    - chain: ipi-azure-pre-stableinitial
     test:
     - ref: openshift-e2e-test
     post:
+    - ref: gather-loki
     - chain: ipi-azure-post
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: "release:initial"
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: "release:latest"
     env:
-      TEST_COMMAND: "run-upgrade"
-      TEST_SUITE: "all"
+      TEST_TYPE: upgrade
+      TEST_SUITE: ""
+      TEST_UPGRADE_OPTIONS: ""
   documentation: |-
-    The Openshift E2E Azure workflow executes the upgrade end-to-end test suite on Azure with a default cluster configuration, exercising an upgrade during the process.
+    The Openshift E2E Azure workflow executes the upgrade end-to-end test suite on Azure with a default cluster configuration and Loki as a log collector, exercising an upgrade during the process.

@@ -10,17 +10,8 @@ build_root:
     namespace: openshift
     tag: golang-1.13
 canonical_go_repository: github.com/openshift/openshift-tests-private
-images:
-- dockerfile_path: openshift-ci/build-root/Dockerfile
-  from: bin
-  inputs:
-    cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-  to: oc-bin-image
 promotion:
-  name: ginkgo-test-priv
+  name: 4.7-priv
   namespace: ocp-private
 releases:
   latest:
@@ -54,8 +45,9 @@ tests:
     cluster_profile: aws
     test:
     - as: bin-test
+      cli: latest
       commands: ./bin/extended-platform-tests run openshift/conformance/parallel --run "High-24829"
-      from: oc-bin-image
+      from: bin
       resources:
         requests:
           cpu: "2"
@@ -67,8 +59,9 @@ tests:
     cluster_profile: aws
     test:
     - as: periodic-e2e-test
+      cli: latest
       commands: make nightly-test
-      from: oc-bin-image
+      from: bin
       resources:
         requests:
           cpu: "2"

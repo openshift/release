@@ -3,26 +3,23 @@ base_images:
     name: 4.7-priv
     namespace: ocp-private
     tag: cli
-binary_build_commands: make build
+binary_build_commands: make all
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: golang-1.13
 canonical_go_repository: github.com/openshift/openshift-tests-private
-images:
-- dockerfile_path: openshift-ci/build-root/Dockerfile
-  from: bin
-  inputs:
-    cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-  to: oc-bin-image
 promotion:
   disabled: true
   name: 4.7-priv
   namespace: ocp-private
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.7"
 resources:
   '*':
     limits:
@@ -38,18 +35,34 @@ resources:
     requests:
       cpu: "4"
       memory: 4Gi
-tag_specification:
-  name: 4.7-priv
-  namespace: ocp-private
 test_binary_build_commands: make test
 tests:
+- as: title-check
+  commands: make name-check
+  container:
+    from: src
 - as: e2e-aws
   steps:
     cluster_profile: aws
     test:
-    - as: e2e-test
+    - as: bin-test
+      cli: latest
       commands: ./bin/extended-platform-tests run openshift/conformance/parallel --run "High-24829"
-      from: oc-bin-image
+      from: bin
+      resources:
+        requests:
+          cpu: "2"
+          memory: 4Gi
+    workflow: ipi-aws
+- as: sanity
+  cron: 0 */8 * * *
+  steps:
+    cluster_profile: aws
+    test:
+    - as: periodic-e2e-test
+      cli: latest
+      commands: make nightly-test
+      from: bin
       resources:
         requests:
           cpu: "2"

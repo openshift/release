@@ -58,34 +58,16 @@ tests:
   steps:
     cluster_profile: aws
     test:
-    - as: test
+    - as: e2e
       cli: latest
       commands: |
         set -x
-        # Increase the size of the machines so that there are machines large enough
-        # to run Presto, and the full metering stack.
-        kubectl -n openshift-machine-api get machinesets -o name | grep worker | cut -d/ -f2 | xargs -I{} kubectl -n openshift-machine-api scale machineset {} --replicas 3
 
-        # Note: re-enable upgrade testing once CRD + apiserver issues have been dealt with
-        # TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/upgrade EXTRA_TEST_FLAGS="-run TestMeteringUpgrades" make e2e
+        # Increase the size of the machines so that there are machines large enough to run Presto, and the full metering stack.
+        kubectl -n openshift-machine-api get machinesets --no-headers | awk '{ print $1 }' | xargs -I{} kubectl -n openshift-machine-api patch machineset {} --type json -p '[{"op": "replace", "path": "/spec/template/spec/providerSpec/value/instanceType", "value": "m5.xlarge"}]'
+        kubectl -n openshift-machine-api get machinesets -o name | grep worker | cut -d/ -f2 | xargs -I{} kubectl -n openshift-machine-api scale machineset {} --replicas 4
 
         TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/e2e EXTRA_TEST_FLAGS="-run TestManualMeteringInstall" make e2e
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
-- as: metering-periodic-aws
-  cron: '@daily'
-  steps:
-    cluster_profile: aws
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        set -x
-
-        make e2e EXTRA_TEST_FLAGS="-run TestManualMeteringInstall" TEST_ENABLE_MACHINE_AUTOSCALING="true" TEST_RUN_ALL_INSTALL_TESTS="true" TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/e2e
       from: src
       resources:
         requests:

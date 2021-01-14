@@ -53,15 +53,18 @@ tests:
   commands: make unused && git diff --exit-code
   container:
     from: src
+- as: test
+  commands: make build && make test
+  container:
+    from: src
 - as: e2e-aws
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
 - as: e2e-aws-upgrade
-  commands: TEST_SUITE=all run-upgrade-tests
-  openshift_installer:
+  steps:
     cluster_profile: aws
-    upgrade: true
+    workflow: openshift-upgrade-aws
 zz_generated_metadata:
   branch: release-4.7
   org: openshift

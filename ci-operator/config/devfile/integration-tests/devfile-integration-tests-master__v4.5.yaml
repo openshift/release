@@ -1,0 +1,51 @@
+base_images:
+  cli:
+    name: "4.5"
+    namespace: ocp
+    tag: cli
+binary_build_commands: make bin
+build_root:
+  project_image:
+    dockerfile_path: openshift-ci/build-root/Dockerfile
+images:
+- context_dir: openshift-ci/build-root/source-image
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: oc-bin-image
+resources:
+  '*':
+    requests:
+      cpu: 800m
+      memory: 6Gi
+tag_specification:
+  name: "4.5"
+  namespace: ocp
+tests:
+- as: integration-e2e
+  steps:
+    cluster_profile: aws
+    test:
+    - as: integration-e2e-steps
+      commands: scripts/openshiftci-presubmit-all-tests.sh
+      credentials:
+      - mount_path: /usr/local/ci-secrets/odo-rabbitmq
+        name: odo-rabbitmq
+        namespace: test-credentials
+      env:
+      - default: /usr/local/ci-secrets/odo-rabbitmq/amqpuri
+        name: ODO_RABBITMQ_AMQP_URL
+      from: oc-bin-image
+      resources:
+        requests:
+          cpu: "2"
+          memory: 6Gi
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: master
+  org: devfile
+  repo: integration-tests
+  variant: v4.5

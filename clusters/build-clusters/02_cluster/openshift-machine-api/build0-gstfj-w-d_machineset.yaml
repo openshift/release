@@ -1,0 +1,53 @@
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineSet
+metadata:
+  labels:
+    machine.openshift.io/cluster-api-cluster: build0-gstfj
+  name: build0-gstfj-w-d
+  namespace: openshift-machine-api
+spec:
+  selector:
+    matchLabels:
+      machine.openshift.io/cluster-api-cluster: build0-gstfj
+      machine.openshift.io/cluster-api-machineset: build0-gstfj-w-d
+  template:
+    metadata:
+      labels:
+        machine.openshift.io/cluster-api-cluster: build0-gstfj
+        machine.openshift.io/cluster-api-machine-role: worker
+        machine.openshift.io/cluster-api-machine-type: worker
+        machine.openshift.io/cluster-api-machineset: build0-gstfj-w-d
+    spec:
+      metadata: {}
+      providerSpec:
+        value:
+          apiVersion: gcpprovider.openshift.io/v1beta1
+          canIPForward: false
+          credentialsSecret:
+            name: gcp-cloud-credentials
+          deletionProtection: false
+          disks:
+          - autoDelete: true
+            boot: true
+            image: build0-gstfj-rhcos-image
+            labels: null
+            sizeGb: 1200
+            type: pd-ssd
+          kind: GCPMachineProviderSpec
+          machineType: n1-standard-16
+          metadata:
+            creationTimestamp: null
+          networkInterfaces:
+          - network: build0-gstfj-network
+            subnetwork: build0-gstfj-worker-subnet
+          projectID: openshift-ci-build-farm
+          region: us-east1
+          serviceAccounts:
+          - email: build0-gstfj-w@openshift-ci-build-farm.iam.gserviceaccount.com
+            scopes:
+            - https://www.googleapis.com/auth/cloud-platform
+          tags:
+          - build0-gstfj-worker
+          userDataSecret:
+            name: worker-user-data
+          zone: us-east1-d

@@ -15,6 +15,7 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
         - --oauth-token-path=/usr/local/github-credentials/oauth
@@ -31,6 +32,9 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
@@ -77,10 +81,10 @@ postsubmits:
         - name: COMPONENT_VERSION
           value: 0.0.2
         - name: PIPELINE_MANIFEST_REMOTE_REPO
-          value: registry.svc.ci.openshift.org/open-cluster-management
+          value: registry.ci.openshift.org/open-cluster-management
         - name: SELF
           value: make -f /opt/build-harness/Makefile.build-harness-openshift-ci
-        image: registry.svc.ci.openshift.org/open-cluster-management/builder:go1.14-linux-amd64
+        image: registry.ci.openshift.org/open-cluster-management/builder:go1.14-linux-amd64
         imagePullPolicy: Always
         name: ""
         resources:
