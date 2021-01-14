@@ -16,6 +16,33 @@ export AWS_DEFAULT_REGION=us-east-1
 
 installer_dir=/tmp/installer
 tfvars_path=/var/run/secrets/ci.openshift.io/cluster-profile/vmc.secret.auto.tfvars
+cluster_name=$(<"${SHARED_DIR}"/clustername.txt)
+
+echo Deprovisioning $cluster_name
+
+echo "$(date -u --rfc-3339=seconds) - Collecting vCenter performance data, events, and alerts"
+
+set +e
+# shellcheck source=/dev/null
+source "${SHARED_DIR}/govc.sh"
+vm_path="/${GOVC_DATACENTER}/vm/${cluster_name}"
+vcenter_state=${ARTIFACT_DIR}/vcenter_state
+mkdir ${vcenter_state}
+
+govc object.collect "/${GOVC_DATACENTER}/host" triggeredAlarmState &> ${vcenter_state}/host_alarms.log
+govc events "/${GOVC_DATACENTER}/host" &> ${vcenter_state}/host_events.log
+govc metric.ls $vm_path/* | xargs govc metric.sample -json -n 60 $vm_path/* &> ${vcenter_state}/vm_metrics.json
+
+clustervms=$(govc ls "${vm_path}")
+for vm in $clustervms; do
+echo Collecting alarms and events from $vm
+echo " >>>> Alarms for: $vm" >> ${vcenter_state}/vm_alarms.log
+echo " >>>> Events for: $vm" >> ${vcenter_state}/vm_events.log
+govc object.collect $vm triggeredAlarmState &>> ${vcenter_state}/vm_alarms.log
+govc events $vm &>> ${vcenter_state}/vm_events.log
+done
+set -e
+
 echo "$(date -u --rfc-3339=seconds) - Copying config from shared dir..."
 
 mkdir -p "${installer_dir}/auth"

@@ -1,0 +1,49 @@
+base_images:
+  cli:
+    name: "4.5"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- dockerfile_path: Dockerfile
+  to: registry-operator
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.5"
+  namespace: ocp
+tests:
+- as: registry-operator-integration-test
+  steps:
+    cluster_profile: aws
+    test:
+    - as: registry-operator-integration-test-steps
+      commands: |
+        export PATH=$PATH:/tmp/bin
+        mkdir /tmp/bin
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.5/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
+        chmod ug+x /tmp/bin/oc
+        .ci/openshift_integration.sh
+      dependencies:
+      - env: REGISTRY_OPERATOR
+        name: registry-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: devfile
+  repo: registry-operator
+  variant: v4.5

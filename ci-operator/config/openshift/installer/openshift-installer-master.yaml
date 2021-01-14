@@ -5,7 +5,7 @@ base_images:
     tag: base
   dev-scripts:
     name: test
-    namespace: openshift-kni
+    namespace: ocp-kni
     tag: dev-scripts
   ocp_4.1_cli:
     name: "4.1"
@@ -233,10 +233,9 @@ tests:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-sharednetwork
 - as: e2e-aws-upgrade
-  commands: TEST_SUITE=all run-upgrade-tests
-  openshift_installer:
+  steps:
     cluster_profile: aws
-    upgrade: true
+    workflow: openshift-upgrade-aws
 - as: e2e-aws-upi
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer_upi:
@@ -262,10 +261,9 @@ tests:
   openshift_installer:
     cluster_profile: aws
 - as: e2e-gcp-upgrade
-  commands: TEST_SUITE=all run-upgrade-tests
-  openshift_installer:
+  steps:
     cluster_profile: gcp
-    upgrade: true
+    workflow: openshift-upgrade-gcp
 - as: e2e-metal-ipi
   steps:
     cluster_profile: packet
@@ -303,6 +301,10 @@ tests:
   steps:
     cluster_profile: openstack
     workflow: openshift-e2e-openstack-ipi
+- as: openstack-manifests
+  steps:
+    cluster_profile: openstack
+    workflow: openshift-manifests-openstack
 - as: e2e-vsphere
   steps:
     cluster_profile: vsphere
@@ -323,6 +325,10 @@ tests:
   steps:
     cluster_profile: packet
     workflow: baremetalds-assisted
+- as: e2e-ovirt
+  steps:
+    cluster_profile: ovirt
+    workflow: openshift-e2e-ovirt-minimal
 zz_generated_metadata:
   branch: master
   org: openshift

@@ -11,6 +11,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.7
   ocp_builder_rhel-8-golang-openshift-4.6:
     name: builder
     namespace: ocp
@@ -25,9 +29,9 @@ images:
 - dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
   to: cluster-authentication-operator
 promotion:
   name: "4.7"
@@ -79,7 +83,7 @@ tests:
 - as: e2e-agnostic-upgrade
   steps:
     cluster_profile: gcp
-    workflow: openshift-upgrade-gcp-loki
+    workflow: openshift-upgrade-gcp
 - artifact_dir: /tmp/artifacts
   as: e2e-console-login
   commands: ./test-prow-e2e.sh login
@@ -101,6 +105,21 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
+- artifact_dir: /tmp/artifacts
+  as: e2e-aws-operator-encryption-perf
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        mkdir -p /tmp/artifacts
+        make test-e2e-encryption-perf JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: openshift

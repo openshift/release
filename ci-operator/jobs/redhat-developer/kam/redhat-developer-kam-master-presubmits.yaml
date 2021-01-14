@@ -17,6 +17,7 @@ presubmits:
     spec:
       containers:
       - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
@@ -30,6 +31,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -50,24 +54,25 @@ presubmits:
     branches:
     - master
     cluster: build01
-    context: ci/prow/v4.5-images
+    context: ci/prow/v4.6-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: v4.5
+      ci-operator.openshift.io/variant: v4.6
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-redhat-developer-kam-master-v4.5-images
-    rerun_command: /test v4.5-images
+    name: pull-ci-redhat-developer-kam-master-v4.6-images
+    rerun_command: /test v4.6-images
     spec:
       containers:
       - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --target=[images]
-        - --variant=v4.5
+        - --variant=v4.6
         command:
         - ci-operator
         image: ci-operator:latest
@@ -77,6 +82,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -91,33 +99,33 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )v4.5-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )v4.6-images,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - master
     cluster: build01
-    context: ci/prow/v4.5-integration-e2e
+    context: ci/prow/v4.6-integration-e2e
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: v4.5
+      ci-operator.openshift.io/variant: v4.6
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-redhat-developer-kam-master-v4.5-integration-e2e
-    optional: true
-    rerun_command: /test v4.5-integration-e2e
+    name: pull-ci-redhat-developer-kam-master-v4.6-integration-e2e
+    rerun_command: /test v4.6-integration-e2e
     spec:
       containers:
       - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-password-file=/etc/boskos/password
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --secret-dir=/usr/local/integration-e2e-cluster-profile
         - --target=integration-e2e
-        - --variant=v4.5
+        - --variant=v4.6
         command:
         - ci-operator
         image: ci-operator:latest
@@ -132,6 +140,9 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/integration-e2e-cluster-profile
           name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -157,4 +168,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )v4.5-integration-e2e,?($|\s.*)
+    trigger: (?m)^/test( | .* )v4.6-integration-e2e,?($|\s.*)

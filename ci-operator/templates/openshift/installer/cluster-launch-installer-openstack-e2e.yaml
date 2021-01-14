@@ -213,7 +213,7 @@ objects:
 
         function run-upgrade-tests() {
           openshift-tests run-upgrade "${TEST_SUITE}" --to-image "${IMAGE:-${RELEASE_IMAGE_LATEST}}" \
-            --options "${TEST_OPTIONS:-}" \
+            --options "${TEST_UPGRADE_OPTIONS:-}" \
             --provider "${TEST_PROVIDER:-}" -o ${ARTIFACT_DIR}/e2e.log --junit-dir ${ARTIFACT_DIR}/junit
         }
 
@@ -393,11 +393,15 @@ objects:
             sed -i -e 's/networkType: .*$/networkType: OVNKubernetes/g' ${ARTIFACT_DIR}/installer/manifests/cluster-network-02-config.yml
           fi
         fi
-        TF_LOG=debug openshift-install --dir=${ARTIFACT_DIR}/installer create cluster --log-level=debug 2>&1 | grep --line-buffered -v password &
+        TF_LOG=debug openshift-install --dir=${ARTIFACT_DIR}/installer create cluster --log-level=debug 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
         wait "$!"
 
         # Password for the cluster gets leaked in the installer logs and hence removing them.
-        sed -i 's/password: .*/password: REDACTED"/g' ${ARTIFACT_DIR}/installer/.openshift_install.log
+        sed -i '
+          s/password: .*/password: REDACTED/;
+          s/X-Auth-Token.*/X-Auth-Token REDACTED/;
+          s/UserData:.*,/UserData: REDACTED,/;
+          ' "${ARTIFACT_DIR}/installer/.openshift_install.log"
 
         INGRESS_PORT=$(openstack port list --format value -c Name | awk "/${CLUSTER_NAME}.*-ingress-port/ {print}")
         if [ -n "$INGRESS_PORT" ]; then

@@ -15,6 +15,7 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
         - --promote
@@ -31,6 +32,9 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -62,7 +66,7 @@ postsubmits:
       - args:
         - -f
         - /opt/build-harness/Makefile.build-harness-openshift-ci
-        - pipeline-manifest/update
+        - osci/publish
         command:
         - make
         env:
@@ -70,11 +74,11 @@ postsubmits:
           value: registration-operator
         - name: COMPONENT_VERSION
           value: 0.0.3
-        - name: PIPELINE_MANIFEST_REMOTE_REPO
+        - name: OSCI_IMAGE_REMOTE_REPO_SRC
           value: registry.svc.ci.openshift.org/open-cluster-management
         - name: SELF
           value: make -f /opt/build-harness/Makefile.build-harness-openshift-ci
-        image: registry.svc.ci.openshift.org/open-cluster-management/builder:go1.14-linux-amd64
+        image: registry.ci.openshift.org/open-cluster-management/builder:go1.14-linux-amd64
         imagePullPolicy: Always
         name: ""
         resources:

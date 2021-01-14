@@ -15,6 +15,10 @@ base_images:
     name: cli-jq
     namespace: ocp
     tag: latest
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
   machine-os-content-base:
     name: 4.7-priv
     namespace: ocp-private
@@ -35,6 +39,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.7
   tools:
     name: 4.7-priv
     namespace: ocp-private
@@ -53,6 +61,9 @@ images:
     ocp_builder_rhel-8-golang-1.15-openshift-4.6:
       as:
       - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
   to: hyperkube
 - dockerfile_path: openshift-hack/images/tests/Dockerfile.rhel
   from: tools
@@ -242,22 +253,22 @@ tests:
 - as: e2e-gcp-upgrade
   steps:
     cluster_profile: gcp
-    workflow: openshift-upgrade-gcp-loki
+    workflow: openshift-upgrade-gcp
 - as: e2e-aws-upgrade
   steps:
     cluster_profile: aws
-    workflow: openshift-upgrade-aws-loki
+    workflow: openshift-upgrade-aws
 - as: e2e-azure-upgrade
   steps:
     cluster_profile: azure4
-    workflow: openshift-upgrade-azure-loki
+    workflow: openshift-upgrade-azure
 - as: e2e-aws-selfupgrade
   steps:
     cluster_profile: aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
-    workflow: openshift-upgrade-aws-loki
+    workflow: openshift-upgrade-aws
 - as: e2e-aws-serial
   steps:
     cluster_profile: aws
@@ -267,9 +278,11 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws-csi
 - as: e2e-vsphere
-  commands: TEST_SUITE=openshift/conformance/parallel run-tests
-  openshift_installer_upi:
+  steps:
     cluster_profile: vsphere
+    env:
+      TEST_SUITE: openshift/conformance/parallel
+    workflow: openshift-e2e-vsphere-upi
 - as: k8s-e2e-conformance-aws
   steps:
     cluster_profile: aws
@@ -282,6 +295,34 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- as: e2e-aws-multitenant
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-sdn-multi
+- as: e2e-metal-ipi
+  steps:
+    cluster_profile: packet
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OpenShiftSDN
+    workflow: baremetalds-e2e
+- as: e2e-metal-ipi-ovn-ipv6
+  steps:
+    cluster_profile: packet
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        NETWORK_TYPE=OVNKubernetes
+    workflow: baremetalds-e2e
+- as: e2e-metal-ipi-ovn-dualstack
+  steps:
+    cluster_profile: packet
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NETWORK_TYPE=OVNKubernetes
+    workflow: baremetalds-e2e
 zz_generated_metadata:
   branch: release-4.7
   org: openshift-priv

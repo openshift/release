@@ -1,0 +1,41 @@
+# See https://github.com/coreos/coreos-assembler/pull/1745/commits/2a458a62c37ed12b652872ff9d4f65a27e6440b5
+apiVersion: v1
+kind: List
+items:
+- kind: ImageStream
+  apiVersion: v1
+  metadata:
+    name: cosa-exttests
+    namespace: coreos
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    name: cosa-exttests
+    namespace: coreos
+    labels:
+      ci.openshift.io/source-repo: coreos-assembler
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: cosa-exttests:latest
+    source:
+      git:
+        uri: https://github.com/coreos/coreos-assembler
+      contextDir: exttests
+      type: Git
+    strategy:
+      dockerStrategy:
+        from:
+          kind: "ImageStreamTag"
+          name: "coreos-assembler:latest"
+      type: Docker
+    triggers:
+    - type: ConfigChange
+    - imageChange:
+        from:
+          kind: ImageStreamTag
+          name: coreos-assembler:latest
+      type: ImageChange

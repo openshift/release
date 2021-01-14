@@ -1,0 +1,32 @@
+base_images:
+  base:
+    name: release
+    namespace: openshift
+    tag: golang-1.15
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.15
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  to: sippy
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: make test
+  container:
+    from: src
+- as: build
+  commands: make build
+  container:
+    from: src
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: sippy

@@ -15,15 +15,15 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-openshift-4.6
-  openshift_release_golang-1.13:
+  openshift_release_golang-1.15:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: golang-1.15
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.10
+    tag: golang-1.15
 canonical_go_repository: github.com/openshift/sriov-network-operator
 images:
 - dockerfile_path: Dockerfile.rhel7
@@ -59,12 +59,20 @@ tag_specification:
   name: 4.7-priv
   namespace: ocp-private
 tests:
-- as: e2e-aws
-  steps:
-    cluster_profile: aws
-    workflow: openshift-e2e-aws
 - as: gofmt
   commands: IS_CONTAINER=TRUE make fmt
+  container:
+    from: src
+- as: controllers
+  commands: CLUSTER_TYPE=openshift make test-controllers
+  container:
+    from: src
+- as: pkg
+  commands: make test-pkg
+  container:
+    from: src
+- as: api
+  commands: make test-api
   container:
     from: src
 zz_generated_metadata:

@@ -7,6 +7,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.7
   ocp_builder_rhel-8-golang-openshift-4.6:
     name: builder
     namespace: ocp
@@ -24,9 +28,9 @@ images:
 - dockerfile_path: Dockerfile
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
   to: elasticsearch-proxy
 promotion:
   name: "4.7"
@@ -48,6 +52,8 @@ tests:
 - as: cluster-logging-operator-e2e
   steps:
     cluster_profile: aws
+    env:
+      COMPUTE_NODE_TYPE: m5.4xlarge
     test:
     - as: test
       cli: latest
@@ -60,6 +66,8 @@ tests:
 - as: elasticsearch-operator-e2e
   steps:
     cluster_profile: aws
+    env:
+      COMPUTE_NODE_TYPE: m5.4xlarge
     test:
     - as: test
       cli: latest

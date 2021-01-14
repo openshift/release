@@ -35,6 +35,7 @@ subjects:
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: RoleBinding
 metadata:
+  apiGroup: rbac.authorization.k8s.io
   name: user-viewer
   namespace: ocp-priv
 roleRef:
@@ -144,6 +145,7 @@ metadata:
   name: release-controller-binding-ocp
   namespace: ocp-priv
 roleRef:
+  apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: release-controller-modify
 subjects:
@@ -161,6 +163,7 @@ metadata:
   name: release-controller-binding-view
   namespace: ocp-priv
 roleRef:
+  apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: view
 subjects:
@@ -178,6 +181,7 @@ metadata:
   name: release-controller-binding-prowjob-ocp-priv
   namespace: ci
 roleRef:
+  apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: release-controller-priv-prowjob
 subjects:
@@ -204,6 +208,7 @@ metadata:
   name: release-controller-binding-ocp
   namespace: ci-release-priv
 roleRef:
+  apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: edit
 subjects:
@@ -221,6 +226,7 @@ metadata:
   name: release-controller-binding-promote
   namespace: ocp-priv
 roleRef:
+  apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: system:image-builder
 subjects:
@@ -238,6 +244,7 @@ metadata:
   name: release-controller-binding-import
   namespace: ocp-priv
 roleRef:
+  apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: release-controller-import-ocp
   namespace: ocp-priv
@@ -267,49 +274,3 @@ metadata:
     serviceaccounts.openshift.io/oauth-redirectreference.release-controller-ocp-priv: '{"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{"kind":"Route","name":"release-controller-ocp-priv"}}'
   name: release-controller-ocp-priv
   namespace: ci
----
-#---------------------------------------------------------------------------------
-# art_namespaces_rbac.py added the following resource
-#---------------------------------------------------------------------------------
-
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  annotations:
-    serviceaccounts.openshift.io/oauth-redirectreference.files-cache-oauth-proxy: '{"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{"kind":"Route","name":"files-cache-oauth-proxy"}}'
-  name: files-cache-oauth
-  namespace: ci-release-priv
----
-#---------------------------------------------------------------------------------
-# art_namespaces_rbac.py added the following resource
-#---------------------------------------------------------------------------------
-
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: files-cache-oauth-priv
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: files-cache-oauth-priv
-subjects:
-- kind: ServiceAccount
-  name: files-cache-oauth
-  namespace: ci-release-priv
----
-#---------------------------------------------------------------------------------
-# art_namespaces_rbac.py added the following resource
-#---------------------------------------------------------------------------------
-
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: release-controller-jobs-binding
-  namespace: ocp-priv
-roleRef:
-  kind: ClusterRole
-  name: edit
-subjects:
-- kind: ServiceAccount
-  name: default
-  namespace: ci-release-priv

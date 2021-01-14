@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: List
+items:
+- kind: ImageStream
+  apiVersion: v1
+  metadata:
+    namespace: ocp
+    name: cli-jq
+- kind: BuildConfig
+  apiVersion: v1
+  metadata:
+    namespace: ocp
+    name: cli-jq
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: cli-jq:latest
+    source:
+      dockerfile: |
+        FROM ocp/4.5:cli
+        RUN yum install -y jq
+      type: Dockerfile
+    strategy:
+      dockerStrategy:
+        from:
+          kind: ImageStreamTag
+          name: 4.5:cli
+          namespace: ocp
+        imageOptimizationPolicy: SkipLayers
+      type: Docker

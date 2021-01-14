@@ -1,35 +1,23 @@
-base_images:
-  cli:
-    name: "4.5"
-    namespace: ocp
-    tag: cli
+binary_build_commands: make bin
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.13
+  project_image:
+    dockerfile_path: openshift-ci/build-root/Dockerfile
 resources:
   '*':
-    limits:
-      memory: 4Gi
     requests:
-      cpu: 100m
-      memory: 200Mi
-tag_specification:
-  name: "4.5"
-  namespace: ocp
+      cpu: "2"
+      memory: 4Gi
 tests:
-- as: e2e-devfile
+- as: unit
   steps:
-    cluster_profile: aws
     test:
-    - as: e2e-devfile
-      commands: echo Success
-      from: cli
+    - as: unit-steps
+      commands: make openshiftci-presubmit-unittests
+      from: src
       resources:
         requests:
-          cpu: 100m
-          memory: 200Mi
+          cpu: "2"
+          memory: 4Gi
 zz_generated_metadata:
   branch: master
   org: devfile

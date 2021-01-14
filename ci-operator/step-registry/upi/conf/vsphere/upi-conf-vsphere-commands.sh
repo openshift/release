@@ -10,6 +10,13 @@ if [[ -z "$RELEASE_IMAGE_LATEST" ]]; then
   echo "RELEASE_IMAGE_LATEST is an empty string, exiting"
   exit 1
 fi
+# ensure LEASED_RESOURCE is set
+if [[ -z "${LEASED_RESOURCE}" ]]; then
+  echo "Failed to acquire lease"
+  exit 1
+fi
+
+third_octet=$(grep -oP 'ci-segment-\K[[:digit:]]+' <(echo "${LEASED_RESOURCE}"))
 
 export HOME=/tmp
 export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${RELEASE_IMAGE_LATEST}
@@ -28,7 +35,6 @@ cluster_name=$(<"${SHARED_DIR}"/clustername.txt)
 # Create clusterdomain.txt
 echo "${cluster_name}.${base_domain}" > "${SHARED_DIR}"/clusterdomain.txt
 cluster_domain=$(<"${SHARED_DIR}"/clusterdomain.txt)
-
 
 ssh_pub_key_path="${CLUSTER_PROFILE_DIR}/ssh-publickey"
 install_config="${SHARED_DIR}/install-config.yaml"
@@ -51,9 +57,6 @@ EOF
 
 echo "$(date -u --rfc-3339=seconds) - Extend install-config.yaml ..."
 
-# We are not setting
-# machineCIDR: 139.178.94.128/25
-# does this cause an issue?
 cat >> "${install_config}" << EOF
 baseDomain: $base_domain
 controlPlane:
@@ -67,7 +70,7 @@ platform:
     cluster: Cluster-1
     datacenter: SDDC-Datacenter
     defaultDatastore: WorkloadDatastore
-    network: "ci-segment"
+    network: "${LEASED_RESOURCE}"
     password: ${vsphere_password}
     username: ${vsphere_user}
     vCenter: vcenter.sddc-44-236-21-251.vmwarevmc.com
@@ -76,7 +79,7 @@ EOF
 
 echo "$(date -u --rfc-3339=seconds) - Create terraform.tfvars ..."
 cat > "${SHARED_DIR}/terraform.tfvars" <<-EOF
-machine_cidr = "172.31.252.0/22"
+machine_cidr = "192.168.${third_octet}.0/27"
 vm_template = "${vm_template}"
 vsphere_cluster = "Cluster-1"
 vsphere_datacenter = "SDDC-Datacenter"
@@ -89,8 +92,12 @@ cluster_domain = "${cluster_domain}"
 ssh_public_key_path = "${ssh_pub_key_path}"
 compute_memory = "16384"
 compute_num_cpus = "4"
-vm_network = "ci-segment"
+vm_network = "${LEASED_RESOURCE}"
 vm_dns_addresses = ["10.0.0.2"]
+bootstrap_ip_address = "192.168.${third_octet}.3"
+lb_ip_address = "192.168.${third_octet}.2"
+compute_ip_addresses = ["192.168.${third_octet}.7","192.168.${third_octet}.8","192.168.${third_octet}.9"]
+control_plane_ip_addresses = ["192.168.${third_octet}.4","192.168.${third_octet}.5","192.168.${third_octet}.6"]
 EOF
 
 dir=/tmp/installer

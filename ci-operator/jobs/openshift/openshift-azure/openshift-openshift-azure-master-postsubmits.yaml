@@ -3,7 +3,7 @@ postsubmits:
   - agent: kubernetes
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: e2e
     decorate: true
     name: branch-ci-openshift-azure-master-e2e
@@ -14,14 +14,20 @@ postsubmits:
         env:
         - name: FOCUS
           value: \[EveryPR\]
-        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        image: registry.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources: {}
-      serviceAccountName: ci-operator
+        volumeMounts:
+        - mountPath: /secrets
+          name: secrets
+      volumes:
+      - name: secrets
+        secret:
+          secretName: cluster-secrets-azure
   - agent: kubernetes
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: unit
     decorate: true
     name: branch-ci-openshift-azure-master-unit
@@ -30,14 +36,13 @@ postsubmits:
       - args:
         - make
         - unit
-        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        image: registry.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources: {}
-      serviceAccountName: ci-operator
   - agent: kubernetes
     branches:
     - master
-    cluster: api.ci
+    cluster: build02
     context: verify
     decorate: true
     name: branch-ci-openshift-azure-master-verify
@@ -46,14 +51,13 @@ postsubmits:
       - args:
         - make
         - verify
-        image: registry.svc.ci.openshift.org/azure/ci-base:latest
+        image: registry.ci.openshift.org/azure/ci-base:latest
         name: ""
         resources: {}
-      serviceAccountName: ci-operator
   - agent: kubernetes
     branches:
     - ^master$
-    cluster: api.ci
+    cluster: build02
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -65,6 +69,7 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
         - --promote
@@ -80,6 +85,9 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true

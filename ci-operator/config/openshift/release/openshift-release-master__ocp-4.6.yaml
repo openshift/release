@@ -3,13 +3,17 @@ base_images:
     name: "4.6"
     namespace: ocp
     tag: ansible
+  assisted-test-infra:
+    name: assisted-test
+    namespace: ocp-kni
+    tag: assisted-test-infra
   base:
     name: "4.6"
     namespace: ocp
     tag: base
   dev-scripts:
     name: test
-    namespace: openshift-kni
+    namespace: ocp-kni
     tag: dev-scripts
   upi-installer:
     name: "4.6"
@@ -32,6 +36,19 @@ tests:
   steps:
     cluster_profile: packet
     workflow: baremetalds-e2e
+- as: e2e-metal-assisted
+  cron: 0 0 * * 1
+  steps:
+    cluster_profile: packet
+    workflow: baremetalds-assisted
+- as: e2e-metal-assisted-onprem
+  cron: 0 0 * * 1
+  steps:
+    cluster_profile: packet
+    env:
+      ASSISTED_CONFIG: |
+        DEPLOY_TARGET=onprem
+    workflow: baremetalds-assisted
 - as: e2e-metal-ipi-ipv4
   cron: 0 0 * * 1
   steps:

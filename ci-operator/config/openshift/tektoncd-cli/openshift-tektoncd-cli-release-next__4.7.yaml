@@ -1,0 +1,39 @@
+base_images:
+  base:
+    name: "4.7"
+    namespace: ocp
+    tag: base
+binary_build_commands: make
+build_root:
+  project_image:
+    dockerfile_path: openshift/Dockerfile
+canonical_go_repository: github.com/tektoncd/cli
+promotion:
+  name: tektoncd-next-4.7
+  namespace: openshift
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 250Mi
+tag_specification:
+  name: "4.7"
+  namespace: ocp
+tests:
+- as: e2e
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make -C openshift test-e2e-downstream-nightly
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-next
+  org: openshift
+  repo: tektoncd-cli
+  variant: "4.7"

@@ -1,9 +1,18 @@
+base_images:
+  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.7
 binary_build_commands: make build
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/windows-machine-config-operator
 images:
 - dockerfile_path: build/Dockerfile.ci
+  inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
   to: windows-machine-config-operator-test
 promotion:
   name: 4.8-priv
@@ -14,7 +23,19 @@ resources:
       memory: 4Gi
     requests:
       cpu: 100m
-      memory: 600Mi
+      memory: 400Mi
+  src:
+    limits:
+      memory: 10Gi
+    requests:
+      cpu: 100m
+      memory: 10Gi
+  windows-machine-config-operator-test:
+    limits:
+      memory: 10Gi
+    requests:
+      cpu: 100m
+      memory: 10Gi
 tag_specification:
   name: 4.8-priv
   namespace: ocp-private

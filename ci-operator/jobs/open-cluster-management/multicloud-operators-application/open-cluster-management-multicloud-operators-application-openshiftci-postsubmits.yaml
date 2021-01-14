@@ -15,6 +15,7 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
         - --promote
@@ -30,6 +31,9 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -64,7 +68,7 @@ postsubmits:
         - pipeline-manifest/update
         command:
         - make
-        image: registry.svc.ci.openshift.org/open-cluster-management/builder:go1.14-linux-amd64
+        image: registry.ci.openshift.org/open-cluster-management/builder:go1.14-linux-amd64
         imagePullPolicy: Always
         name: ""
         resources:
@@ -96,7 +100,7 @@ postsubmits:
         env:
         - name: GOPROXY
           value: proxy.golang.org,direct
-        image: registry.svc.ci.openshift.org/open-cluster-management/builder:go1.14-linux-amd64
+        image: registry.ci.openshift.org/open-cluster-management/builder:go1.14-linux-amd64
         imagePullPolicy: Always
         name: ""
         resources:

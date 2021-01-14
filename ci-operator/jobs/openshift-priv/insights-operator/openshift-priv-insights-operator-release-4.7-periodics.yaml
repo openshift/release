@@ -18,6 +18,7 @@ periodics:
   spec:
     containers:
     - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-password-file=/etc/boskos/password
       - --oauth-token-path=/usr/local/github-credentials/oauth
@@ -25,16 +26,8 @@ periodics:
       - --report-username=ci
       - --secret-dir=/usr/local/insights-operator-e2e-tests-periodic-cluster-profile
       - --target=insights-operator-e2e-tests-periodic
-      - --template=/usr/local/insights-operator-e2e-tests-periodic
       command:
       - ci-operator
-      env:
-      - name: CLUSTER_TYPE
-        value: gcp
-      - name: JOB_NAME_SAFE
-        value: insights-operator-e2e-tests-periodic
-      - name: TEST_COMMAND
-        value: make test-e2e
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -47,12 +40,12 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/insights-operator-e2e-tests-periodic-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/github-credentials
         name: github-credentials-openshift-ci-robot-private-git-cloner
         readOnly: true
-      - mountPath: /usr/local/insights-operator-e2e-tests-periodic
-        name: job-definition
-        subPath: cluster-launch-installer-src.yaml
       - mountPath: /etc/pull-secret
         name: pull-secret
         readOnly: true
@@ -77,9 +70,83 @@ periodics:
     - name: github-credentials-openshift-ci-robot-private-git-cloner
       secret:
         secretName: github-credentials-openshift-ci-robot-private-git-cloner
-    - configMap:
-        name: prow-job-cluster-launch-installer-src
-      name: job-definition
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 0 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: release-4.7
+    org: openshift-priv
+    path_alias: github.com/openshift/insights-operator
+    repo: insights-operator
+  hidden: true
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-priv-insights-operator-release-4.7-insights-operator-tests-periodic
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-password-file=/etc/boskos/password
+      - --oauth-token-path=/usr/local/github-credentials/oauth
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --secret-dir=/usr/local/insights-operator-tests-periodic-cluster-profile
+      - --target=insights-operator-tests-periodic
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/insights-operator-tests-periodic-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /usr/local/github-credentials
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-gcp
+        - configMap:
+            name: cluster-profile-gcp
+    - name: github-credentials-openshift-ci-robot-private-git-cloner
+      secret:
+        secretName: github-credentials-openshift-ci-robot-private-git-cloner
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials

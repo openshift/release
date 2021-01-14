@@ -7,6 +7,10 @@ base_images:
     name: release
     namespace: openshift
     tag: golang-1.15
+  ubi:
+    name: ubi
+    namespace: ocp
+    tag: "8"
   ubi_minimal:
     name: ubi-minimal
     namespace: ocp
@@ -24,6 +28,10 @@ images:
   dockerfile_path: build/create-vm/Dockerfile
   from: openshift_release_golang-1.15
   to: tekton-task-create-vm
+- context_dir: modules/execute-in-vm/
+  dockerfile_path: build/execute-in-vm/Dockerfile
+  from: openshift_release_golang-1.15
+  to: tekton-task-execute-in-vm
 resources:
   '*':
     limits:
@@ -80,6 +88,8 @@ tests:
       dependencies:
       - env: CREATE_VM_IMAGE
         name: tekton-task-create-vm
+      - env: EXECUTE_IN_VM_IMAGE
+        name: tekton-task-execute-in-vm
       from: test-bin
       resources:
         requests:
@@ -105,6 +115,8 @@ tests:
       dependencies:
       - env: CREATE_VM_IMAGE
         name: tekton-task-create-vm
+      - env: EXECUTE_IN_VM_IMAGE
+        name: tekton-task-execute-in-vm
       from: test-bin
       resources:
         requests:

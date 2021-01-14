@@ -1,0 +1,64 @@
+base_images:
+  base:
+    name: "4.7"
+    namespace: ocp
+    tag: base
+  operator-registry:
+    name: "4.7"
+    namespace: ocp
+    tag: operator-registry
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- dockerfile_path: build/Dockerfile
+  from: base
+  to: node-maintenance-operator
+- dockerfile_path: build/index.Dockerfile.ci.base
+  from: operator-registry
+  to: node-maintenance-operator-index-base
+- dockerfile_path: build/index.Dockerfile.ci.intermediate
+  from: node-maintenance-operator-index-base
+  to: node-maintenance-operator-index-intermediate
+- dockerfile_path: build/index.Dockerfile.ci
+  from: node-maintenance-operator-index-intermediate
+  inputs:
+    node-maintenance-operator-index-intermediate:
+      paths:
+      - destination_dir: database
+        source_path: /registry/index.db
+  to: node-maintenance-operator-index
+promotion:
+  excluded_images:
+  - node-maintenance-operator-index-base
+  - node-maintenance-operator-index-intermediate
+  name: "4.7"
+  namespace: kubevirt
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.7"
+  namespace: ocp
+tests:
+- as: openshift-e2e
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make cluster-sync-deploy cluster-functest
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-0.8
+  org: kubevirt
+  repo: node-maintenance-operator

@@ -1,0 +1,66 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp_builder_rhel-8-base-openshift:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-base-openshift
+  ocp_builder_rhel-8-base-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-base-openshift-4.7
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.15
+images:
+- dockerfile_path: Dockerfile.ocp
+  from: base
+  inputs:
+    base:
+      as:
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-base-openshift
+  to: ironic
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      cat <<EOF> /etc/yum.repos.d/base-4-7-rhel-8-ironic-prevalidation.repo
+      [rhel-8-ironic-prevalidation]
+      id = rhel-8-ironic-prevalidation
+      name = rhel-8-ironic-prevalidation
+      baseurl = http://base-4-7-rhel-8-ironic-prevalidation.ocp.svc/rhel-8-ironic-prevalidation
+      enabled = 1
+      gpgcheck = 0
+      EOF
+    from: ocp_builder_rhel-8-base-openshift
+    to: base
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.7"
+  namespace: ocp
+tests:
+- as: e2e-metal-ipi-prevalidation
+  steps:
+    cluster_profile: packet
+    workflow: baremetalds-e2e
+- as: e2e-metal-ipi-virtualmedia-prevalidation
+  steps:
+    cluster_profile: packet
+    pre:
+    - ref: baremetalds-packet-setup
+    - ref: ipi-install-rbac
+    - ref: baremetalds-devscripts-conf-virtualmedia
+    - ref: baremetalds-devscripts-setup
+    workflow: baremetalds-e2e
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: ironic-image
+  variant: prevalidation

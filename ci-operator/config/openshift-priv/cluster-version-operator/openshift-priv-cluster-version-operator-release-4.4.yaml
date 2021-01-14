@@ -40,11 +40,22 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
-- as: e2e-upgrade
-  commands: TEST_SUITE=all TEST_OPTIONS=abort-at=100 run-upgrade-tests
-  openshift_installer:
+- as: e2e-agnostic-operator
+  steps:
     cluster_profile: gcp
-    upgrade: true
+    test:
+    - as: e2e-test
+      commands: hack/test-integration.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-gcp
+- as: e2e-upgrade
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-upgrade-gcp
 zz_generated_metadata:
   branch: release-4.4
   org: openshift-priv
