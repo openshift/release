@@ -20,6 +20,10 @@ base_images:
     namespace: ocp
     tag: upi-installer
 releases:
+  initial:
+    release:
+      channel: stable
+      version: "4.6"
   latest:
     candidate:
       product: ocp
@@ -91,6 +95,16 @@ tests:
     - ref: baremetalds-devscripts-conf-virtualmedia
     - ref: baremetalds-devscripts-setup
     workflow: baremetalds-e2e
+- as: e2e-metal-ipi-upgrade
+  cron: 0 0 1 1 *
+  steps:
+    cluster_profile: packet
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OpenShiftSDN
+      RUN_UPGRADE_TEST: "true"
+    workflow: baremetalds-e2e-upgrade
 - as: e2e-aws-proxy
   cron: 0 0 */2 * *
   steps:
