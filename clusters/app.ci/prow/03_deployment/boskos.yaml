@@ -70,6 +70,7 @@ objects:
           args:
           - --config=/etc/config/boskos.yaml
           - --namespace=${namespace}
+          - --projected-token-file=/var/sa-token/token
           - --log-level=debug
           ports:
             - containerPort: 8080
@@ -81,6 +82,8 @@ objects:
           - name: boskos-config
             mountPath: /etc/config
             readOnly: true
+          - name: service-account-token
+            mountPath: /var/sa-token
         volumes:
           - name: boskos-config
             configMap:
@@ -97,6 +100,11 @@ objects:
           - name: secret-boskos-tls
             secret:
               secretName: boskos-tls
+          - name: service-account-token
+            projected:
+              sources:
+              - serviceAccountToken:
+                  path: token
 - apiVersion: v1
   kind: Service
   metadata:

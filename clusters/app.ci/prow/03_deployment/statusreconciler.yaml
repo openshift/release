@@ -34,10 +34,13 @@ spec:
         - --github-endpoint=https://api.github.com
         - --github-graphql-endpoint=http://ghproxy/graphql
         - --job-config-path=/etc/job-config
+        - --projected-token-file=/var/sa-token/token
         ports:
           - name: http
             containerPort: 8888
         volumeMounts:
+        - name: service-account-token
+          mountPath: /var/sa-token
         - name: oauth
           mountPath: /etc/github
           readOnly: true
@@ -85,6 +88,11 @@ spec:
             memory: "200Mi"
             cpu: "20m"
       volumes:
+      - name: service-account-token
+        projected:
+          sources:
+          - serviceAccountToken:
+              path: token
       - name: oauth
         secret:
           secretName: github-credentials-openshift-ci-robot
