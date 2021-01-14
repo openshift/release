@@ -23,7 +23,6 @@ periodics:
       - --lease-server-password-file=/etc/boskos/password
       - --report-password-file=/etc/report/password.txt
       - --report-username=ci
-      - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-aws-proxy-cluster-profile
       - --target=e2e-aws-proxy
       - --variant=ocp-4.4
@@ -38,9 +37,6 @@ periodics:
       volumeMounts:
       - mountPath: /etc/boskos
         name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
         readOnly: true
       - mountPath: /usr/local/e2e-aws-proxy-cluster-profile
         name: cluster-profile
@@ -61,9 +57,6 @@ periodics:
         - key: password
           path: password
         secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -71,7 +64,7 @@ periodics:
             name: cluster-secrets-aws
     - name: pull-secret
       secret:
-        secretName: registry-pull-credentials
+        secretName: registry-pull-credentials-all
     - name: result-aggregator
       secret:
         secretName: result-aggregator
