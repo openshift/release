@@ -47,6 +47,7 @@ items:
           image: gcr.io/k8s-prow/exporter:v20210114-14c707557a
           args:
           - --config-path=/etc/config/config.yaml
+          - --projected-token-file=/var/sa-token/token
           ports:
           - name: metrics
             containerPort: 9090
@@ -54,6 +55,8 @@ items:
           - name: config
             mountPath: /etc/config
             readOnly: true
+          - name: service-account-token
+            mountPath: /var/sa-token
           resources:
             requests:
               memory: "4Gi"
@@ -62,3 +65,8 @@ items:
         - name: config
           configMap:
             name: config
+        - name: service-account-token
+          projected:
+            sources:
+            - serviceAccountToken:
+                path: token
