@@ -194,6 +194,11 @@ def generate_app_ci_content(config, git_clone_dir):
         with genlib.GenDoc(config.paths.path_rc_rpms.joinpath(f'rpms-ocp-{major_minor}.yaml'), context=config) as gendoc:
             content.add_rpm_mirror_service(gendoc, git_clone_dir, major_minor)
 
+    # Generate the release-controller one-offs...
+    context = Context(config, "x86_64", False)
+    content.generate_origin_resources(context)
+    content.generate_signer_resources(context)
+
 
 def run(git_clone_dir, bump=False):
 
