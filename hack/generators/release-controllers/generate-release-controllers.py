@@ -34,6 +34,7 @@ class RCPaths:
         self.path_base = pathlib.Path(git_clone_dir)
         self.path_rc_deployments = self.path_base.joinpath('clusters/app.ci/release-controller')
         self.path_rc_release_resources = self.path_base.joinpath('core-services/release-controller')
+        self.path_rc_rpms = self.path_base.joinpath('clusters/build-clusters/common/release-controller')
 
         self.path_rc_build_configs = self.path_rc_release_resources
         self.path_rc_build_configs.mkdir(exist_ok=True)
@@ -154,11 +155,11 @@ def run(git_clone_dir, bump=False):
     with genlib.GenDoc(config.paths.path_rc_deployments.joinpath('admin_deploy-ocp-publish-art.yaml'), context=config) as gendoc:
         content.add_art_publish(gendoc)
 
-    with genlib.GenDoc(config.paths.path_rc_release_resources.joinpath('rpms-ocp-3.11.yaml'), context=config) as gendoc:
+    with genlib.GenDoc(config.paths.path_rc_rpms.joinpath('rpms-ocp-3.11.yaml'), context=config) as gendoc:
         content.add_rpm_mirror_service(gendoc, git_clone_dir, '3.11')
 
     for major_minor in config.releases:
-        with genlib.GenDoc(config.paths.path_rc_release_resources.joinpath(f'rpms-ocp-{major_minor}.yaml'), context=config) as gendoc:
+        with genlib.GenDoc(config.paths.path_rc_rpms.joinpath(f'rpms-ocp-{major_minor}.yaml'), context=config) as gendoc:
             content.add_rpm_mirror_service(gendoc, git_clone_dir, major_minor)
 
         # If there is an annotation defined for the public release controller, use it as a template
