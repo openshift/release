@@ -11,3 +11,5 @@ from .art_namespaces_rbac import add_imagestream_namespace_rbac
 from .redirect_resources import add_redirect_resources
 from .art_rpm_mirroring_services import add_rpm_mirror_service
 from .bump_versioned_resources import bump_versioned_resources
+from .origin_resources import generate_origin_resources
+from .signer_resources import generate_signer_resources

@@ -1,36 +1,54 @@
-kind: Route
+##################################################################################
+#                                DO NOT EDIT
+# File generated during execution of: generate-release-controllers.py
+##################################################################################
+
+
+#---------------------------------------------------------------------------------
+# origin_resources.py added the following resource
+#---------------------------------------------------------------------------------
+
 apiVersion: route.openshift.io/v1
+kind: Route
 metadata:
   name: release-controller
   namespace: ci
 spec:
   host: origin-release.apps.ci.l2s4.p1.openshiftapps.com
   tls:
-    termination: Edge
     insecureEdgeTerminationPolicy: Redirect
+    termination: Edge
   to:
     kind: Service
     name: release-controller
 ---
-kind: Service
+#---------------------------------------------------------------------------------
+# origin_resources.py added the following resource
+#---------------------------------------------------------------------------------
+
 apiVersion: v1
+kind: Service
 metadata:
   name: release-controller
   namespace: ci
 spec:
-  selector:
-    app: release-controller
   ports:
   - port: 80
     targetPort: 8080
+  selector:
+    app: release-controller
 ---
-kind: Deployment
+#---------------------------------------------------------------------------------
+# origin_resources.py added the following resource
+#---------------------------------------------------------------------------------
+
 apiVersion: apps/v1
+kind: Deployment
 metadata:
-  name: release-controller
-  namespace: ci
   annotations:
     image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"release-controller:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"controller\")].image"}]'
+  name: release-controller
+  namespace: ci
 spec:
   replicas: 1
   selector:
@@ -41,6 +59,66 @@ spec:
       labels:
         app: release-controller
     spec:
+      containers:
+      - command:
+        - /usr/bin/release-controller
+        - --release-namespace=origin
+        - --prow-config=/etc/config/config.yaml
+        - --job-config=/etc/job-config
+        - --prow-namespace=ci
+        - --non-prow-job-kubeconfig=/etc/kubeconfig/kubeconfig
+        - --job-namespace=ci-release
+        - --tools-image-stream-tag=4.6:tests
+        - --release-architecture=amd64
+        - -v=4
+        image: release-controller:latest
+        name: controller
+        volumeMounts:
+        - mountPath: /etc/config
+          name: config
+          readOnly: true
+        - mountPath: /etc/job-config/misc
+          name: job-config-misc
+          readOnly: true
+        - mountPath: /etc/job-config/master
+          name: job-config-master
+          readOnly: true
+        - mountPath: /etc/job-config/3.x
+          name: job-config-3x
+          readOnly: true
+        - mountPath: /etc/job-config/4.1
+          name: job-config-41
+          readOnly: true
+        - mountPath: /etc/job-config/4.2
+          name: job-config-42
+          readOnly: true
+        - mountPath: /etc/job-config/4.3
+          name: job-config-43
+          readOnly: true
+        - mountPath: /etc/job-config/4.4
+          name: job-config-44
+          readOnly: true
+        - mountPath: /etc/job-config/4.5
+          name: job-config-45
+          readOnly: true
+        - mountPath: /etc/job-config/4.6
+          name: job-config-46
+          readOnly: true
+        - mountPath: /etc/job-config/4.7
+          name: job-config-47
+          readOnly: true
+        - mountPath: /etc/kubeconfig
+          name: release-controller-kubeconfigs
+          readOnly: true
+        - mountPath: /etc/github
+          name: oauth
+          readOnly: true
+        - mountPath: /etc/bugzilla
+          name: bugzilla
+          readOnly: true
+        - mountPath: /etc/plugins
+          name: plugins
+          readOnly: true
       serviceAccountName: release-controller
       volumes:
       - configMap:
@@ -79,84 +157,30 @@ spec:
           defaultMode: 420
           name: job-config-4.5
         name: job-config-45
-      - name: job-config-46
-        configMap:
+      - configMap:
+          defaultMode: 420
           name: job-config-4.6
-      - name: job-config-47
-        configMap:
+        name: job-config-46
+      - configMap:
+          defaultMode: 420
           name: job-config-4.7
+        name: job-config-47
       - name: release-controller-kubeconfigs
         secret:
-          secretName: release-controller-kubeconfigs
+          defaultMode: 420
           items:
           - key: sa.release-controller.app.ci.config
             path: kubeconfig
+          secretName: release-controller-kubeconfigs
       - name: oauth
         secret:
+          defaultMode: 420
           secretName: github-credentials-openshift-ci-robot
       - name: bugzilla
         secret:
+          defaultMode: 420
           secretName: bugzilla-credentials-openshift-bugzilla-robot
-      - name: plugins
-        configMap:
+      - configMap:
+          defaultMode: 420
           name: plugins
-      containers:
-      - name: controller
-        image: release-controller:latest
-        volumeMounts:
-        - mountPath: /etc/config
-          name: config
-          readOnly: true
-        - mountPath: /etc/job-config/misc
-          name: job-config-misc
-          readOnly: true
-        - mountPath: /etc/job-config/master
-          name: job-config-master
-          readOnly: true
-        - mountPath: /etc/job-config/3.x
-          name: job-config-3x
-          readOnly: true
-        - mountPath: /etc/job-config/4.1
-          name: job-config-41
-          readOnly: true
-        - mountPath: /etc/job-config/4.2
-          name: job-config-42
-          readOnly: true
-        - mountPath: /etc/job-config/4.3
-          name: job-config-43
-          readOnly: true
-        - name: job-config-44
-          mountPath: /etc/job-config/4.4
-          readOnly: true
-        - name: job-config-45
-          mountPath: /etc/job-config/4.5
-          readOnly: true
-        - name: job-config-46
-          mountPath: /etc/job-config/4.6
-          readOnly: true
-        - name: job-config-47
-          mountPath: /etc/job-config/4.7
-          readOnly: true
-        - name: release-controller-kubeconfigs
-          mountPath: /etc/kubeconfig
-          readOnly: true
-        - name: oauth
-          mountPath: /etc/github
-          readOnly: true
-        - name: bugzilla
-          mountPath: /etc/bugzilla
-          readOnly: true
-        - name: plugins
-          mountPath: /etc/plugins
-          readOnly: true
-        command:
-        - /usr/bin/release-controller
-        - --release-namespace=origin
-        - --prow-config=/etc/config/config.yaml
-        - --job-config=/etc/job-config
-        - --prow-namespace=ci
-        - --non-prow-job-kubeconfig=/etc/kubeconfig/kubeconfig
-        - --job-namespace=ci-release
-        - --tools-image-stream-tag=4.6:tests
-        - --release-architecture=amd64
-        - -v=4
+        name: plugins
