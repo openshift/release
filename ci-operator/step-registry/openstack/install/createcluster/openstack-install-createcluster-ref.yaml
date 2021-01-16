@@ -1,0 +1,28 @@
+ref:
+  as: openstack-install-createcluster
+  from: installer
+  commands: openstack-install-createcluster-commands.sh
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+  dependencies:
+    - name: "release:latest"
+      env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+    - name: "release:latest"
+      env: RELEASE_IMAGE_LATEST
+  env:
+    - name: USE_ETCD_RAMDISK
+      default: "true"
+      documentation: Use a ramdisk for etcd storage on the master nodes
+    - name: TF_LOG
+      default: "debug"
+      documentation: sets the level of Teerraform debug level
+    - name: OPENSHIFT_INSTALL_LOG_LEVEL
+      default: "debug"
+      documentation: controls the settings for --log-level flag of openshift-install command
+  documentation: |-
+    Generates the necessary install-config.yaml file based on the requested CONFIG_TYPE.
+    Saves the file as ${SHARED_DIR}/install-config.yaml. Load balancer IP and cluster
+    name, are expected to be in ${SHARED}/LB_FIP_IP and ${SHARED_DIR}/CLUSTER_NAME
+    respectively.
