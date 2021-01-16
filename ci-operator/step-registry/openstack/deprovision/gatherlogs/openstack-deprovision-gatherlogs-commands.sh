@@ -1,3 +1,0 @@
-#!$SHEBANG$
-
-$END$
