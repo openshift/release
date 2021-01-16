@@ -51,6 +51,15 @@ do
   cp "${item}" "${dir}/manifests/${manifest##manifest_}"
 done <   <( find "${SHARED_DIR}" -name "manifest_*.yml" -print0)
 
+if [[ "${USE_ETCD_RAMDISK}" == "true" ]]; then
+  openshift-install --dir=${dir} create ignition-configs
+  python -c \
+      'import json, sys; j = json.load(sys.stdin); j[u"systemd"] = {}; j[u"systemd"][u"units"] = [{u"contents": "[Unit]\nDescription=Mount etcd as a ramdisk\nBefore=local-fs.target\n[Mount]\n What=none\nWhere=/var/lib/etcd\nType=tmpfs\nOptions=size=2G\n[Install]\nWantedBy=local-fs.target", u"enabled": True, u"name":u"var-lib-etcd.mount"}]; json.dump(j, sys.stdout)' \
+      <${dir}/master.ign \
+      >${dir}/master.ign.out
+  mv ${dir}/master.ign.out ${dir}/master.ign
+fi
+
 TF_LOG=debug openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
 
 set +e
