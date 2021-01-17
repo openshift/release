@@ -58,8 +58,10 @@ source /root/config
 # Get sosreport including sar data
 sosreport --ticket-number "\${HOSTNAME}" --batch -o container_log,filesys,kvm,libvirt,logs,networkmanager,podman,processor,rpm,sar,virsh,yum --tmp-dir /tmp/artifacts
 
+NAMESPACE="assisted-installer"
+
 # Print pods
-KUBECONFIG=\${HOME}/.kube/config kubectl get pods
+KUBECONFIG=\${HOME}/.kube/config kubectl get pods -n \${NAMESPACE}
 
 # Get pods
 if [ "\${DEPLOY_TARGET:-}" = "onprem" ]; then
@@ -68,7 +70,7 @@ if [ "\${DEPLOY_TARGET:-}" = "onprem" ]; then
   done
 else
   for service in "assisted-service" "postgres" "scality" "createimage"; do
-    KUBECONFIG=\${HOME}/.kube/config kubectl get pods -o=custom-columns=NAME:.metadata.name -A | grep \${service} | xargs -r -I {} sh -c "KUBECONFIG=\${HOME}/.kube/config kubectl logs {} -n assisted-installer > /tmp/artifacts/k8s_{}.log" || true
+    KUBECONFIG=\${HOME}/.kube/config kubectl get pods -o=custom-columns=NAME:.metadata.name -A | grep \${service} | xargs -r -I {} sh -c "KUBECONFIG=\${HOME}/.kube/config kubectl logs {} -n \${NAMESPACE} > /tmp/artifacts/k8s_{}.log" || true
   done
 fi
 
@@ -76,7 +78,7 @@ fi
 if [ "\${DEPLOY_TARGET:-}" = "onprem" ]; then
   make download_all_logs LOGS_DEST=/tmp/artifacts REMOTE_SERVICE_URL=http://localhost:8090
 else
-  make download_all_logs LOGS_DEST=/tmp/artifacts REMOTE_SERVICE_URL=\$(KUBECONFIG=\${HOME}/.kube/config minikube service assisted-service -n assisted-installer --url)
+  make download_all_logs LOGS_DEST=/tmp/artifacts REMOTE_SERVICE_URL=\$(KUBECONFIG=\${HOME}/.kube/config minikube service assisted-service -n \${NAMESPACE} --url)
 fi
 
 EOF
