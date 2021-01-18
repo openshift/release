@@ -23,7 +23,7 @@ platform:
     cloud:            ${OS_CLOUD}
     externalNetwork:  ${OPENSTACK_EXTERNAL_NETWORK}
     computeFlavor:    ${OPENSTACK_COMPUTE_FLAVOR}
-    lbFloatingIP:     ${LB_FIP_IP}
+    apiFloatingIP:    ${LB_FIP_IP}
 pullSecret: >
   ${PULL_SECRET}
 sshKey: |
