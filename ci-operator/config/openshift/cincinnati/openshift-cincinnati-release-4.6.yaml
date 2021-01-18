@@ -8,25 +8,20 @@ base_images:
     namespace: openshift
     tag: golang-1.13
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.13
+  project_image:
+    dockerfile_path: dist/Dockerfile.build/Dockerfile
 images:
-- dockerfile_path: dist/Dockerfile.build/Dockerfile
-  from: centos
-  to: buildroot
 - dockerfile_path: dist/Dockerfile.deploy/Dockerfile
   from: centos
   inputs:
-    buildroot:
+    src:
       as:
       - quay.io/app-sre/cincinnati:builder
   to: deploy
 - dockerfile_path: dist/Dockerfile.e2e/Dockerfile
   from: centos
   inputs:
-    buildroot:
+    src:
       as:
       - quay.io/app-sre/cincinnati:builder
     openshift_release_golang-1.13:
@@ -96,7 +91,7 @@ tests:
         name: CINCINNATI_TEST_QUAY_API_TOKEN_PATH
       - default: /usr/local/ci-secrets/cincinnati-secrets-cincinnati-credentials/github_token.key
         name: CINCINNATI_GITHUB_SCRAPER_OAUTH_TOKEN_PATH
-      from: e2e-test
+      from: src
       resources:
         requests:
           cpu: 100m
@@ -104,11 +99,11 @@ tests:
 - as: yaml-lint
   commands: dist/prow_yaml_lint.sh
   container:
-    from: e2e-test
+    from: src
 - as: rustfmt-1.46.0
   commands: dist/prow_rustfmt.sh 1.46.0
   container:
-    from: e2e-test
+    from: src
 - as: e2e
   steps:
     cluster_profile: aws
