@@ -17,6 +17,11 @@ cat << EOF > ~/inventory
 sshd.bastion-telco ansible_ssh_user=tester ansible_ssh_common_args="-o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" ansible_password=$SSH_PASS
 EOF
 
+KCLI_PARAM=""
+if [ ! -z $OO_CHANNEL ] ; then
+    KCLI_PARAM="-P openshift_image=registry.svc.ci.openshift.org/ocp/release:$OO_CHANNEL"
+fi
+
 cat << EOF > ~/ocp-install.yml
 ---
 - name: Grab and run kcli to install openshift cluster
@@ -31,8 +36,9 @@ cat << EOF > ~/ocp-install.yml
     retries: 5
   - name: Remove last run
     shell: kcli delete plan --yes upstream_ci
+    ignore_errors: yes
   - name: Run deployment
-    shell: timeout 2h kcli create plan --paramfile /home/tester/kcli_parameters.yml upstream_ci --wait
+    shell: timeout 2h kcli create plan --paramfile /home/tester/kcli_parameters.yml upstream_ci $KCLI_PARAM --wait
     args:
       chdir: ~/kcli-openshift4-baremetal
   - name: Run playbook to copy kubeconfig from installer vm to bastion vm
