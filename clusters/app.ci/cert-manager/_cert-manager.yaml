@@ -7084,7 +7084,7 @@ metadata:
     app.kubernetes.io/component: "webhook"
     helm.sh/chart: cert-manager-v0.15.1
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app.kubernetes.io/name: webhook
@@ -7135,6 +7135,17 @@ spec:
                 fieldPath: metadata.namespace
           resources:
             {}
+---
+apiVersion: policy/v1beta1
+kind: PodDisruptionBudget
+metadata:
+  name: webhook
+  namespace: cert-manager
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: webhook
 ---
 # Source: cert-manager/templates/webhook-mutating-webhook.yaml
 apiVersion: admissionregistration.k8s.io/v1beta1
