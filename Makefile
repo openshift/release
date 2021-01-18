@@ -117,23 +117,12 @@ all: roles prow projects
 roles: cluster-operator-roles
 .PHONY: roles
 
-prow: prow-ci-ns prow-ci-stg-ns
+prow: ci-ns prow-jobs
 .PHONY: prow
-
-prow-ci-ns: ci-ns prow-jobs
-.PHONY: prow-ci-ns
-
-prow-ci-stg-ns: ci-stg-ns
-	$(MAKE) apply WHAT=cluster/ci/config/prow/openshift/ci-operator/stage.yaml
-.PHONY: prow-ci-stg-ns
 
 ci-ns:
 	oc project ci
 .PHONY: ci-ns
-
-ci-stg-ns:
-	oc project ci-stg
-.PHONY: ci-stg-ns
 
 openshift-ns:
 	oc project openshift
