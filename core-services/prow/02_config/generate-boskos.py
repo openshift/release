@@ -40,6 +40,9 @@ CONFIG = {
     },
     'kubevirt-quota-slice':{},
     'vsphere-quota-slice':{},
+    'osd-ephemeral-quota-slice': {
+        'default': 5,
+    },
 }
 
 for i in range(2):
