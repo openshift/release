@@ -83,7 +83,7 @@ in 3.11).''')
                 },
                 'rules': [{
                     'apiGroups': ['image.openshift.io'],
-                    'resources': ['imagestreams'],
+                    'resources': ['imagestreams', 'imagestreamtags'],
                     'verbs': ['get', 'list', 'watch', 'update', 'patch']
                 }]
             })
