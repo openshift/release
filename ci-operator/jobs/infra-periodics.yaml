@@ -955,7 +955,7 @@ periodics:
       - /app/prow/cmd/config-bootstrapper/app.binary
       env:
       - name: KUBECONFIG
-        value: /etc/build-farm-credentials/api.ci.kubeconfig:/etc/build-farm-credentials/build01.kubeconfig:/etc/app-ci-config-updater-kubeconfig/kubeconfig:/etc/build-farm-credentials/build02.kubeconfig:/etc/build-farm-credentials/vsphere.kubeconfig
+        value: /etc/build-farm-credentials/api.ci.kubeconfig:/etc/build-farm-credentials/build01.kubeconfig:/etc/build-farm-credentials/app.ci.kubeconfig:/etc/build-farm-credentials/build02.kubeconfig:/etc/build-farm-credentials/vsphere.kubeconfig
       image: gcr.io/k8s-prow/config-bootstrapper:v20210115-4e5212a395
       imagePullPolicy: Always
       name: ""
@@ -966,9 +966,6 @@ periodics:
       - mountPath: /etc/build-farm-credentials
         name: build-farm-credentials
         readOnly: true
-      - mountPath: /etc/app-ci-config-updater-kubeconfig
-        name: app-ci-config-updater-kubeconfig
-        readOnly: true
     serviceAccountName: config-updater
     volumes:
     - name: build-farm-credentials
@@ -976,6 +973,8 @@ periodics:
         items:
         - key: sa.hook.api.ci.config
           path: api.ci.kubeconfig
+        - key: sa.hook.app.ci.config
+          path: app.ci.kubeconfig
         - key: sa.hook.build01.config
           path: build01.kubeconfig
         - key: sa.hook.build02.config
@@ -983,9 +982,6 @@ periodics:
         - key: sa.hook.vsphere.config
           path: vsphere.kubeconfig
         secretName: build-farm-credentials
-    - name: app-ci-config-updater-kubeconfig
-      secret:
-        secretName: app-ci-config-updater-kubeconfig
 - agent: kubernetes
   cluster: api.ci
   cron: '@hourly'
