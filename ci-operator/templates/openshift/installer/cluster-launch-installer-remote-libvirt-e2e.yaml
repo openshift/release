@@ -171,8 +171,6 @@ objects:
         value: /tmp/home
       - name: KUBECONFIG
         value: /tmp/artifacts/installer/auth/kubeconfig
-      - name: MIRROR_BASE
-        value: registry.ci.openshift.org/${NAMESPACE}/release
       command:
       - /bin/bash
       - -c
@@ -186,6 +184,8 @@ objects:
         trap 'jobs -p | xargs -r kill || true; exit 0' TERM
 
         function patch_image_specs() {
+          MIRROR_BASE=$( KUBECONFIG= oc get is release -o 'jsonpath={.status.publicDockerImageRepository}' )
+
           cat <<EOF >samples-patch.yaml
         - op: add
           path: /spec/skippedImagestreams
@@ -342,8 +342,6 @@ objects:
         value: test
       - name: NSS_GROUPNAME
         value: test
-      - name: MIRROR_BASE
-        value: registry.ci.openshift.org/${NAMESPACE}/release
       - name: MASTER_REPLICAS
         value: "3"
       - name: WORKER_REPLICAS
