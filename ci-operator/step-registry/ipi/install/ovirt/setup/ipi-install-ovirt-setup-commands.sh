@@ -16,6 +16,7 @@ function populate_artifact_dir() {
 }
 
 function prepare_next_steps() {
+  rv=$?
   set +e
   echo "Setup phase finished, prepare env for next steps"
   populate_artifact_dir
@@ -28,8 +29,8 @@ function prepare_next_steps() {
       "${installer_artifact_dir}/metadata.json" \
       "${installer_artifact_dir}"/terraform.*
 
-  echo "Sending event to ovirt, status code ${install_exit_status}"
-  if test "${install_exit_status}" -eq 0 ; then
+  echo "Sending event to ovirt, status code ${rv}"
+  if test "${rv}" -eq 0 ; then
     send_event_to_ovirt "Success"
   else
     send_event_to_ovirt "Failed"
