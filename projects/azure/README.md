@@ -158,18 +158,6 @@ Set the location of the namespace you wish to use for the `ci-operator` jobs
 export CI_OPERATOR_NAMESPACE=your-chosen-namespace
 ```
 
-## Testing prow jobs
-
-To test native prow jobs (non ci-operator) follow [Testing with MKPJ and MKPOD documentation](https://github.com/openshift/release/blob/master/ci-operator/README.md#testing-with-mkpj-and-mkpod)
-
-Example:
-```
-hack/pj_env.py \
-    openshift/openshift-azure master 1053 'Pull Request Author' \
-    hack/mkpjpod.sh pull-ci-openshift-openshift-azure-master-adhoc \
-    | oc -n ci-stg create -f -
-```
-
 ## Testing E2E-Upgrade script locally:
 
 To test e2e-upgrade script we can emulate prow and ci-operator env with docker command:
