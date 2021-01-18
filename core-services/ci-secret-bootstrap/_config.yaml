@@ -2485,18 +2485,15 @@ secret_configs:
     name: openshift-prow-github-app
     namespace: ci
 - from:
-    email:
+    client-id:
       bw_item: dex
-      field: email
-    pw:
+      field: rh-internal-sso-client-id
+    client-secret:
       bw_item: dex
-      field: static-user-pw
-    pw-raw:
-      bw_item: dex
-      field: static-user-pw-raw
+      field: rh-internal-sso-client-secret
   to:
   - cluster: app.ci
-    name: dex-static-user
+    name: rh-sso
     namespace: dex
 - from:
     build01-id:
@@ -2518,5 +2515,27 @@ secret_configs:
       field: build01-secret
   to:
   - cluster: build01
+    name: dex-rh-sso
+    namespace: openshift-config
+- from:
+    build02-id:
+      bw_item: dex
+      field: build02-id
+    build02-secret:
+      bw_item: dex
+      field: build02-secret
+  to:
+  - cluster: app.ci
+    name: build02-secret
+    namespace: dex
+  - cluster: app.ci
+    name: build02-dex-oidc
+    namespace: ci
+- from:
+    clientSecret:
+      bw_item: dex
+      field: build02-secret
+  to:
+  - cluster: build02
     name: dex-rh-sso
     namespace: openshift-config
