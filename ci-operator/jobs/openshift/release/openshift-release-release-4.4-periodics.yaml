@@ -1189,14 +1189,18 @@ periodics:
 
         # create namespace and craft a release image without the machine operator
         namespace="ci-op-$( echo "${JOB_NAME}-${BUILD_ID}" | md5sum -t | cut -c 1-8 )"
-        export RELEASE_IMAGE_INITIAL=registry.ci.openshift.org/ocp/release:$(FROM_BRANCH)
-        export RELEASE_IMAGE_LATEST=registry.ci.openshift.org/${namespace}/release:upgrade
-        export IMAGE_TESTS=registry.ci.openshift.org/${namespace}/stable-initial:tests # use the older version of the payload
         oc registry login
         oc new-project ${namespace}
+        oc create is --lookup-local -n "${namespace}" release
+        oc create is --lookup-local -n "${namespace}" stable-initial
+        RELEASE_REPO=$( oc get is -n "${namespace}" release -o 'jsonpath={.status.publicDockerImageRepository}' )
+        INITIAL_REPO=$( oc get is -n "${namespace}" stable-initial -o 'jsonpath={.status.publicDockerImageRepository}' )
+        export RELEASE_IMAGE_INITIAL=registry.ci.openshift.org/ocp/release:$(FROM_BRANCH)
+        export RELEASE_IMAGE_LATEST=${RELEASE_REPO}:upgrade
+        export IMAGE_TESTS=${INITIAL_REPO}:tests # use the older version of the payload
         oc policy add-role-to-group system:image-puller -n ${namespace} system:unauthenticated system:authenticated
         oc adm release new --from-release=registry.ci.openshift.org/ocp/release:$(BRANCH) \
-          --to-image=registry.ci.openshift.org/${namespace}/release:upgrade \
+          --to-image=${RELEASE_IMAGE_LATEST} \
           --exclude=machine-config-operator
 
         # execute the test
