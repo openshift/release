@@ -16,7 +16,6 @@ periodics:
       - --secret-dir=/usr/local/pull-secret
       - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-cluster-profile
       - --target=e2e-$(CLUSTER_TYPE)
-      - --template=/usr/local/e2e-$(CLUSTER_TYPE)
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --promote
@@ -65,9 +64,7 @@ periodics:
         value: "4.3"
       - name: TAG_SOURCE
         value: machine-os-content:$(BRANCH)
-      - name: CLUSTER_TYPE
-        value: aws
-      - name: CONFIG_SPEC
+      - name: UNRESOLVED_CONFIG
         value: |
           tag_specification:
             name: "$(BRANCH)"
@@ -102,13 +99,9 @@ periodics:
                 memory: 200Mi
           tests:
           - as: e2e-aws
-            commands: TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
+            steps:
               cluster_profile: aws
-      - name: JOB_NAME_SAFE
-        value: e2e-aws
-      - name: TEST_COMMAND
-        value: TEST_SUITE=openshift/conformance/parallel run-tests
+              workflow: openshift-e2e-aws
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -124,9 +117,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-aws-cluster-profile
         name: cluster-profile
-      - mountPath: /usr/local/e2e-aws
-        name: job-definition
-        subPath: cluster-launch-installer-e2e.yaml
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
       - mountPath: /etc/pull-secret
@@ -151,9 +141,6 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
-    - configMap:
-        name: prow-job-cluster-launch-installer-e2e
-      name: job-definition
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -210,50 +197,6 @@ periodics:
         value: s390x
       - name: TAG_SOURCE
         value: machine-os-content:$(BRANCH)-$(ARCH)
-      - name: CLUSTER_TYPE
-        value: aws
-      - name: CONFIG_SPEC
-        value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: "ocp-$(ARCH)"
-          promotion:
-            name: "$(BRANCH)"
-            namespace: "ocp-$(ARCH)"
-            additional_images:
-              $(TAG): $(TAG)
-          build_root:
-            image_stream_tag:
-              name: release
-              namespace: openshift
-              tag: golang-1.12
-          base_images:
-            $(TAG):
-              name: $(TAG)
-              namespace: rhcos
-              tag: "$(BRANCH)-$(ARCH)"
-          raw_steps:
-          - output_image_tag_step:
-              from: $(TAG)
-              to:
-                name: stable
-                tag: $(TAG)
-          resources:
-            '*':
-              limits:
-                memory: 4Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tests:
-          - as: e2e-aws
-            commands: TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
-              cluster_profile: aws
-      - name: JOB_NAME_SAFE
-        value: e2e-aws
-      - name: TEST_COMMAND
-        value: TEST_SUITE=openshift/conformance/parallel run-tests
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -346,50 +289,6 @@ periodics:
         value: ppc64le
       - name: TAG_SOURCE
         value: machine-os-content:$(BRANCH)-$(ARCH)
-      - name: CLUSTER_TYPE
-        value: aws
-      - name: CONFIG_SPEC
-        value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: "ocp-$(ARCH)"
-          promotion:
-            name: "$(BRANCH)"
-            namespace: "ocp-$(ARCH)"
-            additional_images:
-              $(TAG): $(TAG)
-          build_root:
-            image_stream_tag:
-              name: release
-              namespace: openshift
-              tag: golang-1.12
-          base_images:
-            $(TAG):
-              name: $(TAG)
-              namespace: rhcos
-              tag: "$(BRANCH)-$(ARCH)"
-          raw_steps:
-          - output_image_tag_step:
-              from: $(TAG)
-              to:
-                name: stable
-                tag: $(TAG)
-          resources:
-            '*':
-              limits:
-                memory: 4Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tests:
-          - as: e2e-aws
-            commands: TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
-              cluster_profile: aws
-      - name: JOB_NAME_SAFE
-        value: e2e-aws
-      - name: TEST_COMMAND
-        value: TEST_SUITE=openshift/conformance/parallel run-tests
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -585,12 +484,6 @@ periodics:
         value: "4.3"
       - name: TAG_SOURCE
         value: $(BRANCH):$(TAG)
-      - name: CLUSTER_TYPE
-        value: aws
-      - name: JOB_NAME_SAFE
-        value: e2e-aws
-      - name: TEST_COMMAND
-        value: TEST_SUITE=openshift/conformance/parallel run-tests
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
