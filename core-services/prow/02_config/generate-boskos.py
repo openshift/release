@@ -59,7 +59,7 @@ for i in range(1, 5):
 for i in range(4):
     CONFIG['openstack-ppc64le-quota-slice']['openstack-ppc64le-{0:0>2}'.format(i)] = 1
 
-for i in range(10, 19):
+for i in range(10, 20):
     CONFIG['ovirt-quota-slice']['ovirt-{}'.format(i)] = 1
 
 for i in range(1, 4):
