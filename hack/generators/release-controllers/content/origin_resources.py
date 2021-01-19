@@ -1,4 +1,7 @@
 
+from .utils import get_rc_volumes, get_rc_volume_mounts
+
+
 def _add_origin_rbac(gendoc):
     gendoc.append({
         'apiVersion': 'authorization.openshift.io/v1',
@@ -34,6 +37,8 @@ def _add_origin_rbac(gendoc):
 
 
 def _add_origin_resources(gendoc):
+    context = gendoc.context
+
     gendoc.append_all([
         {
             "apiVersion": "route.openshift.io/v1",
@@ -111,199 +116,11 @@ def _add_origin_resources(gendoc):
                                 ],
                                 "image": "release-controller:latest",
                                 "name": "controller",
-                                "volumeMounts": [
-                                    {
-                                        "mountPath": "/etc/config",
-                                        "name": "config",
-                                        "readOnly": True
-                                    },
-                                    {
-                                        "mountPath": "/etc/job-config/misc",
-                                        "name": "job-config-misc",
-                                        "readOnly": True
-                                    },
-                                    {
-                                        "mountPath": "/etc/job-config/master",
-                                        "name": "job-config-master",
-                                        "readOnly": True
-                                    },
-                                    {
-                                        "mountPath": "/etc/job-config/3.x",
-                                        "name": "job-config-3x",
-                                        "readOnly": True
-                                    },
-                                    {
-                                        "mountPath": "/etc/job-config/4.1",
-                                        "name": "job-config-41",
-                                        "readOnly": True
-                                    },
-                                    {
-                                        "mountPath": "/etc/job-config/4.2",
-                                        "name": "job-config-42",
-                                        "readOnly": True
-                                    },
-                                    {
-                                        "mountPath": "/etc/job-config/4.3",
-                                        "name": "job-config-43",
-                                        "readOnly": True
-                                    },
-                                    {
-                                        "mountPath": "/etc/job-config/4.4",
-                                        "name": "job-config-44",
-                                        "readOnly": True
-                                    },
-                                    {
-                                        "mountPath": "/etc/job-config/4.5",
-                                        "name": "job-config-45",
-                                        "readOnly": True
-                                    },
-                                    {
-                                        "mountPath": "/etc/job-config/4.6",
-                                        "name": "job-config-46",
-                                        "readOnly": True
-                                    },
-                                    {
-                                        "mountPath": "/etc/job-config/4.7",
-                                        "name": "job-config-47",
-                                        "readOnly": True
-                                    },
-                                    {
-                                        "mountPath": "/etc/kubeconfig",
-                                        "name": "release-controller-kubeconfigs",
-                                        "readOnly": True
-                                    },
-                                    {
-                                        "mountPath": "/etc/github",
-                                        "name": "oauth",
-                                        "readOnly": True
-                                    },
-                                    {
-                                        "mountPath": "/etc/bugzilla",
-                                        "name": "bugzilla",
-                                        "readOnly": True
-                                    },
-                                    {
-                                        "mountPath": "/etc/plugins",
-                                        "name": "plugins",
-                                        "readOnly": True
-                                    }
-                                ]
+                                "volumeMounts": get_rc_volume_mounts(context)
                             }
                         ],
                         "serviceAccountName": "release-controller",
-                        "volumes": [
-                            {
-                                "configMap": {
-                                    "defaultMode": 420,
-                                    "name": "config"
-                                },
-                                "name": "config"
-                            },
-                            {
-                                "configMap": {
-                                    "defaultMode": 420,
-                                    "name": "job-config-misc"
-                                },
-                                "name": "job-config-misc"
-                            },
-                            {
-                                "configMap": {
-                                    "defaultMode": 420,
-                                    "name": "job-config-master"
-                                },
-                                "name": "job-config-master"
-                            },
-                            {
-                                "configMap": {
-                                    "defaultMode": 420,
-                                    "name": "job-config-3.x"
-                                },
-                                "name": "job-config-3x"
-                            },
-                            {
-                                "configMap": {
-                                    "defaultMode": 420,
-                                    "name": "job-config-4.1"
-                                },
-                                "name": "job-config-41"
-                            },
-                            {
-                                "configMap": {
-                                    "defaultMode": 420,
-                                    "name": "job-config-4.2"
-                                },
-                                "name": "job-config-42"
-                            },
-                            {
-                                "configMap": {
-                                    "defaultMode": 420,
-                                    "name": "job-config-4.3"
-                                },
-                                "name": "job-config-43"
-                            },
-                            {
-                                "configMap": {
-                                    "defaultMode": 420,
-                                    "name": "job-config-4.4"
-                                },
-                                "name": "job-config-44"
-                            },
-                            {
-                                "configMap": {
-                                    "defaultMode": 420,
-                                    "name": "job-config-4.5"
-                                },
-                                "name": "job-config-45"
-                            },
-                            {
-                                "configMap": {
-                                    "defaultMode": 420,
-                                    "name": "job-config-4.6"
-                                },
-                                "name": "job-config-46"
-                            },
-                            {
-                                "configMap": {
-                                    "defaultMode": 420,
-                                    "name": "job-config-4.7"
-                                },
-                                "name": "job-config-47"
-                            },
-                            {
-                                "name": "release-controller-kubeconfigs",
-                                "secret": {
-                                    "defaultMode": 420,
-                                    "items": [
-                                        {
-                                            "key": "sa.release-controller.app.ci.config",
-                                            "path": "kubeconfig"
-                                        }
-                                    ],
-                                    "secretName": "release-controller-kubeconfigs"
-                                }
-                            },
-                            {
-                                "name": "oauth",
-                                "secret": {
-                                    "defaultMode": 420,
-                                    "secretName": "github-credentials-openshift-ci-robot"
-                                }
-                            },
-                            {
-                                "name": "bugzilla",
-                                "secret": {
-                                    "defaultMode": 420,
-                                    "secretName": "bugzilla-credentials-openshift-bugzilla-robot"
-                                }
-                            },
-                            {
-                                "configMap": {
-                                    "defaultMode": 420,
-                                    "name": "plugins"
-                                },
-                                "name": "plugins"
-                            }
-                        ]
+                        "volumes": get_rc_volumes(context, None)
                     }
                 }
             }

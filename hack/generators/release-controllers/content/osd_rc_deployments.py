@@ -1,4 +1,6 @@
 
+from .utils import get_rc_volumes, get_rc_volume_mounts
+
 
 def _add_osd_rc_bootstrap(gendoc):
     context = gendoc.context
@@ -85,49 +87,6 @@ def _add_osd_rc_service(gendoc):
             }
         }
     })
-
-
-def _get_dynamic_rc_volume_mounts(context):
-    prow_volume_mounts = []
-
-    for major_minor in context.config.releases:
-        prow_volume_mounts.append({
-            'mountPath': f'/etc/job-config/{major_minor}',
-            'name': f'job-config-{major_minor.replace(".", "")}',  # e.g. job-config-45
-            'readOnly': True
-        })
-
-    return prow_volume_mounts
-
-
-def _get_dynamic_deployment_volumes(context):
-    prow_volumes = []
-
-    if context.private:
-        prow_volumes.append({
-            'name': 'internal-tls',
-            'secret': {
-                'secretName': context.secret_name_tls,
-            }
-        })
-        prow_volumes.append({
-            'name': 'session-secret',
-            'secret': {
-                # clusters/app.ci/release-controller/admin_deploy-ocp-controller-session-secret.yaml
-                'secretName': 'release-controller-session-secret',
-            }
-        })
-
-    for major_minor in context.config.releases:
-        prow_volumes.append({
-            'configMap': {
-                'defaultMode': 420,
-                'name': f'job-config-{major_minor}'
-            },
-            'name': f'job-config-{major_minor.replace(".", "")}'
-        })
-
-    return prow_volumes
 
 
 def _get_osd_rc_deployment_sidecars(context):
@@ -238,108 +197,10 @@ def _add_osd_rc_deployment(gendoc):
                                         '--verify-bugzilla'],
                             'image': 'release-controller:latest',
                             'name': 'controller',
-                            'volumeMounts': [
-                                {
-                                    'mountPath': '/etc/config',
-                                    'name': 'config',
-                                    'readOnly': True
-                                },
-                                {
-                                    'mountPath': '/etc/job-config/misc',
-                                    'name': 'job-config-misc',
-                                    'readOnly': True
-                                },
-                                {
-                                    'mountPath': '/etc/job-config/master',
-                                    'name': 'job-config-master',
-                                    'readOnly': True
-                                },
-                                {
-                                    'mountPath': '/etc/job-config/3.x',
-                                    'name': 'job-config-3x',
-                                    'readOnly': True
-                                },
-                                *_get_dynamic_rc_volume_mounts(context),
-                                {
-                                    'mountPath': '/etc/kubeconfig',
-                                    'name': 'release-controller-kubeconfigs',
-                                    'readOnly': True
-                                },
-                                {
-                                    'mountPath': '/etc/github',
-                                    'name': 'oauth',
-                                    'readOnly': True
-                                },
-                                {
-                                    'mountPath': '/etc/bugzilla',
-                                    'name': 'bugzilla',
-                                    'readOnly': True
-                                },
-                                {
-                                    'mountPath': '/etc/plugins',
-                                    'name': 'plugins',
-                                    'readOnly': True
-                                }]
+                            'volumeMounts': get_rc_volume_mounts(context)
                         }],
                     'serviceAccountName': 'release-controller',
-                    'volumes': [
-                        {
-                            'configMap': {
-                                'defaultMode': 420,
-                                'name': 'config'
-                            },
-                            'name': 'config'
-                        },
-                        {
-                            'configMap': {
-                                'defaultMode': 420,
-                                'name': 'job-config-misc'
-                            },
-                            'name': 'job-config-misc'
-                        },
-                        {
-                            'configMap': {
-                                'defaultMode': 420,
-                                'name': 'job-config-master'
-                            },
-                            'name': 'job-config-master'
-                        },
-                        {
-                            'configMap': {
-                                'defaultMode': 420,
-                                'name': 'job-config-3.x'
-                            },
-                            'name': 'job-config-3x'
-                        },
-                        *_get_dynamic_deployment_volumes(context),
-                        {
-                            'name': 'release-controller-kubeconfigs',
-                            'secret': {
-                                'items': [{
-                                    'key': f'sa.release-controller-{context.is_namespace}.app.ci.config',
-                                    'path': 'kubeconfig'
-                                }],
-                                'secretName': 'release-controller-kubeconfigs'
-                            }
-                        },
-                        {
-                            'name': 'oauth',
-                            'secret': {
-                                'secretName': 'github-credentials-openshift-ci-robot'
-                            }
-                        },
-                        {
-                            'name': 'bugzilla',
-                            'secret': {
-                                'secretName': 'bugzilla-credentials-openshift-bugzilla-robot'
-                            }
-                        },
-                        {
-                            'configMap': {
-                                'name': 'plugins'
-                            },
-                            'name': 'plugins'
-                        }]
+                    'volumes': get_rc_volumes(context, context.is_namespace)
                 }
             }
         }
