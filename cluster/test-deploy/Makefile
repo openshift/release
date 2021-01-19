@@ -1,3 +1,4 @@
+AAA ?= "BBB"
 PROFILE ?= "gcp-dev"
 TYPE ?= $(shell cat $(PROFILE)/.type)
 INSTANCE_PREFIX ?= $(WHAT)
