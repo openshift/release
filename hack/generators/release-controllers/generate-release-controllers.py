@@ -196,8 +196,17 @@ def generate_app_ci_content(config, git_clone_dir):
 
     # Generate the release-controller one-offs...
     context = Context(config, "x86_64", False)
-    content.generate_origin_resources(context)
-    content.generate_signer_resources(context)
+
+    # Origin release-controller
+    with genlib.GenDoc(config.paths.path_rc_deployments.joinpath('admin_deploy-origin-controller.yaml'), context) as gendoc:
+        content.generate_origin_admin_resources(gendoc)
+
+    with genlib.GenDoc(config.paths.path_rc_deployments.joinpath('deploy-origin-controller.yaml'), context) as gendoc:
+        content.generate_origin_resources(gendoc)
+
+    # Signer
+    with genlib.GenDoc(config.paths.path_rc_deployments.joinpath('deploy-ci-signer.yaml'), context) as gendoc:
+        content.generate_signer_resources(gendoc)
 
 
 def run(git_clone_dir, bump=False):

@@ -1,7 +1,4 @@
 
-import genlib
-
-
 def _add_origin_rbac(gendoc):
     gendoc.append({
         'apiVersion': 'authorization.openshift.io/v1',
@@ -314,11 +311,9 @@ def _add_origin_resources(gendoc):
     ])
 
 
-def generate_origin_resources(context):
-    config = context.config
+def generate_origin_admin_resources(gendoc):
+    _add_origin_rbac(gendoc)
 
-    with genlib.GenDoc(config.paths.path_rc_deployments.joinpath('admin_deploy-origin-controller.yaml'), context) as gendoc:
-        _add_origin_rbac(gendoc)
 
-    with genlib.GenDoc(config.paths.path_rc_deployments.joinpath('deploy-origin-controller.yaml'), context) as gendoc:
-        _add_origin_resources(gendoc)
+def generate_origin_resources(gendoc):
+    _add_origin_resources(gendoc)
