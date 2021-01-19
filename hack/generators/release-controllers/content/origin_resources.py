@@ -2,6 +2,40 @@
 import genlib
 
 
+def _add_origin_rbac(gendoc):
+    gendoc.append({
+        'apiVersion': 'authorization.openshift.io/v1',
+        'kind': 'Role',
+        'metadata': {
+            'name': 'release-controller-modify',
+            'namespace': 'origin'
+        },
+        'rules': [
+            {
+                'apiGroups': [''],
+                'resourceNames': ['release-upgrade-graph'],
+                'resources': ['secrets'],
+                'verbs': ['get', 'update', 'patch']
+            },
+            {
+                'apiGroups': ['image.openshift.io'],
+                'resources': ['imagestreams', 'imagestreamtags'],
+                'verbs': ['get',
+                          'list',
+                          'watch',
+                          'create',
+                          'delete',
+                          'update',
+                          'patch']
+            },
+            {
+                'apiGroups': [''],
+                'resources': ['events'],
+                'verbs': ['create', 'patch', 'update']
+            }]
+    })
+
+
 def _add_origin_resources(gendoc):
     gendoc.append_all([
         {
@@ -282,6 +316,9 @@ def _add_origin_resources(gendoc):
 
 def generate_origin_resources(context):
     config = context.config
+
+    with genlib.GenDoc(config.paths.path_rc_deployments.joinpath('admin_deploy-origin-controller.yaml'), context) as gendoc:
+        _add_origin_rbac(gendoc)
 
     with genlib.GenDoc(config.paths.path_rc_deployments.joinpath('deploy-origin-controller.yaml'), context) as gendoc:
         _add_origin_resources(gendoc)
