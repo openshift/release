@@ -5632,25 +5632,33 @@ periodics:
       - --lease-server-password-file=/etc/boskos/password
       - --lease-server-username=ci
       - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
-      - --target=e2e-$(CLUSTER_TYPE)-upgrade
+      - --secret-dir=/usr/local/e2e-aws-upgrade-cluster-profile
+      - --target=e2e-aws-upgrade
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       command:
       - ci-operator
       env:
-      - name: BRANCH
-        value: "4.6"
-      - name: CLUSTER_TYPE
-        value: aws
-      - name: CLUSTER_VARIANT
-        value: ovn
-      - name: CONFIG_SPEC
+      - name: UNRESOLVED_CONFIG
         value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
+          base_images:
+            base:
+              name: "4.7"
+              namespace: ocp
+              tag: base
+          releases:
+            initial:
+              prerelease:
+                product: ocp
+                version_bounds:
+                  lower: "4.6.0"
+                  upper: "4.7.0-0"
+            latest:
+              candidate:
+                product: ocp
+                stream: ci
+                version: "4.7"
           resources:
             '*':
               limits:
@@ -5659,11 +5667,12 @@ periodics:
                 cpu: 100m
                 memory: 200Mi
           tests:
-          - as: e2e-$(CLUSTER_TYPE)-upgrade
-            commands: TEST_SUITE=all run-upgrade-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: true
+          - as: e2e-aws-upgrade
+            steps:
+              cluster_profile: aws
+              env:
+                TEST_TYPE: upgrade-conformance
+              workflow: openshift-upgrade-aws-ovn
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
