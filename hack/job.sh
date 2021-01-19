@@ -17,6 +17,7 @@ docker run \
     --config-path core-services/prow/02_config/_config.yaml \
     --job-config-path ci-operator/jobs/ \
     ${BASE_REF:+"--base-ref" "${BASE_REF}"} \
+    --pull-number 497 \
     ${arg:-} \
     --job "${1}" |
     oc --context app.ci --namespace ci --as system:admin apply -f -
