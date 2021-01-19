@@ -1,0 +1,84 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  annotations:
+    openshift.io/description: Service Accounts for CVP Use
+    openshift.io/display-name: CVP CI
+  name: cvp
+---
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: triggerer
+  namespace: cvp
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: triggerer
+  namespace: ci
+rules:
+- apiGroups:
+  - prow.k8s.io
+  resources:
+  - prowjobs
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: cvp-triggerer-binding
+  namespace: ci
+roleRef:
+  kind: Role
+  apiGroup: rbac.authorization.k8s.io
+  name: triggerer
+subjects:
+- kind: ServiceAccount
+  namespace: cvp
+  name: triggerer
+---
+kind: Group
+apiVersion: v1
+metadata:
+  name: cvp-admins
+users:
+- kpavic
+- dirgim
+- lslebodn
+- lslebodn
+- srallaba
+- samvarankashyap
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: cvp-admins-binding
+  namespace: cvp
+roleRef:
+  kind: Role
+  apiGroup: rbac.authorization.k8s.io
+  name: secret-reader
+subjects:
+- kind: Group
+  apiGroup: rbac.authorization.k8s.io
+  name: cvp-admins
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: secret-reader
+  namespace: cvp
+rules:
+  - apiGroups:
+    - ""
+    resources:
+    - serviceaccounts
+    - secrets
+    verbs:
+    - get
+    - list
