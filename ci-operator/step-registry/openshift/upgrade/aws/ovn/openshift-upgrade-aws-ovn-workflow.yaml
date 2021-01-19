@@ -1,0 +1,27 @@
+workflow:
+  as: openshift-upgrade-aws-ovn
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - ref: ipi-install-loki
+    - chain: ipi-conf-aws
+    - ref: ovn-conf
+    - chain: ipi-install-stableinitial
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - ref: openshift-e2e-test-capabilities-check
+    - ref: gather-loki
+    - chain: gather-network
+    - chain: gather-core-dump
+    - chain: ipi-aws-post
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: "release:initial"
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: "release:latest"
+    env:
+      TEST_TYPE: upgrade
+      TEST_SUITE: ""
+      TEST_UPGRADE_OPTIONS: ""
+      DELETE_MC: "false"
+  documentation: |-
+    The Openshift E2E AWS OVN workflow executes the upgrade end-to-end test suite on AWS with a default cluster configuration and Loki as log collector, exercising an upgrade during the process.
