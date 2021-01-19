@@ -42,6 +42,9 @@ wait "$!"
 
 sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
 
+echo "Will include manifests:"
+find "${SHARED_DIR}" -name "manifest_*.yml"
+
 while IFS= read -r -d '' item
 do
   manifest="$( basename "${item}" )"
