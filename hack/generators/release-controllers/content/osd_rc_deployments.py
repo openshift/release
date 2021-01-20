@@ -1,5 +1,5 @@
 
-from .utils import get_rc_volumes, get_rc_volume_mounts
+from content.utils import get_rc_volumes, get_rc_volume_mounts
 
 
 def _add_osd_rc_bootstrap(gendoc):
