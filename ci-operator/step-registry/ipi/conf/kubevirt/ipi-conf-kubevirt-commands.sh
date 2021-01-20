@@ -20,7 +20,7 @@ KUBEVIRT_API_VIP=$(<"${HOME}/secret-kube/${LEASED_RESOURCE}-api-vip")
 KUBEVIRT_INGRESS_VIP=$(<"${HOME}/secret-kube/${LEASED_RESOURCE}-ingress-vip")
 KUBEVIRT_CIDR="10.123.124.0/24"
 CLUSTER_NETWORK_CIDR="10.128.0.0/14"
-SERVICE_NETWROK_CIDR="172.30.0.0/16"
+SERVICE_NETWORK_CIDR="172.30.0.0/16"
 KUBEVIRT_NAMESPACE=ipi-ci
 KUBEVIRT_TENANT_CLUSTER_NAME=$(<"${HOME}/secret-kube/${LEASED_RESOURCE}-cluster-name")
 KUBEVIRT_NETWORK_NAME=mynet
@@ -37,9 +37,8 @@ networking:
     hostPrefix: 23
   machineNetwork:
   - cidr: ${KUBEVIRT_CIDR}
-  networkType: OpenShiftSDN
   serviceNetwork:
-  - ${SERVICE_NETWROK_CIDR}
+  - ${SERVICE_NETWORK_CIDR}
 platform:
   kubevirt:
     # TODO this section is WIP - see the installer PR
