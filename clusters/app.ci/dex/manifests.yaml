@@ -79,11 +79,27 @@ spec:
             redirectURIs:
             - https://oauth-openshift.apps.build02.gcp.ci.openshift.org/oauth2callback/RedHat_Internal_SSO
     spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - dex
+              topologyKey: "kubernetes.io/hostname"
       serviceAccountName: dex
       containers:
       - image: ghcr.io/dexidp/dex:v2.27.0
         name: dex
         command: ["/usr/local/bin/dex", "serve", "/etc/dex/cfg/config.yaml"]
+        readinessProbe:
+          httpGet:
+            path: /.well-known/openid-configuration
+            port: 8000
         env:
         - name: PW
           valueFrom:
@@ -133,6 +149,17 @@ spec:
           - path: config.yaml
             fieldRef:
               fieldPath: metadata.annotations['config.yaml']
+---
+apiVersion: policy/v1beta1
+kind: PodDisruptionBudget
+metadata:
+  name: dex
+  namespace: dex
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: dex
 ---
 apiVersion: v1
 kind: Service
