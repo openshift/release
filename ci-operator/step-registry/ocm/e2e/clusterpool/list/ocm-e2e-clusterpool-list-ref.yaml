@@ -1,0 +1,42 @@
+ref:
+  as: ocm-e2e-clusterpool-list
+  from_image:
+    namespace: open-cluster-management
+    name: builder
+    tag: go1.15-linux-amd64
+  commands: ocm-e2e-clusterpool-list-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+    - name: MAKEFILE
+      default: "/opt/build-harness/Makefile.build-harness-openshift-ci"
+      documentation: |-
+        Location of the build harness Makefile for use on OSCI.
+    - name: CLUSTERPOOL_HOST_API
+      default: ""
+      documentation: |-
+        API URL of the cluster running the target clusterpool, used in oc login,
+        so port :6443 is required
+    - name: CLUSTERPOOL_HOST_KUBE_SECRET
+      default: ""
+      documentation: |-
+        The name of the kube secret with the kube API user and token.
+    - name: CLUSTERPOOL_LIST_ORDER
+      default: "shuffle"
+      documentation: |-
+        Valid values are "sort" and "shuffle". Any other value leaves the
+        list in its original order.
+    - name: CLUSTERPOOL_LIST_FILTER
+      default: ""
+      documentation: |-
+        Regular expression to filter the cluster pool list.
+    - name: CLUSTERPOOL_LIST_FILE
+      default: "clusterpool-list"
+      documentation: |-
+        File name to use for the cluster pool list.
+  documentation: |-
+    This step queries the cluster pool host for a list of available cluster
+    pools and writes the list to "${SHARED_DIR}/${CLUSTERPOOL_LIST_FILE}".
+
