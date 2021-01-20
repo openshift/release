@@ -82,6 +82,12 @@ tests:
         # KUBECONFIG is mounted from a secret, so its immutable. We have to copy it to some writable location.
         cp -L "${KUBECONFIG}" /tmp/kubeconfig && export KUBECONFIG=/tmp/kubeconfig
 
+        if ! hash kubectl 2>/dev/null; then
+          pushd $(dirname $(which oc))
+          ln -s oc kubectl
+          popd
+        fi
+
         SCOPE=namespace \
         NUM_NODES=2 \
           make e2e-tests
@@ -108,6 +114,12 @@ tests:
 
         # KUBECONFIG is mounted from a secret, so its immutable. We have to copy it to some writable location.
         cp -L "${KUBECONFIG}" /tmp/kubeconfig && export KUBECONFIG=/tmp/kubeconfig
+
+        if ! hash kubectl 2>/dev/null; then
+          pushd $(dirname $(which oc))
+          ln -s oc kubectl
+          popd
+        fi
 
         SCOPE=cluster \
         NUM_NODES=2 \
