@@ -1,0 +1,43 @@
+base_images:
+  os:
+    name: ubi
+    namespace: ocp
+    tag: "8"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.15
+images:
+- dockerfile_path: build/Dockerfile
+  from: os
+  to: ci-artifacts
+resources:
+  '*':
+    limits:
+      memory: 2Gi
+    requests:
+      cpu: 2000m
+      memory: 2Gi
+tag_specification:
+  name: "4.6"
+  namespace: ocp
+tests:
+- as: gpu-operator-e2e
+  postsubmit: true
+  steps:
+    cluster_profile: aws
+    test:
+    - as: nightly
+      cli: latest
+      commands: run gpu-ci
+      from: ci-artifacts
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-next
+  org: openshift-psap
+  repo: ci-artifacts
