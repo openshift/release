@@ -302,7 +302,31 @@ objects:
             --provider "${TEST_PROVIDER:-}" -o ${ARTIFACT_DIR}/e2e.log --junit-dir ${ARTIFACT_DIR}/junit
         }
 
+        (
+          set +o errexit; set +o pipefail
+
+          LOG_FILE="${ARTIFACT_DIR}/oc-adm-top-nodes.log"
+          # Close STDOUT file descriptor
+          exec 1<&-
+          # Close STDERR FD
+          exec 2<&-
+          # Open STDOUT as $LOG_FILE file for read and write.
+          exec 1<>${LOG_FILE}
+          # Redirect STDERR to STDOUT
+          exec 2>&1
+
+          while true
+          do
+            echo "$(date): ***************************************************************"
+            oc adm top nodes
+            sleep 30s
+          done
+        ) &
+        OPENSHIFT_WATCH="$!"
+
         ${TEST_COMMAND}
+
+        kill -9 ${OPENSHIFT_WATCH} >/dev/null 2>&1 || true
 
     # Runs an install
     - name: setup
