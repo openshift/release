@@ -6,7 +6,7 @@ export TYPE
 
 # Select RPMs based on branch or tag
 REF ?= "v4.0"
-LATEST = "https://rpms.svc.ci.openshift.org/openshift-origin-$(REF)/"
+LATEST = "https://artifacts-rpms-openshift-origin-ci-rpms.apps.ci.l2s4.p1.openshiftapps.com/openshift-origin-$(REF)/"
 REPO ?= $(LATEST)
 
 up: check-cluster
