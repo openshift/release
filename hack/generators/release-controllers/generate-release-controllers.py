@@ -176,6 +176,9 @@ def generate_app_ci_content(config, git_clone_dir):
         for arch in config.arches:
             context = Context(config, arch, private)
 
+            with genlib.GenDoc(config.paths.path_rc_deployments.joinpath(f'admin_deploy-{context.is_namespace}-controller.yaml'), context) as gendoc:
+                content.add_imagestream_namespace_rbac(gendoc)
+
             with genlib.GenDoc(config.paths.path_rc_deployments.joinpath(f'deploy-{context.is_namespace}-controller.yaml'), context) as gendoc:
                 content.add_osd_rc_deployments(gendoc)
                 content.add_osd_files_cache_service_account_resources(gendoc)
