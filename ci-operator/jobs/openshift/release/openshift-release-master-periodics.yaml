@@ -1935,7 +1935,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: api.ci
-  cron: 0 */3 * * *
+  cron: 0 */6 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -3105,7 +3105,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: api.ci
-  cron: 0 */3 * * *
+  cron: 0 */6 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -3147,6 +3147,82 @@ periodics:
         name: ci-pull-credentials
         readOnly: true
       - mountPath: /usr/local/openshift-ipi-azure-arcconformance-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-azure4
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: api.ci
+  cron: 0 */6 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: ocp-4.7
+    job-release: "4.7"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ocp-4.7-openshift-ipi-azure-arcconformance-test
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-password-file=/etc/boskos/password
+      - --report-password-file=/etc/report/password.txt
+      - --report-username=ci
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/openshift-ipi-azure-arcconformance-test-cluster-profile
+      - --target=openshift-ipi-azure-arcconformance-test
+      - --variant=ocp-4.7
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/openshift-ipi-azure-arcconformance-test-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
