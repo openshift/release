@@ -29,7 +29,7 @@ def add_imagestream_namespace_rbac(gendoc):
         })
 
     resources.append({
-        'apiVersion': 'rbac.authorization.k8s.io/v1beta1',
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
         'kind': 'RoleBinding',
         'metadata': {
             'name': 'image-puller',
@@ -44,10 +44,9 @@ def add_imagestream_namespace_rbac(gendoc):
     })
 
     resources.append({
-        'apiVersion': 'rbac.authorization.k8s.io/v1beta1',
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
         'kind': 'RoleBinding',
         'metadata': {
-            'apiGroup': 'rbac.authorization.k8s.io',
             'name': 'user-viewer',
             'namespace': context.is_namespace
         },
@@ -313,7 +312,6 @@ def add_imagestream_namespace_rbac(gendoc):
             'apiGroup': 'rbac.authorization.k8s.io',
             'kind': 'Role',
             'name': 'release-controller-import-ocp',
-            'namespace': context.is_namespace,
         },
         'subjects': [{
             'kind': 'ServiceAccount',

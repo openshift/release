@@ -1,0 +1,96 @@
+base_images:
+  base:
+    name: "4.6"
+    namespace: ocp
+    tag: base
+  openshift_release_golang-1.15:
+    name: release
+    namespace: openshift
+    tag: golang-1.15
+binary_build_commands: make build
+build_root:
+  project_image:
+    dockerfile_path: build/build-image/Dockerfile
+images:
+- dockerfile_path: Dockerfile.hivebase
+  from: base
+  to: hivebase
+- dockerfile_path: Dockerfile
+  from: hivebase
+  inputs:
+    openshift_release_golang-1.15:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.15
+  to: hive
+promotion:
+  name: ocm-2.2
+  namespace: openshift
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  integration:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+  unit:
+    requests:
+      cpu: 1000m
+      memory: 4Gi
+tag_specification:
+  name: "4.6"
+  namespace: ocp
+tests:
+- as: unit
+  commands: make test
+  container:
+    from: src
+- as: verify
+  commands: make verify
+  container:
+    from: src
+- as: integration
+  commands: make test-integration
+  container:
+    from: src
+- as: e2e
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: CLOUD=aws make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-gcp
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: CLOUD=gcp make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- as: e2e-azure
+  steps:
+    cluster_profile: azure4
+    test:
+    - as: test
+      cli: latest
+      commands: CLOUD=azure make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-azure
+zz_generated_metadata:
+  branch: ocm-2.2
+  org: openshift
+  repo: hive

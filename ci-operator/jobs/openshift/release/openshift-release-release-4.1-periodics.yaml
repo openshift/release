@@ -15,7 +15,6 @@ periodics:
       - --lease-server-username=ci
       - --secret-dir=/usr/local/pull-secret
       - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-cluster-profile
-      - --template=/usr/local/e2e-$(CLUSTER_TYPE)
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --promote
@@ -64,9 +63,7 @@ periodics:
         value: "4.1"
       - name: TAG_SOURCE
         value: machine-os-content:$(BRANCH)
-      - name: CLUSTER_TYPE
-        value: aws
-      - name: CONFIG_SPEC
+      - name: UNRESOLVED_CONFIG
         value: |
           tag_specification:
             name: "$(BRANCH)"
@@ -101,13 +98,9 @@ periodics:
                 memory: 200Mi
           tests:
           - as: e2e-aws
-            commands: TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
+            steps:
               cluster_profile: aws
-      - name: JOB_NAME_SAFE
-        value: e2e-aws
-      - name: TEST_COMMAND
-        value: TEST_SUITE=openshift/conformance/parallel run-tests
+              workflow: openshift-e2e-aws
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -123,9 +116,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-aws-cluster-profile
         name: cluster-profile
-      - mountPath: /usr/local/e2e-aws
-        name: job-definition
-        subPath: cluster-launch-installer-e2e.yaml
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
       - mountPath: /etc/pull-secret
@@ -150,9 +140,6 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
-    - configMap:
-        name: prow-job-cluster-launch-installer-e2e
-      name: job-definition
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials

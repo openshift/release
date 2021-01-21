@@ -6,23 +6,14 @@ set -o pipefail
 
 echo "************ baremetalds gather command ************"
 
-# TODO: Remove once OpenShift CI will be upgraded to 4.2 (see https://access.redhat.com/articles/4859371)
-~/fix_uid.sh
-
-# Initial check
-if [ "${CLUSTER_TYPE}" != "packet" ]; then
-  echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"
-  exit 1
-fi
-
 if [[ ! -e "${SHARED_DIR}/server-ip" ]]; then
   echo "No server IP found; skipping log gathering."
   exit 0
 fi
 
-# Fetch packet server IP
-IP=$(cat "${SHARED_DIR}/server-ip")
-SSHOPTS=(-o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -i "${CLUSTER_PROFILE_DIR}/.packet-kni-ssh-privatekey")
+# Fetch packet basic configuration
+# shellcheck source=/dev/null
+source "${SHARED_DIR}/packet-conf.sh"
 
 function getlogs() {
   echo "### Downloading logs..."
@@ -49,4 +40,14 @@ sosreport --ticket-number "\$HOSTNAME" --batch -o container_log,filesys,kvm,libv
 
 # Get libvirt logs
 tar -czC "/var/log/libvirt/qemu" -f "/tmp/artifacts/libvirt-logs-\$HOSTNAME.tar.gz" --transform "s?^\.?libvirt-logs-\$HOSTNAME?" .
+
+
+# Get the Botstrap logs if its still around, due to an error
+. common.sh
+. network.sh
+
+ssh -o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' core@\$BOOTSTRAP_PROVISIONING_IP TAR_FILE=/tmp/log-bundle-bootstrap.tar.gz sudo -E /usr/local/bin/installer-gather.sh --id bootstrap &&
+scp -o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' core@\$BOOTSTRAP_PROVISIONING_IP:/tmp/log-bundle-bootstrap.tar.gz /tmp/artifacts/log-bundle-bootstrap.tar.gz || true
+
+
 EOF

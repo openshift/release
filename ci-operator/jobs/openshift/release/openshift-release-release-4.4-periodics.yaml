@@ -16,7 +16,6 @@ periodics:
       - --secret-dir=/usr/local/pull-secret
       - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-cluster-profile
       - --target=e2e-$(CLUSTER_TYPE)
-      - --template=/usr/local/e2e-$(CLUSTER_TYPE)
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --promote
@@ -65,9 +64,7 @@ periodics:
         value: "4.4"
       - name: TAG_SOURCE
         value: machine-os-content:$(BRANCH)
-      - name: CLUSTER_TYPE
-        value: aws
-      - name: CONFIG_SPEC
+      - name: UNRESOLVED_CONFIG
         value: |
           tag_specification:
             name: "$(BRANCH)"
@@ -102,13 +99,9 @@ periodics:
                 memory: 200Mi
           tests:
           - as: e2e-aws
-            commands: TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
+            steps:
               cluster_profile: aws
-      - name: JOB_NAME_SAFE
-        value: e2e-aws
-      - name: TEST_COMMAND
-        value: TEST_SUITE=openshift/conformance/parallel run-tests
+              workflow: openshift-e2e-aws
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -124,9 +117,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-aws-cluster-profile
         name: cluster-profile
-      - mountPath: /usr/local/e2e-aws
-        name: job-definition
-        subPath: cluster-launch-installer-e2e.yaml
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
       - mountPath: /etc/pull-secret
@@ -151,9 +141,6 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
-    - configMap:
-        name: prow-job-cluster-launch-installer-e2e
-      name: job-definition
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -210,9 +197,7 @@ periodics:
         value: s390x
       - name: TAG_SOURCE
         value: machine-os-content:$(BRANCH)-$(ARCH)
-      - name: CLUSTER_TYPE
-        value: aws
-      - name: CONFIG_SPEC
+      - name: UNRESOLVED_CONFIG
         value: |
           tag_specification:
             name: "$(BRANCH)"
@@ -247,13 +232,9 @@ periodics:
                 memory: 200Mi
           tests:
           - as: e2e-aws
-            commands: TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
+            steps:
               cluster_profile: aws
-      - name: JOB_NAME_SAFE
-        value: e2e-aws
-      - name: TEST_COMMAND
-        value: TEST_SUITE=openshift/conformance/parallel run-tests
+              workflow: openshift-e2e-aws
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -778,9 +759,7 @@ periodics:
         value: ppc64le
       - name: TAG_SOURCE
         value: machine-os-content:$(BRANCH)-$(ARCH)
-      - name: CLUSTER_TYPE
-        value: aws
-      - name: CONFIG_SPEC
+      - name: UNRESOLVED_CONFIG
         value: |
           tag_specification:
             name: "$(BRANCH)"
@@ -815,13 +794,9 @@ periodics:
                 memory: 200Mi
           tests:
           - as: e2e-aws
-            commands: TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
+            steps:
               cluster_profile: aws
-      - name: JOB_NAME_SAFE
-        value: e2e-aws
-      - name: TEST_COMMAND
-        value: TEST_SUITE=openshift/conformance/parallel run-tests
+              workflow: openshift-e2e-aws
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -890,7 +865,6 @@ periodics:
       - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-aws-cluster-profile
       - --secret-dir=/usr/local/pull-secret
-      - --template=/usr/local/e2e-aws
       command:
       - /bin/bash
       - -c
@@ -1057,9 +1031,7 @@ periodics:
         value: "4.4"
       - name: TAG_SOURCE
         value: machine-os-content:$(BRANCH)
-      - name: CLUSTER_TYPE
-        value: aws
-      - name: CONFIG_SPEC
+      - name: UNRESOLVED_CONFIG
         value: |
           tag_specification:
             name: "$(BRANCH)"
@@ -1094,13 +1066,9 @@ periodics:
                 memory: 200Mi
           tests:
           - as: e2e-aws
-            commands: TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
+            steps:
               cluster_profile: aws
-      - name: JOB_NAME_SAFE
-        value: e2e-aws
-      - name: TEST_COMMAND
-        value: TEST_SUITE=openshift/conformance/parallel run-tests
+              workflow: openshift-e2e-aws
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -5328,108 +5296,6 @@ periodics:
         secretName: ci-pull-credentials
 - agent: kubernetes
   cluster: api.ci
-  cron: '@yearly'
-  decorate: true
-  labels:
-    job-env: aws
-    job-release: "4.4"
-    job-test: e2e
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    release.openshift.io/verify: "true"
-  name: release-openshift-origin-installer-e2e-aws-upgrade-4.4-stable-to-4.4-ci
-  spec:
-    containers:
-    - args:
-      - --artifact-dir=$(ARTIFACTS)
-      - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
-      - --target=e2e-$(CLUSTER_TYPE)-upgrade
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      command:
-      - ci-operator
-      env:
-      - name: BRANCH
-        value: "4.4"
-      - name: CLUSTER_TYPE
-        value: aws
-      - name: UNRESOLVED_CONFIG
-        value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
-          resources:
-            '*':
-              limits:
-                memory: 4Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tests:
-          - as: e2e-$(CLUSTER_TYPE)-upgrade
-            steps:
-              cluster_profile: "$(CLUSTER_TYPE)"
-              workflow: openshift-upgrade-$(CLUSTER_TYPE)
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/apici
-        name: apici-ci-operator-credentials
-        readOnly: true
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
-        name: cluster-profile
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-      - mountPath: /etc/appci
-        name: appci-release-bot-credentials
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: apici-ci-operator-credentials
-      secret:
-        items:
-        - key: sa.ci-operator.apici.config
-          path: kubeconfig
-        secretName: apici-ci-operator-credentials
-    - name: boskos
-      secret:
-        items:
-        - key: password
-          path: password
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-aws
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-    - name: appci-release-bot-credentials
-      secret:
-        items:
-        - key: sa.release-bot.app.ci.config
-          path: sa.release-bot.app.ci.config
-        secretName: build-farm-credentials
-- agent: kubernetes
-  cluster: api.ci
   decorate: true
   interval: 24h
   labels:
@@ -5572,108 +5438,6 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
-- agent: kubernetes
-  cluster: api.ci
-  cron: '@yearly'
-  decorate: true
-  labels:
-    job-env: aws
-    job-release: "4.4"
-    job-test: e2e
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    release.openshift.io/verify: "true"
-  name: release-openshift-origin-installer-e2e-aws-upgrade-4.4-nightly-to-4.4-nightly
-  spec:
-    containers:
-    - args:
-      - --artifact-dir=$(ARTIFACTS)
-      - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
-      - --target=e2e-$(CLUSTER_TYPE)-upgrade
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      command:
-      - ci-operator
-      env:
-      - name: BRANCH
-        value: "4.4"
-      - name: CLUSTER_TYPE
-        value: aws
-      - name: UNRESOLVED_CONFIG
-        value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
-          resources:
-            '*':
-              limits:
-                memory: 4Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tests:
-          - as: e2e-$(CLUSTER_TYPE)-upgrade
-            steps:
-              cluster_profile: "$(CLUSTER_TYPE)"
-              workflow: openshift-upgrade-$(CLUSTER_TYPE)
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/apici
-        name: apici-ci-operator-credentials
-        readOnly: true
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
-        name: cluster-profile
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-      - mountPath: /etc/appci
-        name: appci-release-bot-credentials
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: apici-ci-operator-credentials
-      secret:
-        items:
-        - key: sa.ci-operator.apici.config
-          path: kubeconfig
-        secretName: apici-ci-operator-credentials
-    - name: boskos
-      secret:
-        items:
-        - key: password
-          path: password
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-aws
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-    - name: appci-release-bot-credentials
-      secret:
-        items:
-        - key: sa.release-bot.app.ci.config
-          path: sa.release-bot.app.ci.config
-        secretName: build-farm-credentials
 - agent: kubernetes
   cluster: api.ci
   cron: '@yearly'
@@ -5986,210 +5750,6 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
-- agent: kubernetes
-  cluster: api.ci
-  cron: '@yearly'
-  decorate: true
-  labels:
-    job-env: gcp
-    job-release: "4.4"
-    job-test: e2e
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: release-openshift-origin-installer-e2e-gcp-upgrade-4.4
-  spec:
-    containers:
-    - args:
-      - --artifact-dir=$(ARTIFACTS)
-      - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
-      - --target=e2e-$(CLUSTER_TYPE)-upgrade
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      command:
-      - ci-operator
-      env:
-      - name: BRANCH
-        value: "4.4"
-      - name: CLUSTER_TYPE
-        value: gcp
-      - name: UNRESOLVED_CONFIG
-        value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
-          resources:
-            '*':
-              limits:
-                memory: 4Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tests:
-          - as: e2e-$(CLUSTER_TYPE)-upgrade
-            steps:
-              cluster_profile: "$(CLUSTER_TYPE)"
-              workflow: "openshift-upgrade-$(CLUSTER_TYPE)"
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/apici
-        name: apici-ci-operator-credentials
-        readOnly: true
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/e2e-gcp-upgrade-cluster-profile
-        name: cluster-profile
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-      - mountPath: /etc/appci
-        name: appci-release-bot-credentials
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: apici-ci-operator-credentials
-      secret:
-        items:
-        - key: sa.ci-operator.apici.config
-          path: kubeconfig
-        secretName: apici-ci-operator-credentials
-    - name: boskos
-      secret:
-        items:
-        - key: password
-          path: password
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-gcp
-        - configMap:
-            name: cluster-profile-gcp
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-    - name: appci-release-bot-credentials
-      secret:
-        items:
-        - key: sa.release-bot.app.ci.config
-          path: sa.release-bot.app.ci.config
-        secretName: build-farm-credentials
-- agent: kubernetes
-  cluster: api.ci
-  cron: '@yearly'
-  decorate: true
-  labels:
-    job-env: azure
-    job-release: "4.4"
-    job-test: e2e
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: release-openshift-origin-installer-e2e-azure-upgrade-4.4
-  spec:
-    containers:
-    - args:
-      - --artifact-dir=$(ARTIFACTS)
-      - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-azure-upgrade-cluster-profile
-      - --target=e2e-azure-upgrade
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      command:
-      - ci-operator
-      env:
-      - name: BRANCH
-        value: "4.4"
-      - name: CLUSTER_TYPE
-        value: azure4
-      - name: UNRESOLVED_CONFIG
-        value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
-          resources:
-            '*':
-              limits:
-                memory: 4Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tests:
-          - as: e2e-azure-upgrade
-            steps:
-              cluster_profile: "$(CLUSTER_TYPE)"
-              workflow: openshift-upgrade-azure
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/apici
-        name: apici-ci-operator-credentials
-        readOnly: true
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/e2e-azure-upgrade-cluster-profile
-        name: cluster-profile
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-      - mountPath: /etc/appci
-        name: appci-release-bot-credentials
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: apici-ci-operator-credentials
-      secret:
-        items:
-        - key: sa.ci-operator.apici.config
-          path: kubeconfig
-        secretName: apici-ci-operator-credentials
-    - name: boskos
-      secret:
-        items:
-        - key: password
-          path: password
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-azure4
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-    - name: appci-release-bot-credentials
-      secret:
-        items:
-        - key: sa.release-bot.app.ci.config
-          path: sa.release-bot.app.ci.config
-        secretName: build-farm-credentials
 - agent: kubernetes
   cluster: api.ci
   cron: 0 2,14 * * *

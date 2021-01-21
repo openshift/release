@@ -6,26 +6,9 @@ set -o pipefail
 
 echo "************ baremetalds devscripts setup command ************"
 
-# TODO: Remove once OpenShift CI will be upgraded to 4.2 (see https://access.redhat.com/articles/4859371)
-~/fix_uid.sh
-
-# Initial check
-if [ "${CLUSTER_TYPE}" != "packet" ] ; then
-    echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"
-    exit 1
-fi
-
-# Fetch packet server IP
-IP=$(cat "${SHARED_DIR}/server-ip")
-
-SSHOPTS=(-o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -i "${CLUSTER_PROFILE_DIR}/.packet-kni-ssh-privatekey")
-
-# Checkout dev-scripts and make
-for x in $(seq 10) ; do
-    test "$x" -eq 10 && exit 1
-    ssh "${SSHOPTS[@]}" "root@${IP}" hostname && break
-    sleep 10
-done
+# Fetch packet basic configuration
+# shellcheck source=/dev/null
+source "${SHARED_DIR}/packet-conf.sh"
 
 # Get dev-scripts logs
 finished()
