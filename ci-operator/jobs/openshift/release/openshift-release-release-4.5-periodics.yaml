@@ -15,7 +15,6 @@ periodics:
       - --lease-server-username=ci
       - --secret-dir=/usr/local/pull-secret
       - --secret-dir=/usr/local/e2e-aws-cluster-profile
-      - --template=/usr/local/e2e-aws
       - --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME)
       - --promote
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
@@ -63,9 +62,7 @@ periodics:
         value: "4.5"
       - name: TAG_SOURCE
         value: machine-os-content:$(BRANCH)
-      - name: CLUSTER_TYPE
-        value: aws
-      - name: CONFIG_SPEC
+      - name: UNRESOLVED_CONFIG
         value: |
           tag_specification:
             name: "$(BRANCH)"
@@ -100,13 +97,9 @@ periodics:
                 memory: 200Mi
           tests:
           - as: e2e-aws
-            commands: TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
+            steps:
               cluster_profile: aws
-      - name: JOB_NAME_SAFE
-        value: e2e-aws
-      - name: TEST_COMMAND
-        value: TEST_SUITE=openshift/conformance/parallel run-tests
+              workflow: openshift-e2e-aws
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -122,9 +115,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-aws-cluster-profile
         name: cluster-profile
-      - mountPath: /usr/local/e2e-aws
-        name: job-definition
-        subPath: cluster-launch-installer-e2e.yaml
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
       - mountPath: /etc/pull-secret
@@ -149,9 +139,6 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
-    - configMap:
-        name: prow-job-cluster-launch-installer-e2e
-      name: job-definition
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -208,50 +195,6 @@ periodics:
         value: s390x
       - name: TAG_SOURCE
         value: machine-os-content:$(BRANCH)-$(ARCH)
-      - name: CLUSTER_TYPE
-        value: aws
-      - name: CONFIG_SPEC
-        value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: "ocp-$(ARCH)"
-          promotion:
-            name: "$(BRANCH)"
-            namespace: "ocp-$(ARCH)"
-            additional_images:
-              $(TAG): $(TAG)
-          build_root:
-            image_stream_tag:
-              name: release
-              namespace: openshift
-              tag: golang-1.12
-          base_images:
-            $(TAG):
-              name: $(TAG)
-              namespace: rhcos
-              tag: "$(BRANCH)-$(ARCH)"
-          raw_steps:
-          - output_image_tag_step:
-              from: $(TAG)
-              to:
-                name: stable
-                tag: $(TAG)
-          resources:
-            '*':
-              limits:
-                memory: 4Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tests:
-          - as: e2e-aws
-            commands: TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
-              cluster_profile: aws
-      - name: JOB_NAME_SAFE
-        value: e2e-aws
-      - name: TEST_COMMAND
-        value: TEST_SUITE=openshift/conformance/parallel run-tests
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -259,38 +202,10 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /etc/apici
-        name: apici-ci-operator-credentials
-        readOnly: true
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/e2e-aws-cluster-profile
-        name: cluster-profile
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
-    - name: apici-ci-operator-credentials
-      secret:
-        items:
-        - key: sa.ci-operator.apici.config
-          path: kubeconfig
-        secretName: apici-ci-operator-credentials
-    - name: boskos
-      secret:
-        items:
-        - key: password
-          path: password
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-aws
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -344,50 +259,6 @@ periodics:
         value: ppc64le
       - name: TAG_SOURCE
         value: machine-os-content:$(BRANCH)-$(ARCH)
-      - name: CLUSTER_TYPE
-        value: aws
-      - name: CONFIG_SPEC
-        value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: "ocp-$(ARCH)"
-          promotion:
-            name: "$(BRANCH)"
-            namespace: "ocp-$(ARCH)"
-            additional_images:
-              $(TAG): $(TAG)
-          build_root:
-            image_stream_tag:
-              name: release
-              namespace: openshift
-              tag: golang-1.12
-          base_images:
-            $(TAG):
-              name: $(TAG)
-              namespace: rhcos
-              tag: "$(BRANCH)-$(ARCH)"
-          raw_steps:
-          - output_image_tag_step:
-              from: $(TAG)
-              to:
-                name: stable
-                tag: $(TAG)
-          resources:
-            '*':
-              limits:
-                memory: 4Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tests:
-          - as: e2e-aws
-            commands: TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
-              cluster_profile: aws
-      - name: JOB_NAME_SAFE
-        value: e2e-aws
-      - name: TEST_COMMAND
-        value: TEST_SUITE=openshift/conformance/parallel run-tests
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -395,41 +266,10 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /etc/apici
-        name: apici-ci-operator-credentials
-        readOnly: true
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/e2e-aws-cluster-profile
-        name: cluster-profile
-      - mountPath: /usr/local/e2e-aws
-        name: job-definition
-        subPath: cluster-launch-installer-e2e.yaml
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
-    - name: apici-ci-operator-credentials
-      secret:
-        items:
-        - key: sa.ci-operator.apici.config
-          path: kubeconfig
-        secretName: apici-ci-operator-credentials
-    - name: boskos
-      secret:
-        items:
-        - key: password
-          path: password
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-aws
-    - configMap:
-        name: prow-job-cluster-launch-installer-e2e
-      name: job-definition
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -462,7 +302,6 @@ periodics:
       - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-gcp-cluster-profile
       - --secret-dir=/usr/local/pull-secret
-      - --template=/usr/local/e2e-gcp
       command:
       - /bin/bash
       - -c
@@ -633,9 +472,7 @@ periodics:
         value: "4.5"
       - name: TAG_SOURCE
         value: $(TAG):$(BRANCH)
-      - name: CLUSTER_TYPE
-        value: gcp
-      - name: CONFIG_SPEC
+      - name: UNRESOLVED_CONFIG
         value: |
           tag_specification:
             name: "$(BRANCH)"
@@ -670,13 +507,9 @@ periodics:
                 memory: 200Mi
           tests:
           - as: e2e-gcp
-            commands: TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
+            steps:
               cluster_profile: gcp
-      - name: JOB_NAME_SAFE
-        value: e2e-gcp
-      - name: TEST_COMMAND
-        value: TEST_SUITE=openshift/conformance/parallel run-tests
+              workflow: openshift-e2e-gcp
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -692,9 +525,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-gcp-cluster-profile
         name: cluster-profile
-      - mountPath: /usr/local/e2e-gcp
-        name: job-definition
-        subPath: cluster-launch-installer-e2e.yaml
       - mountPath: /etc/pull-secret
         name: pull-secret
         readOnly: true
