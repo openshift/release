@@ -27,7 +27,7 @@ ZONES_STR+=" ]"
 echo "AWS region: ${REGION} (zones: ${ZONES_STR})"
 
 cat >> "${CONFIG}" << EOF
-baseDomain: origin-ci-int-aws.dev.rhcloud.com
+baseDomain: ${BASE_DOMAIN}
 controlPlane:
   name: master
   platform:
