@@ -88,7 +88,7 @@ echo "export PULL_SECRET='\$(cat /root/pull-secret)'" >> /root/config
 echo "export NO_MINIKUBE=true" >> /root/config
 
 # TODO: remove to use baked version instead of a hardcoded one
-echo "export OPENSHIFT_INSTALL_RELEASE_IMAGE=quay.io/eranco74/ocp-release:bootstrap-in-place" >> /root/config
+echo "export OPENSHIFT_INSTALL_RELEASE_IMAGE=registry.svc.ci.openshift.org/sno-dev/openshift-bip:0.2.0" >> /root/config
 # echo "export OPENSHIFT_INSTALL_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}" >> /root/config
 set -x
 
