@@ -3,6 +3,10 @@ base_images:
     name: 4.7-priv
     namespace: ocp-private
     tag: base
+  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.7
 binary_build_commands: go build cmd/cluster-cloud-controller-manager-operator/main.go
 build_root:
   image_stream_tag:
@@ -10,6 +14,13 @@ build_root:
     namespace: openshift
     tag: golang-1.15
 canonical_go_repository: github.com/openshift/cluster-cloud-controller-manager-operator
+images:
+- from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
+  to: cluster-cloud-controller-manager-operator
 promotion:
   name: 4.7-priv
   namespace: ocp-private
