@@ -6,8 +6,9 @@ set -o pipefail
 
 echo "************ baremetalds packet teardown command ************"
 
-# TODO: Remove once OpenShift CI will be upgraded to 4.2 (see https://access.redhat.com/articles/4859371)
-~/fix_uid.sh
+# This is required to be able to SSH.
+# shellcheck source=/dev/null
+source "${SHARED_DIR}/fix-uid.sh"
 
 # Run Ansible playbook
 cd

@@ -7,27 +7,9 @@ set -x
 
 echo "************ baremetalds test command ************"
 
-# Ensure our UID, which is randomly generated, is in /etc/passwd. This is required
-# to be able to SSH.
-if ! whoami &> /dev/null; then
-    if [[ -w /etc/passwd ]]; then
-        echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
-    else
-        echo "/etc/passwd is not writeable, and user matching this uid is not found."
-        exit 1
-    fi
-fi
-
-# Initial check
-if [ "${CLUSTER_TYPE}" != "packet" ] ; then
-    echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"
-    exit 0
-fi
-
-# Fetch packet server IP
-IP=$(cat "${SHARED_DIR}/server-ip")
-
-SSHOPTS=(-o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -i "${CLUSTER_PROFILE_DIR}/.packet-kni-ssh-privatekey")
+# Fetch packet basic configuration
+# shellcheck source=/dev/null
+source "${SHARED_DIR}/packet-conf.sh"
 
 collect_artifacts() {
     echo "### Fetching results"
