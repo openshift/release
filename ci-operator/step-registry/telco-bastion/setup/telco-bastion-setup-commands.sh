@@ -38,7 +38,7 @@ cat << EOF > ~/ocp-install.yml
     shell: kcli delete plan --yes upstream_ci
     ignore_errors: yes
   - name: Run deployment
-    shell: timeout 2h kcli create plan --paramfile /home/tester/kcli_parameters.yml upstream_ci $KCLI_PARAM --wait
+    shell: timeout 2h kcli create plan --paramfile /home/tester/kcli_parameters.yml upstream_ci $KCLI_PARAM
     args:
       chdir: ~/kcli-openshift4-baremetal
   - name: Run playbook to copy kubeconfig from installer vm to bastion vm
