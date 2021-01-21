@@ -43,6 +43,12 @@ CONFIG = {
     'osd-ephemeral-quota-slice': {
         'default': 5,
     },
+    'aws-cpaas-quota-slice': {
+        'us-east-1': 8,
+        'us-east-2': 8,
+        'us-west-1': 8,
+        'us-west-2': 8
+    }
 }
 
 for i in range(2):
