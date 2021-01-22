@@ -366,16 +366,6 @@ objects:
           ${SSH_PUB_KEY}
         EOF
 
-        # Create a ramdisk for the etcd storage. This helps with disk latency
-        # unpredictability in the OpenStack cloud used by the CI:
-        TF_LOG=debug openshift-install --dir=${ARTIFACT_DIR}/installer create ignition-configs --log-level=debug
-        python -c \
-            'import json, sys; j = json.load(sys.stdin); j[u"systemd"] = {}; j[u"systemd"][u"units"] = [{u"contents": "[Unit]\nDescription=Mount etcd as a ramdisk\nBefore=local-fs.target\n[Mount]\n What=none\nWhere=/var/lib/etcd\nType=tmpfs\nOptions=size=2G\n[Install]\nWantedBy=local-fs.target", u"enabled": True, u"name":u"var-lib-etcd.mount"}]; json.dump(j, sys.stdout)' \
-            <${ARTIFACT_DIR}/installer/master.ign \
-            >${ARTIFACT_DIR}/installer/master.ign.out
-        mv ${ARTIFACT_DIR}/installer/master.ign.out ${ARTIFACT_DIR}/installer/master.ign
-
-
         # What we're doing here is we generate manifests first and force that OpenShift SDN is configured. Kuryr is only
         # allowed when KURYR_ENABLED variable is set to "true".
         TF_LOG=debug openshift-install --dir=${ARTIFACT_DIR}/installer create manifests --log-level=debug &
@@ -393,6 +383,16 @@ objects:
             sed -i -e 's/networkType: .*$/networkType: OVNKubernetes/g' ${ARTIFACT_DIR}/installer/manifests/cluster-network-02-config.yml
           fi
         fi
+
+        # Create a ramdisk for the etcd storage. This helps with disk latency
+        # unpredictability in the OpenStack cloud used by the CI:
+        TF_LOG=debug openshift-install --dir=${ARTIFACT_DIR}/installer create ignition-configs --log-level=debug
+        python -c \
+            'import json, sys; j = json.load(sys.stdin); j[u"systemd"] = {}; j[u"systemd"][u"units"] = [{u"contents": "[Unit]\nDescription=Mount etcd as a ramdisk\nBefore=local-fs.target\n[Mount]\n What=none\nWhere=/var/lib/etcd\nType=tmpfs\nOptions=size=2G\n[Install]\nWantedBy=local-fs.target", u"enabled": True, u"name":u"var-lib-etcd.mount"}]; json.dump(j, sys.stdout)' \
+            <${ARTIFACT_DIR}/installer/master.ign \
+            >${ARTIFACT_DIR}/installer/master.ign.out
+        mv ${ARTIFACT_DIR}/installer/master.ign.out ${ARTIFACT_DIR}/installer/master.ign
+
         TF_LOG=debug openshift-install --dir=${ARTIFACT_DIR}/installer create cluster --log-level=debug 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
         wait "$!"
 
