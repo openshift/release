@@ -549,11 +549,8 @@ objects:
         # Bump the libvirt workers disk to to 30GB
         yq write --inplace ${ARTIFACT_DIR}/installer/openshift/99_openshift-cluster-api_worker-machineset-0.yaml spec.template.spec.providerSpec.value.volume[volumeSize] 32212254720
 
-        mock-nss.sh openshift-install create cluster --dir=${ARTIFACT_DIR}/installer --log-level=debug || true &
+        mock-nss.sh openshift-install create cluster --dir=${ARTIFACT_DIR}/installer --log-level=debug 2>&1 | sed 's/password: .*/password: REDACTED"/g' || true &
         openshift_install="$!"
-
-        # Password for the cluster gets leaked in the installer logs and hence removing them.
-        sed -i 's/password: .*/password: REDACTED"/g' ${ARTIFACT_DIR}/installer/.openshift_install.log
 
         # While openshift-install is running...
         i=0
@@ -582,8 +579,15 @@ objects:
         wait "${openshift_install}"
 
         # Add a step to wait for installation to complete, in case the cluster takes longer to create than the default time of 30 minutes.
-        mock-nss.sh openshift-install --dir=${ARTIFACT_DIR}/installer --log-level=debug wait-for install-complete 2>&1 &
+        mock-nss.sh openshift-install --dir=${ARTIFACT_DIR}/installer --log-level=debug wait-for install-complete 2>&1 | sed 's/password: .*/password: REDACTED"/g' &
         wait "$!"
+        RC=$?
+
+        # Password for the cluster gets leaked in the installer logs and hence removing them.
+        sed -i 's/password: .*/password: REDACTED"/g' ${ARTIFACT_DIR}/installer/.openshift_install.log
+
+        exit ${RC}
+
     # Performs cleanup of all created resources
     - name: teardown
       image: "${IMAGE_LIBVIRT_INSTALLER}"
