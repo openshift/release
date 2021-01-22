@@ -1,0 +1,38 @@
+binary_build_commands: make manager
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: make gotest
+  container:
+    from: src
+- as: govet
+  commands: make govet
+  container:
+    from: src
+- as: golangci
+  commands: make golangci
+  container:
+    from: src
+- as: golint
+  commands: make golint
+  container:
+    from: src
+- as: gofmt
+  commands: make gofmt
+  container:
+    from: src
+zz_generated_metadata:
+  branch: master
+  org: openstack-k8s-operators
+  repo: osp-director-operator
