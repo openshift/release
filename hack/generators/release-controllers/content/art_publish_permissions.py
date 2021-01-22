@@ -45,6 +45,25 @@ def add_art_publish(gendoc):
 Also permit the creation of daemonsets to ensure kubelet does not gc builder images from nodes (bug
 in 3.11).''')
 
+    gendoc.append({
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
+        'kind': 'RoleBinding',
+        'metadata': {
+            'name': 'art-publish',
+            'namespace': 'openshift'
+        },
+        'roleRef': {
+            'apiGroup': 'rbac.authorization.k8s.io',
+            'kind': 'ClusterRole',
+            'name': 'system:image-builder'
+        },
+        'subjects': [{
+            'kind': 'ServiceAccount',
+            'name': 'art-publish',
+            'namespace': 'ocp'
+        }]
+    }, comment='Allow ART to mirror images to the openshift namespace so ci-build-root "release" images can be pushed')
+
     for private in (False, True):
         for arch in config.arches:
 
