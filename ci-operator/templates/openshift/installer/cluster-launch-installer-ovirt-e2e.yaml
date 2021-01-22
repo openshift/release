@@ -504,6 +504,15 @@ objects:
 
         }
 
+        # What we're doing here is we generate manifests first and force that OpenShift SDN is configured.
+        TF_LOG=debug openshift-install --dir=${ARTIFACT_DIR}/installer create manifests --log-level=debug &
+        wait "$!"
+
+        sed -i '/^  channel:/d' ${ARTIFACT_DIR}/installer/manifests/cvo-overrides.yaml
+
+        # This is for debugging purposes, allows us to map a job to a VM
+        cat ${ARTIFACT_DIR}/installer/manifests/cluster-infrastructure-02-config.yml
+
         #change the masters igntion for non upgrade jobs, to use tempfs for etcd IOPS optimization
         if [[ ! -n $(echo "$JOB_NAME" | grep -P '\-upgrade\-') ]]; then
           echo "Using tmpfs hack for job $JOB_NAME"
@@ -515,15 +524,6 @@ objects:
 
           mv ${ARTIFACT_DIR}/installer/master.ign.out ${ARTIFACT_DIR}/installer/master.ign
         fi
-        
-        # What we're doing here is we generate manifests first and force that OpenShift SDN is configured.
-        TF_LOG=debug openshift-install --dir=${ARTIFACT_DIR}/installer create manifests --log-level=debug &
-        wait "$!"
-
-        sed -i '/^  channel:/d' ${ARTIFACT_DIR}/installer/manifests/cvo-overrides.yaml
-
-        # This is for debugging purposes, allows us to map a job to a VM
-        cat ${ARTIFACT_DIR}/installer/manifests/cluster-infrastructure-02-config.yml
 
         export KUBECONFIG=${ARTIFACT_DIR}/installer/auth/kubeconfig
         echo "JOB_NAME is $JOB_NAME"
