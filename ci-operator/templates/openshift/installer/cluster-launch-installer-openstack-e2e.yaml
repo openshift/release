@@ -187,7 +187,9 @@ objects:
 
         # set up openstack env vars for testing
         function get_clouds_param() {
-          awk '/^\s+'$1':/ { print $2 }' /tmp/cluster/clouds.yaml | sed -e 's/^"//' -e 's/"$//'
+          key=$1
+          default=$2
+          awk '/^\s+'$key':/ { print $2 }' /tmp/cluster/clouds.yaml | sed -e 's/^"//' -e 's/"$//' | grep . || echo $default
         }
 
         XTRACE_ENABLED=0
@@ -203,6 +205,9 @@ objects:
         export OS_REGION_NAME="$(get_clouds_param 'region_name')"
         export OS_ENDPOINT_TYPE="$(get_clouds_param 'interface')"
         export OS_IDENTITY_API_VERSION="$(get_clouds_param 'identity_api_version')"
+        # Some clouds might not have cinder v2 anymore. This ensure we use cinder v3.
+        # https://bugzilla.redhat.com/show_bug.cgi?id=1918680
+        export OS_VOLUME_API_VERSION="$(get_clouds_param 'volume_api_version' 3)"
         export OS_USER_DOMAIN_NAME="$(get_clouds_param 'user_domain_name')"
         if [[ "$XTRACE_ENABLED" == 1 ]]; then
           set -x
