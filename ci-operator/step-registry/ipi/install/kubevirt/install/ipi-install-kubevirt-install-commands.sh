@@ -26,6 +26,8 @@ cp "${SHARED_DIR}/install-config.yaml" "${dir}/"
 mkdir -p ~/.ssh
 cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/
 
+
+echo "*********************"
 KUBECONFIG=${HOME}/secret-kube/kubeconfig-infra-cluster openshift-install --dir="${dir}" create manifests &
 wait "$!"
 
