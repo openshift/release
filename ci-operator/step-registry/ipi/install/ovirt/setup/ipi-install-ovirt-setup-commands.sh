@@ -62,6 +62,14 @@ chmod ug+x "${installer_artifact_dir}"/jq
 export PATH=$PATH:"${installer_artifact_dir}"
 export OVIRT_CONFIG="${installer_artifact_dir}/ovirt-config.yaml"
 
+# Generate manifests first and force OpenShift SDN to be configured.
+TF_LOG=debug openshift-install --dir="${installer_artifact_dir}" create manifests --log-level=debug &
+wait "$!"
+sed -i '/^  channel:/d' "${installer_artifact_dir}"/manifests/cvo-overrides.yaml
+
+# This is for debugging purposes, allows us to map a job to a VM
+cat "${installer_artifact_dir}"/manifests/cluster-infrastructure-02-config.yml
+
 if [[ ! -n $(echo "$JOB_NAME" | grep -P '\-upgrade\-') ]]; then
   echo "Using tmpfs hack for job $JOB_NAME"
   TF_LOG=debug openshift-install --dir="${installer_artifact_dir}" create ignition-configs --log-level=debug
@@ -71,14 +79,6 @@ if [[ ! -n $(echo "$JOB_NAME" | grep -P '\-upgrade\-') ]]; then
       >"${installer_artifact_dir}/master.ign.out"
   mv "${installer_artifact_dir}/master.ign.out" "${installer_artifact_dir}/master.ign"
 fi
-
-# Generate manifests first and force OpenShift SDN to be configured.
-TF_LOG=debug openshift-install --dir="${installer_artifact_dir}" create manifests --log-level=debug &
-wait "$!"
-sed -i '/^  channel:/d' "${installer_artifact_dir}"/manifests/cvo-overrides.yaml
-
-# This is for debugging purposes, allows us to map a job to a VM
-cat "${installer_artifact_dir}"/manifests/cluster-infrastructure-02-config.yml
 
 export KUBECONFIG="${installer_artifact_dir}"/auth/kubeconfig
 
