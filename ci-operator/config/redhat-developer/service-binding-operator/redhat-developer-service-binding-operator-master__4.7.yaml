@@ -1,0 +1,48 @@
+base_images:
+  os:
+    name: ubi
+    namespace: ocp
+    tag: "8"
+binary_build_commands: make build
+build_root:
+  project_image:
+    dockerfile_path: openshift-ci/Dockerfile.tools
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 250Mi
+tag_specification:
+  name: "4.7"
+  namespace: ocp
+tests:
+- as: acceptance
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: VERBOSE=2 make -k test-acceptance test-acceptance-artifacts
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: validate-master-build
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: VERBOSE=2 make -k test-acceptance-with-bundle test-acceptance-artifacts
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: master
+  org: redhat-developer
+  repo: service-binding-operator
+  variant: "4.7"
