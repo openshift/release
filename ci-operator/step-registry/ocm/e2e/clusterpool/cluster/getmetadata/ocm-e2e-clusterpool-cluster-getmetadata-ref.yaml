@@ -1,0 +1,43 @@
+ref:
+  as: ocm-e2e-clusterpool-cluster-getmetadata
+  from_image:
+    namespace: open-cluster-management
+    name: builder
+    tag: go1.15-linux-amd64
+  commands: ocm-e2e-clusterpool-cluster-getmetadata-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+    - name: MAKEFILE
+      default: "/opt/build-harness/Makefile.build-harness-openshift-ci"
+      documentation: |-
+        Location of the build harness Makefile for use on OSCI.
+    - name: CLUSTERPOOL_HOST_API
+      default: ""
+      documentation: |-
+        API URL of the cluster running the target clusterpool, used in oc login,
+        so port :6443 is required
+    - name: CLUSTERPOOL_HOST_KUBE_SECRET
+      default: ""
+      documentation: |-
+        The name of the kube secret with the kube API user and token.
+    - name: CLUSTER_CLAIM
+      default: ""
+      documentation: |-
+        The cluster claim name to use. If blank, the file specified by
+        CLUSTER_CLAIM_FILE is used.
+    - name: CLUSTER_CLAIM_FILE
+      default: "cluster-claim"
+      documentation: |-
+        File name that stores the cluster claim name.
+    - name: CLUSTER_DATA_FILE
+      default: ""
+      documentation: |-
+        File name to use to store the cluster metadata. If it's blank, the
+        file name is the cluster claim name followed by ".json".
+  documentation: |-
+    This step queries the cluster meta data specified by the cluster claim
+    name in either CLUSTER_CLAIM or the file specified by CLUSTER_CLAIM_FILE.
+    The meta data is store in "${SHARED_DIR}/${CLUSTER_DATA_FILE}".
