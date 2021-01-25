@@ -103,15 +103,15 @@ presubmits:
     branches:
     - master
     cluster: build02
-    context: ci/prow/integration-aws
+    context: ci/prow/integration-gcp
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-route-monitor-operator-master-integration-aws
-    rerun_command: /test integration-aws
+    name: pull-ci-openshift-route-monitor-operator-master-integration-gcp
+    rerun_command: /test integration-gcp
     spec:
       containers:
       - args:
@@ -120,8 +120,8 @@ presubmits:
         - --lease-server-password-file=/etc/boskos/password
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/usr/local/integration-aws-cluster-profile
-        - --target=integration-aws
+        - --secret-dir=/usr/local/integration-gcp-cluster-profile
+        - --target=integration-gcp
         command:
         - ci-operator
         image: ci-operator:latest
@@ -134,7 +134,7 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/integration-aws-cluster-profile
+        - mountPath: /usr/local/integration-gcp-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -157,14 +157,16 @@ presubmits:
         projected:
           sources:
           - secret:
-              name: cluster-secrets-aws
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )integration-aws,?($|\s.*)
+    trigger: (?m)^/test( | .* )integration-gcp,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
