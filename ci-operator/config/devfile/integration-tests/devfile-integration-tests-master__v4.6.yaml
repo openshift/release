@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.5"
+    name: "4.6"
     namespace: ocp
     tag: cli
 binary_build_commands: make bin
@@ -22,42 +22,28 @@ resources:
       cpu: 800m
       memory: 6Gi
 tag_specification:
-  name: "4.5"
+  name: "4.6"
   namespace: ocp
 tests:
-- as: integration-e2e
+- as: integration-devfile-odo
   steps:
     cluster_profile: aws
     test:
-    - as: integration-e2e-steps
+    - as: integration-devfile-odo-steps
       commands: scripts/openshiftci-presubmit-devfiles-tests.sh
-      credentials:
-      - mount_path: /usr/local/ci-secrets/odo-rabbitmq
-        name: odo-rabbitmq
-        namespace: test-credentials
-      env:
-      - default: /usr/local/ci-secrets/odo-rabbitmq/amqpuri
-        name: ODO_RABBITMQ_AMQP_URL
       from: oc-bin-image
       resources:
         requests:
           cpu: "2"
           memory: 6Gi
     workflow: ipi-aws
-- as: integration-e2e-periodic
+- as: integration-devfile-odo-periodic
   cron: 0 */6 * * *
   steps:
     cluster_profile: aws
     test:
-    - as: integration-e2e-periodic-steps
+    - as: integration-devfile-odo-periodic-steps
       commands: scripts/openshiftci-presubmit-devfiles-tests.sh
-      credentials:
-      - mount_path: /usr/local/ci-secrets/odo-rabbitmq
-        name: odo-rabbitmq
-        namespace: test-credentials
-      env:
-      - default: /usr/local/ci-secrets/odo-rabbitmq/amqpuri
-        name: ODO_RABBITMQ_AMQP_URL
       from: oc-bin-image
       resources:
         requests:
@@ -68,4 +54,4 @@ zz_generated_metadata:
   branch: master
   org: devfile
   repo: integration-tests
-  variant: v4.5
+  variant: v4.6
