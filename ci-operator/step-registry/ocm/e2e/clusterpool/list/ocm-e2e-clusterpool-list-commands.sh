@@ -22,3 +22,6 @@ case "$CLUSTERPOOL_LIST_ORDER" in
         mv "$OUTPUT.tmp" "$OUTPUT"
         ;;
 esac
+
+echo "Cluter pools"
+cat "$OUTPUT"
