@@ -108,9 +108,6 @@ applyTemplate:
 	oc process -f $(WHAT) | oc apply -f -
 .PHONY: applyTemplate
 
-postsubmit-update: origin-release
-.PHONY: postsubmit-update
-
 all: roles prow projects
 .PHONY: all
 
@@ -153,7 +150,7 @@ prow-release-controller-deploy:
 prow-release-controller: prow-release-controller-definitions prow-release-controller-deploy
 .PHONY: prow-release-controller
 
-projects: ci-ns origin-release publishing-bot content-mirror azure metering coreos
+projects: ci-ns publishing-bot content-mirror azure metering coreos
 .PHONY: projects
 
 content-mirror:
@@ -175,11 +172,6 @@ oauth-proxy:
 publishing-bot:
 	$(MAKE) apply WHAT=projects/publishing-bot/storage-class.yaml
 .PHONY: publishing-bot
-
-origin-release:
-	$(MAKE) applyTemplate WHAT=projects/origin-release/pipeline.yaml
-	oc tag docker.io/centos/ruby-25-centos7:latest --scheduled openshift/release:ruby-25
-.PHONY: origin-release
 
 service-idler:
 	$(MAKE) apply WHAT=projects/service-idler/pipeline.yaml

@@ -1,4 +1,4 @@
-apiVersion: v1
+apiVersion: template.openshift.io/v1
 kind: Template
 labels:
   template: origin-release
@@ -26,6 +26,10 @@ parameters:
   required: false
 - name: BASE_REPOSITORY
   value: centos:7
+- description: Namespace
+  name: NAMESPACE
+  required: false
+  value: ci
 objects:
 - kind: ImageStream
   apiVersion: v1
@@ -33,12 +37,14 @@ objects:
     labels:
       app: origin-release
     name: origin-release
+    namespace: ${NAMESPACE}
   spec:
     tags:
     - name: base
       from:
         kind: DockerImage
         name: ${BASE_REPOSITORY}
+        namespace: ${NAMESPACE}
       importPolicy:
         scheduled: true
 - apiVersion: v1
@@ -47,6 +53,7 @@ objects:
     labels:
       app: origin-release
     name: "origin-release-golang-1.11"
+    namespace: ${NAMESPACE}
   spec:
     successfulBuildsHistoryLimit: 1
     failedBuildsHistoryLimit: 2
@@ -55,12 +62,12 @@ objects:
         kind: DockerImage
         name: "${PUSH_REPOSITORY}:golang-1.11"
       pushSecret:
-        name: "dockerhub"
+        name: "registry-push-credentials-openshift"
     source:
       git:
         ref: "${SOURCE_REF}"
         uri: "${SOURCE_URL}"
-      contextDir: "projects/origin-release/golang-1.11/"
+      contextDir: "clusters/build-clusters/01_cluster/ci/origin-release/_build/golang-1.11/"
       type: Git
     strategy:
       dockerStrategy:
@@ -77,6 +84,7 @@ objects:
     labels:
       app: origin-release
     name: "origin-release-golang-1.12"
+    namespace: ${NAMESPACE}
   spec:
     successfulBuildsHistoryLimit: 1
     failedBuildsHistoryLimit: 2
@@ -85,12 +93,12 @@ objects:
         kind: DockerImage
         name: "${PUSH_REPOSITORY}:golang-1.12"
       pushSecret:
-        name: "dockerhub"
+        name: "registry-push-credentials-openshift"
     source:
       git:
         ref: "${SOURCE_REF}"
         uri: "${SOURCE_URL}"
-      contextDir: "projects/origin-release/golang-1.12/"
+      contextDir: "clusters/build-clusters/01_cluster/ci/origin-release/_build/golang-1.12/"
       type: Git
     strategy:
       dockerStrategy:
@@ -107,6 +115,7 @@ objects:
     labels:
       app: origin-release
     name: "origin-release-golang-1.13"
+    namespace: ${NAMESPACE}
   spec:
     successfulBuildsHistoryLimit: 1
     failedBuildsHistoryLimit: 2
@@ -115,12 +124,12 @@ objects:
         kind: DockerImage
         name: "${PUSH_REPOSITORY}:golang-1.13"
       pushSecret:
-        name: "dockerhub"
+        name: "registry-push-credentials-openshift"
     source:
       git:
         ref: "${SOURCE_REF}"
         uri: "${SOURCE_URL}"
-      contextDir: "projects/origin-release/golang-1.13/"
+      contextDir: "clusters/build-clusters/01_cluster/ci/origin-release/_build/golang-1.13/"
       type: Git
     strategy:
       dockerStrategy:
@@ -137,6 +146,7 @@ objects:
     labels:
       app: origin-release
     name: "origin-release-golang-1.14"
+    namespace: ${NAMESPACE}
   spec:
     successfulBuildsHistoryLimit: 1
     failedBuildsHistoryLimit: 2
@@ -145,12 +155,12 @@ objects:
         kind: DockerImage
         name: "${PUSH_REPOSITORY}:golang-1.14"
       pushSecret:
-        name: "dockerhub"
+        name: "registry-push-credentials-openshift"
     source:
       git:
         ref: "${SOURCE_REF}"
         uri: "${SOURCE_URL}"
-      contextDir: "projects/origin-release/golang-1.14/"
+      contextDir: "clusters/build-clusters/01_cluster/ci/origin-release/_build/golang-1.14/"
       type: Git
     strategy:
       dockerStrategy:
@@ -167,6 +177,7 @@ objects:
     labels:
       app: origin-release
     name: "origin-release-golang-1.15"
+    namespace: ${NAMESPACE}
   spec:
     successfulBuildsHistoryLimit: 1
     failedBuildsHistoryLimit: 2
@@ -175,12 +186,12 @@ objects:
         kind: DockerImage
         name: "${PUSH_REPOSITORY}:golang-1.15"
       pushSecret:
-        name: "dockerhub"
+        name: "registry-push-credentials-openshift"
     source:
       git:
         ref: "${SOURCE_REF}"
         uri: "${SOURCE_URL}"
-      contextDir: "projects/origin-release/golang-1.15/"
+      contextDir: "clusters/build-clusters/01_cluster/ci/origin-release/_build/golang-1.15/"
       type: Git
     strategy:
       dockerStrategy:
@@ -197,6 +208,7 @@ objects:
     labels:
       app: origin-release
     name: "origin-release-rhel-7-golang-1.11"
+    namespace: ${NAMESPACE}
   spec:
     successfulBuildsHistoryLimit: 1
     failedBuildsHistoryLimit: 2
@@ -205,12 +217,12 @@ objects:
         kind: DockerImage
         name: "${PUSH_REPOSITORY}:rhel-7-golang-1.11"
       pushSecret:
-        name: "dockerhub"
+        name: "registry-push-credentials-openshift"
     source:
       git:
         ref: "${SOURCE_REF}"
         uri: "${SOURCE_URL}"
-      contextDir: "projects/origin-release/rhel-7-golang-1.11/"
+      contextDir: "clusters/build-clusters/01_cluster/ci/origin-release/_build/rhel-7-golang-1.11/"
       type: Git
     strategy:
       dockerStrategy:
@@ -228,6 +240,7 @@ objects:
     labels:
       app: origin-release
     name: "origin-release-rhel-7-golang-1.12"
+    namespace: ${NAMESPACE}
   spec:
     successfulBuildsHistoryLimit: 1
     failedBuildsHistoryLimit: 2
@@ -236,12 +249,12 @@ objects:
         kind: DockerImage
         name: "${PUSH_REPOSITORY}:rhel-7-golang-1.12"
       pushSecret:
-        name: "dockerhub"
+        name: "registry-push-credentials-openshift"
     source:
       git:
         ref: "${SOURCE_REF}"
         uri: "${SOURCE_URL}"
-      contextDir: "projects/origin-release/rhel-7-golang-1.12/"
+      contextDir: "clusters/build-clusters/01_cluster/ci/origin-release/_build/rhel-7-golang-1.12/"
       type: Git
     strategy:
       dockerStrategy:
@@ -259,6 +272,7 @@ objects:
     labels:
       app: origin-release
     name: "origin-release-rhel-8-golang-1.12"
+    namespace: ${NAMESPACE}
   spec:
     successfulBuildsHistoryLimit: 1
     failedBuildsHistoryLimit: 2
@@ -267,12 +281,12 @@ objects:
         kind: DockerImage
         name: "${PUSH_REPOSITORY}:rhel-8-golang-1.12"
       pushSecret:
-        name: "dockerhub"
+        name: "registry-push-credentials-openshift"
     source:
       git:
         ref: "${SOURCE_REF}"
         uri: "${SOURCE_URL}"
-      contextDir: "projects/origin-release/rhel-8-golang-1.12/"
+      contextDir: "clusters/build-clusters/01_cluster/ci/origin-release/_build/rhel-8-golang-1.12/"
       type: Git
     strategy:
       dockerStrategy:
@@ -291,6 +305,7 @@ objects:
     labels:
       app: origin-release
     name: "origin-release-nodejs-8"
+    namespace: ${NAMESPACE}
   spec:
     successfulBuildsHistoryLimit: 1
     failedBuildsHistoryLimit: 2
@@ -299,12 +314,12 @@ objects:
         kind: DockerImage
         name: "${PUSH_REPOSITORY}:nodejs-8"
       pushSecret:
-        name: "dockerhub"
+        name: "registry-push-credentials-openshift"
     source:
       git:
         ref: "${SOURCE_REF}"
         uri: "${SOURCE_URL}"
-      contextDir: "projects/origin-release/nodejs-8/"
+      contextDir: "clusters/build-clusters/01_cluster/ci/origin-release/_build/nodejs-8/"
       type: Git
     strategy:
       dockerStrategy:
@@ -321,6 +336,7 @@ objects:
     labels:
       app: origin-release
     name: "origin-release-nodejs-8-browser-tests"
+    namespace: ${NAMESPACE}
   spec:
     successfulBuildsHistoryLimit: 1
     failedBuildsHistoryLimit: 2
@@ -329,12 +345,12 @@ objects:
         kind: DockerImage
         name: "${PUSH_REPOSITORY}:nodejs-8-browser-tests"
       pushSecret:
-        name: "dockerhub"
+        name: "registry-push-credentials-openshift"
     source:
       git:
         ref: "${SOURCE_REF}"
         uri: "${SOURCE_URL}"
-      contextDir: "projects/origin-release/nodejs-8-browser-tests/"
+      contextDir: "clusters/build-clusters/01_cluster/ci/origin-release/_build/nodejs-8-browser-tests/"
       type: Git
     strategy:
       dockerStrategy:
