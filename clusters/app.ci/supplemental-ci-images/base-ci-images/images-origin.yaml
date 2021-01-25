@@ -1,22 +1,22 @@
 kind: ImageStream
 apiVersion: image.openshift.io/v1
 metadata:
-  namespace: ocp
-  name: rhel
+  namespace: origin
+  name: centos
 spec:
   tags:
   - name: "7"
     from:
       kind: DockerImage
-      name: registry.access.redhat.com/rhel7:latest
+      name: docker.io/centos:7
     importPolicy:
       scheduled: true
     referencePolicy:
       type: Local
-  - name: minimal
+  - name: "8"
     from:
       kind: DockerImage
-      name: registry.access.redhat.com/ubi7/ubi-minimal:latest
+      name: docker.io/centos:8
     importPolicy:
       scheduled: true
     referencePolicy:
@@ -25,7 +25,7 @@ spec:
 kind: ImageStream
 apiVersion: image.openshift.io/v1
 metadata:
-  namespace: ocp
+  namespace: origin
   name: ubi
 spec:
   tags:
@@ -49,7 +49,7 @@ spec:
 kind: ImageStream
 apiVersion: image.openshift.io/v1
 metadata:
-  namespace: ocp
+  namespace: origin
   name: ubi-minimal
 spec:
   tags:
@@ -73,7 +73,7 @@ spec:
 kind: ImageStream
 apiVersion: image.openshift.io/v1
 metadata:
-  namespace: ocp
+  namespace: origin
   name: builder
 spec:
   tags:
@@ -169,14 +169,13 @@ spec:
       type: Local
   - name: rhel-7-golang-1.13
     from:
-      kind: ImageStreamTag
-      namespace: ocp
-      name: "builder-base:rhel-7-golang-1.13"
+      kind: DockerImage
+      name: docker.io/openshift/origin-release:rhel-7-golang-1.13
+    importPolicy:
+      scheduled: true
     referencePolicy:
       type: Local
-  # Newer golang versions will be pushed directly to the builder imagestream with tags like
-  # "rhel-?-golang-1.X"
-  # "rhel-?-golang-openshift-X.Y" (to indicate that ART is using this golang openshift-X.Y to build)
+
   - name: rhel-8-golang-1.11
     from:
       kind: ImageStreamTag
@@ -198,18 +197,3 @@ spec:
       name: "builder-base:rhel-8-golang-1.13"
     referencePolicy:
       type: Local
-# Newer golang versions will be pushed directly to the builder imagestream with tags like
-# "rhel-?-golang-1.X"
-# "rhel-?-golang-openshift-X.Y" (to indicate that ART is using this golang openshift-X.Y to build)
----
-kind: ImageStream
-apiVersion: image.openshift.io/v1
-metadata:
-  namespace: ocp-s390x
-  name: release-s390x
----
-kind: ImageStream
-apiVersion: image.openshift.io/v1
-metadata:
-  namespace: ocp-ppc64le
-  name: release-ppc64le
