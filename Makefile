@@ -108,7 +108,7 @@ applyTemplate:
 	oc process -f $(WHAT) | oc apply -f -
 .PHONY: applyTemplate
 
-postsubmit-update: origin-release origin-stable
+postsubmit-update: origin-release
 .PHONY: postsubmit-update
 
 all: roles prow projects
@@ -153,7 +153,7 @@ prow-release-controller-deploy:
 prow-release-controller: prow-release-controller-definitions prow-release-controller-deploy
 .PHONY: prow-release-controller
 
-projects: ci-ns origin-stable origin-release publishing-bot content-mirror azure metering coreos
+projects: ci-ns origin-release publishing-bot content-mirror azure metering coreos
 .PHONY: projects
 
 content-mirror:
@@ -175,10 +175,6 @@ oauth-proxy:
 publishing-bot:
 	$(MAKE) apply WHAT=projects/publishing-bot/storage-class.yaml
 .PHONY: publishing-bot
-
-origin-stable:
-	$(MAKE) apply WHAT=projects/origin-stable/release.yaml
-.PHONY: origin-stable
 
 origin-release:
 	$(MAKE) applyTemplate WHAT=projects/origin-release/pipeline.yaml
