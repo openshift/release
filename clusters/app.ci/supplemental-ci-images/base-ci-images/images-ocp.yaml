@@ -1,22 +1,22 @@
 kind: ImageStream
 apiVersion: image.openshift.io/v1
 metadata:
-  namespace: origin
-  name: centos
+  namespace: ocp
+  name: rhel
 spec:
   tags:
   - name: "7"
     from:
       kind: DockerImage
-      name: docker.io/centos:7
+      name: registry.access.redhat.com/rhel7:latest
     importPolicy:
       scheduled: true
     referencePolicy:
       type: Local
-  - name: "8"
+  - name: minimal
     from:
       kind: DockerImage
-      name: docker.io/centos:8
+      name: registry.access.redhat.com/ubi7/ubi-minimal:latest
     importPolicy:
       scheduled: true
     referencePolicy:
@@ -25,7 +25,7 @@ spec:
 kind: ImageStream
 apiVersion: image.openshift.io/v1
 metadata:
-  namespace: origin
+  namespace: ocp
   name: ubi
 spec:
   tags:
@@ -49,7 +49,7 @@ spec:
 kind: ImageStream
 apiVersion: image.openshift.io/v1
 metadata:
-  namespace: origin
+  namespace: ocp
   name: ubi-minimal
 spec:
   tags:
@@ -73,13 +73,7 @@ spec:
 kind: ImageStream
 apiVersion: image.openshift.io/v1
 metadata:
-  namespace: origin
-  name: release
----
-kind: ImageStream
-apiVersion: image.openshift.io/v1
-metadata:
-  namespace: origin
+  namespace: ocp
   name: builder
 spec:
   tags:
@@ -175,13 +169,14 @@ spec:
       type: Local
   - name: rhel-7-golang-1.13
     from:
-      kind: DockerImage
-      name: docker.io/openshift/origin-release:rhel-7-golang-1.13
-    importPolicy:
-      scheduled: true
+      kind: ImageStreamTag
+      namespace: ocp
+      name: "builder-base:rhel-7-golang-1.13"
     referencePolicy:
       type: Local
-
+  # Newer golang versions will be pushed directly to the builder imagestream with tags like
+  # "rhel-?-golang-1.X"
+  # "rhel-?-golang-openshift-X.Y" (to indicate that ART is using this golang openshift-X.Y to build)
   - name: rhel-8-golang-1.11
     from:
       kind: ImageStreamTag
@@ -203,3 +198,6 @@ spec:
       name: "builder-base:rhel-8-golang-1.13"
     referencePolicy:
       type: Local
+# Newer golang versions will be pushed directly to the builder imagestream with tags like
+# "rhel-?-golang-1.X"
+# "rhel-?-golang-openshift-X.Y" (to indicate that ART is using this golang openshift-X.Y to build)
