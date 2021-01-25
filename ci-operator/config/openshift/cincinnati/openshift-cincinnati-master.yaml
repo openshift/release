@@ -9,33 +9,55 @@ base_images:
     tag: golang-1.13
 build_root:
   image_stream_tag:
-    name: cincinnati-build-root
-    namespace: cincinnati-ci
-    tag: buildroot
+    name: release
+    namespace: openshift
+    tag: golang-1.15
 images:
 - dockerfile_path: dist/Dockerfile.build/Dockerfile
-  from: centos
-  to: buildroot
-- dockerfile_path: dist/Dockerfile.deploy/Dockerfile
-  from: centos
   inputs:
-    buildroot:
+    base:
+      as:
+      - registry.centos.org/centos/centos:7
+  to: rust
+- dockerfile_path: dist/Dockerfile.deploy/Dockerfile
+  inputs:
+    centos:
+      as:
+      - registry.centos.org/centos/centos:7
+    rust:
       as:
       - quay.io/app-sre/cincinnati:builder
   to: deploy
 - dockerfile_path: dist/Dockerfile.e2e/Dockerfile
-  from: centos
   inputs:
-    buildroot:
+    centos:
+      as:
+      - registry.centos.org/centos/centos:7
+    rust:
       as:
       - quay.io/app-sre/cincinnati:builder
-    openshift_release_golang-1.13:
-      as:
-      - registry.svc.ci.openshift.org/openshift/release:golang-1.13
   to: e2e-test
 promotion:
   name: cincinnati-build-root
   namespace: cincinnati-ci
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      cat <<DOCKERFILE > /opt/Dockerfile
+      FROM centos
+      WORKDIR /go/src/github.com/openshift/cincinnati/
+      COPY . .
+      DOCKERFILE
+    from: centos
+    to: src-dockerfile
+- project_directory_image_build_step:
+    from: src
+    inputs:
+      src-dockerfile:
+        paths:
+        - destination_dir: .
+          source_path: /opt/Dockerfile
+    to: base
 resources:
   '*':
     requests:
@@ -49,16 +71,6 @@ tag_specification:
   name: "4.5"
   namespace: ocp
 tests:
-- as: build-only
-  steps:
-    test:
-    - as: rust-1.43.1
-      commands: cargo +1.43.1 build --bins --release
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
 - as: cargo-test
   steps:
     pre:
@@ -85,7 +97,7 @@ tests:
         name: CINCINNATI_CI_DOCKERJSON_FILE
       - default: public-ci-image-sa-dockerjson
         name: CINCINNATI_CI_PUBLIC_DOCKERJSON_FILE
-      from: src
+      from: rust
       resources:
         requests:
           cpu: 100m
@@ -106,7 +118,7 @@ tests:
         name: CINCINNATI_TEST_QUAY_API_TOKEN_PATH
       - default: /usr/local/ci-secrets/cincinnati-secrets-cincinnati-credentials/github_token.key
         name: CINCINNATI_GITHUB_SCRAPER_OAUTH_TOKEN_PATH
-      from: src
+      from: rust
       resources:
         requests:
           cpu: 100m
@@ -114,17 +126,17 @@ tests:
 - as: yaml-lint
   commands: dist/prow_yaml_lint.sh
   container:
-    from: src
+    from: rust
 - as: rustfmt-1.46.0
   commands: dist/prow_rustfmt.sh 1.46.0
   container:
-    from: src
+    from: rust
 - as: e2e
   steps:
     cluster_profile: aws
     test:
     - as: openshift-e2e-test
-      commands: bash hack/e2e.sh
+      commands: bash ./hack/e2e.sh
       from: e2e-test
       resources:
         requests:
