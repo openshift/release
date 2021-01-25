@@ -23,7 +23,7 @@ then
     export PATH="${HOME}/.local/bin:${PATH}"
     if [[ $python_version -eq 2 ]]
     then
-        easy_install --user pip  # our Python 2.7.5 is even too old for ensurepip
+        easy_install --user 'pip<21'  # our Python 2.7.5 is even too old for ensurepip
         pip install --user awscli
     elif [[ $python_version -eq 3 ]]
     then
