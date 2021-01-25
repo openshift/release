@@ -1,0 +1,46 @@
+ref:
+  as: ocm-e2e-clusterpool-checkout
+  from_image:
+    namespace: open-cluster-management
+    name: builder
+    tag: go1.15-linux-amd64
+  commands: ocm-e2e-clusterpool-checkout-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+    - name: MAKEFILE
+      default: "/opt/build-harness/Makefile.build-harness-openshift-ci"
+      documentation: |-
+        Location of the build harness Makefile for use on OSCI.
+    - name: CLUSTERPOOL_HOST_API
+      default: ""
+      documentation: |-
+        API URL of the cluster running the target clusterpool, used in oc login,
+        so port :6443 is required
+    - name: CLUSTERPOOL_HOST_KUBE_SECRET
+      default: ""
+      documentation: |-
+        The name of the kube secret with the kube API user and token.
+    - name: CLUSTERPOOL_LIST
+      default: ""
+      documentation: |-
+        A comma separated list of cluster pools to use when attempting to
+        checkout a cluster.
+    - name: CLUSTERPOOL_LIST_FILE
+      default: "clusterpool-list"
+      documentation: |-
+        File name to use for the cluster pool list to use when attempting to
+        checkout a cluster. Only used if CLUSTERPOOL_LIST is empty.
+    - name: CLUSTER_CLAIM_FILE
+      default: "cluster-claim"
+      documentation: |-
+        File name to use to store the cluster claim name.
+  documentation: |-
+    This step checks out a cluster from the cluster pool host. It tries to
+    check out a cluster from the cluster pools specified in CLUSTERPOOL_LIST.
+    If CLUSTERPOOL_LIST is empty, it will use the cluster pools listed in the
+    in CLUSTERPOOL_LIST_FILE to get the list of cluster pools to try
+    to checkout a cluster from. The cluster claim will be stored in 
+    "${SHARED_DIR}/${CLUSTER_CLAIM_FILE}"
