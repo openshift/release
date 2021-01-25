@@ -23,5 +23,5 @@ case "$CLUSTERPOOL_LIST_ORDER" in
         ;;
 esac
 
-echo "Cluter pools"
+echo "Cluster pools"
 cat "$OUTPUT"
