@@ -66,12 +66,18 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-upgrade-aws
-- artifact_dir: /tmp/artifacts
-  as: e2e-aws-console-login
-  commands: ./test-prow-e2e.sh login
-  openshift_installer_custom_test_image:
+- as: e2e-console-login
+  steps:
     cluster_profile: aws
-    from: stable:console-tests
+    test:
+    - as: test
+      cli: latest
+      commands: ./test-prow-e2e.sh login
+      from: stable:console-tests
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: release-4.3
   org: openshift-priv
