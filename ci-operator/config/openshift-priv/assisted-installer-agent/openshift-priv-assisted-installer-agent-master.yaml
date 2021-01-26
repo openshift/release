@@ -1,0 +1,51 @@
+base_images:
+  base:
+    name: 4.7-priv
+    namespace: ocp-private
+    tag: base
+  openshift_release_golang-1.15:
+    name: release
+    namespace: openshift
+    tag: golang-1.15
+binary_build_commands: go mod vendor
+build_root:
+  project_image:
+    dockerfile_path: Dockerfile.assisted_installer_agent-build
+canonical_go_repository: github.com/openshift/assisted-installer-agent
+images:
+- dockerfile_path: Dockerfile.assisted_installer_agent
+  from: base
+  inputs:
+    base:
+      as:
+      - registry.svc.ci.openshift.org/ocp/4.7:base
+    openshift_release_golang-1.15:
+      as:
+      - registry.svc.ci.openshift.org/openshift/release:golang-1.15
+  to: assisted-installer-agent
+promotion:
+  name: 4.7-priv
+  namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: 4.7-priv
+  namespace: ocp-private
+tests:
+- as: lint
+  commands: export GOLANGCI_LINT_CACHE=/tmp/golangci-cache make lint
+  container:
+    from: bin
+- as: unit-test
+  commands: |
+    export GOPATH=/tmp/go && export GOCACHE=/tmp/.cache/go-build && export GOMODCACHE=/tmp/go/pkg/mod
+    make REPORTS=/tmp/reports unit-test
+  container:
+    from: bin
+zz_generated_metadata:
+  branch: master
+  org: openshift-priv
+  repo: assisted-installer-agent
