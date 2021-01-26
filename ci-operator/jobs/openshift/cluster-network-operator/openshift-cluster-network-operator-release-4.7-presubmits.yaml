@@ -608,14 +608,16 @@ presubmits:
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-network-operator-release-4.7-e2e-gcp-ovn-upgrade
+    optional: true
     rerun_command: /test e2e-gcp-ovn-upgrade
     spec:
       containers:
       - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --input-hash=$(JOB_NAME)
         - --lease-server-password-file=/etc/boskos/password
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
@@ -623,15 +625,6 @@ presubmits:
         - --target=e2e-gcp-ovn-upgrade
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: gcp
-        - name: CLUSTER_VARIANT
-          value: ovn
-        - name: JOB_NAME_SAFE
-          value: e2e-gcp-ovn-upgrade
-        - name: TEST_COMMAND
-          value: TEST_SUITE=all run-upgrade-tests
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -644,6 +637,9 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/e2e-gcp-ovn-upgrade-cluster-profile
           name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
