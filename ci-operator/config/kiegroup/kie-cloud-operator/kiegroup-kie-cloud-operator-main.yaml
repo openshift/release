@@ -1,0 +1,57 @@
+base_images:
+  os:
+    name: ubi
+    namespace: ocp
+    tag: "8"
+binary_build_commands: CI=true make build
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- dockerfile_path: build/Dockerfile
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/kiegroup/kie-cloud-operator/build
+  to: kie-cloud-operator
+promotion:
+  namespace: kiegroup
+  tag: latest
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: CI=true make test
+  container:
+    from: src
+- as: configs
+  commands: make check-configs
+  container:
+    from: src
+- as: format
+  commands: CI=true make format
+  container:
+    from: src
+- as: lint
+  commands: make lint
+  container:
+    from: src
+- as: vet
+  commands: CI=true make vet
+  container:
+    from: src
+- as: mod
+  commands: CI=true make mod
+  container:
+    from: src
+zz_generated_metadata:
+  branch: main
+  org: kiegroup
+  repo: kie-cloud-operator
