@@ -53,6 +53,22 @@ tests:
     - as: e2e-upgrade-functests
       cli: latest
       commands: |
+        export component=ssp-operator-container
+        export IMG=$(echo $IMAGE_FORMAT | envsubst)
+        ./automation/ocp-ci-run-e2e-upgrade-tests.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: e2e-upgrade-from-old-operator-functests
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: e2e-upgrade-from-old-operator-functests
+      cli: latest
+      commands: |
         ./hack/deploy-kubevirt-and-cdi.sh
         ./hack/deploy-old-ssp-operator.sh
         export component=ssp-operator-container
