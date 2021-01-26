@@ -135,6 +135,10 @@ def add_imagestream_namespace_rbac(gendoc):
             'apiGroups': ['image.openshift.io'],
             'resources': ['imagestreamimports'],
             'verbs': ['create']
+        }, {
+            'apiGroups': ['image.openshift.io'],
+            'resources': ['imagestreams'],
+            'verbs': ['get', 'list']
         }]
     })
 
