@@ -644,6 +644,39 @@ periodics:
       secret:
         secretName: github-credentials-openshift-merge-robot
 - agent: kubernetes
+  cluster: api.ci
+  cron: '@daily'
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  labels:
+    app: image-pruner
+    ci.openshift.io/role: infra
+  name: periodic-ci-image-pruner
+  spec:
+    containers:
+    - args:
+      - adm
+      - prune
+      - images
+      - --certificate-authority=/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+      - --keep-tag-revisions=3
+      - --keep-younger-than=96h
+      - --confirm=true
+      command:
+      - oc
+      image: registry.svc.ci.openshift.org/ocp/4.7:cli
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        limits:
+          cpu: "2"
+          memory: 8Gi
+        requests:
+          cpu: "1"
+          memory: 4Gi
+    serviceAccountName: image-pruner
+- agent: kubernetes
   cluster: app.ci
   decorate: true
   extra_refs:
