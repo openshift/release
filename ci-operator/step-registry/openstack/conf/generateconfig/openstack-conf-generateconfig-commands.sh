@@ -18,6 +18,8 @@ apiVersion: ${CONFIG_API_VERSION}
 baseDomain: ${BASE_DOMAIN}
 metadata:
   name: ${CLUSTER_NAME}
+networking:
+  networkType: ${NETWORK_TYPE}
 platform:
   openstack:
     cloud:            ${OS_CLOUD}
