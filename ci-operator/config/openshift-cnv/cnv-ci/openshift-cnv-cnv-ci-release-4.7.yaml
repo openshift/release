@@ -20,14 +20,46 @@ tag_specification:
   namespace: ocp
 tests:
 - artifact_dir: /tmp/artifacts
-  as: e2e
+  as: e2e-deploy
   postsubmit: true
   steps:
     cluster_profile: azure4
     test:
     - as: test
       cli: latest
-      commands: make all
+      commands: make deploy-test
+      credentials:
+      - mount_path: /var/run/cnv-ci-brew-pull-secret
+        name: cnv-ci-brew-pull-secret
+        namespace: test-credentials
+      env:
+      - default: '|7820aea2-0d75-11e7-9259-28d244ea5a6d.hhav.f63e13'
+        name: BREW_IMAGE_REGISTRY_USERNAME
+      - default: /var/run/cnv-ci-brew-pull-secret/token
+        name: BREW_IMAGE_REGISTRY_TOKEN_PATH
+      - default: v0.36.0
+        name: KUBEVIRT_RELEASE
+      - default: "4.7"
+        name: OCP_VERSION
+      - default: /tmp/artifacts
+        name: ARTIFACTS_DIR
+      - default: openshift-cnv
+        name: TARGET_NAMESPACE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-azure
+- artifact_dir: /tmp/artifacts
+  as: e2e-upgrade
+  postsubmit: true
+  steps:
+    cluster_profile: azure4
+    test:
+    - as: test
+      cli: latest
+      commands: make upgrade-test
       credentials:
       - mount_path: /var/run/cnv-ci-brew-pull-secret
         name: cnv-ci-brew-pull-secret
