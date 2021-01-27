@@ -35,7 +35,8 @@ tag_specification:
   namespace: ocp-private
 test_binary_build_commands: make build GOFLAGS='-race'
 tests:
-- as: verify
+- artifact_dir: /tmp/artifacts
+  as: verify
   commands: |
     go get -u golang.org/x/tools/imports
     make verify -k
@@ -49,11 +50,13 @@ tests:
     make test-unit JUNITFILE=/tmp/artifacts/junit_report.xml
   container:
     from: test-bin
-- as: e2e-aws
+- artifact_dir: /tmp/artifacts
+  as: e2e-aws
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
-- as: e2e-aws-operator
+- artifact_dir: /tmp/artifacts
+  as: e2e-aws-operator
   steps:
     cluster_profile: aws
     test:

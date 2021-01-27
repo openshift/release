@@ -35,15 +35,18 @@ tag_specification:
   namespace: ocp-private
 test_binary_build_commands: OS_GOFLAGS='-race' make build
 tests:
-- as: unit
+- artifact_dir: /tmp/artifacts
+  as: unit
   commands: make test-unit
   container:
     from: test-bin
-- as: e2e-aws
+- artifact_dir: /tmp/artifacts
+  as: e2e-aws
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
-- as: e2e-aws-operator
+- artifact_dir: /tmp/artifacts
+  as: e2e-aws-operator
   steps:
     cluster_profile: aws
     test:
@@ -55,22 +58,26 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: verify
+- artifact_dir: /tmp/artifacts
+  as: verify
   commands: |
     make verify -k
   container:
     from: src
-- as: verify-deps
+- artifact_dir: /tmp/artifacts
+  as: verify-deps
   commands: |
     HOME=$( mktemp -d )
     make verify-deps -k --warn-undefined-variables
   container:
     from: src
-- as: e2e-aws-serial
+- artifact_dir: /tmp/artifacts
+  as: e2e-aws-serial
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-serial
-- as: e2e-aws-upgrade
+- artifact_dir: /tmp/artifacts
+  as: e2e-aws-upgrade
   steps:
     cluster_profile: aws
     workflow: openshift-upgrade-aws
