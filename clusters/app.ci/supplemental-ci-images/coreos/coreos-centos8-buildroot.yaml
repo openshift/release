@@ -1,0 +1,56 @@
+# Container used for CentOS/RHEL8 CI for CoreOS projects
+apiVersion: v1
+kind: List
+items:
+- kind: ImageStream
+  apiVersion: image.openshift.io/v1
+  metadata:
+    namespace: coreos
+    name: centos8
+  spec:
+    tags:
+    - name: "8"
+      from:
+        kind: DockerImage
+        name: quay.io/centos/centos:8
+      importPolicy:
+        scheduled: true
+      referencePolicy:
+        type: Local
+- kind: ImageStream
+  apiVersion: v1
+  metadata:
+    name: coreos-centos8-buildroot
+    namespace: coreos
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    name: coreos-centos8-buildroot
+    namespace: coreos
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: coreos-centos8-buildroot:latest
+    source:
+      git:
+        uri: "https://github.com/openshift/release"
+        ref: "master"
+      contextDir: "clusters/app.ci/supplemental-ci-images/coreos/coreos-centos8-buildroot"
+      type: Git
+    strategy:
+      dockerStrategy:
+        from:
+          kind: "ImageStreamTag"
+          name: "coreos-centos8-buildroot:latest"
+        dockerfilePath: Dockerfile.buildroot
+      type: Docker
+    triggers:
+    - type: ConfigChange
+    - imageChange:
+        from:
+          kind: ImageStreamTag
+          name: centos:8
+      type: ImageChange
