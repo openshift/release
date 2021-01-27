@@ -69,3 +69,5 @@ cp \
     "${dir}/auth/kubeadmin-password" \
     "${dir}/metadata.json"
 exit "$ret"
+
+sleep 5m
