@@ -58,44 +58,54 @@ tag_specification:
   name: "4.7"
   namespace: ocp
 tests:
-- as: unit
+- artifact_dir: /tmp/artifacts
+  as: unit
   commands: hack/test-go.sh
   container:
     from: src
-- as: verify
+- artifact_dir: /tmp/artifacts
+  as: verify
   commands: "export GOLANGCI_LINT_VERSION=$(cat .golangciversion 2&> /dev/null || echo \"1.23.8\")  \nexport GOLANGCI_LINT_CACHE=/tmp/.cache\ncurl -sfL \"https://github.com/golangci/golangci-lint/releases/download/v${GOLANGCI_LINT_VERSION:?'golangci-lint version is unset'}/golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64.tar.gz\" | tar -C /go/bin -zx --strip-components=1 \"golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64/golangci-lint\"\n ./hack/verify-style.sh\n"
   container:
     from: src
-- as: e2e-gcp
+- artifact_dir: /tmp/artifacts
+  as: e2e-gcp
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
-- as: e2e-gcp-ovn-upgrade
+- artifact_dir: /tmp/artifacts
+  as: e2e-gcp-ovn-upgrade
   cron: '@yearly'
   steps:
     cluster_profile: gcp
     workflow: openshift-upgrade-gcp
-- as: e2e-agnostic-upgrade
+- artifact_dir: /tmp/artifacts
+  as: e2e-agnostic-upgrade
   steps:
     cluster_profile: gcp
     workflow: openshift-upgrade-gcp
-- as: e2e-aws-sdn-multi
+- artifact_dir: /tmp/artifacts
+  as: e2e-aws-sdn-multi
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-sdn-multi
-- as: e2e-ovn-step-registry
+- artifact_dir: /tmp/artifacts
+  as: e2e-ovn-step-registry
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-ovn
-- as: e2e-ovn-hybrid-step-registry
+- artifact_dir: /tmp/artifacts
+  as: e2e-ovn-hybrid-step-registry
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-ovn-hybrid
-- as: e2e-ovn-ipsec-step-registry
+- artifact_dir: /tmp/artifacts
+  as: e2e-ovn-ipsec-step-registry
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-ovn-ipsec
-- as: e2e-metal-ipi-ovn-ipv6
+- artifact_dir: /tmp/artifacts
+  as: e2e-metal-ipi-ovn-ipv6
   steps:
     cluster_profile: packet
     env:
@@ -103,21 +113,25 @@ tests:
         IP_STACK=v6
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
-- as: e2e-aws-ovn-windows
+- artifact_dir: /tmp/artifacts
+  as: e2e-aws-ovn-windows
   steps:
     cluster_profile: aws
     test:
     - ref: windows-e2e-operator-test-with-custom-vxlan-port
     workflow: ipi-aws-ovn-hybrid-custom-vxlan-port
-- as: e2e-vsphere-ovn
+- artifact_dir: /tmp/artifacts
+  as: e2e-vsphere-ovn
   steps:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere-ovn
-- as: e2e-azure-ovn
+- artifact_dir: /tmp/artifacts
+  as: e2e-azure-ovn
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-ovn
-- as: e2e-gcp-ovn
+- artifact_dir: /tmp/artifacts
+  as: e2e-gcp-ovn
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-ovn
