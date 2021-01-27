@@ -22,6 +22,9 @@ fi
 ova_url="$(jq -r '.baseURI + .images["vmware"].path' $image_json_file)"
 vm_template="${ova_url##*/}"
 
+# Troubleshooting UPI OVA import issue
+echo "$(date -u --rfc-3339=seconds) - vm_template: ${vm_template}"
+
 echo "$(date -u --rfc-3339=seconds) - Configuring govc exports..."
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
@@ -39,6 +42,9 @@ cat > /tmp/rhcos.json << EOF
 EOF
 
 echo "$(date -u --rfc-3339=seconds) - Checking if RHCOS OVA needs to be downloaded from ${ova_url}..."
+
+# Troubleshooting UPI OVA import issue
+govc vm.info "${vm_template}" || true
 
 if [[ "$(govc vm.info "${vm_template}" | wc -c)" -eq 0 ]]
 then
