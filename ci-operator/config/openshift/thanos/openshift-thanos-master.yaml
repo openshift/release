@@ -44,15 +44,18 @@ tag_specification:
   name: "4.7"
   namespace: ocp
 tests:
-- as: vendor
+- artifact_dir: /tmp/artifacts
+  as: vendor
   commands: scripts/verify-vendor.sh && git diff --exit-code
   container:
     from: src
-- as: test-local
+- artifact_dir: /tmp/artifacts
+  as: test-local
   commands: GOFLAGS= make test-local
   container:
     from: src
-- as: react-app-test
+- artifact_dir: /tmp/artifacts
+  as: react-app-test
   commands: |
     nodejs_version=v10.23.1
     nodejs_platform=linux-x64
@@ -72,11 +75,13 @@ tests:
     make react-app-test
   container:
     from: src
-- as: e2e-aws
+- artifact_dir: /tmp/artifacts
+  as: e2e-aws
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
-- as: e2e-aws-upgrade
+- artifact_dir: /tmp/artifacts
+  as: e2e-aws-upgrade
   steps:
     cluster_profile: aws
     workflow: openshift-upgrade-aws
