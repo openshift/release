@@ -11,7 +11,8 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: coverage
+- artifact_dir: /tmp/artifacts
+  as: coverage
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
     make coverage
@@ -20,7 +21,8 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: osd-metrics-exporter-codecov-token
-- as: publish-coverage
+- artifact_dir: /tmp/artifacts
+  as: publish-coverage
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
     make coverage
@@ -30,15 +32,18 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: osd-metrics-exporter-codecov-token
-- as: lint
+- artifact_dir: /tmp/artifacts
+  as: lint
   commands: make lint
   container:
     from: src
-- as: test
+- artifact_dir: /tmp/artifacts
+  as: test
   commands: make test
   container:
     from: src
-- as: validate
+- artifact_dir: /tmp/artifacts
+  as: validate
   commands: make validate
   container:
     from: src

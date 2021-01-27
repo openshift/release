@@ -26,7 +26,8 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: verify
+- artifact_dir: /tmp/artifacts
+  as: verify
   commands: |
     export GOLANGCI_LINT_VERSION=$(cat .golangciversion)
     export GOLANGCI_LINT_CACHE=/tmp/.cache
@@ -35,12 +36,14 @@ tests:
     make verify
   container:
     from: src
-- as: test
+- artifact_dir: /tmp/artifacts
+  as: test
   commands: |
     make test
   container:
     from: src
-- as: coverage
+- artifact_dir: /tmp/artifacts
+  as: coverage
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
     make coverage

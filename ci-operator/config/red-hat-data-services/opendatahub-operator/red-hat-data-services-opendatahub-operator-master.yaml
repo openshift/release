@@ -32,14 +32,16 @@ tag_specification:
   name: "4.6"
   namespace: ocp
 tests:
-- as: modh-unit-tests
+- artifact_dir: /tmp/artifacts
+  as: modh-unit-tests
   commands: |
     go get -u github.com/jstemmer/go-junit-report
     go mod vendor
     make test-junit
   container:
     from: src
-- as: modh-opendatahub-operator-nightly
+- artifact_dir: /tmp/artifacts
+  as: modh-opendatahub-operator-nightly
   commands: |
     go get -u github.com/jstemmer/go-junit-report
     go mod vendor
@@ -47,7 +49,8 @@ tests:
   container:
     from: src
   cron: 30 0 * * *
-- as: modh-operator-e2e
+- artifact_dir: /tmp/artifacts
+  as: modh-operator-e2e
   steps:
     cluster_profile: gcp
     env:
@@ -64,7 +67,8 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: optional-operators-ci-gcp
-- as: modh-operator-e2e-nightly
+- artifact_dir: /tmp/artifacts
+  as: modh-operator-e2e-nightly
   cron: 30 3 * * *
   steps:
     cluster_profile: gcp
