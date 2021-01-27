@@ -185,91 +185,113 @@ tag_specification:
   name: 4.7-priv
   namespace: ocp-private
 tests:
-- as: unit
+- artifact_dir: /tmp/artifacts
+  as: unit
   commands: go test ./pkg/...
   container:
     from: src
-- as: gofmt
+- artifact_dir: /tmp/artifacts
+  as: gofmt
   commands: IS_CONTAINER=TRUE ./hack/go-fmt.sh .
   container:
     from: src
-- as: govet
+- artifact_dir: /tmp/artifacts
+  as: govet
   commands: IS_CONTAINER=TRUE ./hack/go-vet.sh ./...
   container:
     from: src
-- as: golint
+- artifact_dir: /tmp/artifacts
+  as: golint
   commands: IS_CONTAINER=TRUE ./hack/go-lint.sh -min_confidence 0.3 $(go list -f '{{ .ImportPath }}' ./...)
   container:
     from: src
-- as: verify-vendor
+- artifact_dir: /tmp/artifacts
+  as: verify-vendor
   commands: IS_CONTAINER=TRUE ./hack/verify-vendor.sh
   container:
     from: src
-- as: verify-codegen
+- artifact_dir: /tmp/artifacts
+  as: verify-codegen
   commands: IS_CONTAINER=TRUE ./hack/verify-codegen.sh
   container:
     from: src
-- as: e2e-aws
+- artifact_dir: /tmp/artifacts
+  as: e2e-aws
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
-- as: e2e-aws-proxy
+- artifact_dir: /tmp/artifacts
+  as: e2e-aws-proxy
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-proxy
-- as: e2e-aws-shared-vpc
+- artifact_dir: /tmp/artifacts
+  as: e2e-aws-shared-vpc
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-sharednetwork
-- as: e2e-gcp
+- artifact_dir: /tmp/artifacts
+  as: e2e-gcp
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
-- as: e2e-gcp-shared-vpc
+- artifact_dir: /tmp/artifacts
+  as: e2e-gcp-shared-vpc
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-sharednetwork
-- as: e2e-azure
+- artifact_dir: /tmp/artifacts
+  as: e2e-azure
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
-- as: e2e-azure-shared-vpc
+- artifact_dir: /tmp/artifacts
+  as: e2e-azure-shared-vpc
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-sharednetwork
-- as: e2e-aws-upgrade
+- artifact_dir: /tmp/artifacts
+  as: e2e-aws-upgrade
   steps:
     cluster_profile: aws
     workflow: openshift-upgrade-aws
-- as: e2e-aws-upi
+- artifact_dir: /tmp/artifacts
+  as: e2e-aws-upi
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer_upi:
     cluster_profile: aws
-- as: e2e-gcp-upi
+- artifact_dir: /tmp/artifacts
+  as: e2e-gcp-upi
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-upi
-- as: e2e-gcp-upi-xpn
+- artifact_dir: /tmp/artifacts
+  as: e2e-gcp-upi-xpn
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-upi-xpn
-- as: e2e-azure-upi
+- artifact_dir: /tmp/artifacts
+  as: e2e-azure-upi
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer_upi:
     cluster_profile: azure4
-- as: e2e-aws-workers-rhel7
+- artifact_dir: /tmp/artifacts
+  as: e2e-aws-workers-rhel7
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-workers-rhel7
-- as: e2e-aws-disruptive
+- artifact_dir: /tmp/artifacts
+  as: e2e-aws-disruptive
   commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
     cluster_profile: aws
-- as: e2e-gcp-upgrade
+- artifact_dir: /tmp/artifacts
+  as: e2e-gcp-upgrade
   steps:
     cluster_profile: gcp
     workflow: openshift-upgrade-gcp
-- as: e2e-metal-ipi
+- artifact_dir: /tmp/artifacts
+  as: e2e-metal-ipi
   steps:
     cluster_profile: packet
     env:
@@ -277,7 +299,8 @@ tests:
         IP_STACK=v4
         NETWORK_TYPE=OpenShiftSDN
     workflow: baremetalds-e2e
-- as: e2e-metal-ipi-ovn-ipv6
+- artifact_dir: /tmp/artifacts
+  as: e2e-metal-ipi-ovn-ipv6
   steps:
     cluster_profile: packet
     env:
@@ -285,7 +308,8 @@ tests:
         IP_STACK=v6
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
-- as: e2e-metal-ipi-ovn-dualstack
+- artifact_dir: /tmp/artifacts
+  as: e2e-metal-ipi-ovn-dualstack
   steps:
     cluster_profile: packet
     env:
@@ -293,47 +317,58 @@ tests:
         IP_STACK=v4v6
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
-- as: e2e-metal-ipi-virtualmedia
+- artifact_dir: /tmp/artifacts
+  as: e2e-metal-ipi-virtualmedia
   steps:
     cluster_profile: packet
     workflow: baremetalds-e2e-virtualmedia
-- as: e2e-openstack-ipi
+- artifact_dir: /tmp/artifacts
+  as: e2e-openstack-ipi
   steps:
     cluster_profile: openstack
     workflow: openshift-e2e-openstack-ipi
-- as: openstack-manifests
+- artifact_dir: /tmp/artifacts
+  as: openstack-manifests
   steps:
     cluster_profile: openstack
     workflow: openshift-manifests-openstack
-- as: e2e-vsphere
+- artifact_dir: /tmp/artifacts
+  as: e2e-vsphere
   steps:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere
-- as: e2e-vsphere-upi
+- artifact_dir: /tmp/artifacts
+  as: e2e-vsphere-upi
   steps:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere-upi
-- as: e2e-crc
+- artifact_dir: /tmp/artifacts
+  as: e2e-crc
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-crc
-- as: e2e-libvirt
+- artifact_dir: /tmp/artifacts
+  as: e2e-libvirt
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-libvirt
-- as: e2e-metal-assisted
+- artifact_dir: /tmp/artifacts
+  as: e2e-metal-assisted
   steps:
     cluster_profile: packet
     workflow: baremetalds-assisted
-- as: e2e-ovirt
+- artifact_dir: /tmp/artifacts
+  as: e2e-ovirt
   steps:
     cluster_profile: ovirt
     workflow: openshift-e2e-ovirt-minimal
-- as: e2e-kubevirt
+- artifact_dir: /tmp/artifacts
+  as: e2e-kubevirt
   steps:
     cluster_profile: kubevirt
     workflow: openshift-e2e-kubevirt
-- as: e2e-aws-single-node
+- artifact_dir: /tmp/artifacts
+  as: e2e-aws-single-node
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-single-node

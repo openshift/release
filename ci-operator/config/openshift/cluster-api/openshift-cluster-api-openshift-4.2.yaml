@@ -29,7 +29,8 @@ tag_specification:
   name: "4.2"
   namespace: ocp
 tests:
-- as: unit
+- artifact_dir: /tmp/artifacts
+  as: unit
   commands: |
     go get -u github.com/golang/dep/cmd/dep
     wget -q https://github.com/bazelbuild/bazel/releases/download/0.18.0/bazel-0.18.0-linux-x86_64 -O bazel
@@ -40,15 +41,18 @@ tests:
     KUBEBUILDER_CONTROLPLANE_START_TIMEOUT=10m scripts/ci-test.sh
   container:
     from: src
-- as: goimports
+- artifact_dir: /tmp/artifacts
+  as: goimports
   commands: IS_CONTAINER=TRUE make goimports
   container:
     from: src
-- as: govet
+- artifact_dir: /tmp/artifacts
+  as: govet
   commands: make vet
   container:
     from: src
-- as: git-history
+- artifact_dir: /tmp/artifacts
+  as: git-history
   commands: ./hack/verify_history.sh
   container:
     from: src

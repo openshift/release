@@ -38,40 +38,49 @@ tag_specification:
   name: 4.5-priv
   namespace: ocp-private
 tests:
-- as: unit
+- artifact_dir: /tmp/artifacts
+  as: unit
   commands: go test ./...
   container:
     from: src
-- as: verify
+- artifact_dir: /tmp/artifacts
+  as: verify
   commands: "export GOLANGCI_LINT_VERSION=$(cat .golangciversion 2&> /dev/null || echo \"1.23.8\")  \nexport GOLANGCI_LINT_CACHE=/tmp/.cache\ncurl -sfL \"https://github.com/golangci/golangci-lint/releases/download/v${GOLANGCI_LINT_VERSION:?'golangci-lint version is unset'}/golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64.tar.gz\" | tar -C /go/bin -zx --strip-components=1 \"golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64/golangci-lint\"\ngo get -u github.com/golang/dep/cmd/dep\n./hack/verify-style.sh\n"
   container:
     from: src
-- as: e2e-gcp
+- artifact_dir: /tmp/artifacts
+  as: e2e-gcp
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
-- as: e2e-gcp-ovn-upgrade
+- artifact_dir: /tmp/artifacts
+  as: e2e-gcp-ovn-upgrade
   cron: '@yearly'
   steps:
     cluster_profile: gcp
     workflow: openshift-upgrade-gcp
-- as: e2e-agnostic-upgrade
+- artifact_dir: /tmp/artifacts
+  as: e2e-agnostic-upgrade
   steps:
     cluster_profile: gcp
     workflow: openshift-upgrade-gcp
-- as: e2e-aws-sdn-multi
+- artifact_dir: /tmp/artifacts
+  as: e2e-aws-sdn-multi
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-sdn-multi
-- as: e2e-ovn-step-registry
+- artifact_dir: /tmp/artifacts
+  as: e2e-ovn-step-registry
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-ovn
-- as: e2e-ovn-hybrid-step-registry
+- artifact_dir: /tmp/artifacts
+  as: e2e-ovn-hybrid-step-registry
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-ovn-hybrid
-- as: e2e-metal-ipi-ovn-ipv6
+- artifact_dir: /tmp/artifacts
+  as: e2e-metal-ipi-ovn-ipv6
   steps:
     cluster_profile: packet
     env:
