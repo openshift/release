@@ -1,21 +1,20 @@
 presubmits:
   openshift/baremetal-operator:
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
     cluster: build02
-    context: ci/prow/e2e-metal-ipi
+    context: ci/prow/e2e-metal-ipi-ovn-dualstack-trigger
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-baremetal-operator-master-e2e-metal-ipi
-    optional: true
+    name: pull-ci-openshift-baremetal-operator-master-e2e-metal-ipi-ovn-dualstack-trigger
     path_alias: github.com/metal3-io/baremetal-operator
-    rerun_command: /test e2e-metal-ipi
+    rerun_command: /test e2e-metal-ipi-ovn-dualstack-trigger
     spec:
       containers:
       - args:
@@ -24,8 +23,8 @@ presubmits:
         - --lease-server-password-file=/etc/boskos/password
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/usr/local/e2e-metal-ipi-cluster-profile
-        - --target=e2e-metal-ipi
+        - --secret-dir=/usr/local/e2e-metal-ipi-ovn-dualstack-trigger-cluster-profile
+        - --target=e2e-metal-ipi-ovn-dualstack-trigger
         command:
         - ci-operator
         image: ci-operator:latest
@@ -38,7 +37,7 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-ipi-cluster-profile
+        - mountPath: /usr/local/e2e-metal-ipi-ovn-dualstack-trigger-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -70,93 +69,22 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-ipi,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - master
-    cluster: build02
-    context: ci/prow/e2e-metal-ipi-ovn-dualstack
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-baremetal-operator-master-e2e-metal-ipi-ovn-dualstack
-    optional: true
-    path_alias: github.com/metal3-io/baremetal-operator
-    rerun_command: /test e2e-metal-ipi-ovn-dualstack
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
-        - --report-password-file=/etc/report/password.txt
-        - --report-username=ci
-        - --secret-dir=/usr/local/e2e-metal-ipi-ovn-dualstack-cluster-profile
-        - --target=e2e-metal-ipi-ovn-dualstack
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/e2e-metal-ipi-ovn-dualstack-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: password
-            path: password
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-packet
-          - configMap:
-              name: cluster-profile-packet
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-ipi-ovn-dualstack,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-metal-ipi-ovn-dualstack-trigger,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - master
     cluster: build02
-    context: ci/prow/e2e-metal-ipi-ovn-ipv6
+    context: ci/prow/e2e-metal-ipi-ovn-ipv6-trigger
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-baremetal-operator-master-e2e-metal-ipi-ovn-ipv6
+    name: pull-ci-openshift-baremetal-operator-master-e2e-metal-ipi-ovn-ipv6-trigger
     path_alias: github.com/metal3-io/baremetal-operator
-    rerun_command: /test e2e-metal-ipi-ovn-ipv6
+    rerun_command: /test e2e-metal-ipi-ovn-ipv6-trigger
     spec:
       containers:
       - args:
@@ -165,8 +93,8 @@ presubmits:
         - --lease-server-password-file=/etc/boskos/password
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/usr/local/e2e-metal-ipi-ovn-ipv6-cluster-profile
-        - --target=e2e-metal-ipi-ovn-ipv6
+        - --secret-dir=/usr/local/e2e-metal-ipi-ovn-ipv6-trigger-cluster-profile
+        - --target=e2e-metal-ipi-ovn-ipv6-trigger
         command:
         - ci-operator
         image: ci-operator:latest
@@ -179,7 +107,7 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-ipi-ovn-ipv6-cluster-profile
+        - mountPath: /usr/local/e2e-metal-ipi-ovn-ipv6-trigger-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -211,22 +139,22 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-ipi-ovn-ipv6,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-metal-ipi-ovn-ipv6-trigger,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
     cluster: build02
-    context: ci/prow/e2e-metal-ipi-virtualmedia
+    context: ci/prow/e2e-metal-ipi-trigger
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-baremetal-operator-master-e2e-metal-ipi-virtualmedia
+    name: pull-ci-openshift-baremetal-operator-master-e2e-metal-ipi-trigger
     path_alias: github.com/metal3-io/baremetal-operator
-    rerun_command: /test e2e-metal-ipi-virtualmedia
+    rerun_command: /test e2e-metal-ipi-trigger
     spec:
       containers:
       - args:
@@ -235,8 +163,8 @@ presubmits:
         - --lease-server-password-file=/etc/boskos/password
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
-        - --secret-dir=/usr/local/e2e-metal-ipi-virtualmedia-cluster-profile
-        - --target=e2e-metal-ipi-virtualmedia
+        - --secret-dir=/usr/local/e2e-metal-ipi-trigger-cluster-profile
+        - --target=e2e-metal-ipi-trigger
         command:
         - ci-operator
         image: ci-operator:latest
@@ -249,7 +177,7 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-ipi-virtualmedia-cluster-profile
+        - mountPath: /usr/local/e2e-metal-ipi-trigger-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -281,7 +209,77 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-ipi-virtualmedia,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-metal-ipi-trigger,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: build02
+    context: ci/prow/e2e-metal-ipi-virtualmedia-trigger
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-baremetal-operator-master-e2e-metal-ipi-virtualmedia-trigger
+    path_alias: github.com/metal3-io/baremetal-operator
+    rerun_command: /test e2e-metal-ipi-virtualmedia-trigger
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-password-file=/etc/boskos/password
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
+        - --secret-dir=/usr/local/e2e-metal-ipi-virtualmedia-trigger-cluster-profile
+        - --target=e2e-metal-ipi-virtualmedia-trigger
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-metal-ipi-virtualmedia-trigger-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: password
+            path: password
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-packet
+          - configMap:
+              name: cluster-profile-packet
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-metal-ipi-virtualmedia-trigger,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
