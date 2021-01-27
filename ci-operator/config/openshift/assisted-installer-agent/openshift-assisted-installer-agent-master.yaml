@@ -1,8 +1,16 @@
 base_images:
+  assisted-test-infra:
+    name: assisted-test
+    namespace: ocp-kni
+    tag: assisted-test-infra
   base:
     name: "4.7"
     namespace: ocp
     tag: base
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
   openshift_release_golang-1.15:
     name: release
     namespace: openshift
@@ -43,6 +51,23 @@ tests:
     make REPORTS=/tmp/reports unit-test
   container:
     from: bin
+- artifact_dir: /tmp/artifacts
+  as: e2e-metal-assisted
+  steps:
+    cluster_profile: packet
+    dependencies:
+      ASSISTED_AGENT_IMAGE: pipeline:assisted-installer-agent
+    workflow: baremetalds-assisted
+- artifact_dir: /tmp/artifacts
+  as: e2e-metal-assisted-onprem
+  steps:
+    cluster_profile: packet
+    dependencies:
+      ASSISTED_AGENT_IMAGE: pipeline:assisted-installer-agent
+    env:
+      ASSISTED_CONFIG: |
+        DEPLOY_TARGET=onprem
+    workflow: baremetalds-assisted
 zz_generated_metadata:
   branch: master
   org: openshift
