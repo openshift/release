@@ -94,7 +94,8 @@ tests:
   commands: make unit TEST_OUTPUT_DIR=/tmp/artifacts
   container:
     from: src
-- as: verify
+- artifact_dir: /tmp/artifacts
+  as: verify
   commands: |
     set -x
     set -e
@@ -113,11 +114,13 @@ tests:
     make verify
   container:
     from: src
-- as: vendor
+- artifact_dir: /tmp/artifacts
+  as: vendor
   commands: make vendor && git diff --exit-code
   container:
     from: src
-- as: metering-e2e-aws
+- artifact_dir: /tmp/artifacts
+  as: metering-e2e-aws
   steps:
     cluster_profile: aws
     test:
@@ -138,7 +141,8 @@ tests:
           cpu: 500m
           memory: 500Mi
     workflow: ipi-aws
-- as: metering-upgrade-aws
+- artifact_dir: /tmp/artifacts
+  as: metering-upgrade-aws
   steps:
     cluster_profile: aws
     test:

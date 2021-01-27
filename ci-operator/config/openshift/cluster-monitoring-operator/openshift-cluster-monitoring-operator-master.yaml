@@ -48,23 +48,28 @@ tag_specification:
   name: "4.7"
   namespace: ocp
 tests:
-- as: generate
+- artifact_dir: /tmp/artifacts
+  as: generate
   commands: make generate --always-make && git diff --exit-code
   container:
     from: src
-- as: vendor
+- artifact_dir: /tmp/artifacts
+  as: vendor
   commands: make vendor && git diff --exit-code
   container:
     from: src
-- as: unit
+- artifact_dir: /tmp/artifacts
+  as: unit
   commands: make test-unit
   container:
     from: src
-- as: e2e-agnostic
+- artifact_dir: /tmp/artifacts
+  as: e2e-agnostic
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
-- as: e2e-agnostic-operator
+- artifact_dir: /tmp/artifacts
+  as: e2e-agnostic-operator
   steps:
     cluster_profile: aws
     test:
@@ -76,7 +81,8 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-agnostic-upgrade
+- artifact_dir: /tmp/artifacts
+  as: e2e-agnostic-upgrade
   steps:
     cluster_profile: gcp
     workflow: openshift-upgrade-gcp

@@ -34,11 +34,13 @@ tag_specification:
   name: 4.5-priv
   namespace: ocp-private
 tests:
-- as: goimports
+- artifact_dir: /tmp/artifacts
+  as: goimports
   commands: IS_CONTAINER=TRUE make goimports
   container:
     from: src
-- as: govet
+- artifact_dir: /tmp/artifacts
+  as: govet
   commands: |
     # Instead of getting alias for cluster-api-provider-azure under
     # /go/src/sigs.k8s.io/cluster-api-provider-azure, I get https://github.com/openshift/release
@@ -51,16 +53,19 @@ tests:
     IS_CONTAINER=TRUE make vet
   container:
     from: src
-- as: unit
+- artifact_dir: /tmp/artifacts
+  as: unit
   commands: |
     NO_DOCKER=1 make test
   container:
     from: src
-- as: e2e-azure
+- artifact_dir: /tmp/artifacts
+  as: e2e-azure
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
-- as: e2e-azure-operator
+- artifact_dir: /tmp/artifacts
+  as: e2e-azure-operator
   steps:
     cluster_profile: azure4
     test:
@@ -72,7 +77,8 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-azure
-- as: git-history
+- artifact_dir: /tmp/artifacts
+  as: git-history
   commands: ./hack/verify_history.sh
   container:
     from: src
