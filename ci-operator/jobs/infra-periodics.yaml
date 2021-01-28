@@ -678,6 +678,36 @@ periodics:
     serviceAccountName: image-pruner
 - agent: kubernetes
   cluster: app.ci
+  cron: '@hourly'
+  decorate: true
+  extra_refs:
+  - base_ref: skuznets/tag-without-logging
+    org: stevekuznetsov
+    repo: release
+  # - base_ref: master
+  #   org: openshift
+  #   repo: release
+  labels:
+    ci.openshift.io/role: infra
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-logging-tech-preview-tagger
+  spec:
+    containers:
+      command:
+      - ./hack/tag-logging-tech-preview.sh
+      image: registry.svc.ci.openshift.org/ocp/cli-jq:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        limits:
+          cpu: "2"
+          memory: 8Gi
+        requests:
+          cpu: "1"
+          memory: 4Gi
+    serviceAccountName: ci-operator
+- agent: kubernetes
+  cluster: app.ci
   decorate: true
   extra_refs:
   - base_ref: master
