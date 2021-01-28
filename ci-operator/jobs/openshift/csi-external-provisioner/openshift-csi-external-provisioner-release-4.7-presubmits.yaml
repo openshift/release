@@ -78,34 +78,24 @@ presubmits:
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-csi-external-provisioner-release-4.7-e2e-ovirt
     optional: true
+    path_alias: github.com/kubernetes-csi/external-provisioner
     rerun_command: /test e2e-ovirt
     spec:
       containers:
       - args:
-        - --artifact-dir=$(ARTIFACTS)
-        - --give-pr-author-access-to-namespace=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
-        - --repo=csi-external-provisioner
-        - --secret-dir=/etc/boskos
+        - --lease-server-password-file=/etc/boskos/password
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
         - --secret-dir=/usr/local/e2e-ovirt-cluster-profile
         - --target=e2e-ovirt
-        - --template=/usr/local/e2e-ovirt
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: ovirt
-        - name: JOB_NAME_SAFE
-          value: e2e-ovirt
-        - name: LEASE_TYPE
-          value: minimal
-        - name: TEST_COMMAND
-          value: |
-            TEST_CSI_DRIVER_FILES=/tmp/cluster/csi-test-manifest.yaml TEST_SUITE=openshift/csi run-csi-tests
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -113,28 +103,22 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
         - mountPath: /usr/local/e2e-ovirt-cluster-profile
           name: cluster-profile
-        - mountPath: /usr/local/e2e-ovirt
-          name: job-definition
-          subPath: cluster-launch-installer-ovirt-e2e.yaml
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
       - name: boskos
         secret:
           items:
@@ -146,16 +130,14 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-ovirt
-          - secret:
-              name: ovirt-infra-secrets
           - configMap:
               name: cluster-profile-ovirt
-      - configMap:
-          name: prow-job-cluster-launch-installer-ovirt-e2e
-        name: job-definition
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-ovirt,?($|\s.*)
   - agent: kubernetes
     always_run: true
