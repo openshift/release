@@ -3,6 +3,10 @@ base_images:
     name: "4.6"
     namespace: ocp
     tag: ansible
+  assisted-installer-agent:
+    name: "4.7"
+    namespace: ocp
+    tag: assisted-installer-agent
   assisted-test-infra:
     name: assisted-test
     namespace: ocp-kni
@@ -61,12 +65,16 @@ tests:
   cron: 0 0 * * 1
   steps:
     cluster_profile: packet
+    dependencies:
+      ASSISTED_AGENT_IMAGE: pipeline:assisted-installer-agent
     workflow: baremetalds-assisted
 - artifact_dir: /tmp/artifacts
   as: e2e-metal-assisted-onprem
   cron: 0 0 * * 1
   steps:
     cluster_profile: packet
+    dependencies:
+      ASSISTED_AGENT_IMAGE: pipeline:assisted-installer-agent
     env:
       ASSISTED_CONFIG: |
         DEPLOY_TARGET=onprem
@@ -76,6 +84,8 @@ tests:
   cron: 0 0 * * 1
   steps:
     cluster_profile: packet
+    dependencies:
+      ASSISTED_AGENT_IMAGE: pipeline:assisted-installer-agent
     env:
       ASSISTED_CONFIG: |
         IPv6=yes
