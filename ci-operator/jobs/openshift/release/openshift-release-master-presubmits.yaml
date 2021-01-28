@@ -20,6 +20,8 @@ presubmits:
         command:
         - applyconfig
         env:
+        - name: HOME
+          value: /tmp
         - name: OPENSHIFT_PROMETHEUS_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -36,7 +38,13 @@ presubmits:
         resources:
           requests:
             cpu: 10m
+        volumeMounts:
+        - mountPath: /tmp
+          name: tmp
       serviceAccountName: config-updater
+      volumes:
+      - emptyDir: {}
+        name: tmp
     trigger: (?m)^/test( | .* )app-ci-config-dry,?($|\s.*)
   - agent: kubernetes
     always_run: true
@@ -107,6 +115,8 @@ presubmits:
         command:
         - applyconfig
         env:
+        - name: HOME
+          value: /tmp
         - name: build01_id
           valueFrom:
             secretKeyRef:
@@ -137,6 +147,8 @@ presubmits:
         - mountPath: /etc/build-farm-credentials
           name: build-farm-credentials
           readOnly: true
+        - mountPath: /tmp
+          name: tmp
       serviceAccountName: config-updater
       volumes:
       - name: build-farm-credentials
@@ -145,6 +157,8 @@ presubmits:
           - key: sa.config-updater.build01.config
             path: kubeconfig
           secretName: build-farm-credentials
+      - emptyDir: {}
+        name: tmp
     trigger: (?m)^/test( | .* )build01-dry,?($|\s.*)
   - agent: kubernetes
     always_run: true
@@ -168,6 +182,8 @@ presubmits:
         command:
         - applyconfig
         env:
+        - name: HOME
+          value: /tmp
         - name: build02_id
           valueFrom:
             secretKeyRef:
@@ -198,6 +214,8 @@ presubmits:
         - mountPath: /etc/build-farm-credentials
           name: build-farm-credentials
           readOnly: true
+        - mountPath: /tmp
+          name: tmp
       serviceAccountName: config-updater
       volumes:
       - name: build-farm-credentials
@@ -206,6 +224,8 @@ presubmits:
           - key: sa.config-updater.build02.config
             path: kubeconfig
           secretName: build-farm-credentials
+      - emptyDir: {}
+        name: tmp
     trigger: (?m)^/test( | .* )build02-dry,?($|\s.*)
   - agent: kubernetes
     always_run: true
@@ -824,6 +844,9 @@ presubmits:
         - --as=
         command:
         - applyconfig
+        env:
+        - name: HOME
+          value: /tmp
         image: registry.ci.openshift.org/ci/applyconfig:latest
         imagePullPolicy: Always
         name: ""
@@ -834,6 +857,8 @@ presubmits:
         - mountPath: /etc/build-farm-credentials
           name: build-farm-credentials
           readOnly: true
+        - mountPath: /tmp
+          name: tmp
       serviceAccountName: config-updater
       volumes:
       - name: build-farm-credentials
@@ -842,6 +867,8 @@ presubmits:
           - key: sa.config-updater.api.ci.config
             path: kubeconfig
           secretName: build-farm-credentials
+      - emptyDir: {}
+        name: tmp
     trigger: (?m)^/test( | .* )services-dry,?($|\s.*)
   - agent: kubernetes
     always_run: true
@@ -961,6 +988,9 @@ presubmits:
         - --as=
         command:
         - applyconfig
+        env:
+        - name: HOME
+          value: /tmp
         image: registry.ci.openshift.org/ci/applyconfig:latest
         imagePullPolicy: Always
         name: ""
@@ -971,6 +1001,8 @@ presubmits:
         - mountPath: /etc/build-farm-credentials
           name: build-farm-credentials
           readOnly: true
+        - mountPath: /tmp
+          name: tmp
       serviceAccountName: config-updater
       volumes:
       - name: build-farm-credentials
@@ -979,6 +1011,8 @@ presubmits:
           - key: sa.config-updater.vsphere.config
             path: kubeconfig
           secretName: build-farm-credentials
+      - emptyDir: {}
+        name: tmp
     trigger: (?m)^/test( | .* )vsphere-dry,?($|\s.*)
   - agent: kubernetes
     always_run: false
