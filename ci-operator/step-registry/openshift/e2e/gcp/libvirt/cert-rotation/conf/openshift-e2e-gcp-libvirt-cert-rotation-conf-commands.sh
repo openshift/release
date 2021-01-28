@@ -8,6 +8,8 @@ echo "************ libvirt cert rotation conf command ************"
 # This enables testing certificate rotation in a cluster older than 1 year
 # Instead of waiting 1 year, fake the time and install with a local image-registry
 # and long-lived certs. 
+#
+# This file gets scp'd to the gcp instance where the nested libvirt install will take place
 cat > "${SHARED_DIR}"/create-cluster-mirrored-local-registry << 'END'
 #!/bin/bash
 
@@ -205,6 +207,7 @@ sudo mv openshift-baremetal-install /usr/local/bin/openshift-install
 oc adm release extract -a ~/pull-secret --command oc "${LOCAL_REG}/${LOCAL_REPO}:${OCP_RELEASE}"
 sudo mv oc /usr/local/bin/oc
 
+# The install-config includes the ImageContentSources for the local registry
 cat > "${CLUSTER_DIR}/install-config.yaml" << EOF
 apiVersion: v1
 baseDomain: "${BASE_DOMAIN}"
@@ -268,6 +271,12 @@ openshift-install wait-for install-complete --log-level=debug --dir="$CLUSTER_DI
 END
 chmod +x "${SHARED_DIR}"/create-cluster-mirrored-local-registry
 
+# This file is scp'd to gcp instance where the nested libvirt cluster is running
+# It stops kubelet service, kills all containers on each node, kills all pods,
+# disables chronyd service on each node and on the gcp host, sets date ahead 400days
+# then starts kubelet on each node and waits for cluster recovery. This simulates
+# cert-rotation after 1 year.
+# TODO: Run suite of conformance tests after recovery
 cat  > "${SHARED_DIR}"/time-skew-test.sh << 'EOF'
 #!/bin/bash
 
@@ -275,9 +284,9 @@ set -euxo pipefail
 
 final-check () {
   if
-    ! oc wait co --all --for='condition=Available=True' --timeout=0 1>/dev/null || \
-    ! oc wait co --all --for='condition=Progressing=False' --timeout=0 1>/dev/null || \
-    ! oc wait co --all --for='condition=Degraded=False' --timeout=0 1>/dev/null; then
+    ! oc wait co --all --for='condition=Available=True' --timeout=20s 1>/dev/null || \
+    ! oc wait co --all --for='condition=Progressing=False' --timeout=20s 1>/dev/null || \
+    ! oc wait co --all --for='condition=Degraded=False' --timeout=20s 1>/dev/null; then
       echo "Some ClusterOperators Degraded=True,Progressing=True,or Available=False"
       oc get co
       exit 1
@@ -303,7 +312,7 @@ approveCSRs () {
 checkNodesReady () {
   nodesReady=0
   retries=0
-  while [ $nodesReady -ne 5 ] && [ $retries -lt 50 ]; do
+  while [ $nodesReady -ne 5 ] && [ $retries -lt 100 ]; do
     approveCSRs
     nodesReady=$(oc wait --for=condition=Ready node --all --timeout=30s| wc -l)
     if [ $nodesReady -eq 5 ]; then
@@ -341,8 +350,10 @@ checkDegradedCOs () {
   # image-pruner job in openshift-image-registry namespace may be stuck due to time skew. This would not
   # happen if time was progressing naturally. Kill image-prune jobs here.
   oc delete jobs --all -n openshift-image-registry
+  # supposedly fixed but still lingering pod trip up insights-operator: https://bugzilla.redhat.com/show_bug.cgi?id=1919778 
+  oc delete pods --all -n openshift-insights --force --grace-period=0
   sleep 10
-  while ! oc wait co --all --for='condition=Degraded=False' --timeout=10s && [ $retries -lt 50 ]; do
+  while ! oc wait co --all --for='condition=Degraded=False' --timeout=20s && [ $retries -lt 100 ]; do
     (( retries++ ))
   done
 }
@@ -353,7 +364,7 @@ checkProgressingCOs () {
   # happen if time was progressing naturally. Kill image-prune jobs here.
   oc delete jobs --all -n openshift-image-registry
   sleep 10
-  while ! oc wait co --all --for='condition=Progressing=False' --timeout=10s && [ $retries -lt 100 ]; do
+  while ! oc wait co --all --for='condition=Progressing=False' --timeout=20s && [ $retries -lt 100 ]; do
     jumpstartNodes
     (( retries++ ))
   done
@@ -374,54 +385,57 @@ SKEW=${1:-+400d}
 OC=${OC:-oc}
 SSH=${SSH:-ssh}
 
-masters=$( ${OC} get nodes --selector='node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' )
-workers=$( ${OC} get nodes --selector='!node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' )
+control_nodes=$( ${OC} get nodes --selector='node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' )
+compute_nodes=$( ${OC} get nodes --selector='!node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' )
 
 function run-on {
         for n in ${1}; do ${SSH} core@"${n}" sudo 'bash -eEuxo pipefail' <<< ${2}; done
 }
 
-ssh-keyscan -H ${masters} ${workers} >> ~/.ssh/known_hosts
+ssh-keyscan -H ${control_nodes} ${compute_nodes} >> ~/.ssh/known_hosts
 
-run-on "${masters} ${workers}" "systemctl stop kubelet"
+run-on "${control_nodes} ${compute_nodes}" "systemctl stop kubelet"
 
-# Destroy all containers on workers.
-run-on "${workers}" "crictl rm --all -f"
-# Destroy all containers on masters except KAS and etcd.
-run-on "${masters}" '
+# Destroy all containers on compute_nodes.
+run-on "${compute_nodes}" "crictl rm --all -f"
+# Destroy all containers on control_nodes except KAS and etcd.
+run-on "${control_nodes}" '
 kas_id=$( crictl ps --name="^kube-apiserver$" -q )
-[[ -n "${kas_id}" ]]
+# [[ -n "${kas_id}" ]]
 etcd_id=$( crictl ps --name="^etcd$" -q )
-[[ -n "${etcd_id}" ]]
+# [[ -n "${etcd_id}" ]]
 other_ids=$( crictl ps --all -q | ( grep -v -e "${kas_id}" -e "${etcd_id}" || true ) )
 if [ -n "${other_ids}" ]; then
         crictl rm -f ${other_ids}
 fi;
 '
 
-# Delete all pods, especialy the operators. Makes sure it needs KCM and KS working when starting again.
-${OC} delete pods -A --all --force --grace-period=0 --timeout=0
+# Delete all pods, especially the operators. Makes sure it needs KCM and KS working when starting again.
+${OC} delete pods --all -n openshift-kube-apiserver-operator --force --grace-period=0
+${OC} delete pods --all -n openshift-kube-apiserver --force --grace-period=0
+${OC} delete pods --all -n openshift-etcd-operator --force --grace-period=0
+${OC} delete pods --all -n openshift-etcd --force --grace-period=0
+${OC} delete pods -A --all --force --grace-period=0
 
 # Delete all clusteroperator status to avoid stale status when the operator pod isn't started.
-export bearer=$( oc -n openshift-cluster-version serviceaccounts get-token default ) && export server=$( oc whoami --show-server ) && for co in $( oc get co --template='{{ range .items }}{{ printf "%s\n" .metadata.name }}{{ end }}' ); do curl -X PATCH -H "Authorization: Bearer ${bearer}" -H "Accept: application/json" -H "Content-Type: application/merge-patch+json" ${server}/apis/config.openshift.io/v1/clusteroperators/${co}/status -d '{"status": null}' && echo; done
+export bearer=$( oc -n openshift-cluster-version serviceaccounts get-token default ) && export server=$( oc whoami --show-server ) && for co in $( oc get co --template='{{ range .items }}{{ printf "%s\n" .metadata.name }}{{ end }}' ); do curl -k -X PATCH -H "Authorization: Bearer ${bearer}" -H "Accept: application/json" -H "Content-Type: application/merge-patch+json" ${server}/apis/config.openshift.io/v1/clusteroperators/${co}/status -d '{"status": null}' && echo; done
 
-# Destroy the remaining containers on masters
-run-on "${masters}" "crictl rm --all -f"
+# Destroy the remaining containers on control_nodes
+run-on "${control_nodes}" "crictl rm --all -f"
 
-run-on "${masters} ${workers}" "systemctl disable chronyd --now"
+run-on "${control_nodes} ${compute_nodes}" "systemctl disable chronyd --now"
 
 # Set time only as a difference to the synced time so we don't introduce a skew between the machines which would break etcd, leader election and others.
-run-on "${masters} ${workers}" "
+run-on "${control_nodes} ${compute_nodes}" "
 timedatectl status
 timedatectl set-ntp false
 timedatectl set-time '${SKEW}'
 timedatectl status
 "
+run-on "${control_nodes} ${compute_nodes}" "sleep 10 && systemctl start kubelet"
 
 # now set date for host
 sudo timedatectl set-time ${SKEW}
-
-run-on "${masters} ${workers}" "systemctl start kubelet"
 
 # wait for connectivity
 # allow 4 minutes for date to propagate and to regain connectivity
