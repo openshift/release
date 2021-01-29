@@ -156,6 +156,156 @@ periodics:
       secret:
         secretName: sentry-dsn
 - agent: kubernetes
+  annotations:
+    job-impl.setup-container: test
+    job-impl.setup-pod: launch-osd-create-create
+    job-impl.workload-container: test
+    job-impl.workload-pod: launch-wait
+  cluster: build01
+  cron: '@yearly'
+  decorate: true
+  labels:
+    job-env: osd-aws
+    job-release: "4.1"
+    job-type: launch
+  name: release-openshift-origin-installer-launch-osd-ephemeral
+  spec:
+    containers:
+    - args:
+      - --artifact-dir=$(ARTIFACTS)
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --kubeconfig=/etc/apici/kubeconfig
+      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-username=ci
+      - --namespace=$(NAMESPACE)
+      - --secret-dir=/usr/local/launch-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=launch
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_INITIAL
+      - name: RELEASE_IMAGE_LATEST
+      - name: CLUSTER_VARIANT
+      - name: CLUSTER_DURATION
+        value: "9000"
+      - name: COMPUTE_MACHINE_TYPE
+        value: m5.xlarge
+      - name: CLUSTER_VERSION
+      - name: BRANCH
+        value: "4.1"
+      - name: CLUSTER_TYPE
+        value: osd-ephemeral
+      - name: JOB_NAME_SAFE
+        value: launch
+      - name: NAMESPACE
+      - name: CONFIG_SPEC
+        value: |
+          base_images:
+            cli:
+              name: "$(BRANCH)"
+              namespace: ocp
+              tag: cli
+            cli-ocm:
+              name: cli-ocm
+              namespace: ci
+              tag: latest
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tag_specification:
+            name: "$(BRANCH)"
+            namespace: ocp
+          tests:
+          - artifact_dir: /tmp/artifacts
+            as: launch
+            steps:
+              cluster_profile: osd-ephemeral
+              env:
+                CLUSTER_DURATION: "$(CLUSTER_DURATION)"
+                CLUSTER_VERSION: "$(CLUSTER_VERSION)"
+                COMPUTE_NODES: "2"
+              post:
+              - ref: osd-delete-delete
+              pre:
+              - ref: openshift-cluster-bot-rbac
+              - ref: osd-create-create
+              test:
+              - as: wait
+                commands: cp /tmp/secret/kubeconfig /tmp/admin.kubeconfig; sleep $(CLUSTER_VERSION) & wait
+                from: cli
+                resources:
+                  requests:
+                    cpu: 100m
+                    memory: 100Mi
+          - artifact_dir: /tmp/artifacts
+            as: e2e
+            steps:
+              cluster_profile: osd-ephemeral
+              env:
+                CLUSTER_DURATION: "$(CLUSTER_DURATION)"
+                CLUSTER_VERSION: "$(CLUSTER_VERSION)"
+                COMPUTE_NODES: "2"
+                TEST_TYPE: suite
+              post:
+              - ref: osd-delete-delete
+              pre:
+              - ref: openshift-cluster-bot-rbac
+              - ref: osd-create-create
+              test:
+              - ref: openshift-e2e-test
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/apici
+        name: apici-ci-operator-credentials
+        readOnly: true
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/launch-cluster-profile
+        name: cluster-profile
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+    serviceAccountName: ci-operator
+    volumes:
+    - name: apici-ci-operator-credentials
+      secret:
+        items:
+        - key: sa.ci-operator.apici.config
+          path: kubeconfig
+        secretName: apici-ci-operator-credentials
+    - name: boskos
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-osd-ephemeral
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+- agent: kubernetes
   cluster: api.ci
   cron: '@yearly'
   decorate: true
