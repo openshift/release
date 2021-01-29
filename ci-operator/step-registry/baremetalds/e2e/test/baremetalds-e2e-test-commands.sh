@@ -47,6 +47,15 @@ else
             "${SHARED_DIR}/test-list" \
             "root@${IP}:/tmp/test-list"
         echo "### Running tests"
+         #ssh \
+         #   "${SSHOPTS[@]}" \
+         #   "root@${IP}" \
+         #   openshift-tests \
+         #   run \
+         #   "openshift/conformance/parallel" \
+         #   --dry-run \
+         #   \| grep -Ff /tmp/test-list \|openshift-tests run -o /tmp/artifacts/e2e_parallel.log --junit-dir /tmp/artifacts/junit -f -
+
         ssh \
             "${SSHOPTS[@]}" \
             "root@${IP}" \
@@ -54,7 +63,7 @@ else
             run \
             "openshift/conformance/serial" \
             --dry-run \
-            \|openshift-tests run -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit -f -
+            \| grep -Ff /tmp/test-list \|openshift-tests run -o /tmp/artifacts/e2e_serial.log --junit-dir /tmp/artifacts/junit -f -
     else
         echo "### Running tests"
         ssh \
