@@ -2,7 +2,8 @@
 
 set -Eeuo pipefail
 
-export OS_CLIENT_CONFIG_FILE="${CLUSTER_PROFILE_DIR}/clouds.yaml"
+export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
+OS_CLOUD='openstack'
 
 /var/lib/openshift-install/manifest-tests/test-manifests.sh \
   -c "$OS_CLOUD" \

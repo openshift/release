@@ -4,9 +4,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-export OS_CLIENT_CONFIG_FILE=${CLUSTER_PROFILE_DIR}/clouds.yaml
 CLUSTER_NAME=$(<"${SHARED_DIR}"/CLUSTER_NAME)
-
+export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
+export OS_CLOUD='openstack'
 
 LB_FIP_AND_ID=$(openstack floating ip create --description $CLUSTER_NAME.api-fip $OPENSTACK_EXTERNAL_NETWORK --format value -c 'floating_ip_address' -c 'id')
 echo ${LB_FIP_AND_ID} |awk '{print $1}' > ${SHARED_DIR}/LB_FIP_IP

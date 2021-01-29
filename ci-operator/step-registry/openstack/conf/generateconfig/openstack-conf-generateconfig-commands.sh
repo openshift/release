@@ -4,10 +4,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-#Read necessary variables
+OS_CLOUD='openstack'
 CLUSTER_NAME=$(<"${SHARED_DIR}"/CLUSTER_NAME)
 LB_FIP_IP=$(<"${SHARED_DIR}"/LB_FIP_IP)
-
 PULL_SECRET=$(<"${CLUSTER_PROFILE_DIR}"/pull-secret)
 SSH_PUB_KEY=$(<"${CLUSTER_PROFILE_DIR}"/ssh-publickey)
 
@@ -22,7 +21,7 @@ platform:
   openstack:
     cloud:            ${OS_CLOUD}
     externalNetwork:  ${OPENSTACK_EXTERNAL_NETWORK}
-    computeFlavor:    ${OPENSTACK_COMPUTE_FLAVOR}
+    computeFlavor:    ${OPENSTACK_INSTANCE_FLAVOR}
     lbFloatingIP:     ${LB_FIP_IP}
 pullSecret: >
   ${PULL_SECRET}
