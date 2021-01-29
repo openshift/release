@@ -4,19 +4,16 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-#Read necessary variables
-CLUSTER_NAME=$(<"${SHARED_DIR}"/CLUSTER_NAME)
-LB_FIP_IP=$(<"${SHARED_DIR}"/LB_FIP_IP)
+OS_CLOUD='openstack'
+CLUSTER_NAME=$(<"${SHARED_DIR}/CLUSTER_NAME")
 OPENSTACK_INSTANCE_FLAVOR=$(<"${SHARED_DIR}/OPENSTACK_INSTANCE_FLAVOR")
 OPENSTACK_EXTERNAL_NETWORK=$(<"${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK")
-OS_CLOUD='openstack'
+LB_FIP_IP=$(<"${SHARED_DIR}/LB_FIP_IP")
+PULL_SECRET=$(<"${CLUSTER_PROFILE_DIR}/pull-secret")
+SSH_PUB_KEY=$(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")
 
-PULL_SECRET=$(<"${CLUSTER_PROFILE_DIR}"/pull-secret)
-SSH_PUB_KEY=$(<"${CLUSTER_PROFILE_DIR}"/ssh-publickey)
-
-CONFIG="${SHARED_DIR}/install-config.yaml"
 if [[ "${CONFIG_TYPE}" == "minimal" ]]; then
-cat > "${CONFIG}" << EOF
+cat > "${SHARED_DIR}/install-config.yaml" << EOF
 apiVersion: ${CONFIG_API_VERSION}
 baseDomain: ${BASE_DOMAIN}
 metadata:
@@ -37,7 +34,7 @@ else
     exit 1
 fi
 
-# Lets  check the syntax of yaml file by reading it.
+# Check the syntax of yaml file by reading it.
 python -c 'import yaml;
 import sys;
-data = yaml.safe_load(open(sys.argv[1]))' ${SHARED_DIR}/install-config.yaml
+data = yaml.safe_load(open(sys.argv[1]))' "${SHARED_DIR}/install-config.yaml"
