@@ -185,5 +185,5 @@ read -d '#' SRL << EOF
 EOF
 
 cat <(echo "$PRL") > "${SHARED_DIR}/test-list"
-#cat <(echo "$SRL") >> "${SHARED_DIR}/test-list"
+cat <(echo "$SRL") > "${SHARED_DIR}/test-list-serial"
 
