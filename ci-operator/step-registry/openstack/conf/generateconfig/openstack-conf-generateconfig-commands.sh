@@ -12,6 +12,22 @@ PULL_SECRET=$(<"${CLUSTER_PROFILE_DIR}"/pull-secret)
 SSH_PUB_KEY=$(<"${CLUSTER_PROFILE_DIR}"/ssh-publickey)
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
+
+case "$CLUSTER_TYPE" in
+  openstack-vexxhost)
+      OPENSTACK_EXTERNAL_NETWORK="external"
+      OPENSTACK_INSTANCE_FLAVOR="m1.s2.xlarge"
+      CONFIG_API_VERSION="v1beta4"
+    ;;
+  openstack)
+      OPENSTACK_EXTERNAL_NETWORK="external"
+      OPENSTACK_INSTANCE_FLAVOR="m1.s2.xlarge"
+      CONFIG_API_VERSION="v1beta4"
+    ;;
+esac
+
+
+
 if [[ "${CONFIG_TYPE}" == "minimal" ]]; then
 cat > "${CONFIG}" << EOF
 apiVersion: ${CONFIG_API_VERSION}
@@ -20,9 +36,9 @@ metadata:
   name: ${CLUSTER_NAME}
 platform:
   openstack:
-    cloud:            ${OS_CLOUD}
+    cloud:            ${CLUSTER_TYPE}
     externalNetwork:  ${OPENSTACK_EXTERNAL_NETWORK}
-    computeFlavor:    ${OPENSTACK_COMPUTE_FLAVOR}
+    computeFlavor:    ${OPENSTACK_INSTANCE_FLAVOR}
     lbFloatingIP:     ${LB_FIP_IP}
 pullSecret: >
   ${PULL_SECRET}
