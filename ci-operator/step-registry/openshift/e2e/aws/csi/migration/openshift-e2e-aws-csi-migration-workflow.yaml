@@ -1,0 +1,21 @@
+workflow:
+  as: openshift-e2e-aws-csi-migration
+  steps:
+    pre:
+    - chain: ipi-aws-pre
+    - ref: storage-conf-feature-gate
+    - ref: storage-conf-wait-for-csi-migration
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - chain: ipi-aws-post
+    env:
+      # For storage-conf-feature-gate
+      FEATURESET: TechPreviewNoUpgrade
+      # For openshift-e2e-test: TechPreviewNoUpgrade raises an alert and sets kube-apiserver Upgradeable=false, which
+      # we need to ignore here.
+      TEST_SKIPS: >-
+        Alerts shouldn't report any alerts in firing or pending state\|
+        Managed cluster should start all core operators
+  documentation: |-
+    This workflow enables CSI migration for all volume plugins and runs e2e tests (which include AWS EBS in-tree tests).
