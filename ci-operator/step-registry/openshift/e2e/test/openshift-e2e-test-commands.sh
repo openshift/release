@@ -124,8 +124,8 @@ function upgrade() {
         --to-image "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}" \
         --options "${TEST_UPGRADE_OPTIONS-}" \
         --provider "${TEST_PROVIDER}" \
-        -o /tmp/artifacts/e2e.log \
-        --junit-dir /tmp/artifacts/junit
+        -o "${ARTIFACT_DIR}/e2e.log" \
+        --junit-dir "${ARTIFACT_DIR}/junit"
     set +x
 }
 
@@ -141,8 +141,8 @@ function suite() {
     set -x
     openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-} \
         --provider "${TEST_PROVIDER}" \
-        -o /tmp/artifacts/e2e.log \
-        --junit-dir /tmp/artifacts/junit
+        -o "${ARTIFACT_DIR}/e2e.log" \
+        --junit-dir "${ARTIFACT_DIR}/junit"
     set +x
 }
 
