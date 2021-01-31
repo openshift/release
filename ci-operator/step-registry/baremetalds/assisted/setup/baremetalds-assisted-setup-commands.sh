@@ -65,6 +65,8 @@ echo "export ASSISTED_SERVICE_HOST=${IP}" >> /root/config
 
 # Override default images
 echo "export AGENT_DOCKER_IMAGE=${ASSISTED_AGENT_IMAGE}" >> /root/config
+echo "export CONTROLLER_IMAGE=${ASSISTED_CONTROLLER_IMAGE}" >> /root/config
+echo "export INSTALLER_IMAGE=${ASSISTED_INSTALLER_IMAGE}" >> /root/config
 
 if [ "\${OPENSHIFT_INSTALL_RELEASE_IMAGE:-}" = "" ]; then
     echo "export OPENSHIFT_INSTALL_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}" >> /root/config
