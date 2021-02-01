@@ -17,6 +17,7 @@ presubmits:
       containers:
       - args:
         - --artifact-dir=$(ARTIFACTS)
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --kubeconfig=/etc/apici/kubeconfig
@@ -52,6 +53,9 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/e2e-aws-ovn-cluster-profile
           name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
         - mountPath: /usr/local/e2e-aws-ovn
           name: job-definition
           subPath: cluster-launch-installer-e2e.yaml
@@ -310,6 +314,7 @@ presubmits:
     spec:
       containers:
       - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --input-hash=$(JOB_NAME)
         - --lease-server-password-file=/etc/boskos/password
@@ -340,6 +345,9 @@ presubmits:
           readOnly: true
         - mountPath: /usr/local/e2e-gcp-ovn-upgrade-cluster-profile
           name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
