@@ -47,70 +47,26 @@ items:
         labels:
           app: artifacts-rpms-openshift-origin
       spec:
-        volumes:
-        - name: sync
-          emptyDir: {}
-        - name: cache
-          emptyDir: {}
-        - name: run
-          emptyDir: {}
         containers:
-        - name: mirror
-          ports:
-            - name: http
-              containerPort: 8080
+        - image: nginxinc/nginx-unprivileged:1.17
+          name: nginx
           volumeMounts:
-          - name: sync
-            mountPath: /tmp/sync
-          - name: cache
-            mountPath: /tmp/cache
-          image: " "
-          workingDir: /tmp/sync
-          command:
-          - content-mirror
-          - --path=/tmp/config
-          - --max-size=5g
-          - --timeout=30m
-          - /tmp/sync
-        - name: sync-openshift
-          volumeMounts:
-          - name: sync
-            mountPath: /tmp/sync
-          image: "centos:7"
-          workingDir: /tmp/sync
-          command:
-          - /bin/bash
-          - -c
-          - |
-            #!/bin/bash
-            set -euo pipefail
-            trap 'jobs -p | xargs -r kill || true; exit 0' TERM
-
-            while true; do
-              cat <<END >/tmp/openshift.repo
-            [openshift-origin-v3.11]
-            name = openshift-origin-v3.11
-            baseurl = https://artifacts-openshift-release-3-11.svc.ci.openshift.org/repo
-            gpgcheck = 0
-            [openshift-origin-v4.0]
-            name = openshift-origin-v4.0
-            baseurl = https://artifacts-openshift-release-4-0.svc.ci.openshift.org/repo
-            gpgcheck = 0
-            [openshift-origin-v4.1]
-            name = openshift-origin-v4.1
-            baseurl = https://artifacts-openshift-release-4-1.svc.ci.openshift.org/repo
-            gpgcheck = 0
-            [openshift-origin-v4.2]
-            name = openshift-origin-v4.2
-            baseurl = https://artifacts-openshift-release-4-2.svc.ci.openshift.org/repo
-            gpgcheck = 0
-            [openshift-4.0]
-            name = openshift-4.0
-            baseurl = https://artifacts-openshift-release-4-0.svc.ci.openshift.org/repo
-            gpgcheck = 0
-            END
-              if ! cmp -s /tmp/openshift.repo /tmp/sync/openshift.repo; then
-                cp -f /tmp/openshift.repo /tmp/sync/openshift.repo
-              fi
-              sleep 180 & wait
-            done
+          - name: config
+            mountPath: /etc/nginx/conf.d
+        volumes:
+        - name: config
+          configMap:
+            name: artifacts-rpms-openshift-origin-redirect-config
+- apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    name: artifacts-rpms-openshift-origin-redirect-config
+    namespace: ci-rpms
+  data:
+    "default.conf": |
+      server {
+        listen 8080;
+        location / {
+          proxy_pass https://artifacts-rpms-openshift-origin-ci-rpms.apps.ci.l2s4.p1.openshiftapps.com;
+        }
+      }
