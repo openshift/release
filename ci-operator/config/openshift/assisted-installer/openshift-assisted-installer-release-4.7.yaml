@@ -1,4 +1,12 @@
 base_images:
+  assisted-test-infra:
+    name: assisted-test
+    namespace: ocp-kni
+    tag: assisted-test-infra
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
   ocp_4.7_cli:
     name: "4.7"
     namespace: ocp
@@ -64,6 +72,25 @@ tests:
   commands: make REPORTS=${ARTIFACT_DIR} unit-test
   container:
     from: bin
+- artifact_dir: /tmp/artifacts
+  as: e2e-metal-assisted
+  steps:
+    cluster_profile: packet
+    dependencies:
+      ASSISTED_CONTROLLER_IMAGE: pipeline:assisted-installer-controller
+      ASSISTED_INSTALLER_IMAGE: pipeline:assisted-installer
+    workflow: baremetalds-assisted
+- artifact_dir: /tmp/artifacts
+  as: e2e-metal-assisted-onprem
+  steps:
+    cluster_profile: packet
+    dependencies:
+      ASSISTED_CONTROLLER_IMAGE: pipeline:assisted-installer-controller
+      ASSISTED_INSTALLER_IMAGE: pipeline:assisted-installer
+    env:
+      ASSISTED_CONFIG: |
+        DEPLOY_TARGET=onprem
+    workflow: baremetalds-assisted
 zz_generated_metadata:
   branch: release-4.7
   org: openshift
