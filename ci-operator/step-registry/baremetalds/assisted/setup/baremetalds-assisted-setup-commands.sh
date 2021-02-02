@@ -10,6 +10,10 @@ echo "************ baremetalds assisted setup command ************"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
 
+git remote add osherdp https://github.com/osherdp/assisted-test-infra
+git fetch osherdp
+git checkout fix/ipv6-proxy-to-registries
+
 # Copy assisted source from current directory to the remote server
 tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/assisted.tar.gz"
 
