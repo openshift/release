@@ -6,6 +6,12 @@ set -o pipefail
 
 echo "************ baremetalds e2e conf command ************"
 
+# We would like to keep running e2e tests only for periodics
+if [ "${JOB_TYPE}" = "presubmit" ]; then
+    echo "true" > "${SHARED_DIR}/skip-e2e-test"
+    exit 0
+fi
+
 # List of include cases
 
 read -d '#' INCL << EOF

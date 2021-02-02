@@ -7,6 +7,11 @@ set -x
 
 echo "************ baremetalds test command ************"
 
+if [[ -e "${SHARED_DIR}/skip-e2e-test" ]]; then
+  echo "Skip e2e testing"
+  exit 0
+fi
+
 # Fetch packet basic configuration
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
