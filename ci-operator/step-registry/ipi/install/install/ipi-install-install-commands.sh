@@ -25,6 +25,7 @@ kubevirt) export KUBEVIRT_KUBECONFIG=${HOME}/.kube/config;;
 vsphere) ;;
 openstack) export OS_CLIENT_CONFIG_FILE=${CLUSTER_PROFILE_DIR}/clouds.yaml ;;
 openstack-vexxhost) export OS_CLIENT_CONFIG_FILE=${CLUSTER_PROFILE_DIR}/clouds.yaml ;;
+ovirt) export OVIRT_CONFIG="${SHARED_DIR}/ovirt-config.yaml" ;;
 *) >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}'"
 esac
 
@@ -70,4 +71,16 @@ cp \
     "${dir}/auth/kubeconfig" \
     "${dir}/auth/kubeadmin-password" \
     "${dir}/metadata.json"
+
+# TODO: remove once BZ#1926093 is done and backported
+if [[ "${CLUSTER_TYPE}" == "ovirt" ]]; then
+  cp -t "${SHARED_DIR}" "${dir}"/terraform.*
+fi
+
+if test "${ret}" -eq 0 ; then
+  touch  "${SHARED_DIR}/success"
+else
+  touch  "${SHARED_DIR}/failure"
+fi
+
 exit "$ret"
