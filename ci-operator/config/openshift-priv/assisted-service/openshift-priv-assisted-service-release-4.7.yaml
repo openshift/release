@@ -4,12 +4,17 @@ base_images:
     namespace: openshift
     tag: golang-1.15
 build_root:
-  project_image:
-    dockerfile_path: Dockerfile.assisted-service-build
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.15
 canonical_go_repository: github.com/openshift/assisted-service
 images:
-- dockerfile_path: Dockerfile.assisted-service
+- dockerfile_path: Dockerfile.assisted-service-build
   from: src
+  to: base-assisted
+- dockerfile_path: Dockerfile.assisted-service
+  from: base-assisted
   inputs:
     openshift_release_golang-1.15:
       as:
@@ -34,14 +39,7 @@ tests:
   as: lint
   commands: export GOLANGCI_LINT_CACHE=/tmp/.cache make lint
   container:
-    from: test-bin
-- artifact_dir: /tmp/artifacts
-  as: format-check
-  commands: |
-    export GOPATH=/tmp/go && export GOCACHE=/tmp/.cache/go-build && export GOMODCACHE=/tmp/go/pkg/mod
-    export GOLANGCI_LINT_CACHE=/tmp/.cache && make format-check
-  container:
-    from: test-bin
+    from: base-assisted
 - artifact_dir: /tmp/artifacts
   as: assisted-service-aws
   steps:
