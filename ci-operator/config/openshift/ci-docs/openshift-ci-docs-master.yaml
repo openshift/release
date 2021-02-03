@@ -1,11 +1,33 @@
+base_images:
+  html-proofer-base:
+    name: html-proofer
+    namespace: ci
+    tag: 3.18.5
+  hugo:
+    name: hugo
+    namespace: ci
+    tag: 0.75.1-ext-ubuntu
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: golang-1.15
 images:
-- to: ci-docs
+- inputs:
+    hugo:
+      as:
+      - klakegg/hugo:0.75.1-ext-ubuntu
+  to: ci-docs
+- dockerfile_path: Dockerfile.links
+  from: html-proofer-base
+  inputs:
+    hugo:
+      as:
+      - klakegg/hugo:0.75.1-ext-ubuntu
+  to: html-proofer
 promotion:
+  excluded_images:
+  - html-proofer
   namespace: ci
   tag: latest
 resources:
@@ -13,6 +35,12 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- artifact_dir: /tmp/artifacts
+  as: links
+  commands: htmlproofer --root-dir /src/public/ --http-status-ignore 403,405 --url-ignore /mojo.redhat.com/
+  container:
+    from: html-proofer
 zz_generated_metadata:
   branch: master
   org: openshift
