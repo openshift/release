@@ -5,15 +5,24 @@ build_root:
     tag: go1.15-linux-amd64
 images:
 - dockerfile_path: Dockerfile
-  to: latest
+  to: hellowprow-go
 promotion:
-  name: helloprow-go
   namespace: open-cluster-management
+  tag: latest
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 100Mi
+tests:
+- artifact_dir: /tmp/artifacts
+  as: sonar
+  commands: GOPROXY="proxy.golang.org,direct" make sonar/go/openshiftci
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
 zz_generated_metadata:
   branch: main
   org: open-cluster-management
