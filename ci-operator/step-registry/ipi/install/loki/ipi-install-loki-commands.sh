@@ -585,6 +585,8 @@ spec:
         app.kubernetes.io/part-of: loki
         app.kubernetes.io/version: ${LOKI_VERSION}
     spec:
+      # Grace period is set longer than our wait time.
+      terminationGracePeriodSeconds: 180
       containers:
       - command:
         - sh
@@ -600,6 +602,15 @@ spec:
               fieldPath: spec.nodeName
         image: grafana/promtail:${LOKI_VERSION}
         imagePullPolicy: IfNotPresent
+        lifecycle:
+          preStop:
+            # We want the pod to keep running when a node is being drained
+            # long enough to exfiltrate the last set of logs from static pods
+            # from things like etcd and the kube-apiserver. To do that, we need
+            # to stay alive longer than the longest shutdown duration will be
+            # run, which should be 135s from kube-apiserver.
+            exec:
+              command: ["sleep", "150"]
         name: promtail
         ports:
         - containerPort: 3101
