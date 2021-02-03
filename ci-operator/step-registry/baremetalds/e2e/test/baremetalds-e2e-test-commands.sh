@@ -46,13 +46,13 @@ else
             "${SSHOPTS[@]}" \
             "${SHARED_DIR}/test-list" \
             "root@${IP}:/tmp/test-list"
-        echo "### Running tests"
+        echo "### Running openshift/conformance tests"
         ssh \
             "${SSHOPTS[@]}" \
             "root@${IP}" \
             openshift-tests \
             run \
-            "openshift/conformance/parallel" \
+            all \
             --dry-run \
             \| grep -Ff /tmp/test-list \|openshift-tests run -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit -f -
     else

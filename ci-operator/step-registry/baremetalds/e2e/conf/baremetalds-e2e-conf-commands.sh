@@ -6,9 +6,9 @@ set -o pipefail
 
 echo "************ baremetalds e2e conf command ************"
 
-# List of include cases
+# List of include conformance/parallel cases
 
-read -d '#' INCL << EOF
+read -d '#' PRL << EOF
 [sig-api-machinery] Watchers should be able to start watching from a specific resource version
 [sig-api-machinery] Watchers should observe an object deletion if it stops meeting the requirements of the selector
 [sig-api-machinery] CustomResourcePublishOpenAPI [Privileged:ClusterAdmin] works for multiple CRDs of different groups
@@ -118,5 +118,33 @@ read -d '#' INCL << EOF
 #
 EOF
 
-cat <(echo "$INCL") > "${SHARED_DIR}/test-list"
+# List of include conformance/serial cases
+
+read -d '#' SRL << EOF
+[sig-api-machinery] API data in etcd should be stored at the correct location and version for all resources [Serial] [Suite:openshift/conformance/serial]
+[sig-api-machinery] Namespaces [Serial] should patch a Namespace [Conformance] [Suite:openshift/conformance/serial/minimal] [Suite:k8s]
+[sig-api-machinery] Namespaces [Serial] should delete fast enough (90 percent of 100 namespaces in 150 seconds) [Suite:openshift/conformance/serial] [Suite:k8s]
+[sig-api-machinery] Namespaces [Serial] should ensure that all services are removed when a namespace is deleted [Conformance] [Suite:openshift/conformance/serial/minimal] [Suite:k8s]
+[sig-api-machinery] Namespaces [Serial] should always delete fast (ALL of 100 namespaces in 150 seconds) [Feature:ComprehensiveNamespaceDraining] [Suite:openshift/conformance/serial] [Suite:k8s]
+[k8s.io] [sig-node] NoExecuteTaintManager Multiple Pods [Serial] only evicts pods without tolerations from tainted nodes [Suite:openshift/conformance/serial] [Suite:k8s]
+[k8s.io] [sig-node] NoExecuteTaintManager Single Pod [Serial] doesn't evict pod with tolerations from tainted nodes [Suite:openshift/conformance/serial] [Suite:k8s]
+[k8s.io] [sig-node] NoExecuteTaintManager Single Pod [Serial] eventually evict pod with finite tolerations from tainted nodes [Suite:openshift/conformance/serial] [Suite:k8s]
+[k8s.io] [sig-node] NoExecuteTaintManager Single Pod [Serial] evicts pods from tainted nodes [Suite:openshift/conformance/serial] [Suite:k8s]
+[sig-imageregistry][Feature:ImageTriggers][Serial] ImageStream API TestImageStreamTagLifecycleHook [Suite:openshift/conformance/serial]
+[sig-imageregistry][Feature:ImageTriggers][Serial] ImageStream admission TestImageStreamTagsAdmission [Suite:openshift/conformance/serial]
+[sig-imageregistry][Feature:ImageTriggers][Serial] ImageStream admission TestImageStreamAdmitSpecUpdate [Suite:openshift/conformance/serial]
+[sig-imageregistry][Feature:ImageTriggers][Serial] ImageStream admission TestImageStreamAdmitStatusUpdate [Suite:openshift/conformance/serial]
+[sig-imageregistry][Feature:ImageTriggers][Serial] ImageStream API TestImageStreamWithoutDockerImageConfig [Suite:openshift/conformance/serial]
+[sig-imageregistry][Feature:ImageTriggers][Serial] ImageStream API TestImageStreamMappingCreate [Suite:openshift/conformance/serial]
+[sig-arch] ocp payload should be based on existing source [Serial] olm version should contain the source commit id [Suite:openshift/conformance/serial]
+[sig-scheduling] SchedulerPredicates [Serial] validates that NodeAffinity is respected if not matching [Suite:openshift/conformance/serial] [Suite:k8s]
+[sig-scheduling] SchedulerPreemption [Serial] PriorityClass endpoints verify PriorityClass endpoints can be operated with different HTTP methods [Conformance] [Suite:openshift/conformance/serial/minimal] [Suite:k8s]
+[sig-network] IngressClass [Feature:Ingress] should set default value on new IngressClass [Serial] [Suite:openshift/conformance/serial] [Suite:k8s]
+[sig-network] IngressClass [Feature:Ingress] should not set default value if no default IngressClass [Serial] [Suite:openshift/conformance/serial] [Suite:k8s]
+[sig-network] IngressClass [Feature:Ingress] should prevent Ingress creation if more than 1 IngressClass marked as default [Serial] [Suite:openshift/conformance/serial] [Suite:k8s]
+#
+EOF
+
+cat <(echo "$PRL") > "${SHARED_DIR}/test-list"
+cat <(echo "$SRL") >> "${SHARED_DIR}/test-list"
 
