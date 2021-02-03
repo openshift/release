@@ -394,6 +394,36 @@ presubmits:
           secretName: cluster-secrets-azure
     trigger: (?m)^/test( | .* )upgrade-private-v19.0,?($|\s.*)
   - agent: kubernetes
+    always_run: false
+    branches:
+    - release-v21
+    cluster: build01
+    context: upgrade-private-v20.0
+    decorate: true
+    name: pull-ci-azure-release-v21-upgrade-private-v20.0
+    rerun_command: /test upgrade-private-v20.0
+    spec:
+      containers:
+      - args:
+        - hack/tests/e2e-upgrade.sh
+        - v20.0
+        env:
+        - name: API_VERSION
+          value: 2019-10-27-preview
+        - name: PRIVATE_API_SERVER
+          value: "true"
+        image: registry.ci.openshift.org/azure/ci-base:latest
+        name: ""
+        resources: {}
+        volumeMounts:
+        - mountPath: /secrets
+          name: secrets
+      volumes:
+      - name: secrets
+        secret:
+          secretName: cluster-secrets-azure
+    trigger: (?m)^/test( | .* )upgrade-private-v20.0,?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - release-v21
@@ -493,6 +523,31 @@ presubmits:
         secret:
           secretName: cluster-secrets-azure
     trigger: (?m)^/test( | .* )upgrade-v19.0,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-v21
+    cluster: build01
+    context: upgrade-v20.0
+    decorate: true
+    name: pull-ci-azure-release-v21-upgrade-v20.0
+    rerun_command: /test upgrade-v20.0
+    spec:
+      containers:
+      - args:
+        - hack/tests/e2e-upgrade.sh
+        - v20.0
+        image: registry.ci.openshift.org/azure/ci-base:latest
+        name: ""
+        resources: {}
+        volumeMounts:
+        - mountPath: /secrets
+          name: secrets
+      volumes:
+      - name: secrets
+        secret:
+          secretName: cluster-secrets-azure
+    trigger: (?m)^/test( | .* )upgrade-v20.0,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
