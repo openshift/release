@@ -52,9 +52,8 @@ else
             "root@${IP}" \
             openshift-tests \
             run \
-            "openshift/conformance/parallel" \
-            --dry-run \
-            \| grep -Ff /tmp/test-list \|openshift-tests run -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit -f -
+            -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit \
+            "openshift/conformance/serial" \
     else
         echo "### Running tests"
         ssh \
