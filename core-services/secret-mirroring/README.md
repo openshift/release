@@ -1,37 +1,3 @@
 # Secret Mirroring
 
-This directory contains the configuration file for the
-[secretsyncer](https://github.com/openshift/ci-tools/tree/master/pkg/controller/secretsyncer).
-This tool mirrors secrets from one location in the api.ci cluster to another in all clusters of the build-farm, allowing
-users to provide secrets without requiring RBAC privileges on secrets in a central
-namespace.
-
-# Self-managed secrets
-
-In order to provide custom secrets to jobs without putting the secret management
-into the hands of the Developer Productivity (Test Platform) team, it is possible
-to create the secrets in the cluster and have them automatically mirrored to be
-available for jobs. This is useful when:
-
- - the secret owners do not wish to upload them to BitWarden
- - the secrets have dynamic lifecycles and the owners need to rotate them frequently
-
-First, create a secret in a self-managed namespace:
-
-```sh
-oc new-project my-kerbID-secrets
-oc create secret --namespace my-kerbID-secrets generic my-secret --from-file secret.txt 
-```
-
-Then, update the [secret mirroring configuration](./_mapping.yaml) in this directory
-to mirror the secret that was just created into the namespaces where jobs run:
-
-```yaml
-secrets:
-- from:
-    namespace: my-kerbID-secrets
-    name: my-secret
-  to:
-    namespace: ci
-    name: my-secret
-```
+Secret mirroring is documented in the [CI docs](https://docs.ci.openshift.org/docs/how-tos/adding-a-new-secret-to-ci/)
