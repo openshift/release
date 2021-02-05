@@ -1,2 +1,1 @@
-The `_allow-list.yaml` file contains the mapping between release-type used to setup the dashboard for the testgrid tool where the default dashboardType needs to be overridden. 
-Input can be given as a dictionary with the name of the job being the key and the release-type as the value.
+Please refer to the [ci-docs](https://docs.ci.openshift.org/docs/how-tos/add-jobs-to-testgrid/)
