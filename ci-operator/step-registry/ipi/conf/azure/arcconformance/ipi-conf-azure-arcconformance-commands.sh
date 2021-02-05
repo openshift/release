@@ -6,14 +6,16 @@ set -o pipefail
 
 echo "$(date -u --rfc-3339=seconds) - Leased resource is ${LEASED_RESOURCE}"
 
-# TODO we should eventually make sure we only get cluster leases in the correct 
-# region. ATM we SKIP testing if the leased is not the expected one.
-if [[ "$LEASED_RESOURCE" != "eastus" ]]; then
-  echo "================================================"
-  echo "Azure Arc-enabled Kubernetes clusters are not" 
-  echo "available in ${LEASED_RESOURCE}. Skipping tests."
-  echo "================================================"
-  exit 0
+if [[ -z "$AZURE_SA_CONNECTION_STRING_PATH" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - Connection string secret is not set"
+  exit 1
+else
+  if [[ -f "${AZURE_SA_CONNECTION_STRING_PATH}" ]]; then
+    AZURE_SA_CONNECTION_STRING=$(<${AZURE_SA_CONNECTION_STRING_PATH})
+  else
+    echo "$(date -u --rfc-3339=seconds) - Connection string secret file not present"
+    exit 1
+  fi
 fi
 
 export PATH=$PATH:/tmp/bin
@@ -42,6 +44,10 @@ yq --version
 # az should already be there
 az version
 
+# install newest oc
+curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
+chmod ug+x /tmp/bin/oc
+
 echo "$(date -u --rfc-3339=seconds) - Collecting parameters..."
 
 # set the parameters we'll need as env vars
@@ -52,8 +58,9 @@ AZURE_AUTH_TENANT_ID="$(cat ${AZURE_AUTH_LOCATION} | jq -r .tenantId)"
 AZURE_AUTH_SUBSCRIPTION_ID="$(cat ${AZURE_AUTH_LOCATION} | jq -r .subscriptionId)"
 
 CLUSTER_NAME="$(oc get -o jsonpath='{.status.infrastructureName}' infrastructure cluster)"
+CLUSTER_VERSION="$(/tmp/bin/oc adm release info -o json | jq -r .metadata.version)"
 RESOURCE_GROUP="$(oc get -o jsonpath='{.status.platformStatus.azure.resourceGroupName}' infrastructure cluster)"
-REGION="${LEASED_RESOURCE}"
+if [ -z $AZURE_REGION ]; then REGION="${LEASED_RESOURCE}"; else REGION="${AZURE_REGION}"; fi
 KUBERNETES_DISTRIBUTION="openshift"
 DNS_NAMESPACE="openshift-dns"
 DNS_POD_LABELS="dns.operator.openshift.io/daemonset-dns"
@@ -108,16 +115,48 @@ while [[ -z "${result}" ]]; do
   result=$(sonobuoy status --json | jq -r '.plugins[0]["result-status"]')
 done
 
-sonobuoy status
-
 echo "$(date -u --rfc-3339=seconds) - Testing finished, retrieving status and assets..."
 
+sonobuoy status --json > /tmp/status.json
 sonobuoy retrieve "${ARTIFACT_DIR}"
+
+# upload assets to the shared blob defined in the AZURE_SA_CONNECTION_STRING env var
+echo "$(date -u --rfc-3339=seconds) - Uploading assets to Azure blob..."
+
+SONOBUOY_ASSETS_FILE_PATH="$(find ${ARTIFACT_DIR} -type f -name "*_sonobuoy_*" -regextype posix-extended -regex ".*\.(tar|tar\.gz)$" | head -1)"
+
+if [[ -z "$SONOBUOY_ASSETS_FILE_PATH" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - Sonobuoy assets file not present, skipping upload"
+else
+  SONOBUOY_ASSETS_FILENAME="$(basename -- ${SONOBUOY_ASSETS_FILE_PATH})"
+  base="$(echo "${SONOBUOY_ASSETS_FILENAME}" | cut -f 1 -d '.')"
+
+  echo "$(date -u --rfc-3339=seconds) - Uploading ${SONOBUOY_ASSETS_FILENAME} to container ${AZURE_SA_CONTAINER_NAME}..."
+  az storage blob upload \
+    --container-name "${AZURE_SA_CONTAINER_NAME}" \
+    --name "${CLUSTER_VERSION}/${SONOBUOY_ASSETS_FILENAME}" \
+    --file "${SONOBUOY_ASSETS_FILE_PATH}" \
+    --connection-string "${AZURE_SA_CONNECTION_STRING}" \
+    --auth-mode key \
+    --validate-content \
+    --metadata "result=${result}"
+
+  echo "$(date -u --rfc-3339=seconds) - Uploading status json file to container ${AZURE_SA_CONTAINER_NAME}..."
+  az storage blob upload \
+    --container-name "${AZURE_SA_CONTAINER_NAME}" \
+    --name "${CLUSTER_VERSION}/${base}.json" \
+    --file "/tmp/status.json" \
+    --connection-string "${AZURE_SA_CONNECTION_STRING}" \
+    --auth-mode key \
+    --validate-content \
+    --metadata "result=${result}"
+fi
 
 echo "$(date -u --rfc-3339=seconds) - Tearing down..."
 
 sonobuoy delete
 
+echo "$(date -u --rfc-3339=seconds) - Sonobuoy test result is: ${result}"
 if [[ "$result" =~ "failed" ]]; then
   exit 1
 fi
