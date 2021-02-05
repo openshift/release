@@ -194,7 +194,7 @@ periodics:
         value: "4.1"
       - name: CLUSTER_TYPE
         value: aws
-      - name: CONFIG_SPEC
+      - name: UNRESOLVED_CONFIG
         value: |
           resources:
             '*':
@@ -264,9 +264,18 @@ periodics:
               cluster_profile: "$(CLUSTER_TYPE)"
               upgrade: true
           - as: launch
-            commands: sleep $(CLUSTER_DURATION) & wait
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              test:
+              - artifact_dir: /tmp/artifacts
+                as: e2e-test
+                commands: sleep $(CLUSTER_DURATION) & wait
+                from: src
+                resources:
+                  requests:
+                    cpu: 100m
+                    memory: 200Mi
+              workflow: openshift-e2e-$(CLUSTER_TYPE)
       - name: JOB_NAME_SAFE
         value: launch
       - name: TEST_COMMAND
@@ -874,7 +883,7 @@ periodics:
         value: "4.2"
       - name: CLUSTER_TYPE
         value: vsphere
-      - name: CONFIG_SPEC
+      - name: UNRESOLVED_CONFIG
         value: |
           resources:
             '*':
@@ -940,9 +949,18 @@ periodics:
               cluster_profile: "$(CLUSTER_TYPE)"
               upgrade: true
           - as: launch
-            commands: sleep $(CLUSTER_DURATION) & wait
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              test:
+              - artifact_dir: /tmp/artifacts
+                as: e2e-test
+                commands: sleep $(CLUSTER_DURATION) & wait
+                from: src
+                resources:
+                  requests:
+                    cpu: 100m
+                    memory: 200Mi
+              workflow: openshift-e2e-$(CLUSTER_TYPE)
       - name: JOB_NAME_SAFE
         value: launch
       - name: TEST_COMMAND
