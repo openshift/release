@@ -31,13 +31,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         MAKEFILE_TARGET="create_full_environment run test_parallel"
-    post:
-    - ref: baremetalds-assisted-gather
-    - ref: baremetalds-packet-teardown
-    pre:
-    - ref: baremetalds-packet-setup
-    - ref: ipi-install-rbac
-    - ref: baremetalds-assisted-setup
+    workflow: baremetalds-assisted-install
 - artifact_dir: /tmp/artifacts
   as: e2e-metal-assisted-ipv6
   steps:
@@ -48,7 +42,7 @@ tests:
         IPv4=no
         VIP_DHCP_ALLOCATION=no
         PROXY=yes
-    workflow: baremetalds-assisted
+    workflow: baremetalds-assisted-install
 - artifact_dir: /tmp/artifacts
   as: e2e-metal-assisted-onprem
   steps:
@@ -56,12 +50,12 @@ tests:
     env:
       ASSISTED_CONFIG: |
         DEPLOY_TARGET=onprem
-    workflow: baremetalds-assisted
+    workflow: baremetalds-assisted-install
 - artifact_dir: /tmp/artifacts
   as: e2e-metal-assisted
   steps:
     cluster_profile: packet
-    workflow: baremetalds-assisted
+    workflow: baremetalds-assisted-install
 - artifact_dir: /tmp/artifacts
   as: e2e-metal-assisted-single-node
   steps:
@@ -70,7 +64,7 @@ tests:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
         OPENSHIFT_INSTALL_RELEASE_IMAGE=registry.svc.ci.openshift.org/sno-dev/openshift-bip:0.2.0
-    workflow: baremetalds-assisted
+    workflow: baremetalds-assisted-install
 - artifact_dir: /tmp/artifacts
   as: e2e-metal-assisted-periodic
   cron: '@daily'
