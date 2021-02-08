@@ -3,6 +3,22 @@ base_images:
     name: "4.8"
     namespace: ocp
     tag: ansible
+  assisted-installer:
+    name: "4.8"
+    namespace: ocp
+    tag: assisted-installer
+  assisted-installer-agent:
+    name: "4.8"
+    namespace: ocp
+    tag: assisted-installer-agent
+  assisted-installer-controller:
+    name: "4.8"
+    namespace: ocp
+    tag: assisted-installer-controller
+  assisted-test-infra:
+    name: assisted-test
+    namespace: ocp-kni
+    tag: assisted-test-infra
   base:
     name: "4.8"
     namespace: ocp
@@ -11,6 +27,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  libvirt-installer:
+    name: "4.8"
+    namespace: ocp
+    tag: libvirt-installer
   upi-installer:
     name: "4.8"
     namespace: ocp
@@ -32,6 +52,45 @@ resources:
       memory: 200Mi
 tests:
 - artifact_dir: /tmp/artifacts
+  as: e2e-metal-assisted
+  cron: 0 0 * * 1
+  steps:
+    cluster_profile: packet
+    dependencies:
+      ASSISTED_AGENT_IMAGE: pipeline:assisted-installer-agent
+      ASSISTED_CONTROLLER_IMAGE: pipeline:assisted-installer-controller
+      ASSISTED_INSTALLER_IMAGE: pipeline:assisted-installer
+    workflow: baremetalds-assisted
+- artifact_dir: /tmp/artifacts
+  as: e2e-metal-assisted-onprem
+  cron: 0 0 * * 1
+  steps:
+    cluster_profile: packet
+    dependencies:
+      ASSISTED_AGENT_IMAGE: pipeline:assisted-installer-agent
+      ASSISTED_CONTROLLER_IMAGE: pipeline:assisted-installer-controller
+      ASSISTED_INSTALLER_IMAGE: pipeline:assisted-installer
+    env:
+      ASSISTED_CONFIG: |
+        DEPLOY_TARGET=onprem
+    workflow: baremetalds-assisted
+- artifact_dir: /tmp/artifacts
+  as: e2e-metal-assisted-ipv6
+  cron: 0 0 * * 1
+  steps:
+    cluster_profile: packet
+    dependencies:
+      ASSISTED_AGENT_IMAGE: pipeline:assisted-installer-agent
+      ASSISTED_CONTROLLER_IMAGE: pipeline:assisted-installer-controller
+      ASSISTED_INSTALLER_IMAGE: pipeline:assisted-installer
+    env:
+      ASSISTED_CONFIG: |
+        IPv6=yes
+        IPv4=no
+        VIP_DHCP_ALLOCATION=no
+        PROXY=yes
+    workflow: baremetalds-assisted
+- artifact_dir: /tmp/artifacts
   as: e2e-metal-ipi
   cron: 0 0 1 1 *
   steps:
@@ -41,17 +100,6 @@ tests:
         IP_STACK=v4
         NETWORK_TYPE=OpenShiftSDN
     workflow: baremetalds-e2e
-- artifact_dir: /tmp/artifacts
-  as: e2e-metal-ipi-upgrade
-  cron: 0 0 1 1 *
-  steps:
-    cluster_profile: packet
-    env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4
-        NETWORK_TYPE=OpenShiftSDN
-      RUN_UPGRADE_TEST: "true"
-    workflow: baremetalds-e2e-upgrade
 - artifact_dir: /tmp/artifacts
   as: e2e-metal-ipi-ovn-ipv6
   cron: 0 0 1 1 *
@@ -90,6 +138,17 @@ tests:
     cluster_profile: packet
     workflow: baremetalds-e2e-virtualmedia
 - artifact_dir: /tmp/artifacts
+  as: e2e-metal-ipi-upgrade
+  cron: 0 0 1 1 *
+  steps:
+    cluster_profile: packet
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OpenShiftSDN
+      RUN_UPGRADE_TEST: "true"
+    workflow: baremetalds-e2e-upgrade
+- artifact_dir: /tmp/artifacts
   as: e2e-aws-proxy
   cron: 0 0 */2 * *
   steps:
@@ -97,25 +156,25 @@ tests:
     workflow: openshift-e2e-aws-proxy
 - artifact_dir: /tmp/artifacts
   as: e2e-vsphere
-  cron: 25 */6 * * *
+  cron: 0 4,10,16,22 * * *
   steps:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere
 - artifact_dir: /tmp/artifacts
   as: e2e-vsphere-serial
-  cron: 35 */6 * * *
+  cron: 30 4,10,16,22 * * *
   steps:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere-serial
 - artifact_dir: /tmp/artifacts
   as: e2e-vsphere-upi
-  cron: 30 */6 * * *
+  cron: 15 4,10,16,22 * * *
   steps:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere-upi
 - artifact_dir: /tmp/artifacts
   as: e2e-vsphere-upi-serial
-  cron: 40 */6 * * *
+  cron: 45 4,10,16,22 * * *
   steps:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere-upi-serial
@@ -126,11 +185,23 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws-workers-rhel7
 - artifact_dir: /tmp/artifacts
+  as: openshift-ipi-azure-arcconformance
+  cron: 0 4,10,16,22 * * *
+  steps:
+    cluster_profile: azure4
+    workflow: ipi-azure-arcconformance
+- artifact_dir: /tmp/artifacts
   as: e2e-ovirt
-  cron: 1 */6 * * *
+  cron: 0 */6 * * *
   steps:
     cluster_profile: ovirt
     workflow: openshift-e2e-ovirt-conformance
+- artifact_dir: /tmp/artifacts
+  as: e2e-gcp-libvirt-cert-rotation
+  cron: '@daily'
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-libvirt-cert-rotation
 zz_generated_metadata:
   branch: master
   org: openshift
