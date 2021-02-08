@@ -415,6 +415,7 @@ objects:
         SUBNETS["${CLUSTER_TYPE}-1-4"]="4"
 
         # ensure LEASED_RESOURCE is set
+        echo "LEASED_RESOURCE=${LEASED_RESOURCE}"
         if [[ -z "${LEASED_RESOURCE}" ]]; then
           echo "Failed to acquire lease"
           exit 1
@@ -422,6 +423,7 @@ objects:
 
         # get cluster subnet or default it to 126
         cluster_subnet="${SUBNETS[${LEASED_RESOURCE}]}"
+        echo "cluster_subnet=${cluster_subnet}"
         if [[ -z "$cluster_subnet" ]]; then
            cluster_subnet=126
         fi
@@ -443,7 +445,10 @@ objects:
         if [[ -z "$remote_libvirt_uri" ]]; then
            remote_libvirt_uri="qemu+tcp://${REMOTE_LIBVIRT_HOSTNAME}/system"
         fi
-        echo $remote_libvirt_uri
+        echo "remote_libvirt_uri=${remote_libvirt_uri}"
+
+        # Test the remote connection
+        mock-nss.sh virsh -c ${remote_libvirt_uri} list
 
         # Assume lease hasn't been cleaned
         CONNECT=$remote_libvirt_uri
@@ -482,6 +487,8 @@ objects:
           exit 1
         fi
 
+        echo "JOB_NAME_HASH=${JOB_NAME_HASH}"
+
         if [[ "${ARCH}" = "s390x" || "${ARCH}" = "ppc64le" ]]; then
             master_type=null
             subnets="[]"
@@ -518,6 +525,9 @@ objects:
         sshKey: |
           ${SSH_PUB_KEY}
         EOF
+            echo "BEGIN: ${ARTIFACT_DIR}/installer/install-config.yaml"
+            awk 'BEGIN{f=1;} /^pullSecret/{f=0; next;} /^sshKey/{f=1;} f' ${ARTIFACT_DIR}/installer/install-config.yaml
+            echo "END: ${ARTIFACT_DIR}/installer/install-config.yaml"
 
         else
             echo "No preallocated hardware for cluster arch '${ARCH}'"
