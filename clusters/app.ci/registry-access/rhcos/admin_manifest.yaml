@@ -1,0 +1,57 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  annotations:
+    openshift.io/display-name: RHCOS
+  name: rhcos
+---
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: image-pusher
+  namespace: rhcos
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: rhcos-image-pusher-binding
+  namespace: rhcos
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: system:image-builder
+subjects:
+  - kind: ServiceAccount
+    namespace: rhcos
+    name: image-pusher
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: rhcos-viewer-binding
+  namespace: rhcos
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: view
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: rhcos-admins
+    namespace: rhcos
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: rhcos-admins-binding
+  namespace: rhcos
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: pull-secret-namespace-manager
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: rhcos-admins
+    namespace: rhcos
