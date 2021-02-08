@@ -199,7 +199,7 @@ def _add_osd_rc_deployment(gendoc):
                             'name': 'controller',
                             'volumeMounts': get_rc_volume_mounts(context)
                         }],
-                    'serviceAccountName': 'release-controller',
+                    'serviceAccountName': f'release-controller-{context.is_namespace}',
                     'volumes': get_rc_volumes(context, context.is_namespace)
                 }
             }
