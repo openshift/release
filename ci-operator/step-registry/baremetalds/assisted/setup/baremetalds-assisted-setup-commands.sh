@@ -84,6 +84,7 @@ echo "export KUBECONFIG=\${REPO_DIR}/build/kubeconfig" >> /root/.bashrc
 
 source /root/config
 
+echo "for the lolz"
 timeout -s 9 105m make \${MAKEFILE_TARGET:-all}
 
 EOF
