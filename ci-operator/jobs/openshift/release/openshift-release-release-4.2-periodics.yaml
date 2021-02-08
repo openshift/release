@@ -19,6 +19,7 @@ periodics:
       - --input-hash=$(JOB_NAME)
       - --promote
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       command:
       - /bin/bash
@@ -34,8 +35,10 @@ periodics:
         chmod ug+x /tmp/bin/oc
 
         # if the source and destination are identical, do nothing
+        export KUBECONFIG=/etc/apici/kubeconfig
         from=$( oc get istag -n "${TAG_NS}" "${TAG_SOURCE}" -o template='{{ .image.metadata.name }}' )
         to=$( oc get istag --ignore-not-found -n ocp "${BRANCH}:${TAG}" -o template='{{ .image.metadata.name }}' )
+        unset KUBECONFIG
         if [[ "${from}" == "${to}" ]]; then
           echo "info: ${TAG_NS}/${TAG_SOURCE} matches ocp/${BRANCH}:${TAG}"
           exit 0
@@ -122,6 +125,9 @@ periodics:
       - mountPath: /etc/pull-secret
         name: pull-secret
         readOnly: true
+      - mountPath: /etc/push-secret
+        name: push-secret
+        readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -147,6 +153,9 @@ periodics:
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
+    - name: push-secret
+      secret:
+        secretName: registry-push-credentials-ci-central
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
