@@ -1,12 +1,11 @@
 {
-  "hide": true,
   "name":"4.8.0-0.ci",
   "to": "release",
   "message": "This release contains CI image builds of all code in release-4.8 (master) branches, and is updated each time someone merges.",
   "mirrorPrefix": "4.8",
-  "expires":"12h",
-  "maxUnreadyReleases": 1,
-  "minCreationIntervalSeconds": 7200,
+  "expires":"72h",
+  "maxUnreadyReleases": 2,
+  "minCreationIntervalSeconds": 1800,
   "pullSecretName": "source",
   "publish":{
     "mirror-to-origin":{
@@ -32,7 +31,8 @@
           "ironic-machine-os-downloader",
           "ironic-static-ip-manager",
           "cluster-samples-operator",
-          "operator-marketplace"
+          "operator-marketplace",
+          "cluster-update-keys"
         ]
       }
     },
@@ -41,6 +41,14 @@
   "verify":{
     "gcp":{
       "prowJob":{"name":"release-openshift-origin-installer-e2e-gcp-4.8"}
+    },
+    "aws-serial":{
+      "prowJob":{"name":"release-openshift-origin-installer-e2e-aws-serial-4.8"}
+    },
+    "upgrade":{
+      "upgrade":true,
+      "optional":true,
+      "prowJob":{"name":"release-openshift-origin-installer-e2e-gcp-upgrade-4.8"}
     },
     "upgrade-minor":{
       "upgrade":true,
@@ -61,16 +69,22 @@
       "upgrade":true,
       "prowJob":{"name":"release-openshift-origin-installer-e2e-gcp-upgrade-4.8"}
     },
-    "upgrade-aws-rollback-minor":{
+    "upgrade-rollback-minor":{
       "interval":"24h",
       "upgrade":true,
       "upgradeFrom": "PreviousMinor",
       "prowJob":{"name":"release-openshift-origin-installer-e2e-aws-upgrade-rollback-4.7-to-4.8"}
     },
-    "upgrade-aws-rollback":{
+    "upgrade-rollback":{
       "interval":"24h",
       "upgrade":true,
       "prowJob":{"name":"release-openshift-origin-installer-e2e-aws-upgrade-rollback-4.8"}
+    },
+    "upgrade-aws-ovn-minor":{
+      "interval":"2h",
+      "upgrade":true,
+      "upgradeFrom": "PreviousMinor",
+      "prowJob":{"name":"release-openshift-origin-installer-e2e-aws-ovn-upgrade-4.7-stable-to-4.8-ci"}
     },
     "upgrade-azure":{
       "interval":"6h",
@@ -83,14 +97,26 @@
       "upgradeFrom": "PreviousMinor",
       "prowJob":{"name":"release-openshift-origin-installer-e2e-gcp-upgrade-4.7-stable-to-4.8-ci"}
     },
+    "upgrade-gcp-ovn-minor":{
+      "interval":"6h",
+      "upgrade":true,
+      "upgradeFrom": "PreviousMinor",
+      "prowJob":{"name":"release-openshift-origin-installer-e2e-gcp-ovn-upgrade-4.7-stable-to-4.8-ci"}
+    },
     "upgrade-azure-minor":{
       "interval":"6h",
       "upgrade":true,
       "upgradeFrom": "PreviousMinor",
       "prowJob":{"name":"release-openshift-origin-installer-e2e-azure-upgrade-4.7-stable-to-4.8-ci"}
     },
+    "upgrade-azure-ovn-minor":{
+      "interval":"6h",
+      "upgrade":true,
+      "upgradeFrom": "PreviousMinor",
+      "prowJob":{"name":"release-openshift-origin-installer-e2e-azure-ovn-upgrade-4.7-stable-to-4.8-ci"}
+    },
     "upgrade-ovirt-minor":{
-      "cron":"0 0,13 * * *",
+      "cron":"0 3,16,22 * * *",
       "upgrade":true,
       "upgradeFrom": "PreviousMinor",
       "prowJob":{"name":"release-openshift-ocp-installer-e2e-ovirt-upgrade-4.7-stable-to-4.8-ci"}
