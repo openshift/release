@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-export LOKI_VERSION="1.6.1"
+export LOKI_VERSION="2.1.0"
 
 cat >> "${SHARED_DIR}/manifest_loki-ns.yml" << EOF
 apiVersion: v1
