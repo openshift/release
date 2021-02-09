@@ -60,6 +60,48 @@ periodics:
       secret:
         secretName: github-credentials-openshift-bot
 - agent: kubernetes
+  cluster: app.ci
+  cron: '@yearly'
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-rotate-serviceaccount-secrets
+  spec:
+    containers:
+    - args:
+      - --namespace=ci
+      - --dry-run=true
+      command:
+      - /usr/bin/serviceaccount-secret-rotation-trigger
+      env:
+      - name: KUBECONFIG
+        value: /etc/build-farm-credentials/sa.config-updater.api.ci.config:/etc/build-farm-credentials/sa.config-updater.app.ci.config:/etc/build-farm-credentials/sa.config-updater.build01.config:/etc/build-farm-credentials/sa.config-updater.build02.config:/etc/build-farm-credentials/sa.config-updater.vsphere.config
+      image: serviceaccount-secret-rotation-trigger:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/build-farm-credentials
+        name: build-farm-credentials
+        readOnly: true
+    volumes:
+    - name: build-farm-credentials
+      secret:
+        items:
+        - key: sa.config-updater.api.ci.config
+          path: sa.config-updater.api.ci.config
+        - key: sa.config-updater.app.ci.config
+          path: sa.config-updater.app.ci.config
+        - key: sa.config-updater.build01.config
+          path: sa.config-updater.build01.config
+        - key: sa.config-updater.build02.config
+          path: sa.config-updater.build02.config
+        - key: sa.config-updater.vsphere.config
+          path: sa.config-updater.vsphere.config
+        secretName: build-farm-credentials
+- agent: kubernetes
   cluster: api.ci
   cron: 0 1 * * *
   decorate: true
