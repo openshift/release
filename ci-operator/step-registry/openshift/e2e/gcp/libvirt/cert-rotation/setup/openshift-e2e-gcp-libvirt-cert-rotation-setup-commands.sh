@@ -49,6 +49,7 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJE
   packer@"${INSTANCE_PREFIX}" \
   --command 'sudo mv /home/packer/openshift-install /usr/local/bin/openshift-install'
 
+# The file 'create-cluster-mirrored-registry' source is in ../conf/openshift-e2e-gcp-libvirt-cert-rotation-conf-commands.sh
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   packer@"${INSTANCE_PREFIX}" \
