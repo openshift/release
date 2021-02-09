@@ -3,9 +3,9 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-# Every AWS cluster should have a PV for prometheus data so that data is preserved across
-# reschedules of pods. This may need to be conditionally disabled in the future if certain
-# instance types are used that cannot access persistent volumes.
+# Every cluster that can should have a PV for prometheus data so that data is preserved
+# across reschedules of pods. This may need to be conditionally disabled in the future
+# if certain instance types are used that cannot access persistent volumes.
 cat >> "${SHARED_DIR}/manifest_cluster-monitoring-pvc.yml" << EOF
 kind: ConfigMap
 apiVersion: v1
