@@ -8,6 +8,7 @@ pushd /tmp
 curl -sSL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz | tar xz
 export HOME=/tmp
 export PATH=${PATH}:/tmp
+export METADATA_COLLECTION=false
 export JOB_TIMEOUT=${JOB_TIMEOUT:-1800}
 export REMOTE_CONFIG=https://raw.githubusercontent.com/cloud-bulldozer/cluster-perf-ci/master/configmap-scale.yml
 export REMOTE_METRIC_PROFILE=https://raw.githubusercontent.com/cloud-bulldozer/cluster-perf-ci/master/metric-profiles/etcdapi.yml
