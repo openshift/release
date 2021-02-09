@@ -265,7 +265,7 @@ mixins:
 .PHONY: mixins
 
 # Runs e2e secrets generation and sync to clusters.
-#	
+#
 # Example:
 # First execute the following
 # echo -n "bw_password" > /tmp/bw_password
@@ -274,6 +274,8 @@ secrets:
 	hack/secrets.sh $(kerberos_id) $(kubeconfig_path) $(bw_password_path)
 .PHONY: secrets
 
+serviceaccount-secret-rotation:
+	make job JOB=periodic-rotate-serviceaccount-secrets
 
 ci-secret-bootstrap-config:
 	hack/generate-pull-secret-entries.py core-services/ci-secret-bootstrap/_config.yaml
