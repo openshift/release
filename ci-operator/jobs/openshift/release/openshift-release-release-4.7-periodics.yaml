@@ -27,6 +27,7 @@ periodics:
       - |
         #!/bin/bash
         set -euo pipefail
+        set -x
 
         # prow doesn't allow init containers or a second container
         export PATH=$PATH:/tmp/bin
@@ -34,11 +35,9 @@ periodics:
         curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.6/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
         chmod ug+x /tmp/bin/oc
 
-        # if the source and destination are identical, do nothing
-        export KUBECONFIG=/etc/apici/kubeconfig
+        # if the source and destination are identical on the prow cluster, do nothing
         from=$( oc get istag -n "${TAG_NS}" "${TAG_SOURCE}" -o template='{{ .image.metadata.name }}' )
         to=$( oc get istag --ignore-not-found -n ocp "${BRANCH}:${TAG}" -o template='{{ .image.metadata.name }}' )
-        unset KUBECONFIG
         if [[ "${from}" == "${to}" ]]; then
           echo "info: ${TAG_NS}/${TAG_SOURCE} matches ocp/${BRANCH}:${TAG}"
           exit 0
@@ -51,6 +50,11 @@ periodics:
           echo "error: The source image has not been pushed to quay ${from}"
           exit 1
         fi
+
+        # ensure the target cluster has the correct referenced image
+        KUBECONFIG=/etc/apici/kubeconfig oc tag --source=docker "registry.ci.openshift.org/${TAG_NS}/${TAG}:${BRANCH}" "${TAG_NS}/${TAG}:${BRANCH}"
+
+        echo ${UNRESOLVED_CONFIG}
 
         # verify the tests pass
         ci-operator $@
@@ -66,7 +70,7 @@ periodics:
       - name: BRANCH
         value: "4.7"
       - name: TAG_SOURCE
-        value: machine-os-content:$(BRANCH)
+        value: $(TAG):$(BRANCH)
       - name: UNRESOLVED_CONFIG
         value: |
           tag_specification:
@@ -83,10 +87,10 @@ periodics:
               namespace: openshift
               tag: golang-1.12
           base_images:
-            $(TAG):
-              name: $(TAG)
-              namespace: rhcos
-              tag: "4.7"
+            "$(TAG)":
+              name: "$(TAG)"
+              namespace: "$(TAG_NS)"
+              tag: "$(BRANCH)"
           raw_steps:
           - output_image_tag_step:
               from: $(TAG)
