@@ -28,9 +28,33 @@ tests:
   steps:
     cluster_profile: aws
     test:
-    - as: nightly
+    - as: presubmit-operatorhub
       cli: latest
       commands: run gpu-ci
+      credentials:
+      - mount_path: /var/run/psap-entitlement-secret
+        name: psap-entitlement-secret
+        namespace: test-credentials
+      from: ci-artifacts
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+    - as: presubmit-operatorhub-cleanup
+      cli: latest
+      commands: run gpu-ci-undeploy
+      credentials:
+      - mount_path: /var/run/psap-entitlement-secret
+        name: psap-entitlement-secret
+        namespace: test-credentials
+      from: ci-artifacts
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+    - as: presubmit-master
+      cli: latest
+      commands: run gpu-commit-ci
       credentials:
       - mount_path: /var/run/psap-entitlement-secret
         name: psap-entitlement-secret
