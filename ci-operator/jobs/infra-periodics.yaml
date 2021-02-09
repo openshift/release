@@ -448,6 +448,9 @@ periodics:
   - base_ref: master
     org: openshift
     repo: release
+  - base_ref: openshift-4.8
+    org: openshift
+    repo: ocp-build-data
   labels:
     ci.openshift.io/role: infra
   name: periodic-prow-auto-config-brancher
@@ -1440,50 +1443,6 @@ periodics:
         secretName: build-farm-credentials
     - emptyDir: {}
       name: config-volume
-- agent: kubernetes
-  cluster: app.ci
-  cron: '@hourly'
-  decorate: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: release
-  - base_ref: openshift-4.8
-    org: openshift
-    repo: ocp-build-data
-  labels:
-    ci.openshift.io/role: infra
-  name: periodic-prow-auto-registry-replacer
-  spec:
-    containers:
-    - args:
-      - --github-token-path=/etc/github/oauth
-      - --github-endpoint=http://ghproxy
-      - --config-dir=./ci-operator/config
-      - --create-pr=true
-      - --self-approve=true
-      - --prune-unused-replacements=true
-      - --prune-ocp-builder-replacements=false
-      - --ensure-correct-promotion-dockerfile=true
-      - --current-release-minor=8
-      - --ensure-correct-promotion-dockerfile-ignored-repos=openshift/origin-aggregated-logging
-      - --ensure-correct-promotion-dockerfile-ignored-repos=openshift/console
-      command:
-      - /usr/bin/registry-replacer
-      image: registry.ci.openshift.org/ci/registry-replacer:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /etc/github
-        name: token
-        readOnly: true
-    volumes:
-    - name: token
-      secret:
-        secretName: github-credentials-openshift-bot
 - agent: kubernetes
   cluster: api.ci
   cron: '@yearly'
