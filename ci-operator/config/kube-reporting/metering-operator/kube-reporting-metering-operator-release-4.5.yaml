@@ -59,14 +59,14 @@ tests:
   as: metering-e2e-aws
   steps:
     cluster_profile: aws
+    env:
+      COMPUTE_NODE_TYPE: m5.xlarge
     test:
     - as: e2e
       cli: latest
       commands: |
         set -x
 
-        # Increase the size of the machines so that there are machines large enough to run Presto, and the full metering stack.
-        kubectl -n openshift-machine-api get machinesets --no-headers | awk '{ print $1 }' | xargs -I{} kubectl -n openshift-machine-api patch machineset {} --type json -p '[{"op": "replace", "path": "/spec/template/spec/providerSpec/value/instanceType", "value": "m5.xlarge"}]'
         kubectl -n openshift-machine-api get machinesets -o name | grep worker | cut -d/ -f2 | xargs -I{} kubectl -n openshift-machine-api scale machineset {} --replicas 4
 
         TEST_OUTPUT_PATH=${ARTIFACT_DIR}/e2e EXTRA_TEST_FLAGS="-run TestManualMeteringInstall" make e2e
