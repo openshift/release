@@ -1,0 +1,175 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: vault
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: cert-issuer
+    route.openshift.io/termination: passthrough
+  name: vault
+  namespace: vault
+spec:
+  tls:
+    - secretName: vault-tls
+      hosts:
+        - vault.ci.openshift.org
+  rules:
+  - host: vault.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: vault
+            port:
+              number: 8200
+        pathType: ImplementationSpecific
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: vault
+  namespace: vault
+spec:
+  lookupPolicy:
+    local: true
+  tags:
+  - name: 1.6.2
+    from:
+      kind: DockerImage
+      # Mirror of docker.io/library/vault:1.6.2 because the cluster hit the ratelimit for that
+      name: quay.io/alvaroaleman/vault:1.6.2
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: vault
+  name: vault
+  namespace: vault
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: vault
+  template:
+    metadata:
+      labels:
+        app: vault
+      annotations:
+        config.hcl: |
+          api_addr = "https://vault.ci.openshift.org"
+          listener "tcp" {
+            address       = "0.0.0.0:8200"
+            # TODO: Sidecar that sends sighub if they change so vault reloads, otherwise
+            # triage will have some fun in three months
+            tls_cert_file = "/var/run/serving-cert/tls.crt"
+            tls_key_file  = "/var/run/serving-cert/tls.key"
+          }
+
+          storage "gcs" {
+            bucket        = "vault-ci-openshift"
+            ha_enabled    = "true"
+          }
+          disable_mlock = "true"
+          ui = "true"
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - vault
+              topologyKey: "kubernetes.io/hostname"
+      containers:
+      - image: vault:1.6.2
+        name: unsealer
+        command:
+        - /bin/sh
+        - -c
+        - |-
+          set -u
+          export VAULT_ADDR=https://127.0.0.1:8200
+          # Cert is only valid for https://vault.ci.openshift.org, not 127.0.0.1
+          export VAULT_SKIP_VERIFY=true
+          until vault status 2>&1 >/dev/null; do
+            vault operator unseal $UNSEAL_KEY
+          done
+          echo "$(date --rfc-2822): Successfully unsealed, starting to sleep"
+          sleep 365d
+        env:
+        - name: UNSEAL_KEY
+          valueFrom:
+            secretKeyRef:
+              name: vault-unseal
+              key: unseal
+      - image: vault:1.6.2
+        name: vault
+        args:
+        - server
+        - -config
+        - /etc/vault/cfg/config.hcl
+        readinessProbe:
+          httpGet:
+            path: /v1/sys/health
+            port: 8200
+            scheme: HTTPS
+        ports:
+        - name: https
+          containerPort: 8200
+        env:
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: /var/run/gcs-key/vault-sa-key.json
+        - name: SKIP_SETCAP
+          value: "true"
+        volumeMounts:
+        - name: config
+          mountPath: /etc/vault/cfg
+        - name: serving-cert
+          mountPath: /var/run/serving-cert
+        - name: gcs-key
+          mountPath: /var/run/gcs-key
+      volumes:
+      - name: serving-cert
+        secret:
+          secretName: vault-tls
+      - name: gcs-key
+        secret:
+          secretName: vault-gcs
+      - name: config
+        downwardAPI:
+          items:
+          - path: config.hcl
+            fieldRef:
+              fieldPath: metadata.annotations['config.hcl']
+---
+apiVersion: policy/v1beta1
+kind: PodDisruptionBudget
+metadata:
+  name: vault
+  namespace: vault
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: vault
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vault
+  namespace: vault
+spec:
+  ports:
+  - name: vault
+    port: 8200
+    protocol: TCP
+  selector:
+    app: vault
