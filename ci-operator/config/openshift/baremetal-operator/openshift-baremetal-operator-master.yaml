@@ -58,16 +58,14 @@ tests:
     set -o pipefail
     echo "Fetching cbo bmh crd"
     curl -s https://raw.githubusercontent.com/openshift/cluster-baremetal-operator/master/manifests/0000_31_cluster-baremetal-operator_03_baremetalhost.crd.yaml -o cbo-bmh.yaml
-    cat cbo-bmh.yaml
     echo "Converting cbo bmh crd yaml to json"
+    jq --version
+    yq --version
     yq eval -j cbo-bmh.yaml > cbo-bmh.json
-    cat cbo-bmh.json
     echo "Fetching bmo bmh crd"
     curl -s https://raw.githubusercontent.com/openshift/baremetal-operator/master/config/crd/bases/metal3.io_baremetalhosts.yaml -o bmo-bmh.yaml
-    cat bmo-bmh.yaml
     echo "Converting bmo bmh crd yaml to json"
     yq eval -j bmo-bmh.yaml > bmo-bmh.json
-    cat bmo-bmh.json
     echo "Checking diff"
     res=$(diff <(jq -S . bmo-bmh.json) <(jq -S . cbo-bmh.json))
     if [ "$res" != "" ]; then
