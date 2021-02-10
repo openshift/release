@@ -23,7 +23,7 @@ ERROR: This check enforces that configuration YAML files will be uploaded automa
 ERROR: as they change. You are adding a file that is not covered by the automatic upload.
 ERROR: See the following page for more details:
 
-https://steps.ci.openshift.org/release#sharding
+https://docs.ci.openshift.org/docs/how-tos/contributing-openshift-release/#ci-operator-configuration-sharding
 
 ERROR: The following errors were found:
 
