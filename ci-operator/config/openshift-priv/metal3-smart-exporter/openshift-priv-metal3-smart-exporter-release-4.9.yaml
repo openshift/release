@@ -1,0 +1,38 @@
+base_images:
+  base:
+    name: 4.9-priv
+    namespace: ocp-private
+    tag: base
+  openshift_release_golang-1.10:
+    name: release
+    namespace: openshift
+    tag: golang-1.10
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.12
+canonical_go_repository: github.com/openshift/metal3-smart-exporter
+images:
+- dockerfile_path: Dockerfile.ocp
+  from: base
+  inputs:
+    openshift_release_golang-1.10:
+      as:
+      - registry.svc.ci.openshift.org/openshift/release:golang-1.10
+  to: metal3-smart-exporter
+promotion:
+  name: 4.9-priv
+  namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: 4.9-priv
+  namespace: ocp-private
+zz_generated_metadata:
+  branch: release-4.9
+  org: openshift-priv
+  repo: metal3-smart-exporter
