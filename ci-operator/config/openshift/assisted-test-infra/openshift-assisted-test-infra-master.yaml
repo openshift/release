@@ -1,4 +1,8 @@
 base_images:
+  assisted_service:
+    name: assisted
+    namespace: ocp-kni
+    tag: assisted-service
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -11,6 +15,10 @@ build_root:
 images:
 - dockerfile_path: Dockerfile.test-infra
   from: src
+  inputs:
+    assisted_service:
+      as:
+      - quay.io/ocpmetal/assisted-service:latest
   to: assisted-test-infra
 promotion:
   name: assisted-test
@@ -63,6 +71,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
+        ISO_IMAGE_TYPE=minimal-iso
         OPENSHIFT_INSTALL_RELEASE_IMAGE=registry.svc.ci.openshift.org/sno-dev/openshift-bip:0.2.0
     workflow: baremetalds-assisted-install
 - artifact_dir: /tmp/artifacts
@@ -79,6 +88,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
+        ISO_IMAGE_TYPE=minimal-iso
         OPENSHIFT_INSTALL_RELEASE_IMAGE=registry.svc.ci.openshift.org/sno-dev/openshift-bip:0.2.0
     workflow: baremetalds-assisted
 - artifact_dir: /tmp/artifacts

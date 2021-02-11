@@ -46,7 +46,6 @@ CONFIG = {
     'aws-cpaas-quota-slice': {
         'us-east-1': 8,
         'us-east-2': 8,
-        'us-west-1': 8,
         'us-west-2': 8
     }
 }
