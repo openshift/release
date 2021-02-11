@@ -131,3 +131,30 @@ path "secret/personal/metadata/{{identity.entity.aliases.${OIDC_ACCESSOR_ID}.nam
   capabilities = ["list"]
 }
 EOH
+
+# Make dptp members admins
+echo "Setting up admin policy"
+vault policy write admin -<<EOF
+path "*" { capabilities = ["create", "read", "update", "delete", "list", "sudo"] }
+EOF
+
+# Vault auth plugins are an abstration above the real identity and create an alias. Getting from
+# that alias back to the identity id which is the thing we need to set up a group is non-trivial.
+echo "Finding ids for dptp members"
+dptp_member_aliases='[
+  "skuznets",
+  "aaleman",
+  "hongkliu",
+  "bbarcaro",
+  "apavel",
+  "nmoraiti",
+  "pmuller"
+ ]'
+dptp_ids="$(curl -Ss --fail -H "X-vault-token: ${VAULT_TOKEN}" "$VAULT_ADDR/v1/identity/entity/id?list=true" \
+            |jq \
+                --argjson dptp_members "$dptp_member_aliases" \
+                '[.data.key_info|to_entries[]|select([.value.aliases[0].name] | inside($dptp_members))|.key]|@csv' -rc \
+            |tr -d '"')"
+
+echo "Setting up group for dptp"
+vault write identity/group name="dptp" policies="admin" member_entity_ids="$dptp_ids"
