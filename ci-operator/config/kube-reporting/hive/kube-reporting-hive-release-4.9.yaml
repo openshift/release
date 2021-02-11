@@ -1,0 +1,53 @@
+base_images:
+  metering-hadoop:
+    name: "4.9"
+    namespace: ocp
+    tag: metering-hadoop
+  ocp_builder_rhel-8-base-openshift:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-base-openshift
+  ocp_builder_rhel-8-base-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-base-openshift-4.6
+  ocp_builder_rhel-8-base-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-base-openshift-4.7
+  ocp_builder_rhel-8-base-openshift-4.8:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-base-openshift-4.8
+  openshift_release_rhel-8-release-openshift-4.6:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-openshift-4.6
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- dockerfile_path: Dockerfile.rhel8
+  from: metering-hadoop
+  inputs:
+    ocp_builder_rhel-8-base-openshift-4.8:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-base-openshift-4.8
+  to: metering-hive
+promotion:
+  name: "4.9"
+  namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.9"
+  namespace: ocp
+zz_generated_metadata:
+  branch: release-4.9
+  org: kube-reporting
+  repo: hive
