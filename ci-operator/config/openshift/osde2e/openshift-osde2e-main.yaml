@@ -2,7 +2,13 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: golang-1.14
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.7"
 resources:
   '*':
     requests:
@@ -21,6 +27,80 @@ tests:
     ci/prow_pr_check.sh
   container:
     from: src
+- artifact_dir: /tmp/artifacts
+  as: ocm-prod-cluster-adoption
+  cron: '@daily'
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        set -o pipefail
+
+        ci/prow-ocm-adoption.sh
+      credentials:
+      - mount_path: /usr/local/osde2e-credentials
+        name: osde2e-credentials
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- artifact_dir: /tmp/artifacts
+  as: ocm-stage-cluster-adoption
+  cron: '@daily'
+  steps:
+    cluster_profile: aws
+    test:
+    - as: ipi-conf
+      commands: ipi-conf-commands.sh
+      credentials:
+      - mount_path: /usr/local/ocm-stage-cluster-adoption-cluster-profile
+        name: cluster-profile
+        namespace: test-credentials
+      from_image:
+        name: centos
+        namespace: origin
+        tag: "8"
+      resources:
+        requests:
+          cpu: 10m
+          memory: 100Mi
+    - as: ipi-install-install
+      commands: ipi-install-install-commands.sh
+      credentials:
+      - mount_path: /usr/local/ocm-stage-cluster-adoption-cluster-profile
+        name: cluster-profile
+        namespace: test-credentials
+      dependencies:
+      - env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+        name: release:latest
+      - env: RELEASE_IMAGE_LATEST
+        name: release:latest
+      from: installer
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 2Gi
+    - as: test
+      cli: latest
+      commands: |
+        set -o pipefail
+
+        export OCM_URL="https://api.stage.openshift.com"
+
+        ci/prow-ocm-adoption.sh
+      credentials:
+      - mount_path: /usr/local/osde2e-credentials
+        name: osde2e-credentials
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: openshift
