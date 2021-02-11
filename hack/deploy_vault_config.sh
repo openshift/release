@@ -5,8 +5,10 @@ set -euo pipefail
 export VAULT_ADDR=https://vault.ci.openshift.org
 
 [[ -z ${VAULT_TOKEN:-} ]] && echo '$VAULT_TOKEN is undefined' && exit 1
-[[ -z ${VAULT_OIDC_CLIENT_ID:-} ]] && echo '$VAULT_OIDC_CLIENT_ID is undefiend' && exit 1
-[[ -z ${VAULT_OIDC_CLIENT_SECRET:-} ]] && echo '$VAULT_OIDC_CLIENT_SECRET is undefiend' && exit 1
+
+RAW_VAULT_OIDC_VALUES="$(kubectl --context=app.ci get secret -n dex vault-secret -o json)"
+VAULT_OIDC_CLIENT_ID="$(echo $RAW_VAULT_OIDC_VALUES|jq '.data["vault-id"]' -r|base64 -d)"
+VAULT_OIDC_CLIENT_SECRET="$(echo $RAW_VAULT_OIDC_VALUES|jq '.data["vault-secret"]' -r|base64 -d)"
 
 
 # Enable kv backend
@@ -27,6 +29,8 @@ EOH
 echo "Configuring OIDC role"
 vault write auth/oidc/role/oidc_default_role \
   allowed_redirect_uris="https://vault.ci.openshift.org/ui/vault/auth/oidc/oidc/callback,http://localhost:8250/oidc/callback" \
+  token_ttl=600 \
+  token_max_ttl=600 \
   oidc_scopes="profile" \
   user_claim="preferred_username"
 
@@ -131,3 +135,30 @@ path "secret/personal/metadata/{{identity.entity.aliases.${OIDC_ACCESSOR_ID}.nam
   capabilities = ["list"]
 }
 EOH
+
+# Make dptp members admins
+echo "Setting up admin policy"
+vault policy write admin -<<EOF
+path "*" { capabilities = ["create", "read", "update", "delete", "list", "sudo"] }
+EOF
+
+# Vault auth plugins are an abstration above the real identity and create an alias. Getting from
+# that alias back to the identity id which is the thing we need to set up a group is non-trivial.
+echo "Finding ids for dptp members"
+dptp_member_aliases='[
+  "skuznets",
+  "aaleman",
+  "hongkliu",
+  "bbarcaro",
+  "apavel",
+  "nmoraiti",
+  "pmuller"
+ ]'
+dptp_ids="$(curl -Ss --fail -H "X-vault-token: ${VAULT_TOKEN}" "$VAULT_ADDR/v1/identity/entity/id?list=true" \
+            |jq \
+                --argjson dptp_members "$dptp_member_aliases" \
+                '[.data.key_info|to_entries[]|select([.value.aliases[0].name] | inside($dptp_members))|.key]|@csv' -rc \
+            |tr -d '"')"
+
+echo "Setting up group for dptp"
+vault write identity/group name="dptp" policies="admin" member_entity_ids="$dptp_ids"
