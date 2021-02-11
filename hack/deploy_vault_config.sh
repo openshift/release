@@ -29,6 +29,8 @@ EOH
 echo "Configuring OIDC role"
 vault write auth/oidc/role/oidc_default_role \
   allowed_redirect_uris="https://vault.ci.openshift.org/ui/vault/auth/oidc/oidc/callback,http://localhost:8250/oidc/callback" \
+  token_ttl=600 \
+  token_max_ttl=600 \
   oidc_scopes="profile" \
   user_claim="preferred_username"
 
