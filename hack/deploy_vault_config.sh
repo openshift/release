@@ -5,8 +5,10 @@ set -euo pipefail
 export VAULT_ADDR=https://vault.ci.openshift.org
 
 [[ -z ${VAULT_TOKEN:-} ]] && echo '$VAULT_TOKEN is undefined' && exit 1
-[[ -z ${VAULT_OIDC_CLIENT_ID:-} ]] && echo '$VAULT_OIDC_CLIENT_ID is undefiend' && exit 1
-[[ -z ${VAULT_OIDC_CLIENT_SECRET:-} ]] && echo '$VAULT_OIDC_CLIENT_SECRET is undefiend' && exit 1
+
+RAW_VAULT_OIDC_VALUES="$(kubectl --context=app.ci get secret -n dex vault-secret -o json)"
+VAULT_OIDC_CLIENT_ID="$(echo $RAW_VAULT_OIDC_VALUES|jq '.data["vault-id"]' -r|base64 -d)"
+VAULT_OIDC_CLIENT_SECRET="$(echo $RAW_VAULT_OIDC_VALUES|jq '.data["vault-secret"]' -r|base64 -d)"
 
 
 # Enable kv backend
