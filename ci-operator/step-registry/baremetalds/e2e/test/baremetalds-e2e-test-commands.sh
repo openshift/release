@@ -19,7 +19,7 @@ trap collect_artifacts EXIT
 
 # Copy test binaries on packet server
 echo "### Copying test binaries"
-scp "${SSHOPTS[@]}" origin/openshift-tests /usr/bin/kubectl "root@${IP}:/usr/local/bin"
+scp "${SSHOPTS[@]}" /usr/bin/openshift-tests /usr/bin/kubectl "root@${IP}:/usr/local/bin"
 
 # Tests execution
 set +e
