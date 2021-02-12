@@ -296,6 +296,9 @@ echo "$(date -u --rfc-3339=seconds) - Uploading the bootstrap.ign to a new bucke
 gsutil mb "gs://${INFRA_ID}-bootstrap-ignition"
 gsutil cp bootstrap.ign "gs://${INFRA_ID}-bootstrap-ignition/"
 
+easy_install --user 'pip<21'
+pip install --user pyopenssl
+
 BOOTSTRAP_IGN="$(gsutil signurl -d 1h service-account-key.json "gs://${INFRA_ID}-bootstrap-ignition/bootstrap.ign" | grep "^gs:" | awk '{print $5}')"
 
 ## Launch temporary bootstrap resources
