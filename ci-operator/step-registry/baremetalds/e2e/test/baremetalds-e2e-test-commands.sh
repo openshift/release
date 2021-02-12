@@ -24,6 +24,20 @@ scp "${SSHOPTS[@]}" /usr/bin/openshift-tests /usr/bin/kubectl "root@${IP}:/usr/l
 # Tests execution
 set +e
 
+# Run tests in disconnected mode
+echo "### Mirroring test images"
+
+# shellcheck disable=SC2046
+read -d '' DEVSCRIPTS_REGISTRY DEVSCRIPTS_WORKING_DIR <<<$(ssh "${SSHOPTS[@]}" "root@${IP}" "source /root/dev-scripts/common.sh; echo \$LOCAL_REGISTRY_DNS_NAME:\$LOCAL_REGISTRY_PORT; echo \$WORKING_DIR")
+DEVSCRIPTS_TEST_IMAGE_REPO=${DEVSCRIPTS_REGISTRY}/localimages/local-test-image
+
+# shellcheck disable=SC2087
+ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
+set -xeuo pipefail
+openshift-tests images --to-repository ${DEVSCRIPTS_TEST_IMAGE_REPO} > /tmp/mirror
+oc image mirror -f /tmp/mirror --registry-config ${DEVSCRIPTS_WORKING_DIR}/pull_secret.json
+EOF
+
 # Test upgrade for workflows that requested it
 if [[ "$RUN_UPGRADE_TEST" == true ]]; then
     echo "### Running Upgrade tests"
@@ -52,9 +66,9 @@ else
             "root@${IP}" \
             openshift-tests \
             run \
-            "openshift/conformance/parallel" \
-            --dry-run \
-            \| grep -Ff /tmp/test-list \|openshift-tests run -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit -f -
+            "openshift/conformance/serial" \
+            --from-repository ${DEVSCRIPTS_TEST_IMAGE_REPO} \
+            -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit
     else
         echo "### Running tests"
         ssh \
