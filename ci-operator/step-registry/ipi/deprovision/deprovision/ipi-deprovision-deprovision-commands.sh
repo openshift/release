@@ -19,6 +19,15 @@ if [[ ! -s "${SHARED_DIR}/metadata.json" ]]; then
 fi
 
 cp -ar "${SHARED_DIR}" /tmp/installer
+
+# TODO: remove once BZ#1926093 is done and backported
+if [[ "${CLUSTER_TYPE}" == "ovirt" ]]; then
+  echo "Destroy bootstrap ..."
+  set +e
+  openshift-install --dir /tmp/installer destroy bootstrap
+  set -e
+fi
+
 openshift-install --dir /tmp/installer destroy cluster &
 
 set +e
