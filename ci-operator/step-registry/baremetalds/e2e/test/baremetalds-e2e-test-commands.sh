@@ -17,13 +17,6 @@ collect_artifacts() {
 }
 trap collect_artifacts EXIT
 
-git clone https://github.com/openshift/origin.git
-cd origin
-
-make WHAT=cmd/openshift-tests
-
-cd ..
-
 # Copy test binaries on packet server
 echo "### Copying test binaries"
 scp "${SSHOPTS[@]}" origin/openshift-tests /usr/bin/kubectl "root@${IP}:/usr/local/bin"
