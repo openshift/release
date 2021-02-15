@@ -36,24 +36,6 @@ source /root/config
 sosreport --ticket-number "\${HOSTNAME}" --batch -o container_log,filesys,kvm,libvirt,logs,networkmanager,podman,processor,rpm,sar,virsh,yum --tmp-dir /tmp/artifacts
 
 # Get assisted logs
-NAMESPACE="assisted-installer"
-
-if [ "\${DEPLOY_TARGET:-}" = "onprem" ]; then
-  podman ps -a || true
-
-  for service in "installer" "db"; do
-    podman logs \${service}  > /tmp/artifacts/onprem_\${service}.log || true
-  done
-
-  make download_all_logs LOGS_DEST=/tmp/artifacts REMOTE_SERVICE_URL=http://localhost:8090
-else
-  KUBECONFIG=\${HOME}/.kube/config kubectl get pods -n \${NAMESPACE} || true
-
-  for service in "assisted-service" "postgres" "scality" "createimage"; do
-    KUBECONFIG=\${HOME}/.kube/config kubectl get pods -o=custom-columns=NAME:.metadata.name -A | grep \${service} | xargs -r -I {} sh -c "KUBECONFIG=\${HOME}/.kube/config kubectl logs {} -n \${NAMESPACE} > /tmp/artifacts/k8s_{}.log" || true
-  done
-
-  make download_all_logs LOGS_DEST=/tmp/artifacts REMOTE_SERVICE_URL=\$(KUBECONFIG=\${HOME}/.kube/config minikube service assisted-service -n \${NAMESPACE} --url)
-fi
+make download_logs LOGS_DEST=/tmp/artifacts ADDITIONAL_PARAMS="--download-all --must-gather" KUBECTL="kubectl --kubeconfig=\${HOME}/.kube/config"
 
 EOF
