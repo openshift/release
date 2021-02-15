@@ -11,8 +11,6 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/pull-secret
       - --secret-dir=/usr/local/e2e-aws-cluster-profile
       - --target=e2e-aws
@@ -22,6 +20,7 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - /bin/bash
       - -c
@@ -121,17 +120,17 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-aws-cluster-profile
         name: cluster-profile
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /etc/pull-secret
         name: pull-secret
         readOnly: true
       - mountPath: /etc/push-secret
         name: push-secret
         readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -143,8 +142,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -552,13 +551,12 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/pull-secret
       - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - /bin/bash
       - -c
@@ -644,14 +642,14 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
         name: cluster-profile
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -663,8 +661,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -5048,8 +5046,6 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/pull-secret
       - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
@@ -5057,6 +5053,7 @@ periodics:
       - --input-hash=$(JOB_NAME)
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - /bin/bash
       - -c
@@ -5139,14 +5136,14 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
         name: cluster-profile
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -5158,8 +5155,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
