@@ -16,13 +16,13 @@ periodics:
     containers:
     - args:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-password-file=/etc/boskos/password
       - --report-password-file=/etc/report/password.txt
       - --report-username=ci
       - --secret-dir=/usr/local/cnf-e2e-gcp-periodic-cluster-profile
       - --target=cnf-e2e-gcp-periodic
       - --template=/usr/local/cnf-e2e-gcp-periodic
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -46,6 +46,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/cnf-e2e-gcp-periodic-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/cnf-e2e-gcp-periodic
         name: job-definition
         subPath: cluster-launch-installer-src.yaml
@@ -55,16 +58,13 @@ periodics:
       - mountPath: /etc/report
         name: result-aggregator
         readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
