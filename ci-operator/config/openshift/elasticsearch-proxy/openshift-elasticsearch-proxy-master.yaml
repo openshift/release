@@ -30,11 +30,11 @@ images:
   inputs:
     ocp_builder_rhel-8-golang-1.15-openshift-4.7:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
   to: elasticsearch-proxy
 promotion:
-  name: "4.7"
-  namespace: ocp
+  name: "5.1"
+  namespace: logging
 resources:
   '*':
     requests:
@@ -46,7 +46,7 @@ tag_specification:
 tests:
 - artifact_dir: /tmp/artifacts
   as: unit
-  commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=/tmp/artifacts/es-proxy-logs ARTIFACT_DIR=${ARTIFACT_DIR}/es-proxy-artifacts make test
+  commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/es-proxy-logs ARTIFACT_DIR=${ARTIFACT_DIR}/es-proxy-artifacts make test
   container:
     from: src
 - artifact_dir: /tmp/artifacts
@@ -58,7 +58,7 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=/tmp/artifacts/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts make test-e2e-olm
+      commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts make test-e2e-olm E2E_TEST_INCLUDES=logforwarding CLF_TEST_INCLUDES=elasticsearchmanaged
       from: stable:cluster-logging-operator-e2e
       resources:
         requests:
@@ -73,7 +73,7 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=/tmp/artifacts/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts make test-e2e-olm
+      commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts make test-e2e-olm
       from: stable:elasticsearch-operator-src
       resources:
         requests:

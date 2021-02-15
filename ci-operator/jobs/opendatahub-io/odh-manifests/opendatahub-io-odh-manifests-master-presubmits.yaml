@@ -4,17 +4,17 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
-    context: ci/prow/45-images
+    cluster: build01
+    context: ci/prow/46-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: "45"
+      ci-operator.openshift.io/variant: "46"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-opendatahub-io-odh-manifests-master-45-images
-    rerun_command: /test 45-images
+    name: pull-ci-opendatahub-io-odh-manifests-master-46-images
+    rerun_command: /test 46-images
     spec:
       containers:
       - args:
@@ -23,7 +23,7 @@ presubmits:
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --target=[images]
-        - --variant=45
+        - --variant=46
         command:
         - ci-operator
         image: ci-operator:latest
@@ -50,12 +50,12 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )45-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )46-images,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -106,7 +106,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/odh-manifests-e2e
     decorate: true
     decoration_config:
@@ -121,7 +121,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --secret-dir=/usr/local/odh-manifests-e2e-cluster-profile
@@ -154,8 +154,8 @@ presubmits:
       - name: boskos
         secret:
           items:
-          - key: password
-            path: password
+          - key: credentials
+            path: credentials
           secretName: boskos-credentials
       - name: cluster-profile
         projected:

@@ -46,7 +46,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210130-326c8c1f2a
+      image: gcr.io/k8s-prow/commenter:v20210215-f94bc1dc87
       imagePullPolicy: Always
       name: ""
       resources:
@@ -59,6 +59,48 @@ periodics:
     - name: token
       secret:
         secretName: github-credentials-openshift-bot
+- agent: kubernetes
+  cluster: app.ci
+  cron: '@yearly'
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-rotate-serviceaccount-secrets
+  spec:
+    containers:
+    - args:
+      - --namespace=ci
+      - --dry-run=true
+      command:
+      - /usr/bin/serviceaccount-secret-rotation-trigger
+      env:
+      - name: KUBECONFIG
+        value: /etc/build-farm-credentials/sa.config-updater.api.ci.config:/etc/build-farm-credentials/sa.config-updater.app.ci.config:/etc/build-farm-credentials/sa.config-updater.build01.config:/etc/build-farm-credentials/sa.config-updater.build02.config:/etc/build-farm-credentials/sa.config-updater.vsphere.config
+      image: serviceaccount-secret-rotation-trigger:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/build-farm-credentials
+        name: build-farm-credentials
+        readOnly: true
+    volumes:
+    - name: build-farm-credentials
+      secret:
+        items:
+        - key: sa.config-updater.api.ci.config
+          path: sa.config-updater.api.ci.config
+        - key: sa.config-updater.app.ci.config
+          path: sa.config-updater.app.ci.config
+        - key: sa.config-updater.build01.config
+          path: sa.config-updater.build01.config
+        - key: sa.config-updater.build02.config
+          path: sa.config-updater.build02.config
+        - key: sa.config-updater.vsphere.config
+          path: sa.config-updater.vsphere.config
+        secretName: build-farm-credentials
 - agent: kubernetes
   cluster: api.ci
   cron: 0 1 * * *
@@ -90,7 +132,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210130-326c8c1f2a
+      image: gcr.io/k8s-prow/commenter:v20210215-f94bc1dc87
       imagePullPolicy: Always
       name: ""
       resources:
@@ -142,7 +184,7 @@ periodics:
       - --random
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210130-326c8c1f2a
+      image: gcr.io/k8s-prow/commenter:v20210215-f94bc1dc87
       imagePullPolicy: Always
       name: ""
       resources:
@@ -187,7 +229,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210130-326c8c1f2a
+      image: gcr.io/k8s-prow/commenter:v20210215-f94bc1dc87
       imagePullPolicy: Always
       name: ""
       resources:
@@ -236,7 +278,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210130-326c8c1f2a
+      image: gcr.io/k8s-prow/commenter:v20210215-f94bc1dc87
       imagePullPolicy: Always
       name: ""
       resources:
@@ -284,7 +326,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210130-326c8c1f2a
+      image: gcr.io/k8s-prow/commenter:v20210215-f94bc1dc87
       imagePullPolicy: Always
       name: ""
       resources:
@@ -318,7 +360,7 @@ periodics:
       - --debug
       command:
       - /app/label_sync/app.binary
-      image: gcr.io/k8s-prow/label_sync:v20210130-326c8c1f2a
+      image: gcr.io/k8s-prow/label_sync:v20210215-f94bc1dc87
       imagePullPolicy: Always
       name: ""
       resources:
@@ -448,6 +490,9 @@ periodics:
   - base_ref: master
     org: openshift
     repo: release
+  - base_ref: openshift-4.8
+    org: openshift
+    repo: ocp-build-data
   labels:
     ci.openshift.io/role: infra
   name: periodic-prow-auto-config-brancher
@@ -463,8 +508,8 @@ periodics:
       - --git-email=openshift-bot@redhat.com
       - --target-dir=.
       - --config-dir=./ci-operator/config
-      - --current-release=4.7
-      - --future-release=4.8
+      - --current-release=4.8
+      - --future-release=4.9
       - --self-approve=true
       - --assign=ghost
       - --whitelist-file=./core-services/openshift-priv/_whitelist.yaml
@@ -481,6 +526,59 @@ periodics:
         name: token
         readOnly: true
     volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-bot
+- agent: kubernetes
+  cluster: app.ci
+  cron: 30 7 * * 1
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-auto-prow-job-dispatcher
+  spec:
+    containers:
+    - args:
+      - --github-token-path=/etc/github/oauth
+      - --github-endpoint=http://ghproxy
+      - --github-endpoint=https://api.github.com
+      - --github-graphql-endpoint=http://ghproxy/graphql
+      - --github-login=openshift-bot
+      - --git-name=openshift-bot
+      - --git-email=openshift-bot@redhat.com
+      - --target-dir=.
+      - --config-path=./core-services/sanitize-prow-jobs/_config.yaml
+      - --prow-jobs-dir=./ci-operator/jobs
+      - --self-approve=true
+      - --prometheus-username=ci
+      - --prometheus-password-path=/etc/prometheus/password
+      - --create-pr=true
+      command:
+      - /usr/bin/prow-job-dispatcher
+      image: registry.ci.openshift.org/ci/prow-job-dispatcher:latest
+      imagePullPolicy: Always
+      name: auto-config-brancher
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/prometheus
+        name: prometheus
+        readOnly: true
+      - mountPath: /etc/github
+        name: token
+        readOnly: true
+    volumes:
+    - name: prometheus
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: prometheus-auth-credentials
     - name: token
       secret:
         secretName: github-credentials-openshift-bot
@@ -542,6 +640,7 @@ periodics:
       - --ignore-repo=ci-operator/config/opendatahub-io/manifests
       - --ignore-repo=ci-operator/jobs/opendatahub-io/manifests
       - --ignore-org=openshift-priv
+      - --ignore-org=kubernetes-sigs
       command:
       - /usr/bin/autoowners
       image: registry.ci.openshift.org/ci/autoowners:latest
@@ -582,7 +681,7 @@ periodics:
       - --github-graphql-endpoint=http://ghproxy/graphql
       command:
       - /app/prow/cmd/branchprotector/app.binary
-      image: gcr.io/k8s-prow/branchprotector:v20210130-326c8c1f2a
+      image: gcr.io/k8s-prow/branchprotector:v20210215-f94bc1dc87
       imagePullPolicy: Always
       name: ""
       resources:
@@ -629,7 +728,7 @@ periodics:
       - --fix-repos
       command:
       - /app/prow/cmd/peribolos/app.binary
-      image: gcr.io/k8s-prow/peribolos:v20210130-326c8c1f2a
+      image: gcr.io/k8s-prow/peribolos:v20210215-f94bc1dc87
       imagePullPolicy: Always
       name: ""
       resources:
@@ -825,11 +924,6 @@ periodics:
           secretKeyRef:
             key: build01_github_client_id
             name: build-farm-credentials
-      - name: github_client_secret
-        valueFrom:
-          secretKeyRef:
-            key: build01_github_client_secret
-            name: build-farm-credentials
       - name: slack_api_url
         valueFrom:
           secretKeyRef:
@@ -884,11 +978,6 @@ periodics:
           secretKeyRef:
             key: build02_github_client_id
             name: build-farm-credentials
-      - name: github_client_secret
-        valueFrom:
-          secretKeyRef:
-            key: build02_github_client_secret
-            name: build-farm-credentials
       - name: slack_api_url
         valueFrom:
           secretKeyRef:
@@ -932,6 +1021,12 @@ periodics:
       - --kubeconfig=/etc/build-farm-credentials/kubeconfig
       command:
       - applyconfig
+      env:
+      - name: github_client_id
+        valueFrom:
+          secretKeyRef:
+            key: vsphere_github_client_id
+            name: build-farm-credentials
       image: applyconfig:latest
       imagePullPolicy: Always
       name: ""
@@ -999,7 +1094,7 @@ periodics:
       env:
       - name: KUBECONFIG
         value: /etc/build-farm-credentials/api.ci.kubeconfig:/etc/build-farm-credentials/build01.kubeconfig:/etc/build-farm-credentials/app.ci.kubeconfig:/etc/build-farm-credentials/build02.kubeconfig:/etc/build-farm-credentials/vsphere.kubeconfig
-      image: gcr.io/k8s-prow/config-bootstrapper:v20210130-326c8c1f2a
+      image: gcr.io/k8s-prow/config-bootstrapper:v20210215-f94bc1dc87
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1040,8 +1135,8 @@ periodics:
     containers:
     - args:
       - --config-dir=./ci-operator/config/
-      - --current-release=4.7
-      - --future-release=4.8
+      - --current-release=4.8
+      - --future-release=4.9
       - --fast-forward
       - --confirm
       - --username=openshift-merge-robot
@@ -1117,8 +1212,8 @@ periodics:
     containers:
     - args:
       - --config-dir=./ci-operator/config/
-      - --current-release=4.7
-      - --future-release=4.8
+      - --current-release=4.8
+      - --future-release=4.9
       - --confirm
       - --username=openshift-merge-robot
       - --token-path=/etc/github/oauth
@@ -1450,55 +1545,11 @@ periodics:
     - emptyDir: {}
       name: config-volume
 - agent: kubernetes
-  cluster: app.ci
-  cron: '@hourly'
-  decorate: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: release
-  - base_ref: openshift-4.7
-    org: openshift
-    repo: ocp-build-data
-  labels:
-    ci.openshift.io/role: infra
-  name: periodic-prow-auto-registry-replacer
-  spec:
-    containers:
-    - args:
-      - --github-token-path=/etc/github/oauth
-      - --github-endpoint=http://ghproxy
-      - --config-dir=./ci-operator/config
-      - --create-pr=true
-      - --self-approve=true
-      - --prune-unused-replacements=true
-      - --prune-ocp-builder-replacements=false
-      - --ensure-correct-promotion-dockerfile=true
-      - --current-release-minor=7
-      - --ensure-correct-promotion-dockerfile-ignored-repos=openshift/origin-aggregated-logging
-      - --ensure-correct-promotion-dockerfile-ignored-repos=openshift/console
-      command:
-      - /usr/bin/registry-replacer
-      image: registry.ci.openshift.org/ci/registry-replacer:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /etc/github
-        name: token
-        readOnly: true
-    volumes:
-    - name: token
-      secret:
-        secretName: github-credentials-openshift-bot
-- agent: kubernetes
   cluster: api.ci
   cron: '@yearly'
   decorate: true
   extra_refs:
-  - base_ref: openshift-4.7
+  - base_ref: openshift-4.8
     org: openshift
     repo: ocp-build-data
   labels:
@@ -1511,7 +1562,7 @@ periodics:
       - --github-endpoint=http://ghproxy
       - --ocp-build-data-repo-dir=./
       - --create-prs=true
-      - --minor=7
+      - --minor=8
       - --pr-creation-ceiling=1000
       command:
       - /usr/bin/ocp-build-data-enforcer

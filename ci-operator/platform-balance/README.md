@@ -24,5 +24,5 @@ count	platform	status	alternatives	job
 ```
 
 
-[boskos-leases]: https://steps.ci.openshift.org/help/leases
+[boskos-leases]: https://docs.ci.openshift.org/docs/architecture/quota-and-leases/
 [release-10152]: https://github.com/openshift/release/pull/10152

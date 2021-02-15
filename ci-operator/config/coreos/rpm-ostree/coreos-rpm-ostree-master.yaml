@@ -1,4 +1,4 @@
-binary_build_commands: env SKIP_INSTALLDEPS=1 ./ci/build-check.sh
+binary_build_commands: ./ci/build.sh && make install
 build_root:
   image_stream_tag:
     name: cosa-buildroot
@@ -8,13 +8,28 @@ resources:
   '*':
     requests:
       cpu: 1000m
-      memory: 3Gi
+      memory: 1Gi
 tests:
 - artifact_dir: /tmp/artifacts
-  as: sanity
+  as: build
   commands: rpm-ostree --version
   container:
     from: bin
+- artifact_dir: /tmp/artifacts
+  as: unit
+  commands: ./ci/unit.sh
+  container:
+    from: src
+- artifact_dir: /tmp/artifacts
+  as: build-clang
+  commands: ./ci/clang-build-check.sh
+  container:
+    from: src
+- artifact_dir: /tmp/artifacts
+  as: clang-analyzer
+  commands: ./ci/clang-analyzer.sh
+  container:
+    from: src
 zz_generated_metadata:
   branch: master
   org: coreos

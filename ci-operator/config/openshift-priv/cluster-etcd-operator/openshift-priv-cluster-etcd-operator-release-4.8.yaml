@@ -23,6 +23,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.15-openshift-4.7
+  ocp_builder_rhel-8-golang-1.15-openshift-4.8:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.8
   ocp_builder_rhel-8-golang-openshift-4.6:
     name: builder
     namespace: ocp
@@ -42,11 +46,12 @@ images:
 - dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.8:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
   to: cluster-etcd-operator
 promotion:
+  disabled: true
   name: 4.8-priv
   namespace: ocp-private
 resources:
@@ -74,7 +79,7 @@ tests:
 - artifact_dir: /tmp/artifacts
   as: unit
   commands: |
-    make test-unit JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
+    make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
   container:
     from: test-bin
 - artifact_dir: /tmp/artifacts
@@ -88,10 +93,15 @@ tests:
     cluster_profile: aws
     workflow: openshift-upgrade-aws
 - artifact_dir: /tmp/artifacts
-  as: e2e-disruptive
-  commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_SUITE=openshift/conformance/parallel run-tests
+  as: e2e-aws-disruptive
+  commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer:
     cluster_profile: aws
+- artifact_dir: /tmp/artifacts
+  as: e2e-gcp-disruptive
+  commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/conformance/parallel run-tests
+  openshift_installer:
+    cluster_profile: gcp
 - artifact_dir: /tmp/artifacts
   as: e2e-operator
   steps:
@@ -100,7 +110,7 @@ tests:
     - as: test
       cli: latest
       commands: |
-        make test-e2e JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
+        make test-e2e JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
       from: src
       resources:
         requests:
@@ -131,6 +141,16 @@ tests:
   steps:
     cluster_profile: packet
     workflow: baremetalds-assisted
+- artifact_dir: /tmp/artifacts
+  as: e2e-aws-single-node
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-single-node
+- artifact_dir: /tmp/artifacts
+  as: e2e-metal-single-node-live-iso
+  steps:
+    cluster_profile: packet
+    workflow: baremetalds-sno
 zz_generated_metadata:
   branch: release-4.8
   org: openshift-priv

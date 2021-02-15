@@ -7,6 +7,8 @@ set -o pipefail
 export LOKI_VERSION="2.0.0"
 export LOKI_ENDPOINT=https://observatorium.api.stage.openshift.com/api/logs/v1/dptp/loki/api/v1
 
+GRAFANACLOUND_USERNAME=$(cat /var/run/loki-grafanacloud-secret/client-id)
+
 cat >> "${SHARED_DIR}/manifest_01_ns.yml" << EOF
 apiVersion: v1
 kind: Namespace
@@ -69,16 +71,27 @@ metadata:
   namespace: loki
 data:
   promtail.yaml: |-
-    client:
-      backoff_config:
-        max_period: 5m
-        max_retries: 20
-        min_period: 1s
-      batchsize: 102400
-      batchwait: 10s
-      bearer_token_file: /tmp/shared/bearer_token
-      timeout: 10s
-      url: ${LOKI_ENDPOINT}/push
+    clients:
+      - backoff_config:
+          max_period: 5m
+          max_retries: 20
+          min_period: 1s
+        batchsize: 102400
+        batchwait: 10s
+        bearer_token_file: /tmp/shared/bearer_token
+        timeout: 10s
+        url: ${LOKI_ENDPOINT}/push
+      - backoff_config:
+          max_period: 5m
+          max_retries: 20
+          min_period: 1s
+        batchsize: 102400
+        batchwait: 10s
+        basic_auth:
+          username: ${GRAFANACLOUND_USERNAME}
+          password_file: /etc/promtail-grafanacom-secrets/password
+        timeout: 10s
+        url: https://logs-prod3.grafana.net/api/prom/push
     positions:
       filename: "/run/promtail/positions.yaml"
     scrape_configs:
@@ -351,6 +364,15 @@ data:
   client-id: "$(cat /var/run/loki-secret/client-id | base64 -w 0)"
   client-secret: "$(cat /var/run/loki-secret/client-secret | base64 -w 0)"
 EOF
+cat >> "${SHARED_DIR}/manifest_grafanacom_creds.yml" << EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: promtail-grafanacom-creds
+  namespace: loki
+data:
+  password: "$(cat /var/run/loki-grafanacloud-secret/client-secret | base64 -w 0)"
+EOF
 cat >> "${SHARED_DIR}/manifest_ds.yml" << EOF
 apiVersion: apps/v1
 kind: DaemonSet
@@ -431,6 +453,8 @@ spec:
         volumeMounts:
         - mountPath: "/etc/promtail"
           name: config
+        - mountPath: "/etc/promtail-grafanacom-secrets"
+          name: grafanacom-secrets
         - mountPath: "/run/promtail"
           name: run
         - mountPath: "/var/lib/docker/containers"
@@ -463,6 +487,9 @@ spec:
       - configMap:
           name: loki-promtail
         name: config
+      - secret:
+          secretName: promtail-grafanacom-creds
+        name: grafanacom-secrets
       - hostPath:
           path: "/run/promtail"
         name: run

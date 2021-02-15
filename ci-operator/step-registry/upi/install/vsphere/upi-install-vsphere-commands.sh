@@ -86,6 +86,9 @@ function approve_csrs() {
   while true; do
     oc get csr -ojson | jq -r '.items[] | select(.status == {} ) | .metadata.name' | xargs --no-run-if-empty oc adm certificate approve || true
     sleep 15
+    if [[ -f "/tmp/install-complete" ]]; then
+        return 0
+    fi
   done
 }
 
@@ -146,20 +149,21 @@ update_image_registry &
 
 ## Monitor for cluster completion
 echo "$(date -u --rfc-3339=seconds) - Monitoring for cluster completion..."
-openshift-install --dir="${installer_dir}" wait-for install-complete 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
+
+# When using line-buffering there is a potential issue that the buffer is not filled (or no new line) and this waits forever
+# or in our case until the four hour CI timer is up.
+openshift-install --dir="${installer_dir}" wait-for install-complete 2>&1 | stdbuf -o0 grep -v password &
 
 set +e
 wait "$!"
 ret="$?"
 set -e
 
-sed 's/password: .*/password: REDACTED/' "${installer_dir}/.openshift_install.log" >>"${ARTIFACT_DIR}/.openshift_install.log"
+touch /tmp/install-complete
 
-if [ $ret -ne 0 ]; then
-  exit "$ret"
-fi
+sed 's/password: .*/password: REDACTED/' "${installer_dir}/.openshift_install.log" >>"${ARTIFACT_DIR}/.openshift_install.log"
 
 cp -t "${SHARED_DIR}" \
     "${installer_dir}/auth/kubeconfig"
 
-popd
+exit "$ret"

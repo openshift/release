@@ -55,6 +55,14 @@ base_images:
     name: knative-v0.19.2
     namespace: openshift
     tag: knative-eventing-src
+  openshift_knative-v0.20.0_knative-eventing-src:
+    name: knative-v0.20.0
+    namespace: openshift
+    tag: knative-eventing-src
+  openshift_knative-v0.20.0_knative-serving-src:
+    name: knative-v0.20.0
+    namespace: openshift
+    tag: knative-serving-src
 build_root:
   project_image:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
@@ -66,15 +74,15 @@ images:
       paths:
       - destination_dir: .
         source_path: /usr/bin/oc
-    openshift_knative-v0.19.0_knative-serving-src:
-      as:
-      - registry.svc.ci.openshift.org/openshift/knative-v0.19.0:knative-serving-src
     openshift_knative-v0.19.1_knative-eventing-kafka-src:
       as:
       - registry.svc.ci.openshift.org/openshift/knative-v0.19.1:knative-eventing-kafka-src
-    openshift_knative-v0.19.2_knative-eventing-src:
+    openshift_knative-v0.20.0_knative-eventing-src:
       as:
-      - registry.svc.ci.openshift.org/openshift/knative-v0.19.2:knative-eventing-src
+      - registry.svc.ci.openshift.org/openshift/knative-v0.20.0:knative-eventing-src
+    openshift_knative-v0.20.0_knative-serving-src:
+      as:
+      - registry.svc.ci.openshift.org/openshift/knative-v0.20.0:knative-serving-src
   to: serverless-operator-src
 - context_dir: .
   dockerfile_path: serving/ingress/Dockerfile
@@ -196,8 +204,8 @@ tests:
         limits:
           memory: 6Gi
         requests:
-          cpu: 100m
-          memory: 200Mi
+          cpu: "2"
+          memory: 4Gi
     workflow: openshift-e2e-aws
 - artifact_dir: /tmp/artifacts
   as: upgrade-tests-aws-ocp-46
@@ -219,8 +227,8 @@ tests:
         limits:
           memory: 6Gi
         requests:
-          cpu: 100m
-          memory: 200Mi
+          cpu: "2"
+          memory: 4Gi
     workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: master

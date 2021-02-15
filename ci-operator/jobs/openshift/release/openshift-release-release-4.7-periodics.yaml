@@ -1,10 +1,11 @@
 periodics:
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build01
   decorate: true
   interval: 4h
   labels:
     job-release: "4.7"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: promote-release-openshift-machine-os-content-e2e-aws-4.7
   spec:
     containers:
@@ -18,6 +19,7 @@ periodics:
       - --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME)
       - --promote
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       command:
       - /bin/bash
@@ -33,8 +35,10 @@ periodics:
         chmod ug+x /tmp/bin/oc
 
         # if the source and destination are identical, do nothing
+        export KUBECONFIG=/etc/apici/kubeconfig
         from=$( oc get istag -n "${TAG_NS}" "${TAG_SOURCE}" -o template='{{ .image.metadata.name }}' )
         to=$( oc get istag --ignore-not-found -n ocp "${BRANCH}:${TAG}" -o template='{{ .image.metadata.name }}' )
+        unset KUBECONFIG
         if [[ "${from}" == "${to}" ]]; then
           echo "info: ${TAG_NS}/${TAG_SOURCE} matches ocp/${BRANCH}:${TAG}"
           exit 0
@@ -92,7 +96,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -121,6 +125,9 @@ periodics:
       - mountPath: /etc/pull-secret
         name: pull-secret
         readOnly: true
+      - mountPath: /etc/push-secret
+        name: push-secret
+        readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -146,11 +153,14 @@ periodics:
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
+    - name: push-secret
+      secret:
+        secretName: registry-push-credentials-ci-central
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build01
   decorate: true
   interval: 24h
   labels:
@@ -214,7 +224,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build01
   decorate: true
   interval: 24h
   labels:
@@ -278,445 +288,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: api.ci
-  cron: 0 0,12 * * *
-  decorate: true
-  labels:
-    ci.openshift.io/release-type: informing
-    dptp.openshift.io/ssh-bastion: "true"
-    job-env: remote-libvirt
-    job-release: "4.7"
-    job-test: e2e
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: release-openshift-origin-installer-e2e-remote-libvirt-ppc64le-4.7
-  spec:
-    containers:
-    - args:
-      - --artifact-dir=$(ARTIFACTS)
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
-      - --secret-dir=/usr/local/e2e-remote-libvirt-cluster-profile
-      - --secret-dir=/usr/local/pull-secret
-      - --target=e2e-remote-libvirt
-      - --template=/usr/local/e2e-remote-libvirt
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      command:
-      - ci-operator
-      env:
-      - name: ARCH
-        value: ppc64le
-      - name: BASTION_SVC_0_1_IP
-        value: 172.30.185.14
-      - name: BASTION_SVC_0_2_IP
-        value: 172.30.68.38
-      - name: BASTION_SVC_0_3_IP
-        value: 172.30.83.172
-      - name: BASTION_SVC_1_0_IP
-        value: 172.30.254.137
-      - name: BASTION_SVC_1_1_IP
-        value: 172.30.70.187
-      - name: BASTION_SVC_1_2_IP
-        value: 172.30.114.129
-      - name: BASTION_SVC_1_3_IP
-        value: 172.30.131.153
-      - name: BASTION_SVC_IP
-        value: 172.30.185.48
-      - name: BRANCH
-        value: "4.7"
-      - name: CLUSTER_TYPE
-        value: libvirt-ppc64le
-      - name: CONFIG_SPEC
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 4Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
-          tests:
-          - as: e2e-$(CLUSTER_TYPE)-all
-            commands: $(TEST_COMMAND)
-            openshift_installer:
-              cluster_profile: libvirt-ppc64le
-      - name: JOB_NAME_SAFE
-        value: e2e-remote-libvirt
-      - name: MULTIARCH_RELEASE_IMAGE_LATEST
-        value: registry.ci.openshift.org/ocp-ppc64le/release-ppc64le:4.7
-      - name: RELEASE_IMAGE_LATEST
-        value: registry.ci.openshift.org/ocp/release:4.7
-      - name: REMOTE_LIBVIRT_HOSTNAME
-        value: c155f2u33
-      - name: REMOTE_LIBVIRT_HOSTNAME_1
-        value: c155f2u31
-      - name: TEST_COMMAND
-        value: |
-          # these tests are not able to run in CI due to
-          # missing test image dependencies.  They must be
-          # run manually
-          cat > invert_excluded.py <<EOSCRIPT
-          #!/usr/libexec/platform-python
-          import sys
-          all_tests = set()
-          excluded_tests = set()
-          for l in sys.stdin.readlines():
-            all_tests.add(l.strip())
-          with open(sys.argv[1], "r") as f:
-            for l in f.readlines():
-              excluded_tests.add(l.strip())
-          test_suite = all_tests - excluded_tests
-          for t in test_suite:
-            print(t)
-          EOSCRIPT
-          chmod +x invert_excluded.py
-          cat > excluded_tests <<EOEXCLUDE
-            "[sig-api-machinery] Servers with support for Table transformation should return chunks of table results for list calls [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-api-machinery] Servers with support for Table transformation should return generic metadata details across all namespaces for nodes [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-apps][Feature:DeploymentConfig] deploymentconfigs when tagging images should successfully tag the deployed image [Suite:openshift/conformance/parallel]"
-            "[sig-auth][Feature:HTPasswdAuth] HTPasswd IDP should successfully configure htpasswd and be responsive [Suite:openshift/conformance/parallel]"
-            "[sig-auth][Feature:LDAP] LDAP IDP should authenticate against an ldap server [Suite:openshift/conformance/parallel]"
-            "[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the authorize URL [Suite:openshift/conformance/parallel]"
-            "[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the grant URL [Suite:openshift/conformance/parallel]"
-            "[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the login URL for the allow all IDP [Suite:openshift/conformance/parallel]"
-            "[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the login URL for the bootstrap IDP [Suite:openshift/conformance/parallel]"
-            "[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the login URL for when there is only one IDP [Suite:openshift/conformance/parallel]"
-            "[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the logout URL [Suite:openshift/conformance/parallel]"
-            "[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the root URL [Suite:openshift/conformance/parallel]"
-            "[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the token request URL [Suite:openshift/conformance/parallel]"
-            "[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the token URL [Suite:openshift/conformance/parallel]"
-            "[sig-auth][Feature:OAuthServer] [Token Expiration] Using a OAuth client with a non-default token max age to generate tokens that do not expire works as expected when using a code authorization flow [Suite:openshift/conformance/parallel]"
-            "[sig-auth][Feature:OAuthServer] [Token Expiration] Using a OAuth client with a non-default token max age to generate tokens that do not expire works as expected when using a token authorization flow [Suite:openshift/conformance/parallel]"
-            "[sig-auth][Feature:OAuthServer] [Token Expiration] Using a OAuth client with a non-default token max age to generate tokens that expire shortly works as expected when using a code authorization flow [Suite:openshift/conformance/parallel]"
-            "[sig-auth][Feature:OAuthServer] [Token Expiration] Using a OAuth client with a non-default token max age to generate tokens that expire shortly works as expected when using a token authorization flow [Suite:openshift/conformance/parallel]"
-            "[sig-builds][Feature:Builds] build have source revision metadata  started build should contain source revision information [Suite:openshift/conformance/parallel]"
-            "[sig-builds][Feature:Builds] build with empty source  started build should build even with an empty source in build config [Suite:openshift/conformance/parallel]"
-            "[sig-builds][Feature:Builds] build without output image  building from templates should create an image from a S2i template without an output image reference defined [Suite:openshift/conformance/parallel]"
-            "[sig-builds][Feature:Builds] oc new-app  should fail with a --name longer than 58 characters [Suite:openshift/conformance/parallel]"
-            "[sig-builds][Feature:Builds] oc new-app  should succeed with a --name of 58 characters [Suite:openshift/conformance/parallel]"
-            "[sig-builds][Feature:Builds] oc new-app  should succeed with an imagestream [Suite:openshift/conformance/parallel]"
-            "[sig-builds][Feature:Builds] result image should have proper labels set  S2I build from a template should create a image from \"test-s2i-build.json\" template with proper Docker labels [Suite:openshift/conformance/parallel]"
-            "[sig-builds][Feature:Builds] s2i build with a quota  Building from a template should create an s2i build with a quota and run it [Suite:openshift/conformance/parallel]"
-            "[sig-builds][Feature:Builds] s2i build with a root user image should create a root build and pass with a privileged SCC [Suite:openshift/conformance/parallel]"
-            "[sig-builds][Feature:Builds][timing] capture build stages and durations  should record build stages and durations for s2i [Suite:openshift/conformance/parallel]"
-            "[sig-builds][Feature:Builds][valueFrom] process valueFrom in build strategy environment variables  should successfully resolve valueFrom in s2i build environment variables [Suite:openshift/conformance/parallel]"
-            "[sig-cli] oc debug ensure it works with image streams [Suite:openshift/conformance/parallel]"
-            "[sig-cli] oc observe works as expected [Suite:openshift/conformance/parallel]"
-            "[sig-devex][Feature:Templates] templateinstance readiness test  should report ready soon after all annotated objects are ready [Suite:openshift/conformance/parallel]"
-            "[sig-imageregistry][Feature:ImageAppend] Image append should create images by appending them [Suite:openshift/conformance/parallel]"
-            "[sig-instrumentation] Prometheus when installed on the cluster shouldn't report any alerts in firing state apart from Watchdog and AlertmanagerReceiversNotConfigured [Early] [Suite:openshift/conformance/parallel]"
-            "[sig-network] Internal connectivity for TCP and UDP on ports 9000-9999 is allowed [Suite:openshift/conformance/parallel]"
-            "[sig-network] Networking Granular Checks: Services should be able to handle large requests: http [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking Granular Checks: Services should be able to handle large requests: udp [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking Granular Checks: Services should function for client IP based session affinity: http [LinuxOnly] [Skipped:Network/OVNKubernetes] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking Granular Checks: Services should function for client IP based session affinity: udp [LinuxOnly] [Skipped:Network/OVNKubernetes] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking Granular Checks: Services should function for endpoint-Service: http [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking Granular Checks: Services should function for endpoint-Service: udp [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking Granular Checks: Services should function for multiple endpoint-Services with same selector [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking Granular Checks: Services should function for node-Service: http [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking Granular Checks: Services should function for node-Service: udp [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking Granular Checks: Services should function for pod-Service(hostNetwork): udp [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking Granular Checks: Services should function for pod-Service: http [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking Granular Checks: Services should function for pod-Service: udp [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking Granular Checks: Services should support basic nodePort: udp functionality [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking Granular Checks: Services should update endpoints: http [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking Granular Checks: Services should update endpoints: udp [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking Granular Checks: Pods should function for intra-pod communication: http [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[sig-network] Networking Granular Checks: Pods should function for intra-pod communication: udp [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[sig-network] Networking Granular Checks: Pods should function for node-pod communication: http [LinuxOnly] [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[sig-network] Networking Granular Checks: Pods should function for node-pod communication: udp [LinuxOnly] [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[sig-storage] CSI mock volume CSI FSGroupPolicy [LinuxOnly] should not modify fsGroup if fsGroupPolicy=None [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking should provide Internet connection for containers [Feature:Networking-IPv4] [Skipped:azure] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce multiple ingress policies with ingress allow-all policy taking precedence [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce multiple, stacked policies with overlapping podSelectors [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce policy based on PodSelector with MatchExpressions[Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Services should be able to create a functioning NodePort service [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-            "[sig-storage] Dynamic Provisioning [k8s.io] GlusterDynamicProvisioner should create and delete persistent volumes [fast] [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] Secrets optional updates should be reflected in volume [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-          EOEXCLUDE
-          export PATH=/usr/libexec/origin:$PATH
-          openshift-tests run openshift/conformance/parallel --dry-run | ./invert_excluded.py excluded_tests > test-suite.txt
-          TEST_SUITE="--file=test-suite.txt" TEST_UPGRADE_OPTIONS="--from-repository=quay.io/multi-arch/community-e2e-images" run-tests
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/apici
-        name: apici-ci-operator-credentials
-        readOnly: true
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/e2e-remote-libvirt-cluster-profile
-        name: cluster-profile
-      - mountPath: /usr/local/e2e-remote-libvirt
-        name: job-definition
-        subPath: cluster-launch-installer-remote-libvirt-e2e.yaml
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: apici-ci-operator-credentials
-      secret:
-        items:
-        - key: sa.ci-operator.apici.config
-          path: kubeconfig
-        secretName: apici-ci-operator-credentials
-    - name: boskos
-      secret:
-        items:
-        - key: password
-          path: password
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-metal
-    - configMap:
-        name: prow-job-cluster-launch-installer-remote-libvirt-e2e
-      name: job-definition
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-- agent: kubernetes
-  cluster: api.ci
-  cron: 0 4,16 * * *
-  decorate: true
-  labels:
-    dptp.openshift.io/ssh-bastion: "true"
-    job-env: remote-libvirt
-    job-release: "4.7"
-    job-test: e2e
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: release-openshift-origin-installer-e2e-remote-libvirt-s390x-4.7
-  spec:
-    containers:
-    - args:
-      - --artifact-dir=$(ARTIFACTS)
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
-      - --secret-dir=/usr/local/e2e-remote-libvirt-cluster-profile
-      - --secret-dir=/usr/local/pull-secret
-      - --target=e2e-remote-libvirt
-      - --template=/usr/local/e2e-remote-libvirt
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      command:
-      - ci-operator
-      env:
-      - name: ARCH
-        value: s390x
-      - name: BASTION_SVC_0_1_IP
-        value: 172.30.60.61
-      - name: BASTION_SVC_0_2_IP
-        value: 172.30.135.156
-      - name: BASTION_SVC_0_3_IP
-        value: 172.30.63.176
-      - name: BASTION_SVC_0_4_IP
-        value: 172.30.62.128
-      - name: BASTION_SVC_1_0_IP
-        value: 172.30.28.119
-      - name: BASTION_SVC_1_1_IP
-        value: 172.30.227.115
-      - name: BASTION_SVC_1_2_IP
-        value: 172.30.210.45
-      - name: BASTION_SVC_1_3_IP
-        value: 172.30.198.47
-      - name: BASTION_SVC_1_4_IP
-        value: 172.30.220.83
-      - name: BASTION_SVC_IP
-        value: 172.30.20.161
-      - name: BRANCH
-        value: "4.7"
-      - name: CLUSTER_TYPE
-        value: libvirt-s390x
-      - name: CONFIG_SPEC
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 4Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
-          tests:
-          - as: e2e-$(CLUSTER_TYPE)-all
-            commands: $(TEST_COMMAND)
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-      - name: JOB_NAME_SAFE
-        value: e2e-remote-libvirt
-      - name: MULTIARCH_RELEASE_IMAGE_LATEST
-        value: registry.ci.openshift.org/ocp-s390x/release-s390x:4.7
-      - name: RELEASE_IMAGE_LATEST
-        value: registry.ci.openshift.org/ocp/release:4.7
-      - name: REMOTE_LIBVIRT_HOSTNAME
-        value: ocponz
-      - name: REMOTE_LIBVIRT_HOSTNAME_1
-        value: ocponz2
-      - name: TEST_COMMAND
-        value: |
-          # these tests are not able to run in CI due to
-          # missing test image dependencies.  They must be
-          # run manually
-          cat > invert_excluded.py <<EOSCRIPT
-          #!/usr/libexec/platform-python
-          import sys
-          all_tests = set()
-          excluded_tests = set()
-          for l in sys.stdin.readlines():
-            all_tests.add(l.strip())
-          with open(sys.argv[1], "r") as f:
-            for l in f.readlines():
-              excluded_tests.add(l.strip())
-          test_suite = all_tests - excluded_tests
-          for t in test_suite:
-            print(t)
-          EOSCRIPT
-          chmod +x invert_excluded.py
-          cat > excluded_tests <<EOEXCLUDE
-            "[sig-api-machinery] ResourceQuota [Feature:ScopeSelectors] should verify ResourceQuota with terminating scopes through scope selectors. [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-api-machinery] Servers with support for Table transformation should return chunks of table results for list calls [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-api-machinery] Servers with support for Table transformation should return generic metadata details across all namespaces for nodes [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-apps][Feature:DeploymentConfig] deploymentconfigs when run iteratively should immediately start a new deployment [Suite:openshift/conformance/parallel]"
-            "[sig-apps][Feature:DeploymentConfig] deploymentconfigs when tagging images should successfully tag the deployed image [Suite:openshift/conformance/parallel]"
-            "[sig-auth][Feature:HTPasswdAuth] HTPasswd IDP should successfully configure htpasswd and be responsive [Suite:openshift/conformance/parallel]"
-            "[sig-auth][Feature:LDAP] LDAP IDP should authenticate against an ldap server [Suite:openshift/conformance/parallel]"
-            "[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the authorize URL [Suite:openshift/conformance/parallel]"
-            "[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the grant URL [Suite:openshift/conformance/parallel]"
-            "[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the login URL for the allow all IDP [Suite:openshift/conformance/parallel]"
-            "[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the login URL for the bootstrap IDP [Suite:openshift/conformance/parallel]"
-            "[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the login URL for when there is only one IDP [Suite:openshift/conformance/parallel]"
-            "[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the logout URL [Suite:openshift/conformance/parallel]"
-            "[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the root URL [Suite:openshift/conformance/parallel]"
-            "[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the token request URL [Suite:openshift/conformance/parallel]"
-            "[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the token URL [Suite:openshift/conformance/parallel]"
-            "[sig-auth][Feature:OAuthServer] [Token Expiration] Using a OAuth client with a non-default token max age to generate tokens that do not expire works as expected when using a code authorization flow [Suite:openshift/conformance/parallel]"
-            "[sig-auth][Feature:OAuthServer] [Token Expiration] Using a OAuth client with a non-default token max age to generate tokens that do not expire works as expected when using a token authorization flow [Suite:openshift/conformance/parallel]"
-            "[sig-auth][Feature:OAuthServer] [Token Expiration] Using a OAuth client with a non-default token max age to generate tokens that expire shortly works as expected when using a code authorization flow [Suite:openshift/conformance/parallel]"
-            "[sig-auth][Feature:OAuthServer] [Token Expiration] Using a OAuth client with a non-default token max age to generate tokens that expire shortly works as expected when using a token authorization flow [Suite:openshift/conformance/parallel]"
-            "[sig-builds][Feature:Builds] build have source revision metadata  started build should contain source revision information [Suite:openshift/conformance/parallel]"
-            "[sig-builds][Feature:Builds] build with empty source  started build should build even with an empty source in build config [Suite:openshift/conformance/parallel]"
-            "[sig-builds][Feature:Builds] build without output image  building from templates should create an image from a S2i template without an output image reference defined [Suite:openshift/conformance/parallel]"
-            "[sig-builds][Feature:Builds] clone repository using git:// protocol  should clone using git:// if no proxy is configured [Suite:openshift/conformance/parallel]"
-            "[sig-builds][Feature:Builds] oc new-app  should fail with a --name longer than 58 characters [Suite:openshift/conformance/parallel]"
-            "[sig-builds][Feature:Builds] oc new-app  should succeed with a --name of 58 characters [Suite:openshift/conformance/parallel]"
-            "[sig-builds][Feature:Builds] oc new-app  should succeed with an imagestream [Suite:openshift/conformance/parallel]"
-            "[sig-builds][Feature:Builds] result image should have proper labels set  S2I build from a template should create a image from \"test-s2i-build.json\" template with proper Docker labels [Suite:openshift/conformance/parallel]"
-            "[sig-builds][Feature:Builds] s2i build with a quota  Building from a template should create an s2i build with a quota and run it [Suite:openshift/conformance/parallel]"
-            "[sig-builds][Feature:Builds] s2i build with a root user image should create a root build and pass with a privileged SCC [Suite:openshift/conformance/parallel]"
-            "[sig-builds][Feature:Builds][timing] capture build stages and durations  should record build stages and durations for s2i [Suite:openshift/conformance/parallel]"
-            "[sig-builds][Feature:Builds][valueFrom] process valueFrom in build strategy environment variables  should successfully resolve valueFrom in s2i build environment variables [Suite:openshift/conformance/parallel]"
-            "[sig-cli] oc adm must-gather runs successfully [Suite:openshift/conformance/parallel]"
-            "[sig-cli] oc debug ensure it works with image streams [Suite:openshift/conformance/parallel]"
-            "[sig-cli] oc observe works as expected [Suite:openshift/conformance/parallel]"
-            "[sig-devex][Feature:Templates] templateinstance readiness test  should report ready soon after all annotated objects are ready [Suite:openshift/conformance/parallel]"
-            "[sig-instrumentation] Prometheus when installed on the cluster shouldn't report any alerts in firing state apart from Watchdog and AlertmanagerReceiversNotConfigured [Early] [Suite:openshift/conformance/parallel]"
-            "[sig-network] Networking Granular Checks: Services should be able to handle large requests: http [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking Granular Checks: Services should be able to handle large requests: udp [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking Granular Checks: Services should function for client IP based session affinity: http [LinuxOnly] [Skipped:Network/OVNKubernetes] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking Granular Checks: Services should function for client IP based session affinity: udp [LinuxOnly] [Skipped:Network/OVNKubernetes] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking Granular Checks: Services should function for endpoint-Service: http [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking Granular Checks: Services should function for endpoint-Service: udp [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking Granular Checks: Services should function for multiple endpoint-Services with same selector [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking Granular Checks: Services should function for node-Service: http [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking Granular Checks: Services should function for node-Service: udp [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking Granular Checks: Services should function for pod-Service(hostNetwork): udp [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking Granular Checks: Services should function for pod-Service: http [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking Granular Checks: Services should function for pod-Service: udp [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking Granular Checks: Services should support basic nodePort: udp functionality [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking Granular Checks: Services should update endpoints: http [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking Granular Checks: Services should update endpoints: udp [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-network] Networking should provide Internet connection for containers [Feature:Networking-IPv4] [Skipped:azure] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] CSI mock volume CSI Volume expansion should expand volume by restarting pod if attach=on, nodeExpansion=on [Suite:openshift/conformance/parallel] [Suite:k8s]"
-            "[sig-storage] Dynamic Provisioning [k8s.io] GlusterDynamicProvisioner should create and delete persistent volumes [fast] [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-          EOEXCLUDE
-          export PATH=/usr/libexec/origin:$PATH
-          openshift-tests run openshift/conformance/parallel --dry-run | ./invert_excluded.py excluded_tests > test-suite.txt
-          TEST_SUITE="--file=test-suite.txt" TEST_UPGRADE_OPTIONS="--from-repository=quay.io/multi-arch/community-e2e-images" run-tests
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/apici
-        name: apici-ci-operator-credentials
-        readOnly: true
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/e2e-remote-libvirt-cluster-profile
-        name: cluster-profile
-      - mountPath: /usr/local/e2e-remote-libvirt
-        name: job-definition
-        subPath: cluster-launch-installer-remote-libvirt-e2e.yaml
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: apici-ci-operator-credentials
-      secret:
-        items:
-        - key: sa.ci-operator.apici.config
-          path: kubeconfig
-        secretName: apici-ci-operator-credentials
-    - name: boskos
-      secret:
-        items:
-        - key: password
-          path: password
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-metal
-    - configMap:
-        name: prow-job-cluster-launch-installer-remote-libvirt-e2e
-      name: job-definition
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-- agent: kubernetes
-  cluster: api.ci
+  cluster: build01
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -902,7 +474,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -1034,7 +606,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -1114,13 +686,12 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-aws-sdn-multitenant-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws
       - --template=/usr/local/e2e-aws
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -1146,7 +717,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -1177,6 +748,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-aws-sdn-multitenant-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-aws
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
@@ -1185,9 +759,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -1199,8 +770,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -1232,13 +803,12 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-aws-ovn-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws
       - --template=/usr/local/e2e-aws
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -1255,7 +825,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -1286,6 +856,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-aws-ovn-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-aws
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
@@ -1294,9 +867,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -1308,8 +878,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -1342,13 +912,12 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-aws-ovn-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws
       - --template=/usr/local/e2e-aws
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -1365,7 +934,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -1396,6 +965,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-aws-ovn-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-aws
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
@@ -1404,9 +976,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -1418,8 +987,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -1452,13 +1021,12 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-gcp-ovn-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-gcp
       - --template=/usr/local/e2e-gcp
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -1475,7 +1043,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -1506,6 +1074,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-gcp-ovn-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-gcp
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
@@ -1514,9 +1085,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -1528,8 +1096,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -1561,13 +1129,12 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-aws-calico-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws
       - --template=/usr/local/e2e-aws
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -1584,7 +1151,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -1615,6 +1182,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-aws-calico-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-aws
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
@@ -1623,9 +1193,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -1637,8 +1204,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -1671,13 +1238,12 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-gcp-rt-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-gcp
       - --template=/usr/local/e2e-gcp
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -1694,7 +1260,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -1725,6 +1291,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-gcp-rt-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-gcp
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
@@ -1733,9 +1302,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -1747,8 +1313,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -1781,13 +1347,12 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-azure-ovn-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-azure
       - --template=/usr/local/e2e-azure
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -1804,7 +1369,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -1835,6 +1400,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-azure-ovn-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-azure
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
@@ -1843,9 +1411,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -1857,8 +1422,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -1891,13 +1456,12 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-azure-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-azure
       - --template=/usr/local/e2e-azure
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -1912,7 +1476,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -1947,6 +1511,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-azure-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-azure
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
@@ -1955,9 +1522,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -1969,8 +1533,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -2003,13 +1567,12 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-azure-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-azure
       - --template=/usr/local/e2e-azure
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -2024,7 +1587,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -2059,6 +1622,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-azure-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-azure
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
@@ -2067,9 +1633,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -2081,8 +1644,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -2115,13 +1678,12 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-azure-fips-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-azure-fips
       - --template=/usr/local/e2e-azure-fips
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -2138,7 +1700,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -2173,6 +1735,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-azure-fips-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-azure-fips
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
@@ -2181,9 +1746,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -2195,8 +1757,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -2229,13 +1791,12 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-aws-fips-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws-fips
       - --template=/usr/local/e2e-aws-fips
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -2252,7 +1813,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -2287,6 +1848,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-aws-fips-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-aws-fips
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
@@ -2295,9 +1859,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -2309,8 +1870,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -2362,7 +1923,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -2468,7 +2029,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -2555,13 +2116,12 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-azure-serial-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-azure-serial
       - --template=/usr/local/e2e-azure-serial
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -2576,7 +2136,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -2611,6 +2171,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-azure-serial-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-azure-serial
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
@@ -2619,9 +2182,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -2633,8 +2193,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -2667,13 +2227,12 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-gcp-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-gcp
       - --template=/usr/local/e2e-gcp
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -2688,7 +2247,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -2723,6 +2282,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-gcp-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-gcp
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
@@ -2731,9 +2293,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -2745,8 +2304,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -2781,13 +2340,12 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-gcp-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-gcp
       - --template=/usr/local/e2e-gcp
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -2802,7 +2360,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -2837,6 +2395,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-gcp-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-gcp
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
@@ -2845,9 +2406,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -2859,8 +2417,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -2895,13 +2453,12 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-gcp-fips-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-gcp-fips
       - --template=/usr/local/e2e-gcp-fips
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -2918,7 +2475,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -2953,6 +2510,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-gcp-fips-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-gcp-fips
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
@@ -2961,9 +2521,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -2975,8 +2532,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -3011,13 +2568,12 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-azure-fips-serial-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-azure-fips-serial
       - --template=/usr/local/e2e-azure-fips-serial
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -3034,7 +2590,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -3069,6 +2625,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-azure-fips-serial-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-azure-fips-serial
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
@@ -3077,9 +2636,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -3091,8 +2647,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -3125,13 +2681,12 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-aws-fips-serial-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws-fips-serial
       - --template=/usr/local/e2e-aws-fips-serial
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -3148,7 +2703,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -3183,6 +2738,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-aws-fips-serial-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-aws-fips-serial
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
@@ -3191,9 +2749,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -3205,8 +2760,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -3239,13 +2794,12 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-gcp-serial-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-gcp-serial
       - --template=/usr/local/e2e-gcp-serial
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -3260,7 +2814,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -3295,6 +2849,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-gcp-serial-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-gcp-serial
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
@@ -3303,9 +2860,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -3317,8 +2871,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -3353,13 +2907,12 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-gcp-fips-serial-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-gcp-fips-serial
       - --template=/usr/local/e2e-gcp-fips-serial
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -3376,7 +2929,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -3411,6 +2964,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-gcp-fips-serial-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-gcp-fips-serial
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
@@ -3419,9 +2975,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -3433,8 +2986,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -3468,13 +3021,12 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-aws-sdn-network-stress-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws-sdn-network-stress
       - --template=/usr/local/e2e-aws-sdn-network-stress
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -3489,7 +3041,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -3533,6 +3085,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-aws-sdn-network-stress-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-aws-sdn-network-stress
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
@@ -3541,9 +3096,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -3555,8 +3107,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -3591,13 +3143,12 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-aws-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws
       - --template=/usr/local/e2e-aws
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -3612,7 +3163,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -3656,6 +3207,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-aws-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-aws
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
@@ -3664,9 +3218,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -3678,8 +3229,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -3714,13 +3265,12 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-aws-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws
       - --template=/usr/local/e2e-aws
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -3735,7 +3285,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -3779,6 +3329,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-aws-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-aws
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
@@ -3787,9 +3340,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -3801,8 +3351,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -3837,13 +3387,12 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-aws-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws
       - --template=/usr/local/e2e-aws
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -3860,7 +3409,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -3904,6 +3453,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-aws-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-aws
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
@@ -3912,9 +3464,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -3926,8 +3475,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -3962,13 +3511,12 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-aws-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws
       - --template=/usr/local/e2e-aws
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -3985,7 +3533,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -4029,6 +3577,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-aws-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-aws
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
@@ -4037,9 +3588,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -4051,8 +3599,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -4085,13 +3633,12 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-gcp-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-gcp
       - --template=/usr/local/e2e-gcp
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -4108,7 +3655,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -4152,6 +3699,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-gcp-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-gcp
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
@@ -4160,9 +3710,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -4174,8 +3721,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -4210,13 +3757,12 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-azure-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-azure
       - --template=/usr/local/e2e-azure
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -4233,7 +3779,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -4277,6 +3823,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-azure-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-azure
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
@@ -4285,9 +3834,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -4299,8 +3845,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -4333,13 +3879,12 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-gcp-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-gcp
       - --template=/usr/local/e2e-gcp
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -4356,7 +3901,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -4387,6 +3932,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-gcp-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-gcp
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
@@ -4395,9 +3943,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -4409,8 +3954,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -4445,13 +3990,12 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-azure-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-azure
       - --template=/usr/local/e2e-azure
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -4468,7 +4012,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -4499,6 +4043,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-azure-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-azure
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
@@ -4507,9 +4054,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -4521,8 +4065,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -4557,13 +4101,12 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-aws-disruptive-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws-disruptive
       - --template=/usr/local/e2e-aws-disruptive
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -4578,7 +4121,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -4610,6 +4153,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-aws-disruptive-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-aws-disruptive
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
@@ -4618,9 +4164,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -4632,8 +4175,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -4667,13 +4210,12 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-aws-serial-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws-serial
       - --template=/usr/local/e2e-aws-serial
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -4688,7 +4230,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -4732,6 +4274,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-aws-serial-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-aws-serial
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
@@ -4740,9 +4285,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -4754,8 +4296,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -4789,13 +4331,12 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-gcp-serial-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-gcp-serial
       - --template=/usr/local/e2e-gcp-serial
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -4810,7 +4351,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -4854,6 +4395,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-gcp-serial-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-gcp-serial
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
@@ -4862,9 +4406,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -4876,8 +4417,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -4912,13 +4453,12 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-aws-console-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws-console
       - --template=/usr/local/e2e-aws-console
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -4933,7 +4473,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -4967,6 +4507,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-aws-console-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-aws-console
         name: job-definition
         subPath: cluster-launch-installer-custom-test-image.yaml
@@ -4975,9 +4518,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -4989,8 +4529,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -5023,13 +4563,12 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-aws-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws
       - --template=/usr/local/e2e-aws
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -5044,7 +4583,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -5088,6 +4627,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-aws-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-aws
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
@@ -5096,9 +4638,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -5110,8 +4649,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -5144,13 +4683,12 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-aws-serial-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws-serial
       - --template=/usr/local/e2e-aws-serial
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -5165,7 +4703,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -5209,6 +4747,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-aws-serial-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-aws-serial
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
@@ -5217,9 +4758,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -5231,8 +4769,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -5265,13 +4803,12 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-aws-upi-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws-upi
       - --template=/usr/local/e2e-aws-upi
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -5286,7 +4823,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -5321,6 +4858,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-aws-upi-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-aws-upi
         name: job-definition
         subPath: cluster-launch-installer-upi-e2e.yaml
@@ -5329,9 +4869,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -5343,8 +4880,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -5436,7 +4973,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -5524,8 +5061,6 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/pull-secret
       - --secret-dir=/usr/local/e2e-aws-upgrade-cluster-profile
       - --target=e2e-aws-upgrade
@@ -5533,6 +5068,7 @@ periodics:
       - --input-hash=$(JOB_NAME)
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -5558,7 +5094,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -5579,22 +5115,22 @@ periodics:
       - mountPath: /etc/apici
         name: apici-ci-operator-credentials
         readOnly: true
+      - mountPath: /etc/appci
+        name: appci-release-bot-credentials
+        readOnly: true
       - mountPath: /etc/boskos
         name: boskos
         readOnly: true
       - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
         name: cluster-profile
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-      - mountPath: /etc/appci
-        name: appci-release-bot-credentials
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
         readOnly: true
       - mountPath: /etc/pull-secret
         name: pull-secret
         readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -5603,11 +5139,17 @@ periodics:
         - key: sa.ci-operator.apici.config
           path: kubeconfig
         secretName: apici-ci-operator-credentials
+    - name: appci-release-bot-credentials
+      secret:
+        items:
+        - key: sa.release-bot.app.ci.config
+          path: sa.release-bot.app.ci.config
+        secretName: build-farm-credentials
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -5620,12 +5162,6 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
-    - name: appci-release-bot-credentials
-      secret:
-        items:
-        - key: sa.release-bot.app.ci.config
-          path: sa.release-bot.app.ci.config
-        secretName: build-farm-credentials
 - agent: kubernetes
   cluster: api.ci
   cron: '@yearly'
@@ -5641,8 +5177,6 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/pull-secret
       - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
@@ -5650,6 +5184,7 @@ periodics:
       - --input-hash=$(JOB_NAME)
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -5679,7 +5214,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -5702,22 +5237,22 @@ periodics:
       - mountPath: /etc/apici
         name: apici-ci-operator-credentials
         readOnly: true
+      - mountPath: /etc/appci
+        name: appci-release-bot-credentials
+        readOnly: true
       - mountPath: /etc/boskos
         name: boskos
         readOnly: true
       - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
         name: cluster-profile
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-      - mountPath: /etc/appci
-        name: appci-release-bot-credentials
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
         readOnly: true
       - mountPath: /etc/pull-secret
         name: pull-secret
         readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -5726,11 +5261,17 @@ periodics:
         - key: sa.ci-operator.apici.config
           path: kubeconfig
         secretName: apici-ci-operator-credentials
+    - name: appci-release-bot-credentials
+      secret:
+        items:
+        - key: sa.release-bot.app.ci.config
+          path: sa.release-bot.app.ci.config
+        secretName: build-farm-credentials
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -5743,12 +5284,6 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
-    - name: appci-release-bot-credentials
-      secret:
-        items:
-        - key: sa.release-bot.app.ci.config
-          path: sa.release-bot.app.ci.config
-        secretName: build-farm-credentials
 - agent: kubernetes
   cluster: api.ci
   cron: '@yearly'
@@ -5764,8 +5299,6 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/pull-secret
       - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
@@ -5773,6 +5306,7 @@ periodics:
       - --input-hash=$(JOB_NAME)
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -5788,7 +5322,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -5808,22 +5342,22 @@ periodics:
       - mountPath: /etc/apici
         name: apici-ci-operator-credentials
         readOnly: true
+      - mountPath: /etc/appci
+        name: appci-release-bot-credentials
+        readOnly: true
       - mountPath: /etc/boskos
         name: boskos
         readOnly: true
       - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
         name: cluster-profile
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-      - mountPath: /etc/appci
-        name: appci-release-bot-credentials
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
         readOnly: true
       - mountPath: /etc/pull-secret
         name: pull-secret
         readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -5832,11 +5366,17 @@ periodics:
         - key: sa.ci-operator.apici.config
           path: kubeconfig
         secretName: apici-ci-operator-credentials
+    - name: appci-release-bot-credentials
+      secret:
+        items:
+        - key: sa.release-bot.app.ci.config
+          path: sa.release-bot.app.ci.config
+        secretName: build-farm-credentials
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -5849,12 +5389,6 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
-    - name: appci-release-bot-credentials
-      secret:
-        items:
-        - key: sa.release-bot.app.ci.config
-          path: sa.release-bot.app.ci.config
-        secretName: build-farm-credentials
 - agent: kubernetes
   cluster: api.ci
   cron: '@yearly'
@@ -5871,8 +5405,6 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/pull-secret
       - --secret-dir=/usr/local/e2e-aws-upgrade-cluster-profile
       - --target=e2e-aws-upgrade
@@ -5880,6 +5412,7 @@ periodics:
       - --input-hash=$(JOB_NAME)
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -5905,7 +5438,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -5926,22 +5459,22 @@ periodics:
       - mountPath: /etc/apici
         name: apici-ci-operator-credentials
         readOnly: true
+      - mountPath: /etc/appci
+        name: appci-release-bot-credentials
+        readOnly: true
       - mountPath: /etc/boskos
         name: boskos
         readOnly: true
       - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
         name: cluster-profile
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-      - mountPath: /etc/appci
-        name: appci-release-bot-credentials
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
         readOnly: true
       - mountPath: /etc/pull-secret
         name: pull-secret
         readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -5950,11 +5483,17 @@ periodics:
         - key: sa.ci-operator.apici.config
           path: kubeconfig
         secretName: apici-ci-operator-credentials
+    - name: appci-release-bot-credentials
+      secret:
+        items:
+        - key: sa.release-bot.app.ci.config
+          path: sa.release-bot.app.ci.config
+        secretName: build-farm-credentials
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -5967,12 +5506,6 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
-    - name: appci-release-bot-credentials
-      secret:
-        items:
-        - key: sa.release-bot.app.ci.config
-          path: sa.release-bot.app.ci.config
-        secretName: build-farm-credentials
 - agent: kubernetes
   cluster: api.ci
   decorate: true
@@ -5992,13 +5525,12 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-aws-cnv-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws
       - --template=/usr/local/e2e-aws
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -6013,7 +5545,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -6028,7 +5560,7 @@ periodics:
       - name: JOB_NAME_SAFE
         value: e2e-aws-cnv
       - name: TEST_COMMAND
-        value: make start && make functest
+        value: ENABLE_SSP=true make start && make functest
       - name: TEST_IMAGESTREAM_TAG
         value: stable:hyperconverged-cluster-operator-tests
       image: ci-operator:latest
@@ -6046,6 +5578,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-aws-cnv-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-aws
         name: job-definition
         subPath: cluster-launch-installer-custom-test-image.yaml
@@ -6054,9 +5589,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -6068,8 +5600,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -6100,8 +5632,6 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/pull-secret
       - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
@@ -6109,6 +5639,7 @@ periodics:
       - --input-hash=$(JOB_NAME)
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -6126,7 +5657,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -6145,22 +5676,22 @@ periodics:
       - mountPath: /etc/apici
         name: apici-ci-operator-credentials
         readOnly: true
+      - mountPath: /etc/appci
+        name: appci-release-bot-credentials
+        readOnly: true
       - mountPath: /etc/boskos
         name: boskos
         readOnly: true
       - mountPath: /usr/local/e2e-gcp-upgrade-cluster-profile
         name: cluster-profile
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-      - mountPath: /etc/appci
-        name: appci-release-bot-credentials
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
         readOnly: true
       - mountPath: /etc/pull-secret
         name: pull-secret
         readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -6169,11 +5700,17 @@ periodics:
         - key: sa.ci-operator.apici.config
           path: kubeconfig
         secretName: apici-ci-operator-credentials
+    - name: appci-release-bot-credentials
+      secret:
+        items:
+        - key: sa.release-bot.app.ci.config
+          path: sa.release-bot.app.ci.config
+        secretName: build-farm-credentials
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -6188,12 +5725,6 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
-    - name: appci-release-bot-credentials
-      secret:
-        items:
-        - key: sa.release-bot.app.ci.config
-          path: sa.release-bot.app.ci.config
-        secretName: build-farm-credentials
 - agent: kubernetes
   cluster: api.ci
   cron: '@yearly'
@@ -6209,8 +5740,6 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/pull-secret
       - --secret-dir=/usr/local/e2e-azure-upgrade-cluster-profile
       - --target=e2e-azure-upgrade
@@ -6218,6 +5747,7 @@ periodics:
       - --input-hash=$(JOB_NAME)
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -6233,7 +5763,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -6252,22 +5782,22 @@ periodics:
       - mountPath: /etc/apici
         name: apici-ci-operator-credentials
         readOnly: true
+      - mountPath: /etc/appci
+        name: appci-release-bot-credentials
+        readOnly: true
       - mountPath: /etc/boskos
         name: boskos
         readOnly: true
       - mountPath: /usr/local/e2e-azure-upgrade-cluster-profile
         name: cluster-profile
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-      - mountPath: /etc/appci
-        name: appci-release-bot-credentials
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
         readOnly: true
       - mountPath: /etc/pull-secret
         name: pull-secret
         readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -6276,11 +5806,17 @@ periodics:
         - key: sa.ci-operator.apici.config
           path: kubeconfig
         secretName: apici-ci-operator-credentials
+    - name: appci-release-bot-credentials
+      secret:
+        items:
+        - key: sa.release-bot.app.ci.config
+          path: sa.release-bot.app.ci.config
+        secretName: build-farm-credentials
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -6293,12 +5829,6 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
-    - name: appci-release-bot-credentials
-      secret:
-        items:
-        - key: sa.release-bot.app.ci.config
-          path: sa.release-bot.app.ci.config
-        secretName: build-farm-credentials
 - agent: kubernetes
   cluster: api.ci
   cron: 0 2,10,18 * * *
@@ -6319,13 +5849,12 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-openstack-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-openstack
       - --template=/usr/local/e2e-openstack
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -6346,7 +5875,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -6379,6 +5908,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-openstack-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-openstack
         name: job-definition
         subPath: cluster-launch-installer-openstack-e2e.yaml
@@ -6387,9 +5919,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -6401,8 +5930,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -6452,13 +5981,12 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-openstack-serial-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-openstack-serial
       - --template=/usr/local/e2e-openstack-serial
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -6479,7 +6007,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -6516,6 +6044,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-openstack-serial-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-openstack-serial
         name: job-definition
         subPath: cluster-launch-installer-openstack-e2e.yaml
@@ -6524,9 +6055,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -6538,8 +6066,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -6586,13 +6114,12 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-aws-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws
       - --template=/usr/local/e2e-aws
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -6611,7 +6138,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -6644,6 +6171,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-aws-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-aws
         name: job-definition
         subPath: cluster-launch-installer-e2e.yaml
@@ -6652,9 +6182,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -6666,8 +6193,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -6722,7 +6249,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -6809,13 +6336,12 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-operator-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-operator
       - --template=/usr/local/e2e-operator
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -6836,7 +6362,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -6864,6 +6390,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-operator-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-operator
         name: job-definition
         subPath: cluster-launch-installer-custom-test-image.yaml
@@ -6872,9 +6401,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -6886,8 +6412,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -6920,13 +6446,12 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-operator-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-operator
       - --template=/usr/local/e2e-operator
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -6947,7 +6472,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -6975,6 +6500,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-operator-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-operator
         name: job-definition
         subPath: cluster-launch-installer-custom-test-image.yaml
@@ -6983,9 +6511,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -6997,8 +6522,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -7007,120 +6532,6 @@ periodics:
             name: cluster-secrets-aws
     - configMap:
         name: prow-job-cluster-launch-installer-custom-test-image
-      name: job-definition
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-- agent: kubernetes
-  cluster: api.ci
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  interval: 6h
-  labels:
-    job-env: ovirt
-    job-release: "4.7"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: release-openshift-ocp-installer-e2e-ovirt-4.7
-  spec:
-    containers:
-    - args:
-      - --artifact-dir=$(ARTIFACTS)
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --kubeconfig=/etc/apici/kubeconfig
-      - --secret-dir=/etc/boskos
-      - --secret-dir=/usr/local/e2e-ovirt-cluster-profile
-      - --secret-dir=/usr/local/pull-secret
-      - --target=e2e-ovirt
-      - --template=/usr/local/e2e-ovirt
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      command:
-      - ci-operator
-      env:
-      - name: RELEASE_IMAGE_LATEST
-        value: registry.ci.openshift.org/ocp/release:4.7
-      - name: BRANCH
-        value: "4.7"
-      - name: CLUSTER_TYPE
-        value: ovirt
-      - name: LEASE_TYPE
-        value: conformance
-      - name: CONFIG_SPEC
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 4Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
-          tests:
-          - as: e2e-$(CLUSTER_TYPE)-parallel
-            commands: TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-      - name: JOB_NAME_SAFE
-        value: e2e-ovirt
-      - name: TEST_COMMAND
-        value: TEST_SUITE=openshift/conformance/parallel run-tests
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/apici
-        name: apici-ci-operator-credentials
-        readOnly: true
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/e2e-ovirt-cluster-profile
-        name: cluster-profile
-      - mountPath: /usr/local/e2e-ovirt
-        name: job-definition
-        subPath: cluster-launch-installer-ovirt-e2e.yaml
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: apici-ci-operator-credentials
-      secret:
-        items:
-        - key: sa.ci-operator.apici.config
-          path: kubeconfig
-        secretName: apici-ci-operator-credentials
-    - name: boskos
-      secret:
-        items:
-        - key: password
-          path: password
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-ovirt
-        - secret:
-            name: ovirt-infra-secrets
-    - configMap:
-        name: prow-job-cluster-launch-installer-ovirt-e2e
       name: job-definition
     - name: pull-secret
       secret:
@@ -7143,8 +6554,6 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/pull-secret
       - --secret-dir=/usr/local/e2e-gcp-upgrade-cluster-profile
       - --target=e2e-gcp-upgrade
@@ -7152,6 +6561,7 @@ periodics:
       - --input-hash=$(JOB_NAME)
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -7177,7 +6587,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -7198,22 +6608,22 @@ periodics:
       - mountPath: /etc/apici
         name: apici-ci-operator-credentials
         readOnly: true
+      - mountPath: /etc/appci
+        name: appci-release-bot-credentials
+        readOnly: true
       - mountPath: /etc/boskos
         name: boskos
         readOnly: true
       - mountPath: /usr/local/e2e-gcp-upgrade-cluster-profile
         name: cluster-profile
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-      - mountPath: /etc/appci
-        name: appci-release-bot-credentials
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
         readOnly: true
       - mountPath: /etc/pull-secret
         name: pull-secret
         readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -7222,11 +6632,17 @@ periodics:
         - key: sa.ci-operator.apici.config
           path: kubeconfig
         secretName: apici-ci-operator-credentials
+    - name: appci-release-bot-credentials
+      secret:
+        items:
+        - key: sa.release-bot.app.ci.config
+          path: sa.release-bot.app.ci.config
+        secretName: build-farm-credentials
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       secret:
@@ -7237,12 +6653,6 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
-    - name: appci-release-bot-credentials
-      secret:
-        items:
-        - key: sa.release-bot.app.ci.config
-          path: sa.release-bot.app.ci.config
-        secretName: build-farm-credentials
 - agent: kubernetes
   cluster: api.ci
   cron: '@yearly'
@@ -7258,8 +6668,6 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/pull-secret
       - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
       - --target=e2e-$(CLUSTER_TYPE)-upgrade
@@ -7267,6 +6675,7 @@ periodics:
       - --input-hash=$(JOB_NAME)
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -7284,7 +6693,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -7304,22 +6713,22 @@ periodics:
       - mountPath: /etc/apici
         name: apici-ci-operator-credentials
         readOnly: true
+      - mountPath: /etc/appci
+        name: appci-release-bot-credentials
+        readOnly: true
       - mountPath: /etc/boskos
         name: boskos
         readOnly: true
       - mountPath: /usr/local/e2e-gcp-upgrade-cluster-profile
         name: cluster-profile
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-      - mountPath: /etc/appci
-        name: appci-release-bot-credentials
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
         readOnly: true
       - mountPath: /etc/pull-secret
         name: pull-secret
         readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -7328,11 +6737,17 @@ periodics:
         - key: sa.ci-operator.apici.config
           path: kubeconfig
         secretName: apici-ci-operator-credentials
+    - name: appci-release-bot-credentials
+      secret:
+        items:
+        - key: sa.release-bot.app.ci.config
+          path: sa.release-bot.app.ci.config
+        secretName: build-farm-credentials
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       secret:
@@ -7343,12 +6758,6 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
-    - name: appci-release-bot-credentials
-      secret:
-        items:
-        - key: sa.release-bot.app.ci.config
-          path: sa.release-bot.app.ci.config
-        secretName: build-farm-credentials
 - agent: kubernetes
   cluster: api.ci
   cron: '@yearly'
@@ -7364,8 +6773,6 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/pull-secret
       - --secret-dir=/usr/local/e2e-azure-upgrade-cluster-profile
       - --target=e2e-azure-upgrade
@@ -7373,6 +6780,7 @@ periodics:
       - --input-hash=$(JOB_NAME)
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -7398,7 +6806,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -7419,22 +6827,22 @@ periodics:
       - mountPath: /etc/apici
         name: apici-ci-operator-credentials
         readOnly: true
+      - mountPath: /etc/appci
+        name: appci-release-bot-credentials
+        readOnly: true
       - mountPath: /etc/boskos
         name: boskos
         readOnly: true
       - mountPath: /usr/local/e2e-azure-upgrade-cluster-profile
         name: cluster-profile
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-      - mountPath: /etc/appci
-        name: appci-release-bot-credentials
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
         readOnly: true
       - mountPath: /etc/pull-secret
         name: pull-secret
         readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -7443,11 +6851,17 @@ periodics:
         - key: sa.ci-operator.apici.config
           path: kubeconfig
         secretName: apici-ci-operator-credentials
+    - name: appci-release-bot-credentials
+      secret:
+        items:
+        - key: sa.release-bot.app.ci.config
+          path: sa.release-bot.app.ci.config
+        secretName: build-farm-credentials
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       secret:
@@ -7458,12 +6872,6 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
-    - name: appci-release-bot-credentials
-      secret:
-        items:
-        - key: sa.release-bot.app.ci.config
-          path: sa.release-bot.app.ci.config
-        secretName: build-farm-credentials
 - agent: kubernetes
   cluster: api.ci
   cron: '@yearly'
@@ -7479,8 +6887,6 @@ periodics:
     - args:
       - --artifact-dir=$(ARTIFACTS)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/pull-secret
       - --secret-dir=/usr/local/e2e-azure-upgrade-cluster-profile
       - --target=e2e-azure-upgrade
@@ -7488,6 +6894,7 @@ periodics:
       - --input-hash=$(JOB_NAME)
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -7505,7 +6912,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -7525,22 +6932,22 @@ periodics:
       - mountPath: /etc/apici
         name: apici-ci-operator-credentials
         readOnly: true
+      - mountPath: /etc/appci
+        name: appci-release-bot-credentials
+        readOnly: true
       - mountPath: /etc/boskos
         name: boskos
         readOnly: true
       - mountPath: /usr/local/e2e-azure-upgrade-cluster-profile
         name: cluster-profile
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-      - mountPath: /etc/appci
-        name: appci-release-bot-credentials
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
         readOnly: true
       - mountPath: /etc/pull-secret
         name: pull-secret
         readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -7549,11 +6956,17 @@ periodics:
         - key: sa.ci-operator.apici.config
           path: kubeconfig
         secretName: apici-ci-operator-credentials
+    - name: appci-release-bot-credentials
+      secret:
+        items:
+        - key: sa.release-bot.app.ci.config
+          path: sa.release-bot.app.ci.config
+        secretName: build-farm-credentials
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       secret:
@@ -7564,12 +6977,6 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
-    - name: appci-release-bot-credentials
-      secret:
-        items:
-        - key: sa.release-bot.app.ci.config
-          path: sa.release-bot.app.ci.config
-        secretName: build-farm-credentials
 - agent: kubernetes
   cluster: api.ci
   decorate: true
@@ -7587,13 +6994,12 @@ periodics:
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --secret-dir=/usr/local/e2e-aws-csi-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=e2e-aws-csi
       - --template=/usr/local/e2e-aws-csi
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -7614,7 +7020,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -7642,6 +7048,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-aws-csi-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-aws-csi
         name: job-definition
         subPath: cluster-launch-installer-custom-test-image.yaml
@@ -7650,9 +7059,6 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: apici-ci-operator-credentials
@@ -7664,8 +7070,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -7724,7 +7130,7 @@ periodics:
           resources:
             '*':
               limits:
-                memory: 4Gi
+                memory: 6Gi
               requests:
                 cpu: 100m
                 memory: 200Mi
@@ -7908,555 +7314,3 @@ periodics:
     - name: osde2e-credentials
       secret:
         secretName: osde2e-credentials
-- agent: kubernetes
-  cluster: api.ci
-  cron: 0 0,12 * * *
-  decorate: true
-  labels:
-    ci.openshift.io/release-type: informing
-    dptp.openshift.io/ssh-bastion: "true"
-    job-env: remote-libvirt
-    job-release: "4.7"
-    job-test: e2e
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: release-openshift-origin-installer-e2e-remote-libvirt-image-ecosystem-ppc64le-4.7
-  spec:
-    containers:
-    - args:
-      - --artifact-dir=$(ARTIFACTS)
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
-      - --secret-dir=/usr/local/image-ecosystem-cluster-profile
-      - --secret-dir=/usr/local/pull-secret
-      - --target=e2e-remote-libvirt
-      - --template=/usr/local/e2e-remote-libvirt
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      command:
-      - ci-operator
-      env:
-      - name: ARCH
-        value: ppc64le
-      - name: BASTION_SVC_0_1_IP
-        value: 172.30.185.14
-      - name: BASTION_SVC_0_2_IP
-        value: 172.30.68.38
-      - name: BASTION_SVC_0_3_IP
-        value: 172.30.83.172
-      - name: BASTION_SVC_1_0_IP
-        value: 172.30.254.137
-      - name: BASTION_SVC_1_1_IP
-        value: 172.30.70.187
-      - name: BASTION_SVC_1_2_IP
-        value: 172.30.114.129
-      - name: BASTION_SVC_1_3_IP
-        value: 172.30.131.153
-      - name: BASTION_SVC_IP
-        value: 172.30.185.48
-      - name: BRANCH
-        value: "4.7"
-      - name: CLUSTER_TYPE
-        value: libvirt-ppc64le
-      - name: CONFIG_SPEC
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 4Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
-          tests:
-          - as: e2e-$(CLUSTER_TYPE)-all
-            commands: $(TEST_COMMAND)
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-      - name: JOB_NAME_SAFE
-        value: image-ecosystem
-      - name: MULTIARCH_RELEASE_IMAGE_LATEST
-        value: registry.ci.openshift.org/ocp-ppc64le/release-ppc64le:4.7
-      - name: RELEASE_IMAGE_LATEST
-        value: registry.ci.openshift.org/ocp/release:4.7
-      - name: REMOTE_LIBVIRT_HOSTNAME
-        value: c155f2u33
-      - name: REMOTE_LIBVIRT_HOSTNAME_1
-        value: c155f2u31
-      - name: TEST_COMMAND
-        value: TEST_SUITE=openshift/image-ecosystem run-tests
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/apici
-        name: apici-ci-operator-credentials
-        readOnly: true
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/image-ecosystem-cluster-profile
-        name: cluster-profile
-      - mountPath: /usr/local/e2e-remote-libvirt
-        name: job-definition
-        subPath: cluster-launch-installer-remote-libvirt-e2e.yaml
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: apici-ci-operator-credentials
-      secret:
-        items:
-        - key: sa.ci-operator.apici.config
-          path: kubeconfig
-        secretName: apici-ci-operator-credentials
-    - name: boskos
-      secret:
-        items:
-        - key: password
-          path: password
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-metal
-    - configMap:
-        name: prow-job-cluster-launch-installer-remote-libvirt-e2e
-      name: job-definition
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-- agent: kubernetes
-  cluster: api.ci
-  cron: 0 6,18 * * *
-  decorate: true
-  labels:
-    ci.openshift.io/release-type: informing
-    dptp.openshift.io/ssh-bastion: "true"
-    job-env: remote-libvirt
-    job-release: "4.7"
-    job-test: e2e
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: release-openshift-origin-installer-e2e-remote-libvirt-image-ecosystem-s390x-4.7
-  spec:
-    containers:
-    - args:
-      - --artifact-dir=$(ARTIFACTS)
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
-      - --secret-dir=/usr/local/image-ecosystem-cluster-profile
-      - --secret-dir=/usr/local/pull-secret
-      - --target=e2e-remote-libvirt
-      - --template=/usr/local/e2e-remote-libvirt
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      command:
-      - ci-operator
-      env:
-      - name: ARCH
-        value: s390x
-      - name: BASTION_SVC_0_1_IP
-        value: 172.30.60.61
-      - name: BASTION_SVC_0_2_IP
-        value: 172.30.135.156
-      - name: BASTION_SVC_0_3_IP
-        value: 172.30.63.176
-      - name: BASTION_SVC_0_4_IP
-        value: 172.30.62.128
-      - name: BASTION_SVC_1_0_IP
-        value: 172.30.28.119
-      - name: BASTION_SVC_1_1_IP
-        value: 172.30.227.115
-      - name: BASTION_SVC_1_2_IP
-        value: 172.30.210.45
-      - name: BASTION_SVC_1_3_IP
-        value: 172.30.198.47
-      - name: BASTION_SVC_1_4_IP
-        value: 172.30.220.83
-      - name: BASTION_SVC_IP
-        value: 172.30.20.161
-      - name: BRANCH
-        value: "4.7"
-      - name: CLUSTER_TYPE
-        value: libvirt-s390x
-      - name: CONFIG_SPEC
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 4Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
-          tests:
-          - as: e2e-$(CLUSTER_TYPE)-all
-            commands: $(TEST_COMMAND)
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-      - name: JOB_NAME_SAFE
-        value: image-ecosystem
-      - name: MULTIARCH_RELEASE_IMAGE_LATEST
-        value: registry.ci.openshift.org/ocp-s390x/release-s390x:4.7
-      - name: RELEASE_IMAGE_LATEST
-        value: registry.ci.openshift.org/ocp/release:4.7
-      - name: REMOTE_LIBVIRT_HOSTNAME
-        value: ocponz
-      - name: REMOTE_LIBVIRT_HOSTNAME_1
-        value: ocponz2
-      - name: TEST_COMMAND
-        value: TEST_SUITE=openshift/image-ecosystem run-tests
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/apici
-        name: apici-ci-operator-credentials
-        readOnly: true
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/image-ecosystem-cluster-profile
-        name: cluster-profile
-      - mountPath: /usr/local/e2e-remote-libvirt
-        name: job-definition
-        subPath: cluster-launch-installer-remote-libvirt-e2e.yaml
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: apici-ci-operator-credentials
-      secret:
-        items:
-        - key: sa.ci-operator.apici.config
-          path: kubeconfig
-        secretName: apici-ci-operator-credentials
-    - name: boskos
-      secret:
-        items:
-        - key: password
-          path: password
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-metal
-    - configMap:
-        name: prow-job-cluster-launch-installer-remote-libvirt-e2e
-      name: job-definition
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-- agent: kubernetes
-  cluster: api.ci
-  cron: 0 0,12 * * *
-  decorate: true
-  labels:
-    ci.openshift.io/release-type: informing
-    dptp.openshift.io/ssh-bastion: "true"
-    job-env: remote-libvirt
-    job-release: "4.7"
-    job-test: e2e
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: release-openshift-origin-installer-e2e-remote-libvirt-jenkins-e2e-ppc64le-4.7
-  spec:
-    containers:
-    - args:
-      - --artifact-dir=$(ARTIFACTS)
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
-      - --secret-dir=/usr/local/jenkins-e2e-cluster-profile
-      - --secret-dir=/usr/local/pull-secret
-      - --target=e2e-remote-libvirt
-      - --template=/usr/local/e2e-remote-libvirt
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      command:
-      - ci-operator
-      env:
-      - name: ARCH
-        value: ppc64le
-      - name: BASTION_SVC_0_1_IP
-        value: 172.30.185.14
-      - name: BASTION_SVC_0_2_IP
-        value: 172.30.68.38
-      - name: BASTION_SVC_0_3_IP
-        value: 172.30.83.172
-      - name: BASTION_SVC_1_0_IP
-        value: 172.30.254.137
-      - name: BASTION_SVC_1_1_IP
-        value: 172.30.70.187
-      - name: BASTION_SVC_1_2_IP
-        value: 172.30.114.129
-      - name: BASTION_SVC_1_3_IP
-        value: 172.30.131.153
-      - name: BASTION_SVC_IP
-        value: 172.30.185.48
-      - name: BRANCH
-        value: "4.7"
-      - name: CLUSTER_TYPE
-        value: libvirt-ppc64le
-      - name: CONFIG_SPEC
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 4Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
-          tests:
-          - as: e2e-$(CLUSTER_TYPE)-all
-            commands: $(TEST_COMMAND)
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-      - name: JOB_NAME_SAFE
-        value: jenkins-e2e
-      - name: MULTIARCH_RELEASE_IMAGE_LATEST
-        value: registry.ci.openshift.org/ocp-ppc64le/release-ppc64le:4.7
-      - name: RELEASE_IMAGE_LATEST
-        value: registry.ci.openshift.org/ocp/release:4.7
-      - name: REMOTE_LIBVIRT_HOSTNAME
-        value: c155f2u33
-      - name: REMOTE_LIBVIRT_HOSTNAME_1
-        value: c155f2u31
-      - name: TEST_COMMAND
-        value: TEST_SUITE=openshift/jenkins-e2e-rhel-only run-tests
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/apici
-        name: apici-ci-operator-credentials
-        readOnly: true
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/jenkins-e2e-cluster-profile
-        name: cluster-profile
-      - mountPath: /usr/local/e2e-remote-libvirt
-        name: job-definition
-        subPath: cluster-launch-installer-remote-libvirt-e2e.yaml
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: apici-ci-operator-credentials
-      secret:
-        items:
-        - key: sa.ci-operator.apici.config
-          path: kubeconfig
-        secretName: apici-ci-operator-credentials
-    - name: boskos
-      secret:
-        items:
-        - key: password
-          path: password
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-metal
-    - configMap:
-        name: prow-job-cluster-launch-installer-remote-libvirt-e2e
-      name: job-definition
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-- agent: kubernetes
-  cluster: api.ci
-  cron: 0 6,18 * * *
-  decorate: true
-  labels:
-    ci.openshift.io/release-type: informing
-    dptp.openshift.io/ssh-bastion: "true"
-    job-env: remote-libvirt
-    job-release: "4.7"
-    job-test: e2e
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: release-openshift-origin-installer-e2e-remote-libvirt-jenkins-e2e-s390x-4.7
-  spec:
-    containers:
-    - args:
-      - --artifact-dir=$(ARTIFACTS)
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
-      - --secret-dir=/usr/local/jenkins-e2e-cluster-profile
-      - --secret-dir=/usr/local/pull-secret
-      - --target=e2e-remote-libvirt
-      - --template=/usr/local/e2e-remote-libvirt
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      command:
-      - ci-operator
-      env:
-      - name: ARCH
-        value: s390x
-      - name: BASTION_SVC_0_1_IP
-        value: 172.30.60.61
-      - name: BASTION_SVC_0_2_IP
-        value: 172.30.135.156
-      - name: BASTION_SVC_0_3_IP
-        value: 172.30.63.176
-      - name: BASTION_SVC_0_4_IP
-        value: 172.30.62.128
-      - name: BASTION_SVC_1_0_IP
-        value: 172.30.28.119
-      - name: BASTION_SVC_1_1_IP
-        value: 172.30.227.115
-      - name: BASTION_SVC_1_2_IP
-        value: 172.30.210.45
-      - name: BASTION_SVC_1_3_IP
-        value: 172.30.198.47
-      - name: BASTION_SVC_1_4_IP
-        value: 172.30.220.83
-      - name: BASTION_SVC_IP
-        value: 172.30.20.161
-      - name: BRANCH
-        value: "4.7"
-      - name: CLUSTER_TYPE
-        value: libvirt-s390x
-      - name: CONFIG_SPEC
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 4Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
-          tests:
-          - as: e2e-$(CLUSTER_TYPE)-all
-            commands: $(TEST_COMMAND)
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-      - name: JOB_NAME_SAFE
-        value: jenkins-e2e
-      - name: MULTIARCH_RELEASE_IMAGE_LATEST
-        value: registry.ci.openshift.org/ocp-s390x/release-s390x:4.7
-      - name: RELEASE_IMAGE_LATEST
-        value: registry.ci.openshift.org/ocp/release:4.7
-      - name: REMOTE_LIBVIRT_HOSTNAME
-        value: ocponz
-      - name: REMOTE_LIBVIRT_HOSTNAME_1
-        value: ocponz2
-      - name: TEST_COMMAND
-        value: TEST_SUITE=openshift/jenkins-e2e-rhel-only run-tests
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/apici
-        name: apici-ci-operator-credentials
-        readOnly: true
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/jenkins-e2e-cluster-profile
-        name: cluster-profile
-      - mountPath: /usr/local/e2e-remote-libvirt
-        name: job-definition
-        subPath: cluster-launch-installer-remote-libvirt-e2e.yaml
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: apici-ci-operator-credentials
-      secret:
-        items:
-        - key: sa.ci-operator.apici.config
-          path: kubeconfig
-        secretName: apici-ci-operator-credentials
-    - name: boskos
-      secret:
-        items:
-        - key: password
-          path: password
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-metal
-    - configMap:
-        name: prow-job-cluster-launch-installer-remote-libvirt-e2e
-      name: job-definition
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials

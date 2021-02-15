@@ -7,6 +7,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.7
   ocp_builder_rhel-8-golang-openshift-4.6:
     name: builder
     namespace: ocp
@@ -22,12 +26,11 @@ images:
 - dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
   to: cluster-csi-snapshot-controller-operator
 promotion:
-  disabled: true
   name: 4.7-priv
   namespace: ocp-private
 resources:
@@ -48,8 +51,7 @@ tests:
 - artifact_dir: /tmp/artifacts
   as: unit
   commands: |
-    mkdir -p /tmp/artifacts
-    make test-unit JUNITFILE=/tmp/artifacts/junit_report.xml
+    make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml
   container:
     from: src
 - artifact_dir: /tmp/artifacts

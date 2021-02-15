@@ -124,6 +124,7 @@ spec:
         - --testImagesDistributorOptions.additional-image-stream-tag=ocp/builder:rhel-golang-1.12
         - --testImagesDistributorOptions.additional-image-stream-tag=ocp/builder:rhel-golang-1.13
         - --testImagesDistributorOptions.additional-image-stream-namespace=ci
+        - --testImagesDistributorOptions.additional-image-stream=rhcos/machine-os-content
         - --testImagesDistributorOptions.forbidden-registry=registry.build01.ci.openshift.org
         - --testImagesDistributorOptions.forbidden-registry=registry.build02.ci.openshift.org
         - --enable-controller=test_images_distributor
@@ -132,26 +133,6 @@ spec:
         - --secretSyncerConfigOptions.secretBoostrapConfigFile=/etc/ci-secret-bootstrap/_config.yaml
         - --secretSyncerConfigOptions.config=/etc/secret-mirroring/mapping.yaml
         - --step-config-path=/etc/registry
-        - --enable-controller=registry_syncer
-        - --registrySyncerOptions.denied-image-stream=origin/release
-        - --registrySyncerOptions.denied-image-stream=ocp/release
-        - --registrySyncerOptions.denied-image-stream=ocp-priv/release-priv
-        - --registrySyncerOptions.denied-image-stream=ocp-ppc64le/release-ppc64le
-        - --registrySyncerOptions.denied-image-stream=ocp-ppc64le-priv/release-ppc64le-priv
-        - --registrySyncerOptions.denied-image-stream=ocp-s390x/release-s390x
-        - --registrySyncerOptions.denied-image-stream=ocp-s390x-priv/release-s390x-priv
-        - --registrySyncerOptions.denied-image-stream=ocp/release-controller-bootstrap
-        - --registrySyncerOptions.denied-image-stream=ocp-priv/release-controller-bootstrap
-        - --registrySyncerOptions.denied-image-stream=ocp-s390x/release-controller-bootstrap
-        - --registrySyncerOptions.denied-image-stream=ocp-s390x-priv/release-controller-bootstrap
-        - --registrySyncerOptions.denied-image-stream=ocp-ppc64le/release-controller-bootstrap
-        - --registrySyncerOptions.denied-image-stream=ocp-ppc64le-priv/release-controller-bootstrap
-        - --registrySyncerOptions.image-stream-prefix=openshift/knative-
-        - --registrySyncerOptions.image-stream-prefix=openshift/kubefed-operator-
-        - --registrySyncerOptions.image-stream-prefix=openshift/tektoncd-
-        - --registrySyncerOptions.image-stream-prefix=openshift/origin-v4.0
-        - --registrySyncerOptions.image-stream-prefix=openshift/origin-v3.10
-        - --registrySyncerOptions.image-stream-prefix=openshift/origin-v3.11
         - --enable-controller=serviceaccount_secret_refresher
         - --serviceAccountRefresherOptions.enabled-namespace=ci
         - --serviceAccountRefresherOptions.remove-old-secrets=true
@@ -227,6 +208,9 @@ spec:
         - name: release-48
           mountPath: /etc/configs/release-4.8
           readOnly: true
+        - name: release-49
+          mountPath: /etc/configs/release-4.9
+          readOnly: true
         - name: job-config-misc
           mountPath: /etc/job-config/misc
           readOnly: true
@@ -259,6 +243,9 @@ spec:
           readOnly: true
         - name: job-config-48
           mountPath: /etc/job-config/4.8
+          readOnly: true
+        - name: job-config-49
+          mountPath: /etc/job-config/4.9
           readOnly: true
         resources:
           requests:
@@ -314,6 +301,9 @@ spec:
       - name: release-48
         configMap:
           name: ci-operator-4.8-configs
+      - name: release-49
+        configMap:
+          name: ci-operator-4.9-configs
       - name: config
         configMap:
           name: config
@@ -350,6 +340,9 @@ spec:
       - name: job-config-48
         configMap:
           name: job-config-4.8
+      - name: job-config-49
+        configMap:
+          name: job-config-4.9
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition

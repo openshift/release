@@ -4,7 +4,7 @@ base_images:
     namespace: ocp-kni
     tag: assisted-test-infra
   base:
-    name: "4.7"
+    name: "4.8"
     namespace: ocp
     tag: base
   dev-scripts:
@@ -28,15 +28,15 @@ images:
       - registry.svc.ci.openshift.org/openshift/release:golang-1.15
   to: assisted-installer-agent
 promotion:
-  name: "4.7"
-  namespace: ocp
+  name: assisted
+  namespace: ocp-kni
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: "4.7"
+  name: "4.8"
   namespace: ocp
 tests:
 - artifact_dir: /tmp/artifacts
@@ -57,7 +57,7 @@ tests:
     cluster_profile: packet
     dependencies:
       ASSISTED_AGENT_IMAGE: pipeline:assisted-installer-agent
-    workflow: baremetalds-assisted
+    workflow: baremetalds-assisted-install
 - artifact_dir: /tmp/artifacts
   as: e2e-metal-assisted-onprem
   steps:
@@ -67,7 +67,20 @@ tests:
     env:
       ASSISTED_CONFIG: |
         DEPLOY_TARGET=onprem
-    workflow: baremetalds-assisted
+    workflow: baremetalds-assisted-install
+- artifact_dir: /tmp/artifacts
+  as: e2e-metal-assisted-ipv6
+  steps:
+    cluster_profile: packet
+    dependencies:
+      ASSISTED_AGENT_IMAGE: pipeline:assisted-installer-agent
+    env:
+      ASSISTED_CONFIG: |
+        IPv6=yes
+        IPv4=no
+        VIP_DHCP_ALLOCATION=no
+        PROXY=yes
+    workflow: baremetalds-assisted-install
 zz_generated_metadata:
   branch: master
   org: openshift

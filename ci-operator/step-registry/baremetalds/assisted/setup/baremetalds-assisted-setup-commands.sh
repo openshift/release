@@ -34,7 +34,7 @@ then
   scp "${SSHOPTS[@]}" "${SHARED_DIR}/assisted-additional-config" "root@${IP}:assisted-additional-config"
 fi
 
-timeout -s 9 175m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
+timeout -s 9 175m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths\{0,1\}".*/*** PULL_SECRET ***/g'
 
 set -xeuo pipefail
 
@@ -62,10 +62,6 @@ set +x
 echo "export PULL_SECRET='\$(cat /root/pull-secret)'" >> /root/config
 set -x
 
-echo "export PUBLIC_CONTAINER_REGISTRIES=quay.io,\$(echo ${RELEASE_IMAGE_LATEST} | cut -d'/' -f1)" >> /root/config
-echo "export ASSISTED_SERVICE_HOST=${IP}" >> /root/config
-echo "export ADDITIONAL_PARAMS=-cvo" >> /root/config
-
 # Override default images
 echo "export AGENT_DOCKER_IMAGE=${ASSISTED_AGENT_IMAGE}" >> /root/config
 echo "export CONTROLLER_IMAGE=${ASSISTED_CONTROLLER_IMAGE}" >> /root/config
@@ -74,6 +70,13 @@ echo "export INSTALLER_IMAGE=${ASSISTED_INSTALLER_IMAGE}" >> /root/config
 if [ "\${OPENSHIFT_INSTALL_RELEASE_IMAGE:-}" = "" ]; then
     echo "export OPENSHIFT_INSTALL_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}" >> /root/config
 fi
+
+IMAGES=(${ASSISTED_AGENT_IMAGE} ${ASSISTED_CONTROLLER_IMAGE} ${ASSISTED_INSTALLER_IMAGE} ${RELEASE_IMAGE_LATEST})
+CI_REGISTRIES=\$(for image in \${IMAGES}; do echo \${image} | cut -d'/' -f1; done | sort -u | paste -sd "," -)
+
+echo "export PUBLIC_CONTAINER_REGISTRIES=quay.io,\${CI_REGISTRIES}" >> /root/config
+echo "export ASSISTED_SERVICE_HOST=${IP}" >> /root/config
+echo "export ADDITIONAL_PARAMS=-cvo" >> /root/config
 
 if [[ -e /root/assisted-additional-config ]]
 then

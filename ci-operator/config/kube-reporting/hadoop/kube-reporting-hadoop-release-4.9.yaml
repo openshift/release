@@ -1,0 +1,45 @@
+base_images:
+  base:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-base-openshift-4.6
+  hbuilder:
+    name: release
+    namespace: openshift
+    tag: rhel-7-release-openshift-4.6
+  openshift_release_rhel-7-release-openshift-4.7:
+    name: release
+    namespace: openshift
+    tag: rhel-7-release-openshift-4.7
+  openshift_release_rhel-7-release-openshift-4.8:
+    name: release
+    namespace: openshift
+    tag: rhel-7-release-openshift-4.8
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-7-release-openshift-4.6
+images:
+- dockerfile_path: Dockerfile.rhel
+  from: base
+  inputs:
+    openshift_release_rhel-7-release-openshift-4.8:
+      as:
+      - registry.ci.openshift.org/openshift/release:rhel-7-release-openshift-4.8
+  to: metering-hadoop
+promotion:
+  name: "4.9"
+  namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.9"
+  namespace: ocp
+zz_generated_metadata:
+  branch: release-4.9
+  org: kube-reporting
+  repo: hadoop

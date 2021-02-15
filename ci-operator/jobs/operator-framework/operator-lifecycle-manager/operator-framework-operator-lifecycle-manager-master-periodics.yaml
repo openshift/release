@@ -17,12 +17,12 @@ periodics:
       - --give-pr-author-access-to-namespace=true
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --kubeconfig=/etc/apici/kubeconfig
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --repo=operator-lifecycle-manager
       - --secret-dir=/usr/local/e2e-operator-metrics-cluster-profile
       - --target=e2e-operator-metrics
       - --template=/usr/local/e2e-operator-metrics
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -77,6 +77,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/e2e-operator-metrics-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /usr/local/e2e-operator-metrics
         name: job-definition
         subPath: cluster-launch-installer-src.yaml
@@ -97,8 +100,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:

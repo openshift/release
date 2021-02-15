@@ -813,6 +813,48 @@ secret_configs:
 - from:
     .awscred:
       attachment: .awscred
+      bw_item: cluster-bot-osd-ephemeral
+    aws-account-id:
+      attachment: aws-account-id
+      bw_item: cluster-bot-osd-ephemeral
+    pull-secret:
+      dockerconfigJSON:
+      - auth_bw_attachment: auth
+        bw_item: api.ci-pull-secret
+        registry_url: registry.svc.ci.openshift.org
+      - auth_bw_attachment: token_image-puller_app.ci_reg_auth_value.txt
+        bw_item: build_farm
+        registry_url: registry.ci.openshift.org
+      - auth_bw_attachment: auth
+        bw_item: cloud.openshift.com-pull-secret
+        email_bw_field: email
+        registry_url: cloud.openshift.com
+      - auth_bw_attachment: auth
+        bw_item: quay.io-pull-secret
+        email_bw_field: email
+        registry_url: quay.io
+      - auth_bw_attachment: auth
+        bw_item: registry.connect.redhat.com-pull-secret
+        email_bw_field: email
+        registry_url: registry.connect.redhat.com
+      - auth_bw_attachment: auth
+        bw_item: registry.redhat.io-pull-secret
+        email_bw_field: email
+        registry_url: registry.redhat.io
+    sso-client-id:
+      attachment: ocm-developer-productivity-staging.user
+      bw_item: cluster-bot-osd-ephemeral
+    sso-client-secret:
+      attachment: ocm-developer-productivity-staging.token
+      bw_item: cluster-bot-osd-ephemeral
+  to:
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-osd-ephemeral
+    namespace: ci
+- from:
+    .awscred:
+      attachment: .awscred
       bw_item: jenkins-ci-iam
     insights-live.yaml:
       attachment: insights-live.yaml
@@ -989,7 +1031,8 @@ secret_configs:
       attachment: ssh-publickey
       bw_item: jenkins-ci-provisioner
   to:
-  - cluster: api.ci
+  - cluster_groups:
+    - non_app_ci
     name: cluster-secrets-openstack
     namespace: ci
 - from:
@@ -1030,7 +1073,8 @@ secret_configs:
       attachment: ssh-publickey
       bw_item: openstack-ppc64le
   to:
-  - cluster: api.ci
+  - cluster_groups:
+    - non_app_ci
     name: cluster-secrets-openstack-ppc64le
     namespace: ci
 - from:
@@ -1065,7 +1109,8 @@ secret_configs:
       attachment: ssh-publickey
       bw_item: jenkins-ci-provisioner
   to:
-  - cluster: api.ci
+  - cluster_groups:
+    - non_app_ci
     name: cluster-secrets-openstack-osuosl
     namespace: ci
 - from:
@@ -1141,9 +1186,6 @@ secret_configs:
         bw_item: registry.redhat.io-pull-secret
         email_bw_field: email
         registry_url: registry.redhat.io
-    secret.auto.tfvars:
-      attachment: secret.auto.tfvars
-      bw_item: vsphere-credentials
     ssh-privatekey:
       attachment: ssh-privatekey
       bw_item: jenkins-ci-iam
@@ -1416,15 +1458,9 @@ secret_configs:
     build01_github_client_id:
       bw_item: build_farm_01_cluster
       field: github_client_id
-    build01_github_client_secret:
-      bw_item: build_farm_01_cluster
-      field: github_client_secret
     build02_github_client_id:
       bw_item: build_farm_02_cluster
       field: github_client_id
-    build02_github_client_secret:
-      bw_item: build_farm_02_cluster
-      field: github_client_secret
     sa.ci-operator.vsphere.config:
       attachment: sa.ci-operator.vsphere.config
       bw_item: build_farm
@@ -1527,6 +1563,9 @@ secret_configs:
     sa.sinker.vsphere.config:
       attachment: sa.sinker.vsphere.config
       bw_item: build_farm
+    vsphere_github_client_id:
+      bw_item: build_farm_vsphere_cluster
+      field: github_client_id
   to:
   - cluster: api.ci
     name: build-farm-credentials
@@ -1571,6 +1610,9 @@ secret_configs:
     ci.htpasswd:
       attachment: ci.htpasswd
       bw_item: boskos-oauth-proxy
+    credentials:
+      bw_item: boskos-oauth-proxy
+      field: boskos-credentials
     password:
       bw_item: boskos-oauth-proxy
       field: boskos-password
@@ -1773,9 +1815,15 @@ secret_configs:
     sa.ci-chat-bot.api.ci.config:
       attachment: sa.ci-chat-bot.api.ci.config
       bw_item: ci-chat-bot
+    sa.ci-chat-bot.build01.config:
+      attachment: sa.ci-chat-bot.build01.config
+      bw_item: ci-chat-bot
+    sa.ci-chat-bot.build02.config:
+      attachment: sa.ci-chat-bot.build02.config
+      bw_item: ci-chat-bot
   to:
   - cluster: app.ci
-    name: ci-chat-bot-kubeconfig
+    name: ci-chat-bot-kubeconfigs
     namespace: ci
 - from:
     prometheus-k8s-basic-auth-password:
@@ -1808,24 +1856,6 @@ secret_configs:
   - cluster_groups:
     - non_app_ci
     name: cluster-bot-aws-account-for-ephemeral-osd
-    namespace: ci
-- from:
-    token:
-      bw_item: acm-cicd
-      field: acm-sonarcloud-token
-  to:
-  - cluster_groups:
-    - non_app_ci
-    name: acm-sonarcloud-token
-    namespace: ci
-- from:
-    token:
-      bw_item: acm-cicd
-      field: acm-cicd-github-token
-  to:
-  - cluster_groups:
-    - non_app_ci
-    name: acm-cicd-github
     namespace: ci
 - from:
     key.json:
@@ -1879,6 +1909,9 @@ secret_configs:
   - cluster: app.ci
     name: prometheus-auth-credentials
     namespace: prow-monitoring
+  - cluster: app.ci
+    name: prometheus-auth-credentials
+    namespace: ci
 - from:
     service-account.json:
       attachment: service-account.json
@@ -2127,6 +2160,34 @@ secret_configs:
   - cluster: app.ci
     name: registry-pull-credentials
     namespace: test-credentials
+    type: kubernetes.io/dockerconfigjson
+  - cluster: app.ci
+    name: registry-pull-credentials
+    namespace: origin
+    type: kubernetes.io/dockerconfigjson
+  - cluster: app.ci
+    name: registry-pull-credentials
+    namespace: ocp
+    type: kubernetes.io/dockerconfigjson
+  - cluster: app.ci
+    name: registry-pull-credentials
+    namespace: ocp-priv
+    type: kubernetes.io/dockerconfigjson
+  - cluster: app.ci
+    name: registry-pull-credentials
+    namespace: ocp-ppc64le
+    type: kubernetes.io/dockerconfigjson
+  - cluster: app.ci
+    name: registry-pull-credentials
+    namespace: ocp-ppc64le-priv
+    type: kubernetes.io/dockerconfigjson
+  - cluster: app.ci
+    name: registry-pull-credentials
+    namespace: ocp-s390x
+    type: kubernetes.io/dockerconfigjson
+  - cluster: app.ci
+    name: registry-pull-credentials
+    namespace: ocp-s390x-priv
     type: kubernetes.io/dockerconfigjson
 - from:
     .dockerconfigjson:
@@ -2557,4 +2618,28 @@ secret_configs:
   to:
   - cluster: build02
     name: dex-rh-sso
+    namespace: openshift-config
+- from:
+    clientSecret:
+      bw_item: build_farm_01_cluster
+      field: github_client_secret
+  to:
+  - cluster: build01
+    name: github-client-secret
+    namespace: openshift-config
+- from:
+    clientSecret:
+      bw_item: build_farm_02_cluster
+      field: github_client_secret
+  to:
+  - cluster: build02
+    name: github-client-secret
+    namespace: openshift-config
+- from:
+    clientSecret:
+      bw_item: build_farm_vsphere_cluster
+      field: github_client_secret
+  to:
+  - cluster: vsphere
+    name: github-client-secret
     namespace: openshift-config

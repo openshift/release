@@ -35,7 +35,6 @@ images:
       - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
   to: cluster-authentication-operator
 promotion:
-  disabled: true
   name: 4.7-priv
   namespace: ocp-private
 resources:
@@ -62,8 +61,7 @@ tests:
 - artifact_dir: /tmp/artifacts
   as: unit
   commands: |
-    mkdir -p /tmp/artifacts
-    make test-unit JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
+    make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
   container:
     from: src
 - artifact_dir: /tmp/artifacts
@@ -79,8 +77,7 @@ tests:
     - as: test
       cli: latest
       commands: |
-        mkdir -p /tmp/artifacts
-        make test-e2e JUNITFILE=/tmp/artifacts/junit_report.xml
+        make test-e2e JUNITFILE=${ARTIFACT_DIR}/junit_report.xml
       from: src
       resources:
         requests:
@@ -112,8 +109,7 @@ tests:
     - as: test
       cli: latest
       commands: |
-        mkdir -p /tmp/artifacts
-        make test-e2e-encryption JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
+        make test-e2e-encryption JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
       from: src
       resources:
         requests:
@@ -127,13 +123,17 @@ tests:
     - as: test
       cli: latest
       commands: |
-        mkdir -p /tmp/artifacts
-        make test-e2e-encryption-perf JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
+        make test-e2e-encryption-perf JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
       from: src
       resources:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- artifact_dir: /tmp/artifacts
+  as: e2e-aws-single-node
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-single-node
 zz_generated_metadata:
   branch: release-4.7
   org: openshift-priv

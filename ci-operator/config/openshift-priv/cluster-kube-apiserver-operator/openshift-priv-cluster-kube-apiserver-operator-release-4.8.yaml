@@ -1,8 +1,16 @@
 base_images:
+  assisted-test-infra:
+    name: assisted-test
+    namespace: ocp-kni
+    tag: assisted-test-infra
   base:
     name: 4.8-priv
     namespace: ocp-private
     tag: base
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
   ocp_builder_golang-1.13:
     name: builder
     namespace: ocp
@@ -39,6 +47,7 @@ images:
       - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
   to: cluster-kube-apiserver-operator
 promotion:
+  disabled: true
   name: 4.8-priv
   namespace: ocp-private
 resources:
@@ -66,7 +75,7 @@ tests:
 - artifact_dir: /tmp/artifacts
   as: unit
   commands: |
-    make test-unit JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
+    make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
   container:
     from: test-bin
 - artifact_dir: /tmp/artifacts
@@ -92,7 +101,7 @@ tests:
     - as: test
       cli: latest
       commands: |
-        make test-e2e JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
+        make test-e2e JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
       from: src
       resources:
         requests:
@@ -106,7 +115,7 @@ tests:
     - as: test
       cli: latest
       commands: |
-        make test-e2e-encryption JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
+        make test-e2e-encryption JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
       from: src
       resources:
         requests:
@@ -125,7 +134,7 @@ tests:
     - as: test
       cli: latest
       commands: |
-        make test-e2e-encryption-perf JUNITFILE=/tmp/artifacts/junit_report.xml --warn-undefined-variables
+        make test-e2e-encryption-perf JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
       from: src
       resources:
         requests:
@@ -136,6 +145,11 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-serial
+- artifact_dir: /tmp/artifacts
+  as: e2e-metal-single-node-live-iso
+  steps:
+    cluster_profile: packet
+    workflow: baremetalds-sno
 zz_generated_metadata:
   branch: release-4.8
   org: openshift-priv

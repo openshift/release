@@ -46,7 +46,6 @@ CONFIG = {
     'aws-cpaas-quota-slice': {
         'us-east-1': 8,
         'us-east-2': 8,
-        'us-west-1': 8,
         'us-west-2': 8
     }
 }
@@ -68,10 +67,10 @@ for i in range(4):
 for i in range(10, 20):
     CONFIG['ovirt-quota-slice']['ovirt-{}'.format(i)] = 1
 
-for i in range(1, 4):
+for i in range(1, 3):
     CONFIG['kubevirt-quota-slice']['tenant-cluster-{}'.format(i)] = 1
 
-for i in range(0,6):
+for i in range(0,10):
     CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 config = {

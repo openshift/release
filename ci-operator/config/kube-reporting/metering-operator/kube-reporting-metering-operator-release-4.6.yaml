@@ -37,17 +37,17 @@ images:
   inputs:
     ocp_builder_rhel-8-golang-1.15-openshift-4.6:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
   to: metering-reporting-operator
 - dockerfile_path: Dockerfile.metering-ansible-operator.rhel8
   from: ansible-operator
   inputs:
     ocp_4.6_cli:
       as:
-      - registry.svc.ci.openshift.org/ocp/4.6:cli
+      - registry.ci.openshift.org/ocp/4.6:cli
     ocp_4.6_metering-helm:
       as:
-      - registry.svc.ci.openshift.org/ocp/4.6:metering-helm
+      - registry.ci.openshift.org/ocp/4.6:metering-helm
   to: metering-ansible-operator
 operator:
   bundles:
@@ -79,7 +79,7 @@ tag_specification:
 tests:
 - artifact_dir: /tmp/artifacts
   as: unit
-  commands: make unit TEST_OUTPUT_DIR=/tmp/artifacts
+  commands: make unit TEST_OUTPUT_DIR=${ARTIFACT_DIR}
   container:
     from: src
 - artifact_dir: /tmp/artifacts
@@ -119,7 +119,7 @@ tests:
         # as the metering stack is resource hungry.
         kubectl -n openshift-machine-api get machinesets --no-headers | awk '{ print $1 }' | xargs -I{} kubectl -n openshift-machine-api patch machineset {} --type json -p '[{"op": "replace", "path": "/spec/template/spec/providerSpec/value/instanceType", "value": "m5.xlarge"}]'
 
-        METERING_ANSIBLE_OPERATOR_INDEX_IMAGE=${OO_INDEX} TEST_ENABLE_MACHINE_AUTOSCALING="true" TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/e2e EXTRA_TEST_FLAGS="-run TestManualMeteringInstall" make e2e
+        METERING_ANSIBLE_OPERATOR_INDEX_IMAGE=${OO_INDEX} TEST_ENABLE_MACHINE_AUTOSCALING="true" TEST_OUTPUT_PATH=${ARTIFACT_DIR}/e2e EXTRA_TEST_FLAGS="-run TestManualMeteringInstall" make e2e
       dependencies:
       - env: OO_INDEX
         name: ci-index
@@ -142,7 +142,7 @@ tests:
         # as the metering stack is resource hungry.
         kubectl -n openshift-machine-api get machinesets --no-headers | awk '{ print $1 }' | xargs -I{} kubectl -n openshift-machine-api patch machineset {} --type json -p '[{"op": "replace", "path": "/spec/template/spec/providerSpec/value/instanceType", "value": "m5.xlarge"}]'
 
-        METERING_ANSIBLE_OPERATOR_INDEX_IMAGE=${OO_INDEX} TEST_ENABLE_MACHINE_AUTOSCALING="true" TEST_OUTPUT_PATH=/tmp/artifacts/metering_test_output/upgrade make e2e-upgrade
+        METERING_ANSIBLE_OPERATOR_INDEX_IMAGE=${OO_INDEX} TEST_ENABLE_MACHINE_AUTOSCALING="true" TEST_OUTPUT_PATH=${ARTIFACT_DIR}/upgrade make e2e-upgrade
       dependencies:
       - env: OO_INDEX
         name: ci-index

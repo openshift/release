@@ -38,6 +38,7 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
   to: prometheus
 promotion:
+  disabled: true
   name: 4.8-priv
   namespace: ocp-private
 resources:
@@ -52,6 +53,32 @@ tests:
 - artifact_dir: /tmp/artifacts
   as: vendor
   commands: make unused && git diff --exit-code
+  container:
+    from: src
+- artifact_dir: /tmp/artifacts
+  as: common-test
+  commands: GOOPTS="-tags=builtinassets -p=1" make common-test
+  container:
+    from: src
+- artifact_dir: /tmp/artifacts
+  as: react-app-test
+  commands: |
+    nodejs_version=v10.23.1
+    nodejs_platform=linux-x64
+    nodejs="node-${nodejs_version}-${nodejs_platform}"
+
+    cd /tmp
+    curl -LO "https://nodejs.org/download/release/${nodejs_version}/${nodejs}.tar.gz"
+    tar xf "${nodejs}.tar.gz"
+
+    export NODEJS_HOME="/tmp/${nodejs}"
+    export PATH=$PATH:$NODEJS_HOME/bin
+
+    HOME=/tmp npm install yarn
+    export PATH=$PATH:/tmp/node_modules/.bin
+    cd -
+
+    make react-app-test
   container:
     from: src
 - artifact_dir: /tmp/artifacts

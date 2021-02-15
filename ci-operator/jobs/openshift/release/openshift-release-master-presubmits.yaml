@@ -64,7 +64,7 @@ presubmits:
         - core-services/prow/02_config/_boskos.yaml
         command:
         - /app
-        image: gcr.io/k8s-staging-boskos/checkconfig:v20210119-648119d
+        image: gcr.io/k8s-staging-boskos/checkconfig:v20210210-9ac98d8
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -126,11 +126,6 @@ presubmits:
           valueFrom:
             secretKeyRef:
               key: build01_github_client_id
-              name: build-farm-credentials
-        - name: github_client_secret
-          valueFrom:
-            secretKeyRef:
-              key: build01_github_client_secret
               name: build-farm-credentials
         - name: slack_api_url
           valueFrom:
@@ -194,11 +189,6 @@ presubmits:
             secretKeyRef:
               key: build02_github_client_id
               name: build-farm-credentials
-        - name: github_client_secret
-          valueFrom:
-            secretKeyRef:
-              key: build02_github_client_secret
-              name: build-farm-credentials
         - name: slack_api_url
           valueFrom:
             secretKeyRef:
@@ -243,6 +233,8 @@ presubmits:
       - args:
         - --config-dir
         - ./ci-operator/config/
+        - --registry
+        - ./ci-operator/step-registry/
         command:
         - ci-operator-checkconfig
         image: ci-operator-checkconfig:latest
@@ -385,7 +377,7 @@ presubmits:
         - mismatched-tide-lenient
         command:
         - /checkconfig
-        image: gcr.io/k8s-prow/checkconfig:v20210130-326c8c1f2a
+        image: gcr.io/k8s-prow/checkconfig:v20210215-f94bc1dc87
         imagePullPolicy: Always
         name: ""
         resources:
@@ -991,6 +983,11 @@ presubmits:
         env:
         - name: HOME
           value: /tmp
+        - name: github_client_id
+          valueFrom:
+            secretKeyRef:
+              key: vsphere_github_client_id
+              name: build-farm-credentials
         image: registry.ci.openshift.org/ci/applyconfig:latest
         imagePullPolicy: Always
         name: ""

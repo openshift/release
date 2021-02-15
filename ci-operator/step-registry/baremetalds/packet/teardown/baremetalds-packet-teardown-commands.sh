@@ -6,10 +6,6 @@ set -o pipefail
 
 echo "************ baremetalds packet teardown command ************"
 
-# This is required to be able to SSH.
-# shellcheck source=/dev/null
-source "${SHARED_DIR}/fix-uid.sh"
-
 # Run Ansible playbook
 cd
 cat > packet-teardown.yaml <<-EOF

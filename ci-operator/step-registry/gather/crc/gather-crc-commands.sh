@@ -31,4 +31,4 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
     --quiet \
     --project "${GOOGLE_PROJECT_ID}" \
     --zone "${GOOGLE_COMPUTE_ZONE}" \
-    --recurse packer@"${INSTANCE_PREFIX}":~/crc/test/integration/out/test-results/ ${ARTIFACT_DIR}
+    --recurse packer@"${INSTANCE_PREFIX}":~/crc/test/e2e/out/test-results/ ${ARTIFACT_DIR}

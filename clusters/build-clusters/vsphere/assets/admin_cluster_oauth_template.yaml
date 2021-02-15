@@ -1,0 +1,40 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+objects:
+- apiVersion: config.openshift.io/v1
+  kind: OAuth
+  metadata:
+    name: cluster
+  spec:
+    identityProviders:
+    - name: github
+      mappingMethod: claim
+      type: GitHub
+      github:
+        # client id is a secret too. https://developer.github.com/v3/guides/basics-of-authentication/
+        clientID: "${github_client_id}"
+        clientSecret:
+          name: github-client-secret
+        organizations:
+          - openshift
+    - ldap:
+        attributes:
+          email: []
+          id:
+          - dn
+          name:
+          - cn
+          preferredUsername:
+          - uid
+        bindDN: cn=admin,dc=openldap-vsphere,dc=openshiftcorp,dc=com
+        bindPassword:
+          name: ldap-bind-password-6wtjz
+        insecure: true
+        url: ldap://10.0.5.25/ou=Users,dc=openldap-vsphere,dc=openshiftcorp,dc=com
+      mappingMethod: claim
+      name: openldap.vmc.ci.openshift.org
+      type: LDAP
+parameters:
+- description: github client ID
+  name: github_client_id
+  required: true

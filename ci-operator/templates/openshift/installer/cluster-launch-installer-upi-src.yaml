@@ -322,7 +322,7 @@ objects:
       - name: PULL_SECRET_PATH
         value: /etc/openshift-installer/pull-secret
       - name: TFVARS_PATH
-        value: /etc/openshift-installer/secret.auto.tfvars
+        value: /etc/openshift-installer/vmc.secret.auto.tfvars
       - name: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
         value: ${RELEASE_IMAGE_LATEST}
       - name: OPENSHIFT_INSTALL_INVOKER
@@ -529,7 +529,7 @@ objects:
           RHCOS_AMI="$(jq -r .amis[\"${AWS_REGION}\"].hvm /var/lib/openshift-install/rhcos.json)"
           # FIXME: get epel-release or otherwise add awscli to our UPI image
           export PATH="${HOME}/.local/bin:${PATH}"
-          easy_install --user pip  # our Python 2.7.5 is even too old for ensurepip
+          easy_install --user 'pip<21'  # our Python 2.7.5 is even too old for ensurepip
           pip install --user awscli
 
           export AWS_DEFAULT_REGION="${AWS_REGION}"  # CLI prefers the former
@@ -714,7 +714,7 @@ objects:
 
           # Install pyopenssl
           export PATH=${HOME}/.local/bin:${PATH}
-          easy_install --user pip
+          easy_install --user 'pip<21'
           pip install --user pyopenssl
 
           export BASE_DOMAIN_ZONE_NAME=`gcloud dns managed-zones list --filter "DNS_NAME=${base_domain}." --format json | jq -r .[0].name`
@@ -1086,7 +1086,7 @@ objects:
       - name: AWS_SHARED_CREDENTIALS_FILE
         value: /etc/openshift-installer/.awscred
       - name: TFVARS_PATH
-        value: /etc/openshift-installer/secret.auto.tfvars
+        value: /etc/openshift-installer/vmc.secret.auto.tfvars
       - name: AWS_REGION
         value: us-east-1
       - name: GOOGLE_CLOUD_KEYFILE_JSON
@@ -1176,6 +1176,7 @@ objects:
             mkdir -p ${ARTIFACT_DIR}/nodes/$i
             queue ${ARTIFACT_DIR}/nodes/$i/heap oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/debug/pprof/heap
             FILTER=gzip queue ${ARTIFACT_DIR}/nodes/$i/journal.gz oc --insecure-skip-tls-verify adm node-logs $i --unify=false
+            FILTER=gzip queue ${ARTIFACT_DIR}/nodes/$i/journal-previous.gz oc --insecure-skip-tls-verify adm node-logs $i --unify=false --boot=-1
           done < /tmp/nodes
 
           # Snapshot iptables-save on each node for debugging possible kube-proxy issues

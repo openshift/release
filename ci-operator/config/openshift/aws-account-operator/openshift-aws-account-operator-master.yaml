@@ -1,38 +1,50 @@
-base_images:
-  base:
-    name: "4.4"
-    namespace: ocp
-    tag: base
-  openshift_release_golang-1.10:
-    name: release
-    namespace: openshift
-    tag: golang-1.10
-  openshift_release_golang-1.13:
-    name: release
-    namespace: openshift
-    tag: golang-1.13
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.13
+  from_repository: true
 images:
 - dockerfile_path: build/Dockerfile
-  from: base
-  to: aws-account-operator
+  to: unused
 resources:
   '*':
+    limits:
+      memory: 4Gi
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
 - artifact_dir: /tmp/artifacts
-  as: lint
+  as: coverage
   commands: |
-    export GOLANGCI_LINT_VERSION=1.30.0
-    export GOLANGCI_LINT_CACHE=/tmp/.cache
-    curl -sfL "https://github.com/golangci/golangci-lint/releases/download/v${GOLANGCI_LINT_VERSION}/golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64.tar.gz" | tar -C /go/bin -zx --strip-components=1 "golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64/golangci-lint"
-    make lint
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  secret:
+    mount_path: /tmp/secret
+    name: aws-account-operator-codecov-token
+- artifact_dir: /tmp/artifacts
+  as: publish-coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  postsubmit: true
+  secret:
+    mount_path: /tmp/secret
+    name: aws-account-operator-codecov-token
+- artifact_dir: /tmp/artifacts
+  as: lint
+  commands: make lint
+  container:
+    from: src
+- artifact_dir: /tmp/artifacts
+  as: test
+  commands: make test
+  container:
+    from: src
+- artifact_dir: /tmp/artifacts
+  as: validate
+  commands: make validate
   container:
     from: src
 zz_generated_metadata:
