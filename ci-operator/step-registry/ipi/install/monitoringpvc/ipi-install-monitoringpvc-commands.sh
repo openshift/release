@@ -21,5 +21,5 @@ data:
         spec:
           resources:
             requests:
-              storage: 10Gi
+              storage: 175Gi
 EOF
