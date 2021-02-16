@@ -27,3 +27,9 @@ pullSecret: >
 sshKey: |
   ${ssh_pub_key}
 EOF
+
+if [ ${FIPS_ENABLED} = "true" ]; then
+	cat >> "${out}" << EOF
+fips: true
+EOF
+fi
