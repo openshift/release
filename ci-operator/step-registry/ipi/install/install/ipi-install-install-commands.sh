@@ -4,6 +4,37 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+function populate_artifact_dir() {
+  set +e
+  echo "Copying log bundle..."
+  cp "${dir}"/log-bundle-*.tar.gz "${ARTIFACT_DIR}/" 2>/dev/null
+  echo "Removing REDACTED info from log..."
+  sed '
+    s/password: .*/password: REDACTED/;
+    s/X-Auth-Token.*/X-Auth-Token REDACTED/;
+    s/UserData:.*,/UserData: REDACTED,/;
+    ' "${dir}/.openshift_install.log" > "${ARTIFACT_DIR}/.openshift_install.log"
+}
+
+function prepare_next_steps() {
+  set +e
+  echo "Setup phase finished, prepare env for next steps"
+  populate_artifact_dir
+  echo "Copying required artifacts to shared dir"
+  #Copy the auth artifacts to shared dir for the next steps
+  cp \
+      -t "${SHARED_DIR}" \
+      "${dir}/auth/kubeconfig" \
+      "${dir}/auth/kubeadmin-password" \
+      "${dir}/metadata.json"
+
+  # TODO: remove once BZ#1926093 is done and backported
+  if [[ "${CLUSTER_TYPE}" == "ovirt" ]]; then
+    cp -t "${SHARED_DIR}" "${dir}"/terraform.*
+  fi
+}
+
+trap 'prepare_next_steps' EXIT
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 if [[ -z "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" ]]; then
@@ -54,33 +85,11 @@ done <   <( find "${SHARED_DIR}" -name "manifest_*.yml" -print0)
 
 TF_LOG=debug openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
 
-set +e
 wait "$!"
 ret="$?"
-cp "${dir}"/log-bundle-*.tar.gz "${ARTIFACT_DIR}/" 2>/dev/null
-set -e
-
-sed '
-  s/password: .*/password: REDACTED/;
-  s/X-Auth-Token.*/X-Auth-Token REDACTED/;
-  s/UserData:.*,/UserData: REDACTED,/;
-  ' "${dir}/.openshift_install.log" > "${ARTIFACT_DIR}/.openshift_install.log"
-
-cp \
-    -t "${SHARED_DIR}" \
-    "${dir}/auth/kubeconfig" \
-    "${dir}/auth/kubeadmin-password" \
-    "${dir}/metadata.json"
-
-# TODO: remove once BZ#1926093 is done and backported
-if [[ "${CLUSTER_TYPE}" == "ovirt" ]]; then
-  cp -t "${SHARED_DIR}" "${dir}"/terraform.*
-fi
 
 if test "${ret}" -eq 0 ; then
   touch  "${SHARED_DIR}/success"
-else
-  touch  "${SHARED_DIR}/failure"
 fi
 
 exit "$ret"
