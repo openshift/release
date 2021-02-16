@@ -10,8 +10,7 @@ oc registry login
 MIRROR_REPO=$( oc get is release -o 'jsonpath={.status.publicDockerImageRepository}' )
 # server + name
 MIRROR_BASE=$(dirname ${REPO_NAME})
-# Tag of the mirrored release
-MIRROR_TAG="mirorred"
+# Tag of the mirrored release is set in envs
 # Imagestream created by ci-operator which holds the mirrored images
 MIRROR_IMAGESTREAM="stable-${MIRROR_TAG}"
 
