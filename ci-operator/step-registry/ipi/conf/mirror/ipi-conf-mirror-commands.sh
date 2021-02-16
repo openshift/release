@@ -11,6 +11,7 @@ MIRROR_REPO=$( oc get is release -o 'jsonpath={.status.publicDockerImageReposito
 # server + name
 MIRROR_BASE=$(dirname ${MIRROR_REPO})
 # Tag of the mirrored release is set in envs
+MIRROR_TAG="mirrored"
 MIRROR_IMAGESTREAM="${MIRROR_TAG}-scratch"
 
 echo "MIRROR_REPO: ${MIRROR_REPO}"
