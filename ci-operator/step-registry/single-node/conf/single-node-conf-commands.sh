@@ -4,6 +4,9 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+echo "Install config before single-node replica patch:"
+cat "${SHARED_DIR}/install-config.yaml"
+
 pip3 install pyyaml --user
 python3 -c '
 import yaml
@@ -36,3 +39,8 @@ for machine_pool in cfg["compute"]:
 with open(output_file, "w") as f:
     yaml.safe_dump(cfg, f)
 ' "${SHARED_DIR}/install-config.yaml"
+
+echo
+
+echo "Install config after single-node replica patch:"
+cat "${SHARED_DIR}/install-config.yaml"
