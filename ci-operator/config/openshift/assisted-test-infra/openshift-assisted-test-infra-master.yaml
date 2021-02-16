@@ -1,5 +1,5 @@
 base_images:
-  assisted_service:
+  assisted-service:
     name: assisted
     namespace: ocp-kni
     tag: assisted-service
@@ -16,7 +16,7 @@ images:
 - dockerfile_path: Dockerfile.test-infra
   from: src
   inputs:
-    assisted_service:
+    assisted-service:
       as:
       - quay.io/ocpmetal/assisted-service:latest
   to: assisted-test-infra
@@ -36,6 +36,8 @@ tests:
   as: unit
   steps:
     cluster_profile: packet
+    dependencies:
+      ASSISTED_SERVICE_IMAGE: pipeline:assisted-service
     env:
       ASSISTED_CONFIG: |
         MAKEFILE_TARGET="create_full_environment run test_parallel"
@@ -44,6 +46,8 @@ tests:
   as: e2e-metal-assisted-ipv6
   steps:
     cluster_profile: packet
+    dependencies:
+      ASSISTED_SERVICE_IMAGE: pipeline:assisted-service
     env:
       ASSISTED_CONFIG: |
         IPv6=yes
@@ -55,6 +59,8 @@ tests:
   as: e2e-metal-assisted-onprem
   steps:
     cluster_profile: packet
+    dependencies:
+      ASSISTED_SERVICE_IMAGE: pipeline:assisted-service
     env:
       ASSISTED_CONFIG: |
         DEPLOY_TARGET=onprem
@@ -63,11 +69,15 @@ tests:
   as: e2e-metal-assisted
   steps:
     cluster_profile: packet
+    dependencies:
+      ASSISTED_SERVICE_IMAGE: pipeline:assisted-service
     workflow: baremetalds-assisted-install
 - artifact_dir: /tmp/artifacts
   as: e2e-metal-assisted-single-node
   steps:
     cluster_profile: packet
+    dependencies:
+      ASSISTED_SERVICE_IMAGE: pipeline:assisted-service
     env:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
@@ -79,12 +89,16 @@ tests:
   cron: '@daily'
   steps:
     cluster_profile: packet
+    dependencies:
+      ASSISTED_SERVICE_IMAGE: pipeline:assisted-service
     workflow: baremetalds-assisted
 - artifact_dir: /tmp/artifacts
   as: e2e-metal-assisted-single-node-periodic
   cron: '@daily'
   steps:
     cluster_profile: packet
+    dependencies:
+      ASSISTED_SERVICE_IMAGE: pipeline:assisted-service
     env:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
