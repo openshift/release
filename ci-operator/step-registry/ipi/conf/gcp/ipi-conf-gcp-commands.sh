@@ -16,4 +16,9 @@ platform:
   gcp:
     projectID: ${GCP_PROJECT}
     region: ${GCP_REGION}
+compute:
+- name: worker
+  platform:
+    gcp:
+      type: ${COMPUTE_NODE_TYPE}
 EOF
