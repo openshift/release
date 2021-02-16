@@ -4,7 +4,7 @@ OUTPUT="$SHARED_DIR/$CLUSTERPOOL_LIST_FILE"
 
 cp "$MAKEFILE" ./Makefile
 
-make clusterpool/list-clusterpools CLUSTERPOOL_LIST_ARGUMENTS=" -o json"
+make clusterpool/list-clusterpools CLUSTERPOOL_LIST_ARGUMENTS=" -o json" \
     | jq -r '.items[] | select(.status.ready > 0) | .metadata.name' > "$OUTPUT"
 
 if [[ -n "$CLUSTERPOOL_LIST_FILTER" ]]; then
