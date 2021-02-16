@@ -7,14 +7,6 @@ base_images:
     name: "4.6"
     namespace: ocp
     tag: cli
-  openshift_knative-v0.15.2_knative-eventing-src:
-    name: knative-v0.15.2
-    namespace: openshift
-    tag: knative-eventing-src
-  openshift_knative-v0.15.2_knative-serving-src:
-    name: knative-v0.15.2
-    namespace: openshift
-    tag: knative-serving-src
   openshift_knative-v0.16.0_knative-eventing-src:
     name: knative-v0.16.0
     namespace: openshift
@@ -71,10 +63,6 @@ base_images:
     name: knative-v0.20.0
     namespace: openshift
     tag: knative-serving-src
-  upi-installer:
-    name: "4.6"
-    namespace: ocp
-    tag: upi-installer
 build_root:
   project_image:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
@@ -111,6 +99,9 @@ images:
 - context_dir: olm-catalog/serverless-operator
   from: base
   to: serverless-bundle
+promotion:
+  name: openshift-serverless-nightly
+  namespace: openshift
 releases:
   latest:
     release:
@@ -125,13 +116,13 @@ resources:
       memory: 200Mi
 tests:
 - artifact_dir: /tmp/artifacts
-  as: e2e-vsphere-ocp-46-continuous
-  cron: 0 0 * * 0
+  as: operator-e2e-aws-ocp-46
   steps:
-    cluster_profile: vsphere
+    allow_skip_on_success: true
+    cluster_profile: aws
     test:
-    - as: serverless-e2e
-      commands: make install-mesh test-e2e-with-kafka
+    - as: operator-e2e
+      commands: make test-e2e-with-kafka
       dependencies:
       - env: KNATIVE_OPENSHIFT_INGRESS
         name: knative-openshift-ingress
@@ -146,9 +137,101 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: openshift-e2e-vsphere-upi
+    workflow: openshift-e2e-aws
+- artifact_dir: /tmp/artifacts
+  as: upstream-e2e-aws-ocp-46
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws
+    test:
+    - as: serverless-e2e
+      commands: make test-upstream-e2e-no-upgrade
+      dependencies:
+      - env: KNATIVE_OPENSHIFT_INGRESS
+        name: knative-openshift-ingress
+      - env: KNATIVE_OPERATOR
+        name: knative-operator
+      - env: OPENSHIFT_KNATIVE_OPERATOR
+        name: openshift-knative-operator
+      from: serverless-operator-src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-aws
+- artifact_dir: /tmp/artifacts
+  as: e2e-aws-ocp-46-continuous
+  cron: 0 */12 * * 1-5
+  steps:
+    cluster_profile: aws
+    test:
+    - as: serverless-e2e
+      commands: make test-e2e test-upstream-e2e-no-upgrade
+      dependencies:
+      - env: KNATIVE_OPENSHIFT_INGRESS
+        name: knative-openshift-ingress
+      - env: KNATIVE_OPERATOR
+        name: knative-operator
+      - env: OPENSHIFT_KNATIVE_OPERATOR
+        name: openshift-knative-operator
+      from: serverless-operator-src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-aws
+- artifact_dir: /tmp/artifacts
+  as: upgrade-tests-aws-ocp-46-continuous
+  cron: 0 */12 * * 1-5
+  steps:
+    cluster_profile: aws
+    test:
+    - as: serverless-e2e
+      commands: make test-upgrade
+      dependencies:
+      - env: KNATIVE_OPENSHIFT_INGRESS
+        name: knative-openshift-ingress
+      - env: KNATIVE_OPERATOR
+        name: knative-operator
+      - env: OPENSHIFT_KNATIVE_OPERATOR
+        name: openshift-knative-operator
+      from: serverless-operator-src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: "2"
+          memory: 4Gi
+    workflow: openshift-e2e-aws
+- artifact_dir: /tmp/artifacts
+  as: upgrade-tests-aws-ocp-46
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws
+    test:
+    - as: serverless-e2e
+      commands: make test-upgrade
+      dependencies:
+      - env: KNATIVE_OPENSHIFT_INGRESS
+        name: knative-openshift-ingress
+      - env: KNATIVE_OPERATOR
+        name: knative-operator
+      - env: OPENSHIFT_KNATIVE_OPERATOR
+        name: openshift-knative-operator
+      from: serverless-operator-src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: "2"
+          memory: 4Gi
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
-  branch: master
+  branch: main
   org: openshift-knative
   repo: serverless-operator
-  variant: 4.6-vsphere
+  variant: "4.6"
