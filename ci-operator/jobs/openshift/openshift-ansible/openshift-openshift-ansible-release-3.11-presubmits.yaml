@@ -18,7 +18,6 @@ presubmits:
           ci-operator \
             --artifact-dir=$(ARTIFACTS) \
             --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson \
-            --kubeconfig=/etc/apici/kubeconfig \
             --secret-dir=/usr/local/e2e-gcp-cluster-profile \
             --template=/usr/local/e2e-gcp-major-upgrade-311 \
             --target=e2e-gcp-major-upgrade-311 \
@@ -52,9 +51,6 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
         - mountPath: /usr/local/e2e-gcp-cluster-profile
           name: e2e-gcp-major-upgrade-311
         - mountPath: /usr/local/e2e-gcp-major-upgrade-311
@@ -65,12 +61,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
       - name: e2e-gcp-major-upgrade-311
         projected:
           sources:
