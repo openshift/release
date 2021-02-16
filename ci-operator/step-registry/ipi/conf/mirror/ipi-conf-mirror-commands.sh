@@ -39,3 +39,5 @@ imageContentSources:
   mirrors:
   - "${MIRROR_REPO}"
 EOF
+
+oc get istag ${MIRROR_BASE}:${MIRROR_TAG} -o=jsonpath="{.image.metadata.name}" > ${SHARED_DIR}/mirrored-release-pullspec
