@@ -32,6 +32,7 @@ controlPlane:
   name: master
   platform:
     aws:
+      type: ${COMPUTE_NODE_TYPE}
       zones: ${ZONES_STR}
 compute:
 - name: worker
@@ -41,7 +42,6 @@ compute:
       zones: ${ZONES_STR}
 platform:
   aws:
-    type: ${COMPUTE_NODE_TYPE}
     region: ${REGION}
     userTags:
       expirationDate: ${expiration_date}
