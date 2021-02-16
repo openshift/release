@@ -32,6 +32,7 @@ controlPlane:
   name: master
   platform:
     aws:
+      type: ${CONTROL_PLANE_NODE_TYPE}
       zones: ${ZONES_STR}
 compute:
 - name: worker
