@@ -44,3 +44,5 @@ echo
 
 echo "Install config after single-node replica patch:"
 cat "${SHARED_DIR}/install-config.yaml"
+
+exit 1
