@@ -61,9 +61,6 @@ else
             "${SHARED_DIR}/test-list" \
             "root@${IP}:/tmp/test-list"
         echo "### Running tests"
-        timeout \
-        --kill-after 10m \
-        120m \
         ssh \
             "${SSHOPTS[@]}" \
             "root@${IP}" \
