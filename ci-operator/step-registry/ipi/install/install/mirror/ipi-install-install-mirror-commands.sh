@@ -6,7 +6,8 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="$(cat ${SHARED_DIR}/mirrored-release-pullspec)"
+OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="$(cat ${SHARED_DIR}/mirrored-release-pullspec)"
+export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
 
 echo "Installing from release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 export SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
