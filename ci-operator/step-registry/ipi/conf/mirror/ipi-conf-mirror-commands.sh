@@ -20,7 +20,8 @@ echo "MIRROR_TAG: ${MIRROR_TAG}"
 echo "MIRROR_IMAGESTREAM: ${MIRROR_IMAGESTREAM}"
 
 # Cleanup mirrored imagestream
-oc create imagestream "${MIRROR_IMAGESTREAM}"
+oc adm policy add-role-to-user ci-operator-image $(oc whoami) -n ${NAMESPACE}
+oc create imagestream "${MIRROR_IMAGESTREAM}" -n ${NAMESPACE}
 
 oc adm release new \
   --from-release ${RELEASE_IMAGE_LATEST} \
@@ -31,7 +32,7 @@ oc adm release mirror \
   --from ${MIRROR_BASE}/${MIRROR_IMAGESTREAM}:release \
   --to ${MIRROR_REPO} \
   --to-release-image ${MIRROR_BASE}:${MIRROR_TAG}
-oc delete imagestream "$(basename "${MIRROR_BASE}/${MIRROR_IMAGESTREAM}")"
+oc delete imagestream "$(basename "${MIRROR_BASE}/${MIRROR_IMAGESTREAM}")" -n ${NAMESPACE}
 
 cat >> ${SHARED_DIR}/install-config.yaml << EOF
 imageContentSources:
