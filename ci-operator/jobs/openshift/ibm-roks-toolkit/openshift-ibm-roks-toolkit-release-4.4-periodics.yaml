@@ -16,7 +16,6 @@ periodics:
       - --artifact-dir=$(ARTIFACTS)
       - --give-pr-author-access-to-namespace=true
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --kubeconfig=/etc/apici/kubeconfig
       - --repo=ibm-roks-toolkit
       - --secret-dir=/usr/ibm-gate-test-secrets/
       - --target=create-cluster
@@ -30,9 +29,6 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /etc/apici
-        name: apici-ci-operator-credentials
-        readOnly: true
       - mountPath: /usr/ibm-gate-test-secrets/
         name: ibm-gate-test-secrets
         readOnly: true
@@ -47,12 +43,6 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: apici-ci-operator-credentials
-      secret:
-        items:
-        - key: sa.ci-operator.apici.config
-          path: kubeconfig
-        secretName: apici-ci-operator-credentials
     - name: ibm-gate-test-secrets
       secret:
         secretName: ibm-gate-test-secrets

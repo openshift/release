@@ -16,7 +16,6 @@ postsubmits:
         - --artifact-dir=$(ARTIFACTS)
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
         - --secret-dir=/secrets/aws-efs-operator-codecov-token
         - --target=coverage
         - --gcs-upload-secret=/secrets/gcs/service-account.json
@@ -29,9 +28,6 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
         - mountPath: /secrets/aws-efs-operator-codecov-token
           name: aws-efs-operator-codecov-token
           readOnly: true
@@ -43,12 +39,6 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
       - name: aws-efs-operator-codecov-token
         secret:
           secretName: aws-efs-operator-codecov-token
