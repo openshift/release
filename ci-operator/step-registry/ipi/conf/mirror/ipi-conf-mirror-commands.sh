@@ -11,8 +11,7 @@ MIRROR_REPO=$( oc get is release -o 'jsonpath={.status.publicDockerImageReposito
 # server + name
 MIRROR_BASE=$(dirname ${MIRROR_REPO})
 # Tag of the mirrored release is set in envs
-# Imagestream created by ci-operator which holds the mirrored images
-MIRROR_IMAGESTREAM="stable-${MIRROR_TAG}"
+MIRROR_IMAGESTREAM="${MIRROR_TAG}-scratch"
 
 echo "MIRROR_REPO: ${MIRROR_REPO}"
 echo "MIRROR_BASE: ${MIRROR_BASE}"
@@ -20,7 +19,7 @@ echo "MIRROR_TAG: ${MIRROR_TAG}"
 echo "MIRROR_IMAGESTREAM: ${MIRROR_IMAGESTREAM}"
 
 # Cleanup mirrored imagestream
-oc get is ${MIRROR_IMAGESTREAM} -o 'jsonpath={.spec.tags[*].name}' | xargs -n1 -I {} oc delete istag "${MIRROR_IMAGESTREAM}:{}"
+oc create imagestream "${MIRROR_IMAGESTREAM}"
 
 oc adm release new \
   --from-release ${RELEASE_IMAGE_LATEST} \
