@@ -106,6 +106,22 @@ tests:
         OPENSHIFT_INSTALL_RELEASE_IMAGE=registry.svc.ci.openshift.org/sno-dev/openshift-bip:0.2.0
     workflow: baremetalds-assisted
 - artifact_dir: /tmp/artifacts
+  as: e2e-metal-assisted-milestone-one-periodic
+  cron: '@daily'
+  steps:
+    cluster_profile: packet
+    dependencies:
+      ASSISTED_SERVICE_IMAGE: pipeline:assisted-service
+    env:
+      ASSISTED_CONFIG: |
+        NUM_MASTERS=1
+        IPv6=yes
+        IPv4=no
+        PROXY=yes
+        ADDITIONAL_PARAMS="--with-static-ips"
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=registry.svc.ci.openshift.org/sno-dev/openshift-bip:0.5.1
+    workflow: baremetalds-assisted
+- artifact_dir: /tmp/artifacts
   as: e2e-metal-single-node-live-iso
   steps:
     cluster_profile: packet
