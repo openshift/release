@@ -6078,7 +6078,7 @@ periodics:
         value: gcp
       - name: CLUSTER_VARIANT
         value: ovn
-      - name: CONFIG_SPEC
+      - name: UNRESOLVED_CONFIG
         value: |
           tag_specification:
             name: "$(BRANCH)"
@@ -6092,10 +6092,11 @@ periodics:
                 memory: 200Mi
           tests:
           - as: e2e-$(CLUSTER_TYPE)-upgrade
-            commands: TEST_SUITE=all run-upgrade-tests
-            openshift_installer:
+            steps:
               cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: true
+              env:
+                TEST_TYPE: "upgrade-conformance"
+              workflow: openshift-upgrade-$(CLUSTER_TYPE)-ovn
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -6259,7 +6260,7 @@ periodics:
         value: azure4
       - name: CLUSTER_VARIANT
         value: ovn
-      - name: CONFIG_SPEC
+      - name: UNRESOLVED_CONFIG
         value: |
           tag_specification:
             name: "$(BRANCH)"
@@ -6272,11 +6273,12 @@ periodics:
                 cpu: 100m
                 memory: 200Mi
           tests:
-          - as: e2e-azure-upgrade
-            commands: TEST_SUITE=all run-upgrade-tests
-            openshift_installer:
+          - as: e2e-$(CLUSTER_TYPE)-upgrade
+            steps:
               cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: true
+              env:
+                TEST_TYPE: "upgrade-conformance"
+              workflow: openshift-upgrade-$(CLUSTER_TYPE)-ovn
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
