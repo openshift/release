@@ -18,4 +18,5 @@ while ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}" ; do
   sleep 60
 done
 
+echo "Cluster is no longer accessible; delete successful"
 exit 0
