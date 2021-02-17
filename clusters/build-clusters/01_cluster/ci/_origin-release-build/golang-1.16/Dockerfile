@@ -27,16 +27,15 @@ RUN yum install -y epel-release && \
     git config --system user.email origin-release@redhat.com
 
 RUN \
+    set -x &&  \
     curl --fail --retry 3 -L https://golang.org/dl/go$VERSION.linux-amd64.tar.gz | tar -C /usr/local -xzf - && \
     go get golang.org/x/tools/cmd/cover \
-        github.com/Masterminds/glide \
         golang.org/x/tools/cmd/goimports \
         github.com/tools/godep \
         golang.org/x/lint/golint \
-        gotest.tools/gotestsum \
         github.com/openshift/release/tools/gotest2junit \
         github.com/openshift/imagebuilder/cmd/imagebuilder && \
-    GO111MODULE=on go get gotest.tools/gotestsum@v0.5.2 && \
+    GO111MODULE=on go get gotest.tools/gotestsum@v0.6.0 && \
     mv $GOPATH/bin/* /usr/bin/ && \
     rm -rf $GOPATH/* $GOPATH/.cache && \
     mkdir $GOPATH/bin && \
