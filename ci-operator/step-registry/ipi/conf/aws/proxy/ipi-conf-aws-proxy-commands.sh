@@ -301,6 +301,7 @@ auth_param basic realm proxy
 acl authenticated proxy_auth REQUIRED
 http_access allow authenticated
 pid_filename /tmp/proxy-setup
+url_rewrite_host_header off
 EOF
 )"
 
