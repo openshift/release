@@ -1,0 +1,125 @@
+{
+  "name":"4.9.0-0.ci",
+  "to": "release",
+  "message": "This release contains CI image builds of all code in release-4.9 (master) branches, and is updated each time someone merges.",
+  "mirrorPrefix": "4.9",
+  "expires":"72h",
+  "maxUnreadyReleases": 2,
+  "minCreationIntervalSeconds": 1800,
+  "pullSecretName": "source",
+  "publish":{
+    "mirror-to-origin":{
+      "imageStreamRef":{
+        "namespace": "origin",
+        "name": "4.9",
+        "excludeTags": [
+          "machine-os-content",
+          "machine-config-operator",
+          "machine-config-operator-rpms",
+          "installer",
+          "installer-artifacts",
+          "baremetal-installer",
+          "openstack-installer",
+          "upi-installer",
+          "libvirt-installer",
+          "baremetal-machine-controllers",
+          "baremetal-operator",
+          "sig-storage-local-static-provisioner",
+          "ironic",
+          "ironic-inspector",
+          "ironic-ipa-downloader",
+          "ironic-machine-os-downloader",
+          "ironic-static-ip-manager",
+          "cluster-samples-operator",
+          "operator-marketplace",
+          "cluster-update-keys"
+        ]
+      }
+    },
+    "tag":{"tagRef":{"name":"4.9-ci"}}
+  },
+  "verify":{
+    "gcp":{
+      "prowJob":{"name":"release-openshift-origin-installer-e2e-gcp-4.9"}
+    },
+    "aws-serial":{
+      "prowJob":{"name":"release-openshift-origin-installer-e2e-aws-serial-4.9"}
+    },
+    "upgrade":{
+      "upgrade":true,
+      "optional":true,
+      "prowJob":{"name":"release-openshift-origin-installer-e2e-gcp-upgrade-4.9"}
+    },
+    "upgrade-minor":{
+      "upgrade":true,
+      "upgradeFrom": "PreviousMinor",
+      "optional":false,
+      "prowJob":{"name":"release-openshift-origin-installer-e2e-aws-upgrade"}
+    }
+  },
+  "periodic":{
+    "upgrade-aws-minor":{
+      "interval":"6h",
+      "upgrade":true,
+      "upgradeFrom": "PreviousMinor",
+      "prowJob":{"name":"release-openshift-origin-installer-e2e-aws-upgrade-4.8-stable-to-4.9-ci"}
+    },
+    "upgrade-gcp":{
+      "interval":"6h",
+      "upgrade":true,
+      "prowJob":{"name":"release-openshift-origin-installer-e2e-gcp-upgrade-4.9"}
+    },
+    "upgrade-rollback-minor":{
+      "interval":"24h",
+      "upgrade":true,
+      "upgradeFrom": "PreviousMinor",
+      "prowJob":{"name":"release-openshift-origin-installer-e2e-aws-upgrade-rollback-4.8-to-4.9"}
+    },
+    "upgrade-rollback":{
+      "interval":"24h",
+      "upgrade":true,
+      "prowJob":{"name":"release-openshift-origin-installer-e2e-aws-upgrade-rollback-4.9"}
+    },
+    "upgrade-aws-ovn-minor":{
+      "interval":"2h",
+      "upgrade":true,
+      "upgradeFrom": "PreviousMinor",
+      "prowJob":{"name":"release-openshift-origin-installer-e2e-aws-ovn-upgrade-4.8-stable-to-4.9-ci"}
+    },
+    "upgrade-azure":{
+      "interval":"6h",
+      "upgrade":true,
+      "prowJob":{"name":"release-openshift-origin-installer-e2e-azure-upgrade-4.9"}
+    },
+    "upgrade-gcp-minor":{
+      "interval":"6h",
+      "upgrade":true,
+      "upgradeFrom": "PreviousMinor",
+      "prowJob":{"name":"release-openshift-origin-installer-e2e-gcp-upgrade-4.8-stable-to-4.9-ci"}
+    },
+    "upgrade-gcp-ovn-minor":{
+      "interval":"6h",
+      "upgrade":true,
+      "upgradeFrom": "PreviousMinor",
+      "prowJob":{"name":"release-openshift-origin-installer-e2e-gcp-ovn-upgrade-4.8-stable-to-4.9-ci"}
+    },
+    "upgrade-azure-minor":{
+      "interval":"6h",
+      "upgrade":true,
+      "upgradeFrom": "PreviousMinor",
+      "prowJob":{"name":"release-openshift-origin-installer-e2e-azure-upgrade-4.8-stable-to-4.9-ci"}
+    },
+    "upgrade-azure-ovn-minor":{
+      "interval":"6h",
+      "upgrade":true,
+      "upgradeFrom": "PreviousMinor",
+      "prowJob":{"name":"release-openshift-origin-installer-e2e-azure-ovn-upgrade-4.8-stable-to-4.9-ci"}
+    },
+    "upgrade-ovirt-minor":{
+      "cron":"0 0,13,22 * * *",
+      "upgrade":true,
+      "upgradeFrom": "PreviousMinor",
+      "prowJob":{"name":"periodic-ci-openshift-release-master-origin-4.8-stable-to-4.9-ci-e2e-ovirt-upgrade"}
+    }
+  }
+}
