@@ -4222,7 +4222,7 @@ periodics:
         value: "4.5"
       - name: CLUSTER_TYPE
         value: aws
-      - name: CONFIG_SPEC
+      - name: UNRESOLVED_CONFIG
         value: |
           tag_specification:
             name: "$(BRANCH)"
@@ -4236,10 +4236,12 @@ periodics:
                 memory: 200Mi
           tests:
           - as: e2e-$(CLUSTER_TYPE)-upgrade
-            commands: TEST_SUITE=all TEST_UPGRADE_OPTIONS=abort-at=99 run-upgrade-tests
-            openshift_installer:
+            steps:
               cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: true
+              env:
+                TEST_TYPE: "upgrade-conformance"
+                TEST_UPGRADE_OPTIONS: "abort-at=99"
+              workflow: openshift-upgrade-$(CLUSTER_TYPE)
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -4308,7 +4310,7 @@ periodics:
         value: "4.6"
       - name: CLUSTER_TYPE
         value: aws
-      - name: CONFIG_SPEC
+      - name: UNRESOLVED_CONFIG
         value: |
           tag_specification:
             name: "$(BRANCH)"
@@ -4322,10 +4324,12 @@ periodics:
                 memory: 200Mi
           tests:
           - as: e2e-$(CLUSTER_TYPE)-upgrade
-            commands: TEST_SUITE=all TEST_UPGRADE_OPTIONS=abort-at=random run-upgrade-tests
-            openshift_installer:
+            steps:
               cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: true
+              env:
+                TEST_TYPE: "upgrade-conformance"
+                TEST_UPGRADE_OPTIONS: "abort-at=random"
+              workflow: openshift-upgrade-$(CLUSTER_TYPE)
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
