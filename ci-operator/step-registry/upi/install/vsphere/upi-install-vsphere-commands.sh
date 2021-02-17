@@ -44,8 +44,7 @@ cp -t "${installer_dir}" \
 
 export KUBECONFIG="${installer_dir}/auth/kubeconfig"
 
-function gather_bootstrap_and_fail() {
-    set +e
+function gather_console_and_bootstrap() {
     # shellcheck source=/dev/null
     source "${SHARED_DIR}/govc.sh"
     # list all the virtual machines in the folder/rp
@@ -72,10 +71,13 @@ function gather_bootstrap_and_fail() {
     GATHER_BOOTSTRAP_ARGS+=('--bootstrap' "${bootstrap_0_ip}")
     GATHER_BOOTSTRAP_ARGS+=('--master' "${control_plane_0_ip}" '--master' "${control_plane_1_ip}" '--master' "${control_plane_2_ip}")
 
-    set -e
-    openshift-install --dir=/tmp/artifacts/installer gather bootstrap --key "${SSH_PRIV_KEY_PATH}" "${GATHER_BOOTSTRAP_ARGS[@]}"
+    # 4.5 and prior used the terraform.tfstate for gather bootstrap. This causes an error with:
+    # state snapshot was created by Terraform v0.12.24, which is newer than current v0.12.20; upgrade to Terraform v0.12.24 or greater to work with this state"
+    # move the state temporarily
+    mv "${installer_dir}/terraform.tfstate" "${installer_dir}/terraform.tfstate.backup"
+    openshift-install --log-level debug --dir="${installer_dir}" gather bootstrap --key "${SSH_PRIV_KEY_PATH}" "${GATHER_BOOTSTRAP_ARGS[@]}"
+    mv "${installer_dir}/terraform.tfstate.backup" "${installer_dir}/terraform.tfstate"
 
-  return 1
 }
 
 function approve_csrs() {
@@ -105,7 +107,7 @@ function update_image_registry() {
   oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"managementState":"Managed","storage":{"emptyDir":{}}}}'
 }
 
-echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
+date +%s > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
 echo "$(date -u --rfc-3339=seconds) - terraform init..."
 terraform init -input=false -no-color &
@@ -136,9 +138,10 @@ if [ $ret -ne 0 ]; then
   set +e
   # Attempt to gather bootstrap logs.
   echo "$(date -u --rfc-3339=seconds) - Bootstrap failed, attempting to gather bootstrap logs..."
-  gather_bootstrap_and_fail
+  gather_console_and_bootstrap
   sed 's/password: .*/password: REDACTED/' "${installer_dir}/.openshift_install.log" >>"${ARTIFACT_DIR}/.openshift_install.log"
-  cp log-bundle-*.tar.gz "${ARTIFACT_DIR}"
+  echo "$(date -u --rfc-3339=seconds) - Copy log-bundle to artifacts directory..."
+  cp --verbose "${installer_dir}"/log-bundle-*.tar.gz "${ARTIFACT_DIR}"
   set -e
   exit "$ret"
 fi
@@ -161,7 +164,7 @@ wait "$!"
 ret="$?"
 set -e
 
-echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_END"
+date +%s > "${SHARED_DIR}/TEST_TIME_INSTALL_END"
 
 touch /tmp/install-complete
 
