@@ -15,7 +15,7 @@ collect_artifacts() {
     echo "### Fetching results"
     ssh "${SSHOPTS[@]}" "root@${IP}" tar -czf - /tmp/artifacts | tar -C "${ARTIFACT_DIR}" -xzf -
 }
-trap collect_artifacts EXIT
+trap collect_artifacts EXIT TERM
 
 # Copy test binaries on packet server
 echo "### Copying test binaries"
@@ -47,6 +47,9 @@ else
             "${SHARED_DIR}/test-list" \
             "root@${IP}:/tmp/test-list"
         echo "### Running tests"
+        timeout \
+        --kill-after 10m \
+        120m \
         ssh \
             "${SSHOPTS[@]}" \
             "root@${IP}" \
