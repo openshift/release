@@ -34,13 +34,35 @@ resources:
 tag_specification:
   name: "4.7"
   namespace: ocp
-test_binary_build_commands: make test
 tests:
 - artifact_dir: /tmp/artifacts
   as: unit
   commands: make test
   container:
     from: src
+- artifact_dir: /tmp/artifacts
+  as: e2e-aws
+  steps:
+    cluster_profile: aws
+    test:
+    - as: install-hypershift
+      cli: latest
+      commands: go run . install --hypershift-image "${HYPERSHIFT_RELEASE_LATEST}"
+      dependencies:
+      - env: HYPERSHIFT_RELEASE_LATEST
+        name: hypershift
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - as: test-e2e
+      cli: latest
+      commands: go test -tags e2e -v ./test/e2e -args --ginkgo.v --ginkgo.trace --e2e.quick-start.aws-credentials-file ${CLUSTER_PROFILE_DIR}/.awscred --e2e.quick-start.pull-secret-file ${CLUSTER_PROFILE_DIR}/pull-secret --e2e.quick-start.ssh-key-file ${CLUSTER_PROFILE_DIR}/ssh-publickey
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: openshift
