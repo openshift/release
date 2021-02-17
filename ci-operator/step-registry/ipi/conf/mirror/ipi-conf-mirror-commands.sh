@@ -20,6 +20,9 @@ echo "MIRROR_TAG: ${MIRROR_TAG}"
 echo "MIRROR_IMAGESTREAM: ${MIRROR_IMAGESTREAM}"
 
 # Cleanup mirrored imagestream
+set -x
+echo $KUBECONFIG
+oc status
 oc adm policy add-role-to-user ci-operator-image $(oc whoami) -n ${NAMESPACE}
 oc create imagestream "${MIRROR_IMAGESTREAM}" -n ${NAMESPACE}
 
