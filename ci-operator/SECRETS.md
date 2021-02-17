@@ -186,13 +186,11 @@ should identify the owning team and should correspond to a subdirectory of [core
 The following Jenkins masters have their credentials stored in secrets on the
 cluster:
 
- - openshift-ci-robot@ci.dev.openshift.redhat.com
  - openshift-ci-robot@ci.openshift.redhat.com
  - katabuilder@kata-jenkins-ci.westus2.cloudapp.azure.com
 
 For each master, the `jenkins-credentials-${master_url}` secret holds the
-password for the Jenkins user in the `password` key. For the `ci.dev` master,
-a client cert, key and CA cert are also present for client authentication.
+password for the Jenkins user in the `password` key.
 
 
 ### Slack Bot Credentials
