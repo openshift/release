@@ -36,6 +36,10 @@ source /root/config
 sosreport --ticket-number "\${HOSTNAME}" --batch -o container_log,filesys,kvm,libvirt,logs,networkmanager,podman,processor,rpm,sar,virsh,yum --tmp-dir /tmp/artifacts
 
 # Get assisted logs
-make download_logs LOGS_DEST=/tmp/artifacts ADDITIONAL_PARAMS="--download-all --must-gather" KUBECTL="kubectl --kubeconfig=\${HOME}/.kube/config"
+export LOGS_DEST=/tmp/artifacts
+export KUBECTL="kubectl --kubeconfig=\${HOME}/.kube/config"
+
+make download_service_logs
+make download_cluster_logs ADDITIONAL_PARAMS="--download-all --must-gather"
 
 EOF
