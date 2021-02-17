@@ -69,7 +69,13 @@ echo "export CONTROLLER_IMAGE=${ASSISTED_CONTROLLER_IMAGE}" >> /root/config
 echo "export INSTALLER_IMAGE=${ASSISTED_INSTALLER_IMAGE}" >> /root/config
 
 if [ "\${OPENSHIFT_INSTALL_RELEASE_IMAGE:-}" = "" ]; then
+  if [ "${JOB_TYPE}" = "presubmit" ]; then
+    # We would like to keep running a stable version for PRs
+    echo "export OPENSHIFT_VERSION=4.7" >> /root/config
+  else
+    # Periodics run against latest release
     echo "export OPENSHIFT_INSTALL_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}" >> /root/config
+  fi
 fi
 
 IMAGES=(${ASSISTED_AGENT_IMAGE} ${ASSISTED_CONTROLLER_IMAGE} ${ASSISTED_INSTALLER_IMAGE} ${RELEASE_IMAGE_LATEST})
