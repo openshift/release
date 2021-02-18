@@ -4870,10 +4870,10 @@ periodics:
         value: "4.8"
       - name: CLUSTER_TYPE
         value: aws
-      - name: CONFIG_SPEC
+      - name: UNRESOLVED_CONFIG
         value: |
           tag_specification:
-            name: "$(BRANCH)"
+            name: "4.8"
             namespace: ocp
           resources:
             '*':
@@ -4884,10 +4884,12 @@ periodics:
                 memory: 200Mi
           tests:
           - as: e2e-$(CLUSTER_TYPE)-upgrade
-            commands: TEST_SUITE=all TEST_UPGRADE_OPTIONS=abort-at=random run-upgrade-tests
-            openshift_installer:
+            steps:
               cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: true
+              env:
+                TEST_TYPE: "upgrade-conformance"
+                TEST_UPGRADE_OPTIONS: "abort-at=random"
+              workflow: openshift-upgrade-aws
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -6076,10 +6078,10 @@ periodics:
         value: gcp
       - name: CLUSTER_VARIANT
         value: ovn
-      - name: CONFIG_SPEC
+      - name: UNRESOLVED_CONFIG
         value: |
           tag_specification:
-            name: "$(BRANCH)"
+            name: "4.8"
             namespace: ocp
           resources:
             '*':
@@ -6090,10 +6092,11 @@ periodics:
                 memory: 200Mi
           tests:
           - as: e2e-$(CLUSTER_TYPE)-upgrade
-            commands: TEST_SUITE=all run-upgrade-tests
-            openshift_installer:
+            steps:
               cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: true
+              env:
+                TEST_TYPE: "upgrade-conformance"
+              workflow: openshift-upgrade-gcp-ovn
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -6235,6 +6238,7 @@ periodics:
     job-release: "4.8"
     job-test: e2e
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    release.openshift.io/verify: "true"
   name: release-openshift-origin-installer-e2e-azure-ovn-upgrade-4.7-stable-to-4.8-ci
   spec:
     containers:
@@ -6257,10 +6261,10 @@ periodics:
         value: azure4
       - name: CLUSTER_VARIANT
         value: ovn
-      - name: CONFIG_SPEC
+      - name: UNRESOLVED_CONFIG
         value: |
           tag_specification:
-            name: "$(BRANCH)"
+            name: "4.7"
             namespace: ocp
           resources:
             '*':
@@ -6271,10 +6275,11 @@ periodics:
                 memory: 200Mi
           tests:
           - as: e2e-azure-upgrade
-            commands: TEST_SUITE=all run-upgrade-tests
-            openshift_installer:
+            steps:
               cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: true
+              env:
+                TEST_TYPE: "upgrade-conformance"
+              workflow: openshift-upgrade-azure-ovn
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
