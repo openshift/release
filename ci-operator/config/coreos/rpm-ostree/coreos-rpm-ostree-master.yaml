@@ -4,17 +4,22 @@ build_root:
     name: cosa-buildroot
     namespace: coreos
     tag: latest
+images:
+- dockerfile_path: ci/prow/Dockerfile
+  to: rpmostree-fcos-e2e
 resources:
   '*':
     requests:
       cpu: 1000m
       memory: 1Gi
+  fcos-e2e:
+    limits:
+      devices.kubevirt.io/kvm: "1"
+    requests:
+      cpu: 1000m
+      devices.kubevirt.io/kvm: "1"
+      memory: 2Gi
 tests:
-- artifact_dir: /tmp/artifacts
-  as: build
-  commands: rpm-ostree --version
-  container:
-    from: bin
 - artifact_dir: /tmp/artifacts
   as: build-clang
   commands: ./ci/clang-build-check.sh
@@ -25,6 +30,11 @@ tests:
   commands: ./ci/clang-analyzer.sh
   container:
     from: src
+- artifact_dir: /tmp/artifacts
+  as: fcos-e2e
+  commands: fcos-e2e
+  container:
+    from: rpmostree-fcos-e2e
 zz_generated_metadata:
   branch: master
   org: coreos
