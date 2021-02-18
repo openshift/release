@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: List
+items:
+- kind: ImageStream
+  apiVersion: image.openshift.io/v1
+  metadata:
+    namespace: openshift
+    name: golang-1.16-vault
+- kind: BuildConfig
+  apiVersion: build.openshift.io/v1
+  metadata:
+    namespace: openshift
+    name: golang-1.16-vault
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: release:golang-1.16-vault
+    source:
+      dockerfile: |
+        FROM openshift/release:golang-1.16
+        ENV VAULT_DISABLE_MLOCK true
+        RUN yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo && \
+            yum install -y vault-1.6.2-1 && \
+            setcap cap_ipc_lock= /usr/bin/vault
+      type: Dockerfile
+    strategy:
+      dockerStrategy:
+        from:
+          kind: ImageStreamTag
+          name: release:golang-1.16
+          namespace: openshift
+        imageOptimizationPolicy: SkipLayers
+      type: Docker
+    triggers:
+    - type: ConfigChange
+    - imageChange:
+        from:
+          kind: ImageStreamTag
+          name: release:golang-1.16
+      type: ImageChange
