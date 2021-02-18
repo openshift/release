@@ -36,6 +36,7 @@ for (( i=0; i<$num_nodes; i++ )); do
       echo "fips not enabled in node ${nodes[i]} but should be, exiting"
       exit 1
     fi
+    echo "fips-check passed for node ${nodes[i]}: fips is enabled."
   else
     if [[ "${out}" -ne 0 ]]; then
       echo "fips is enabled in node ${nodes[i]} but should not be, exiting"
