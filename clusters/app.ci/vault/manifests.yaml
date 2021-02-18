@@ -118,7 +118,7 @@ spec:
         - /etc/vault/cfg/config.hcl
         readinessProbe:
           httpGet:
-            path: /v1/sys/health
+            path: /v1/sys/health?standbyok=true
             port: 8200
             scheme: HTTPS
         ports:
@@ -129,6 +129,14 @@ spec:
           value: /var/run/gcs-key/vault-sa-key.json
         - name: SKIP_SETCAP
           value: "true"
+        # Need to define this here so it can
+        # be referenced in VAULT_CLUSTER_ADDR
+        - name: MY_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: VAULT_CLUSTER_ADDR
+          value: https://$(MY_IP):8201
         volumeMounts:
         - name: config
           mountPath: /etc/vault/cfg
