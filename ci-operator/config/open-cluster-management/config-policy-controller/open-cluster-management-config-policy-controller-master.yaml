@@ -1,0 +1,41 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+  ocm_builder:
+    name: builder
+    namespace: open-cluster-management
+    tag: go1.14-linux-amd64
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: open-cluster-management
+    tag: go1.14-linux-amd64
+images:
+- dockerfile_path: build/Dockerfile
+  from: base
+  inputs:
+    ocm_builder:
+      as:
+      - builder
+  to: config-policy-controller
+promotion:
+  namespace: open-cluster-management
+  tag: latest
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- artifact_dir: /tmp/artifacts
+  as: test-unit
+  commands: make test
+  container:
+    from: src
+zz_generated_metadata:
+  branch: master
+  org: open-cluster-management
+  repo: config-policy-controller

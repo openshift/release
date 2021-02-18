@@ -589,10 +589,6 @@ objects:
           fi
         }
 
-        function get_clouds_param() {
-          awk '/^\s+'$1':/ { print $2 }' "$OS_CLIENT_CONFIG_FILE" | sed -e 's/^"//' -e 's/"$//'
-        }
-
         # Copy the playbooks in the assets directory
         function prepare_ansible_playbooks() {
           cp "${OS_UPI_DIR}/common.yaml" "${ASSETS_DIR}"
@@ -641,7 +637,6 @@ objects:
           # consistent with `create_ingress_fip`
           create_bootstrap_fip
 
-          OPENSTACK_REGION="$(get_clouds_param 'region_name')"
           sed "
             0,/os_subnet_range:.*/         {s||os_subnet_range: \'${OS_SUBNET_RANGE}\'|}                ;
             0,/os_flavor_master:.*/        {s||os_flavor_master: \'${OPENSTACK_FLAVOR}\'|}              ;
@@ -651,7 +646,6 @@ objects:
             0,/os_api_fip:.*/              {s||os_api_fip: \'${LB_FIP_IP}\'|}                           ;
             0,/os_ingress_fip:.*/          {s||os_ingress_fip: \'${INGRESS_FIP_IP}\'|}                  ;
             0,/os_bootstrap_fip:.*/        {s||os_bootstrap_fip: \'${BOOTSTRAP_FIP_IP}\'|}              ;
-            0,/os_region_name:.*/          {s||os_region_name: \'${OPENSTACK_REGION}\'|}                ;
             0,/os_cp_nodes_number:.*/      {s||os_cp_nodes_number: ${NUMBER_OF_MASTERS}|}               ;
             0,/os_compute_nodes_number:.*/ {s||os_compute_nodes_number: ${NUMBER_OF_WORKERS}|}          ;
             " "${OS_UPI_DIR}/inventory.yaml" > "${ASSETS_DIR}/inventory.yaml"
@@ -918,14 +912,6 @@ objects:
           mkdir -p ~/.ssh
           cp ${TMP_CLUSTER_PROFILE}/ssh-privatekey ~/.ssh/kube_openstack_rsa || true
           export TEST_PROVIDER='{"type":"openstack"}'
-        }
-
-        function configure_xtrace() {
-          XTRACE_ENABLED=0
-          if set -o | grep xtrace.*on &>/dev/null; then
-            XTRACE_ENABLED=1
-            set -x
-          fi
         }
 
         function setup_test_bed() {

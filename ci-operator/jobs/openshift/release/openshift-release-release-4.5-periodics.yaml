@@ -1775,8 +1775,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -1871,8 +1871,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -4192,10 +4192,10 @@ periodics:
         value: aws
       - name: CLUSTER_VARIANT
         value: ovn
-      - name: CONFIG_SPEC
+      - name: UNRESOLVED_CONFIG
         value: |
           tag_specification:
-            name: "$(BRANCH)"
+            name: "4.5"
             namespace: ocp
           resources:
             '*':
@@ -4206,10 +4206,11 @@ periodics:
                 memory: 200Mi
           tests:
           - as: e2e-$(CLUSTER_TYPE)-upgrade
-            commands: TEST_SUITE=all run-upgrade-tests
-            openshift_installer:
+            steps:
               cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: true
+              env:
+                TEST_TYPE: "upgrade-conformance"
+              workflow: openshift-upgrade-aws-ovn
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -4217,9 +4218,6 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /etc/appci
-        name: appci-release-bot-credentials
-        readOnly: true
       - mountPath: /etc/boskos
         name: boskos
         readOnly: true
@@ -4235,12 +4233,6 @@ periodics:
         name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
-    - name: appci-release-bot-credentials
-      secret:
-        items:
-        - key: sa.release-bot.app.ci.config
-          path: sa.release-bot.app.ci.config
-        secretName: build-farm-credentials
     - name: boskos
       secret:
         items:
@@ -4287,10 +4279,10 @@ periodics:
         value: "4.4"
       - name: CLUSTER_TYPE
         value: aws
-      - name: CONFIG_SPEC
+      - name: UNRESOLVED_CONFIG
         value: |
           tag_specification:
-            name: "$(BRANCH)"
+            name: "4.5"
             namespace: ocp
           resources:
             '*':
@@ -4301,10 +4293,12 @@ periodics:
                 memory: 200Mi
           tests:
           - as: e2e-$(CLUSTER_TYPE)-upgrade
-            commands: TEST_SUITE=all TEST_UPGRADE_OPTIONS=abort-at=99 run-upgrade-tests
-            openshift_installer:
+            steps:
               cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: true
+              env:
+                TEST_TYPE: "upgrade-conformance"
+                TEST_UPGRADE_OPTIONS: "abort-at=99"
+              workflow: openshift-upgrade-aws
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -4312,9 +4306,6 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /etc/appci
-        name: appci-release-bot-credentials
-        readOnly: true
       - mountPath: /etc/boskos
         name: boskos
         readOnly: true
@@ -4330,12 +4321,6 @@ periodics:
         name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
-    - name: appci-release-bot-credentials
-      secret:
-        items:
-        - key: sa.release-bot.app.ci.config
-          path: sa.release-bot.app.ci.config
-        secretName: build-farm-credentials
     - name: boskos
       secret:
         items:
@@ -4382,10 +4367,10 @@ periodics:
         value: "4.5"
       - name: CLUSTER_TYPE
         value: aws
-      - name: CONFIG_SPEC
+      - name: UNRESOLVED_CONFIG
         value: |
           tag_specification:
-            name: "$(BRANCH)"
+            name: "4.5"
             namespace: ocp
           resources:
             '*':
@@ -4396,10 +4381,12 @@ periodics:
                 memory: 200Mi
           tests:
           - as: e2e-$(CLUSTER_TYPE)-upgrade
-            commands: TEST_SUITE=all TEST_UPGRADE_OPTIONS=abort-at=random run-upgrade-tests
-            openshift_installer:
+            steps:
               cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: true
+              env:
+                TEST_TYPE: "upgrade-conformance"
+                TEST_UPGRADE_OPTIONS: "abort-at=random"
+              workflow: openshift-upgrade-aws
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -4407,9 +4394,6 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /etc/appci
-        name: appci-release-bot-credentials
-        readOnly: true
       - mountPath: /etc/boskos
         name: boskos
         readOnly: true
@@ -4425,12 +4409,6 @@ periodics:
         name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
-    - name: appci-release-bot-credentials
-      secret:
-        items:
-        - key: sa.release-bot.app.ci.config
-          path: sa.release-bot.app.ci.config
-        secretName: build-farm-credentials
     - name: boskos
       secret:
         items:
@@ -5029,8 +5007,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -5280,10 +5258,10 @@ periodics:
         value: gcp
       - name: CLUSTER_VARIANT
         value: ovn
-      - name: CONFIG_SPEC
+      - name: UNRESOLVED_CONFIG
         value: |
           tag_specification:
-            name: "$(BRANCH)"
+            name: "4.5"
             namespace: ocp
           resources:
             '*':
@@ -5294,10 +5272,11 @@ periodics:
                 memory: 200Mi
           tests:
           - as: e2e-$(CLUSTER_TYPE)-upgrade
-            commands: TEST_SUITE=all run-upgrade-tests
-            openshift_installer:
+            steps:
               cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: true
+              env:
+                TEST_TYPE: "upgrade-conformance"
+              workflow: openshift-upgrade-gcp-ovn
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -5305,9 +5284,6 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /etc/appci
-        name: appci-release-bot-credentials
-        readOnly: true
       - mountPath: /etc/boskos
         name: boskos
         readOnly: true
@@ -5323,12 +5299,6 @@ periodics:
         name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
-    - name: appci-release-bot-credentials
-      secret:
-        items:
-        - key: sa.release-bot.app.ci.config
-          path: sa.release-bot.app.ci.config
-        secretName: build-farm-credentials
     - name: boskos
       secret:
         items:
@@ -5353,6 +5323,7 @@ periodics:
     job-release: "4.5"
     job-test: e2e
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    release.openshift.io/verify: "true"
   name: release-openshift-origin-installer-e2e-azure-ovn-upgrade-4.4-stable-to-4.5-ci
   spec:
     containers:
@@ -5375,10 +5346,10 @@ periodics:
         value: azure4
       - name: CLUSTER_VARIANT
         value: ovn
-      - name: CONFIG_SPEC
+      - name: UNRESOLVED_CONFIG
         value: |
           tag_specification:
-            name: "$(BRANCH)"
+            name: "4.5"
             namespace: ocp
           resources:
             '*':
@@ -5389,10 +5360,11 @@ periodics:
                 memory: 200Mi
           tests:
           - as: e2e-azure-upgrade
-            commands: TEST_SUITE=all run-upgrade-tests
-            openshift_installer:
+            steps:
               cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: true
+              env:
+                TEST_TYPE: "upgrade-conformance"
+              workflow: openshift-upgrade-azure-ovn
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -5400,9 +5372,6 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /etc/appci
-        name: appci-release-bot-credentials
-        readOnly: true
       - mountPath: /etc/boskos
         name: boskos
         readOnly: true
@@ -5418,12 +5387,6 @@ periodics:
         name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
-    - name: appci-release-bot-credentials
-      secret:
-        items:
-        - key: sa.release-bot.app.ci.config
-          path: sa.release-bot.app.ci.config
-        secretName: build-farm-credentials
     - name: boskos
       secret:
         items:
@@ -5593,9 +5556,6 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /etc/appci
-        name: appci-release-bot-credentials
-        readOnly: true
       - mountPath: /etc/boskos
         name: boskos
         readOnly: true
@@ -5614,12 +5574,6 @@ periodics:
         name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
-    - name: appci-release-bot-credentials
-      secret:
-        items:
-        - key: sa.release-bot.app.ci.config
-          path: sa.release-bot.app.ci.config
-        secretName: build-farm-credentials
     - name: boskos
       secret:
         items:
@@ -5694,9 +5648,6 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /etc/appci
-        name: appci-release-bot-credentials
-        readOnly: true
       - mountPath: /etc/boskos
         name: boskos
         readOnly: true
@@ -5715,12 +5666,6 @@ periodics:
         name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
-    - name: appci-release-bot-credentials
-      secret:
-        items:
-        - key: sa.release-bot.app.ci.config
-          path: sa.release-bot.app.ci.config
-        secretName: build-farm-credentials
     - name: boskos
       secret:
         items:

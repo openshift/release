@@ -137,11 +137,8 @@ periodics:
         secretName: sentry-dsn
 - agent: kubernetes
   annotations:
-    job-impl.setup-container: test
-    job-impl.setup-pod: launch-osd-create-create
-    job-impl.workload-container: test
-    job-impl.workload-pod: launch-wait
-  cluster: build01
+    job-impl.install-step: osd-create-create
+  cluster: api.ci
   cron: '@yearly'
   decorate: true
   labels:
@@ -157,12 +154,12 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --input-hash=$(BUILD_ID)
       - --input-hash=$(JOB_NAME)
-      - --lease-server-password-file=/etc/boskos/password
-      - --lease-server-username=ci
       - --namespace=$(NAMESPACE)
       - --secret-dir=/usr/local/launch-cluster-profile
       - --secret-dir=/usr/local/pull-secret
       - --target=launch
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
       command:
       - ci-operator
       env:
@@ -181,7 +178,7 @@ periodics:
       - name: JOB_NAME_SAFE
         value: launch
       - name: NAMESPACE
-      - name: CONFIG_SPEC
+      - name: UNRESOLVED_CONFIG
         value: |
           base_images:
             cli:
@@ -218,12 +215,9 @@ periodics:
               - ref: osd-create-create
               test:
               - as: wait
-                commands: cp /tmp/secret/kubeconfig /tmp/admin.kubeconfig; sleep $(CLUSTER_VERSION) & wait
+                commands: cp /tmp/secret/kubeconfig /tmp/admin.kubeconfig; sleep $(CLUSTER_DURATION) & wait
                 from: cli
-                resources:
-                  requests:
-                    cpu: 100m
-                    memory: 100Mi
+                resources: { requests: { cpu: 100m, memory: 100Mi } }
           - artifact_dir: /tmp/artifacts
             as: e2e
             steps:
@@ -240,6 +234,7 @@ periodics:
               - ref: osd-create-create
               test:
               - ref: openshift-e2e-test
+      image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
       resources:
@@ -251,6 +246,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/launch-cluster-profile
         name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /etc/pull-secret
         name: pull-secret
         readOnly: true
@@ -261,8 +259,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -895,8 +893,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:
@@ -1020,7 +1018,10 @@ periodics:
               - artifact_dir: /tmp/artifacts
                 as: e2e-test
                 commands: sleep $(CLUSTER_DURATION) & wait
-                from: src
+                from_image:
+                  namespace: origin
+                  name: centos
+                  tag: '8'
                 resources:
                   requests:
                     cpu: 100m

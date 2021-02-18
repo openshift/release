@@ -78,15 +78,6 @@ data:
           min_period: 1s
         batchsize: 102400
         batchwait: 10s
-        bearer_token_file: /tmp/shared/bearer_token
-        timeout: 10s
-        url: ${LOKI_ENDPOINT}/push
-      - backoff_config:
-          max_period: 5m
-          max_retries: 20
-          min_period: 1s
-        batchsize: 102400
-        batchwait: 10s
         basic_auth:
           username: ${GRAFANACLOUND_USERNAME}
           password_file: /etc/promtail-grafanacom-secrets/password
@@ -100,6 +91,8 @@ data:
       - role: pod
       pipeline_stages:
       - cri: {}
+      - labeldrop:
+        - filename
       relabel_configs:
       - source_labels:
         - __meta_kubernetes_pod_label_name
@@ -143,6 +136,8 @@ data:
       - role: pod
       pipeline_stages:
       - cri: {}
+      - labeldrop:
+        - filename
       relabel_configs:
       - action: drop
         regex: ".+"
@@ -190,6 +185,8 @@ data:
       - role: pod
       pipeline_stages:
       - cri: {}
+      - labeldrop:
+        - filename
       relabel_configs:
       - action: drop
         regex: ".+"
@@ -243,6 +240,8 @@ data:
       - role: pod
       pipeline_stages:
       - cri: {}
+      - labeldrop:
+        - filename
       relabel_configs:
       - action: drop
         regex: ".+"
@@ -298,6 +297,8 @@ data:
       - role: pod
       pipeline_stages:
       - cri: {}
+      - labeldrop:
+        - filename
       relabel_configs:
       - action: drop
         regex: ''
@@ -396,28 +397,6 @@ spec:
         app.kubernetes.io/version: ${LOKI_VERSION}
     spec:
       containers:
-      - args:
-        - --oidc.client-id=\$(CLIENT_ID)
-        - --oidc.client-secret=\$(CLIENT_SECRET)
-        - --oidc.issuer-url=https://sso.redhat.com/auth/realms/redhat-external
-        - --margin=10m
-        - --file=/tmp/shared/bearer_token
-        name: bearer-token
-        env:
-          - name: CLIENT_ID
-            valueFrom:
-              secretKeyRef:
-                name: promtail-creds
-                key: client-id
-          - name: CLIENT_SECRET
-            valueFrom:
-              secretKeyRef:
-                name: promtail-creds
-                key: client-secret
-        volumeMounts:
-        - mountPath: "/tmp/shared"
-          name: shared-data
-        image: quay.io/observatorium/token-refresher
       - command:
         - sh
         - -c
