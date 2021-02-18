@@ -191,8 +191,12 @@ objects:
 
         clouds_to_env="
         import os
-        import shlex
         import yaml
+        try:
+            from shlex import quote
+        except ImportError:
+            from pipes import quote
+
 
         cloud = os.environ.get('OS_CLOUD')
         if not cloud:
@@ -205,14 +209,14 @@ objects:
             exit(1)
 
         # https://docs.openstack.org/openstacksdk/latest/user/config/configuration.html
-        # The keys are all of the keys you’d expect from OS_* - except lower case and
+        # The keys are all of the keys you'd expect from OS_* - except lower case and
         # without the OS prefix. So, region name is set with region_name.
         def parse_key(clouds_key, clouds_value):
             if clouds_key == 'auth':
                 for k in clouds_value:
                     parse_key(k, clouds_value[k])
             elif not clouds_key == 'regions':
-                print('export OS_%s=%s' % (clouds_key.upper(), shlex.quote(str(clouds_value))))
+                print('export OS_%s=%s' % (clouds_key.upper(), quote(str(clouds_value))))
 
         with open(config_file) as f:
             data = yaml.safe_load(f)
