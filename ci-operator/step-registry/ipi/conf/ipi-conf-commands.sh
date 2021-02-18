@@ -29,6 +29,7 @@ sshKey: |
 EOF
 
 if [ ${FIPS_ENABLED} = "true" ]; then
+	echo "Adding 'fips: true' to install-config.yaml"
 	cat >> "${out}" << EOF
 fips: true
 EOF
