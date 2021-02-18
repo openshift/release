@@ -100,6 +100,8 @@ data:
       - role: pod
       pipeline_stages:
       - cri: {}
+      - labeldrop:
+        - filename
       relabel_configs:
       - source_labels:
         - __meta_kubernetes_pod_label_name
@@ -143,6 +145,8 @@ data:
       - role: pod
       pipeline_stages:
       - cri: {}
+      - labeldrop:
+        - filename
       relabel_configs:
       - action: drop
         regex: ".+"
@@ -190,6 +194,8 @@ data:
       - role: pod
       pipeline_stages:
       - cri: {}
+      - labeldrop:
+        - filename
       relabel_configs:
       - action: drop
         regex: ".+"
@@ -243,6 +249,8 @@ data:
       - role: pod
       pipeline_stages:
       - cri: {}
+      - labeldrop:
+        - filename
       relabel_configs:
       - action: drop
         regex: ".+"
@@ -298,6 +306,8 @@ data:
       - role: pod
       pipeline_stages:
       - cri: {}
+      - labeldrop:
+        - filename
       relabel_configs:
       - action: drop
         regex: ''
