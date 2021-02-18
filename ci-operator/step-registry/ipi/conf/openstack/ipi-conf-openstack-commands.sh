@@ -13,4 +13,18 @@ UNSAFE_CLUSTER_NAME=${NAMESPACE}-${JOB_NAME_HASH}
 SAFE_CLUSTER_NAME=${UNSAFE_CLUSTER_NAME#"ci-op-"}
 echo "${SAFE_CLUSTER_NAME}" > ${SHARED_DIR}/CLUSTER_NAME
 
+#
+if [ -f "/var/run/cluster-secrets/${CLUSTER_TYPE}/clouds.yaml" ]; then
+  cp "/var/run/cluster-secrets/${CLUSTER_TYPE}/clouds.yaml"  "${SHARED_DIR}/clouds.yaml"
+fi
 
+case "$CLUSTER_TYPE" in
+  openstack-vexxhost)
+    echo "public" > ${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK
+    echo "v1-standard-4" > ${SHARED_DIR}/OPENSTACK_INSTANCE_FLAVOR
+    ;;
+  openstack)
+    echo "external" > ${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK
+    echo "m1.s2.xlarge" > ${SHARED_DIR}/OPENSTACK_INSTANCE_FLAVOR
+    ;;
+esac
