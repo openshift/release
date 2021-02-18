@@ -130,12 +130,19 @@ function upgrade() {
 }
 
 function suite() {
-    if [[ -n "${TEST_SKIPS}" ]]; then
+    if [[ -n "${TEST_SKIPS}" || -n "${TEST_RUNS}" ]]; then
         TESTS="$(openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")"
-        echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests
-        echo "Skipping tests:"
-        echo "${TESTS}" | grep "${TEST_SKIPS}"
-        TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
+        tests_file="/tmp/tests"
+        if [[ -n "${TEST_SKIPS}" ]]; then
+            echo "${TESTS}" | grep -v "${TEST_SKIPS}" >"${tests_file}"
+            echo "Skipping tests:"
+            echo "${TESTS}" | grep "${TEST_SKIPS}"
+        else
+            echo "${TESTS}" | grep "${TEST_RUNS}" >"${tests_file}"
+            echo "Running tests"
+            cat "${tests_file}"
+        fi
+        TEST_ARGS="${TEST_ARGS:-} --file ${tests_file}"
     fi
 
     set -x
