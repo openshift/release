@@ -4,7 +4,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.8
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-aws
     decorate: true
     decoration_config:
@@ -20,7 +20,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-aws-cluster-profile
@@ -53,8 +53,8 @@ presubmits:
       - name: boskos
         secret:
           items:
-          - key: password
-            path: password
+          - key: credentials
+            path: credentials
           secretName: boskos-credentials
       - name: cluster-profile
         projected:
@@ -72,7 +72,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.8
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-aws-disruptive
     decorate: true
     decoration_config:
@@ -88,7 +88,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-aws-disruptive-cluster-profile
@@ -132,8 +132,8 @@ presubmits:
       - name: boskos
         secret:
           items:
-          - key: password
-            path: password
+          - key: credentials
+            path: credentials
           secretName: boskos-credentials
       - name: cluster-profile
         projected:
@@ -154,12 +154,13 @@ presubmits:
     always_run: true
     branches:
     - release-4.8
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-aws-fips
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.8-e2e-aws-fips
     optional: true
@@ -167,30 +168,15 @@ presubmits:
     spec:
       containers:
       - args:
-        - --artifact-dir=$(ARTIFACTS)
         - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
-        - --lease-server-password-file=/etc/boskos/password
-        - --lease-server-username=ci
-        - --repo=installer
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-password-file=/etc/report/password.txt
+        - --report-username=ci
         - --secret-dir=/usr/local/e2e-aws-fips-cluster-profile
         - --target=e2e-aws-fips
-        - --template=/usr/local/e2e-aws-fips
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: aws
-        - name: CLUSTER_VARIANT
-          value: fips
-        - name: JOB_NAME_SAFE
-          value: e2e-aws-fips
-        - name: TEST_COMMAND
-          value: |
-            fips_check
-            TEST_SUITE=openshift/conformance/parallel run-tests
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -198,9 +184,6 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
@@ -209,49 +192,37 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-aws-fips
-          name: job-definition
-          subPath: cluster-launch-installer-e2e.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
-        - mountPath: /etc/sentry-dsn
-          name: sentry-dsn
+        - mountPath: /etc/report
+          name: result-aggregator
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
       - name: boskos
         secret:
           items:
-          - key: password
-            path: password
+          - key: credentials
+            path: credentials
           secretName: boskos-credentials
       - name: cluster-profile
         projected:
           sources:
           - secret:
               name: cluster-secrets-aws
-      - configMap:
-          name: prow-job-cluster-launch-installer-e2e
-        name: job-definition
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
-      - name: sentry-dsn
+      - name: result-aggregator
         secret:
-          secretName: sentry-dsn
+          secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-fips,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - release-4.8
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-aws-proxy
     decorate: true
     decoration_config:
@@ -267,7 +238,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-aws-proxy-cluster-profile
@@ -300,8 +271,8 @@ presubmits:
       - name: boskos
         secret:
           items:
-          - key: password
-            path: password
+          - key: credentials
+            path: credentials
           secretName: boskos-credentials
       - name: cluster-profile
         projected:
@@ -319,7 +290,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.8
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-aws-rhel8
     decorate: true
     decoration_config:
@@ -334,9 +305,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
-        - --lease-server-password-file=/etc/boskos/password
-        - --lease-server-username=ci
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --repo=installer
         - --secret-dir=/usr/local/e2e-aws-rhel8-cluster-profile
         - --target=e2e-aws-rhel8
@@ -403,9 +372,6 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
@@ -422,17 +388,11 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
       - name: boskos
         secret:
           items:
-          - key: password
-            path: password
+          - key: credentials
+            path: credentials
           secretName: boskos-credentials
       - name: cluster-profile
         projected:
@@ -450,7 +410,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.8
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-aws-shared-vpc
     decorate: true
     decoration_config:
@@ -466,7 +426,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-aws-shared-vpc-cluster-profile
@@ -499,8 +459,8 @@ presubmits:
       - name: boskos
         secret:
           items:
-          - key: password
-            path: password
+          - key: credentials
+            path: credentials
           secretName: boskos-credentials
       - name: cluster-profile
         projected:
@@ -518,7 +478,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.8
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-aws-single-node
     decorate: true
     decoration_config:
@@ -533,7 +493,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-aws-single-node-cluster-profile
@@ -566,8 +526,8 @@ presubmits:
       - name: boskos
         secret:
           items:
-          - key: password
-            path: password
+          - key: credentials
+            path: credentials
           secretName: boskos-credentials
       - name: cluster-profile
         projected:
@@ -585,7 +545,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.8
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-aws-upgrade
     decorate: true
     decoration_config:
@@ -600,7 +560,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-aws-upgrade-cluster-profile
@@ -633,8 +593,8 @@ presubmits:
       - name: boskos
         secret:
           items:
-          - key: password
-            path: password
+          - key: credentials
+            path: credentials
           secretName: boskos-credentials
       - name: cluster-profile
         projected:
@@ -652,7 +612,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.8
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-aws-upi
     decorate: true
     decoration_config:
@@ -668,7 +628,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-aws-upi-cluster-profile
@@ -712,8 +672,8 @@ presubmits:
       - name: boskos
         secret:
           items:
-          - key: password
-            path: password
+          - key: credentials
+            path: credentials
           secretName: boskos-credentials
       - name: cluster-profile
         projected:
@@ -734,7 +694,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.8
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-aws-workers-rhel7
     decorate: true
     decoration_config:
@@ -750,7 +710,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-aws-workers-rhel7-cluster-profile
@@ -783,8 +743,8 @@ presubmits:
       - name: boskos
         secret:
           items:
-          - key: password
-            path: password
+          - key: credentials
+            path: credentials
           secretName: boskos-credentials
       - name: cluster-profile
         projected:
@@ -802,7 +762,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.8
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-azure
     decorate: true
     decoration_config:
@@ -818,7 +778,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-azure-cluster-profile
@@ -851,8 +811,8 @@ presubmits:
       - name: boskos
         secret:
           items:
-          - key: password
-            path: password
+          - key: credentials
+            path: credentials
           secretName: boskos-credentials
       - name: cluster-profile
         projected:
@@ -870,7 +830,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.8
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-azure-shared-vpc
     decorate: true
     decoration_config:
@@ -886,7 +846,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-azure-shared-vpc-cluster-profile
@@ -919,8 +879,8 @@ presubmits:
       - name: boskos
         secret:
           items:
-          - key: password
-            path: password
+          - key: credentials
+            path: credentials
           secretName: boskos-credentials
       - name: cluster-profile
         projected:
@@ -938,7 +898,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.8
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-azure-upi
     decorate: true
     decoration_config:
@@ -953,7 +913,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-azure-upi-cluster-profile
@@ -997,8 +957,8 @@ presubmits:
       - name: boskos
         secret:
           items:
-          - key: password
-            path: password
+          - key: credentials
+            path: credentials
           secretName: boskos-credentials
       - name: cluster-profile
         projected:
@@ -1016,10 +976,10 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-azure-upi,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - release-4.8
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-crc
     decorate: true
     decoration_config:
@@ -1035,7 +995,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-crc-cluster-profile
@@ -1068,8 +1028,8 @@ presubmits:
       - name: boskos
         secret:
           items:
-          - key: password
-            path: password
+          - key: credentials
+            path: credentials
           secretName: boskos-credentials
       - name: cluster-profile
         projected:
@@ -1089,7 +1049,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.8
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-gcp
     decorate: true
     decoration_config:
@@ -1105,7 +1065,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-gcp-cluster-profile
@@ -1138,8 +1098,8 @@ presubmits:
       - name: boskos
         secret:
           items:
-          - key: password
-            path: password
+          - key: credentials
+            path: credentials
           secretName: boskos-credentials
       - name: cluster-profile
         projected:
@@ -1159,7 +1119,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.8
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-gcp-shared-vpc
     decorate: true
     decoration_config:
@@ -1175,7 +1135,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-gcp-shared-vpc-cluster-profile
@@ -1208,8 +1168,8 @@ presubmits:
       - name: boskos
         secret:
           items:
-          - key: password
-            path: password
+          - key: credentials
+            path: credentials
           secretName: boskos-credentials
       - name: cluster-profile
         projected:
@@ -1229,7 +1189,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.8
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-gcp-upgrade
     decorate: true
     decoration_config:
@@ -1244,7 +1204,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-gcp-upgrade-cluster-profile
@@ -1277,8 +1237,8 @@ presubmits:
       - name: boskos
         secret:
           items:
-          - key: password
-            path: password
+          - key: credentials
+            path: credentials
           secretName: boskos-credentials
       - name: cluster-profile
         projected:
@@ -1298,7 +1258,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.8
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-gcp-upi
     decorate: true
     decoration_config:
@@ -1314,7 +1274,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-gcp-upi-cluster-profile
@@ -1347,8 +1307,8 @@ presubmits:
       - name: boskos
         secret:
           items:
-          - key: password
-            path: password
+          - key: credentials
+            path: credentials
           secretName: boskos-credentials
       - name: cluster-profile
         projected:
@@ -1368,7 +1328,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.8
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-gcp-upi-xpn
     decorate: true
     decoration_config:
@@ -1384,7 +1344,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-gcp-upi-xpn-cluster-profile
@@ -1417,8 +1377,8 @@ presubmits:
       - name: boskos
         secret:
           items:
-          - key: password
-            path: password
+          - key: credentials
+            path: credentials
           secretName: boskos-credentials
       - name: cluster-profile
         projected:
@@ -1438,7 +1398,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.8
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-kubevirt
     decorate: true
     decoration_config:
@@ -1453,7 +1413,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-kubevirt-cluster-profile
@@ -1486,8 +1446,8 @@ presubmits:
       - name: boskos
         secret:
           items:
-          - key: password
-            path: password
+          - key: credentials
+            path: credentials
           secretName: boskos-credentials
       - name: cluster-profile
         projected:
@@ -1505,7 +1465,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.8
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-libvirt
     decorate: true
     decoration_config:
@@ -1522,7 +1482,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-libvirt-cluster-profile
@@ -1555,8 +1515,8 @@ presubmits:
       - name: boskos
         secret:
           items:
-          - key: password
-            path: password
+          - key: credentials
+            path: credentials
           secretName: boskos-credentials
       - name: cluster-profile
         projected:
@@ -1576,7 +1536,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.8
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-metal
     decorate: true
     decoration_config:
@@ -1593,7 +1553,6 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
         - --repo=installer
         - --secret-dir=/usr/local/e2e-metal-cluster-profile
         - --target=e2e-metal
@@ -1614,9 +1573,6 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
         - mountPath: /usr/local/e2e-metal-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
@@ -1630,12 +1586,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -1652,7 +1602,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.8
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-metal-assisted
     decorate: true
     decoration_config:
@@ -1667,7 +1617,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-metal-assisted-cluster-profile
@@ -1700,8 +1650,8 @@ presubmits:
       - name: boskos
         secret:
           items:
-          - key: password
-            path: password
+          - key: credentials
+            path: credentials
           secretName: boskos-credentials
       - name: cluster-profile
         projected:
@@ -1721,7 +1671,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.8
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-metal-ipi
     decorate: true
     decoration_config:
@@ -1736,7 +1686,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-metal-ipi-cluster-profile
@@ -1769,8 +1719,8 @@ presubmits:
       - name: boskos
         secret:
           items:
-          - key: password
-            path: password
+          - key: credentials
+            path: credentials
           secretName: boskos-credentials
       - name: cluster-profile
         projected:
@@ -1790,7 +1740,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.8
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-metal-ipi-ovn-dualstack
     decorate: true
     decoration_config:
@@ -1805,7 +1755,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-metal-ipi-ovn-dualstack-cluster-profile
@@ -1838,8 +1788,8 @@ presubmits:
       - name: boskos
         secret:
           items:
-          - key: password
-            path: password
+          - key: credentials
+            path: credentials
           secretName: boskos-credentials
       - name: cluster-profile
         projected:
@@ -1859,7 +1809,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.8
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-metal-ipi-ovn-ipv6
     decorate: true
     decoration_config:
@@ -1874,7 +1824,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-metal-ipi-ovn-ipv6-cluster-profile
@@ -1907,8 +1857,8 @@ presubmits:
       - name: boskos
         secret:
           items:
-          - key: password
-            path: password
+          - key: credentials
+            path: credentials
           secretName: boskos-credentials
       - name: cluster-profile
         projected:
@@ -1928,7 +1878,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.8
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-metal-ipi-virtualmedia
     decorate: true
     decoration_config:
@@ -1943,7 +1893,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-metal-ipi-virtualmedia-cluster-profile
@@ -1976,8 +1926,8 @@ presubmits:
       - name: boskos
         secret:
           items:
-          - key: password
-            path: password
+          - key: credentials
+            path: credentials
           secretName: boskos-credentials
       - name: cluster-profile
         projected:
@@ -1997,7 +1947,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.8
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-metal-single-node-live-iso
     decorate: true
     decoration_config:
@@ -2012,7 +1962,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-metal-single-node-live-iso-cluster-profile
@@ -2045,8 +1995,8 @@ presubmits:
       - name: boskos
         secret:
           items:
-          - key: password
-            path: password
+          - key: credentials
+            path: credentials
           secretName: boskos-credentials
       - name: cluster-profile
         projected:
@@ -2066,7 +2016,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.8
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-openstack
     decorate: true
     decoration_config:
@@ -2084,9 +2034,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
-        - --lease-server-password-file=/etc/boskos/password
-        - --lease-server-username=ci
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --repo=installer
         - --secret-dir=/usr/local/e2e-openstack-cluster-profile
         - --target=e2e-openstack
@@ -2109,9 +2057,6 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
@@ -2128,17 +2073,11 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
       - name: boskos
         secret:
           items:
-          - key: password
-            path: password
+          - key: credentials
+            path: credentials
           secretName: boskos-credentials
       - name: cluster-profile
         projected:
@@ -2156,7 +2095,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.8
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-openstack-ipi
     decorate: true
     decoration_config:
@@ -2171,7 +2110,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-openstack-ipi-cluster-profile
@@ -2204,8 +2143,8 @@ presubmits:
       - name: boskos
         secret:
           items:
-          - key: password
-            path: password
+          - key: credentials
+            path: credentials
           secretName: boskos-credentials
       - name: cluster-profile
         projected:
@@ -2223,7 +2162,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.8
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-openstack-parallel
     decorate: true
     decoration_config:
@@ -2240,9 +2179,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --kubeconfig=/etc/apici/kubeconfig
-        - --lease-server-password-file=/etc/boskos/password
-        - --lease-server-username=ci
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --repo=installer
         - --secret-dir=/usr/local/e2e-openstack-parallel-cluster-profile
         - --target=e2e-openstack-parallel
@@ -2265,9 +2202,6 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/apici
-          name: apici-ci-operator-credentials
-          readOnly: true
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
@@ -2284,17 +2218,11 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: apici-ci-operator-credentials
-        secret:
-          items:
-          - key: sa.ci-operator.apici.config
-            path: kubeconfig
-          secretName: apici-ci-operator-credentials
       - name: boskos
         secret:
           items:
-          - key: password
-            path: password
+          - key: credentials
+            path: credentials
           secretName: boskos-credentials
       - name: cluster-profile
         projected:
@@ -2312,7 +2240,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.8
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-ovirt
     decorate: true
     decoration_config:
@@ -2328,7 +2256,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-ovirt-cluster-profile
@@ -2361,8 +2289,8 @@ presubmits:
       - name: boskos
         secret:
           items:
-          - key: password
-            path: password
+          - key: credentials
+            path: credentials
           secretName: boskos-credentials
       - name: cluster-profile
         projected:
@@ -2398,7 +2326,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-vsphere-cluster-profile
@@ -2431,8 +2359,8 @@ presubmits:
       - name: boskos
         secret:
           items:
-          - key: password
-            path: password
+          - key: credentials
+            path: credentials
           secretName: boskos-credentials
       - name: cluster-profile
         projected:
@@ -2465,7 +2393,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --secret-dir=/usr/local/e2e-vsphere-upi-cluster-profile
@@ -2498,8 +2426,8 @@ presubmits:
       - name: boskos
         secret:
           items:
-          - key: password
-            path: password
+          - key: credentials
+            path: credentials
           secretName: boskos-credentials
       - name: cluster-profile
         projected:
@@ -2517,7 +2445,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.8
-    cluster: build02
+    cluster: build01
     context: ci/prow/gofmt
     decorate: true
     decoration_config:
@@ -2566,7 +2494,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.8
-    cluster: build02
+    cluster: build01
     context: ci/prow/golint
     decorate: true
     decoration_config:
@@ -2615,7 +2543,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.8
-    cluster: build02
+    cluster: build01
     context: ci/prow/govet
     decorate: true
     decoration_config:
@@ -2664,7 +2592,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.8
-    cluster: build02
+    cluster: build01
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -2713,7 +2641,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.8
-    cluster: build02
+    cluster: build01
     context: ci/prow/openstack-manifests
     decorate: true
     decoration_config:
@@ -2728,7 +2656,7 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-password-file=/etc/boskos/password
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-password-file=/etc/report/password.txt
         - --report-username=ci
         - --secret-dir=/usr/local/openstack-manifests-cluster-profile
@@ -2761,8 +2689,8 @@ presubmits:
       - name: boskos
         secret:
           items:
-          - key: password
-            path: password
+          - key: credentials
+            path: credentials
           secretName: boskos-credentials
       - name: cluster-profile
         projected:
@@ -2780,7 +2708,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.8
-    cluster: build02
+    cluster: build01
     context: ci/prow/shellcheck
     decorate: true
     labels:
@@ -2807,7 +2735,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.8
-    cluster: build02
+    cluster: build01
     context: ci/prow/tf-fmt
     decorate: true
     labels:
@@ -2835,7 +2763,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.8
-    cluster: build02
+    cluster: build01
     context: ci/prow/tf-lint
     decorate: true
     labels:
@@ -2862,7 +2790,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.8
-    cluster: build02
+    cluster: build01
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -2911,7 +2839,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.8
-    cluster: build02
+    cluster: build01
     context: ci/prow/verify-codegen
     decorate: true
     decoration_config:
@@ -2960,7 +2888,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.8
-    cluster: build02
+    cluster: build01
     context: ci/prow/verify-vendor
     decorate: true
     decoration_config:
@@ -3009,7 +2937,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.8
-    cluster: build02
+    cluster: build01
     context: ci/prow/yaml-lint
     decorate: true
     labels:

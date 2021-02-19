@@ -85,6 +85,24 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- artifact_dir: /tmp/artifacts
+  as: e2e-aws-rhcos4-moderate
+  steps:
+    cluster_profile: aws
+    env:
+      FIPS_ENABLED: "true"
+    pre:
+    - chain: ipi-aws-pre
+    - ref: fips-check
+    test:
+    - as: test
+      cli: latest
+      commands: content=ocp4-content-ds make -f tests/ocp4e2e/Makefile e2e PROFILE=moderate PRODUCT=rhcos4
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: ComplianceAsCode

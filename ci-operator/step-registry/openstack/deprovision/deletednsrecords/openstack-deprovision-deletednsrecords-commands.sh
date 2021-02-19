@@ -7,7 +7,7 @@ set -o pipefail
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 export AWS_DEFAULT_REGION=us-east-1
 export AWS_DEFAULT_OUTPUT=json
-export AWS_PROFILE=openshift-ci-infra
+export AWS_PROFILE=profile
 
 HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "${BASE_DOMAIN}" | python -c '
 import json,sys

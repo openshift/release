@@ -34,7 +34,7 @@ then
   scp "${SSHOPTS[@]}" "${SHARED_DIR}/assisted-additional-config" "root@${IP}:assisted-additional-config"
 fi
 
-timeout -s 9 175m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
+timeout -s 9 175m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths\{0,1\}".*/*** PULL_SECRET ***/g'
 
 set -xeuo pipefail
 
@@ -63,12 +63,19 @@ echo "export PULL_SECRET='\$(cat /root/pull-secret)'" >> /root/config
 set -x
 
 # Override default images
+echo "export SERVICE=${ASSISTED_SERVICE_IMAGE}" >> /root/config
 echo "export AGENT_DOCKER_IMAGE=${ASSISTED_AGENT_IMAGE}" >> /root/config
 echo "export CONTROLLER_IMAGE=${ASSISTED_CONTROLLER_IMAGE}" >> /root/config
 echo "export INSTALLER_IMAGE=${ASSISTED_INSTALLER_IMAGE}" >> /root/config
 
 if [ "\${OPENSHIFT_INSTALL_RELEASE_IMAGE:-}" = "" ]; then
+  if [ "${JOB_TYPE}" = "presubmit" ]; then
+    # We would like to keep running a stable version for PRs
+    echo "export OPENSHIFT_VERSION=4.7" >> /root/config
+  else
+    # Periodics run against latest release
     echo "export OPENSHIFT_INSTALL_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}" >> /root/config
+  fi
 fi
 
 IMAGES=(${ASSISTED_AGENT_IMAGE} ${ASSISTED_CONTROLLER_IMAGE} ${ASSISTED_INSTALLER_IMAGE} ${RELEASE_IMAGE_LATEST})

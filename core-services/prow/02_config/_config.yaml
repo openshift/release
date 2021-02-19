@@ -83,6 +83,10 @@ branch-protection:
       repos:
         learn-operator:
           protect: false
+    kata-containers:
+      repos:
+        kata-containers:
+          protect: false
     kiegroup:
       repos:
         kie-cloud-operator:
@@ -419,7 +423,6 @@ deck:
       - bparees
       - AlexNPavel
       - jupierce
-      - GeoBK
   spyglass:
     gcs_browser_prefixes:
       '*': https://gcsweb-ci.svc.ci.openshift.org/gcs/
@@ -489,10 +492,6 @@ jenkins_operators:
   report_templates:
     '*': '[Full PR test history](https://prow.ci.openshift.org/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://prow.ci.openshift.org/pr?query=is:pr+state:open+author:{{with index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
     openshift-priv: '[Full PR test history](https://deck-internal-ci.svc.ci.openshift.org/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://deck-internal-ci.svc.ci.openshift.org/pr?query=is:pr+state:open+author:{{with index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
-- job_url_template: https://ci.dev.openshift.redhat.com/jenkins/job/{{.Spec.Job}}/{{.Status.JenkinsBuildID}}
-  label_selector: master=ci.dev.openshift.redhat.com
-  max_concurrency: 25
-  max_goroutines: 20
 - job_url_template: http://jenkins.katacontainers.io/job/{{.Spec.Job}}/{{.Status.JenkinsBuildID}}
   label_selector: master=jenkins.katacontainers.io
   max_concurrency: 10
@@ -546,16 +545,18 @@ plank:
             memory: 250Mi
       timeout: 4h0m0s
       utility_images:
-        clonerefs: gcr.io/k8s-prow/clonerefs:v20210211-2a998229a0
-        entrypoint: gcr.io/k8s-prow/entrypoint:v20210211-2a998229a0
-        initupload: gcr.io/k8s-prow/initupload:v20210211-2a998229a0
-        sidecar: gcr.io/k8s-prow/sidecar:v20210211-2a998229a0
+        clonerefs: gcr.io/k8s-prow/clonerefs:v20210218-445b85c368
+        entrypoint: gcr.io/k8s-prow/entrypoint:v20210218-445b85c368
+        initupload: gcr.io/k8s-prow/initupload:v20210218-445b85c368
+        sidecar: gcr.io/k8s-prow/sidecar:v20210218-445b85c368
     openshift-priv:
       gcs_configuration:
         bucket: origin-ci-private
         mediaTypes:
           log: text/plain
       gcs_credentials_secret: gce-sa-credentials-gcs-private
+    openshift/osde2e:
+      timeout: 6h0m0s
   job_url_prefix_config:
     '*': https://prow.ci.openshift.org/view/
     openshift-priv: https://deck-internal-ci.svc.ci.openshift.org/view/
@@ -636,7 +637,11 @@ tide:
     integr8ly/ansible-tower-configuration: rebase
     integr8ly/heimdall: rebase
     jianzhangbjz/learn-operator: squash
+    open-cluster-management/config-policy-controller: squash
     open-cluster-management/console: squash
+    open-cluster-management/governance-policy-propagator: squash
+    open-cluster-management/image-builder: squash
+    open-cluster-management/managedcluster-import-controller: squash
     opendatahub-io/manifests: squash
     opendatahub-io/odh-manifests: squash
     opendatahub-io/opendatahub-operator: squash
@@ -659,6 +664,7 @@ tide:
     openshift-priv/dev-scripts: squash
     openshift-priv/gatekeeper: squash
     openshift-priv/gatekeeper-operator: squash
+    openshift-priv/insights-operator: squash
     openshift-priv/jenkins-client-plugin: rebase
     openshift-priv/jenkins-openshift-login-plugin: rebase
     openshift-priv/jenkins-sync-plugin: rebase
@@ -679,6 +685,7 @@ tide:
     openshift/cluster-api: rebase
     openshift/cluster-api-provider-azure: rebase
     openshift/custom-resource-status: squash
+    openshift/insights-operator: squash
     openshift/jenkins-client-plugin: rebase
     openshift/jenkins-openshift-login-plugin: rebase
     openshift/jenkins-plugin: rebase
@@ -776,7 +783,6 @@ tide:
     - redhat-developer/service-binding-operator
     - redhat-operator-ecosystem/playground
     - redhat-operator-ecosystem/release
-    - shipwright-io/build
     - shipwright-io/website
   - includedBranches:
     - master
@@ -811,6 +817,7 @@ tide:
     - openshift-priv/cincinnati-operator
     - openshift-priv/client-go
     - openshift-priv/cloud-credential-operator
+    - openshift-priv/cloud-network-config-controller
     - openshift-priv/cloud-provider-openstack
     - openshift-priv/cluster-api-actuator-pkg
     - openshift-priv/cluster-api-provider-aws
@@ -969,6 +976,7 @@ tide:
     - openshift/cincinnati-operator
     - openshift/client-go
     - openshift/cloud-credential-operator
+    - openshift/cloud-network-config-controller
     - openshift/cloud-provider-openstack
     - openshift/cluster-api-actuator-pkg
     - openshift/cluster-api-provider-aws
@@ -1170,6 +1178,7 @@ tide:
     - openshift-priv/cincinnati-operator
     - openshift-priv/client-go
     - openshift-priv/cloud-credential-operator
+    - openshift-priv/cloud-network-config-controller
     - openshift-priv/cloud-provider-openstack
     - openshift-priv/cluster-api-actuator-pkg
     - openshift-priv/cluster-api-provider-aws
@@ -1322,6 +1331,7 @@ tide:
     - openshift/cincinnati-operator
     - openshift/client-go
     - openshift/cloud-credential-operator
+    - openshift/cloud-network-config-controller
     - openshift/cloud-provider-openstack
     - openshift/cluster-api-actuator-pkg
     - openshift/cluster-api-provider-aws
@@ -1500,6 +1510,7 @@ tide:
     - openshift-priv/cincinnati-operator
     - openshift-priv/client-go
     - openshift-priv/cloud-credential-operator
+    - openshift-priv/cloud-network-config-controller
     - openshift-priv/cloud-provider-openstack
     - openshift-priv/cluster-api-actuator-pkg
     - openshift-priv/cluster-api-provider-aws
@@ -1656,6 +1667,7 @@ tide:
     - openshift/cincinnati-operator
     - openshift/client-go
     - openshift/cloud-credential-operator
+    - openshift/cloud-network-config-controller
     - openshift/cloud-provider-openstack
     - openshift/cluster-api-actuator-pkg
     - openshift/cluster-api-provider-aws
@@ -1805,6 +1817,7 @@ tide:
   - includedBranches:
     - community-4.6
     - community-4.7
+    - release-3.11
     - release-4.0
     - release-4.1
     - release-4.2
@@ -1852,6 +1865,7 @@ tide:
     - openshift-priv/builder
     - openshift-priv/client-go
     - openshift-priv/cloud-credential-operator
+    - openshift-priv/cloud-network-config-controller
     - openshift-priv/cloud-provider-openstack
     - openshift-priv/cluster-api-actuator-pkg
     - openshift-priv/cluster-api-provider-aws
@@ -2004,6 +2018,7 @@ tide:
     - openshift/builder
     - openshift/client-go
     - openshift/cloud-credential-operator
+    - openshift/cloud-network-config-controller
     - openshift/cloud-provider-openstack
     - openshift/cluster-api-actuator-pkg
     - openshift/cluster-api-provider-aws
@@ -2809,6 +2824,7 @@ tide:
     - do-not-merge/invalid-owners-file
     - do-not-merge/release-note-label-needed
     repos:
+    - shipwright-io/build
     - tnozicka/openshift-acme
   rebase_label: tide/merge-method-rebase
   squash_label: tide/merge-method-squash

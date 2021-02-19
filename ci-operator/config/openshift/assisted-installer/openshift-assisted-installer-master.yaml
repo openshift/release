@@ -25,24 +25,21 @@ images:
   inputs:
     openshift_release_golang-1.15:
       as:
-      - registry.svc.ci.openshift.org/openshift/release:golang-1.15
+      - registry.ci.openshift.org/openshift/release:golang-1.15
   to: assisted-installer
 - dockerfile_path: Dockerfile.assisted-installer-controller
   from: openshift_release_golang-1.15
   inputs:
-    ocp_4.7_cli:
-      as:
-      - registry.svc.ci.openshift.org/ocp/4.7:cli
     openshift_release_golang-1.15:
       as:
-      - registry.svc.ci.openshift.org/openshift/release:golang-1.15
+      - registry.ci.openshift.org/openshift/release:golang-1.15
   to: assisted-installer-controller
 - dockerfile_path: Dockerfile.assisted-installer-controller-ocp
   from: openshift_release_golang-1.15
   inputs:
     openshift_release_golang-1.15:
       as:
-      - registry.svc.ci.openshift.org/openshift/release:golang-1.15
+      - registry.ci.openshift.org/openshift/release:golang-1.15
   to: assisted-installer-controller-ocp
 promotion:
   name: assisted
@@ -89,6 +86,20 @@ tests:
     env:
       ASSISTED_CONFIG: |
         DEPLOY_TARGET=onprem
+    workflow: baremetalds-assisted-install
+- artifact_dir: /tmp/artifacts
+  as: e2e-metal-assisted-ipv6
+  steps:
+    cluster_profile: packet
+    dependencies:
+      ASSISTED_CONTROLLER_IMAGE: pipeline:assisted-installer-controller
+      ASSISTED_INSTALLER_IMAGE: pipeline:assisted-installer
+    env:
+      ASSISTED_CONFIG: |
+        IPv6=yes
+        IPv4=no
+        VIP_DHCP_ALLOCATION=no
+        PROXY=yes
     workflow: baremetalds-assisted-install
 zz_generated_metadata:
   branch: master

@@ -19,6 +19,10 @@ base_images:
     name: "4.8"
     namespace: ocp
     tag: cli
+  ocp_4.8_cli:
+    name: "4.8"
+    namespace: ocp
+    tag: cli
   ocp_builder_golang-1.13:
     name: builder
     namespace: ocp
@@ -35,6 +39,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.15-openshift-4.7
+  ocp_builder_rhel-8-golang-1.15-openshift-4.8:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.8
   ocp_builder_rhel-8-golang-openshift-4.6:
     name: builder
     namespace: ocp
@@ -59,6 +67,10 @@ base_images:
     name: "4.7"
     namespace: origin
     tag: cli
+  origin_4.8_cli:
+    name: "4.8"
+    namespace: origin
+    tag: cli
   rhel-7:
     name: "4.8"
     namespace: ocp
@@ -72,69 +84,57 @@ images:
 - dockerfile_path: images/installer/Dockerfile.ci
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.8:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
-    openshift_release_golang-1.14:
-      as:
-      - registry.svc.ci.openshift.org/openshift/release:golang-1.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
   to: installer
 - dockerfile_path: images/installer-artifacts/Dockerfile.rhel
   from: installer
   inputs:
-    ocp_builder_golang-1.14:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.8:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:golang-1.14
-    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
   to: installer-artifacts
 - dockerfile_path: images/libvirt/Dockerfile.ci
   from: base
   inputs:
-    openshift_release_golang-1.14:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.8:
       as:
-      - registry.svc.ci.openshift.org/openshift/release:golang-1.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
   to: libvirt-installer
 - dockerfile_path: images/installer/Dockerfile.upi.ci
   from: rhel-7
   inputs:
-    ocp_4.6_cli:
+    ocp_4.8_cli:
       as:
-      - registry.svc.ci.openshift.org/ocp/4.6:cli
-    ocp_builder_golang-1.14:
+      - registry.ci.openshift.org/ocp/4.8:cli
+    ocp_builder_rhel-8-golang-1.15-openshift-4.8:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:golang-1.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
   to: upi-installer
 - dockerfile_path: images/openstack/Dockerfile.ci
   from: base
   inputs:
-    openshift_release_golang-1.14:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.8:
       as:
-      - registry.svc.ci.openshift.org/openshift/release:golang-1.14
-    origin_4.7_cli:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
+    origin_4.8_cli:
       as:
-      - registry.svc.ci.openshift.org/origin/4.7:cli
+      - registry.ci.openshift.org/origin/4.8:cli
   to: openstack-installer
 - dockerfile_path: images/baremetal/Dockerfile.ci
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.8:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
-    openshift_release_golang-1.14:
-      as:
-      - registry.svc.ci.openshift.org/openshift/release:golang-1.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
   to: baremetal-installer
 - dockerfile_path: images/installer/Dockerfile.ci
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.8:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
-    openshift_release_golang-1.14:
-      as:
-      - registry.svc.ci.openshift.org/openshift/release:golang-1.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
   to: ovirt-installer
 promotion:
   disabled: true
@@ -377,6 +377,19 @@ tests:
   steps:
     cluster_profile: packet
     workflow: baremetalds-sno
+- artifact_dir: /tmp/artifacts
+  as: e2e-aws-fips
+  steps:
+    cluster_profile: aws
+    env:
+      FIPS_ENABLED: "true"
+      TEST_SUITE: openshift/conformance/parallel
+    pre:
+    - chain: ipi-aws-pre
+    - ref: fips-check
+    test:
+    - ref: openshift-e2e-test
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: release-4.8
   org: openshift

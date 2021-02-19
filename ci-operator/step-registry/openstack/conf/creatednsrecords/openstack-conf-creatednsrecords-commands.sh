@@ -8,7 +8,7 @@ export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
 export AWS_DEFAULT_REGION=us-east-1
 export AWS_DEFAULT_OUTPUT=json
-export AWS_PROFILE=openshift-ci-infra
+export AWS_PROFILE=profile
 
 CLUSTER_NAME=$(<"${SHARED_DIR}"/CLUSTER_NAME)
 LB_FIP_IP=$(<"${SHARED_DIR}"/LB_FIP_IP)

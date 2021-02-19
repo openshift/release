@@ -74,8 +74,6 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  annotations:
-    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"release-controller:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"controller\")].image"}]'
   name: release-controller-ocp-s390x-priv
   namespace: ci
 spec:
@@ -141,7 +139,7 @@ spec:
         - --bugzilla-api-key-path=/etc/bugzilla/api
         - --plugin-config=/etc/plugins/plugins.yaml
         - --verify-bugzilla
-        image: release-controller:latest
+        image: release-controller:muller-2021-02-19
         name: controller
         resources:
           requests:
@@ -182,6 +180,9 @@ spec:
           readOnly: true
         - mountPath: /etc/job-config/4.8
           name: job-config-48
+          readOnly: true
+        - mountPath: /etc/job-config/4.9
+          name: job-config-49
           readOnly: true
         - mountPath: /etc/kubeconfig
           name: release-controller-kubeconfigs
@@ -251,6 +252,10 @@ spec:
           defaultMode: 420
           name: job-config-4.8
         name: job-config-48
+      - configMap:
+          defaultMode: 420
+          name: job-config-4.9
+        name: job-config-49
       - name: release-controller-kubeconfigs
         secret:
           defaultMode: 420

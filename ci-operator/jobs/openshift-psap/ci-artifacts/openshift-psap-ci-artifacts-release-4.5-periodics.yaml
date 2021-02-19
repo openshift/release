@@ -13,12 +13,20 @@ periodics:
     ci-operator.openshift.io/prowgen-controlled: "true"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-psap-ci-artifacts-release-4.5-gpu-operator-e2e
+  reporter_config:
+    slack:
+      channel: '#psap-ci-alerts'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark: {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning: {{end}}'
   spec:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-password-file=/etc/boskos/password
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-password-file=/etc/report/password.txt
       - --report-username=ci
       - --secret-dir=/usr/local/gpu-operator-e2e-cluster-profile
@@ -51,8 +59,8 @@ periodics:
     - name: boskos
       secret:
         items:
-        - key: password
-          path: password
+        - key: credentials
+          path: credentials
         secretName: boskos-credentials
     - name: cluster-profile
       projected:

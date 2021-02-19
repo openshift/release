@@ -147,9 +147,7 @@ def renderHeader(dc):
     available = status.get("availableReplicas", 0)
     version = "<unknown-version>"
     containers = spec.get("template", {}).get("spec", {}).get("containers", [])
-    if  "jenkins-dev-operator" in name:
-        container_name = "jenkins-operator"
-    elif "deck-internal" in name:
+    if "deck-internal" in name:
         container_name = "deck"
     elif "priv" in dc and "release-controller" in dc:
         container_name = "controller"
