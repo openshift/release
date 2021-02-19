@@ -146,6 +146,9 @@ def _add_osd_rc_deployment(gendoc):
         'apiVersion': 'apps/v1',
         'kind': 'Deployment',
         'metadata': {
+            'annotations': {
+                'image.openshift.io/triggers': '[{"from":{"kind":"ImageStreamTag","name":"release-controller:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\\"controller\\")].image"}]'
+            },
             'name': f'release-controller-{context.is_namespace}',
             'namespace': context.config.rc_deployment_namespace,
         },
@@ -192,7 +195,7 @@ def _add_osd_rc_deployment(gendoc):
                                         '--bugzilla-api-key-path=/etc/bugzilla/api',
                                         '--plugin-config=/etc/plugins/plugins.yaml',
                                         '--verify-bugzilla'],
-                            'image': 'release-controller:muller-2021-02-19',
+                            'image': 'release-controller:latest',
                             'name': 'controller',
                             'volumeMounts': get_rc_volume_mounts(context)
                         }],

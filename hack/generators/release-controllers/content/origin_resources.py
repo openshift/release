@@ -80,6 +80,9 @@ def _add_origin_resources(gendoc):
             "apiVersion": "apps/v1",
             "kind": "Deployment",
             "metadata": {
+                "annotations": {
+                    "image.openshift.io/triggers": "[{\"from\":{\"kind\":\"ImageStreamTag\",\"name\":\"release-controller:latest\"},\"fieldPath\":\"spec.template.spec.containers[?(@.name==\\\"controller\\\")].image\"}]",
+                },
                 "name": "release-controller",
                 "namespace": "ci",
             },
@@ -111,7 +114,7 @@ def _add_origin_resources(gendoc):
                                     "--release-architecture=amd64",
                                     "-v=4"
                                 ],
-                                "image": "release-controller:muller-2021-02-19",
+                                "image": "release-controller:latest",
                                 "name": "controller",
                                 "volumeMounts": get_rc_volume_mounts(context)
                             }
