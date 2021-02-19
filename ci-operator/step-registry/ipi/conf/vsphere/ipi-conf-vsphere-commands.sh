@@ -26,6 +26,8 @@ controlPlane:
   replicas: 3
   platform:
     vsphere:
+      cpus: 8
+      coresPerSocket: 8
       osDisk:
         diskSizeGB: 120
 compute:
@@ -34,7 +36,7 @@ compute:
   platform:
     vsphere:
       cpus: 4
-      coresPerSocket: 1
+      coresPerSocket: 4
       memoryMB: 16384
       osDisk:
         diskSizeGB: 120
