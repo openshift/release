@@ -6,7 +6,7 @@ set -o pipefail
 
 echo "************ baremetalds e2e conf command ************"
 
-# List of include cases
+# List of include cases (from openshift/conformance/parallel)
 
 read -d '#' INCL << EOF
 [sig-api-machinery] Watchers should be able to start watching from a specific resource version
@@ -120,3 +120,12 @@ EOF
 
 cat <(echo "$INCL") > "${SHARED_DIR}/test-list"
 
+# List of additional test cases (from openshfit/conformance/[parallel|serial] suites), to be used only for 4.7+ branches. This is
+# just a temporary approach for smoothly migrating to the full execution of openshift/conformance suite
+
+read -d '#' INCL_EXT << EOF
+<add matching test names here>
+#
+EOF
+
+cat <(echo "$INCL_EXT") > "${SHARED_DIR}/test-list-ext"
