@@ -83,7 +83,7 @@ else
             "root@${IP}" \
             openshift-tests \
             run \
-            "openshift/conformance/parallel" \
+            "openshift/conformance" \
             --dry-run \
             \| grep -Ff /tmp/test-list \|openshift-tests run ${TEST_ARGS} -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit -f -
     else
