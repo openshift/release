@@ -13,7 +13,7 @@ source "${SHARED_DIR}/packet-conf.sh"
 
 collect_artifacts() {
     echo "### Fetching results"
-    ssh "${SSHOPTS[@]}" "root@${IP}" tar -czf - /tmp/artifacts | tar -C "${ARTIFACT_DIR}" -xzf - 
+    ssh "${SSHOPTS[@]}" "root@${IP}" tar -czf - /tmp/artifacts | tar -C "${ARTIFACT_DIR}" -xzf -
 }
 trap collect_artifacts EXIT TERM
 
