@@ -12,11 +12,8 @@ echo "************ baremetalds test command ************"
 source "${SHARED_DIR}/packet-conf.sh"
 
 collect_artifacts() {
-    START_TIME=$(date +%s)
-    echo "### Fetching results ${START_TIME}"
-    ssh "${SSHOPTS[@]}" "root@${IP}" tar -czf - /tmp/artifacts | tar -C "${ARTIFACT_DIR}" -xzf -
-    END_TIME=$(date +%s)
-    echo "Collect artifact elapsed time in seconds: $(($END_TIME - $START_TIME))"  
+    echo "### Fetching results"
+    ssh "${SSHOPTS[@]}" "root@${IP}" tar -czf - /tmp/artifacts | tar -C "${ARTIFACT_DIR}" -xzf - 
 }
 trap collect_artifacts EXIT
 
