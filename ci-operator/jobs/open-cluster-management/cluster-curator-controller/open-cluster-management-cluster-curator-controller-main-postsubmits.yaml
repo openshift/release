@@ -60,22 +60,18 @@ postsubmits:
     decorate: true
     labels:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: branch-ci-open-cluster-management-cluster-curator-controller-main-publish
+    name: branch-ci-open-cluster-management-cluster-curator-controller-main-sonar
     spec:
       containers:
       - args:
         - -f
         - Makefile.prow
-        - osci/publish
+        - sonar/go/openshiftci-post
         command:
         - make
-       env:
-        - name: COMPONENT_NAME
-          value: cluster-curator-controller
-        - name: COMPONENT_VERSION
-          value: 0.1.0
-        - name: OSCI_IMAGE_REMOTE_REPO_SRC
-          value: registry.svc.ci.openshift.org/open-cluster-management
+        env:
+        - name: GOPROXY
+          value: proxy.golang.org,direct
         - name: SELF
           value: make -f Makefile.prow
         image: registry.ci.openshift.org/open-cluster-management/builder:go1.15-linux-amd64
@@ -86,11 +82,11 @@ postsubmits:
             cpu: 100m
             memory: 200Mi
         volumeMounts:
-        - mountPath: /etc/github
-          name: acm-cicd-github
+        - mountPath: /etc/sonarcloud
+          name: acm-sonarcloud-token
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: acm-cicd-github
+      - name: acm-sonarcloud-token
         secret:
-          secretName: acm-cicd-github
+          secretName: acm-sonarcloud-token
