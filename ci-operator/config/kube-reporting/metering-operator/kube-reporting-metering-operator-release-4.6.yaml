@@ -7,10 +7,10 @@ base_images:
     name: "4.6"
     namespace: ocp
     tag: base
-  ocp_4.4_base:
-    name: "4.4"
+  oauth_proxy:
+    name: "4.6"
     namespace: ocp
-    tag: base
+    tag: oauth-proxy
   ocp_4.6_cli:
     name: "4.6"
     namespace: ocp
@@ -65,6 +65,8 @@ operator:
     with: stable:metering-presto
   - pullspec: quay.io/openshift/origin-metering-reporting-operator:4.6
     with: pipeline:metering-reporting-operator
+  - pullspec: quay.io/openshift/origin-oauth-proxy:4.6
+    with: pipeline:oauth_proxy
 promotion:
   name: "4.6"
   namespace: ocp
@@ -111,14 +113,11 @@ tests:
   as: metering-e2e-aws
   steps:
     cluster_profile: aws
+    env:
+      COMPUTE_NODE_TYPE: m5.xlarge
     test:
     - as: e2e
       commands: |
-        set -x
-        # Patch the default MachineSet instance size (typically m5.large) to m5.xlarge post-install
-        # as the metering stack is resource hungry.
-        kubectl -n openshift-machine-api get machinesets --no-headers | awk '{ print $1 }' | xargs -I{} kubectl -n openshift-machine-api patch machineset {} --type json -p '[{"op": "replace", "path": "/spec/template/spec/providerSpec/value/instanceType", "value": "m5.xlarge"}]'
-
         METERING_ANSIBLE_OPERATOR_INDEX_IMAGE=${OO_INDEX} TEST_ENABLE_MACHINE_AUTOSCALING="true" TEST_OUTPUT_PATH=${ARTIFACT_DIR}/e2e EXTRA_TEST_FLAGS="-run TestManualMeteringInstall" make e2e
       dependencies:
       - env: OO_INDEX
@@ -133,15 +132,11 @@ tests:
   as: metering-upgrade-aws
   steps:
     cluster_profile: aws
+    env:
+      COMPUTE_NODE_TYPE: m5.xlarge
     test:
     - as: e2e
       commands: |
-        set -x
-
-        # Patch the default MachineSet instance size (typically m5.large) to m5.xlarge post-install
-        # as the metering stack is resource hungry.
-        kubectl -n openshift-machine-api get machinesets --no-headers | awk '{ print $1 }' | xargs -I{} kubectl -n openshift-machine-api patch machineset {} --type json -p '[{"op": "replace", "path": "/spec/template/spec/providerSpec/value/instanceType", "value": "m5.xlarge"}]'
-
         METERING_ANSIBLE_OPERATOR_INDEX_IMAGE=${OO_INDEX} TEST_ENABLE_MACHINE_AUTOSCALING="true" TEST_OUTPUT_PATH=${ARTIFACT_DIR}/upgrade make e2e-upgrade
       dependencies:
       - env: OO_INDEX

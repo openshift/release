@@ -188,9 +188,11 @@ tests:
     cluster_profile: aws
 - artifact_dir: /tmp/artifacts
   as: e2e-gcp-upi
-  commands: TEST_SUITE=openshift/conformance/parallel run-tests
-  openshift_installer_upi:
+  steps:
     cluster_profile: gcp
+    env:
+      TEST_SUITE: openshift/conformance/parallel
+    workflow: openshift-e2e-gcp-upi
 - artifact_dir: /tmp/artifacts
   as: e2e-aws-workers-rhel7
   steps:
@@ -221,6 +223,19 @@ tests:
   steps:
     cluster_profile: ovirt
     workflow: openshift-e2e-ovirt-minimal-without-csi
+- artifact_dir: /tmp/artifacts
+  as: e2e-aws-fips
+  steps:
+    cluster_profile: aws
+    env:
+      FIPS_ENABLED: "true"
+      TEST_SUITE: openshift/conformance/parallel
+    pre:
+    - chain: ipi-aws-pre
+    - ref: fips-check
+    test:
+    - ref: openshift-e2e-test
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: release-4.4
   org: openshift

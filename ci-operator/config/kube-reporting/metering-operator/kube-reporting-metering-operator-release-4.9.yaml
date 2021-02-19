@@ -7,26 +7,10 @@ base_images:
     name: "4.9"
     namespace: ocp
     tag: base
-  ocp_4.4_base:
-    name: "4.4"
-    namespace: ocp
-    tag: base
-  ocp_4.6_cli:
+  oauth_proxy:
     name: "4.9"
     namespace: ocp
-    tag: cli
-  ocp_4.6_metering-helm:
-    name: "4.9"
-    namespace: ocp
-    tag: metering-helm
-  ocp_4.7_cli:
-    name: "4.9"
-    namespace: ocp
-    tag: cli
-  ocp_4.7_metering-helm:
-    name: "4.9"
-    namespace: ocp
-    tag: metering-helm
+    tag: oauth-proxy
   ocp_4.8_cli:
     name: "4.9"
     namespace: ocp
@@ -35,22 +19,10 @@ base_images:
     name: "4.9"
     namespace: ocp
     tag: metering-helm
-  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.15-openshift-4.6
-  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.15-openshift-4.7
   ocp_builder_rhel-8-golang-1.15-openshift-4.8:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.15-openshift-4.8
-  ocp_builder_rhel-8-golang-openshift-4.6:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-openshift-4.6
 build_root:
   project_image:
     context_dir: .
@@ -77,18 +49,20 @@ operator:
   bundles:
   - dockerfile_path: Dockerfile.bundle
   substitutions:
-  - pullspec: quay.io/openshift/origin-ghostunnel:4.7
+  - pullspec: quay.io/openshift/origin-ghostunnel:4.8
     with: stable:ghostunnel
-  - pullspec: quay.io/openshift/origin-metering-ansible-operator:4.7
+  - pullspec: quay.io/openshift/origin-metering-ansible-operator:4.8
     with: pipeline:metering-ansible-operator
-  - pullspec: quay.io/openshift/origin-metering-hadoop:4.7
+  - pullspec: quay.io/openshift/origin-metering-hadoop:4.8
     with: stable:metering-hadoop
-  - pullspec: quay.io/openshift/origin-metering-hive:4.7
+  - pullspec: quay.io/openshift/origin-metering-hive:4.8
     with: stable:metering-hive
-  - pullspec: quay.io/openshift/origin-metering-presto:4.7
+  - pullspec: quay.io/openshift/origin-metering-presto:4.8
     with: stable:metering-presto
-  - pullspec: quay.io/openshift/origin-metering-reporting-operator:4.7
+  - pullspec: quay.io/openshift/origin-metering-reporting-operator:4.8
     with: pipeline:metering-reporting-operator
+  - pullspec: quay.io/openshift/origin-oauth-proxy:4.8
+    with: pipeline:oauth_proxy
 promotion:
   name: "4.9"
   namespace: ocp
@@ -135,14 +109,11 @@ tests:
   as: metering-e2e-aws
   steps:
     cluster_profile: aws
+    env:
+      COMPUTE_NODE_TYPE: m5.xlarge
     test:
     - as: e2e
       commands: |
-        set -x
-        # Patch the default MachineSet instance size (typically m5.large) to m5.xlarge post-install
-        # as the metering stack is resource hungry.
-        kubectl -n openshift-machine-api get machinesets --no-headers | awk '{ print $1 }' | xargs -I{} kubectl -n openshift-machine-api patch machineset {} --type json -p '[{"op": "replace", "path": "/spec/template/spec/providerSpec/value/instanceType", "value": "m5.xlarge"}]'
-
         METERING_ANSIBLE_OPERATOR_INDEX_IMAGE=${OO_INDEX} TEST_ENABLE_MACHINE_AUTOSCALING="true" TEST_OUTPUT_PATH=${ARTIFACT_DIR}/e2e EXTRA_TEST_FLAGS="-run TestManualMeteringInstall" make e2e
       dependencies:
       - env: OO_INDEX
@@ -157,15 +128,11 @@ tests:
   as: metering-upgrade-aws
   steps:
     cluster_profile: aws
+    env:
+      COMPUTE_NODE_TYPE: m5.xlarge
     test:
     - as: e2e
       commands: |
-        set -x
-
-        # Patch the default MachineSet instance size (typically m5.large) to m5.xlarge post-install
-        # as the metering stack is resource hungry.
-        kubectl -n openshift-machine-api get machinesets --no-headers | awk '{ print $1 }' | xargs -I{} kubectl -n openshift-machine-api patch machineset {} --type json -p '[{"op": "replace", "path": "/spec/template/spec/providerSpec/value/instanceType", "value": "m5.xlarge"}]'
-
         METERING_ANSIBLE_OPERATOR_INDEX_IMAGE=${OO_INDEX} TEST_ENABLE_MACHINE_AUTOSCALING="true" TEST_OUTPUT_PATH=${ARTIFACT_DIR}/upgrade make e2e-upgrade
       dependencies:
       - env: OO_INDEX

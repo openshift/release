@@ -110,9 +110,17 @@ tests:
     workflow: openshift-e2e-vsphere-upi
 - artifact_dir: /tmp/artifacts
   as: e2e-vsphere-operator
-  commands: JUNIT_REPORT=1 make test-e2e
-  openshift_installer_upi_src:
+  steps:
     cluster_profile: vsphere
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_REPORT=1 make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-vsphere-upi
 - artifact_dir: /tmp/artifacts
   as: verify
   commands: make verify

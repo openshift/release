@@ -27,3 +27,10 @@ pullSecret: >
 sshKey: |
   ${ssh_pub_key}
 EOF
+
+if [ ${FIPS_ENABLED} = "true" ]; then
+	echo "Adding 'fips: true' to install-config.yaml"
+	cat >> "${out}" << EOF
+fips: true
+EOF
+fi
