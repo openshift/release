@@ -9,20 +9,6 @@ metadata:
   name: iostat-vmstat
   namespace: upgrade-debug-data
 ---
-kind: PersistentVolumeClaim
-apiVersion: v1
-metadata:
-  name: iostat-vmstat-pvc
-  namespace: upgrade-debug-data
-  labels:
-    k8s-app: iostat-vmstat-ds
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 8Gi
----
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -44,23 +30,29 @@ spec:
       - name: monitor
         image: quay.io/umohnani8/monitor-nvme:1.0
         imagePullPolicy: Always
+        securityContext:
+          privileged: true
         volumeMounts:
         - name: myvol
           mountPath: /myvol
       - name: iostat
         image: quay.io/umohnani8/iostat:1.0
         imagePullPolicy: Always
+        securityContext:
+          privileged: true
         volumeMounts:
         - name: myvol
           mountPath: /myvol
       - name: vmstat
         image: quay.io/umohnani8/vmstat:1.0
         imagePullPolicy: Always
+        securityContext:
+          privileged: true
         volumeMounts:
         - name: myvol
           mountPath: /myvol
       terminationGracePeriodSeconds: 30
       volumes:
       - name: myvol
-        persistentVolumeClaim:
-          claimName: iostat-vmstat-pvc
+        hostPath:
+          path: /etc/test/stat-data
