@@ -62,6 +62,9 @@ set +x
 echo "export PULL_SECRET='\$(cat /root/pull-secret)'" >> /root/config
 set -x
 
+# Save Prow variables that might become handy
+echo "export RELEASE_IMAGE_LATEST=${RELEASE_IMAGE_LATEST}" >> /root/config
+
 # Override default images
 echo "export SERVICE=${ASSISTED_SERVICE_IMAGE}" >> /root/config
 echo "export AGENT_DOCKER_IMAGE=${ASSISTED_AGENT_IMAGE}" >> /root/config
