@@ -1,0 +1,45 @@
+base_images:
+  console-tests:
+    name: "4.2"
+    namespace: ocp
+    tag: console-tests
+releases:
+  initial:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: nightly
+      version: "4.2"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.2"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- artifact_dir: /tmp/artifacts
+  as: console-aws
+  interval: 12h
+  steps:
+    cluster_profile: aws
+    test:
+    - as: e2e-test
+      cli: latest
+      commands: ./test-prow-e2e.sh release
+      from: console-tests
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: release
+  variant: ocp-4.2
