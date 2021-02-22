@@ -22,7 +22,10 @@ if [[ -f "${AWSCRED}" ]]; then
 
   # Set defaults for AWS if necessary
   COMPUTE_MACHINE_TYPE=${COMPUTE_MACHINE_TYPE:-"m5.xlarge"}
-  CLOUD_PROVIDER_REGION=${CLOUD_PROVIDER_REGION:-"us-east-1"}
+  declare -a AWS_REGIONS=('us-east-1' 'us-east-2' 'us-west-1' 'us-west-2')
+  RAND_REGION="${AWS_REGIONS[$RANDOM % ${#AWS_REGIONS[@]}]}"
+  CLOUD_PROVIDER_REGION=${CLOUD_PROVIDER_REGION:-"${RAND_REGION}"}
+  echo "Will launch in AWS region: ${CLOUD_PROVIDER_REGION}"
 else
   echo "Did not find compatible cloud provider cluster_profile"
   exit 1
