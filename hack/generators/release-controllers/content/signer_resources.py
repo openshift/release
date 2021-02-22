@@ -14,6 +14,9 @@ The signer will sign both OKD, CI, and nightly releases, but nightly releases do
         'metadata': {
             'name': 'release-controller-signer',
             'namespace': 'ci',
+            'annotations': {
+                'image.openshift.io/triggers': '[{"from":{"kind":"ImageStreamTag","name":"release-controller:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\\\"controller\\\")].image"}]'
+            }
         },
         'spec': {
             'replicas': 1,
@@ -52,7 +55,7 @@ The signer will sign both OKD, CI, and nightly releases, but nightly releases do
                     }],
                     'containers': [{
                         'name': 'controller',
-                        'image': 'release-controller:muller-2021-02-19',
+                        'image': 'release-controller:latest',
                         'volumeMounts': [{
                             'name': 'publisher',
                             'mountPath': '/etc/release-controller/publisher',
