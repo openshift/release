@@ -1,4 +1,16 @@
 base_images:
+  assisted-installer:
+    name: assisted
+    namespace: ocp-kni
+    tag: assisted-installer
+  assisted-installer-agent:
+    name: assisted
+    namespace: ocp-kni
+    tag: assisted-installer-agent
+  assisted-installer-controller:
+    name: assisted
+    namespace: ocp-kni
+    tag: assisted-installer-controller
   assisted-service:
     name: assisted
     namespace: ocp-kni
@@ -81,8 +93,10 @@ tests:
     env:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
+        NUM_WORKERS=0
         ISO_IMAGE_TYPE=minimal-iso
-        OPENSHIFT_INSTALL_RELEASE_IMAGE=registry.svc.ci.openshift.org/sno-dev/openshift-bip:0.2.0
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}
+        OPENSHIFT_VERSION=4.8
     workflow: baremetalds-assisted-install
 - artifact_dir: /tmp/artifacts
   as: e2e-metal-assisted-periodic
@@ -102,8 +116,8 @@ tests:
     env:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
+        NUM_WORKERS=0
         ISO_IMAGE_TYPE=minimal-iso
-        OPENSHIFT_INSTALL_RELEASE_IMAGE=registry.svc.ci.openshift.org/sno-dev/openshift-bip:0.2.0
     workflow: baremetalds-assisted
 - artifact_dir: /tmp/artifacts
   as: e2e-metal-assisted-milestone-one-periodic
@@ -115,11 +129,11 @@ tests:
     env:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
+        NUM_WORKERS=0
         IPv6=yes
         IPv4=no
         PROXY=yes
         ADDITIONAL_PARAMS="--with-static-ips"
-        OPENSHIFT_INSTALL_RELEASE_IMAGE=registry.svc.ci.openshift.org/sno-dev/openshift-bip:0.5.1
     workflow: baremetalds-assisted
 - artifact_dir: /tmp/artifacts
   as: e2e-metal-single-node-live-iso

@@ -62,20 +62,21 @@ set +x
 echo "export PULL_SECRET='\$(cat /root/pull-secret)'" >> /root/config
 set -x
 
+# Save Prow variables that might become handy
+echo "export RELEASE_IMAGE_LATEST=${RELEASE_IMAGE_LATEST}" >> /root/config
+
 # Override default images
 echo "export SERVICE=${ASSISTED_SERVICE_IMAGE}" >> /root/config
 echo "export AGENT_DOCKER_IMAGE=${ASSISTED_AGENT_IMAGE}" >> /root/config
 echo "export CONTROLLER_IMAGE=${ASSISTED_CONTROLLER_IMAGE}" >> /root/config
 echo "export INSTALLER_IMAGE=${ASSISTED_INSTALLER_IMAGE}" >> /root/config
 
-if [ "\${OPENSHIFT_INSTALL_RELEASE_IMAGE:-}" = "" ]; then
-  if [ "${JOB_TYPE}" = "presubmit" ]; then
-    # We would like to keep running a stable version for PRs
-    echo "export OPENSHIFT_VERSION=4.7" >> /root/config
-  else
-    # Periodics run against latest release
-    echo "export OPENSHIFT_INSTALL_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}" >> /root/config
-  fi
+if [ "${JOB_TYPE}" = "presubmit" ]; then
+  # We would like to keep running a stable version for PRs
+  echo "export OPENSHIFT_VERSION=4.7" >> /root/config
+else
+  # Periodics run against latest release
+  echo "export OPENSHIFT_INSTALL_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}" >> /root/config
 fi
 
 IMAGES=(${ASSISTED_AGENT_IMAGE} ${ASSISTED_CONTROLLER_IMAGE} ${ASSISTED_INSTALLER_IMAGE} ${RELEASE_IMAGE_LATEST})
@@ -84,6 +85,7 @@ CI_REGISTRIES=\$(for image in \${IMAGES}; do echo \${image} | cut -d'/' -f1; don
 echo "export PUBLIC_CONTAINER_REGISTRIES=quay.io,\${CI_REGISTRIES}" >> /root/config
 echo "export ASSISTED_SERVICE_HOST=${IP}" >> /root/config
 echo "export ADDITIONAL_PARAMS=-cvo" >> /root/config
+echo "export NUM_WORKERS=2" >> /root/config
 
 if [[ -e /root/assisted-additional-config ]]
 then
