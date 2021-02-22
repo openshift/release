@@ -2,6 +2,10 @@
 
 OUTPUT="$SHARED_DIR/$CLUSTERPOOL_LIST_FILE"
 
+echo $PWD
+ls -l $PWD
+ls -l ..
+
 cp "$MAKEFILE" ./Makefile
 
 make clusterpool/list-clusterpools CLUSTERPOOL_LIST_ARGUMENTS=" -o json" \
