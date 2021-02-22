@@ -2,9 +2,11 @@
 
 OUTPUT="$SHARED_DIR/$CLUSTERPOOL_LIST_FILE"
 
-echo $PWD
-ls -l $PWD
-ls -l ..
+echo "OUTPUT=$OUTPUT"
+echo "uid=$(id -u)"
+
+temp=$(mktemp)
+cd $temp || exit 1
 
 cp "$MAKEFILE" ./Makefile
 
