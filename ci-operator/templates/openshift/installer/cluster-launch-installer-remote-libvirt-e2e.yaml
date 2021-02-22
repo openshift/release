@@ -543,6 +543,9 @@ objects:
           libvirt:
             URI: ${remote_libvirt_uri}
             network:
+              dnsmasqOptions:
+              - name: "address"
+                value: "/.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}/192.168.${cluster_subnet}.1"
               if: "br$(printf ${LEASED_RESOURCE} | tail -c 3)-${JOB_NAME_HASH}"
         pullSecret: >
           ${PULL_SECRET}
@@ -582,30 +585,6 @@ objects:
 
         mock-nss.sh openshift-install create cluster --dir=${ARTIFACT_DIR}/installer --log-level=debug 2>&1 | sed 's/password: .*/password: REDACTED"/g' || true &
         openshift_install="$!"
-
-        # While openshift-install is running...
-        i=0
-        while kill -0 $openshift_install 2> /dev/null; do
-            sleep 60
-            echo "Polling libvirt for network, attempt #$((++i))"
-            libvirt_network=$(mock-nss.sh virsh --connect "${remote_libvirt_uri}" net-list --name | grep "${CLUSTER_NAME::21}" || true)
-            if [[ -n "${libvirt_network}" ]]; then
-                cat > ${ARTIFACT_DIR}/installer/worker-hostrecords.xml << EOF
-        <host ip='192.168.${cluster_subnet}.1'>
-          <hostname>alertmanager-main-openshift-monitoring.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
-          <hostname>canary-openshift-ingress-canary.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
-          <hostname>console-openshift-console.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
-          <hostname>downloads-openshift-console.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
-          <hostname>grafana-openshift-monitoring.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
-          <hostname>oauth-openshift.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
-          <hostname>prometheus-k8s-openshift-monitoring.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
-        </host>
-        EOF
-                echo "Libvirt network found. Injecting worker DNS records."
-                mock-nss.sh virsh --connect "${remote_libvirt_uri}" net-update --network "${libvirt_network}" --command add-last --section dns-host --xml "$(< ${ARTIFACT_DIR}/installer/worker-hostrecords.xml)"
-                break
-            fi
-        done
 
         wait "${openshift_install}"
 
@@ -882,44 +861,3 @@ objects:
       - "grafana-openshift-monitoring.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-4"
       - "oauth-openshift.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-4"
       - "prometheus-k8s-openshift-monitoring.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-1-4"
-    - ip: "${BASTION_SVC_2_0_IP}"
-      hostnames:
-      - "${REMOTE_LIBVIRT_HOSTNAME_2}"
-      - "alertmanager-main-openshift-monitoring.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-2-0"
-      - "api.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-2-0"
-      - "canary-openshift-ingress-canary.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-2-0"
-      - "console-openshift-console.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-2-0"
-      - "downloads-openshift-console.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-2-0"
-      - "grafana-openshift-monitoring.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-2-0"
-      - "oauth-openshift.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-2-0"
-      - "prometheus-k8s-openshift-monitoring.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-2-0"
-    - ip: "${BASTION_SVC_2_1_IP}"
-      hostnames:
-      - "alertmanager-main-openshift-monitoring.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-2-1"
-      - "api.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-2-1"
-      - "canary-openshift-ingress-canary.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-2-1"
-      - "console-openshift-console.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-2-1"
-      - "downloads-openshift-console.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-2-1"
-      - "grafana-openshift-monitoring.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-2-1"
-      - "oauth-openshift.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-2-1"
-      - "prometheus-k8s-openshift-monitoring.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-2-1"
-    - ip: "${BASTION_SVC_2_2_IP}"
-      hostnames:
-      - "alertmanager-main-openshift-monitoring.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-2-2"
-      - "api.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-2-2"
-      - "canary-openshift-ingress-canary.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-2-2"
-      - "console-openshift-console.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-2-2"
-      - "downloads-openshift-console.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-2-2"
-      - "grafana-openshift-monitoring.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-2-2"
-      - "oauth-openshift.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-2-2"
-      - "prometheus-k8s-openshift-monitoring.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-2-2"
-    - ip: "${BASTION_SVC_2_3_IP}"
-      hostnames:
-      - "alertmanager-main-openshift-monitoring.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-2-3"
-      - "api.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-2-3"
-      - "canary-openshift-ingress-canary.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-2-3"
-      - "console-openshift-console.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-2-3"
-      - "downloads-openshift-console.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-2-3"
-      - "grafana-openshift-monitoring.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-2-3"
-      - "oauth-openshift.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-2-3"
-      - "prometheus-k8s-openshift-monitoring.apps.${LEASED_RESOURCE}-${JOB_NAME_HASH}.${CLUSTER_TYPE}-2-3"
