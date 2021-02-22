@@ -36,7 +36,25 @@ tests:
   steps:
     cluster_profile: gcp
     test:
-    - as: test
+    - as: e2e-gcp-console-steps
+      cli: latest
+      commands: |
+        # Clone source from console repository and run test
+        ./scripts/openshiftci-presubmit-devfiles-console-tests.sh
+        cd /go/src/github.com/openshift/console
+        ./test-prow-e2e.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- artifact_dir: /tmp/artifacts
+  as: e2e-gcp-console-periodic
+  cron: 0 */6 * * *
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: e2e-gcp-console-periodic-steps
       cli: latest
       commands: |
         # Clone source from console repository and run test
