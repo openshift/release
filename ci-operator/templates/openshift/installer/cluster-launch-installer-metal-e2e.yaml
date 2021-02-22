@@ -554,6 +554,10 @@ objects:
         openshift-install --dir=${TMP_SHARED}/installer wait-for install-complete 2>&1 | grep --line-buffered -v password &
         wait "$!"
 
+        # cluster-bot requires the kubeadmin password in ARTIFACT_DIR
+        mkdir -p ${ARTIFACT_DIR}/installer/auth
+        cp ${TMP_SHARED}/installer/auth/kubeadmin-password ${ARTIFACT_DIR}/installer/auth
+
         # Password for the cluster gets leaked in the installer logs and hence removing them.
         sed '
           s/password: .*/password: REDACTED/g;
