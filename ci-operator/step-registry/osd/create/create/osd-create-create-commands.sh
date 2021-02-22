@@ -73,7 +73,8 @@ while true; do
     break
   fi
   if [[ "${CLUSTER_STATE}" != "installing" && "${CLUSTER_STATE}" != "pending" ]]; then
-    echo "Cluster reported invalid state: ${CLUSTER_STATE}"
+    ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/logs/install" > "${ARTIFACT_DIR}/.osd_install.log" || echo "error: Unable to pull installation log."
+    echo "error: Cluster reported invalid state: ${CLUSTER_STATE}"
     exit 1
   fi
 done
