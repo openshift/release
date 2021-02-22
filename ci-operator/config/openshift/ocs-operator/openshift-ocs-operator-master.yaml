@@ -66,7 +66,10 @@ images:
   to: ocs-must-gather-quay
 operator:
   bundles:
-  - dockerfile_path: openshift-ci/Dockerfile.bundle
+  - as: dev-master-dependencies
+    dockerfile_path: openshift-ci/Dockerfile.bundle.master
+  - as: fixed-dependencies
+    dockerfile_path: openshift-ci/Dockerfile.bundle
   substitutions:
   - pullspec: quay.io/ocs-dev/ocs-operator:latest
     with: ocs-operator
@@ -75,6 +78,7 @@ promotion:
   - ocs-operator
   - operator-registry-base
   - ocs-registry
+  - ocs-registry-master
   name: ocs-4.8
   namespace: ocp
 resources:
@@ -99,6 +103,8 @@ tests:
 - as: ocs-operator-bundle-e2e-aws
   steps:
     cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-fixed-dependencies
     env:
       OO_CHANNEL: alpha
       OO_INSTALL_NAMESPACE: openshift-storage
@@ -116,6 +122,41 @@ tests:
     - as: tests
       commands: |
         export GOFLAGS=''; make functest
+      dependencies:
+      - env: OO_INDEX
+        name: ci-index
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-aws
+- as: ocs-operator-bundle-master-e2e-aws
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-dev-master-dependencies
+    env:
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: openshift-storage
+      OO_PACKAGE: ocs-operator
+      OO_TARGET_NAMESPACES: '!install'
+    post:
+    - as: ocs-must-gather
+      cli: latest
+      commands: hack/dump-debug-info.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    test:
+    - as: tests
+      commands: |
+        export GOFLAGS=''; make functest
+      dependencies:
+      - env: OO_INDEX
+        name: ci-index
       from: src
       resources:
         requests:
