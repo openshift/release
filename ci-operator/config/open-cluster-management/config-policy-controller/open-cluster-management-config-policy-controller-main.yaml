@@ -3,10 +3,6 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  ocm_builder:
-    name: builder
-    namespace: open-cluster-management
-    tag: go1.14-linux-amd64
 binary_build_commands: make build
 build_root:
   image_stream_tag:
@@ -16,6 +12,10 @@ build_root:
 images:
 - dockerfile_path: build/Dockerfile
   from: base
+  inputs:
+    bin:
+      as:
+      - golang:1.14
   to: config-policy-controller
 promotion:
   namespace: open-cluster-management
@@ -31,7 +31,18 @@ tests:
   commands: make test
   container:
     from: src
+- artifact_dir: /tmp/artifacts
+  as: sonarcloud
+  commands: |
+    export GOPROXY="proxy.golang.org,direct"
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow sonar/go/openshiftci
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
 zz_generated_metadata:
-  branch: master
+  branch: main
   org: open-cluster-management
   repo: config-policy-controller
