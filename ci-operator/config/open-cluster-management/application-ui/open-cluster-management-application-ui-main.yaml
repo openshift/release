@@ -20,6 +20,20 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- artifact_dir: /tmp/artifacts
+  as: unit
+  commands: make test
+  container:
+    from: src
+- artifact_dir: /tmp/artifacts
+  as: sonar
+  commands: GOPROXY="proxy.golang.org,direct" make sonar/go/openshiftci
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
 zz_generated_metadata:
   branch: main
   org: open-cluster-management
