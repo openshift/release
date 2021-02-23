@@ -53,6 +53,13 @@ ocm create cluster ${OCM_CREATE_ARGS} \
 CLUSTER_ID=$(cat "${CLUSTER_INFO}" | grep '^ID:' | tr -d '[:space:]' | cut -d ':' -f 2)
 echo "Cluster ${CLUSTER_NAME} is being created with cluster-id: ${CLUSTER_ID}"
 
+# By default, OSD will setup clusters running for a few days before they expire.
+# In case things go wrong in our flow, give the cluster an initial expiration
+# that will minimize wasted compute if post steps are not successful.
+# After installation, the expiration will be bumped according to CLUSTER_DURATION.
+INIT_EXPIRATION_DATE=$(date -u -d "+3hours" "+%Y-%m-%dT%H:%M:%S.00000Z")
+echo '{ "expiration_timestamp": "'"${INIT_EXPIRATION_DATE}"'" }' | ocm patch "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}"
+
 # Store the cluster ID for the delete operation
 echo -n "${CLUSTER_ID}" > "${HOME}/cluster-id"
 
@@ -66,7 +73,8 @@ while true; do
     break
   fi
   if [[ "${CLUSTER_STATE}" != "installing" && "${CLUSTER_STATE}" != "pending" ]]; then
-    echo "Cluster reported invalid state: ${CLUSTER_STATE}"
+    ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/logs/install" > "${ARTIFACT_DIR}/.osd_install.log" || echo "error: Unable to pull installation log."
+    echo "error: Cluster reported invalid state: ${CLUSTER_STATE}"
     exit 1
   fi
 done
@@ -91,5 +99,10 @@ while true; do
   fi
   sleep 30
 done
+
+# OSD replaces the provider selection template and eliminate the kube:admin option.
+# Restore the ugly, but kube:admin containing, default template.
+cd /tmp
+oc --kubeconfig "${SHARED_DIR}/kubeconfig" patch oauth.config.openshift.io cluster --type='json' -p='{"spec":{"templates": null}}' --type=merge
 
 exit 0

@@ -1,0 +1,43 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+  open-cluster-management_builder_go1.15-linux-amd64:
+    name: builder
+    namespace: open-cluster-management
+    tag: go1.15-linux-amd64
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: open-cluster-management
+    tag: go1.15-linux-amd64
+images:
+- dockerfile_path: Dockerfile.prow
+  from: base
+  inputs:
+    open-cluster-management_builder_go1.15-linux-amd64:
+      as:
+      - registry.ci.openshift.org/open-cluster-management/builder:go1.15-linux-amd64
+  to: discovery-operator
+promotion:
+  name: latest
+  namespace: open-cluster-management
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- artifact_dir: /tmp/artifacts
+  as: unit
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow unit-tests
+  container:
+    from: src
+zz_generated_metadata:
+  branch: main
+  org: open-cluster-management
+  repo: discovery

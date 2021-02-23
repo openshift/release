@@ -473,9 +473,9 @@ objects:
 
         openshift-install --dir=${TMP_SHARED}/installer create ignition-configs
 
-        mkdir ${ARTIFACT_DIR}/terraform
-        cp -r /var/lib/openshift-install/upi/metal/* ${ARTIFACT_DIR}/terraform/
-        cp /bin/terraform-provider-matchbox ${ARTIFACT_DIR}/terraform/
+        mkdir ${TMP_SHARED}/terraform
+        cp -r /var/lib/openshift-install/upi/metal/* ${TMP_SHARED}/terraform/
+        cp /bin/terraform-provider-matchbox ${TMP_SHARED}/terraform/
 
         PXE_INITRD_URL="$(jq -r '.baseURI + (.images["live-initramfs"].path // .images["initramfs"].path)' /var/lib/openshift-install/rhcos.json)"
         PXE_KERNEL_URL="$(jq -r '.baseURI + (.images["live-kernel"].path // .images["kernel"].path)' /var/lib/openshift-install/rhcos.json)"
@@ -488,7 +488,7 @@ objects:
           PXE_KERNEL_ARGS="coreos.inst.image_url=${PXE_OS_IMAGE_URL}"
         fi
         # 4.3 unified 'metal-bios' and 'metal-uefi' into just 'metal', unused in 4.6
-        cat > ${ARTIFACT_DIR}/terraform/terraform.tfvars <<-EOF
+        cat > ${TMP_SHARED}/terraform/terraform.tfvars <<-EOF
         cluster_id = "${CLUSTER_NAME}"
         bootstrap_ign_file = "${TMP_SHARED}/installer/bootstrap.ign"
         cluster_domain = "${CLUSTER_NAME}.${BASE_DOMAIN}"
@@ -515,13 +515,13 @@ objects:
         export PACKET_AUTH_TOKEN=$(cat /etc/openshift-installer/.packetcred)
 
         echo "Creating resources using terraform"
-        (cd ${ARTIFACT_DIR}/terraform && terraform init)
+        (cd ${TMP_SHARED}/terraform && terraform init)
 
         # Packet returns transients errors when creating devices.
         # example, `Oh snap, something went wrong! We've logged the error and will take a look - please reach out to us if you continue having trouble.`
         # therefore the terraform apply needs to be retried a few time before giving up.
         rc=1
-        for r in {1..5}; do (cd ${ARTIFACT_DIR}/terraform && terraform apply -auto-approve) && rc=0 && break ; done
+        for r in {1..5}; do (cd ${TMP_SHARED}/terraform && terraform apply -auto-approve) && rc=0 && break ; done
         if test "${rc}" -eq 1; then echo "failed to create the infra resources"; exit 1; fi
 
         echo "Waiting for bootstrap to complete"
@@ -530,7 +530,7 @@ objects:
         if test "${rc}" -eq 1; then echo "failed to bootstrap"; exit 1; fi
 
         echo "Removing bootstrap host from control plane api pool"
-        (cd ${ARTIFACT_DIR}/terraform && terraform apply -auto-approve=true -var=bootstrap_dns="false")
+        (cd ${TMP_SHARED}/terraform && terraform apply -auto-approve=true -var=bootstrap_dns="false")
 
         function approve_csrs() {
           while [[ ! -f ${TMP_SHARED}/setup-failed ]] && [[ ! -f ${TMP_SHARED}/setup-success ]]; do
@@ -575,6 +575,8 @@ objects:
       env:
       - name: ARTIFACT_DIR
         value: /tmp/artifacts
+      - name: TMP_SHARED
+        value: /tmp/shared
       - name: INSTANCE_PREFIX
         value: ${NAMESPACE}-${JOB_NAME_HASH}
       - name: TYPE
@@ -700,8 +702,8 @@ objects:
 
           echo "Deprovisioning cluster ..."
           export PACKET_AUTH_TOKEN=$(cat /etc/openshift-installer/.packetcred)
-          (cd ${ARTIFACT_DIR}/terraform && terraform init)
-          for r in {1..3}; do (cd ${ARTIFACT_DIR}/terraform && terraform destroy -auto-approve) && break ; done
+          (cd ${TMP_SHARED}/terraform && terraform init)
+          for r in {1..3}; do (cd ${TMP_SHARED}/terraform && terraform destroy -auto-approve) && break ; done
         }
 
         trap 'teardown' EXIT

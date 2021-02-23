@@ -488,10 +488,10 @@ gcloud deployment-manager deployments delete -q "${INFRA_ID}-bootstrap"
 ## Approving the CSR requests for nodes
 echo "$(date -u --rfc-3339=seconds) - Approving the CSR requests for nodes..."
 function approve_csrs() {
-  while true; do
-    oc get csr -ojson | jq -r '.items[] | select(.status == {} ) | .metadata.name' | xargs --no-run-if-empty oc adm certificate approve
-    sleep 15 & wait
-    continue
+  while [[ ! -f /tmp/install-complete ]]; do
+      # even if oc get csr fails continue
+      oc get csr -ojson | jq -r '.items[] | select(.status == {} ) | .metadata.name' | xargs --no-run-if-empty oc adm certificate approve || true
+      sleep 15 & wait
   done
 }
 approve_csrs &
@@ -541,3 +541,4 @@ cp -t "${SHARED_DIR}" \
     "${dir}/auth/kubeconfig"
 
 popd
+touch /tmp/install-complete

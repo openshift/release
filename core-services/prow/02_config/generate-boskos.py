@@ -41,7 +41,7 @@ CONFIG = {
     'kubevirt-quota-slice':{},
     'vsphere-quota-slice':{},
     'osd-ephemeral-quota-slice': {
-        'default': 5,
+        'default': 15,
     },
     'aws-cpaas-quota-slice': {
         'us-east-1': 8,

@@ -19,8 +19,7 @@ postsubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
         - --promote
-        - --report-password-file=/etc/report/password.txt
-        - --report-username=ci
+        - --report-credentials-file=/etc/report/credentials
         - --target=[images]
         command:
         - ci-operator
@@ -54,3 +53,44 @@ postsubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+  - agent: kubernetes
+    branches:
+    - ^main$
+    cluster: build02
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: branch-ci-open-cluster-management-governance-policy-propagator-main-publish
+    spec:
+      containers:
+      - args:
+        - -f
+        - Makefile.prow
+        - osci/publish
+        command:
+        - make
+        env:
+        - name: COMPONENT_NAME
+          value: governance-policy-propagator
+        - name: COMPONENT_VERSION
+          value: 1.0.0
+        - name: OSCI_IMAGE_REMOTE_REPO_SRC
+          value: registry.ci.openshift.org/open-cluster-management
+        - name: SELF
+          value: make -f Makefile.prow
+        image: registry.ci.openshift.org/open-cluster-management/builder:go1.15-linux-amd64
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 100m
+            memory: 200Mi
+        volumeMounts:
+        - mountPath: /etc/github
+          name: acm-cicd-github
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: acm-cicd-github
+        secret:
+          secretName: acm-cicd-github
