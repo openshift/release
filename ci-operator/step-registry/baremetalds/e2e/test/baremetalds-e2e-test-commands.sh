@@ -6,6 +6,11 @@ set -o pipefail
 
 echo "************ baremetalds test command ************"
 
+if [ "${SKIP_E2E_TEST:-}" = "true" ]; then
+  echo "Skip e2e testing"
+  exit 0
+fi
+
 # Fetch packet basic configuration
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
