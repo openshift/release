@@ -131,6 +131,14 @@ data:
         - __meta_kubernetes_pod_uid
         - __meta_kubernetes_pod_container_name
         target_label: __path__
+      - action: drop
+        regex: ''
+        source_labels:
+        - pod_template_hash
+        - controller_revision_hash
+        - ingresscontroller_operator_openshift_io_hash
+        - pod_template_generation
+        - stream
     - job_name: kubernetes-pods-app
       kubernetes_sd_configs:
       - role: pod
@@ -180,6 +188,14 @@ data:
         - __meta_kubernetes_pod_uid
         - __meta_kubernetes_pod_container_name
         target_label: __path__
+      - action: drop
+        regex: ''
+        source_labels:
+        - pod_template_hash
+        - controller_revision_hash
+        - ingresscontroller_operator_openshift_io_hash
+        - pod_template_generation
+        - stream
     - job_name: kubernetes-pods-direct-controllers
       kubernetes_sd_configs:
       - role: pod
@@ -235,6 +251,14 @@ data:
         - __meta_kubernetes_pod_uid
         - __meta_kubernetes_pod_container_name
         target_label: __path__
+      - action: drop
+        regex: ''
+        source_labels:
+        - pod_template_hash
+        - controller_revision_hash
+        - ingresscontroller_operator_openshift_io_hash
+        - pod_template_generation
+        - stream
     - job_name: kubernetes-pods-indirect-controller
       kubernetes_sd_configs:
       - role: pod
@@ -292,6 +316,14 @@ data:
         - __meta_kubernetes_pod_uid
         - __meta_kubernetes_pod_container_name
         target_label: __path__
+      - action: drop
+        regex: ''
+        source_labels:
+        - pod_template_hash
+        - controller_revision_hash
+        - ingresscontroller_operator_openshift_io_hash
+        - pod_template_generation
+        - stream
     - job_name: kubernetes-pods-static
       kubernetes_sd_configs:
       - role: pod
@@ -342,6 +374,14 @@ data:
         - __meta_kubernetes_pod_annotation_kubernetes_io_config_mirror
         - __meta_kubernetes_pod_container_name
         target_label: __path__
+      - action: drop
+        regex: ''
+        source_labels:
+        - pod_template_hash
+        - controller_revision_hash
+        - ingresscontroller_operator_openshift_io_hash
+        - pod_template_generation
+        - stream
     - job_name: journal
       journal:
         path: /var/log/journal
@@ -402,7 +442,7 @@ spec:
         - -c
         - |
           promtail \
-            -client.external-labels=,host=\$(HOSTNAME),invoker=\$(cat /tmp/shared/cluster-invoker) \
+            -client.external-labels=host=\$(HOSTNAME),invoker=\$(cat /tmp/shared/cluster-invoker) \
             -config.file=/etc/promtail/promtail.yaml
         env:
         - name: HOSTNAME
