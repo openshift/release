@@ -68,6 +68,39 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-aws
+- artifact_dir: /tmp/artifacts
+  as: e2e-azure-fips
+  cron: '@yearly'
+  steps:
+    cluster_profile: azure4
+    env:
+      FIPS_ENABLED: "true"
+    pre:
+    - chain: ipi-azure-pre
+    - ref: fips-check
+    workflow: openshift-e2e-azure
+- artifact_dir: /tmp/artifacts
+  as: e2e-aws-fips
+  interval: 24h
+  steps:
+    cluster_profile: aws
+    env:
+      FIPS_ENABLED: "true"
+    pre:
+    - chain: ipi-aws-pre
+    - ref: fips-check
+    workflow: openshift-e2e-aws
+- artifact_dir: /tmp/artifacts
+  as: e2e-gcp-fips
+  cron: '@yearly'
+  steps:
+    cluster_profile: gcp
+    env:
+      FIPS_ENABLED: "true"
+    pre:
+    - chain: ipi-gcp-pre
+    - ref: fips-check
+    workflow: openshift-e2e-gcp
 zz_generated_metadata:
   branch: master
   org: openshift
