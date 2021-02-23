@@ -1,27 +1,25 @@
-presubmits:
-  open-cluster-management/config-policy-controller:
+postsubmits:
+  openshift-cnv/cnv-ci:
   - agent: kubernetes
-    always_run: true
     branches:
-    - master
-    cluster: build01
-    context: ci/prow/images
+    - ^release-4\.8$
+    cluster: build02
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-open-cluster-management-config-policy-controller-master-images
-    rerun_command: /test images
+    max_concurrency: 1
+    name: branch-ci-openshift-cnv-cnv-ci-release-4.8-e2e-deploy
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-password-file=/etc/report/password.txt
-        - --report-username=ci
-        - --target=[images]
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-deploy-cluster-profile
+        - --target=e2e-deploy
         command:
         - ci-operator
         image: ci-operator:latest
@@ -31,6 +29,11 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-deploy-cluster-profile
+          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -42,35 +45,43 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-azure4
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
     branches:
-    - master
-    cluster: build01
-    context: ci/prow/test-unit
+    - ^release-4\.8$
+    cluster: build02
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-open-cluster-management-config-policy-controller-master-test-unit
-    rerun_command: /test test-unit
+    max_concurrency: 1
+    name: branch-ci-openshift-cnv-cnv-ci-release-4.8-e2e-upgrade
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-password-file=/etc/report/password.txt
-        - --report-username=ci
-        - --target=test-unit
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-upgrade-cluster-profile
+        - --target=e2e-upgrade
         command:
         - ci-operator
         image: ci-operator:latest
@@ -80,6 +91,11 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-upgrade-cluster-profile
+          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -91,10 +107,20 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-azure4
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )test-unit,?($|\s.*)

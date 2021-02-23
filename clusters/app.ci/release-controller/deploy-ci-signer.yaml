@@ -15,6 +15,8 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"release-controller:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"controller\")].image"}]'
   name: release-controller-signer
   namespace: ci
 spec:
@@ -39,7 +41,7 @@ spec:
         - --sign=/etc/release-controller/signer/openshift-ci.gpg
         - --audit-gcs-service-account=/etc/release-controller/publisher/service-account.json
         - -v=4
-        image: release-controller:muller-2021-02-19
+        image: release-controller:latest
         name: controller
         volumeMounts:
         - mountPath: /etc/release-controller/publisher

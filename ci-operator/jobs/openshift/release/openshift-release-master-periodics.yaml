@@ -1,6 +1,231 @@
 periodics:
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  interval: 12h
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: ocp-4.2
+    job-release: "4.2"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ocp-4.2-console-aws
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/console-aws-cluster-profile
+      - --target=console-aws
+      - --variant=ocp-4.2
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/console-aws-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  interval: 24h
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: ocp-4.3
+    job-release: "4.3"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ocp-4.3-console-aws
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/console-aws-cluster-profile
+      - --target=console-aws
+      - --variant=ocp-4.3
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/console-aws-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  interval: 24h
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: ocp-4.4
+    job-release: "4.4"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ocp-4.4-console-aws
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/console-aws-cluster-profile
+      - --target=console-aws
+      - --variant=ocp-4.4
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/console-aws-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -21,8 +246,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-aws-cluster-profile
       - --target=e2e-aws
@@ -76,7 +300,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: 0 0 */2 * *
   decorate: true
   decoration_config:
@@ -97,8 +321,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-aws-proxy-cluster-profile
       - --target=e2e-aws-proxy
@@ -152,7 +375,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -173,8 +396,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-gcp-cluster-profile
       - --target=e2e-gcp
@@ -230,7 +452,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: 0 5,22 * * *
   decorate: true
   decoration_config:
@@ -251,8 +473,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-ovirt-cluster-profile
       - --target=e2e-ovirt
@@ -308,7 +529,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: 0 */6 * * *
   decorate: true
   decoration_config:
@@ -329,8 +550,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-44-stable-to-45-ci-cluster-profile
       - --target=e2e-44-stable-to-45-ci
@@ -384,7 +604,82 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  interval: 48h
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: ocp-4.5
+    job-release: "4.5"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ocp-4.5-console-aws
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/console-aws-cluster-profile
+      - --target=console-aws
+      - --variant=ocp-4.5
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/console-aws-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -405,8 +700,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-aws-cluster-profile
       - --target=e2e-aws
@@ -460,7 +754,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: 0 0 */2 * *
   decorate: true
   decoration_config:
@@ -481,8 +775,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-aws-proxy-cluster-profile
       - --target=e2e-aws-proxy
@@ -536,7 +829,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -557,8 +850,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-gcp-cluster-profile
       - --target=e2e-gcp
@@ -614,7 +906,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: 0 0 * * 1
   decorate: true
   decoration_config:
@@ -635,8 +927,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-ipi-cluster-profile
       - --target=e2e-metal-ipi
@@ -692,7 +983,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: 0 0 * * 1
   decorate: true
   decoration_config:
@@ -713,8 +1004,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-ipi-compact-cluster-profile
       - --target=e2e-metal-ipi-compact
@@ -770,7 +1060,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: 0 0 * * 1
   decorate: true
   decoration_config:
@@ -791,8 +1081,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-ipi-ipv4-cluster-profile
       - --target=e2e-metal-ipi-ipv4
@@ -848,7 +1137,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: 0 4,21 * * *
   decorate: true
   decoration_config:
@@ -869,8 +1158,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-ovirt-cluster-profile
       - --target=e2e-ovirt
@@ -947,8 +1235,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-vsphere-cluster-profile
       - --target=e2e-vsphere
@@ -1023,8 +1310,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-vsphere-serial-cluster-profile
       - --target=e2e-vsphere-serial
@@ -1099,8 +1385,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-vsphere-upi-cluster-profile
       - --target=e2e-vsphere-upi
@@ -1175,8 +1460,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-vsphere-upi-serial-cluster-profile
       - --target=e2e-vsphere-upi-serial
@@ -1230,7 +1514,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: 0 0,6,12,18 * * *
   decorate: true
   decoration_config:
@@ -1251,8 +1535,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/openshift-ipi-azure-arcconformance-cluster-profile
       - --target=openshift-ipi-azure-arcconformance
@@ -1306,7 +1589,82 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  interval: 48h
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: ocp-4.6
+    job-release: "4.6"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ocp-4.6-console-aws
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/console-aws-cluster-profile
+      - --target=console-aws
+      - --variant=ocp-4.6
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/console-aws-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -1327,8 +1685,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-aws-cluster-profile
       - --target=e2e-aws
@@ -1382,7 +1739,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: 0 0 */2 * *
   decorate: true
   decoration_config:
@@ -1403,8 +1760,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-aws-proxy-cluster-profile
       - --target=e2e-aws-proxy
@@ -1458,7 +1814,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: 30 */6 * * *
   decorate: true
   decoration_config:
@@ -1479,8 +1835,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-aws-workers-rhel7-cluster-profile
       - --target=e2e-aws-workers-rhel7
@@ -1534,7 +1889,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -1555,8 +1910,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-gcp-cluster-profile
       - --target=e2e-gcp
@@ -1612,7 +1966,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: 0 9 * * 1,3,5
   decorate: true
   decoration_config:
@@ -1633,8 +1987,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-gcp-libvirt-cert-rotation-cluster-profile
       - --target=e2e-gcp-libvirt-cert-rotation
@@ -1690,7 +2043,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: 0 0 * * 1
   decorate: true
   decoration_config:
@@ -1718,8 +2071,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-assisted-cluster-profile
       - --target=e2e-metal-assisted
@@ -1775,7 +2127,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: 0 0 * * 1
   decorate: true
   decoration_config:
@@ -1803,8 +2155,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-assisted-ipv6-cluster-profile
       - --target=e2e-metal-assisted-ipv6
@@ -1860,7 +2211,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: 0 0 * * 1
   decorate: true
   decoration_config:
@@ -1888,8 +2239,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-assisted-onprem-cluster-profile
       - --target=e2e-metal-assisted-onprem
@@ -1945,7 +2295,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: 0 0 * * 1
   decorate: true
   decoration_config:
@@ -1966,8 +2316,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-ipi-cluster-profile
       - --target=e2e-metal-ipi
@@ -2023,7 +2372,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: 0 0 * * 1
   decorate: true
   decoration_config:
@@ -2044,8 +2393,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-ipi-compact-cluster-profile
       - --target=e2e-metal-ipi-compact
@@ -2101,7 +2449,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: 0 0 * * 1
   decorate: true
   decoration_config:
@@ -2122,8 +2470,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-ipi-ipv4-cluster-profile
       - --target=e2e-metal-ipi-ipv4
@@ -2179,7 +2526,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: 0 0 1 1 *
   decorate: true
   decoration_config:
@@ -2200,8 +2547,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-ipi-upgrade-cluster-profile
       - --target=e2e-metal-ipi-upgrade
@@ -2257,7 +2603,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: 0 0 * * 1
   decorate: true
   decoration_config:
@@ -2278,8 +2624,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-ipi-virtualmedia-cluster-profile
       - --target=e2e-metal-ipi-virtualmedia
@@ -2335,7 +2680,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: 3 */6 * * *
   decorate: true
   decoration_config:
@@ -2356,8 +2701,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-ovirt-cluster-profile
       - --target=e2e-ovirt
@@ -2434,8 +2778,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-vsphere-cluster-profile
       - --target=e2e-vsphere
@@ -2510,8 +2853,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-vsphere-serial-cluster-profile
       - --target=e2e-vsphere-serial
@@ -2586,8 +2928,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-vsphere-upi-cluster-profile
       - --target=e2e-vsphere-upi
@@ -2662,8 +3003,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-vsphere-upi-serial-cluster-profile
       - --target=e2e-vsphere-upi-serial
@@ -2717,7 +3057,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: 0 2,8,14,20 * * *
   decorate: true
   decoration_config:
@@ -2738,8 +3078,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/openshift-ipi-azure-arcconformance-cluster-profile
       - --target=openshift-ipi-azure-arcconformance
@@ -2793,7 +3132,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: 0 0 */2 * *
   decorate: true
   decoration_config:
@@ -2814,8 +3153,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-aws-proxy-cluster-profile
       - --target=e2e-aws-proxy
@@ -2869,7 +3207,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: 30 */6 * * *
   decorate: true
   decoration_config:
@@ -2890,8 +3228,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-aws-workers-rhel7-cluster-profile
       - --target=e2e-aws-workers-rhel7
@@ -2945,7 +3282,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: 0 9 * * 1,3,5
   decorate: true
   decoration_config:
@@ -2966,8 +3303,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-gcp-libvirt-cert-rotation-cluster-profile
       - --target=e2e-gcp-libvirt-cert-rotation
@@ -3023,7 +3359,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: 0 0 * * 1
   decorate: true
   decoration_config:
@@ -3051,8 +3387,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-assisted-cluster-profile
       - --target=e2e-metal-assisted
@@ -3108,7 +3443,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: 0 0 * * 1
   decorate: true
   decoration_config:
@@ -3136,8 +3471,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-assisted-ipv6-cluster-profile
       - --target=e2e-metal-assisted-ipv6
@@ -3193,7 +3527,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: 0 0 * * 1
   decorate: true
   decoration_config:
@@ -3221,8 +3555,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-assisted-onprem-cluster-profile
       - --target=e2e-metal-assisted-onprem
@@ -3278,7 +3611,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: 0 0 1 1 *
   decorate: true
   decoration_config:
@@ -3299,8 +3632,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-ipi-cluster-profile
       - --target=e2e-metal-ipi
@@ -3356,7 +3688,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: 0 0 * * 1
   decorate: true
   decoration_config:
@@ -3377,8 +3709,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-ipi-compact-cluster-profile
       - --target=e2e-metal-ipi-compact
@@ -3434,7 +3765,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: 0 0 1 1 *
   decorate: true
   decoration_config:
@@ -3455,8 +3786,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-ipi-ovn-dualstack-cluster-profile
       - --target=e2e-metal-ipi-ovn-dualstack
@@ -3512,7 +3842,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: 0 0 1 1 *
   decorate: true
   decoration_config:
@@ -3533,8 +3863,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-ipi-ovn-ipv6-cluster-profile
       - --target=e2e-metal-ipi-ovn-ipv6
@@ -3590,7 +3919,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: 0 0 1 1 *
   decorate: true
   decoration_config:
@@ -3611,8 +3940,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-ipi-upgrade-cluster-profile
       - --target=e2e-metal-ipi-upgrade
@@ -3668,7 +3996,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: 0 0 * * 1
   decorate: true
   decoration_config:
@@ -3689,8 +4017,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-ipi-virtualmedia-cluster-profile
       - --target=e2e-metal-ipi-virtualmedia
@@ -3746,7 +4073,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: 0 */6 * * *
   decorate: true
   decoration_config:
@@ -3767,8 +4094,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-ovirt-cluster-profile
       - --target=e2e-ovirt
@@ -3845,8 +4171,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-vsphere-cluster-profile
       - --target=e2e-vsphere
@@ -3921,8 +4246,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-vsphere-serial-cluster-profile
       - --target=e2e-vsphere-serial
@@ -3997,8 +4321,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-vsphere-upi-cluster-profile
       - --target=e2e-vsphere-upi
@@ -4073,8 +4396,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-vsphere-upi-serial-cluster-profile
       - --target=e2e-vsphere-upi-serial
@@ -4128,7 +4450,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: 0 4,10,16,22 * * *
   decorate: true
   decoration_config:
@@ -4149,8 +4471,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/openshift-ipi-azure-arcconformance-cluster-profile
       - --target=openshift-ipi-azure-arcconformance
@@ -4204,7 +4525,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: 0 0 */2 * *
   decorate: true
   decoration_config:
@@ -4225,8 +4546,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-aws-proxy-cluster-profile
       - --target=e2e-aws-proxy
@@ -4280,7 +4600,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: 30 */6 * * *
   decorate: true
   decoration_config:
@@ -4301,8 +4621,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-aws-workers-rhel7-cluster-profile
       - --target=e2e-aws-workers-rhel7
@@ -4356,7 +4675,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: '@daily'
   decorate: true
   decoration_config:
@@ -4377,8 +4696,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-gcp-libvirt-cert-rotation-cluster-profile
       - --target=e2e-gcp-libvirt-cert-rotation
@@ -4434,7 +4752,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: 0 0 * * 1
   decorate: true
   decoration_config:
@@ -4462,8 +4780,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-assisted-cluster-profile
       - --target=e2e-metal-assisted
@@ -4519,7 +4836,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: 0 0 * * 1
   decorate: true
   decoration_config:
@@ -4547,8 +4864,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-assisted-ipv6-cluster-profile
       - --target=e2e-metal-assisted-ipv6
@@ -4604,7 +4920,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: 0 0 * * 1
   decorate: true
   decoration_config:
@@ -4632,8 +4948,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-assisted-onprem-cluster-profile
       - --target=e2e-metal-assisted-onprem
@@ -4689,7 +5004,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: 0 0 1 1 *
   decorate: true
   decoration_config:
@@ -4710,8 +5025,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-ipi-cluster-profile
       - --target=e2e-metal-ipi
@@ -4767,7 +5081,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: 0 0 * * 1
   decorate: true
   decoration_config:
@@ -4788,8 +5102,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-ipi-compact-cluster-profile
       - --target=e2e-metal-ipi-compact
@@ -4845,7 +5158,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: 0 0 1 1 *
   decorate: true
   decoration_config:
@@ -4866,8 +5179,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-ipi-ovn-dualstack-cluster-profile
       - --target=e2e-metal-ipi-ovn-dualstack
@@ -4923,7 +5235,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: 0 0 1 1 *
   decorate: true
   decoration_config:
@@ -4944,8 +5256,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-ipi-ovn-ipv6-cluster-profile
       - --target=e2e-metal-ipi-ovn-ipv6
@@ -5001,7 +5312,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: 0 0 1 1 *
   decorate: true
   decoration_config:
@@ -5022,8 +5333,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-ipi-upgrade-cluster-profile
       - --target=e2e-metal-ipi-upgrade
@@ -5079,7 +5389,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: 0 0 * * 1
   decorate: true
   decoration_config:
@@ -5100,8 +5410,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-ipi-virtualmedia-cluster-profile
       - --target=e2e-metal-ipi-virtualmedia
@@ -5157,7 +5466,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: 0 */6 * * *
   decorate: true
   decoration_config:
@@ -5178,8 +5487,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-ovirt-cluster-profile
       - --target=e2e-ovirt
@@ -5256,8 +5564,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-vsphere-cluster-profile
       - --target=e2e-vsphere
@@ -5332,8 +5639,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-vsphere-serial-cluster-profile
       - --target=e2e-vsphere-serial
@@ -5408,8 +5714,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-vsphere-upi-cluster-profile
       - --target=e2e-vsphere-upi
@@ -5484,8 +5789,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-vsphere-upi-serial-cluster-profile
       - --target=e2e-vsphere-upi-serial
@@ -5539,7 +5843,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: 0 4,10,16,22 * * *
   decorate: true
   decoration_config:
@@ -5560,8 +5864,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/openshift-ipi-azure-arcconformance-cluster-profile
       - --target=openshift-ipi-azure-arcconformance
@@ -5615,7 +5918,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: 0 0 */2 * *
   decorate: true
   decoration_config:
@@ -5636,8 +5939,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-aws-proxy-cluster-profile
       - --target=e2e-aws-proxy
@@ -5691,7 +5993,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: 30 */6 * * *
   decorate: true
   decoration_config:
@@ -5712,8 +6014,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-aws-workers-rhel7-cluster-profile
       - --target=e2e-aws-workers-rhel7
@@ -5767,7 +6068,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: '@daily'
   decorate: true
   decoration_config:
@@ -5788,8 +6089,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-gcp-libvirt-cert-rotation-cluster-profile
       - --target=e2e-gcp-libvirt-cert-rotation
@@ -5845,7 +6145,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: 0 0 * * 1
   decorate: true
   decoration_config:
@@ -5866,8 +6166,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-assisted-cluster-profile
       - --target=e2e-metal-assisted
@@ -5923,7 +6222,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: 0 0 * * 1
   decorate: true
   decoration_config:
@@ -5944,8 +6243,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-assisted-ipv6-cluster-profile
       - --target=e2e-metal-assisted-ipv6
@@ -6001,7 +6299,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: 0 0 * * 1
   decorate: true
   decoration_config:
@@ -6022,8 +6320,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-assisted-onprem-cluster-profile
       - --target=e2e-metal-assisted-onprem
@@ -6079,7 +6376,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: 0 0 1 1 *
   decorate: true
   decoration_config:
@@ -6100,8 +6397,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-ipi-cluster-profile
       - --target=e2e-metal-ipi
@@ -6157,7 +6453,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: 0 0 * * 1
   decorate: true
   decoration_config:
@@ -6178,8 +6474,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-ipi-compact-cluster-profile
       - --target=e2e-metal-ipi-compact
@@ -6235,7 +6530,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: 0 0 1 1 *
   decorate: true
   decoration_config:
@@ -6256,8 +6551,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-ipi-ovn-dualstack-cluster-profile
       - --target=e2e-metal-ipi-ovn-dualstack
@@ -6313,7 +6607,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: 0 0 1 1 *
   decorate: true
   decoration_config:
@@ -6334,8 +6628,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-ipi-ovn-ipv6-cluster-profile
       - --target=e2e-metal-ipi-ovn-ipv6
@@ -6391,7 +6684,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: 0 0 1 1 *
   decorate: true
   decoration_config:
@@ -6412,8 +6705,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-ipi-upgrade-cluster-profile
       - --target=e2e-metal-ipi-upgrade
@@ -6469,7 +6761,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: 0 0 * * 1
   decorate: true
   decoration_config:
@@ -6490,8 +6782,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-ipi-virtualmedia-cluster-profile
       - --target=e2e-metal-ipi-virtualmedia
@@ -6547,7 +6838,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: 0 */6 * * *
   decorate: true
   decoration_config:
@@ -6568,8 +6859,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-ovirt-cluster-profile
       - --target=e2e-ovirt
@@ -6646,8 +6936,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-vsphere-cluster-profile
       - --target=e2e-vsphere
@@ -6722,8 +7011,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-vsphere-serial-cluster-profile
       - --target=e2e-vsphere-serial
@@ -6798,8 +7086,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-vsphere-upi-cluster-profile
       - --target=e2e-vsphere-upi
@@ -6874,8 +7161,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-vsphere-upi-serial-cluster-profile
       - --target=e2e-vsphere-upi-serial
@@ -6929,7 +7215,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: 0 4,10,16,22 * * *
   decorate: true
   decoration_config:
@@ -6950,8 +7236,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/openshift-ipi-azure-arcconformance-cluster-profile
       - --target=openshift-ipi-azure-arcconformance
@@ -7005,7 +7290,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -7026,8 +7311,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-aws-cluster-profile
       - --target=e2e-aws
@@ -7081,7 +7365,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -7102,8 +7386,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-aws-cluster-profile
       - --target=e2e-aws
@@ -7157,7 +7440,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -7178,8 +7461,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-aws-cluster-profile
       - --target=e2e-aws
@@ -7233,7 +7515,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -7254,8 +7536,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-aws-cluster-profile
       - --target=e2e-aws
@@ -7309,7 +7590,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -7330,8 +7611,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-aws-cluster-profile
       - --target=e2e-aws
@@ -7385,7 +7665,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -7406,8 +7686,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-aws-cluster-profile
       - --target=e2e-aws
@@ -7461,7 +7740,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -7482,8 +7761,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-aws-upgrade-rollback-cluster-profile
       - --target=e2e-aws-upgrade-rollback
@@ -7537,7 +7815,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -7558,8 +7836,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-azure-upgrade-cluster-profile
       - --target=e2e-azure-upgrade
@@ -7613,7 +7890,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -7634,8 +7911,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-gcp-cluster-profile
       - --target=e2e-gcp
@@ -7691,7 +7967,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -7712,8 +7988,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-gcp-upgrade-cluster-profile
       - --target=e2e-gcp-upgrade
@@ -7769,7 +8044,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -7790,8 +8065,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-aws-upgrade-cluster-profile
       - --target=e2e-aws-upgrade
@@ -7845,7 +8119,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -7866,8 +8140,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-aws-upgrade-cluster-profile
       - --target=e2e-aws-upgrade
@@ -7921,7 +8194,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -7942,8 +8215,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-aws-ovn-upgrade-cluster-profile
       - --target=e2e-aws-ovn-upgrade
@@ -7997,7 +8269,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -8018,8 +8290,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-aws-upgrade-cluster-profile
       - --target=e2e-aws-upgrade
@@ -8073,7 +8344,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -8094,8 +8365,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-azure-ovn-upgrade-cluster-profile
       - --target=e2e-azure-ovn-upgrade
@@ -8149,7 +8419,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -8170,8 +8440,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-azure-upgrade-cluster-profile
       - --target=e2e-azure-upgrade
@@ -8225,7 +8494,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -8246,8 +8515,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-gcp-ovn-upgrade-cluster-profile
       - --target=e2e-gcp-ovn-upgrade
@@ -8303,7 +8571,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -8324,8 +8592,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-gcp-upgrade-cluster-profile
       - --target=e2e-gcp-upgrade
@@ -8381,7 +8648,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: 0 9 * * *
   decorate: true
   decoration_config:
@@ -8402,8 +8669,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-ovirt-upgrade-cluster-profile
       - --target=e2e-ovirt-upgrade
@@ -8459,7 +8725,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -8480,8 +8746,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-aws-upgrade-rollback-cluster-profile
       - --target=e2e-aws-upgrade-rollback
@@ -8535,7 +8800,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -8556,8 +8821,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-aws-upgrade-rollback-cluster-profile
       - --target=e2e-aws-upgrade-rollback
@@ -8611,7 +8875,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -8632,8 +8896,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-aws-cluster-profile
       - --target=e2e-aws
@@ -8687,7 +8950,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -8708,8 +8971,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-aws-upgrade-rollback-cluster-profile
       - --target=e2e-aws-upgrade-rollback
@@ -8763,7 +9025,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -8784,8 +9046,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-azure-upgrade-cluster-profile
       - --target=e2e-azure-upgrade
@@ -8839,7 +9100,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -8860,8 +9121,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-gcp-cluster-profile
       - --target=e2e-gcp
@@ -8917,7 +9177,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -8938,8 +9198,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-gcp-upgrade-cluster-profile
       - --target=e2e-gcp-upgrade
@@ -8995,8 +9254,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
-  cron: '@yearly'
+  cluster: build02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -9004,6 +9262,7 @@ periodics:
   - base_ref: master
     org: openshift
     repo: release
+  interval: 12h
   labels:
     ci-operator.openshift.io/prowgen-controlled: "true"
     ci-operator.openshift.io/variant: origin-4.5-stable-to-4.6-ci
@@ -9016,8 +9275,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-aws-ovn-upgrade-cluster-profile
       - --target=e2e-aws-ovn-upgrade
@@ -9071,8 +9329,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
-  cron: '@yearly'
+  cluster: build02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -9080,6 +9337,7 @@ periodics:
   - base_ref: master
     org: openshift
     repo: release
+  interval: 12h
   labels:
     ci-operator.openshift.io/prowgen-controlled: "true"
     ci-operator.openshift.io/variant: origin-4.5-stable-to-4.6-ci
@@ -9092,8 +9350,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-aws-upgrade-cluster-profile
       - --target=e2e-aws-upgrade
@@ -9147,8 +9404,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
-  cron: '@yearly'
+  cluster: build02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -9156,6 +9412,7 @@ periodics:
   - base_ref: master
     org: openshift
     repo: release
+  interval: 12h
   labels:
     ci-operator.openshift.io/prowgen-controlled: "true"
     ci-operator.openshift.io/variant: origin-4.5-stable-to-4.6-ci
@@ -9168,8 +9425,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-azure-ovn-upgrade-cluster-profile
       - --target=e2e-azure-ovn-upgrade
@@ -9223,8 +9479,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
-  cron: '@yearly'
+  cluster: build02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -9232,6 +9487,7 @@ periodics:
   - base_ref: master
     org: openshift
     repo: release
+  interval: 12h
   labels:
     ci-operator.openshift.io/prowgen-controlled: "true"
     ci-operator.openshift.io/variant: origin-4.5-stable-to-4.6-ci
@@ -9244,8 +9500,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-azure-upgrade-cluster-profile
       - --target=e2e-azure-upgrade
@@ -9299,8 +9554,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
-  cron: '@yearly'
+  cluster: build02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -9308,6 +9562,84 @@ periodics:
   - base_ref: master
     org: openshift
     repo: release
+  interval: 12h
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: origin-4.5-stable-to-4.6-ci
+    job-release: "4.6"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-origin-4.5-stable-to-4.6-ci-e2e-gcp-ovn-upgrade
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-gcp-ovn-upgrade-cluster-profile
+      - --target=e2e-gcp-ovn-upgrade
+      - --variant=origin-4.5-stable-to-4.6-ci
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-gcp-ovn-upgrade-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-gcp
+        - configMap:
+            name: cluster-profile-gcp
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  interval: 12h
   labels:
     ci-operator.openshift.io/prowgen-controlled: "true"
     ci-operator.openshift.io/variant: origin-4.5-stable-to-4.6-ci
@@ -9320,8 +9652,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-gcp-upgrade-cluster-profile
       - --target=e2e-gcp-upgrade
@@ -9377,7 +9708,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: 0 6,19 * * *
   decorate: true
   decoration_config:
@@ -9398,8 +9729,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-ovirt-upgrade-cluster-profile
       - --target=e2e-ovirt-upgrade
@@ -9455,7 +9785,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -9476,8 +9806,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-aws-upgrade-rollback-cluster-profile
       - --target=e2e-aws-upgrade-rollback
@@ -9531,7 +9860,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -9552,8 +9881,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-aws-cluster-profile
       - --target=e2e-aws
@@ -9607,7 +9935,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -9628,8 +9956,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-aws-upgrade-rollback-cluster-profile
       - --target=e2e-aws-upgrade-rollback
@@ -9683,7 +10010,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -9704,8 +10031,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-azure-upgrade-cluster-profile
       - --target=e2e-azure-upgrade
@@ -9759,7 +10085,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -9780,8 +10106,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-gcp-cluster-profile
       - --target=e2e-gcp
@@ -9837,7 +10162,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -9858,8 +10183,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-gcp-upgrade-cluster-profile
       - --target=e2e-gcp-upgrade
@@ -9915,7 +10239,461 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  interval: 12h
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: origin-4.6-stable-to-4.7-ci
+    job-release: "4.7"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-origin-4.6-stable-to-4.7-ci-e2e-aws-ovn-upgrade
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-aws-ovn-upgrade-cluster-profile
+      - --target=e2e-aws-ovn-upgrade
+      - --variant=origin-4.6-stable-to-4.7-ci
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-aws-ovn-upgrade-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  interval: 12h
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: origin-4.6-stable-to-4.7-ci
+    job-release: "4.7"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-origin-4.6-stable-to-4.7-ci-e2e-aws-upgrade
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-aws-upgrade-cluster-profile
+      - --target=e2e-aws-upgrade
+      - --variant=origin-4.6-stable-to-4.7-ci
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  interval: 12h
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: origin-4.6-stable-to-4.7-ci
+    job-release: "4.7"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-origin-4.6-stable-to-4.7-ci-e2e-azure-ovn-upgrade
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-azure-ovn-upgrade-cluster-profile
+      - --target=e2e-azure-ovn-upgrade
+      - --variant=origin-4.6-stable-to-4.7-ci
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-azure-ovn-upgrade-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-azure4
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  interval: 12h
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: origin-4.6-stable-to-4.7-ci
+    job-release: "4.7"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-origin-4.6-stable-to-4.7-ci-e2e-azure-upgrade
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-azure-upgrade-cluster-profile
+      - --target=e2e-azure-upgrade
+      - --variant=origin-4.6-stable-to-4.7-ci
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-azure-upgrade-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-azure4
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  interval: 12h
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: origin-4.6-stable-to-4.7-ci
+    job-release: "4.7"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-origin-4.6-stable-to-4.7-ci-e2e-gcp-ovn-upgrade
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-gcp-ovn-upgrade-cluster-profile
+      - --target=e2e-gcp-ovn-upgrade
+      - --variant=origin-4.6-stable-to-4.7-ci
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-gcp-ovn-upgrade-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-gcp
+        - configMap:
+            name: cluster-profile-gcp
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  interval: 12h
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: origin-4.6-stable-to-4.7-ci
+    job-release: "4.7"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-origin-4.6-stable-to-4.7-ci-e2e-gcp-upgrade
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-gcp-upgrade-cluster-profile
+      - --target=e2e-gcp-upgrade
+      - --variant=origin-4.6-stable-to-4.7-ci
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-gcp-upgrade-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-gcp
+        - configMap:
+            name: cluster-profile-gcp
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
   cron: 0 3,16 * * *
   decorate: true
   decoration_config:
@@ -9936,8 +10714,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-ovirt-upgrade-cluster-profile
       - --target=e2e-ovirt-upgrade
@@ -9993,7 +10770,461 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: api.ci
+  cluster: build02
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  interval: 24h
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: origin-4.7-stable-to-4.8-ci
+    job-release: "4.8"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-origin-4.7-stable-to-4.8-ci-e2e-aws-ovn-upgrade
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-aws-ovn-upgrade-cluster-profile
+      - --target=e2e-aws-ovn-upgrade
+      - --variant=origin-4.7-stable-to-4.8-ci
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-aws-ovn-upgrade-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  interval: 24h
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: origin-4.7-stable-to-4.8-ci
+    job-release: "4.8"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-origin-4.7-stable-to-4.8-ci-e2e-aws-upgrade
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-aws-upgrade-cluster-profile
+      - --target=e2e-aws-upgrade
+      - --variant=origin-4.7-stable-to-4.8-ci
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  interval: 24h
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: origin-4.7-stable-to-4.8-ci
+    job-release: "4.8"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-origin-4.7-stable-to-4.8-ci-e2e-azure-ovn-upgrade
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-azure-ovn-upgrade-cluster-profile
+      - --target=e2e-azure-ovn-upgrade
+      - --variant=origin-4.7-stable-to-4.8-ci
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-azure-ovn-upgrade-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-azure4
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  interval: 24h
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: origin-4.7-stable-to-4.8-ci
+    job-release: "4.8"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-origin-4.7-stable-to-4.8-ci-e2e-azure-upgrade
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-azure-upgrade-cluster-profile
+      - --target=e2e-azure-upgrade
+      - --variant=origin-4.7-stable-to-4.8-ci
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-azure-upgrade-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-azure4
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  interval: 24h
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: origin-4.7-stable-to-4.8-ci
+    job-release: "4.8"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-origin-4.7-stable-to-4.8-ci-e2e-gcp-ovn-upgrade
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-gcp-ovn-upgrade-cluster-profile
+      - --target=e2e-gcp-ovn-upgrade
+      - --variant=origin-4.7-stable-to-4.8-ci
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-gcp-ovn-upgrade-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-gcp
+        - configMap:
+            name: cluster-profile-gcp
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  interval: 24h
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: origin-4.7-stable-to-4.8-ci
+    job-release: "4.8"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-origin-4.7-stable-to-4.8-ci-e2e-gcp-upgrade
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-gcp-upgrade-cluster-profile
+      - --target=e2e-gcp-upgrade
+      - --variant=origin-4.7-stable-to-4.8-ci
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-gcp-upgrade-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-gcp
+        - configMap:
+            name: cluster-profile-gcp
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
   cron: 0 0,13,22 * * *
   decorate: true
   decoration_config:
@@ -10014,8 +11245,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-ovirt-upgrade-cluster-profile
       - --target=e2e-ovirt-upgrade
@@ -10071,7 +11301,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: 0 0,13,22 * * *
   decorate: true
   decoration_config:
@@ -10092,8 +11322,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-password-file=/etc/report/password.txt
-      - --report-username=ci
+      - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-ovirt-upgrade-cluster-profile
       - --target=e2e-ovirt-upgrade
