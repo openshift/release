@@ -5,7 +5,8 @@ OUTPUT="$SHARED_DIR/$CLUSTERPOOL_LIST_FILE"
 echo "OUTPUT=$OUTPUT"
 echo "uid=$(id -u)"
 
-temp=$(mktemp)
+temp=$(mktemp -d -t ocm-XXXXX)
+echo "temp=$temp"
 cd $temp || exit 1
 
 cp "$MAKEFILE" ./Makefile
