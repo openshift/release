@@ -402,7 +402,7 @@ spec:
         - -c
         - |
           promtail \
-            -client.external-labels=_id=\$(cat /tmp/shared/cluster-id),host=\$(HOSTNAME),invoker=\$(cat /tmp/shared/cluster-invoker) \
+            -client.external-labels=,host=\$(HOSTNAME),invoker=\$(cat /tmp/shared/cluster-invoker) \
             -config.file=/etc/promtail/promtail.yaml
         env:
         - name: HOSTNAME
@@ -451,7 +451,7 @@ spec:
       - command:
         - sh
         - "-c"
-        - oc get clusterversion/version -o=jsonpath='{.spec.clusterID}' > /tmp/shared/cluster-id && oc get cm openshift-install -n openshift-config -o=jsonpath='{.data.invoker}' > /tmp/shared/cluster-invoker
+        - oc get cm openshift-install -n openshift-config -o=jsonpath='{.data.invoker}' > /tmp/shared/cluster-invoker
         volumeMounts:
           - mountPath: "/tmp/shared"
             name: shared-data
