@@ -11,6 +11,7 @@ cd $temp || exit 1
 
 cp "$MAKEFILE" ./Makefile
 
+export SELF="make -d"
 make -d clusterpool/list-clusterpools CLUSTERPOOL_LIST_ARGUMENTS=" -o json" > >(tee list.json ${ARTIFACT_DIR}/list.json)
 echo "list.json:"
 cat list.json
