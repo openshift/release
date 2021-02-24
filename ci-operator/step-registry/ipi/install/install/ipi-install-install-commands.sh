@@ -69,6 +69,8 @@ cp "${SHARED_DIR}/install-config.yaml" "${dir}/"
 mkdir -p ~/.ssh
 cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/
 
+echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
+
 openshift-install --dir="${dir}" create manifests &
 wait "$!"
 
@@ -87,6 +89,8 @@ TF_LOG=debug openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-
 
 wait "$!"
 ret="$?"
+
+echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_END"
 
 if test "${ret}" -eq 0 ; then
   touch  "${SHARED_DIR}/success"
