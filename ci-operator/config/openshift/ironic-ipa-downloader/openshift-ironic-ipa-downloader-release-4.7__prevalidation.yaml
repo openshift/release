@@ -3,10 +3,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_builder_rhel-8-base-openshift-4.8:
+  ocp_builder_rhel-8-base-openshift-4.7:
     name: builder
     namespace: ocp
-    tag: rhel-8-base-openshift-4.8
+    tag: rhel-8-base-openshift-4.7
 build_root:
   image_stream_tag:
     name: release
@@ -18,22 +18,22 @@ images:
   inputs:
     base:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-base-openshift-4.8
+      - registry.ci.openshift.org/ocp/builder:rhel-8-base-openshift-4.7
   to: ironic-ipa-downloader
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
-      cat <<EOF> /etc/yum.repos.d/base-4-8-rhel-8-ironic-prevalidation.repo
-      [rhel-8-ironic-prevalidation-ocp48]
-      id = rhel-8-ironic-prevalidation-ocp48
-      name = rhel-8-ironic-prevalidation-ocp48
-      baseurl = http://base-4-8-rhel-8-ironic-prevalidation.ocp.svc/rhel-8-ironic-prevalidation-ocp48
+      cat <<EOF> /etc/yum.repos.d/base-4-7-rhel-8-ironic-prevalidation.repo
+      [rhel-8-ironic-prevalidation-ocp47]
+      id = rhel-8-ironic-prevalidation-ocp47
+      name = rhel-8-ironic-prevalidation-ocp47
+      baseurl = http://base-4-7-rhel-8-ironic-prevalidation.ocp.svc/rhel-8-ironic-prevalidation-ocp47
       enabled = 1
       gpgcheck = 0
       priority = 1
       skip_if_unavailable=FALSE
       EOF
-    from: ocp_builder_rhel-8-base-openshift-4.8
+    from: ocp_builder_rhel-8-base-openshift-4.7
     to: base
 resources:
   '*':
@@ -41,7 +41,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: "4.8"
+  name: "4.7"
   namespace: ocp
 tests:
 - artifact_dir: /tmp/artifacts
@@ -50,7 +50,7 @@ tests:
     cluster_profile: packet
     workflow: baremetalds-e2e
 zz_generated_metadata:
-  branch: master
+  branch: release-4.7
   org: openshift
   repo: ironic-ipa-downloader
   variant: prevalidation
