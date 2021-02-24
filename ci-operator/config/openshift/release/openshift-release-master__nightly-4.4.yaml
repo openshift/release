@@ -1,26 +1,68 @@
 base_images:
+  base:
+    name: "4.4"
+    namespace: ocp
+    tag: base
   console-tests:
-    name: "4.3"
+    name: "4.4"
     namespace: ocp
     tag: console-tests
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  upi-installer:
+    name: "4.4"
+    namespace: ocp
+    tag: upi-installer
 releases:
   initial:
     candidate:
       product: ocp
       relative: 1
       stream: nightly
-      version: "4.3"
+      version: "4.4"
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.3"
+      version: "4.4"
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
+- artifact_dir: /tmp/artifacts
+  as: e2e-aws-proxy
+  cron: 0 0 */2 * *
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-proxy
+- artifact_dir: /tmp/artifacts
+  as: e2e-aws
+  interval: 24h
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- artifact_dir: /tmp/artifacts
+  as: e2e-aws-upgrade
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws
+    workflow: openshift-upgrade-aws
+- artifact_dir: /tmp/artifacts
+  as: e2e-ovirt
+  cron: 0 5,22 * * *
+  steps:
+    cluster_profile: ovirt
+    workflow: openshift-e2e-ovirt-conformance-without-csi
+- artifact_dir: /tmp/artifacts
+  as: e2e-gcp
+  interval: 24h
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp
 - artifact_dir: /tmp/artifacts
   as: console-aws
   interval: 24h
@@ -51,7 +93,7 @@ tests:
     workflow: openshift-e2e-azure
 - artifact_dir: /tmp/artifacts
   as: e2e-aws-fips
-  interval: 2h
+  interval: 24h
   steps:
     cluster_profile: aws
     env:
@@ -111,4 +153,4 @@ zz_generated_metadata:
   branch: master
   org: openshift
   repo: release
-  variant: ocp-4.3
+  variant: nightly-4.4
