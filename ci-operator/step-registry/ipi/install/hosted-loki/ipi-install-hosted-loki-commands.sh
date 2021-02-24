@@ -550,3 +550,6 @@ metadata:
   name: loki-promtail
   namespace: loki
 EOF
+
+
+echo "Promtail manifests created, the cluster can be found at https://grafana-loki.ci.openshift.org/explore using '{invoker=\"${OPENSHIFT_INSTALL_INVOKER}\"}' query"
