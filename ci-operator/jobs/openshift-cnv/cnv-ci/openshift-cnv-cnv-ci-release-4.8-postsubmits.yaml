@@ -1,20 +1,16 @@
-presubmits:
-  devfile/devworkspace-operator:
+postsubmits:
+  openshift-cnv/cnv-ci:
   - agent: kubernetes
-    always_run: false
     branches:
-    - master
+    - ^release-4\.8$
     cluster: build02
-    context: ci/prow/v5-devworkspaces-operator-e2e
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: v5
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-devfile-devworkspace-operator-master-v5-devworkspaces-operator-e2e
-    rerun_command: /test v5-devworkspaces-operator-e2e
+    max_concurrency: 1
+    name: branch-ci-openshift-cnv-cnv-ci-release-4.8-e2e-deploy
     spec:
       containers:
       - args:
@@ -22,9 +18,8 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/usr/local/devworkspaces-operator-e2e-cluster-profile
-        - --target=devworkspaces-operator-e2e
-        - --variant=v5
+        - --secret-dir=/usr/local/e2e-deploy-cluster-profile
+        - --target=e2e-deploy
         command:
         - ci-operator
         image: ci-operator:latest
@@ -37,7 +32,7 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/devworkspaces-operator-e2e-cluster-profile
+        - mountPath: /usr/local/e2e-deploy-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -60,37 +55,33 @@ presubmits:
         projected:
           sources:
           - secret:
-              name: cluster-secrets-aws
+              name: cluster-secrets-azure4
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )v5-devworkspaces-operator-e2e,?($|\s.*)
   - agent: kubernetes
-    always_run: true
     branches:
-    - master
+    - ^release-4\.8$
     cluster: build02
-    context: ci/prow/v5-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: v5
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-devfile-devworkspace-operator-master-v5-images
-    rerun_command: /test v5-images
+    max_concurrency: 1
+    name: branch-ci-openshift-cnv-cnv-ci-release-4.8-e2e-upgrade
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        - --variant=v5
+        - --secret-dir=/usr/local/e2e-upgrade-cluster-profile
+        - --target=e2e-upgrade
         command:
         - ci-operator
         image: ci-operator:latest
@@ -100,6 +91,11 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-upgrade-cluster-profile
+          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -111,10 +107,20 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-azure4
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )v5-images,?($|\s.*)

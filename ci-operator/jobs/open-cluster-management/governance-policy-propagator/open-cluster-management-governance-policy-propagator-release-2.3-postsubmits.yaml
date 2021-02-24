@@ -1,24 +1,24 @@
-presubmits:
-  open-cluster-management/config-policy-controller:
+postsubmits:
+  open-cluster-management/governance-policy-propagator:
   - agent: kubernetes
-    always_run: true
     branches:
-    - master
-    cluster: build01
-    context: ci/prow/images
+    - ^release-2\.3$
+    cluster: build02
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/is-promotion: "true"
       ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-open-cluster-management-config-policy-controller-master-images
-    rerun_command: /test images
+    max_concurrency: 1
+    name: branch-ci-open-cluster-management-governance-policy-propagator-release-2.3-images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+        - --promote
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
         command:
@@ -36,6 +36,9 @@ presubmits:
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
+        - mountPath: /etc/push-secret
+          name: push-secret
+          readOnly: true
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
@@ -44,55 +47,50 @@ presubmits:
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
+      - name: push-secret
+        secret:
+          secretName: registry-push-credentials-ci-central
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
     branches:
-    - master
-    cluster: build01
-    context: ci/prow/test-unit
+    - ^release-2\.3$
+    cluster: build02
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-open-cluster-management-config-policy-controller-master-test-unit
-    rerun_command: /test test-unit
+    name: branch-ci-open-cluster-management-governance-policy-propagator-release-2.3-publish
     spec:
       containers:
       - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=test-unit
+        - -f
+        - Makefile.prow
+        - osci/publish
         command:
-        - ci-operator
-        image: ci-operator:latest
+        - make
+        env:
+        - name: COMPONENT_NAME
+          value: governance-policy-propagator
+        - name: COMPONENT_VERSION
+          value: 1.0.0
+        - name: OSCI_IMAGE_REMOTE_REPO_SRC
+          value: registry.ci.openshift.org/open-cluster-management
+        - name: SELF
+          value: make -f Makefile.prow
+        image: registry.ci.openshift.org/open-cluster-management/builder:go1.15-linux-amd64
         imagePullPolicy: Always
         name: ""
         resources:
           requests:
-            cpu: 10m
+            cpu: 100m
+            memory: 200Mi
         volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
+        - mountPath: /etc/github
+          name: acm-cicd-github
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: pull-secret
+      - name: acm-cicd-github
         secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )test-unit,?($|\s.*)
+          secretName: acm-cicd-github

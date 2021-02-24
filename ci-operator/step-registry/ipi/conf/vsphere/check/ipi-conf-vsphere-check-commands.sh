@@ -32,6 +32,12 @@ echo "$(date -u --rfc-3339=seconds) - Find virtual machines attached to ${LEASED
 # 1. Get the OpaqueNetwork (NSX-T port group) which is listed in LEASED_RESOURCE.
 # 2. Select the virtual machines attached to network
 # 3. list the path to the virtual machine via the managed object reference
-# 4. Power off and delete the virtual machine
-govc ls -json -t OpaqueNetwork "/SDDC-Datacenter/network/${LEASED_RESOURCE}" | jq '.elements[]?.Object.Vm[]?.Value' | xargs -I {} govc ls -L VirtualMachine:{} | xargs -I {} govc vm.destroy {}
+# 4. skip the templates with ova
+# 5. Power off and delete the virtual machine
+
+govc ls -json -t OpaqueNetwork "/SDDC-Datacenter/network/${LEASED_RESOURCE}" |\
+    jq '.elements[]?.Object.Vm[]?.Value' |\
+    xargs -I {} --no-run-if-empty govc ls -json -L VirtualMachine:{} |\
+    jq '.elements[].Path | select(contains("ova") | not)' |\
+    xargs -I {} --no-run-if-empty govc vm.destroy {}
 

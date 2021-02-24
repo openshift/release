@@ -27,6 +27,14 @@ base_images:
     name: "4.6"
     namespace: ocp
     tag: base
+  cluster-logging-operator-e2e:
+    name: "4.6"
+    namespace: ocp
+    tag: cluster-logging-operator-e2e
+  console-tests:
+    name: "4.6"
+    namespace: ocp
+    tag: console-tests
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -207,6 +215,73 @@ tests:
   interval: 12h
   steps:
     cluster_profile: gcp
+    workflow: openshift-e2e-gcp
+- artifact_dir: /tmp/artifacts
+  as: console-aws
+  interval: 48h
+  steps:
+    cluster_profile: aws
+    test:
+    - as: e2e-test
+      cli: latest
+      commands: ./test-prow-e2e.sh release
+      from: console-tests
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+- artifact_dir: /tmp/artifacts
+  as: cluster-logging-operator-e2e
+  interval: 24h
+  steps:
+    cluster_profile: aws
+    test:
+    - as: e2e-test
+      cli: latest
+      commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts make test-e2e-olm
+      from: cluster-logging-operator-e2e
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+- artifact_dir: /tmp/artifacts
+  as: e2e-azure-fips
+  cron: '@yearly'
+  steps:
+    cluster_profile: azure4
+    env:
+      FIPS_ENABLED: "true"
+    pre:
+    - chain: ipi-azure-pre
+    - ref: fips-check
+    workflow: openshift-e2e-azure
+- artifact_dir: /tmp/artifacts
+  as: e2e-aws-fips
+  interval: 48h
+  steps:
+    cluster_profile: aws
+    env:
+      FIPS_ENABLED: "true"
+    pre:
+    - chain: ipi-aws-pre
+    - ref: fips-check
+    workflow: openshift-e2e-aws
+- artifact_dir: /tmp/artifacts
+  as: e2e-gcp-fips
+  cron: '@yearly'
+  steps:
+    cluster_profile: gcp
+    env:
+      FIPS_ENABLED: "true"
+    pre:
+    - chain: ipi-gcp-pre
+    - ref: fips-check
     workflow: openshift-e2e-gcp
 zz_generated_metadata:
   branch: master
