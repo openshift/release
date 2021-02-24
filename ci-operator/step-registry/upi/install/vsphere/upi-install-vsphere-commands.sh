@@ -105,6 +105,8 @@ function update_image_registry() {
   oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"managementState":"Managed","storage":{"emptyDir":{}}}}'
 }
 
+echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
+
 echo "$(date -u --rfc-3339=seconds) - terraform init..."
 terraform init -input=false -no-color &
 wait "$!"
@@ -158,6 +160,8 @@ set +e
 wait "$!"
 ret="$?"
 set -e
+
+echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_END"
 
 touch /tmp/install-complete
 
