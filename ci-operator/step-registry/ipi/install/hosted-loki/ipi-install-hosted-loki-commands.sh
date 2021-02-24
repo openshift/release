@@ -411,6 +411,15 @@ spec:
               fieldPath: spec.nodeName
         image: grafana/promtail:${LOKI_VERSION}
         imagePullPolicy: IfNotPresent
+        lifecycle:
+          preStop:
+            # We want the pod to keep running when a node is being drained
+            # long enough to exfiltrate the last set of logs from static pods
+            # from things like etcd and the kube-apiserver. To do that, we need
+            # to stay alive longer than the longest shutdown duration will be
+            # run, which should be 135s from kube-apiserver.
+            exec:
+              command: ["sleep", "150"]
         name: promtail
         ports:
         - containerPort: 3101
@@ -458,6 +467,7 @@ spec:
         image: quay.io/openshift/origin-cli:4.6.0
         name: fetch-cluster-data
       serviceAccountName: loki-promtail
+      terminationGracePeriodSeconds: 180
       tolerations:
       - effect: NoSchedule
         key: node-role.kubernetes.io/master
