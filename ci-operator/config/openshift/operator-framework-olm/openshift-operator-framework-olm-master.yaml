@@ -1,7 +1,31 @@
+base_images:
+  base:
+    name: "4.8"
+    namespace: ocp
+    tag: base
+  ocp_builder_rhel-8-golang-1.15-openshift-4.8:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.8
 build_root:
   project_image:
     context_dir: .
     dockerfile_path: base.Dockerfile
+images:
+- dockerfile_path: operator-registry.Dockerfile
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.8:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
+  to: operator-registry
+- dockerfile_path: operator-lifecycle-manager.Dockerfile
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.8:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
+  to: operator-lifecycle-manager
 resources:
   '*':
     requests:
@@ -11,8 +35,32 @@ tag_specification:
   name: "4.8"
   namespace: ocp
 tests:
-- as: unit
-  commands: ls /usr/local/kubebuilder/bin
+- as: api-unit
+  commands: |
+    pushd staging/api
+    go test -mod=vendor -v ./...
+    popd
+  container:
+    from: src
+- as: registry-unit
+  commands: |
+    pushd staging/operator-registry
+    make unit
+    popd
+  container:
+    from: src
+- as: olm-unit
+  commands: |
+    pushd staging/operator-lifecycle-manager
+    make unit
+    popd
+  container:
+    from: src
+- as: olm-verify
+  commands: |
+    pushd staging/operator-lifecycle-manager
+    make verify
+    popd
   container:
     from: src
 zz_generated_metadata:
