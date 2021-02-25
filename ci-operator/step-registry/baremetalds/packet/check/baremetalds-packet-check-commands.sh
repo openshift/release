@@ -6,9 +6,9 @@ set -o pipefail
 
 set +x
 
-PACKET_PROJECT_ID=$(grep packet_project_id "${CLUSTER_PROFILE_DIR}/.packet-kni-vars" | awk '{print $2}')
-PACKET_AUTH_TOKEN=$(grep packet_auth_token "${CLUSTER_PROFILE_DIR}/.packet-kni-vars" | awk '{print $2}')
-SLACK_AUTH_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/.slackhook")
+PACKET_PROJECT_ID=$(cat "${CLUSTER_PROFILE_DIR}/packet-project-id")
+PACKET_AUTH_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/packet-auth-token")
+SLACK_AUTH_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/slackhook")
 
 # Initial check
 if [ "${CLUSTER_TYPE}" != "packet" ] ; then
