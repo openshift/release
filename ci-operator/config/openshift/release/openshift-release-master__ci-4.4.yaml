@@ -1,0 +1,62 @@
+releases:
+  initial:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: ci
+      version: "4.4"
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.4"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- artifact_dir: /tmp/artifacts
+  as: e2e-gcp-upgrade
+  cron: '@yearly'
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-upgrade-gcp
+- artifact_dir: /tmp/artifacts
+  as: e2e-azure-upgrade
+  cron: '@yearly'
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-upgrade-azure
+- artifact_dir: /tmp/artifacts
+  as: e2e-aws
+  interval: 24h
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- artifact_dir: /tmp/artifacts
+  as: e2e-gcp
+  interval: 24h
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp
+- artifact_dir: /tmp/artifacts
+  as: e2e-aws-upgrade-rollback
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws
+    env:
+      TEST_TYPE: upgrade-conformance
+      TEST_UPGRADE_OPTIONS: abort-at=random
+    workflow: openshift-upgrade-aws
+- artifact_dir: /tmp/artifacts
+  as: e2e-aws-sdn-multitenant
+  interval: 24h
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-sdn-multi
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: release
+  variant: ci-4.4

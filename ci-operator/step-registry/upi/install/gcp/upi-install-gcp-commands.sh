@@ -61,6 +61,8 @@ function backoff() {
     return $failed
 }
 
+echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
+
 ## Export variables to be used in examples below.
 echo "$(date -u --rfc-3339=seconds) - Exporting variables..."
 BASE_DOMAIN='origin-ci-int-gce.dev.openshift.com'
@@ -530,6 +532,8 @@ set +e
 wait "$!"
 ret="$?"
 set -e
+
+echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_END"
 
 sed 's/password: .*/password: REDACTED/' "${dir}/.openshift_install.log" >>"${ARTIFACT_DIR}/.openshift_install.log"
 
