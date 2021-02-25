@@ -381,11 +381,11 @@ PUBLIC_PROXY_IP="$(aws --region "${REGION}" cloudformation describe-stacks --sta
 # echo proxy IP to ${SHARED_DIR}/proxyip
 echo "${PUBLIC_PROXY_IP}" >> "${SHARED_DIR}/proxyip"
 
-PROXY_URL="http://${PROXY_NAME}:${PASSWORD}@${PRIVATE_PROXY_IP}:3128/"
-# due to https://bugzilla.redhat.com/show_bug.cgi?id=1750650 we don't use a tls end point for squid
+HTTPS_PROXY_URL="https://${PROXY_NAME}:${PASSWORD}@${PRIVATE_PROXY_IP}:3128/"
+HTTP_PROXY_URL="http://${PROXY_NAME}:${PASSWORD}@${PRIVATE_PROXY_IP}:3128/"
 
 cat >> "${CONFIG}" << EOF
 proxy:
-  httpsProxy: ${PROXY_URL}
-  httpProxy: ${PROXY_URL}
+  httpsProxy: ${HTTPS_PROXY_URL}
+  httpProxy: ${HTTP_PROXY_URL}
 EOF
