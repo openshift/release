@@ -3,13 +3,13 @@ releases:
     prerelease:
       product: ocp
       version_bounds:
-        lower: 4.5.0-0
-        upper: 4.6.0-0
+        lower: 4.4.0-0
+        upper: 4.5.0-0
   latest:
     candidate:
       product: ocp
       stream: ci
-      version: "4.6"
+      version: "4.5"
 resources:
   '*':
     requests:
@@ -18,31 +18,40 @@ resources:
 tests:
 - artifact_dir: /tmp/artifacts
   as: e2e-aws-upgrade
-  interval: 12h
+  cron: 0 */6 * * *
   steps:
     cluster_profile: aws
     workflow: openshift-upgrade-aws
 - artifact_dir: /tmp/artifacts
+  as: e2e-aws-upgrade-rollback
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws
+    env:
+      TEST_TYPE: upgrade-conformance
+      TEST_UPGRADE_OPTIONS: abort-at=99
+    workflow: openshift-upgrade-aws
+- artifact_dir: /tmp/artifacts
   as: e2e-gcp-upgrade
-  interval: 12h
+  cron: '@yearly'
   steps:
     cluster_profile: gcp
     workflow: openshift-upgrade-gcp
 - artifact_dir: /tmp/artifacts
   as: e2e-azure-upgrade
-  interval: 12h
+  cron: '@yearly'
   steps:
     cluster_profile: azure4
     workflow: openshift-upgrade-azure
 - artifact_dir: /tmp/artifacts
   as: e2e-ovirt-upgrade
-  cron: 0 6,19 * * *
+  cron: 0 9 * * *
   steps:
     cluster_profile: ovirt
     workflow: openshift-upgrade-ovirt-without-csi
 - artifact_dir: /tmp/artifacts
   as: e2e-aws-ovn-upgrade
-  interval: 12h
+  cron: '@yearly'
   steps:
     cluster_profile: aws
     env:
@@ -50,7 +59,7 @@ tests:
     workflow: openshift-upgrade-aws-ovn
 - artifact_dir: /tmp/artifacts
   as: e2e-gcp-ovn-upgrade
-  interval: 12h
+  cron: '@yearly'
   steps:
     cluster_profile: gcp
     env:
@@ -58,7 +67,7 @@ tests:
     workflow: openshift-upgrade-gcp-ovn
 - artifact_dir: /tmp/artifacts
   as: e2e-azure-ovn-upgrade
-  interval: 12h
+  cron: '@yearly'
   steps:
     cluster_profile: azure4
     env:
@@ -68,4 +77,4 @@ zz_generated_metadata:
   branch: master
   org: openshift
   repo: release
-  variant: origin-4.5-stable-to-4.6-ci
+  variant: ci-4.5-upgrade-from-stable-4.4
