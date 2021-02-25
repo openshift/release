@@ -1,0 +1,44 @@
+kind: List
+apiVersion: v1
+items:
+- kind: Namespace
+  apiVersion: v1
+  metadata:
+    name: bastion-ppc64le
+- kind: ServiceAccount
+  apiVersion: v1
+  metadata:
+    name: port-forwarder
+    namespace: bastion-ppc64le
+- kind: Role
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: port-forward
+    namespace: bastion-ppc64le
+  rules:
+    - apiGroups:
+        - ""
+      resources:
+        - pods/portforward
+      verbs:
+        - create
+    - apiGroups:
+        - ""
+      resources:
+        - pods
+      verbs:
+        - get
+        - list
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1beta1
+  metadata:
+    name: port-forward-to-port-forwarder
+    namespace: bastion-ppc64le
+  subjects:
+  - kind: ServiceAccount
+    name: port-forwarder
+    namespace: bastion-ppc64le
+  roleRef:
+    kind: Role
+    apiGroup: rbac.authorization.k8s.io
+    name: port-forward

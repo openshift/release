@@ -146,17 +146,21 @@ function suite() {
     set +x
 }
 
+start_time="$(date +%s)"
+echo "${start_time}" > "${SHARED_DIR}/TEST_TIME_TEST_START"
+trap 'echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"' EXIT
+
 case "${TEST_TYPE}" in
 upgrade-conformance)
     upgrade
-    TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/conformance/parallel suite
+    TEST_LIMIT_START_TIME="${start_time}" TEST_SUITE=openshift/conformance/parallel suite
     ;;
 upgrade)
     upgrade
     ;;
 suite-conformance)
     suite
-    TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/conformance/parallel suite
+    TEST_LIMIT_START_TIME="${start_time}" TEST_SUITE=openshift/conformance/parallel suite
     ;;
 suite)
     suite

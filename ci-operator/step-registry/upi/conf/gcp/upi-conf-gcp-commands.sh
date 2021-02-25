@@ -71,6 +71,8 @@ data["publish"] = "Internal";
 open(path, "w").write(yaml.dump(data, default_flow_style=False))'
 fi
 
+echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
+
 ### Create manifests
 echo "Creating manifests..."
 openshift-install --dir="${dir}" create manifests &
@@ -138,6 +140,8 @@ set +e
 wait "$!"
 ret="$?"
 set -e
+
+echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_END"
 
 cp "${dir}/.openshift_install.log" "${ARTIFACT_DIR}/.openshift_install.log"
 
