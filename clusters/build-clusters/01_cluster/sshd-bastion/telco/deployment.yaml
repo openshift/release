@@ -1,0 +1,85 @@
+kind: List
+apiVersion: v1
+items:
+- apiVersion: v1
+  kind: Service
+  metadata:
+    namespace: bastion-telco
+    name: sshd
+    labels:
+      app: prow
+      component: sshd
+  spec:
+    selector:
+      app: prow
+      component: sshd
+    ports:
+    - name: main
+      port: 22
+      targetPort: main
+    - name: api
+      port: 6443
+      targetPort: api-0
+    type: ClusterIP
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: sshd
+    namespace: bastion-telco
+    labels:
+      app: prow
+      component: sshd
+  spec:
+    replicas: 1
+    revisionHistoryLimit: 2
+    selector:
+      matchLabels:
+        app: prow
+        component: sshd
+    template:
+      metadata:
+        labels:
+          app: prow
+          component: sshd
+      spec:
+        priorityClassName: prow-critical
+        containers:
+        - name: sshd
+          image: registry.ci.openshift.org/ci/sshd:latest
+          command:
+          - /usr/sbin/sshd
+          args:
+          - -D
+          - -e
+          - -f/config/sshd_config
+          ports:
+            - name: ssh
+              containerPort: 2222
+            - name: main
+              containerPort: 2022
+            - name: api-0
+              containerPort: 6443
+          volumeMounts:
+          - name: authorized-keys
+            mountPath: /keys/authorized
+            readOnly: true
+          - name: host-keys
+            mountPath: /keys/host/
+            readOnly: true
+          - name: config
+            mountPath: /config/
+            readOnly: true
+          resources:
+            requests:
+              memory: "3Gi"
+              cpu: "100m"
+        volumes:
+        - name: authorized-keys
+          secret:
+            secretName: sshd-authorized-keys
+        - name: host-keys
+          secret:
+            secretName: sshd-host-keys
+        - name: config
+          configMap:
+            name: sshd-config-telco

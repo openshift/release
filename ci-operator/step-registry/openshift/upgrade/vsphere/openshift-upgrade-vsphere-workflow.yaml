@@ -1,0 +1,19 @@
+workflow:
+  as: openshift-upgrade-vsphere
+  steps:
+    pre:
+    - ref: ipi-install-hosted-loki
+    - chain: ipi-vsphere-pre-stableinitial
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - chain: ipi-vsphere-post
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: "release:initial"
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: "release:latest"
+    env:
+      TEST_TYPE: upgrade
+      TEST_SUITE: ""
+      TEST_UPGRADE_OPTIONS: ""
+  documentation: |-
+    The Openshift E2E vSphere workflow executes the upgrade end-to-end test suite on vSphere with a default cluster configuration and loki as log collector, exercising an upgrade during the process.

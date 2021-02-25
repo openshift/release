@@ -517,11 +517,8 @@ objects:
         echo "Creating resources using terraform"
         (cd ${TMP_SHARED}/terraform && terraform init)
 
-        # Packet returns transients errors when creating devices.
-        # example, `Oh snap, something went wrong! We've logged the error and will take a look - please reach out to us if you continue having trouble.`
-        # therefore the terraform apply needs to be retried a few time before giving up.
         rc=1
-        for r in {1..5}; do (cd ${TMP_SHARED}/terraform && terraform apply -auto-approve) && rc=0 && break ; done
+        (cd ${TMP_SHARED}/terraform && terraform apply -auto-approve) && rc=0
         if test "${rc}" -eq 1; then echo "failed to create the infra resources"; exit 1; fi
 
         echo "Waiting for bootstrap to complete"
