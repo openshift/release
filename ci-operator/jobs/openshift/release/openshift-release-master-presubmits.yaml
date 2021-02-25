@@ -4,6 +4,31 @@ presubmits:
     always_run: true
     branches:
     - master
+    cluster: build01
+    context: ci/prow/ci-secret-bootstrap-config-validation
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-ci-secret-bootstrap-config-validation
+    rerun_command: /test ci-secret-bootstrap-config-validation
+    spec:
+      containers:
+      - args:
+        - --config=core-services/ci-secret-bootstrap/_config.yaml
+        - --validate-only
+        command:
+        - /usr/bin/ci-secret-bootstrap
+        image: registry.ci.openshift.org/ci/ci-secret-bootstrap:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )ci-secret-bootstrap-config-validation,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
     cluster: app.ci
     context: ci/build-farm/app-ci-config-dry
     decorate: true
@@ -64,7 +89,7 @@ presubmits:
         - core-services/prow/02_config/_boskos.yaml
         command:
         - /app
-        image: gcr.io/k8s-staging-boskos/checkconfig:v20210210-9ac98d8
+        image: gcr.io/k8s-staging-boskos/checkconfig:v20210224-2728a7d
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -377,7 +402,7 @@ presubmits:
         - mismatched-tide-lenient
         command:
         - /checkconfig
-        image: gcr.io/k8s-prow/checkconfig:v20210224-afd05eb414
+        image: gcr.io/k8s-prow/checkconfig:v20210224-e3e64422a6
         imagePullPolicy: Always
         name: ""
         resources:

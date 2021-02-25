@@ -1,0 +1,255 @@
+kind: List
+apiVersion: v1
+items:
+- apiVersion: v1
+  kind: Service
+  metadata:
+    namespace: bastion-ppc64le
+    name: sshd-1
+    labels:
+      app: prow
+      component: sshd
+  spec:
+    selector:
+      app: prow
+      component: sshd
+    ports:
+    - name: osh-api
+      port: 443
+      targetPort: osh-api-1
+    - name: ost-auth
+      port: 13000
+      targetPort: ost-auth
+    - name: osh-lb
+      port: 6443
+      targetPort: osh-lb-1
+    - name: ost-nova
+      port: 13774
+      targetPort: ost-nova
+    - name: ost-cinder
+      port: 13776
+      targetPort: ost-cinder
+    - name: ost-swift
+      port: 13808
+      targetPort: ost-swift
+    - name: local-dns
+      port: 13053
+      targetPort: local-dns
+    - name: ost-glance
+      port: 13292
+      targetPort: ost-glance
+    - name: ost-neutron
+      port: 13696
+      targetPort: ost-neutron
+    type: ClusterIP
+- apiVersion: v1
+  kind: Service
+  metadata:
+    namespace: bastion-ppc64le
+    name: sshd-2
+    labels:
+      app: prow
+      component: sshd
+  spec:
+    selector:
+      app: prow
+      component: sshd
+    ports:
+    - name: osh-api
+      port: 443
+      targetPort: osh-api-2
+    - name: ost-auth
+      port: 13000
+      targetPort: ost-auth
+    - name: osh-lb
+      port: 6443
+      targetPort: osh-lb-2
+    - name: ost-nova
+      port: 13774
+      targetPort: ost-nova
+    - name: ost-cinder
+      port: 13776
+      targetPort: ost-cinder
+    - name: ost-swift
+      port: 13808
+      targetPort: ost-swift
+    - name: local-dns
+      port: 13053
+      targetPort: local-dns
+    - name: ost-glance
+      port: 13292
+      targetPort: ost-glance
+    - name: ost-neutron
+      port: 13696
+      targetPort: ost-neutron
+    type: ClusterIP
+- apiVersion: v1
+  kind: Service
+  metadata:
+    namespace: bastion-ppc64le
+    name: sshd-3
+    labels:
+      app: prow
+      component: sshd
+  spec:
+    selector:
+      app: prow
+      component: sshd
+    ports:
+    - name: osh-api
+      port: 443
+      targetPort: osh-api-3
+    - name: ost-auth
+      port: 13000
+      targetPort: ost-auth
+    - name: osh-lb
+      port: 6443
+      targetPort: osh-lb-3
+    - name: ost-nova
+      port: 13774
+      targetPort: ost-nova
+    - name: ost-cinder
+      port: 13776
+      targetPort: ost-cinder
+    - name: ost-swift
+      port: 13808
+      targetPort: ost-swift
+    - name: local-dns
+      port: 13053
+      targetPort: local-dns
+    - name: ost-glance
+      port: 13292
+      targetPort: ost-glance
+    - name: ost-neutron
+      port: 13696
+      targetPort: ost-neutron
+    type: ClusterIP
+- apiVersion: v1
+  kind: Service
+  metadata:
+    namespace: bastion-ppc64le
+    name: sshd-4
+    labels:
+      app: prow
+      component: sshd
+  spec:
+    selector:
+      app: prow
+      component: sshd
+    ports:
+    - name: osh-api
+      port: 443
+      targetPort: osh-api-4
+    - name: ost-auth
+      port: 13000
+      targetPort: ost-auth
+    - name: osh-lb
+      port: 6443
+      targetPort: osh-lb-4
+    - name: ost-nova
+      port: 13774
+      targetPort: ost-nova
+    - name: ost-cinder
+      port: 13776
+      targetPort: ost-cinder
+    - name: ost-swift
+      port: 13808
+      targetPort: ost-swift
+    - name: local-dns
+      port: 13053
+      targetPort: local-dns
+    - name: ost-glance
+      port: 13292
+      targetPort: ost-glance
+    - name: ost-neutron
+      port: 13696
+      targetPort: ost-neutron
+    type: ClusterIP
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: sshd
+    namespace: bastion-ppc64le
+    labels:
+      app: prow
+      component: sshd
+  spec:
+    replicas: 1
+    revisionHistoryLimit: 2
+    selector:
+      matchLabels:
+        app: prow
+        component: sshd
+    template:
+      metadata:
+        labels:
+          app: prow
+          component: sshd
+      spec:
+        priorityClassName: prow-critical
+        containers:
+        - name: sshd
+          image: registry.ci.openshift.org/ci/sshd:latest
+          command:
+          - /usr/sbin/sshd
+          args:
+          - -D
+          - -e
+          - -f/config/sshd_config
+          ports:
+            - name: ssh
+              containerPort: 2222
+            - name: ost-auth
+              containerPort: 10000
+            - name: local-dns
+              containerPort: 10053
+            - name: osh-api-1
+              containerPort: 10443
+            - name: osh-lb-1
+              containerPort: 10643
+            - name: ost-nova
+              containerPort: 10774
+            - name: ost-cinder
+              containerPort: 10776
+            - name: ost-swift
+              containerPort: 10808
+            - name: ost-glance
+              containerPort: 10292
+            - name: ost-neutron
+              containerPort: 10696
+            - name: osh-api-2
+              containerPort: 20443
+            - name: osh-lb-2
+              containerPort: 20643
+            - name: osh-api-3
+              containerPort: 30443
+            - name: osh-lb-3
+              containerPort: 30643
+            - name: osh-api-4
+              containerPort: 40443
+            - name: osh-lb-4
+              containerPort: 40643
+          volumeMounts:
+          - name: authorized-keys
+            mountPath: /keys/authorized
+            readOnly: true
+          - name: host-keys
+            mountPath: /keys/host/
+            readOnly: true
+          - name: config
+            mountPath: /config/
+            readOnly: true
+          resources:
+            requests:
+              memory: "3Gi"
+              cpu: "100m"
+        volumes:
+        - name: authorized-keys
+          secret:
+            secretName: sshd-authorized-keys
+        - name: host-keys
+          secret:
+            secretName: sshd-host-keys
+        - name: config
+          configMap:
+            name: sshd-config-ppc64le
