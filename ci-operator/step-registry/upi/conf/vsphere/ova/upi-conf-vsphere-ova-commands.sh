@@ -12,14 +12,16 @@ export HOME
 echo "$(date -u --rfc-3339=seconds) - Locating RHCOS image for release..."
 
 openshift_install_path="/var/lib/openshift-install"
-image_json_file="${openshift_install_path}/rhcos.json"
-fcos_json_file="${openshift_install_path}/fcos.json"
-
-if [[ -f "$fcos_json_file" ]]; then
-    image_json_file=$fcos_json_file
+if test -f "${openshift_install_path}/coreos-stream.json"; then
+    ova_url=$(jq -r '.architectures["'"$(arch)"'"].artifacts.vmware.formats.ova.disk.location' < /var/lib/openshift-install/coreos-stream.json)
+else
+    image_json_file="${openshift_install_path}/rhcos.json"
+    fcos_json_file="${openshift_install_path}/fcos.json"
+    if [[ -f "$fcos_json_file" ]]; then
+        image_json_file=$fcos_json_file
+    fi
+    ova_url="$(jq -r '.baseURI + .images["vmware"].path' $image_json_file)"
 fi
-
-ova_url="$(jq -r '.baseURI + .images["vmware"].path' $image_json_file)"
 vm_template="${ova_url##*/}"
 
 # Troubleshooting UPI OVA import issue

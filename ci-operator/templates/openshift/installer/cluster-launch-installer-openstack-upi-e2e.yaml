@@ -217,12 +217,25 @@ objects:
 
         function upload_rhcos_image() {
           export RHCOS_GLANCE_IMAGE_NAME=${INFRA_ID}-rhcos-${RHCOS_RELEASE}
-          rm -rf ${TMP_SHARED}/rhcos.json
-          local IMAGE_SOURCE=https://raw.githubusercontent.com/openshift/installer/${RHCOS_RELEASE}/data/data/rhcos.json
-          wget -q -O ${TMP_SHARED}/rhcos.json $IMAGE_SOURCE
-          local GZ_IMAGE_FILENAME=$(grep path ${TMP_SHARED}/rhcos.json | grep openstack |awk '{print $2}' | awk -F\" '{print $2}')
-          local BASEURI=$(grep base ${TMP_SHARED}/rhcos.json | awk '{print $2}' |awk -F\" '{print $2}')
-          wget  -q -O ${TMP_SHARED}/$GZ_IMAGE_FILENAME $BASEURI$GZ_IMAGE_FILENAME
+          if test -f "${TMP_SHARED}/coreos-stream.json"; then
+            jq '.architectures["'$(arch)'"].artifacts.openstack.formats["qcow2.gz"].disk' > openstack.json
+            local img=$(jq -r '.location' < openstack.json)
+            local checksum=$(jq -r '.sha256' < openstack.json)
+            local GZ_IMAGE_FILENAME=$(basename ${img})
+            curl -L -o ${TMP_SHARED}/${GZ_IMAGE_FILENAME} ${img}
+            local actual=$(sha256sum ${GZ_IMAGE_FILENAME})
+            if test "${checksum}" != "${actual}"; then
+              echo "checksum mismatch expected: ${checksum} actual: ${actual}" 1>&2
+              exit 1
+            fi
+          else
+            rm -rf ${TMP_SHARED}/rhcos.json
+            local IMAGE_SOURCE=https://raw.githubusercontent.com/openshift/installer/${RHCOS_RELEASE}/data/data/rhcos.json
+            wget -q -O ${TMP_SHARED}/rhcos.json $IMAGE_SOURCE
+            local GZ_IMAGE_FILENAME=$(grep path ${TMP_SHARED}/rhcos.json | grep openstack |awk '{print $2}' | awk -F\" '{print $2}')
+            local BASEURI=$(grep base ${TMP_SHARED}/rhcos.json | awk '{print $2}' |awk -F\" '{print $2}')
+            wget  -q -O ${TMP_SHARED}/$GZ_IMAGE_FILENAME $BASEURI$GZ_IMAGE_FILENAME
+          fi
           gunzip ${TMP_SHARED}/$GZ_IMAGE_FILENAME
           local IMAGE_FILENAME=${GZ_IMAGE_FILENAME%.gz}
           IMAGE_ID=$(openstack image create --container-format=bare --disk-format=qcow2 --file ${TMP_SHARED}/$IMAGE_FILENAME $RHCOS_GLANCE_IMAGE_NAME -f value -c id)

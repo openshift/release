@@ -41,7 +41,11 @@ install_config="${SHARED_DIR}/install-config.yaml"
 tfvars_path=/var/run/secrets/ci.openshift.io/cluster-profile/vmc.secret.auto.tfvars
 vsphere_user=$(grep -oP 'vsphere_user\s*=\s*"\K[^"]+' ${tfvars_path})
 vsphere_password=$(grep -oP 'vsphere_password\s*=\s*"\K[^"]+' ${tfvars_path})
-ova_url="$(jq -r '.baseURI + .images["vmware"].path' /var/lib/openshift-install/rhcos.json)"
+if test -f /var/lib/openshift-install/coreos-stream.json; then
+  ova_url=$(jq -r '.architectures["'"$(arch)"'"].artifacts.vmware.formats.ova.disk.location' < /var/lib/openshift-install/coreos-stream.json)
+else
+  ova_url="$(jq -r '.baseURI + .images["vmware"].path' /var/lib/openshift-install/rhcos.json)"
+fi
 vm_template="${ova_url##*/}"
 
 
