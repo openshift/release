@@ -34,32 +34,27 @@ tag_specification:
   namespace: ocp
 test_binary_build_commands: make build GOFLAGS='-race'
 tests:
-- artifact_dir: /tmp/artifacts
-  as: verify
+- as: verify
   commands: |
     make verify -k
   container:
     from: bin
-- artifact_dir: /tmp/artifacts
-  as: verify-deps
+- as: verify-deps
   commands: |
     HOME=$( mktemp -d )
     make verify-deps -k --warn-undefined-variables
   container:
     from: src
-- artifact_dir: /tmp/artifacts
-  as: unit
+- as: unit
   commands: |
     make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml
   container:
     from: test-bin
-- artifact_dir: /tmp/artifacts
-  as: e2e-aws
+- as: e2e-aws
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
-- artifact_dir: /tmp/artifacts
-  as: e2e-aws-operator
+- as: e2e-aws-operator
   steps:
     cluster_profile: aws
     test:
@@ -72,8 +67,7 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- artifact_dir: /tmp/artifacts
-  as: e2e-aws-upgrade
+- as: e2e-aws-upgrade
   steps:
     cluster_profile: aws
     workflow: openshift-upgrade-aws
