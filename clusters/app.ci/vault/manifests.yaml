@@ -24,7 +24,7 @@ spec:
           service:
             name: vault
             port:
-              number: 8200
+              number: 8300
         pathType: ImplementationSpecific
 ---
 apiVersion: image.openshift.io/v1
@@ -47,6 +47,8 @@ kind: Deployment
 metadata:
   labels:
     app: vault
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"vault-subpath-proxy:latest","namespace":"ci"},"fieldPath":"spec.template.spec.containers[?(@.name==\"subpath-proxy\")].image"}]'
   name: vault
   namespace: vault
 spec:
@@ -62,11 +64,9 @@ spec:
         config.hcl: |
           api_addr = "https://vault.ci.openshift.org"
           listener "tcp" {
-            address       = "0.0.0.0:8200"
-            # TODO: Sidecar that sends sighub if they change so vault reloads, otherwise
-            # triage will have some fun in three months
-            tls_cert_file = "/var/run/serving-cert/tls.crt"
-            tls_key_file  = "/var/run/serving-cert/tls.key"
+            address       = "127.0.0.1:8200"
+            # The subpath proxy does the tls termination
+            tls_disable   = "true"
           }
 
           storage "gcs" {
@@ -89,6 +89,17 @@ spec:
                   - vault
               topologyKey: "kubernetes.io/hostname"
       containers:
+      - image: vault-subpath-proxy:latest
+        name: subpath-proxy
+        args:
+        - -kv-mount-path=kv
+        - -listen-addr=0.0.0.0:8300
+        - -tls-cert-file=/var/run/serving-cert/tls.crt
+        - -tls-key-file=/var/run/serving-cert/tls.key
+        - -vault-addr=http://127.0.0.1:8200
+        volumeMounts:
+        - name: serving-cert
+          mountPath: /var/run/serving-cert
       - image: vault:1.6.2
         name: unsealer
         command:
@@ -96,9 +107,7 @@ spec:
         - -c
         - |-
           set -u
-          export VAULT_ADDR=https://127.0.0.1:8200
-          # Cert is only valid for https://vault.ci.openshift.org, not 127.0.0.1
-          export VAULT_SKIP_VERIFY=true
+          export VAULT_ADDR=http://127.0.0.1:8200
           until vault status 2>&1 >/dev/null; do
             vault operator unseal $UNSEAL_KEY
           done
@@ -119,11 +128,10 @@ spec:
         readinessProbe:
           httpGet:
             path: /v1/sys/health?standbyok=true
-            port: 8200
-            scheme: HTTPS
+            port: 8300
         ports:
         - name: https
-          containerPort: 8200
+          containerPort: 8300
         env:
         - name: GOOGLE_APPLICATION_CREDENTIALS
           value: /var/run/gcs-key/vault-sa-key.json
@@ -140,8 +148,6 @@ spec:
         volumeMounts:
         - name: config
           mountPath: /etc/vault/cfg
-        - name: serving-cert
-          mountPath: /var/run/serving-cert
         - name: gcs-key
           mountPath: /var/run/gcs-key
       volumes:
@@ -177,7 +183,7 @@ metadata:
 spec:
   ports:
   - name: vault
-    port: 8200
+    port: 8300
     protocol: TCP
   selector:
     app: vault
