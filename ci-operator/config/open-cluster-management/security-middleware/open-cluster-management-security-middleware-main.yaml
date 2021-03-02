@@ -10,11 +10,17 @@ resources:
       memory: 200Mi
 tests:
 - as: unit
-  commands: npm run test
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow make unit-test
   container:
     from: src
 - as: sonarcloud
-  commands: sonar-scanner --debug
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow make sonar/js/jest-init
+    make -f Makefile.prow make unit-test
+    make -f Makefile.prow sonar/js/prow
   container:
     from: src
   secrets:
