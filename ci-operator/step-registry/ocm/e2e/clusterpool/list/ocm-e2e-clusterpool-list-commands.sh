@@ -2,25 +2,14 @@
 
 OUTPUT="$SHARED_DIR/$CLUSTERPOOL_LIST_FILE"
 
-echo "OUTPUT=$OUTPUT"
-echo "uid=$(id -u)"
-
 temp=$(mktemp -d -t ocm-XXXXX)
-echo "temp=$temp"
 cd $temp || exit 1
 
 cp "$MAKEFILE" ./Makefile
 
-export SELF="make -d"
-make -d clusterpool/list-clusterpools CLUSTERPOOL_LIST_ARGUMENTS=" -o json" > >(tee list.json ${ARTIFACT_DIR}/list.json)
-echo "list.json:"
-cat list.json
-echo "---"
+make clusterpool/list-clusterpools CLUSTERPOOL_LIST_ARGUMENTS=" -o json" > >(tee list.json ${ARTIFACT_DIR}/list.json)
 
-jq -r '.items[] | select(.status.ready > 0) | .metadata.name' list.json > "$OUTPUT"
-echo "$OUTPUT after jq:"
-cat "$OUTPUT"
-echo "---"
+jq -r '.items[] | select(.status.ready > 0) | .metadata.name' list.json > >(tee "$OUTPUT" "${ARTIFACT_DIR}/$CLUSTERPOOL_LIST_FILE")
 
 if [[ -n "$CLUSTERPOOL_LIST_FILTER" ]]; then
     grep -v -e "$CLUSTERPOOL_LIST_FILTER" "$OUTPUT" > "$OUTPUT.tmp"
