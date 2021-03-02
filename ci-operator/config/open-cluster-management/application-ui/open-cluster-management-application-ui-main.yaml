@@ -14,13 +14,23 @@ images:
   from: base
   to: application-ui
 promotion:
-  name: latest
+  name: "2.3"
   namespace: open-cluster-management
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- as: unit
+  commands: |
+    export SELF="make -f Makefile.prow"
+    mkdir /tmp/npmcache
+    export npm_config_cache=/tmp/npmcache
+    make -f Makefile.prow install
+    make -f Makefile.prow unit-tests
+  container:
+    from: src
 zz_generated_metadata:
   branch: main
   org: open-cluster-management

@@ -56,7 +56,6 @@ postsubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
-        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --promote
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
@@ -72,9 +71,6 @@ postsubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
-          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -86,9 +82,6 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -110,7 +103,7 @@ postsubmits:
       containers:
       - args:
         - -f
-        - /opt/build-harness/Makefile.build-harness-openshift-ci
+        - /opt/build-harness/Makefile.prow
         - sonar/go/openshiftci-post
         command:
         - make
@@ -118,7 +111,7 @@ postsubmits:
         - name: GOPROXY
           value: proxy.golang.org,direct
         - name: SELF
-          value: make -f /opt/build-harness/Makefile.build-harness-openshift-ci
+          value: make -f /opt/build-harness/Makefile.prow
         image: registry.ci.openshift.org/open-cluster-management/builder:go1.15-linux-amd64
         imagePullPolicy: Always
         name: ""
