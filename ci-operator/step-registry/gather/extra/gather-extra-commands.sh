@@ -257,9 +257,9 @@ ${t_test}    cluster:resource:test:delta sort_desc(max by(resource) (delta(etcd_
 ${t_all}     cluster:node:total:boots sum(increase(node_boots_total[${d_all}]))
 ${t_test}    cluster:node:test:boots sum(increase(node_boots_total[${d_test}]))
 
-${t_all}     cluster:pod:openshift:unready:total:fraction   1-avg_over_time(cluster:usage:openshift:kube_running_pod_ready:avg[${d_all}])
-${t_install} cluster:pod:openshift:unready:install:fraction 1-avg_over_time(cluster:usage:openshift:kube_running_pod_ready:avg[${d_install}])
-${t_test}    cluster:pod:openshift:unready:test:fraction    1-avg_over_time(cluster:usage:openshift:kube_running_pod_ready:avg[${d_test}])
+${t_all}     cluster:pod:openshift:unready:total:fraction   1-max(avg_over_time(cluster:usage:openshift:kube_running_pod_ready:avg[${d_all}]))
+${t_install} cluster:pod:openshift:unready:install:fraction 1-max(avg_over_time(cluster:usage:openshift:kube_running_pod_ready:avg[${d_install}]))
+${t_test}    cluster:pod:openshift:unready:test:fraction    1-max(avg_over_time(cluster:usage:openshift:kube_running_pod_ready:avg[${d_test}]))
 
 ${t_all}     cluster:pod:openshift:started:total:count sum(changes(kube_pod_start_time{namespace=~"openshift-.*"}[${d_all}]) + 1)
 ${t_install} cluster:pod:openshift:started:install:count sum(changes(kube_pod_start_time{namespace=~"openshift-.*"}[${d_install}]) + 1)
@@ -268,6 +268,12 @@ ${t_test}    cluster:pod:openshift:started:test:count sum(changes(kube_pod_start
 ${t_all}     cluster:container:total:started count(count_over_time((count without(container,endpoint,name,namespace,pod,service,job,metrics_path,instance,image) (container_start_time_seconds{container!="",container!="POD",pod!=""}))[${d_all}:30s]))
 ${t_install} cluster:container:install:started  count(count_over_time((count without(container,endpoint,name,namespace,pod,service,job,metrics_path,instance,image) (container_start_time_seconds{container!="",container!="POD",pod!=""}))[${d_install}:30s]))
 ${t_test}    cluster:container:test:started  count(count_over_time((count without(container,endpoint,name,namespace,pod,service,job,metrics_path,instance,image) (container_start_time_seconds{container!="",container!="POD",pod!=""} > (${t_test}-${s_test})))[${d_test}:30s]))
+
+${t_all}     cluster:version:info:total   topk(1, max by (version) (max_over_time(cluster_version{type="completed"}[${d_all}])))*0+1
+${t_install} cluster:version:info:install topk(1, max by (version) (max_over_time(cluster_version{type="completed"}[${d_install}])))*0+1
+
+${t_all}     cluster:version:current:seconds count_over_time(max by (version) ((cluster_version{type="current"}))[${d_all}:1s])
+${t_test}    cluster:version:updates:seconds count_over_time(max by (version) ((cluster_version{type="updating",from_version!=""}))[${d_test}:1s])
 
 ${t_all}     job:duration:total:seconds vector(${s_all})
 ${t_install} job:duration:install:seconds vector(${s_install})
