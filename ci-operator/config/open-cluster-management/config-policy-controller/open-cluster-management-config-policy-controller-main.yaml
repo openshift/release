@@ -18,24 +18,22 @@ images:
       - golang:1.14
   to: config-policy-controller
 promotion:
+  name: latest
   namespace: open-cluster-management
-  tag: latest
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- artifact_dir: /tmp/artifacts
-  as: test-unit
+- as: test-unit
   commands: make test
   container:
     from: src
-- artifact_dir: /tmp/artifacts
-  as: sonarcloud
+- as: sonarcloud
   commands: |
     export GOPROXY="proxy.golang.org,direct"
-    export SONAR_GO_TEST_ARGS=$(go list ./... | grep -v test/e2e)
+    export SONAR_GO_TEST_ARGS="$(go list ./... | awk '!/test\/e2e/ {printf $0" "}')"
     export SELF="make -f Makefile.prow"
     make -f Makefile.prow sonar/go/openshiftci
   container:

@@ -14,9 +14,9 @@ cat > packet-teardown.yaml <<-EOF
   gather_facts: no
   vars:
     - cluster_type: "{{ lookup('env', 'CLUSTER_TYPE') }}"
-    - slackhook_path: "{{ lookup('env', 'CLUSTER_PROFILE_DIR') }}"
-  vars_files:
-    - "{{ lookup('env', 'CLUSTER_PROFILE_DIR') }}/.packet-kni-vars"
+    - slackhook_path: "{{ lookup('env', 'CLUSTER_PROFILE_DIR') }}/slackhook"
+    - packet_project_id: "{{ lookup('file', lookup('env', 'CLUSTER_PROFILE_DIR') + '/packet-project-id') }}"
+    - packet_auth_token: "{{ lookup('file', lookup('env', 'CLUSTER_PROFILE_DIR') + '/packet-auth-token') }}"
   tasks:
 
   - name: check cluster type
@@ -40,7 +40,7 @@ cat > packet-teardown.yaml <<-EOF
     rescue:
     - name: Send notification message via Slack in case of failure
       slack:
-        token: "{{ 'T027F3GAJ/B011TAG710V/' + lookup('file', slackhook_path + '/.slackhook') }}"
+        token: "{{ 'T027F3GAJ/B011TAG710V/' + lookup('file', slackhook_path) }}"
         msg: 'Packet teardown failed. Error msg: {{ ansible_failed_result.msg }}'
         username: '{{ packet_hostname }}'
         color: warning

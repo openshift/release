@@ -53,7 +53,7 @@ secret_configs:
       attachment: authorized_keys
       bw_item: sshd-bastion-z
   to:
-  - cluster: api.ci
+  - cluster: build01
     name: sshd-authorized-keys
     namespace: bastion-z
 - from:
@@ -70,7 +70,7 @@ secret_configs:
       attachment: ssh_host_rsa_key
       bw_item: sshd-bastion-z
   to:
-  - cluster: api.ci
+  - cluster: build01
     name: sshd-host-keys
     namespace: bastion-z
 - from:
@@ -78,7 +78,7 @@ secret_configs:
       attachment: authorized_keys
       bw_item: sshd-bastion-ppc64le
   to:
-  - cluster: api.ci
+  - cluster: build01
     name: sshd-authorized-keys
     namespace: bastion-ppc64le
 - from:
@@ -95,7 +95,7 @@ secret_configs:
       attachment: ssh_host_rsa_key
       bw_item: sshd-bastion-ppc64le
   to:
-  - cluster: api.ci
+  - cluster: build01
     name: sshd-host-keys
     namespace: bastion-ppc64le
 - from:
@@ -103,7 +103,7 @@ secret_configs:
       attachment: authorized_keys
       bw_item: sshd-bastion-ppc64le-libvirt
   to:
-  - cluster: api.ci
+  - cluster: build01
     name: sshd-authorized-keys
     namespace: bastion-ppc64le-libvirt
 - from:
@@ -120,7 +120,7 @@ secret_configs:
       attachment: ssh_host_rsa_key
       bw_item: sshd-bastion-ppc64le-libvirt
   to:
-  - cluster: api.ci
+  - cluster: build01
     name: sshd-host-keys
     namespace: bastion-ppc64le-libvirt
 - from:
@@ -128,7 +128,7 @@ secret_configs:
       attachment: authorized_keys
       bw_item: sshd-bastion-telco
   to:
-  - cluster: api.ci
+  - cluster: build01
     name: sshd-authorized-keys
     namespace: bastion-telco
 - from:
@@ -145,7 +145,7 @@ secret_configs:
       attachment: ssh_host_rsa_key
       bw_item: sshd-bastion-telco
   to:
-  - cluster: api.ci
+  - cluster: build01
     name: sshd-host-keys
     namespace: bastion-telco
 - from:
@@ -1014,6 +1014,48 @@ secret_configs:
   - cluster_groups:
     - non_app_ci
     name: cluster-secrets-openstack
+    namespace: ci
+- from:
+    .awscred:
+      attachment: .awscred
+      bw_item: openstack
+    insights-live.yaml:
+      attachment: insights-live.yaml
+      bw_item: insights-ci-account
+    pull-secret:
+      dockerconfigJSON:
+      - auth_bw_attachment: auth
+        bw_item: api.ci-pull-secret
+        registry_url: registry.svc.ci.openshift.org
+      - auth_bw_attachment: token_image-puller_app.ci_reg_auth_value.txt
+        bw_item: build_farm
+        registry_url: registry.ci.openshift.org
+      - auth_bw_attachment: auth
+        bw_item: cloud.openshift.com-pull-secret
+        email_bw_field: email
+        registry_url: cloud.openshift.com
+      - auth_bw_attachment: auth
+        bw_item: quay.io-pull-secret
+        email_bw_field: email
+        registry_url: quay.io
+      - auth_bw_attachment: auth
+        bw_item: registry.connect.redhat.com-pull-secret
+        email_bw_field: email
+        registry_url: registry.connect.redhat.com
+      - auth_bw_attachment: auth
+        bw_item: registry.redhat.io-pull-secret
+        email_bw_field: email
+        registry_url: registry.redhat.io
+    ssh-privatekey:
+      attachment: ssh-privatekey
+      bw_item: jenkins-ci-provisioner
+    ssh-publickey:
+      attachment: ssh-publickey
+      bw_item: jenkins-ci-provisioner
+  to:
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-openstack-vexxhost
     namespace: ci
 - from:
     ca-cert.pem:

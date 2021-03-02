@@ -4,10 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-export LOKI_VERSION="2.0.0"
+export LOKI_VERSION="2.1.0"
 export LOKI_ENDPOINT=https://observatorium.api.stage.openshift.com/api/logs/v1/dptp/loki/api/v1
 
 GRAFANACLOUND_USERNAME=$(cat /var/run/loki-grafanacloud-secret/client-id)
+export OPENSHIFT_INSTALL_INVOKER="openshift-internal-ci/${JOB_NAME}/${BUILD_ID}"
 
 cat >> "${SHARED_DIR}/manifest_01_ns.yml" << EOF
 apiVersion: v1
@@ -93,6 +94,7 @@ data:
       - cri: {}
       - labeldrop:
         - filename
+        - stream
       relabel_configs:
       - source_labels:
         - __meta_kubernetes_pod_label_name
@@ -120,7 +122,7 @@ data:
       - action: replace
         source_labels:
         - __meta_kubernetes_pod_name
-        target_label: instance
+        target_label: pod_name
       - action: replace
         source_labels:
         - __meta_kubernetes_pod_container_name
@@ -131,6 +133,13 @@ data:
         - __meta_kubernetes_pod_uid
         - __meta_kubernetes_pod_container_name
         target_label: __path__
+      - action: drop
+        regex: ''
+        source_labels:
+        - pod_template_hash
+        - controller_revision_hash
+        - ingresscontroller_operator_openshift_io_hash
+        - pod_template_generation
     - job_name: kubernetes-pods-app
       kubernetes_sd_configs:
       - role: pod
@@ -138,6 +147,7 @@ data:
       - cri: {}
       - labeldrop:
         - filename
+        - stream
       relabel_configs:
       - action: drop
         regex: ".+"
@@ -169,7 +179,7 @@ data:
       - action: replace
         source_labels:
         - __meta_kubernetes_pod_name
-        target_label: instance
+        target_label: pod_name
       - action: replace
         source_labels:
         - __meta_kubernetes_pod_container_name
@@ -180,6 +190,13 @@ data:
         - __meta_kubernetes_pod_uid
         - __meta_kubernetes_pod_container_name
         target_label: __path__
+      - action: drop
+        regex: ''
+        source_labels:
+        - pod_template_hash
+        - controller_revision_hash
+        - ingresscontroller_operator_openshift_io_hash
+        - pod_template_generation
     - job_name: kubernetes-pods-direct-controllers
       kubernetes_sd_configs:
       - role: pod
@@ -187,6 +204,7 @@ data:
       - cri: {}
       - labeldrop:
         - filename
+        - stream
       relabel_configs:
       - action: drop
         regex: ".+"
@@ -224,7 +242,7 @@ data:
       - action: replace
         source_labels:
         - __meta_kubernetes_pod_name
-        target_label: instance
+        target_label: pod_name
       - action: replace
         source_labels:
         - __meta_kubernetes_pod_container_name
@@ -235,6 +253,13 @@ data:
         - __meta_kubernetes_pod_uid
         - __meta_kubernetes_pod_container_name
         target_label: __path__
+      - action: drop
+        regex: ''
+        source_labels:
+        - pod_template_hash
+        - controller_revision_hash
+        - ingresscontroller_operator_openshift_io_hash
+        - pod_template_generation
     - job_name: kubernetes-pods-indirect-controller
       kubernetes_sd_configs:
       - role: pod
@@ -242,6 +267,7 @@ data:
       - cri: {}
       - labeldrop:
         - filename
+        - stream
       relabel_configs:
       - action: drop
         regex: ".+"
@@ -281,7 +307,7 @@ data:
       - action: replace
         source_labels:
         - __meta_kubernetes_pod_name
-        target_label: instance
+        target_label: pod_name
       - action: replace
         source_labels:
         - __meta_kubernetes_pod_container_name
@@ -292,6 +318,13 @@ data:
         - __meta_kubernetes_pod_uid
         - __meta_kubernetes_pod_container_name
         target_label: __path__
+      - action: drop
+        regex: ''
+        source_labels:
+        - pod_template_hash
+        - controller_revision_hash
+        - ingresscontroller_operator_openshift_io_hash
+        - pod_template_generation
     - job_name: kubernetes-pods-static
       kubernetes_sd_configs:
       - role: pod
@@ -299,6 +332,7 @@ data:
       - cri: {}
       - labeldrop:
         - filename
+        - stream
       relabel_configs:
       - action: drop
         regex: ''
@@ -331,7 +365,7 @@ data:
       - action: replace
         source_labels:
         - __meta_kubernetes_pod_name
-        target_label: instance
+        target_label: pod_name
       - action: replace
         source_labels:
         - __meta_kubernetes_pod_container_name
@@ -342,6 +376,13 @@ data:
         - __meta_kubernetes_pod_annotation_kubernetes_io_config_mirror
         - __meta_kubernetes_pod_container_name
         target_label: __path__
+      - action: drop
+        regex: ''
+        source_labels:
+        - pod_template_hash
+        - controller_revision_hash
+        - ingresscontroller_operator_openshift_io_hash
+        - pod_template_generation
     - job_name: journal
       journal:
         path: /var/log/journal
@@ -398,19 +439,27 @@ spec:
     spec:
       containers:
       - command:
-        - sh
-        - -c
-        - |
-          promtail \
-            -client.external-labels=_id=\$(cat /tmp/shared/cluster-id),host=\$(HOSTNAME),invoker=\$(cat /tmp/shared/cluster-invoker) \
-            -config.file=/etc/promtail/promtail.yaml
+        - promtail
+        - -client.external-labels=host=\$(HOSTNAME),invoker=\$(INVOKER)
+        - -config.file=/etc/promtail/promtail.yaml
         env:
         - name: HOSTNAME
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
+        - name: INVOKER
+          value: "${OPENSHIFT_INSTALL_INVOKER}"
         image: grafana/promtail:${LOKI_VERSION}
         imagePullPolicy: IfNotPresent
+        lifecycle:
+          preStop:
+            # We want the pod to keep running when a node is being drained
+            # long enough to exfiltrate the last set of logs from static pods
+            # from things like etcd and the kube-apiserver. To do that, we need
+            # to stay alive longer than the longest shutdown duration will be
+            # run, which should be 135s from kube-apiserver.
+            exec:
+              command: ["sleep", "150"]
         name: promtail
         ports:
         - containerPort: 3101
@@ -447,17 +496,8 @@ spec:
         - mountPath: "/var/log/journal"
           name: journal
           readOnly: true
-      initContainers:
-      - command:
-        - sh
-        - "-c"
-        - oc get clusterversion/version -o=jsonpath='{.spec.clusterID}' > /tmp/shared/cluster-id && oc get cm openshift-install -n openshift-config -o=jsonpath='{.data.invoker}' > /tmp/shared/cluster-invoker
-        volumeMounts:
-          - mountPath: "/tmp/shared"
-            name: shared-data
-        image: quay.io/openshift/origin-cli:4.6.0
-        name: fetch-cluster-data
       serviceAccountName: loki-promtail
+      terminationGracePeriodSeconds: 180
       tolerations:
       - effect: NoSchedule
         key: node-role.kubernetes.io/master
@@ -550,3 +590,6 @@ metadata:
   name: loki-promtail
   namespace: loki
 EOF
+
+
+echo "Promtail manifests created, the cluster can be found at https://grafana-loki.ci.openshift.org/explore using '{invoker=\"${OPENSHIFT_INSTALL_INVOKER}\"}' query"

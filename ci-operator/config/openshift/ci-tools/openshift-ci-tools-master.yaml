@@ -268,13 +268,13 @@ images:
       - destination_dir: .
         source_path: /go/bin/secret-wrapper
   to: secret-wrapper
-- context_dir: images/secret-wrapper
+- context_dir: images/entrypoint-wrapper
   from: os
   inputs:
     bin:
       paths:
       - destination_dir: .
-        source_path: /go/bin/secret-wrapper
+        source_path: /go/bin/entrypoint-wrapper
   to: entrypoint-wrapper
 - context_dir: images/ci-operator-configresolver
   from: os
@@ -457,28 +457,23 @@ resources:
       memory: 200Mi
 test_binary_build_commands: make race-install
 tests:
-- artifact_dir: /tmp/artifacts
-  as: unit
+- as: unit
   commands: make test TESTFLAGS='-count=25'
   container:
     from: src
-- artifact_dir: /tmp/artifacts
-  as: codegen
+- as: codegen
   commands: make verify-gen
   container:
     from: src
-- artifact_dir: /tmp/artifacts
-  as: format
+- as: format
   commands: make format
   container:
     from: src
-- artifact_dir: /tmp/artifacts
-  as: integration
+- as: integration
   commands: make integration
   container:
     from: test-bin
-- artifact_dir: /tmp/artifacts
-  as: e2e
+- as: e2e
   steps:
     test:
     - as: e2e
@@ -505,13 +500,11 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-- artifact_dir: /tmp/artifacts
-  as: breaking-changes
+- as: breaking-changes
   commands: make check-breaking-changes
   container:
     from: test-bin
-- artifact_dir: /tmp/artifacts
-  as: validate-vendor
+- as: validate-vendor
   commands: make validate-vendor
   container:
     from: src

@@ -146,6 +146,9 @@ function suite() {
     set +x
 }
 
+echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_START"
+trap 'echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"' EXIT
+
 case "${TEST_TYPE}" in
 upgrade-conformance)
     upgrade

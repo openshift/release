@@ -37,10 +37,10 @@ images:
   inputs:
     ocp_4.6_cli:
       as:
-      - registry.svc.ci.openshift.org/ocp/4.6:cli
+      - registry.ci.openshift.org/ocp/4.6:cli
     ocp_builder_rhel-8-golang-1.15-openshift-4.6:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
   to: cluster-logging-operator
 - dockerfile_path: olm_deploy/operatorregistry/Dockerfile
   from: base
@@ -60,13 +60,11 @@ tag_specification:
   name: "4.6"
   namespace: ocp
 tests:
-- artifact_dir: /tmp/artifacts
-  as: unit
+- as: unit
   commands: make test-unit
   container:
     from: src
-- artifact_dir: /tmp/artifacts
-  as: e2e-operator
+- as: e2e-operator
   steps:
     cluster_profile: aws
     env:
@@ -80,8 +78,7 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- artifact_dir: /tmp/artifacts
-  as: functional
+- as: functional
   steps:
     cluster_profile: aws
     test:

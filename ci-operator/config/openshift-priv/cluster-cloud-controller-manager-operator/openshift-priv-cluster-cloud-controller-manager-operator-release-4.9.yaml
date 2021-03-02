@@ -21,9 +21,9 @@ canonical_go_repository: github.com/openshift/cluster-cloud-controller-manager-o
 images:
 - from: base
   inputs:
-    openshift_release_golang-1.15:
+    openshift_release_golang-1.16:
       as:
-      - registry.svc.ci.openshift.org/openshift/release:golang-1.15
+      - registry.ci.openshift.org/openshift/release:golang-1.16
   to: cluster-cloud-controller-manager-operator
 promotion:
   name: 4.9-priv
@@ -39,23 +39,19 @@ tag_specification:
   name: 4.9-priv
   namespace: ocp-private
 tests:
-- artifact_dir: /tmp/artifacts
-  as: verify
+- as: verify
   commands: make test
   container:
     from: src
-- artifact_dir: /tmp/artifacts
-  as: vendor
+- as: vendor
   commands: make vendor
   container:
     from: src
-- artifact_dir: /tmp/artifacts
-  as: e2e-aws
+- as: e2e-aws
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
-- artifact_dir: /tmp/artifacts
-  as: e2e-aws-upgrade
+- as: e2e-aws-upgrade
   steps:
     cluster_profile: aws
     workflow: openshift-upgrade-aws

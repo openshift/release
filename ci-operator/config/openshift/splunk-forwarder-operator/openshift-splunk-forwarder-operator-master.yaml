@@ -18,7 +18,7 @@ images:
   inputs:
     openshift_release_golang-1.12:
       as:
-      - registry.svc.ci.openshift.org/openshift/release:golang-1.12
+      - registry.ci.openshift.org/openshift/release:golang-1.12
   to: splunk-forwarder-operator
 - dockerfile_path: containers/forwarder/Dockerfile
   from: base
@@ -32,8 +32,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- artifact_dir: /tmp/artifacts
-  as: verify
+- as: verify
   commands: |
     export GOLANGCI_LINT_VERSION=$(cat .golangciversion)
     export GOLANGCI_LINT_CACHE=/tmp/.cache
@@ -41,8 +40,7 @@ tests:
     make verify
   container:
     from: src
-- artifact_dir: /tmp/artifacts
-  as: vuln-check-operator
+- as: vuln-check-operator
   commands: |
     cd /tmp
     curl -sfL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 --output jq
@@ -54,8 +52,7 @@ tests:
     ./jq --exit-status '.Vulnerabilities, (.Vulnerabilities|length == 0)' <<< "$ERRATA"
   container:
     from: splunk-forwarder-operator
-- artifact_dir: /tmp/artifacts
-  as: vuln-check-forwarder
+- as: vuln-check-forwarder
   commands: |
     cd /tmp
     curl -sfL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 --output jq
@@ -67,8 +64,7 @@ tests:
     ./jq --exit-status '.Vulnerabilities, (.Vulnerabilities|length == 0)' <<< "$ERRATA"
   container:
     from: splunk-forwarder
-- artifact_dir: /tmp/artifacts
-  as: vuln-check-heavyforwarder
+- as: vuln-check-heavyforwarder
   commands: |
     cd /tmp
     curl -sfL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 --output jq

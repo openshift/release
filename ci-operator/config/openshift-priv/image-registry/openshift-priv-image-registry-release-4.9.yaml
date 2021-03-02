@@ -15,6 +15,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.15-openshift-4.7
+  ocp_builder_rhel-8-golang-1.15-openshift-4.8:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.8
   ocp_builder_rhel-8-golang-openshift-4.6:
     name: builder
     namespace: ocp
@@ -34,9 +38,9 @@ images:
 - dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.8:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
   to: docker-registry
 promotion:
   name: 4.9-priv
@@ -51,28 +55,23 @@ tag_specification:
   namespace: ocp-private
 test_binary_build_commands: OS_GOFLAGS='-race' make build
 tests:
-- artifact_dir: /tmp/artifacts
-  as: unit
+- as: unit
   commands: JUNIT_REPORT=1 hack/test-go.sh
   container:
     from: test-bin
-- artifact_dir: /tmp/artifacts
-  as: e2e-aws
+- as: e2e-aws
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
-- artifact_dir: /tmp/artifacts
-  as: e2e-aws-image-registry
+- as: e2e-aws-image-registry
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-image-registry
-- artifact_dir: /tmp/artifacts
-  as: e2e-aws-upgrade
+- as: e2e-aws-upgrade
   steps:
     cluster_profile: aws
     workflow: openshift-upgrade-aws
-- artifact_dir: /tmp/artifacts
-  as: e2e-agnostic-image-registry
+- as: e2e-agnostic-image-registry
   steps:
     cluster_profile: gcp
     test:
@@ -84,8 +83,7 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: openshift-e2e-gcp
-- artifact_dir: /tmp/artifacts
-  as: verify
+- as: verify
   commands: make verify
   container:
     from: src
