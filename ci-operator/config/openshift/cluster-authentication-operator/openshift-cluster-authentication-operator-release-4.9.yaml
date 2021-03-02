@@ -3,6 +3,10 @@ base_images:
     name: "4.9"
     namespace: ocp
     tag: base
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
   ocp_builder_golang-1.14:
     name: builder
     namespace: ocp
@@ -68,6 +72,14 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
+- as: e2e-agnostic-ipv6
+  steps:
+    cluster_profile: packet
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        NETWORK_TYPE=OVNKubernetes
+    workflow: baremetalds-e2e
 - as: e2e-operator
   steps:
     cluster_profile: gcp
