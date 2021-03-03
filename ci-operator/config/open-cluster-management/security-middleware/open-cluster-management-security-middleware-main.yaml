@@ -1,0 +1,36 @@
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: open-cluster-management
+    tag: nodejs10-linux-amd64
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: |
+    mkdir /tmp/npmcache
+    export npm_config_cache=/tmp/npmcache
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow unit-test
+  container:
+    from: src
+- as: sonarcloud
+  commands: |
+    mkdir /tmp/npmcache
+    export npm_config_cache=/tmp/npmcache
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow sonar/js/jest-init
+    make -f Makefile.prow unit-test
+    make -f Makefile.prow sonar/js/prow
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+zz_generated_metadata:
+  branch: main
+  org: open-cluster-management
+  repo: security-middleware
