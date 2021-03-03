@@ -22,3 +22,17 @@ compute:
     gcp:
       type: ${COMPUTE_NODE_TYPE}
 EOF
+
+if [ ${RT_ENABLED} = "true" ]; then
+	cat > "${SHARED_DIR}/manifest_mc-kernel-rt.yaml" << EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: worker
+  name: realtime-worker
+spec:
+  kernelType: realtime
+EOF
+fi
+
