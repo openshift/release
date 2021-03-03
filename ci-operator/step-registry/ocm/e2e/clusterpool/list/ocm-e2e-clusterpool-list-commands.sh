@@ -1,9 +1,9 @@
 #!/bin/bash
 
-OUTPUT="$SHARED_DIR/$CLUSTERPOOL_LIST_FILE"
-
 temp=$(mktemp -d -t ocm-XXXXX)
 cd $temp || exit 1
+
+OUTPUT="$SHARED_DIR/$CLUSTERPOOL_LIST_FILE"
 
 cp "$MAKEFILE" ./Makefile
 
