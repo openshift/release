@@ -67,8 +67,9 @@ tests:
   cron: 2 7 * * *
   steps:
     cluster_profile: azure4
-    test:
-    - as: kata-containers-test
+    pre:
+    - chain: ipi-azure-pre
+    - as: kata-containers-e2e-pre
       cli: latest
       commands: |
         # oc is made available to this script via cli configuration, but
@@ -86,13 +87,34 @@ tests:
 
         KATA_WORKDIR=/go/src/github.com/kata-containers/tests
         cd $KATA_WORKDIR
+        # Install Kata Containers and run a smoke test.
         .ci/openshift-ci/test.sh
+
+        # In the following block it builds and deploy the kata-webhook so that the
+        # tests ran on next step of the workflow will use the kata runtime.
+        pushd "${KATA_WORKDIR}/kata-webhook"
+        echo "INFO: Build the kata-webhook"
+        ./create-certs.sh
+        echo "INFO: Deploy the kata-webhook"
+        oc apply -f deploy/
+        # Wait it to become available.
+        oc wait deployment/pod-annotate-webhook --for condition=Available --timeout 60s
+        # Check the web-hook is working correctly.
+        oc apply -f https://raw.githubusercontent.com/openshift/origin/master/examples/hello-openshift/hello-pod.json
+        class_name=$(oc get -o jsonpath='{.spec.runtimeClassName}' pod/hello-openshift)
+        oc delete pod/hello-openshift
+        if [ "$class_name" != "kata" ]; then
+            echo "ERROR: kata-webhook is not working"
+            exit 1
+        fi
+        echo "INFO: kata-webhook is up and working"
+        popd
       from: pipeline:bin
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: ipi-azure
+    workflow: openshift-e2e-azure
 zz_generated_metadata:
   branch: main
   org: kata-containers
