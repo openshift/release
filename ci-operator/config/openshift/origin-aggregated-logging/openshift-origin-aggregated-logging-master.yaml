@@ -122,11 +122,12 @@ tests:
     cluster_profile: aws
     env:
       COMPUTE_NODE_TYPE: m5.4xlarge
-    test:
-    - as: test
-      cli: latest
-      commands: make test
+    pre:
+    - as: deploy-logging
+      commands: make deploy-elasticsearch-operator && make deploy-catalog && make cluster-logging-operator-install 
       dependencies:
+      - env: IMAGE_ELASTICSEARCH_OPERATOR_REGISTRY
+        name: pipeline:elasticsearch-operator-registry
       - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
         name: pipeline:cluster-logging-operator-registry
       - env: IMAGE_CLUSTER_LOGGING_OPERATOR
@@ -145,6 +146,14 @@ tests:
         name: pipeline:logging-kibana6
       - env: IMAGE_LOGGING_EVENTROUTER
         name: pipeline:logging-eventrouter
+      from: pipeline:cluster-logging-operator-e2e
+      resources:
+        requests:
+          cpu: 100m
+    test:
+    - as: test
+      cli: latest
+      commands: make test
       from: pipeline:origin-aggregated-logging-tests
       resources:
         requests:
