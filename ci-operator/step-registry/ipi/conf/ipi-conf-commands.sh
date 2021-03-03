@@ -33,6 +33,7 @@ if [ ${FIPS_ENABLED} = "true" ]; then
 	cat >> "${out}" << EOF
 fips: true
 EOF
+fi
 
 if [ ${RT_ENABLED} = "true" ]; then
 	cat > "${out}" << EOF
@@ -47,4 +48,3 @@ spec:
 EOF
 fi
 
-fi
