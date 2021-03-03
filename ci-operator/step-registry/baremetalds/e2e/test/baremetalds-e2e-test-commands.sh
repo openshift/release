@@ -33,7 +33,7 @@ TEST_ARGS=""
 if printf '%s\n%s' "4.7" "${OPENSHIFT_VERSION}" | sort -C -V; then
   echo "### Mirroring test images"
 
-  DEVSCRIPTS_TEST_IMAGE_REPO=${DEVSCRIPTS_REGISTRY}/localimages/local-test-image  
+  DEVSCRIPTS_TEST_IMAGE_REPO="file://myregistry/myimages"
   # shellcheck disable=SC2087
   ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
 set +x
@@ -41,8 +41,7 @@ set +x
 source /root/dev-scripts/common.sh
 source /root/dev-scripts/ocp_install_env.sh
 
-openshift-tests images --to-repository ${DEVSCRIPTS_TEST_IMAGE_REPO} > /tmp/mirror
-oc image mirror -f /tmp/mirror --registry-config ${DEVSCRIPTS_WORKING_DIR}/pull_secret.json
+openshift-tests images --upstream --to-repository ${DEVSCRIPTS_TEST_IMAGE_REPO} | oc image mirror -f - --filter-by-os=.* --registry-config ${DEVSCRIPTS_WORKING_DIR}/pull_secret.json
 EOF
 
   TEST_ARGS="--from-repository ${DEVSCRIPTS_TEST_IMAGE_REPO}"
