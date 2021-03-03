@@ -11,7 +11,9 @@ for claim in $(cat ${SHARED_DIR}/${CLUSTER_CLAIM_FILE}); do
     cluster=$( sed -e "s/-[[:alnum:]]\+$//" <<<$claim )
     output="${SHARED_DIR}/${cluster}.json"
 
-    make clusterpool/get-cluster-metadata CLUSTERPOOL_CLUSTER_CLAIM="$claim" > $output
+    make clusterpool/get-cluster-metadata \
+        CLUSTERPOOL_CLUSTER_CLAIM="$claim" \
+        CLUSTERPOOL_METADATA_FILE="$output"
 
     if [[ "$?" == 0 ]]; then
         echo "Cluster meta data for $claim saved to $output"
