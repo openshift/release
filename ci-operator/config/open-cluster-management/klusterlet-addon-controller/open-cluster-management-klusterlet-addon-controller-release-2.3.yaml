@@ -3,6 +3,10 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
+  open-cluster-management_builder_go1.15-linux-amd64:
+    name: builder
+    namespace: open-cluster-management
+    tag: go1.15-linux-amd64
 binary_build_commands: go build ./cmd/manager
 build_root:
   image_stream_tag:
@@ -14,6 +18,7 @@ images:
   from: base
   to: klusterlet-addon-controller
 promotion:
+  disabled: true
   name: "2.3"
   namespace: open-cluster-management
 resources:
@@ -35,6 +40,15 @@ tests:
   commands: make test
   container:
     from: src
+- as: sonarcloud
+  commands: |
+    export SELF="make -f /opt/build-harness/Makefile.prow"
+    make -f /opt/build-harness/Makefile.prow sonar/go/prow
+  container:
+    from: open-cluster-management_builder_go1.15-linux-amd64
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
 zz_generated_metadata:
   branch: release-2.3
   org: open-cluster-management
