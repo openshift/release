@@ -36,7 +36,7 @@ EOF
 fi
 
 if [ ${RT_ENABLED} = "true" ]; then
-	cat > "${out}" << EOF
+	cat > "${SHARED_DIR}/manifest_mc-kernel-rt.yaml" << EOF
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfig
 metadata:
