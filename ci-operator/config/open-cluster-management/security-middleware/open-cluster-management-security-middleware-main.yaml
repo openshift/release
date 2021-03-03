@@ -2,7 +2,7 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: open-cluster-management
-    tag: nodejs12-linux-amd64
+    tag: nodejs10-linux-amd64
 resources:
   '*':
     requests:
@@ -11,14 +11,16 @@ resources:
 tests:
 - as: unit
   commands: |
-    npm ci
+    mkdir /tmp/npmcache
+    export npm_config_cache=/tmp/npmcache
     export SELF="make -f Makefile.prow"
     make -f Makefile.prow unit-test
   container:
     from: src
 - as: sonarcloud
   commands: |
-    npm ci
+    mkdir /tmp/npmcache
+    export npm_config_cache=/tmp/npmcache
     export SELF="make -f Makefile.prow"
     make -f Makefile.prow sonar/js/jest-init
     make -f Makefile.prow unit-test
