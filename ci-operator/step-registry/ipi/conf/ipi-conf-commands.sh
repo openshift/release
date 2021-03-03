@@ -33,4 +33,18 @@ if [ ${FIPS_ENABLED} = "true" ]; then
 	cat >> "${out}" << EOF
 fips: true
 EOF
+
+if [ ${RT_ENABLED} = "true" ]; then
+	cat > "${out}" << EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: worker
+  name: realtime-worker
+spec:
+  kernelType: realtime
+EOF
+fi
+
 fi
