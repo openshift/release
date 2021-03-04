@@ -24,17 +24,36 @@ resources:
       memory: 4Gi
 tests:
 - as: lint
-  commands: make -f Makefile.prow lint
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow lint
   container:
     from: bin
 - as: check
-  commands: make -f Makefile.prow check
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow check
   container:
     from: bin
-- as: unit
-  commands: make -f Makefile.prow unit-tests
+- as: unit-tests
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow unit-tests
   container:
     from: bin
+- as: sonar
+  commands: |
+    mkdir /tmp/npmcache
+    export npm_config_cache=/tmp/npmcache
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow sonar/js/jest-init
+    make -f Makefile.prow unit-tests
+    make -f Makefile.prow sonar/js/prow
+  container:
+    from: bin
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
 zz_generated_metadata:
   branch: cahl-copyright
   org: open-cluster-management
