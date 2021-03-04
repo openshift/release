@@ -2,34 +2,29 @@ periodics:
 - agent: kubernetes
   cluster: build01
   decorate: true
+  decoration_config:
+    skip_cloning: true
   extra_refs:
   - base_ref: master
     org: openshift
+    path_alias: k8s.io/kubernetes
     repo: kubernetes
   interval: 24h
   labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-kubernetes-conformance-k8s
+  name: periodic-ci-openshift-kubernetes-master-k8s-conformance
   spec:
     containers:
     - args:
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --repo=kubernetes
-      - --secret-dir=/usr/local/e2e-conformance-k8s-cluster-profile
-      - --target=e2e-conformance-k8s
-      - --template=/usr/local/e2e-conformance-k8s
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/usr/local/k8s-conformance-cluster-profile
+      - --target=k8s-conformance
       command:
       - ci-operator
-      env:
-      - name: CLUSTER_TYPE
-        value: aws
-      - name: JOB_NAME_SAFE
-        value: e2e-conformance-k8s
-      - name: TEST_COMMAND
-        value: openshift-hack/conformance-k8s.sh
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -40,16 +35,16 @@ periodics:
       - mountPath: /etc/boskos
         name: boskos
         readOnly: true
-      - mountPath: /usr/local/e2e-conformance-k8s-cluster-profile
+      - mountPath: /usr/local/k8s-conformance-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-conformance-k8s
-        name: job-definition
-        subPath: cluster-launch-installer-src.yaml
       - mountPath: /etc/pull-secret
         name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
@@ -64,9 +59,9 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
-    - configMap:
-        name: prow-job-cluster-launch-installer-src
-      name: job-definition
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
