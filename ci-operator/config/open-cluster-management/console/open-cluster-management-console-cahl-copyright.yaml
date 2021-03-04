@@ -1,0 +1,41 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+binary_build_commands: make install && make build
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: open-cluster-management
+    tag: nodejs14-linux-amd64
+images:
+- dockerfile_path: Dockerfile.prow
+  to: console
+promotion:
+  name: cahl-copyright
+  namespace: open-cluster-management
+resources:
+  '*':
+    limits:
+      memory: 10Gi
+    requests:
+      cpu: 200m
+      memory: 4Gi
+tests:
+- as: lint
+  commands: make lint
+  container:
+    from: src
+- as: check
+  commands: make check
+  container:
+    from: src
+- as: unit
+  commands: make unit-tests
+  container:
+    from: src
+zz_generated_metadata:
+  branch: cahl-copyright
+  org: open-cluster-management
+  repo: console
