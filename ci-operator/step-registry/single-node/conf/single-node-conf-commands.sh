@@ -4,7 +4,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-SINGLE_NODE_AWS_INSTANCE_TYPE="m5.2xlarge"
+SINGLE_NODE_AWS_INSTANCE_TYPE="m5d.2xlarge"
 
 echo "Install config before single-node config patch:"
 cat "${SHARED_DIR}/install-config.yaml"

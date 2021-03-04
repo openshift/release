@@ -1,34 +1,24 @@
 #!/bin/bash
 
+temp=$(mktemp -d -t ocm-XXXXX)
+cd $temp || exit 1
+
 cp "$MAKEFILE" ./Makefile
 
-claim=""
-if [[ -n "$CLUSTER_CLAIM" ]]; then
-    claim="$CLUSTER_CLAIM"
-elif [[ -f "$CLUSTER_CLAIM_FILE" ]]; then
-    claim=$(cat "$CLUSTER_CLAIM_FILE")
-fi
+# claims are in the form hub-1-abcde
+for claim in $(cat ${SHARED_DIR}/${CLUSTER_CLAIM_FILE}); do
+    # strip off the -abcde suffix
+    cluster=$( sed -e "s/-[[:alnum:]]\+$//" <<<$claim )
+    output="${SHARED_DIR}/${cluster}.json"
 
-if [[ -z "$claim" ]]; then
-    echo "No cluster claim found in:"
-    echo "  CLUSTER_CLAIM      : $CLUSTER_CLAIM"
-    echo "  CLUSTER_CLAIM_FILE : $CLUSTER_CLAIM_FILE"
-    exit 1
-fi
+    make clusterpool/get-cluster-metadata \
+        CLUSTERPOOL_CLUSTER_CLAIM="$claim" \
+        CLUSTERPOOL_METADATA_FILE="$output"
 
-if [[ -n "$CLUSTER_DATA_FILE" ]]; then
-    output="${SHARED_DIR}/${CLUSTER_DATA_FILE}"
-else
-    output="${SHARED_DIR}/${claim}.json"
-fi
-
-make clusterpool/get-cluster-metadata CLUSTERPOOL_CLUSTER_CLAIM="$claim" > $output
-
-if [[ "$?" == 0 ]]; then
-    echo "Cluster meta data saved."
-    echo "  Cluster Claim : $claim"
-    echo "  Output File   : $output"
-else
-    echo "Error getting cluster metadata for $claim"
-    exit 1
-fi
+    if [[ "$?" == 0 ]]; then
+        echo "Cluster meta data for $claim saved to $output"
+    else
+        echo "Error getting cluster metadata for $claim"
+        exit 1
+    fi
+done

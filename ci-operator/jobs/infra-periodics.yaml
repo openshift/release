@@ -22,6 +22,28 @@ periodics:
           cpu: 500m
     serviceAccountName: clonerefs-manager
 - agent: kubernetes
+  cluster: build01
+  cron: 30 7 * * *
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-build01-upgrade
+  spec:
+    containers:
+    - args:
+      - adm
+      - upgrade
+      - --to-latest
+      command:
+      - /usr/bin/oc
+      image: registry.ci.openshift.org/ocp/4.7:cli
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+    serviceAccountName: upgrader
+- agent: kubernetes
   cluster: app.ci
   cron: '@yearly'
   decorate: true
@@ -46,7 +68,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210302-0f5b3c3186
+      image: gcr.io/k8s-prow/commenter:v20210303-204466f47d
       imagePullPolicy: Always
       name: ""
       resources:
@@ -132,7 +154,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210302-0f5b3c3186
+      image: gcr.io/k8s-prow/commenter:v20210303-204466f47d
       imagePullPolicy: Always
       name: ""
       resources:
@@ -172,6 +194,7 @@ periodics:
         repo:operator-framework/operator-marketplace
         repo:operator-framework/operator-registry
         repo:tnozicka/openshift-acme
+        repo:cri-o/cri-o
       - --token=/etc/oauth/oauth
       - --updated=0
       - |-
@@ -184,7 +207,7 @@ periodics:
       - --random
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210302-0f5b3c3186
+      image: gcr.io/k8s-prow/commenter:v20210303-204466f47d
       imagePullPolicy: Always
       name: ""
       resources:
@@ -229,7 +252,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210302-0f5b3c3186
+      image: gcr.io/k8s-prow/commenter:v20210303-204466f47d
       imagePullPolicy: Always
       name: ""
       resources:
@@ -278,7 +301,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210302-0f5b3c3186
+      image: gcr.io/k8s-prow/commenter:v20210303-204466f47d
       imagePullPolicy: Always
       name: ""
       resources:
@@ -326,7 +349,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210302-0f5b3c3186
+      image: gcr.io/k8s-prow/commenter:v20210303-204466f47d
       imagePullPolicy: Always
       name: ""
       resources:
@@ -360,7 +383,7 @@ periodics:
       - --debug
       command:
       - /app/label_sync/app.binary
-      image: gcr.io/k8s-prow/label_sync:v20210302-0f5b3c3186
+      image: gcr.io/k8s-prow/label_sync:v20210303-204466f47d
       imagePullPolicy: Always
       name: ""
       resources:
@@ -682,7 +705,7 @@ periodics:
       - --tokens=3000
       command:
       - /app/prow/cmd/branchprotector/app.binary
-      image: gcr.io/k8s-prow/branchprotector:v20210302-0f5b3c3186
+      image: gcr.io/k8s-prow/branchprotector:v20210303-204466f47d
       imagePullPolicy: Always
       name: ""
       resources:
@@ -729,7 +752,7 @@ periodics:
       - --fix-repos
       command:
       - /app/prow/cmd/peribolos/app.binary
-      image: gcr.io/k8s-prow/peribolos:v20210302-0f5b3c3186
+      image: gcr.io/k8s-prow/peribolos:v20210303-204466f47d
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1075,7 +1098,7 @@ periodics:
       env:
       - name: KUBECONFIG
         value: /etc/build-farm-credentials/api.ci.kubeconfig:/etc/build-farm-credentials/build01.kubeconfig:/etc/build-farm-credentials/app.ci.kubeconfig:/etc/build-farm-credentials/build02.kubeconfig:/etc/build-farm-credentials/vsphere.kubeconfig
-      image: gcr.io/k8s-prow/config-bootstrapper:v20210302-0f5b3c3186
+      image: gcr.io/k8s-prow/config-bootstrapper:v20210303-204466f47d
       imagePullPolicy: Always
       name: ""
       resources:
