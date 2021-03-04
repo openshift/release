@@ -60,15 +60,15 @@ presubmits:
     branches:
     - release-2.3
     cluster: build01
-    context: ci/prow/unit
+    context: ci/prow/sonarcloud
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-open-cluster-management-application-ui-release-2.3-unit
-    rerun_command: /test unit
+    name: pull-ci-open-cluster-management-application-ui-release-2.3-sonarcloud
+    rerun_command: /test sonarcloud
     spec:
       containers:
       - args:
@@ -76,7 +76,8 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
-        - --target=unit
+        - --secret-dir=/secrets/acm-sonarcloud-token
+        - --target=sonarcloud
         command:
         - ci-operator
         image: ci-operator:latest
@@ -86,6 +87,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/acm-sonarcloud-token
+          name: acm-sonarcloud-token
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -100,6 +104,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: acm-sonarcloud-token
+        secret:
+          secretName: acm-sonarcloud-token
       - name: github-credentials-openshift-ci-robot-private-git-cloner
         secret:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
@@ -109,4 +116,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )unit,?($|\s.*)
+    trigger: (?m)^/test( | .* )sonarcloud,?($|\s.*)
