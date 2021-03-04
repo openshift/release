@@ -6,6 +6,11 @@ items:
   metadata:
     namespace: openshift
     name: golang-1.16-vault
+- kind: ImageStream
+  apiVersion: image.openshift.io/v1
+  metadata:
+    namespace: openshift
+    name: golang-1.16-vault-typescript
 - kind: BuildConfig
   apiVersion: build.openshift.io/v1
   metadata:
@@ -40,4 +45,36 @@ items:
         from:
           kind: ImageStreamTag
           name: release:golang-1.16
+      type: ImageChange
+- kind: BuildConfig
+  apiVersion: build.openshift.io/v1
+  metadata:
+    namespace: openshift
+    name: golang-1.16-vault-typescript
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: release:golang-1.16-vault-typescript
+    source:
+      dockerfile: |
+        FROM openshift/release:golang-1.16-vault
+        RUN yum install -y nodejs && npm install -g typescript
+      type: Dockerfile
+    strategy:
+      dockerStrategy:
+        from:
+          kind: ImageStreamTag
+          name: release:golang-1.16-vault
+          namespace: openshift
+        imageOptimizationPolicy: SkipLayers
+      type: Docker
+    triggers:
+    - type: ConfigChange
+    - imageChange:
+        from:
+          kind: ImageStreamTag
+          name: release:golang-1.16-vault
       type: ImageChange
