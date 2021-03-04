@@ -1,0 +1,71 @@
+base_images:
+  cli:
+    name: "4.7"
+    namespace: ocp
+    tag: cli
+  cli-jq:
+    name: cli-jq
+    namespace: ocp
+    tag: latest
+  operator-registry:
+    name: "4.7"
+    namespace: ocp
+    tag: operator-registry
+build_root:
+  project_image:
+    dockerfile_path: .ci/openshift-ci/Dockerfile
+images:
+- dockerfile_path: Dockerfile
+  to: che-operator-image
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.7"
+  namespace: ocp
+tests:
+- as: e2e-aws-proxy
+  steps:
+    cluster_profile: aws
+    env:
+      TEST_SKIPS: ""
+    test:
+    - as: basic-test
+      cli: latest
+      commands: |
+        echo ${TEST_SKIPS}
+        oc get proxy/cluster -o yaml
+
+        echo -e "[INFO] Test script content:"
+        cat .ci/oci-nightly-olm.sh
+
+        echo "oc status"
+        oc status
+
+        echo -e "Kubeconfig"
+        echo ${KUBECONFIG}
+
+        echo "Cluster View"
+        oc config view |yq ".clusters[].cluster.server"
+
+        /bin/bash .ci/oci-proxy.sh
+      dependencies:
+      - env: CI_CHE_OPERATOR_IMAGE
+        name: che-operator-image
+      env:
+      - name: TEST_SKIPS
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-aws-proxy
+zz_generated_metadata:
+  branch: che-ci
+  org: eclipse
+  repo: che-operator
+  variant: v7
