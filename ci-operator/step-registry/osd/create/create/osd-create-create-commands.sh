@@ -45,6 +45,13 @@ if [[ "$OLD_CLUSTER_ID" != ID* ]]; then
 fi
 
 CLUSTER_INFO="${ARTIFACT_DIR}/ocm-cluster.txt"
+
+echo "Parameters for cluster request:"
+echo "  Cluster name: ${CLUSTER_NAME}"
+echo "  Compute nodes: ${COMPUTE_NODES}"
+echo "  Cluster version: ${CLUSTER_VERSION}"
+echo "  Compute machine type: ${COMPUTE_MACHINE_TYPE}"
+echo "  Cloud provider region: ${CLOUD_PROVIDER_REGION}"
 ocm create cluster ${OCM_CREATE_ARGS} \
                    --ccs "${CLUSTER_NAME}" \
                    --compute-nodes "${COMPUTE_NODES}" \
