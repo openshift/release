@@ -54,7 +54,7 @@ for i in range(2):
     for j in range(5):
         CONFIG['libvirt-s390x-quota-slice']['libvirt-s390x-{}-{}'.format(i, j)] = 1
 
-for i in range(2):
+for i in range(3):
     for j in range(4):
         CONFIG['libvirt-ppc64le-quota-slice']['libvirt-ppc64le-{}-{}'.format(i, j)] = 1
 
