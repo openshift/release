@@ -10,17 +10,31 @@ ref:
       cpu: 10m
       memory: 100Mi
   env:
-    - name: COMPUTE_NODE_TYPE
-      default: "m4.xlarge"
-      documentation: |-
-        The instance type to use for compute nodes (e.g. AWS https://aws.amazon.com/ec2/instance-types/). We use a 4 core worker to match the median configuration of the fleet.
-    - name: ZONES_COUNT
-      default: "2"
-      documentation: |-
-        The number of AZs to present in the cluster. Accepted values are 1 and 2.
-    - name: BASE_DOMAIN
-      default: "origin-ci-int-aws.dev.rhcloud.com"
-      documentation: |-
-        A fully-qualified domain or subdomain name. The base domain of the cloud provider is used for setting baseDomain variable of the install configuration of the cluster.
+  - name: SIZE_VARIANT
+    default: ""
+    documentation: |-
+      The size of the cluster in one of our supported t-shirt values that is standard across all CI environments.
+
+      The sizes are:
+      * "" (default) - 4 vCPU, 16GB control plane nodes, default workers
+      * "compact" - 8 vCPU, 32GB control plane nodes, no workers
+      * "large" - 16 vCPU, 64GB+ control plane nodes, default workers, suitable for clusters up to 250 nodes
+      * "xlarge" - 32 vCPU, 128GB+ control plane nodes, default workers, suitable for clusters up to 1000 nodes
+
+      These sizes are roughly consistent across all cloud providers, but we may not be able to instantiate some sizes
+      in some regions or accounts due to quota issues.
+
+  - name: COMPUTE_NODE_TYPE
+    default: "m4.xlarge"
+    documentation: |-
+      The instance type to use for compute nodes (e.g. AWS https://aws.amazon.com/ec2/instance-types/). We use a 4 core worker to match the median configuration of the fleet.
+  - name: ZONES_COUNT
+    default: "2"
+    documentation: |-
+      The number of AZs to present in the cluster. Accepted values are 1 and 2.
+  - name: BASE_DOMAIN
+    default: "origin-ci-int-aws.dev.rhcloud.com"
+    documentation: |-
+      A fully-qualified domain or subdomain name. The base domain of the cloud provider is used for setting baseDomain variable of the install configuration of the cluster.
   documentation: |-
     The IPI AWS configure step generates the AWS-specific install-config.yaml contents based on the cluster profile and optional input files.
