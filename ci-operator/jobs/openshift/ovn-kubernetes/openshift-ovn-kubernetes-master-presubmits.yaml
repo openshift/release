@@ -277,6 +277,7 @@ presubmits:
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-ovn-kubernetes-master-e2e-gcp-ovn-upgrade
     optional: true
@@ -286,22 +287,12 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --input-hash=$(JOB_NAME)
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/usr/local/e2e-gcp-ovn-upgrade-cluster-profile
         - --target=e2e-gcp-ovn-upgrade
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: gcp
-        - name: CLUSTER_VARIANT
-          value: ovn
-        - name: JOB_NAME_SAFE
-          value: e2e-gcp-ovn-upgrade
-        - name: TEST_COMMAND
-          value: TEST_SUITE=all run-upgrade-tests
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
