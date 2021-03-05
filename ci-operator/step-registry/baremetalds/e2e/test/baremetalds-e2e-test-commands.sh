@@ -66,7 +66,7 @@ if [[ "$RUN_UPGRADE_TEST" == true ]]; then
             --to-image "$OPENSHIFT_UPGRADE_RELEASE_IMAGE" \
             -o /tmp/artifacts/e2e-upgrade.log \
             --junit-dir /tmp/artifacts/junit-upgrade \
-            platform
+            all
 else
     if [[ -s "${SHARED_DIR}/test-list" ]]; then
         echo "### Copying test-list file"
