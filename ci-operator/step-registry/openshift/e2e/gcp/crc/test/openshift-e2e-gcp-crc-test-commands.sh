@@ -91,4 +91,4 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJE
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   packer@"${INSTANCE_PREFIX}" \
-  --command "export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${RELEASE_IMAGE_LATEST}  && timeout 360m bash -ce \"/home/packer/run-tests.sh\""
+  --command "export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${OPENSHIFT_INSTALL_RELEASE_IMAGE}  && timeout 360m bash -ce \"/home/packer/run-tests.sh\""

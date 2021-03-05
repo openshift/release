@@ -3,6 +3,9 @@ ref:
   from: tests
   commands: openshift-e2e-test-commands.sh
   timeout: 10800s
+  dependencies:
+  - name: "release:latest"
+    env: OPENSHIFT_UPGRADE_RELEASE_IMAGE
   env:
   - name: TEST_TYPE
     default: "suite"
@@ -16,7 +19,7 @@ ref:
                   suite to verify the cluster is still functional. This is typically used for testing
                   disruption from one suite, then confirming that the disruption did not degrade the
                   product.
-      * 'upgrade' - Perform an upgrade to the image defined by OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE.
+      * 'upgrade' - Perform an upgrade to the image defined by OPENSHIFT_UPGRADE_RELEASE_IMAGE.
                   The TEST_UPGRADE_OPTIONS flag may be optionally set. All product components
                   must run the default upgrade test (verify an upgrade completes) on pull requests
                   prior to merge.
@@ -49,9 +52,6 @@ ref:
       Name of the CSI driver manifest file to use.  Used by the `openshift-tests`
       program as TEST_CSI_DRIVER_FILES env. var., see its documentation for
       details. The file must be present in ${SHARED_DIR}.
-  dependencies:
-  - name: "release:latest"
-    env: OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE
   resources:
     requests:
       cpu: "3"

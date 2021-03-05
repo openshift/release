@@ -121,7 +121,7 @@ fi
 function upgrade() {
     set -x
     openshift-tests run-upgrade all \
-        --to-image "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}" \
+        --to-image "${OPENSHIFT_UPGRADE_RELEASE_IMAGE}" \
         --options "${TEST_UPGRADE_OPTIONS-}" \
         --provider "${TEST_PROVIDER}" \
         -o "${ARTIFACT_DIR}/e2e.log" \
