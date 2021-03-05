@@ -90,6 +90,35 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: optional-operators-ci-aws
+- as: che-operator-proxy-deployment
+  steps:
+    cluster_profile: aws
+    env:
+      TEST_SKIPS: ""
+    test:
+    - as: che-behind-proxy
+      cli: latest
+      commands: |
+        echo ${TEST_SKIPS}
+
+        echo -e "Kubernetes proxy object:"
+        oc get proxy/cluster -o yaml
+
+        echo -e "[INFO] Test script content"
+        cat .ci/oci-proxy.sh
+
+        /bin/bash .ci/oci-proxy.sh
+      dependencies:
+      - env: CI_CHE_OPERATOR_IMAGE
+        name: che-operator-image
+      env:
+      - name: TEST_SKIPS
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-aws-proxy
 zz_generated_metadata:
   branch: master
   org: eclipse
