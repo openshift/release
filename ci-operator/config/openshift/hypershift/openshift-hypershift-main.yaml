@@ -46,6 +46,42 @@ tests:
 - as: e2e-aws
   steps:
     cluster_profile: aws
+    post:
+    - as: cleanup-infra
+      cli: latest
+      commands: |-
+        bin/hypershift destroy infra aws \
+          --infra-id $(cat "${SHARED_DIR}/infra-id") \
+          --aws-creds "${CLUSTER_PROFILE_DIR}/.awscred"; \
+        bin/hypershift destroy iam aws \
+          --profile-name $(cat "${SHARED_DIR}/infra-id") \
+          --aws-creds "${CLUSTER_PROFILE_DIR}/.awscred"
+      from: bin
+      grace_period: 30s
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 10m0s
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - as: create-infra
+      cli: latest
+      commands: |-
+        echo "hypershift-$(uuidgen -r)" > "${SHARED_DIR}/infra-id" && \
+        bin/hypershift create iam aws \
+          --profile-name $(cat "${SHARED_DIR}/infra-id") \
+          --aws-creds "${CLUSTER_PROFILE_DIR}/.awscred" && \
+        bin/hypershift create infra aws \
+          --infra-id $(cat "${SHARED_DIR}/infra-id") \
+          --aws-creds "${CLUSTER_PROFILE_DIR}/.awscred" \
+          --output-file "${SHARED_DIR}/infra.json"
+      from: bin
+      grace_period: 30s
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 10m0s
     test:
     - as: install-hypershift
       cli: latest
@@ -61,7 +97,16 @@ tests:
       timeout: 2m0s
     - as: test-e2e
       cli: latest
-      commands: make e2e && bin/test-e2e -test.v -test.timeout 0 --e2e.quick-start.aws-credentials-file ${CLUSTER_PROFILE_DIR}/.awscred --e2e.quick-start.pull-secret-file ${CLUSTER_PROFILE_DIR}/pull-secret --e2e.quick-start.ssh-key-file ${CLUSTER_PROFILE_DIR}/ssh-publickey
+      commands: |-
+        make e2e && \
+        bin/test-e2e \
+          -test.v \
+          -test.timeout 0 \
+          --e2e.quick-start.aws-credentials-file ${CLUSTER_PROFILE_DIR}/.awscred \
+          --e2e.quick-start.pull-secret-file ${CLUSTER_PROFILE_DIR}/pull-secret \
+          --e2e.quick-start.ssh-key-file ${CLUSTER_PROFILE_DIR}/ssh-publickey \
+          --e2e.quick-start.infra-json ${SHARED_DIR}/infra.json \
+          --e2e.quick-start.instance-profile $(cat ${SHARED_DIR}/infra-id)
       from: src
       grace_period: 15m0s
       resources:
@@ -73,6 +118,40 @@ tests:
   postsubmit: true
   steps:
     cluster_profile: aws
+    post:
+    - as: cleanup-infra
+      cli: latest
+      commands: |-
+        bin/hypershift destroy infra aws \
+          --infra-id $(cat "${SHARED_DIR}/infra-id") \
+          --aws-creds "${CLUSTER_PROFILE_DIR}/.awscred"; \
+        bin/hypershift destroy iam aws \
+          --profile-name $(cat "${SHARED_DIR}/infra-id") \
+          --aws-creds "${CLUSTER_PROFILE_DIR}/.awscred"
+      from: bin
+      grace_period: 30s
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 10m0s
+    pre:
+    - as: create-infra
+      cli: latest
+      commands: |-
+        echo "hypershift-$(uuidgen -r)" > "${SHARED_DIR}/infra-id" && \
+        bin/hypershift create iam aws \
+          --profile-name $(cat "${SHARED_DIR}/infra-id") \
+          --aws-creds "${CLUSTER_PROFILE_DIR}/.awscred" && \
+        bin/hypershift create infra aws \
+          --infra-id $(cat "${SHARED_DIR}/infra-id") \
+          --aws-creds "${CLUSTER_PROFILE_DIR}/.awscred" \
+          --output-file "${SHARED_DIR}/infra.json"
+      from: bin
+      grace_period: 30s
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 10m0s
     test:
     - as: install-hypershift
       cli: latest
@@ -88,7 +167,16 @@ tests:
       timeout: 2m0s
     - as: test-e2e
       cli: latest
-      commands: make e2e && bin/test-e2e -test.v -test.timeout 0 --e2e.quick-start.aws-credentials-file ${CLUSTER_PROFILE_DIR}/.awscred --e2e.quick-start.pull-secret-file ${CLUSTER_PROFILE_DIR}/pull-secret --e2e.quick-start.ssh-key-file ${CLUSTER_PROFILE_DIR}/ssh-publickey
+      commands: |-
+        make e2e && \
+        bin/test-e2e \
+          -test.v \
+          -test.timeout 0 \
+          --e2e.quick-start.aws-credentials-file ${CLUSTER_PROFILE_DIR}/.awscred \
+          --e2e.quick-start.pull-secret-file ${CLUSTER_PROFILE_DIR}/pull-secret \
+          --e2e.quick-start.ssh-key-file ${CLUSTER_PROFILE_DIR}/ssh-publickey \
+          --e2e.quick-start.infra-json ${SHARED_DIR}/infra.json \
+          --e2e.quick-start.instance-profile $(cat ${SHARED_DIR}/infra-id)
       from: src
       grace_period: 15m0s
       resources:
