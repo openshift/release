@@ -1,0 +1,37 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.15
+images:
+- dockerfile_path: Dockerfile
+  inputs:
+    open-cluster-management_builder_go1.15-linux-amd64:
+      as:
+      - registry.ci.openshift.org/open-cluster-management/builder:go1.15-linux-amd64
+  to: multicluster-observability-operator
+promotion:
+  name: "2.3"
+  namespace: open-cluster-management
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 100m
+      memory: 1Gi
+tag_specification:
+  name: "4.6"
+  namespace: ocp
+test_binary_build_commands: "true"
+tests:
+- as: test-unit
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow unit-tests
+  container:
+    from: src
+zz_generated_metadata:
+  branch: main
+  org: open-cluster-management
+  repo: multicluster-observability-operator
