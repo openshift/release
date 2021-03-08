@@ -90,25 +90,9 @@ tests:
         # Install Kata Containers and run a smoke test.
         .ci/openshift-ci/test.sh
 
-        # In the following block it builds and deploy the kata-webhook so that the
-        # tests ran on next step of the workflow will use the kata runtime.
-        pushd "${KATA_WORKDIR}/kata-webhook"
-        echo "INFO: Build the kata-webhook"
-        ./create-certs.sh
-        echo "INFO: Deploy the kata-webhook"
-        oc apply -f deploy/
-        # Wait it to become available.
-        oc wait deployment/pod-annotate-webhook --for condition=Available --timeout 60s
-        # Check the web-hook is working correctly.
-        oc apply -f https://raw.githubusercontent.com/openshift/origin/master/examples/hello-openshift/hello-pod.json
-        class_name=$(oc get -o jsonpath='{.spec.runtimeClassName}' pod/hello-openshift)
-        oc delete pod/hello-openshift
-        if [ "$class_name" != "kata" ]; then
-            echo "ERROR: kata-webhook is not working"
-            exit 1
-        fi
-        echo "INFO: kata-webhook is up and working"
-        popd
+        # Deploy the kata-webhook so that the tests ran on next step of the
+        # workflow will use the kata runtime.
+        .ci/openshift-ci/cluster/deploy_webhook.sh
       from: pipeline:bin
       resources:
         requests:
