@@ -1,3 +1,59 @@
 #!/bin/bash
 
-# TODO: Generate terraform.tfvars
+set -o nounset
+set -o errexit
+set -o pipefail
+
+trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+
+if [[ -z "$RELEASE_IMAGE_LATEST" ]]; then
+  echo "RELEASE_IMAGE_LATEST is an empty string, exiting"
+  exit 1
+fi
+if [[ -z "${OPENSTACK_COMPUTE_FLAVOR}" ]]; then
+  echo "Compute flavor isn't specified. Using 'small' by default."
+  export OPENSTACK_COMPUTE_FLAVOR="small"
+fi
+if [[ -z "${OS_CLOUD}" ]]; then
+  echo "OpenStack cloud isn't specified. Using 'openstack' by default."
+  export OS_CLOUD="openstack"
+fi
+if [[ -z "${BASE_DOMAIN}" ]]; then
+  echo "Cluster's base domain must be specified in BASE_DOMAIN."
+  exit 1
+fi
+
+export HOME=/tmp
+
+pull_secret_in=${HOME}/pull-secret
+pull_secret_out=${SHARED_DIR}/pull-secret
+clouds_in=/var/run/secrets/ci.openshift.io/cluster-profile/clouds.yaml
+clouds_out=${SHARED_DIR}/clouds.yaml
+tfvars_out=${SHARED_DIR}/terraform.tfvars
+ocp_version=`cut -d: -f2 <<<${RELEASE_IMAGE_LATEST}`
+
+export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${RELEASE_IMAGE_LATEST}
+# Ensure ignition assets are configured with the correct invoker to track CI jobs.
+export OPENSHIFT_INSTALL_INVOKER=openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD_ID}
+
+
+# Retrieve clouds.yaml
+echo "$(date -u --rfc-3339=seconds) - Retrieving clouds.yaml from secrets..."
+cp ${clouds_in} ${clouds_out}
+
+# Retrieve pull-secret
+echo "$(date -u --rfc-3339=seconds) - Retrieving pull-secret..."
+cp ${pull_secret_in} ${pull_secret_out}
+
+# Create terraform.tfvars
+echo "$(date -u --rfc-3339=seconds) - Creating terraform variables file..."
+cat > "${tfvars_out}" <<-EOF
+base_domain = "${base_domain}"
+openshift_version = "${RELEASE_IMAGE_LATEST}"
+worker_count = "1"
+openstack_master_flavor_name = "large"
+openstack_worker_flavor_name = "${OPENSTACK_COMPUTE_FLAVOR}"
+openstack_bastion_flavor_name = "medium"
+openstack_credentials_cloud = "${OS_CLOUD}"
+openshift_pull_secret_filename = "pull-secret"
+EOF
