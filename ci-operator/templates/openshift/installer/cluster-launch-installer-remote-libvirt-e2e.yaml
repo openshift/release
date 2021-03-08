@@ -512,7 +512,7 @@ objects:
         fi
 
         echo "JOB_NAME_HASH=${JOB_NAME_HASH}"
-
+        # dnsmasq options is only supported in 4.8+
         if [[ "${ARCH}" = "s390x" || "${ARCH}" = "ppc64le" ]]; then
             master_type=null
             subnets="[]"
@@ -543,19 +543,9 @@ objects:
           libvirt:
             URI: ${remote_libvirt_uri}
             network:
-        EOF
-
-        # Support for releases 4.8 and above
-        release_version=${MULTIARCH_RELEASE_IMAGE_LATEST: -3}
-        if (( $(bc <<< "$release_version > 4.7") > 0 )); then
-        cat > ${ARTIFACT_DIR}/installer/install-config.yaml << EOF
               dnsmasqOptions:
               - name: "address"
                 value: "/.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}/192.168.${cluster_subnet}.1"
-        EOF
-        fi
-
-        cat > ${ARTIFACT_DIR}/installer/install-config.yaml << EOF
               if: "br$(printf ${LEASED_RESOURCE} | tail -c 3)-${JOB_NAME_HASH}"
         pullSecret: >
           ${PULL_SECRET}
@@ -596,8 +586,7 @@ objects:
         mock-nss.sh openshift-install create cluster --dir=${ARTIFACT_DIR}/installer --log-level=debug 2>&1 | sed 's/password: .*/password: REDACTED"/g' || true &
         openshift_install="$!"
 
-        # Support for releases before 4.8
-        if (( $(bc <<< "$release_version < 4.8") > 0 )); then
+        # Remove block after 4.7 EOL
         # While openshift-install is running...
         i=0
         while kill -0 $openshift_install 2> /dev/null; do
@@ -621,7 +610,6 @@ objects:
                 break
             fi
         done
-        fi
 
         wait "${openshift_install}"
 
