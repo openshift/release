@@ -104,6 +104,10 @@ EOF
 )
 
 echo "CatalogSource name is \"$CATSRC\""
+
+DEPLOYMENT_START_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+echo "Set the deployment start time: ${DEPLOYMENT_START_TIME}"
+
 echo "Creating Subscription"
 
 SUB=$(
@@ -129,6 +133,20 @@ for _ in $(seq 1 60); do
     if [[ -n "$CSV" ]]; then
         if [[ "$(oc -n "$OO_INSTALL_NAMESPACE" get csv "$CSV" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
             echo "ClusterServiceVersion \"$CSV\" ready"
+
+            DEPLOYMENT_ART="oo_deployment_details.yaml"
+            echo "Saving deployment details in ${DEPLOYMENT_ART} as a shared artifact"
+            cat > "${ARTIFACT_DIR}/${DEPLOYMENT_ART}" <<EOF
+---
+csv: "${CSV}"
+operatorgroup: "${OPERATORGROUP}"
+subscription: "{SUB}"
+catalogsource: "${CATSRC}"
+install_namespace: "${OO_INSTALL_NAMESPACE}"
+target_namespaces: "${OO_TARGET_NAMESPACES}"
+deployment_start_time: "${DEPLOYMENT_START_TIME}"
+EOF
+            cp "${ARTIFACT_DIR}/${DEPLOYMENT_ART}" "${SHARED_DIR}/${DEPLOYMENT_ART}"
             exit 0
         fi
     fi
