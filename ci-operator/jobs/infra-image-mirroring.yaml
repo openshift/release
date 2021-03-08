@@ -741,3 +741,51 @@ periodics:
     - configMap:
         name: image-mirror-mappings
       name: config
+- agent: kubernetes
+  cluster: app.ci
+  cron: '@yearly'
+  decorate: true
+  labels:
+    ci.openshift.io/area: dptp-internal
+    ci.openshift.io/role: image-mirroring
+  name: periodic-image-mirroring-dptp-internal
+  spec:
+    containers:
+    - args:
+      - -c
+      - |
+        set -o errexit
+        failures=0
+        for mapping in /etc/imagemirror/mapping_dptp_internal_*; do
+          echo "Running: oc image mirror --continue-on-error=true --max-per-registry=20 -f=$mapping"
+          if ! oc image mirror --continue-on-error=true --max-per-registry=20 -f="$mapping"; then
+            echo "ERROR: Failed to mirror images from $mapping"
+            failures=$((failures+1))
+          fi
+        done
+        exit $failures
+      command:
+      - /bin/bash
+      env:
+      - name: HOME
+        value: /home/mirror
+      image: docker-registry.default.svc:5000/ocp/4.7:cli
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /home/mirror/.docker/config.json
+        name: push
+        readOnly: true
+        subPath: config.json
+      - mountPath: /etc/imagemirror
+        name: config
+    volumes:
+    - name: push
+      secret:
+        secretName: registry-push-credentials-ci-central
+    - configMap:
+        name: image-mirror-mappings
+      name: config
