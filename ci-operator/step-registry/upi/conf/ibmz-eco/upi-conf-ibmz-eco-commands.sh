@@ -44,12 +44,12 @@ cp ${clouds_in} ${clouds_out}
 # Retrieve pull-secret
 echo "$(date -u --rfc-3339=seconds) - Retrieving pull-secret..."
 cp ${pull_secret_in} ${pull_secret_out}
-
 # Create terraform.tfvars
 echo "$(date -u --rfc-3339=seconds) - Creating terraform variables file..."
 cat > "${tfvars_out}" <<-EOF
 base_domain = "${base_domain}"
-openshift_version = "${RELEASE_IMAGE_LATEST}"
+openshift_version = "${ocp_version}"
+image_override = "${RELEASE_IMAGE_LATEST}"
 worker_count = "1"
 openstack_master_flavor_name = "large"
 openstack_worker_flavor_name = "${OPENSTACK_COMPUTE_FLAVOR}"
