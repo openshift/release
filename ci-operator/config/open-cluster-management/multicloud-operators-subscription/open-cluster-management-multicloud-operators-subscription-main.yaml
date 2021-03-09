@@ -31,6 +31,16 @@ resources:
 tag_specification:
   name: "4.8"
   namespace: ocp
+tests:
+- as: unit
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow setup-tests
+    set -o pipefail
+    make -f Makefile.prow test 2>&1 | tee ${ARTIFACT_DIR}/test_out.log
+    set +o pipefail
+  container:
+    from: src
 zz_generated_metadata:
   branch: main
   org: open-cluster-management
