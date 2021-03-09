@@ -11,33 +11,6 @@ metadata:
   name: vector-log-shipper
   namespace: prow-logging
 ---
-kind: ClusterRole
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: vector-pod-watcher
-  namespace: prow-logging
-rules:
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  verbs:
-  - watch
----
-kind: ClusterRoleBinding
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: vector-pod-watcher-binding
-  namespace: prow-logging
-roleRef:
-  kind: ClusterRole
-  apiGroup: rbac.authorization.k8s.io
-  name: vector-pod-watcher
-subjects:
-- kind: ServiceAccount
-  namespace: prow-logging
-  name: vector-log-shipper
----
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -53,7 +26,7 @@ data:
     data_dir = "/var/lib/vector"
     # Ingest logs from Kubernetes
     [sources.kubernetes]
-      type = "kubernetes_logs"
+      type = "kubernetes"
     # captures services in the ci namespace
     [transforms.ci-services]
       type = "filter"
@@ -110,15 +83,9 @@ spec:
       serviceAccountName: vector-log-shipper
       containers:
       - name: vector
-        image: docker.io/timberio/vector:0.11.1-alpine
-        args:
-        - --watch-config=/etc/vector/vector.toml
+        image: docker.io/timberio/vector:0.9.0-alpine
+        command: ["/usr/local/bin/vector", "-w"]
         env:
-        - name: VECTOR_SELF_NODE_NAME
-          valueFrom:
-            fieldRef:
-              apiVersion: v1
-              fieldPath: spec.nodeName
         - name: AWS_ACCESS_KEY_ID
           valueFrom:
             secretKeyRef:
