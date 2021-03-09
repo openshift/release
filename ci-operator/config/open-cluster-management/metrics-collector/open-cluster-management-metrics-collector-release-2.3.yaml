@@ -3,7 +3,6 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-binary_build_commands: make -f Makefile.prow build
 build_root:
   image_stream_tag:
     name: builder
@@ -12,13 +11,9 @@ build_root:
 images:
 - dockerfile_path: Dockerfile.prow
   from: base
-  inputs:
-    bin:
-      paths:
-      - destination_dir: ./build/_output/bin
-        source_path: /go/src/github.com/open-cluster-management/endpoint-metrics-operator/build/_output/bin/endpoint-monitoring-operator
-  to: endpoint-metrics-operator
+  to: metrics-collector
 promotion:
+  disabled: true
   name: "2.3"
   namespace: open-cluster-management
 resources:
@@ -33,6 +28,7 @@ tests:
 - as: unit
   commands: |
     export SELF="make -f Makefile.prow"
+    make -f Makefile.prow vendor
     make -f Makefile.prow test-unit
   container:
     from: src
@@ -46,6 +42,6 @@ tests:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
 zz_generated_metadata:
-  branch: main
+  branch: release-2.3
   org: open-cluster-management
-  repo: endpoint-metrics-operator
+  repo: metrics-collector
