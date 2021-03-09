@@ -370,6 +370,39 @@ presubmits:
     branches:
     - master
     cluster: build02
+    context: ci/prow/validate-test-infra
+    decorate: true
+    extra_refs:
+    - base_ref: master
+      org: kubernetes
+      repo: test-infra
+    - base_ref: master
+      org: openshift
+      repo: ci-chat-bot
+    - base_ref: master
+      org: openshift
+      repo: release-controller
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ci-tools-master-validate-test-infra
+    optional: true
+    rerun_command: /test validate-test-infra
+    spec:
+      containers:
+      - command:
+        - hack/check-test-infra-version.sh
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )validate-test-infra,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: build02
     context: ci/prow/validate-vendor
     decorate: true
     decoration_config:
