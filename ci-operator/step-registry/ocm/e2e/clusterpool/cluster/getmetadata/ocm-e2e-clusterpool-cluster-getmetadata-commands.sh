@@ -13,7 +13,7 @@ for claim in $(cat ${SHARED_DIR}/${CLUSTER_CLAIM_FILE}); do
 
     make clusterpool/get-cluster-metadata \
         CLUSTERPOOL_CLUSTER_CLAIM="$claim" \
-        CLUSTERPOOL_METADATA_FILE="$output"
+        CLUSTERPOOL_METADATA_FILE="$output" > /dev/null
 
     if [[ "$?" == 0 ]]; then
         echo "Cluster meta data for $claim saved to $output"
