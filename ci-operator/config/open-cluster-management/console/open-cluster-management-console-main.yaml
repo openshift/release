@@ -1,0 +1,45 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+binary_build_commands: make -f Makefile.prow install && make -f Makefile.prow build
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: open-cluster-management
+    tag: nodejs14-linux-amd64
+images:
+- dockerfile_path: Dockerfile.prow
+  to: console
+promotion:
+  name: "2.3"
+  namespace: open-cluster-management
+resources:
+  '*':
+    requests:
+      cpu: 400m
+      memory: 2Gi
+tests:
+- as: lint
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow lint
+  container:
+    from: bin
+- as: check
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow check
+  container:
+    from: bin
+- as: unit-tests
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow unit-tests
+  container:
+    from: bin
+zz_generated_metadata:
+  branch: main
+  org: open-cluster-management
+  repo: console
