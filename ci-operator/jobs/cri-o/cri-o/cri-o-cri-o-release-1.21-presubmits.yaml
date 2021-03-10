@@ -1,27 +1,28 @@
 presubmits:
-  openshift/os:
+  cri-o/cri-o:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
-    cluster: build02
-    context: ci/prow/build-test-qemu
+    - release-1.21
+    cluster: build01
+    context: ci/prow/e2e-aws
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-      devices.kubevirt.io/kvm: "1"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-os-master-build-test-qemu
-    rerun_command: /test build-test-qemu
+    name: pull-ci-cri-o-cri-o-release-1.21-e2e-aws
+    rerun_command: /test e2e-aws
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --target=build-test-qemu
+        - --secret-dir=/usr/local/e2e-aws-cluster-profile
+        - --target=e2e-aws
         command:
         - ci-operator
         image: ci-operator:latest
@@ -31,6 +32,11 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-aws-cluster-profile
+          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -42,18 +48,29 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )build-test-qemu,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - master
-    cluster: build02
+    - release-1.21
+    cluster: build01
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -61,7 +78,7 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-os-master-images
+    name: pull-ci-cri-o-cri-o-release-1.21-images
     rerun_command: /test images
     spec:
       containers:
@@ -97,51 +114,3 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
-    cluster: build02
-    context: ci/prow/validate
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-os-master-validate
-    rerun_command: /test validate
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=validate
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )validate,?($|\s.*)
