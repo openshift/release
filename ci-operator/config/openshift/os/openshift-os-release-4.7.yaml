@@ -1,0 +1,46 @@
+base_images:
+  coreos_coreos-assembler_latest:
+    name: coreos-assembler
+    namespace: coreos
+    tag: latest
+  coreos_cosa-buildroot_latest:
+    name: cosa-buildroot
+    namespace: coreos
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: cosa-buildroot
+    namespace: coreos
+    tag: latest
+images:
+- dockerfile_path: ci/Dockerfile
+  inputs:
+    coreos_coreos-assembler_latest:
+      as:
+      - registry.svc.ci.openshift.org/coreos/coreos-assembler:latest
+  to: build-test-qemu-img
+resources:
+  '*':
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+  build-test-qemu:
+    limits:
+      devices.kubevirt.io/kvm: "1"
+    requests:
+      cpu: 1000m
+      devices.kubevirt.io/kvm: "1"
+      memory: 2Gi
+tests:
+- as: validate
+  commands: ./ci/validate.sh
+  container:
+    from: src
+- as: build-test-qemu
+  commands: /src/ci/build-test-qemu.sh
+  container:
+    from: build-test-qemu-img
+zz_generated_metadata:
+  branch: release-4.7
+  org: openshift
+  repo: os
