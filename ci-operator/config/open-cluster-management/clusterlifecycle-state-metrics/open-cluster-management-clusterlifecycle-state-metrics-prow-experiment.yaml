@@ -3,7 +3,9 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-binary_build_commands: go build ./cmd/manager
+binary_build_commands: |-
+  GOFLAGS="" go build ./cmd/clusterlifecycle-state-metrics; \
+  GOFLAGS="" go test -covermode=atomic -coverpkg=github.com/open-cluster-management/clusterlifecycle-state-metrics/pkg/... -c -tags testrunmain ./cmd/clusterlifecycle-state-metrics -o clusterlifecycle-state-metrics-coverage
 build_root:
   image_stream_tag:
     name: release
@@ -13,6 +15,9 @@ images:
 - dockerfile_path: build/Dockerfile.prow
   from: base
   to: clusterlifecycle-state-metrics
+- dockerfile_path: build/Dockerfile.coverage.prow
+  from: clusterlifecycle-state-metrics
+  to: clusterlifecycle-state-metrics-coverage
 promotion:
   disabled: true
   name: latest
