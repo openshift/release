@@ -134,6 +134,22 @@ tests:
         NUM_WORKERS=0
         ISO_IMAGE_TYPE=minimal-iso
     workflow: baremetalds-assisted
+- as: e2e-metal-assisted-milestone-one
+  steps:
+    cluster_profile: packet
+    dependencies:
+      ASSISTED_SERVICE_IMAGE: pipeline:assisted-service
+    env:
+      ASSISTED_CONFIG: |
+        NUM_MASTERS=1
+        NUM_WORKERS=0
+        IPv6=yes
+        IPv4=no
+        PROXY=yes
+        ADDITIONAL_PARAMS="--with-static-network-config"
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}
+        OPENSHIFT_VERSION=4.8
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-milestone-one-periodic
   cron: '@daily'
   steps:
@@ -147,7 +163,9 @@ tests:
         IPv6=yes
         IPv4=no
         PROXY=yes
-        ADDITIONAL_PARAMS="--with-static-ips"
+        ADDITIONAL_PARAMS="--with-static-network-config"
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}
+        OPENSHIFT_VERSION=4.8
     workflow: baremetalds-assisted
 - as: e2e-metal-single-node-live-iso
   steps:
