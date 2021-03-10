@@ -62,25 +62,29 @@ postsubmits:
           secretName: result-aggregator
   - agent: kubernetes
     branches:
-    - ^release-2.3$
+    - ^release-2\.3$
     cluster: build02
     decorate: true
     labels:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: branch-ci-open-cluster-management-console-release-2.3-sonarcloud
+    name: branch-ci-open-cluster-management-console-release-2.3-publish
     spec:
       containers:
       - args:
-        - -c
-        - |
-          make -f Makefile.prow sonar/js/jest-init
-          make -f Makefile.prow unit-tests
-          make -f Makefile.prow sonar/js/prow
+        - -f
+        - Makefile.prow
+        - osci/publish
         command:
-        - /bin/bash
+        - make
         env:
-        - name: ARTIFACT_DIR
-          value: $(ARTIFACTS)
+        - name: COMPONENT_NAME
+          value: console
+        - name: COMPONENT_VERSION
+          value: 2.3.0
+        - name: OSCI_IMAGE_REMOTE_REPO_SRC
+          value: registry.ci.openshift.org/open-cluster-management
+        - name: OSCI_PUBLISH_DELAY
+          value: "20"
         - name: SELF
           value: make -f Makefile.prow
         image: registry.ci.openshift.org/open-cluster-management/builder:nodejs14-linux-amd64
@@ -91,11 +95,11 @@ postsubmits:
             cpu: 100m
             memory: 200Mi
         volumeMounts:
-        - mountPath: /etc/sonarcloud
-          name: acm-sonarcloud-token
+        - mountPath: /etc/github
+          name: acm-cicd-github
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: acm-sonarcloud-token
+      - name: acm-cicd-github
         secret:
-          secretName: acm-sonarcloud-token
+          secretName: acm-cicd-github
