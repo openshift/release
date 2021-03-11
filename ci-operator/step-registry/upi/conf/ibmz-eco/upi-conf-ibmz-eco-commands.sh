@@ -11,12 +11,12 @@ if [[ -z "$RELEASE_IMAGE_LATEST" ]]; then
   exit 1
 fi
 if [[ -z "${OPENSTACK_COMPUTE_FLAVOR}" ]]; then
-  echo "Compute flavor isn't specified. Using 'small' by default."
-  export OPENSTACK_COMPUTE_FLAVOR="small"
+  echo "Compute flavor isn't specified. Using 'medium' by default."
+  export OPENSTACK_COMPUTE_FLAVOR="medium"
 fi
 if [[ -z "${OS_CLOUD}" ]]; then
   echo "OpenStack cloud isn't specified. Using 'openstack' by default."
-  export OS_CLOUD="openstack"
+  export OS_CLOUD="rhcert"
 fi
 if [[ -z "${BASE_DOMAIN}" ]]; then
   echo "Cluster's base domain must be specified in BASE_DOMAIN."
@@ -27,19 +27,12 @@ export HOME=/tmp
 
 pull_secret_in=${HOME}/pull-secret
 pull_secret_out=${SHARED_DIR}/pull-secret
-clouds_in=/var/run/secrets/ci.openshift.io/cluster-profile/clouds.yaml
-clouds_out=${SHARED_DIR}/clouds.yaml
 tfvars_out=${SHARED_DIR}/terraform.tfvars
 ocp_version=`cut -d: -f2 <<<${RELEASE_IMAGE_LATEST}`
 
 export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${RELEASE_IMAGE_LATEST}
 # Ensure ignition assets are configured with the correct invoker to track CI jobs.
 export OPENSHIFT_INSTALL_INVOKER=openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD_ID}
-
-
-# Retrieve clouds.yaml
-echo "$(date -u --rfc-3339=seconds) - Retrieving clouds.yaml from secrets..."
-cp ${clouds_in} ${clouds_out}
 
 # Retrieve pull-secret
 echo "$(date -u --rfc-3339=seconds) - Retrieving pull-secret..."
@@ -50,7 +43,7 @@ cat > "${tfvars_out}" <<-EOF
 base_domain = "${base_domain}"
 openshift_version = "${ocp_version}"
 image_override = "${RELEASE_IMAGE_LATEST}"
-worker_count = "1"
+worker_count = "2"
 openstack_master_flavor_name = "large"
 openstack_worker_flavor_name = "${OPENSTACK_COMPUTE_FLAVOR}"
 openstack_bastion_flavor_name = "medium"
