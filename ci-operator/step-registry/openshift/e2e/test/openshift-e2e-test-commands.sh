@@ -94,6 +94,12 @@ aws)
     export TEST_PROVIDER="{\"type\":\"aws\",\"region\":\"${REGION}\",\"zone\":\"${ZONE}\",\"multizone\":true,\"multimaster\":true}"
     export KUBE_SSH_USER=core
     ;;
+osd-ephemeral)
+    export PROVIDER_ARGS="-provider=aws -gce-zone=us-east-1"
+    REGION="$(oc get -o jsonpath='{.status.platformStatus.aws.region}' infrastructure cluster)"
+    ZONE="$(oc get -o jsonpath='{.items[0].metadata.labels.failure-domain\.beta\.kubernetes\.io/zone}' nodes)"
+    export TEST_PROVIDER="{\"type\":\"aws\",\"region\":\"${REGION}\",\"zone\":\"${ZONE}\",\"multizone\":true,\"multimaster\":true}"
+    ;;
 azure4) export TEST_PROVIDER=azure;;
 vsphere) export TEST_PROVIDER=vsphere;;
 openstack) export TEST_PROVIDER='{"type":"openstack"}';;
