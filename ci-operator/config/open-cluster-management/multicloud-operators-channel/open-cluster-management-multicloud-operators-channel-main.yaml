@@ -21,27 +21,29 @@ images:
       - registry.ci.openshift.org/open-cluster-management/builder:go1.15-linux-amd64
   to: multicloud-operators-channel
 promotion:
+  name: "2.3"
   namespace: open-cluster-management
-  tag: latest
 resources:
   '*':
-    limits:
-      memory: 6Gi
     requests:
-      cpu: 80m
+      cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: "4.8"
-  namespace: ocp
 tests:
-- as: unit
+- as: test-unit
   commands: |
     export SELF="make -f Makefile.prow"
-    set -o pipefail
-    make -f Makefile.prow test 2>&1 | tee ${ARTIFACT_DIR}/test.log
-    set +o pipefail
+    make -f Makefile.prow test
   container:
     from: src
+- as: sonarcloud
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow sonar/go/prow
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
 zz_generated_metadata:
   branch: main
   org: open-cluster-management
