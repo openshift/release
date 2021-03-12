@@ -20,9 +20,9 @@ metadata:
   name: ${CLUSTER_NAME}
 platform:
   openstack:
-    cloud:            ${OS_CLOUD}
+    cloud:            ${CLUSTER_TYPE}
     externalNetwork:  ${OPENSTACK_EXTERNAL_NETWORK}
-    computeFlavor:    ${OPENSTACK_COMPUTE_FLAVOR}
+    computeFlavor:    ${OPENSTACK_INSTANCE_FLAVOR}
     lbFloatingIP:     ${LB_FIP_IP}
 pullSecret: >
   ${PULL_SECRET}

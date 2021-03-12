@@ -13,4 +13,7 @@ UNSAFE_CLUSTER_NAME=${NAMESPACE}-${JOB_NAME_HASH}
 SAFE_CLUSTER_NAME=${UNSAFE_CLUSTER_NAME#"ci-op-"}
 echo "${SAFE_CLUSTER_NAME}" > ${SHARED_DIR}/CLUSTER_NAME
 
-
+# Get the clouds.yaml based on the cluster type.
+if [ -f "/var/run/cluster-secrets/${CLUSTER_TYPE}/clouds.yaml" ]; then
+  cp "/var/run/cluster-secrets/${CLUSTER_TYPE}/clouds.yaml"  "${SHARED_DIR}/clouds.yaml"
+fi
