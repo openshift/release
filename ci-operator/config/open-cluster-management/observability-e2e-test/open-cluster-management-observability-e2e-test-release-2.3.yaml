@@ -38,6 +38,23 @@ tests:
     make -f Makefile test-unit
   container:
     from: src
+- as: test-e2e
+  steps:
+    cluster_profile: aws
+    test:
+    - as: run-e2e
+      cli: latest
+      commands: |
+        make test-e2e
+      env:
+      - default: oc
+        name: KUBECTL
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: release-2.3
   org: open-cluster-management
