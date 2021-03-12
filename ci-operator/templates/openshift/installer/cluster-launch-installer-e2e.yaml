@@ -755,8 +755,8 @@ objects:
           fi
         fi
 
-        if has_variant "ipv6"; then
-          export OPENSHIFT_INSTALL_AZURE_EMULATE_SINGLESTACK_IPV6=true
+        if has_variant "dualstack"; then
+          export OPENSHIFT_INSTALL_EXPERIMENTAL_DUAL_STACK=true
           cat >> ${ARTIFACT_DIR}/installer/install-config.yaml << EOF
         networking:
           networkType: OVNKubernetes
@@ -764,10 +764,13 @@ objects:
             - cidr: 10.0.0.0/16
             - cidr: fd00::/48
           clusterNetwork:
-            - cidr: fd01::/48
+            - cidr: 10.128.0.0/14
+              hostPrefix: 23
+            - cidr: fd00:10:128::/56
               hostPrefix: 64
           serviceNetwork:
-            - fd02::/112
+            - 172.30.0.0/16
+            - fd00:172:30::/112
         EOF
         elif [[ -n "${network_type}" ]]; then
           cat >> ${ARTIFACT_DIR}/installer/install-config.yaml << EOF
