@@ -13,4 +13,9 @@ UNSAFE_CLUSTER_NAME=${NAMESPACE}-${JOB_NAME_HASH}
 SAFE_CLUSTER_NAME=${UNSAFE_CLUSTER_NAME#"ci-op-"}
 echo "${SAFE_CLUSTER_NAME}" > ${SHARED_DIR}/CLUSTER_NAME
 
+if [ -f "/var/run/cluster-secrets/${CLUSTER_TYPE}/clouds.yaml" ]; then
+  cp "/var/run/cluster-secrets/${CLUSTER_TYPE}/clouds.yaml"  "${SHARED_DIR}/clouds.yaml"
+fi
 
+echo "${OPENSTACK_EXTERNAL_NETWORK}" > ${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK
+echo "${OPENSTACK_COMPUTE_FLAVOR}" > ${SHARED_DIR}/OPENSTACK_INSTANCE_FLAVOR

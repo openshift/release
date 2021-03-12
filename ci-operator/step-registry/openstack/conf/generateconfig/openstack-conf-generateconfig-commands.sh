@@ -6,10 +6,12 @@ set -o pipefail
 
 #Read necessary variables
 CLUSTER_NAME=$(<"${SHARED_DIR}"/CLUSTER_NAME)
+OPENSTACK_INSTANCE_FLAVOR=$(<"${SHARED_DIR}"/OPENSTACK_INSTANCE_FLAVOR)
+OPENSTACK_EXTERNAL_NETWORK=$(<"${SHARED_DIR}"/OPENSTACK_EXTERNAL_NETWORK)
 LB_FIP_IP=$(<"${SHARED_DIR}"/LB_FIP_IP)
 
-PULL_SECRET=$(<"${CLUSTER_PROFILE_DIR}"/pull-secret)
-SSH_PUB_KEY=$(<"${CLUSTER_PROFILE_DIR}"/ssh-publickey)
+PULL_SECRET=$(<"${CLUSTER_PROFILE_DIR}/pull-secret")
+SSH_PUB_KEY=$(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 if [[ "${CONFIG_TYPE}" == "minimal" ]]; then
@@ -22,7 +24,7 @@ platform:
   openstack:
     cloud:            ${OS_CLOUD}
     externalNetwork:  ${OPENSTACK_EXTERNAL_NETWORK}
-    computeFlavor:    ${OPENSTACK_COMPUTE_FLAVOR}
+    computeFlavor:    ${OPENSTACK_INSTANCE_FLAVOR}
     lbFloatingIP:     ${LB_FIP_IP}
 pullSecret: >
   ${PULL_SECRET}
