@@ -4,6 +4,7 @@ set -o nounset
 set -o pipefail
 set -x
 
+dnf install -y git
 pushd /tmp
 export HOME=/tmp
 export PATH=${PATH}:/tmp
@@ -13,4 +14,4 @@ git clone https://github.com/cloud-bulldozer/e2e-benchmarking.git --depth=1
 pushd e2e-benchmarking/workloads/network-perf
 
 # Trigger workload
-./ run_pod_network_test_fromgit.sh 
+./run_pod_network_test_fromgit.sh
