@@ -3,6 +3,10 @@ base_images:
     name: builder
     namespace: open-cluster-management
     tag: nodejs14-linux-amd64
+  open-cluster-management_builder_nodejs14-linux-amd64:
+    name: builder
+    namespace: open-cluster-management
+    tag: nodejs14-linux-amd64
 binary_build_commands: make build
 build_root:
   image_stream_tag:
@@ -25,8 +29,6 @@ tests:
 - as: unit-tests
   commands: |
     export SELF="make -f Makefile.prow"
-    mkdir /tmp/npmcache
-    export npm_config_cache=/tmp/npmcache
     make -f Makefile.prow install
     make -f Makefile.prow unit-tests
   container:
@@ -34,8 +36,6 @@ tests:
 - as: sonarcloud
   commands: |
     export SELF="make -f Makefile.prow"
-    mkdir /tmp/npmcache
-    export npm_config_cache=/tmp/npmcache
     make -f Makefile.prow sonar/js/jest-init
     make -f Makefile.prow unit-tests
     make -f Makefile.prow sonar/js/prow

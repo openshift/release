@@ -48,3 +48,27 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: build02
+    context: ci/prow/ci-chat-bot-linter
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ci-chat-bot-master-linter
+    rerun_command: /test linter
+    spec:
+      containers:
+      - args:
+        - ./
+        command:
+        - hack/linter.sh
+        image: registry.ci.openshift.org/openshift/release:golang-1.15
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )linter,?($|\s.*)

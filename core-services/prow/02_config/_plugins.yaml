@@ -91,6 +91,7 @@ approve:
   ignore_review_state: true
   repos:
   - shipwright-io/build
+  - shipwright-io/operator
   - shipwright-io/website
   require_self_approval: true
 - commandHelpLink: https://go.k8s.io/bot-commands
@@ -131,7 +132,6 @@ approve:
   lgtm_acts_as_approve: true
   repos:
   - coreos/bootupd
-  - coreos/rpm-ostree
   require_self_approval: false
 - commandHelpLink: https://go.k8s.io/bot-commands
   lgtm_acts_as_approve: true
@@ -183,6 +183,10 @@ approve:
 - commandHelpLink: ""
   repos:
   - openshift-kni/node-label-operator
+  require_self_approval: false
+- commandHelpLink: ""
+  repos:
+  - openshift-kni/poison-pill
   require_self_approval: false
 - commandHelpLink: https://go.k8s.io/bot-commands
   repos:
@@ -419,6 +423,9 @@ approve:
 - commandHelpLink: ""
   repos:
   - openshift/oc-compliance
+- commandHelpLink: ""
+  repos:
+  - openshift/ceph-csi
   require_self_approval: false
 blunderbuss:
   max_request_count: 2
@@ -2417,11 +2424,6 @@ external_plugins:
     events:
     - pull_request
     name: needs-rebase
-  containers/conmon:
-  - endpoint: http://needs-rebase
-    events:
-    - pull_request
-    name: needs-rebase
   containers/dnsname:
   - endpoint: http://needs-rebase
     events:
@@ -2895,6 +2897,20 @@ external_plugins:
     events:
     - pull_request
     name: needs-rebase
+  openshift-kni/poison-pill:
+  - endpoint: http://refresh
+    events:
+    - issue_comment
+    name: refresh
+  - endpoint: http://cherrypick
+    events:
+    - issue_comment
+    - pull_request
+    name: cherrypick
+  - endpoint: http://needs-rebase
+    events:
+    - pull_request
+    name: needs-rebase
   openshift-metal3/dev-scripts:
   - endpoint: http://refresh
     events:
@@ -3120,6 +3136,15 @@ external_plugins:
     events:
     - pull_request
     name: needs-rebase
+  shipwright-io/operator:
+  - endpoint: http://refresh
+    events:
+    - issue_comment
+    name: refresh
+  - endpoint: http://needs-rebase
+    events:
+    - pull_request
+    name: needs-rebase
   shipwright-io/website:
   - endpoint: http://refresh
     events:
@@ -3213,6 +3238,9 @@ lgtm:
   review_acts_as_lgtm: true
 - repos:
   - openshift-kni/node-label-operator
+  review_acts_as_lgtm: true
+- repos:
+  - openshift-kni/poison-pill
   review_acts_as_lgtm: true
 - repos:
   - openshift-priv/cluster-csi-snapshot-controller-operator
@@ -3385,6 +3413,9 @@ lgtm:
   review_acts_as_lgtm: true
 - repos:
   - openshift/oc-compliance
+  review_acts_as_lgtm: true
+- repos:
+  - openshift/ceph-csi
   review_acts_as_lgtm: true
 override:
   allow_top_level_owners: true
@@ -3760,28 +3791,6 @@ plugins:
     - verify-owners
     - wip
     - yuks
-  containers/conmon:
-    plugins:
-    - approve
-    - assign
-    - cat
-    - dog
-    - heart
-    - golint
-    - help
-    - hold
-    - label
-    - lgtm
-    - lifecycle
-    - override
-    - retitle
-    - shrug
-    - sigmention
-    - skip
-    - trigger
-    - verify-owners
-    - wip
-    - yuks
   containers/dnsname:
     plugins:
     - approve
@@ -3874,22 +3883,16 @@ plugins:
     - yuks
   coreos/rpm-ostree:
     plugins:
-    - approve
     - assign
-    - blunderbuss
     - cat
     - dog
     - heart
-    - golint
     - help
     - hold
     - label
-    - lgtm
-    - lifecycle
     - override
     - retitle
     - shrug
-    - sigmention
     - skip
     - trigger
     - verify-owners
@@ -4697,6 +4700,34 @@ plugins:
     - wip
     - yuks
     - approve
+  openshift-kni/poison-pill:
+    plugins:
+    - assign
+    - blunderbuss
+    - bugzilla
+    - cat
+    - dog
+    - heart
+    - golint
+    - goose
+    - help
+    - hold
+    - jira
+    - label
+    - lgtm
+    - lifecycle
+    - override
+    - pony
+    - retitle
+    - shrug
+    - sigmention
+    - skip
+    - trigger
+    - verify-owners
+    - owners-label
+    - wip
+    - yuks
+    - approve
   openshift-metal3/dev-scripts:
     plugins:
     - assign
@@ -5468,6 +5499,9 @@ plugins:
     plugins:
     - approve
   openshift/builder:
+    plugins:
+    - approve
+  openshift/ceph-csi:
     plugins:
     - approve
   openshift/certman-operator:
@@ -6486,6 +6520,11 @@ plugins:
     - wip
     - yuks
   shipwright-io/build:
+    plugins:
+    - approve
+    - release-note
+    - require-matching-label
+  shipwright-io/operator:
     plugins:
     - approve
     - release-note

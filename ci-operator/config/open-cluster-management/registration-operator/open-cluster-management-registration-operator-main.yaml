@@ -1,0 +1,125 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+  registration:
+    name: "2.3"
+    namespace: open-cluster-management
+    tag: registration
+  work:
+    name: "2.3"
+    namespace: open-cluster-management
+    tag: work
+binary_build_commands: make build --warn-undefined-variables
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.15
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  to: registration-operator
+promotion:
+  additional_images:
+    registration-operator-src: src
+  name: "2.3"
+  namespace: open-cluster-management
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.6"
+  namespace: ocp
+test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
+tests:
+- as: build
+  commands: |
+    true
+  container:
+    from: bin
+- as: verify
+  commands: |
+    make verify -k --warn-undefined-variables
+  container:
+    from: bin
+- as: verify-deps
+  commands: |
+    make verify-deps -k --warn-undefined-variables
+  container:
+    from: bin
+- as: unit
+  commands: |
+    make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+  container:
+    from: test-bin
+- as: integration
+  commands: make test-integration
+  container:
+    from: test-bin
+- as: e2e
+  steps:
+    cluster_profile: aws
+    test:
+    - as: deploy
+      commands: |
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar xvzf - oc
+        KUBECTL=oc
+        OLM_NAMESPACE=openshift-operator-lifecycle-manager
+        IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:registration-operator}
+        REGISTRATION_IMAGE=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:registration}
+        WORK_IMAGE=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:work}
+        PATH=.:$PATH
+        export KUBECTL OLM_NAMESPACE PATH IMAGE_NAME REGISTRATION_IMAGE WORK_IMAGE
+        make deploy-hub e2e-bootstrap-secret
+      from: src
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: registration-e2e-test
+      commands: |
+        export IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:registration}
+        /e2e.test -test.v -ginkgo.v
+      from: registration
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: work-e2e-test
+      commands: |
+        export IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:work}
+        /e2e.test -test.v -ginkgo.v
+      from: work
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: operator-e2e-test
+      commands: |
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar xvzf - oc
+        KUBECTL=oc
+        OLM_NAMESPACE=openshift-operator-lifecycle-manager
+        IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:registration-operator}
+        REGISTRATION_IMAGE=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:registration}
+        WORK_IMAGE=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:work}
+        PATH=.:$PATH
+        export KUBECTL OLM_NAMESPACE PATH IMAGE_NAME REGISTRATION_IMAGE WORK_IMAGE
+        make deploy-spoke-operator run-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-aws
+zz_generated_metadata:
+  branch: main
+  org: open-cluster-management
+  repo: registration-operator
