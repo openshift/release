@@ -36,7 +36,7 @@ CONFIG = {
     'openstack-ppc64le-quota-slice': {},
     'ovirt-quota-slice': {},
     'packet-quota-slice': {
-        'default': 40,
+        'default': 60,
     },
     'kubevirt-quota-slice':{},
     'vsphere-quota-slice':{},
