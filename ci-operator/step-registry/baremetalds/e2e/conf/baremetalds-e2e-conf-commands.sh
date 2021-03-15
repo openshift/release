@@ -7,6 +7,10 @@ set -o pipefail
 echo "************ baremetalds e2e conf command ************"
 
 # List of include cases (from openshift/conformance/parallel)
+# This is needed for IPv6 only environments
+if [[ "$IP_STACK" != "v6" ]]; then
+    exit 0
+fi
 
 read -d '#' INCL << EOF
 [sig-api-machinery] Watchers should be able to start watching from a specific resource version
