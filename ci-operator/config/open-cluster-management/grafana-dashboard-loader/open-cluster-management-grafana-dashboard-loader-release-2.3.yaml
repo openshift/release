@@ -43,11 +43,23 @@ tests:
   container:
     from: src
 - as: test-e2e
-  commands: |
-    export SELF="make -f Makefile.prow"
-    make -f Makefile.prow e2e-tests
-  container:
-    from: src
+  steps:
+    cluster_profile: aws
+    test:
+    - as: run-e2e
+      cli: latest
+      commands: |
+        export SELF="make -f Makefile.prow"
+        make -f Makefile.prow e2e-tests
+      env:
+      - default: oc
+        name: KUBECTL
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-aws
 - as: sonarcloud
   commands: |
     export SELF="make -f /opt/build-harness/Makefile.prow"
