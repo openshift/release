@@ -1,0 +1,24 @@
+workflow:
+  as: openshift-e2e-openstack-ipi-ovn
+  steps:
+    pre:
+    - chain: ipi-conf-openstack
+    - ref: ovn-conf
+    - chain: ipi-install
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - chain: gather-network
+    - chain: gather-core-dump
+    - chain: ipi-openstack-post
+    env:
+      OPENSTACK_EXTERNAL_NETWORK: "external"
+      OS_CLOUD: "openstack-cloud"
+      OPENSTACK_COMPUTE_FLAVOR: "m1.s2.xlarge"
+      CONFIG_API_VERSION: "v1beta4"
+      CONFIG_TYPE: "minimal"
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+  documentation: |-
+    The openshift-e2e-openstack-ipi workflow executes the common
+    end-to-end test suite on OpenShift ipi intallation on OpenStack
+    with the OVNKubernetes network plugin.
