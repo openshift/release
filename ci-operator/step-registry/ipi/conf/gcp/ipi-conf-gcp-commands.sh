@@ -10,6 +10,8 @@ GCP_BASE_DOMAIN="origin-ci-int-gce.dev.openshift.com"
 GCP_PROJECT="openshift-gce-devel-ci"
 GCP_REGION="us-east1"
 
+masters="${CONTROL_PLANE_REPLICAS}"
+
 workers=3
 if [[ "${SIZE_VARIANT}" == "compact" ]]; then
   workers=0
@@ -34,6 +36,7 @@ controlPlane:
   platform:
     gcp:
       type: ${master_type}
+  replicas: ${masters}
 compute:
 - name: worker
   replicas: ${workers}
