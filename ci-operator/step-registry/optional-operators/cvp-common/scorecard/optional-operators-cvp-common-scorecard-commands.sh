@@ -18,7 +18,7 @@ echo "Starting the basic operator-sdk scorecard test for ${OO_BUNDLE}"
 echo "Extracting the operator bundle image into the operator directory"
 mkdir -p ${OPERATOR_DIR}
 pushd ${OPERATOR_DIR}
-oc image extract ${OO_BUNDLE} --confirm -a /var/run/brew-pullsecret/dockercfg.json
+oc image extract ${OO_BUNDLE} --confirm -a /var/run/brew-pullsecret/.dockerconfigjson
 popd
 echo "Extracted the following bundle data:"
 tree ${OPERATOR_DIR}
