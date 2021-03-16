@@ -24,7 +24,22 @@ presubmits:
         - --secret-dir=/usr/local/e2e-aws-cluster-profile
         - --target=e2e-aws
         command:
-        - ci-operator
+        - /bin/bash
+        - -c
+        - |
+          #!/bin/bash
+          set -euo pipefail
+          export COSA_SKIP_OVERLAY=1
+
+          # tmpdir for cosa
+          tmpsrc=$(mktemp -d)
+          cp -a /src "${tmpsrc}"/src
+          cd "$(mktemp -d)"
+          cosa init https://github.com/coreos/fedora-coreos-config --branch next-devel
+          cosa fetch --update-lockfile
+          cosa build ostree
+          cosa upload-oscontainer --name "machine-os-content"
+          ci-operator $@
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
