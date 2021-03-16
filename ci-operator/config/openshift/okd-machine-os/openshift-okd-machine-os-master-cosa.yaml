@@ -3,19 +3,53 @@ base_images:
     name: "4.8"
     namespace: origin
     tag: base
-  coreos_coreos-assembler_latest:
+  cosa:
     name: coreos-assembler
     namespace: coreos
     tag: latest
+  mcd:
+    name: "4.8"
+    namespace: origin
+    tag: machine-config-operator
+  artifacts:
+    name: "4.8"
+    namespace: origin
+    tag: artifacts
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: golang-1.15
-images:
-- dockerfile_path: Dockerfile
-  from: base
-  to: machine-os-content
+# images:
+# - dockerfile_path: Dockerfile
+#   from: base
+#   to: machine-os-content
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      cat <<DOCKERFILE > /tmp/Dockerfile
+      FROM cosa
+      WORKDIR /src/github.com/openshift/okd-machine-os
+      COPY . .
+      COPY --from=mcd /usr/bin/machine-config-daemon /overrides/rootfs/usr/libexec/machine-config-daemon
+      COPY --from=artifacts /srv/repo/*.rpm /overrides/rpms
+      DOCKERFILE
+    from: cosa
+    to: src-dockerfile
+- project_directory_image_build_step:
+    from: src
+    inputs:
+      src-dockerfile:
+        paths:
+        - destination_dir: .
+          source_path: /tmp/Dockerfile
+      mcd:
+        as:
+        - mcd
+      artifacts:
+        as:
+        - artifacts
+    to: cosa-src
 promotion:
   disabled: true
   name: "4.8"
@@ -25,7 +59,7 @@ resources:
     requests:
       cpu: 1000m
       memory: 1Gi
-  machine-os-content:
+  machine-os-content-build:
     limits:
       devices.kubevirt.io/kvm: "1"
     requests:
@@ -36,22 +70,36 @@ tag_specification:
   name: "4.8"
   namespace: origin
 tests:
-- as: e2e-gcp
-  steps:
-    cluster_profile: gcp
-    workflow: openshift-e2e-gcp
-- as: e2e-aws
-  steps:
-    cluster_profile: aws
-    workflow: openshift-e2e-aws
-- as: e2e-ovirt
-  steps:
-    cluster_profile: ovirt
-    workflow: openshift-e2e-ovirt-minimal
-- as: e2e-aws-upgrade
-  steps:
-    cluster_profile: aws
-    workflow: openshift-upgrade-aws
+- as: machine-os-content-build
+  commands: |
+    set -exuo pipefail
+    export COSA_SKIP_OVERLAY=1
+    tmpsrc=$(mktemp -d)
+    cp -a /src "${tmpsrc}"/src
+    cd "$(mktemp -d)"
+    cosa init https://github.com/coreos/fedora-coreos-config --branch next-devel
+    cp -rvf /overrides/* ./overrides
+    cosa fetch --update-lockfile
+    cosa build ostree
+  container:
+    from: cosa-src
+
+# - as: e2e-gcp
+#   steps:
+#     cluster_profile: gcp
+#     workflow: openshift-e2e-gcp
+# - as: e2e-aws
+#   steps:
+#     cluster_profile: aws
+#     workflow: openshift-e2e-aws
+# - as: e2e-ovirt
+#   steps:
+#     cluster_profile: ovirt
+#     workflow: openshift-e2e-ovirt-minimal
+# - as: e2e-aws-upgrade
+#   steps:
+#     cluster_profile: aws
+#     workflow: openshift-upgrade-aws
 zz_generated_metadata:
   branch: master-cosa
   org: openshift
