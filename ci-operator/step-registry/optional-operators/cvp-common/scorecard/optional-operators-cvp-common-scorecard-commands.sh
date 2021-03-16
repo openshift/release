@@ -13,12 +13,12 @@ NAMESPACE=$(grep "install_namespace:" ${SHARED_DIR}/oo_deployment_details.yaml |
 
 OPERATOR_DIR="${ARTIFACT_DIR}/test-operator-basic"
 
-echo "Starting the basic operator-sdk scorecard test for ${BUNDLE_IMAGE}"
+echo "Starting the basic operator-sdk scorecard test for ${OO_BUNDLE}"
 
 echo "Extracting the operator bundle image into the operator directory"
 mkdir -p ${OPERATOR_DIR}
 pushd ${OPERATOR_DIR}
-oc image extract ${BUNDLE_IMAGE} --confirm -a /var/run/brew-pullsecret/dockercfg.json
+oc image extract ${OO_BUNDLE} --confirm -a /var/run/brew-pullsecret/.dockerconfigjson
 popd
 echo "Extracted the following bundle data:"
 tree ${OPERATOR_DIR}
@@ -28,4 +28,4 @@ operator-sdk scorecard --config /tmp/config/scorecard-basic-config.yml \
                        --namespace ${NAMESPACE} \
                        --kubeconfig ${KUBECONFIG} \
                        --output json \
-                       ${OPERATOR_DIR} > ${ARTIFACT_DIR}/scorecard-output-basic.json
+                       ${OPERATOR_DIR} > ${ARTIFACT_DIR}/scorecard-output-basic.json || true
