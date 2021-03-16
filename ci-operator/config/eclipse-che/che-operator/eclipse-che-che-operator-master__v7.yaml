@@ -1,14 +1,10 @@
 base_images:
-  cli:
-    name: "4.6"
-    namespace: ocp
-    tag: cli
   cli-jq:
     name: cli-jq
     namespace: ocp
     tag: latest
   operator-registry:
-    name: "4.6"
+    name: "4.7"
     namespace: ocp
     tag: operator-registry
 build_root:
@@ -29,10 +25,10 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: "4.6"
+  name: "4.7"
   namespace: ocp
 tests:
-- as: che-operator-olm-nightly-deployment
+- as: olm-nightly-deployment
   steps:
     cluster_profile: aws
     env:
@@ -42,12 +38,8 @@ tests:
       OO_TARGET_NAMESPACES: '!install'
     test:
     - as: olm-nightly-deployment
+      cli: latest
       commands: |
-        export PATH=$PATH:/tmp/bin
-        mkdir -p /tmp/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.6/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
-        chmod ug+x /tmp/bin/oc
-
         echo -e "[INFO] Test script content:"
         cat .ci/oci-nightly-olm.sh
 
@@ -55,13 +47,18 @@ tests:
       dependencies:
       - env: CI_CHE_OPERATOR_IMAGE
         name: che-operator-image
+      env:
+      - name: OO_CHANNEL
+      - name: OO_INSTALL_NAMESPACE
+      - name: OO_PACKAGE
+      - name: OO_TARGET_NAMESPACES
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
     workflow: optional-operators-ci-aws
-- as: che-operator-single-host-nightly-deployment
+- as: single-host-nightly-deployment
   steps:
     cluster_profile: aws
     env:
@@ -70,20 +67,21 @@ tests:
       OO_PACKAGE: eclipse-che-preview-openshift
       OO_TARGET_NAMESPACES: '!install'
     test:
-    - as: single-host-deployment
+    - as: single-host-nightly-deployment
+      cli: latest
       commands: |
-        export PATH=$PATH:/tmp/bin
-        mkdir -p /tmp/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.6/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
-        chmod ug+x /tmp/bin/oc
-
-        echo -e "[INFO] Test script content:"
+        echo -e "[INFO] Test script content"
         cat .ci/oci-single-host.sh
 
         /bin/bash .ci/oci-single-host.sh
       dependencies:
       - env: CI_CHE_OPERATOR_IMAGE
         name: che-operator-image
+      env:
+      - name: OO_CHANNEL
+      - name: OO_INSTALL_NAMESPACE
+      - name: OO_PACKAGE
+      - name: OO_TARGET_NAMESPACES
       from: src
       resources:
         requests:
@@ -92,6 +90,6 @@ tests:
     workflow: optional-operators-ci-aws
 zz_generated_metadata:
   branch: master
-  org: eclipse
+  org: eclipse-che
   repo: che-operator
-  variant: v6
+  variant: v7
