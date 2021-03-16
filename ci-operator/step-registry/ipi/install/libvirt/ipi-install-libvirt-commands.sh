@@ -91,7 +91,7 @@ while kill -0 $openshift_install 2> /dev/null; do
   LIBVIRT_NETWORK=$(mock-nss.sh virsh --connect "${REMOTE_LIBVIRT_URI}" net-list --name | grep "${NAMESPACE}-${JOB_NAME_HASH}" || true)
   if [[ -n "${LIBVIRT_NETWORK}" ]]; then
       cat > ${dir}/worker-hostrecords.xml << EOF
-<host ip='192.168.${CLUTER_SUBNET}.51'>
+<host ip='192.168.${CLUTER_SUBNET}.1'>
   <hostname>alertmanager-main-openshift-monitoring.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
   <hostname>console-openshift-console.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
   <hostname>downloads-openshift-console.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
