@@ -17,12 +17,6 @@ operator:
   bundles:
   - context_dir: deploy/olm-catalog/nightly/eclipse-che-preview-openshift
     dockerfile_path: bundle.Dockerfile
-releases:
-  latest:
-    release:
-      architecture: amd64
-      channel: stable
-      version: "4.7"
 resources:
   '*':
     limits:
@@ -30,6 +24,9 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tag_specification:
+  name: "4.7"
+  namespace: ocp
 tests:
 - as: olm-nightly-deployment
   steps:
@@ -50,11 +47,46 @@ tests:
       dependencies:
       - env: CI_CHE_OPERATOR_IMAGE
         name: che-operator-image
+      env:
+      - name: OO_CHANNEL
+      - name: OO_INSTALL_NAMESPACE
+      - name: OO_PACKAGE
+      - name: OO_TARGET_NAMESPACES
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
+- as: single-host-nightly-deployment
+  steps:
+    cluster_profile: aws
+    env:
+      OO_CHANNEL: nightly
+      OO_INSTALL_NAMESPACE: eclipse-che
+      OO_PACKAGE: eclipse-che-preview-openshift
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: single-host-nightly-deployment
+      cli: latest
+      commands: |
+        echo -e "[INFO] Test script content:"
+        cat .ci/oci-single-host.sh
+
+        /bin/bash .ci/oci-single-host.sh
+      dependencies:
+      - env: CI_CHE_OPERATOR_IMAGE
+        name: che-operator-image
+      env:
+      - name: OO_CHANNEL
+      - name: OO_INSTALL_NAMESPACE
+      - name: OO_PACKAGE
+      - name: OO_TARGET_NAMESPACES
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-aws
 zz_generated_metadata:
   branch: master
   org: eclipse-che
