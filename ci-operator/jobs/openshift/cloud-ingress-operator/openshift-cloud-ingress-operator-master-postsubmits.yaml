@@ -13,11 +13,11 @@ postsubmits:
     spec:
       containers:
       - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --secret-dir=/secrets/cloud-ingress-operator-codecov-token
         - --target=coverage
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
         command:
         - ci-operator
         image: ci-operator:latest
@@ -30,11 +30,11 @@ postsubmits:
         - mountPath: /secrets/cloud-ingress-operator-codecov-token
           name: cloud-ingress-operator-codecov-token
           readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
@@ -44,3 +44,52 @@ postsubmits:
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
+  - agent: kubernetes
+    branches:
+    - ^master$
+    cluster: build02
+    decorate: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+    max_concurrency: 1
+    name: branch-ci-openshift-cloud-ingress-operator-master-publish-coverage
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/cloud-ingress-operator-codecov-token
+        - --target=publish-coverage
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/cloud-ingress-operator-codecov-token
+          name: cloud-ingress-operator-codecov-token
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: cloud-ingress-operator-codecov-token
+        secret:
+          secretName: cloud-ingress-operator-codecov-token
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
