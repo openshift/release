@@ -67,8 +67,9 @@ tests:
   cron: 2 7 * * *
   steps:
     cluster_profile: azure4
-    test:
-    - as: kata-containers-test
+    pre:
+    - chain: ipi-azure-pre
+    - as: kata-containers-e2e-pre
       cli: latest
       commands: |
         # oc is made available to this script via cli configuration, but
@@ -86,13 +87,18 @@ tests:
 
         KATA_WORKDIR=/go/src/github.com/kata-containers/tests
         cd $KATA_WORKDIR
+        # Install Kata Containers and run a smoke test.
         .ci/openshift-ci/test.sh
+
+        # Deploy the kata-webhook so that the tests ran on next step of the
+        # workflow will use the kata runtime.
+        .ci/openshift-ci/cluster/deploy_webhook.sh
       from: pipeline:bin
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: ipi-azure
+    workflow: openshift-e2e-azure
 zz_generated_metadata:
   branch: main
   org: kata-containers

@@ -10,14 +10,36 @@ GCP_BASE_DOMAIN="origin-ci-int-gce.dev.openshift.com"
 GCP_PROJECT="openshift-gce-devel-ci"
 GCP_REGION="us-east1"
 
+masters="${CONTROL_PLANE_REPLICAS}"
+
+workers=3
+if [[ "${SIZE_VARIANT}" == "compact" ]]; then
+  workers=0
+fi
+master_type=null
+if [[ "${SIZE_VARIANT}" == "xlarge" ]]; then
+  master_type=n1-standard-32
+elif [[ "${SIZE_VARIANT}" == "large" ]]; then
+  master_type=n1-standard-16
+elif [[ "${SIZE_VARIANT}" == "compact" ]]; then
+  master_type=n1-standard-8
+fi
+
 cat >> "${CONFIG}" << EOF
 baseDomain: ${GCP_BASE_DOMAIN}
 platform:
   gcp:
     projectID: ${GCP_PROJECT}
     region: ${GCP_REGION}
+controlPlane:
+  name: master
+  platform:
+    gcp:
+      type: ${master_type}
+  replicas: ${masters}
 compute:
 - name: worker
+  replicas: ${workers}
   platform:
     gcp:
       type: ${COMPUTE_NODE_TYPE}

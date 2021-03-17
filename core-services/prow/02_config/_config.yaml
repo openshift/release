@@ -47,12 +47,6 @@ branch-protection:
     coreos:
       repos:
         rpm-ostree:
-          branches:
-            master:
-              protect: true
-              required_status_checks:
-                contexts:
-                - continuous-integration/jenkins/pr-merge
           protect: false
     cri-o:
       required_status_checks:
@@ -62,7 +56,7 @@ branch-protection:
       repos:
         devworkspace-operator:
           protect: false
-    eclipse:
+    eclipse-che:
       repos:
         che-operator:
           protect: false
@@ -104,7 +98,19 @@ branch-protection:
         common-templates:
           protect: false
         hyperconverged-cluster-operator:
-          protect: false
+          branches:
+            release-1.1:
+              protect: false
+            release-1.2:
+              protect: false
+            release-1.3:
+              protect: false
+            release-4.7:
+              protect: false
+            release-4.8:
+              protect: false
+            release-4.9:
+              protect: false
         kubevirt-ssp-operator:
           branches:
             master:
@@ -127,6 +133,12 @@ branch-protection:
       repos:
         monstorak-operator:
           protect: false
+    open-cluster-management:
+      repos:
+        console:
+          required_pull_request_reviews:
+            dismiss_stale_reviews: true
+            required_approving_review_count: 2
     openshift:
       repos:
         assisted-installer:
@@ -256,8 +268,6 @@ branch-protection:
           required_status_checks:
             contexts:
             - ci.ext.devshift.net PR build
-        odo:
-          protect: false
         openshift-azure:
           restrictions:
             teams:
@@ -343,6 +353,8 @@ branch-protection:
             - team-jenkins
     openshift-psap:
       repos:
+        ci-artifacts:
+          protect: false
         special-resource-operator:
           protect: false
     openshift-s2i:
@@ -510,6 +522,7 @@ owners_dir_blacklist:
 plank:
   default_decoration_configs:
     '*':
+      censor_secrets: true
       gcs_configuration:
         bucket: origin-ci-test
         default_org: openshift
@@ -546,10 +559,10 @@ plank:
             memory: 250Mi
       timeout: 4h0m0s
       utility_images:
-        clonerefs: gcr.io/k8s-prow/clonerefs:v20210304-1913db73ff
-        entrypoint: gcr.io/k8s-prow/entrypoint:v20210304-1913db73ff
-        initupload: gcr.io/k8s-prow/initupload:v20210304-1913db73ff
-        sidecar: gcr.io/k8s-prow/sidecar:v20210304-1913db73ff
+        clonerefs: gcr.io/k8s-prow/clonerefs:v20210316-fe8b28563d
+        entrypoint: gcr.io/k8s-prow/entrypoint:v20210316-fe8b28563d
+        initupload: gcr.io/k8s-prow/initupload:v20210316-fe8b28563d
+        sidecar: gcr.io/k8s-prow/sidecar:v20210316-fe8b28563d
     openshift-priv:
       gcs_configuration:
         bucket: origin-ci-private
@@ -639,20 +652,27 @@ tide:
     integr8ly/heimdall: rebase
     jianzhangbjz/learn-operator: squash
     open-cluster-management/application-ui: squash
+    open-cluster-management/applifecycle-backend-e2e: squash
     open-cluster-management/cluster-curator-controller: squash
+    open-cluster-management/clusterlifecycle-state-metrics: squash
     open-cluster-management/config-policy-controller: squash
     open-cluster-management/console: squash
     open-cluster-management/console-api: squash
     open-cluster-management/discovery: squash
+    open-cluster-management/endpoint-metrics-operator: squash
     open-cluster-management/governance-policy-propagator: squash
     open-cluster-management/governance-policy-spec-sync: squash
     open-cluster-management/governance-policy-status-sync: squash
     open-cluster-management/governance-policy-template-sync: squash
+    open-cluster-management/grafana-dashboard-loader: squash
     open-cluster-management/hub-crds: squash
     open-cluster-management/image-builder: squash
     open-cluster-management/klusterlet-addon-controller: squash
     open-cluster-management/klusterlet-addon-operator: squash
+    open-cluster-management/library-go: squash
     open-cluster-management/managedcluster-import-controller: squash
+    open-cluster-management/management-ingress: squash
+    open-cluster-management/metrics-collector: squash
     open-cluster-management/multicloud-operators-application: squash
     open-cluster-management/multicloud-operators-channel: squash
     open-cluster-management/multicloud-operators-deployable: squash
@@ -661,6 +681,9 @@ tide:
     open-cluster-management/multicloud-operators-subscription-release: squash
     open-cluster-management/multicloudhub-operator: squash
     open-cluster-management/multicloudhub-repo: squash
+    open-cluster-management/observability-e2e-test: squash
+    open-cluster-management/rbac-query-proxy: squash
+    open-cluster-management/search-collector: squash
     open-cluster-management/security-middleware: squash
     opendatahub-io/manifests: squash
     opendatahub-io/odh-manifests: squash
@@ -769,12 +792,10 @@ tide:
     - codeready-toolchain/toolchain-e2e
     - containers/buildah
     - containers/common
-    - containers/conmon
     - containers/dnsname
     - containers/podman
     - coreos/bootupd
     - coreos/coreos-assembler
-    - coreos/rpm-ostree
     - integr8ly/ansible-tower-configuration
     - integr8ly/application-monitoring-operator
     - integr8ly/cloud-resource-operator
@@ -901,6 +922,7 @@ tide:
     - openshift-priv/csi-livenessprobe
     - openshift-priv/csi-node-driver-registrar
     - openshift-priv/csi-operator
+    - openshift-priv/driver-toolkit
     - openshift-priv/egress-router-cni
     - openshift-priv/elasticsearch-operator
     - openshift-priv/elasticsearch-proxy
@@ -1062,6 +1084,7 @@ tide:
     - openshift/csi-node-driver-registrar
     - openshift/csi-operator
     - openshift/custom-resource-status
+    - openshift/driver-toolkit
     - openshift/egress-router-cni
     - openshift/elasticsearch-operator
     - openshift/elasticsearch-proxy
@@ -1247,6 +1270,7 @@ tide:
     - openshift-priv/csi-livenessprobe
     - openshift-priv/csi-node-driver-registrar
     - openshift-priv/csi-operator
+    - openshift-priv/driver-toolkit
     - openshift-priv/egress-router-cni
     - openshift-priv/elasticsearch-operator
     - openshift-priv/elasticsearch-proxy
@@ -1408,6 +1432,7 @@ tide:
     - openshift/csi-node-driver-registrar
     - openshift/csi-operator
     - openshift/custom-resource-status
+    - openshift/driver-toolkit
     - openshift/egress-router-cni
     - openshift/elasticsearch-operator
     - openshift/elasticsearch-proxy
@@ -1610,6 +1635,7 @@ tide:
     - openshift-priv/csi-livenessprobe
     - openshift-priv/csi-node-driver-registrar
     - openshift-priv/csi-operator
+    - openshift-priv/driver-toolkit
     - openshift-priv/egress-router-cni
     - openshift-priv/elasticsearch-operator
     - openshift-priv/elasticsearch-proxy
@@ -1765,6 +1791,7 @@ tide:
     - openshift/csi-node-driver-registrar
     - openshift/csi-operator
     - openshift/custom-resource-status
+    - openshift/driver-toolkit
     - openshift/egress-router-cni
     - openshift/elasticsearch-operator
     - openshift/elasticsearch-proxy
@@ -1959,6 +1986,7 @@ tide:
     - openshift-priv/csi-livenessprobe
     - openshift-priv/csi-node-driver-registrar
     - openshift-priv/csi-operator
+    - openshift-priv/driver-toolkit
     - openshift-priv/egress-router-cni
     - openshift-priv/elasticsearch-operator
     - openshift-priv/elasticsearch-proxy
@@ -2114,6 +2142,7 @@ tide:
     - openshift/csi-node-driver-registrar
     - openshift/csi-operator
     - openshift/custom-resource-status
+    - openshift/driver-toolkit
     - openshift/egress-router-cni
     - openshift/elasticsearch-operator
     - openshift/elasticsearch-proxy
@@ -2209,13 +2238,16 @@ tide:
     - backports/unvalidated-commits
     repos:
     - app-sre/deployment-validation-operator
+    - eclipse-che/che-operator
     - openshift-knative/eventing-kafka
     - openshift-knative/eventing-operator
     - openshift-knative/kourier
     - openshift-knative/serverless-operator
     - openshift-knative/serving-operator
     - openshift-kni/cnf-features-deploy
+    - openshift-kni/node-label-operator
     - openshift-kni/performance-addon-operators
+    - openshift-kni/poison-pill
     - openshift-priv/build-machinery-go
     - openshift-priv/kubernetes-nmstate
     - openshift-priv/library-go
@@ -2232,6 +2264,7 @@ tide:
     - openshift/azure-misc
     - openshift/boilerplate
     - openshift/build-machinery-go
+    - openshift/ceph-csi
     - openshift/certman-operator
     - openshift/ci-chat-bot
     - openshift/ci-docs
@@ -2875,6 +2908,7 @@ tide:
     - do-not-merge/release-note-label-needed
     repos:
     - shipwright-io/build
+    - shipwright-io/operator
   - labels:
     - lgtm
     - approved

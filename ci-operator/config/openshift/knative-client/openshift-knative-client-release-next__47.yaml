@@ -1,0 +1,83 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+binary_build_commands: |
+  make install
+  make build-cross
+build_root:
+  project_image:
+    dockerfile_path: openshift/ci-operator/build-image/Dockerfile
+canonical_go_repository: github.com/knative/client
+images:
+- dockerfile_path: openshift/ci-operator/knative-images/client/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/kn
+  to: knative-client
+- dockerfile_path: openshift/ci-operator/knative-images/client/Dockerfile.cliartifacts
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/knative/client/kn-linux-amd64
+      - destination_dir: .
+        source_path: /go/src/github.com/knative/client/kn-darwin-amd64
+      - destination_dir: .
+        source_path: /go/src/github.com/knative/client/kn-windows-amd64.exe
+      - destination_dir: .
+        source_path: /go/src/github.com/knative/client/LICENSE
+      - destination_dir: .
+        source_path: /go/src/github.com/knative/client/package_cliartifacts.sh
+  to: kn-cli-artifacts
+- dockerfile_path: openshift/ci-operator/knative-test-images/helloworld/Dockerfile
+  from: base
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/helloworld
+  to: knative-client-test-helloworld
+- dockerfile_path: openshift/ci-operator/knative-test-images/grpc-ping/Dockerfile
+  from: base
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/grpc-ping
+  to: knative-client-test-grpc-ping
+promotion:
+  name: knative-nightly
+  namespace: openshift
+resources:
+  '*':
+    requests:
+      memory: 2Gi
+tag_specification:
+  name: "4.7"
+  namespace: ocp
+test_binary_build_commands: make test-install
+tests:
+- as: e2e-aws-ocp-47
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-next
+  org: openshift
+  repo: knative-client
+  variant: "47"

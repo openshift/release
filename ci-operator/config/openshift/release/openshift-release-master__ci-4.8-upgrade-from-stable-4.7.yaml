@@ -42,14 +42,22 @@ tests:
     cluster_profile: ovirt
     workflow: openshift-upgrade-ovirt
 - as: e2e-aws-ovn-upgrade
-  interval: 24h
+  cron: '@yearly'
   steps:
     cluster_profile: aws
     env:
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-aws-ovn
-- as: e2e-gcp-ovn-upgrade
+- as: e2e-aws-ovn-upgrade-rollback
   interval: 24h
+  steps:
+    cluster_profile: aws
+    env:
+      TEST_TYPE: upgrade-conformance
+      TEST_UPGRADE_OPTIONS: abort-at=99
+    workflow: openshift-upgrade-aws-ovn
+- as: e2e-gcp-ovn-upgrade
+  cron: '@yearly'
   steps:
     cluster_profile: gcp
     env:
@@ -75,6 +83,15 @@ tests:
       OS_CLOUD: openstack-cloud
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-openstack-loki
+- as: e2e-aws-upgrade-rollback
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws
+    env:
+      DELETE_MC: "false"
+      TEST_TYPE: upgrade
+      TEST_UPGRADE_OPTIONS: abort-at=99
+    workflow: openshift-upgrade-aws
 zz_generated_metadata:
   branch: master
   org: openshift

@@ -21,16 +21,30 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
-- as: e2e-aws-sdn-multitenant
+- as: e2e-aws-compact
   interval: 48h
   steps:
     cluster_profile: aws
-    workflow: openshift-e2e-aws-sdn-multi
+    env:
+      SIZE_VARIANT: compact
+    workflow: openshift-e2e-aws
 - as: e2e-aws-serial
   interval: 24h
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-serial
+- as: e2e-aws-compact-serial
+  interval: 48h
+  steps:
+    cluster_profile: aws
+    env:
+      SIZE_VARIANT: compact
+    workflow: openshift-e2e-aws
+- as: e2e-aws-sdn-multitenant
+  interval: 48h
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-sdn-multi
 - as: e2e-aws-upgrade
   interval: 24h
   steps:
@@ -38,32 +52,76 @@ tests:
     env:
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-aws
+- as: e2e-aws-compact-upgrade
+  interval: 72h
+  steps:
+    cluster_profile: aws
+    env:
+      SIZE_VARIANT: compact
+      TEST_TYPE: upgrade-conformance
+    workflow: openshift-upgrade-aws
 - as: e2e-azure
+  interval: 24h
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure
+- as: e2e-azure-compact
+  interval: 48h
+  steps:
+    cluster_profile: azure4
+    env:
+      SIZE_VARIANT: compact
+    workflow: openshift-e2e-azure
+- as: e2e-azure-serial
+  interval: 24h
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-serial
+- as: e2e-azure-compact-serial
+  interval: 48h
+  steps:
+    cluster_profile: azure4
+    env:
+      SIZE_VARIANT: compact
+    workflow: openshift-e2e-azure
+- as: e2e-azure-upgrade
   interval: 24h
   steps:
     cluster_profile: azure4
     env:
       TEST_TYPE: upgrade-conformance
-    workflow: openshift-e2e-azure
-- as: e2e-azure-serial
-  interval: 24h
-  steps:
-    cluster_profile: aws
-    workflow: openshift-e2e-azure-serial
-- as: e2e-azure-upgrade
-  interval: 24h
+    workflow: openshift-upgrade-azure
+- as: e2e-azure-compact-upgrade
+  interval: 72h
   steps:
     cluster_profile: azure4
+    env:
+      SIZE_VARIANT: compact
+      TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-azure
 - as: e2e-gcp
   interval: 24h
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
+- as: e2e-gcp-compact
+  interval: 48h
+  steps:
+    cluster_profile: gcp
+    env:
+      SIZE_VARIANT: compact
+    workflow: openshift-e2e-gcp
 - as: e2e-gcp-serial
   interval: 24h
   steps:
     cluster_profile: gcp
+    workflow: openshift-e2e-gcp-serial
+- as: e2e-gcp-compact-serial
+  interval: 48h
+  steps:
+    cluster_profile: gcp
+    env:
+      SIZE_VARIANT: compact
     workflow: openshift-e2e-gcp-serial
 - as: e2e-gcp-upgrade
   interval: 24h
@@ -72,6 +130,22 @@ tests:
     env:
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-gcp
+- as: e2e-gcp-compact-upgrade
+  interval: 72h
+  steps:
+    cluster_profile: gcp
+    env:
+      SIZE_VARIANT: compact
+      TEST_TYPE: upgrade-conformance
+    workflow: openshift-upgrade-gcp
+- as: e2e-aws-upgrade-rollback
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws
+    env:
+      TEST_TYPE: upgrade-conformance
+      TEST_UPGRADE_OPTIONS: abort-at=random
+    workflow: openshift-upgrade-aws
 zz_generated_metadata:
   branch: master
   org: openshift
