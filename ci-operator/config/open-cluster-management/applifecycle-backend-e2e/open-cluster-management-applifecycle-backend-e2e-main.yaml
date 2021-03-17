@@ -17,8 +17,8 @@ images:
   from: base
   to: applifecycle-backend-e2e
 promotion:
+  name: "2.3"
   namespace: open-cluster-management
-  tag: latest
 resources:
   '*':
     requests:
@@ -37,6 +37,15 @@ tests:
     set +o pipefail
   container:
     from: src
+- as: sonar
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow sonar/go/prow
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
 zz_generated_metadata:
   branch: main
   org: open-cluster-management
