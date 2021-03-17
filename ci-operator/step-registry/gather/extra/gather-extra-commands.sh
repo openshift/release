@@ -116,11 +116,13 @@ while IFS= read -r i; do
 done < /tmp/containers
 
 echo "Snapshotting prometheus (may take 15s) ..."
-queue ${ARTIFACT_DIR}/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring prometheus-k8s-0 -- tar cvzf - -C /prometheus .
-FILTER=gzip queue ${ARTIFACT_DIR}/metrics/prometheus-target-metadata.json.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring prometheus-k8s-0 -- /bin/bash -c "curl -G http://localhost:9090/api/v1/targets/metadata --data-urlencode 'match_target={instance!=\"\"}'"
-FILTER=gzip queue ${ARTIFACT_DIR}/metrics/prometheus-config.json.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring prometheus-k8s-0 -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/config"
-queue ${ARTIFACT_DIR}/metrics/prometheus-tsdb-status.json oc --insecure-skip-tls-verify exec -n openshift-monitoring prometheus-k8s-0 -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/tsdb"
-queue ${ARTIFACT_DIR}/metrics/prometheus-runtimeinfo.json oc --insecure-skip-tls-verify exec -n openshift-monitoring prometheus-k8s-0 -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/runtimeinfo"
+# Use logs and data the "last" monitoring pod in order to catch issues that occur when the first prometheus pod upgrades
+monitoring_pod="$( oc --insecure-skip-tls-verify get pods -n openshift-monitoring -o name | grep prometheus-k8s- | tail -1 )"
+queue ${ARTIFACT_DIR}/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${monitoring_pod}" -- tar cvzf - -C /prometheus .
+FILTER=gzip queue ${ARTIFACT_DIR}/metrics/prometheus-target-metadata.json.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${monitoring_pod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/targets/metadata --data-urlencode 'match_target={instance!=\"\"}'"
+FILTER=gzip queue ${ARTIFACT_DIR}/metrics/prometheus-config.json.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${monitoring_pod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/config"
+queue ${ARTIFACT_DIR}/metrics/prometheus-tsdb-status.json oc --insecure-skip-tls-verify exec -n openshift-monitoring "${monitoring_pod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/tsdb"
+queue ${ARTIFACT_DIR}/metrics/prometheus-runtimeinfo.json oc --insecure-skip-tls-verify exec -n openshift-monitoring "${monitoring_pod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/runtimeinfo"
 
 # Calculate metrics suitable for apples-to-apples comparison across CI runs.
 # Load whatever timestamps we can, generate the metrics script, and then send it to the
