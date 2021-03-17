@@ -18,8 +18,8 @@ if [[ -z "${OS_CLOUD}" ]]; then
   echo "OpenStack cloud isn't specified. Using 'openstack' by default."
   export OS_CLOUD="rhcert"
 fi
-if [[ -z "${BASE_DOMAIN}" ]]; then
-  echo "Cluster's base domain must be specified in BASE_DOMAIN."
+if [[ -z "${CLUSTER_DOMAIN}" ]]; then
+  echo "Cluster's base domain must be specified in CLUSTER_DOMAIN."
   exit 1
 fi
 
@@ -28,7 +28,8 @@ export HOME=/tmp
 pull_secret_in=${HOME}/pull-secret
 pull_secret_out=${SHARED_DIR}/pull-secret
 tfvars_out=${SHARED_DIR}/terraform.tfvars
-ocp_version=`cut -d: -f2 <<<${RELEASE_IMAGE_LATEST}`
+ocp_version=$(echo $RELEASE_IMAGE_LATEST | cut -d: -f2)
+ocp_version=$(echo $ocp_version | cut -d- -f1)
 
 export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${RELEASE_IMAGE_LATEST}
 # Ensure ignition assets are configured with the correct invoker to track CI jobs.
@@ -40,7 +41,7 @@ cp ${pull_secret_in} ${pull_secret_out}
 # Create terraform.tfvars
 echo "$(date -u --rfc-3339=seconds) - Creating terraform variables file..."
 cat > "${tfvars_out}" <<-EOF
-base_domain = "${base_domain}"
+cluster_domain = "${cluster_domain}"
 openshift_version = "${ocp_version}"
 image_override = "${RELEASE_IMAGE_LATEST}"
 worker_count = "2"
