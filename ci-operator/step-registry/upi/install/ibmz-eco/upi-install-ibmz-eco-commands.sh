@@ -6,8 +6,6 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-#export HOME=/tmp
-#export OPENSHIFT_INSTALL_INVOKER=openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD_ID}
 export http_proxy="http://204.90.115.172:8080"
 export https_proxy="http://204.90.115.172:8080"
 
@@ -23,6 +21,9 @@ pushd ${installer_dir}
 cp -t "${installer_dir}" \
     "${SHARED_DIR}/terraform.tfvars" \
     ${ibmz_eco_cloud_auth}
+
+cp -t "${cluster_dir}" \
+    "${SHARED_DIR}/pull-secret"
 
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
