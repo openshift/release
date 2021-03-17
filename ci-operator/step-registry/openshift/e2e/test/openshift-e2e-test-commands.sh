@@ -141,6 +141,7 @@ function suite() {
     set -x
     openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-} \
         --provider "${TEST_PROVIDER}" \
+        --max-parallel-tests 5 \
         -o "${ARTIFACT_DIR}/e2e.log" \
         --junit-dir "${ARTIFACT_DIR}/junit"
     set +x
