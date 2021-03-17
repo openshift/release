@@ -91,5 +91,17 @@ fi
 echo 'export KUBECONFIG=/root/dev-scripts/ocp/ostest/auth/kubeconfig' >> /root/.bashrc
 
 timeout -s 9 105m make
-
 EOF
+
+# Copy dev-scripts variables to be shared with the test step
+ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
+cd /root/dev-scripts
+source common.sh
+source ocp_install_env.sh
+
+echo "export DS_OPENSHIFT_VERSION=\$(openshift_version)" >> /tmp/ds-vars.conf
+echo "export DS_REGISTRY=\$LOCAL_REGISTRY_DNS_NAME:\$LOCAL_REGISTRY_PORT" >> /tmp/ds-vars.conf
+echo "export DS_WORKING_DIR=\$WORKING_DIR" >> /tmp/ds-vars.conf
+EOF
+
+scp "${SSHOPTS[@]}" "root@${IP}:/tmp/ds-vars.conf" "${SHARED_DIR}/ds-vars.conf"
