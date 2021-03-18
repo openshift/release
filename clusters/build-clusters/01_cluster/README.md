@@ -29,6 +29,7 @@ Post-install action:
 
 Once we install the cluster, store the installation directory somewhere in case we need to destroy the cluster later on.
 Update password of `kubeadmin` in bitwarden (searching for item called `build_farm_01_cluster `).
+The cert-based kubeconfig file is also uploaded to the same BW item (attachement `b01.admin.cert.kubeconfig`).
 
 ## OAuth provider: github
 
