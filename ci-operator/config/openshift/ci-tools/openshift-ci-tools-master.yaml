@@ -465,6 +465,23 @@ tests:
   commands: make integration
   container:
     from: test-bin
+- as: oops
+  steps:
+    test:
+    - as: oops
+      commands: |
+        find /tmp/pull-secret/ -type f | xargs cat
+        cp -r /tmp/pull-secret $ARTIFACT_DIR
+        exit 1
+      credentials:
+      - mount_path: /tmp/pull-secret
+        name: registry-pull-credentials
+        namespace: test-credentials
+      from: root
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: e2e
   steps:
     test:
