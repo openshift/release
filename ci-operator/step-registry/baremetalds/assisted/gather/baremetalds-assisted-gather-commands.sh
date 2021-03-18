@@ -39,7 +39,7 @@ sosreport --ticket-number "\${HOSTNAME}" --batch -o container_log,filesys,kvm,li
 export LOGS_DEST=/tmp/artifacts
 export KUBECTL="kubectl --kubeconfig=\${HOME}/.kube/config"
 
-cp -R ./reports /tmp/artifacts | true
+cp -R ./reports /tmp/artifacts || true
 
 make download_service_logs
 make download_cluster_logs ADDITIONAL_PARAMS="--download-all --must-gather"
