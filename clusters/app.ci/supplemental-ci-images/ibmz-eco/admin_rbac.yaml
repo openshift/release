@@ -1,0 +1,50 @@
+# this is the Namespace in which your image will live
+apiVersion: v1
+kind: Namespace
+metadata:
+  annotations:
+    openshift.io/description: OCP deployments on IBM Z Ecosystem Cloud
+    openshift.io/display-name: IBM Z Ecosystem Cloud
+  name: ibmz-eco
+---
+# the Group of people who should be able to manage this Namespace
+kind: Group
+apiVersion: v1
+metadata:
+  name: ibmz-eco-admins
+users:
+  # these names are GitHub usernames
+  - aosadchyy
+  - ashfreeth
+---
+# this adds the admins to the project.
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ibmz-eco-viewer-binding
+  namespace: ibmz-eco
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: view
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: ibmz-eco-admins
+    namespace: ibmz-eco
+---
+# this grants all authenticated users rights to pull images
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ibmz-eco-image-puller-binding
+  namespace: ibmz-eco
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: system:image-puller
+subjects:
+# this is the set of all authenticated users
+- apiGroup: rbac.authorization.k8s.io
+  kind: Group
+  name: system:authenticated
