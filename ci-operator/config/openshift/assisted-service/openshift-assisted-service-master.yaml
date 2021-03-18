@@ -28,10 +28,8 @@ base_images:
     namespace: openshift
     tag: golang-1.15
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.15
+  project_image:
+    dockerfile_path: Dockerfile.assisted-service-build
 images:
 - dockerfile_path: Dockerfile.assisted-service
   from: coreos_centos
@@ -58,7 +56,11 @@ test_binary_build_commands: |
   mkdir /.cache && chmod 775 -R /.cache && chmod 775 -R $GOPATH
 tests:
 - as: lint
-  commands: export GOLANGCI_LINT_CACHE=/tmp/.cache && export GOPROXY=https://proxy.golang.org && make lint
+  commands: export GOLANGCI_LINT_CACHE=/tmp/golangci-cache make lint
+  container:
+    from: test-bin
+- as: unit-test
+  commands: make REPORTS=${ARTIFACT_DIR} unit-test
   container:
     from: test-bin
 - as: assisted-service-aws
