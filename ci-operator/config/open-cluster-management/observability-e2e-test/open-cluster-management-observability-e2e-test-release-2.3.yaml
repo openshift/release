@@ -46,7 +46,9 @@ tests:
       cli: latest
       commands: |
         export COMPONENT_IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:observability-e2e-test}
-        make test-e2e
+        set -o pipefail
+        make test-e2e 2>&1 | tee ${ARTIFACT_DIR}/e2e_tests_out.log
+        set +o pipefail
       env:
       - default: oc
         name: KUBECTL
