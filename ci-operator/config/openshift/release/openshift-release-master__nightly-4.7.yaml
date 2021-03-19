@@ -93,6 +93,16 @@ tests:
         IP_STACK=v4
         NETWORK_TYPE=OpenShiftSDN
     workflow: baremetalds-e2e
+- as: e2e-metal-ipi-serial
+  cron: 0 0 1 1 *
+  steps:
+    cluster_profile: packet
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OpenShiftSDN
+      TEST_SUITE: openshift/conformance/serial
+    workflow: baremetalds-e2e
 - as: e2e-metal-ipi-upgrade
   cron: 0 0 1 1 *
   steps:
@@ -112,6 +122,16 @@ tests:
         IP_STACK=v6
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
+- as: e2e-metal-ipi-ovn-ipv6-serial
+  cron: 0 0 1 1 *
+  steps:
+    cluster_profile: packet
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        NETWORK_TYPE=OVNKubernetes
+      TEST_SUITE: openshift/conformance/serial
+    workflow: baremetalds-e2e
 - as: e2e-metal-ipi-ovn-dualstack
   cron: 0 0 1 1 *
   steps:
@@ -120,6 +140,16 @@ tests:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4v6
         NETWORK_TYPE=OVNKubernetes
+    workflow: baremetalds-e2e
+- as: e2e-metal-ipi-ovn-dualstack-serial
+  cron: 0 0 1 1 *
+  steps:
+    cluster_profile: packet
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NETWORK_TYPE=OVNKubernetes
+      TEST_SUITE: openshift/conformance/serial
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-compact
   cron: 0 0 * * 1
@@ -131,10 +161,29 @@ tests:
     - ref: baremetalds-devscripts-conf-compact
     - ref: baremetalds-devscripts-setup
     workflow: baremetalds-e2e
+- as: e2e-metal-ipi-compact-serial
+  cron: 0 0 * * 1
+  steps:
+    cluster_profile: packet
+    env:
+      TEST_SUITE: openshift/conformance/serial
+    pre:
+    - ref: baremetalds-packet-setup
+    - ref: ipi-install-rbac
+    - ref: baremetalds-devscripts-conf-compact
+    - ref: baremetalds-devscripts-setup
+    workflow: baremetalds-e2e
 - as: e2e-metal-ipi-virtualmedia
   cron: 0 0 * * 1
   steps:
     cluster_profile: packet
+    workflow: baremetalds-e2e-virtualmedia
+- as: e2e-metal-ipi-virtualmedia-serial
+  cron: 0 0 * * 1
+  steps:
+    cluster_profile: packet
+    env:
+      TEST_SUITE: openshift/conformance/serial
     workflow: baremetalds-e2e-virtualmedia
 - as: e2e-aws-proxy
   cron: 0 0 */2 * *
