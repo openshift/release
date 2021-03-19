@@ -23,7 +23,7 @@ function copy_test_binaries() {
 function mirror_test_images() {
         echo "### Mirroring test images"
 
-        DEVSCRIPTS_TEST_IMAGE_REPO=${DS_REGISTRY}/localimages/local-test-image  
+        DEVSCRIPTS_TEST_IMAGE_REPO=${DS_REGISTRY}/localimages/local-test-image
         # shellcheck disable=SC2087
         ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
 openshift-tests images --to-repository ${DEVSCRIPTS_TEST_IMAGE_REPO} > /tmp/mirror
@@ -34,7 +34,7 @@ EOF
 
 function use_minimal_test_list() {
         echo "### Skipping test images mirroring, fall back to minimal tests list"
-        
+
         TEST_ARGS="--file /tmp/tests"
         TEST_SKIPS=""
         echo "${TEST_MINIMAL_LIST}" > /tmp/tests
@@ -47,12 +47,12 @@ packet)
     # shellcheck source=/dev/null
     source "${SHARED_DIR}/ds-vars.conf"
     copy_test_binaries
-    export TEST_PROVIDER=\"\"
+    export TEST_PROVIDER='{\"type\":\"baremetal\"}'
 
     echo "### Checking release version"
     # Mirroring test images is supported only for versions greater than or equal to 4.7
     if printf '%s\n%s' "4.7" "${DS_OPENSHIFT_VERSION}" | sort -C -V; then
-        mirror_test_images       
+        mirror_test_images
     else
         use_minimal_test_list
     fi
@@ -65,7 +65,7 @@ function upgrade() {
     ssh "${SSHOPTS[@]}" "root@${IP}" \
         openshift-tests run-upgrade all \
         --to-image "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}" \
-        --provider "${TEST_PROVIDER}" \
+        --provider "${TEST_PROVIDER:-}" \
         -o "/tmp/artifacts/e2e.log" \
         --junit-dir "/tmp/artifacts/junit"
     set +x
@@ -73,7 +73,7 @@ function upgrade() {
 
 function suite() {
     if [[ -n "${TEST_SKIPS}" ]]; then
-        TESTS="$(ssh "${SSHOPTS[@]}" "root@${IP}" openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")"
+        TESTS="$(ssh "${SSHOPTS[@]}" "root@${IP}" openshift-tests run --dry-run --provider "${TEST_PROVIDER:-}" "${TEST_SUITE}")"
         echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests
         echo "Skipping tests:"
         echo "${TESTS}" | grep "${TEST_SKIPS}"
@@ -81,7 +81,7 @@ function suite() {
     fi
 
     scp "${SSHOPTS[@]}" /tmp/tests "root@${IP}:/tmp/tests"
-    
+
     set -x
     ssh "${SSHOPTS[@]}" "root@${IP}" \
         openshift-tests run "${TEST_SUITE}" "${TEST_ARGS:-}" \
