@@ -51,7 +51,9 @@ tests:
       commands: |
         export COMPONENT_IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:rbac-query-proxy}
         export SELF="make -f Makefile.prow"
-        make -f Makefile.prow e2e-tests
+        set -o pipefail
+        make -f Makefile.prow e2e-tests 2>&1 | tee ${ARTIFACT_DIR}/e2e_tests_out.log
+        set +o pipefail
       env:
       - default: oc
         name: KUBECTL
