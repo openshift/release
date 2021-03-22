@@ -604,15 +604,15 @@ presubmits:
     branches:
     - master
     cluster: build02
-    context: ci/prow/unit
+    context: ci/prow/system-test
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-test-infra-master-unit
-    rerun_command: /test unit
+    name: pull-ci-openshift-assisted-test-infra-master-system-test
+    rerun_command: /test system-test
     spec:
       containers:
       - args:
@@ -620,8 +620,8 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/usr/local/unit-cluster-profile
-        - --target=unit
+        - --secret-dir=/usr/local/system-test-cluster-profile
+        - --target=system-test
         command:
         - ci-operator
         image: ci-operator:latest
@@ -634,7 +634,7 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/unit-cluster-profile
+        - mountPath: /usr/local/system-test-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -666,4 +666,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )unit,?($|\s.*)
+    trigger: (?m)^/test( | .* )system-test,?($|\s.*)
