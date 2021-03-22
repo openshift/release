@@ -11,6 +11,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      job-release: "4.8"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-psap-ci-artifacts-release-4.8-gpu-operator-e2e
     rerun_command: /test gpu-operator-e2e
@@ -21,6 +22,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --secret-dir=/usr/local/gpu-operator-e2e-cluster-profile
         - --target=gpu-operator-e2e
         command:
@@ -34,6 +36,9 @@ presubmits:
         volumeMounts:
         - mountPath: /etc/boskos
           name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
           readOnly: true
         - mountPath: /usr/local/gpu-operator-e2e-cluster-profile
           name: cluster-profile
@@ -54,6 +59,9 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -77,6 +85,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      job-release: "4.8"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-psap-ci-artifacts-release-4.8-images
     rerun_command: /test images
