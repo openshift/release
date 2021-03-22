@@ -3,6 +3,10 @@ base_images:
     name: alpine
     namespace: ci
     tag: "3.10"
+  cli:
+    name: "4.7"
+    namespace: ocp
+    tag: cli
 binary_build_commands: make CGO_ENABLED=0 install
 build_root:
   image_stream_tag:
@@ -26,7 +30,22 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tag_specification:
+  name: "4.5"
+  namespace: ocp
 tests:
+- as: e2e-aws
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+    test:
+    - as: e2e-aws-test
+      commands: oc get node && echo ${ARTIFACT_DIR}
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: unit
   commands: make test
   container:
