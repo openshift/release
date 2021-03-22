@@ -46,16 +46,20 @@ tests:
     make vendor && git diff --stat HEAD --ignore-submodules --exit-code
   container:
     from: src
+- as: e2e-gcp
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp
 - as: unit-olm
   commands: make unit/olm
   container:
     from: src
-- as: unit-api
-  commands: make unit/api
-  container:
-    from: src
 - as: unit-registry
   commands: make unit/registry
+  container:
+    from: src
+- as: unit-api
+  commands: make unit/api
   container:
     from: src
 - as: e2e-aws-olm
@@ -70,6 +74,22 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- as: e2e-aws-console-olm
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: ./test-prow-e2e.sh olmFull
+      from: stable:console-tests
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-upgrade
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-upgrade-gcp
 zz_generated_metadata:
   branch: release-4.8
   org: openshift
