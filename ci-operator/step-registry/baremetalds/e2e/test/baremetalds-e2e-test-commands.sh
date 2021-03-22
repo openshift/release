@@ -47,7 +47,7 @@ packet)
     # shellcheck source=/dev/null
     source "${SHARED_DIR}/ds-vars.conf"
     copy_test_binaries
-    export TEST_PROVIDER=\"\"
+    export TEST_PROVIDER='{\"type\":\"baremetal\"}'
 
     echo "### Checking release version"
     # Mirroring test images is supported only for versions greater than or equal to 4.7
