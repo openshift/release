@@ -1,0 +1,45 @@
+releases:
+  initial:
+    release:
+      channel: stable
+      version: "4.7"
+  intermediate:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.8"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.9"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws-upgrade-paused
+  interval: 72h
+  steps:
+    cluster_profile: aws
+    env:
+      TEST_UPGRADE_OPTIONS: ""
+    test:
+    - as: set-releases-release
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_LATEST}" > ${SHARED_DIR}/override-upgrade
+      dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE
+        name: release:intermediate
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: openshift-e2e-test
+    workflow: openshift-upgrade-aws-pausedworkers
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: release
+  variant: nightly-4.9-upgrade-from-stable-4.7
