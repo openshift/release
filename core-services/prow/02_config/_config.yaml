@@ -179,10 +179,6 @@ branch-protection:
           restrictions:
             teams:
             - team-azure-committers
-        cloud-ingress-operator:
-          required_status_checks:
-            contexts:
-            - ci.ext.devshift.net PR build
         cluster-api-provider-kubevirt:
           branches:
             master:
@@ -559,10 +555,10 @@ plank:
             memory: 250Mi
       timeout: 4h0m0s
       utility_images:
-        clonerefs: gcr.io/k8s-prow/clonerefs:v20210316-fe8b28563d
-        entrypoint: gcr.io/k8s-prow/entrypoint:v20210316-fe8b28563d
-        initupload: gcr.io/k8s-prow/initupload:v20210316-fe8b28563d
-        sidecar: gcr.io/k8s-prow/sidecar:v20210316-fe8b28563d
+        clonerefs: gcr.io/k8s-prow/clonerefs:v20210322-52e1f8ab47
+        entrypoint: gcr.io/k8s-prow/entrypoint:v20210322-52e1f8ab47
+        initupload: gcr.io/k8s-prow/initupload:v20210322-52e1f8ab47
+        sidecar: gcr.io/k8s-prow/sidecar:v20210322-52e1f8ab47
     openshift-priv:
       gcs_configuration:
         bucket: origin-ci-private
@@ -652,7 +648,9 @@ tide:
     integr8ly/heimdall: rebase
     jianzhangbjz/learn-operator: squash
     open-cluster-management/application-ui: squash
+    open-cluster-management/applier: squash
     open-cluster-management/applifecycle-backend-e2e: squash
+    open-cluster-management/cert-policy-controller: squash
     open-cluster-management/cluster-curator-controller: squash
     open-cluster-management/clusterlifecycle-state-metrics: squash
     open-cluster-management/config-policy-controller: squash
@@ -660,13 +658,19 @@ tide:
     open-cluster-management/console-api: squash
     open-cluster-management/discovery: squash
     open-cluster-management/endpoint-metrics-operator: squash
+    open-cluster-management/governance-policy-framework: squash
     open-cluster-management/governance-policy-propagator: squash
     open-cluster-management/governance-policy-spec-sync: squash
     open-cluster-management/governance-policy-status-sync: squash
     open-cluster-management/governance-policy-template-sync: squash
     open-cluster-management/grafana-dashboard-loader: squash
+    open-cluster-management/grc-chart: squash
+    open-cluster-management/grc-ui: squash
+    open-cluster-management/grc-ui-api: squash
     open-cluster-management/hub-crds: squash
+    open-cluster-management/iam-policy-controller: squash
     open-cluster-management/image-builder: squash
+    open-cluster-management/insights-client: squash
     open-cluster-management/klusterlet-addon-controller: squash
     open-cluster-management/klusterlet-addon-operator: squash
     open-cluster-management/library-go: squash
@@ -683,8 +687,11 @@ tide:
     open-cluster-management/multicloudhub-repo: squash
     open-cluster-management/observability-e2e-test: squash
     open-cluster-management/rbac-query-proxy: squash
+    open-cluster-management/search-aggregator: squash
     open-cluster-management/search-collector: squash
+    open-cluster-management/search-operator: squash
     open-cluster-management/security-middleware: squash
+    open-cluster-management/thanos: squash
     opendatahub-io/manifests: squash
     opendatahub-io/odh-manifests: squash
     opendatahub-io/opendatahub-operator: squash
@@ -747,6 +754,7 @@ tide:
     openshift/static-config-operator: squash
     openshift/template-service-broker-operator: squash
     openshift/verification-tests: squash
+    operator-framework/olm-docs: squash
     operator-framework/operator-lib: squash
     red-hat-data-services/opendatahub-operator: rebase
     redhat-developer/gitops-backend: squash
@@ -759,6 +767,17 @@ tide:
   pr_status_base_urls:
     '*': https://prow.ci.openshift.org/pr
     openshift-priv: https://deck-internal-ci.svc.ci.openshift.org/pr
+  priority:
+  - labels:
+    - bugzilla/severity-urgent
+  - labels:
+    - bugzilla/severity-high
+  - labels:
+    - bugzilla/severity-medium
+  - labels:
+    - bugzilla/severity-low
+  - labels:
+    - bugzilla/severity-unspecified
   queries:
   - labels:
     - lgtm
@@ -814,8 +833,8 @@ tide:
     - openshift-metal3/dev-scripts
     - openshift/odo
     - openshift/odo-init-image
+    - operator-framework/olm-docs
     - operator-framework/operator-lib
-    - ostreedev/ostree
     - red-hat-data-services/opendatahub-operator
     - redhat-developer/gitops-backend
     - redhat-developer/gitops-operator
@@ -977,6 +996,7 @@ tide:
     - openshift-priv/openshift-state-metrics
     - openshift-priv/openshift-tuned
     - openshift-priv/openstack-cinder-csi-driver-operator
+    - openshift-priv/operator-framework-olm
     - openshift-priv/origin
     - openshift-priv/origin-aggregated-logging
     - openshift-priv/ovirt-csi-driver
@@ -1004,6 +1024,8 @@ tide:
     - openshift-priv/template-service-broker-operator
     - openshift-priv/thanos
     - openshift-priv/vertical-pod-autoscaler-operator
+    - openshift-priv/vmware-vsphere-csi-driver
+    - openshift-priv/vmware-vsphere-csi-driver-operator
     - openshift-priv/vsphere-problem-detector
     - openshift-priv/whereabouts-cni
     - openshift/ansible-service-broker
@@ -1167,6 +1189,8 @@ tide:
     - openshift/template-service-broker-operator
     - openshift/thanos
     - openshift/vertical-pod-autoscaler-operator
+    - openshift/vmware-vsphere-csi-driver
+    - openshift/vmware-vsphere-csi-driver-operator
     - openshift/vsphere-problem-detector
     - openshift/whereabouts-cni
     - operator-framework/operator-lifecycle-manager
@@ -1325,6 +1349,7 @@ tide:
     - openshift-priv/openshift-state-metrics
     - openshift-priv/openshift-tuned
     - openshift-priv/openstack-cinder-csi-driver-operator
+    - openshift-priv/operator-framework-olm
     - openshift-priv/origin
     - openshift-priv/origin-aggregated-logging
     - openshift-priv/ovirt-csi-driver
@@ -1352,6 +1377,8 @@ tide:
     - openshift-priv/template-service-broker-operator
     - openshift-priv/thanos
     - openshift-priv/vertical-pod-autoscaler-operator
+    - openshift-priv/vmware-vsphere-csi-driver
+    - openshift-priv/vmware-vsphere-csi-driver-operator
     - openshift-priv/vsphere-problem-detector
     - openshift-priv/whereabouts-cni
     - openshift/ansible-service-broker
@@ -1515,6 +1542,8 @@ tide:
     - openshift/template-service-broker-operator
     - openshift/thanos
     - openshift/vertical-pod-autoscaler-operator
+    - openshift/vmware-vsphere-csi-driver
+    - openshift/vmware-vsphere-csi-driver-operator
     - openshift/vsphere-problem-detector
     - openshift/whereabouts-cni
     - operator-framework/operator-lifecycle-manager
@@ -1687,6 +1716,7 @@ tide:
     - openshift-priv/openshift-state-metrics
     - openshift-priv/openshift-tuned
     - openshift-priv/openstack-cinder-csi-driver-operator
+    - openshift-priv/operator-framework-olm
     - openshift-priv/origin-aggregated-logging
     - openshift-priv/ovirt-csi-driver
     - openshift-priv/ovirt-csi-driver-operator
@@ -1712,6 +1742,8 @@ tide:
     - openshift-priv/template-service-broker-operator
     - openshift-priv/thanos
     - openshift-priv/vertical-pod-autoscaler-operator
+    - openshift-priv/vmware-vsphere-csi-driver
+    - openshift-priv/vmware-vsphere-csi-driver-operator
     - openshift-priv/whereabouts-cni
     - openshift/ansible-service-broker
     - openshift/api
@@ -1869,6 +1901,8 @@ tide:
     - openshift/template-service-broker-operator
     - openshift/thanos
     - openshift/vertical-pod-autoscaler-operator
+    - openshift/vmware-vsphere-csi-driver
+    - openshift/vmware-vsphere-csi-driver-operator
     - openshift/whereabouts-cni
     - operator-framework/operator-lifecycle-manager
     - operator-framework/operator-marketplace
@@ -2039,6 +2073,7 @@ tide:
     - openshift-priv/openshift-state-metrics
     - openshift-priv/openshift-tuned
     - openshift-priv/openstack-cinder-csi-driver-operator
+    - openshift-priv/operator-framework-olm
     - openshift-priv/origin
     - openshift-priv/origin-aggregated-logging
     - openshift-priv/ovirt-csi-driver
@@ -2065,6 +2100,8 @@ tide:
     - openshift-priv/template-service-broker-operator
     - openshift-priv/thanos
     - openshift-priv/vertical-pod-autoscaler-operator
+    - openshift-priv/vmware-vsphere-csi-driver
+    - openshift-priv/vmware-vsphere-csi-driver-operator
     - openshift-priv/whereabouts-cni
     - openshift/ansible-service-broker
     - openshift/api
@@ -2222,6 +2259,8 @@ tide:
     - openshift/template-service-broker-operator
     - openshift/thanos
     - openshift/vertical-pod-autoscaler-operator
+    - openshift/vmware-vsphere-csi-driver
+    - openshift/vmware-vsphere-csi-driver-operator
     - openshift/whereabouts-cni
     - operator-framework/operator-lifecycle-manager
     - operator-framework/operator-marketplace
@@ -2253,6 +2292,7 @@ tide:
     - openshift-priv/library-go
     - openshift-priv/openshift-tests
     - openshift-priv/openshift-tests-private
+    - openshift-priv/operator-framework-olm
     - openshift-priv/osd-metrics-exporter
     - openshift-priv/osin
     - openshift-psap/ci-artifacts

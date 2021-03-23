@@ -125,7 +125,8 @@ function upgrade() {
         --options "${TEST_UPGRADE_OPTIONS-}" \
         --provider "${TEST_PROVIDER}" \
         -o "${ARTIFACT_DIR}/e2e.log" \
-        --junit-dir "${ARTIFACT_DIR}/junit"
+        --junit-dir "${ARTIFACT_DIR}/junit" &
+    wait "$!"
     set +x
 }
 
@@ -142,7 +143,8 @@ function suite() {
     openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-} \
         --provider "${TEST_PROVIDER}" \
         -o "${ARTIFACT_DIR}/e2e.log" \
-        --junit-dir "${ARTIFACT_DIR}/junit"
+        --junit-dir "${ARTIFACT_DIR}/junit" &
+    wait "$!"
     set +x
 }
 

@@ -308,6 +308,11 @@ approve:
   repos:
   - operator-framework/operator-lib
   require_self_approval: true
+- commandHelpLink: https://go.k8s.io/bot-commands
+  ignore_review_state: true
+  repos:
+  - operator-framework/olm-docs
+  require_self_approval: false
 - commandHelpLink: ""
   repos:
   - openshift-priv/cluster-baremetal-operator
@@ -415,6 +420,7 @@ approve:
   require_self_approval: false
 - commandHelpLink: https://go.k8s.io/bot-commands
   repos:
+  - openshift-priv/operator-framework-olm
   - openshift/operator-framework-olm
   require_self_approval: false
 - commandHelpLink: ""
@@ -427,11 +433,21 @@ approve:
 - commandHelpLink: ""
   repos:
   - eclipse-che/che-operator
+  require_self_approval: false
 - commandHelpLink: ""
   repos:
-  - eclipse-che/che-operator
   - openshift-priv/driver-toolkit
   - openshift/driver-toolkit
+  require_self_approval: false
+- commandHelpLink: ""
+  repos:
+  - openshift-priv/vmware-vsphere-csi-driver-operator
+  - openshift/vmware-vsphere-csi-driver-operator
+  require_self_approval: false
+- commandHelpLink: ""
+  repos:
+  - openshift-priv/vmware-vsphere-csi-driver
+  - openshift/vmware-vsphere-csi-driver
   require_self_approval: false
 blunderbuss:
   max_request_count: 2
@@ -448,6 +464,8 @@ bugzilla:
       - status: VERIFIED
       - status: RELEASE_PENDING
       - resolution: ERRATA
+        status: CLOSED
+      - resolution: CURRENTRELEASE
         status: CLOSED
       is_open: true
       state_after_close:
@@ -1128,6 +1146,11 @@ config_updater:
         - ci
       gzip: true
       name: ci-operator-misc-configs
+    ci-operator/config/redhat-operator-ecosystem/cvp/*-ocp-4.*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      name: ci-operator-misc-configs
     ci-operator/config/redhat-operator-ecosystem/playground/*-cvp-ocp-4.4.yaml:
       clusters:
         app.ci:
@@ -1645,6 +1668,14 @@ config_updater:
       gzip: true
       name: job-config-misc
     ci-operator/jobs/red-hat-data-services/**/*-v1*.yaml:
+      clusters:
+        api.ci:
+        - ci
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
+    ci-operator/jobs/redhat-operator-ecosystem/cvp/*-ocp-4.*.yaml:
       clusters:
         api.ci:
         - ci
@@ -2246,6 +2277,13 @@ config_updater:
         app.ci:
         - ci
       name: deck-extensions
+    core-services/prow/02_config/deck-internal-extensions/*:
+      clusters:
+        api.ci:
+        - ci
+        app.ci:
+        - ci
+      name: deck-internal-extensions
     core-services/release-controller/_releases/*:
       clusters:
         api.ci:
@@ -3467,6 +3505,7 @@ lgtm:
   - openshift/cloud-network-config-controller
   review_acts_as_lgtm: true
 - repos:
+  - openshift-priv/operator-framework-olm
   - openshift/operator-framework-olm
   review_acts_as_lgtm: true
 - repos:
@@ -3481,6 +3520,14 @@ lgtm:
   review_acts_as_lgtm: true
 - repos:
   - eclipse-che/che-operator
+  review_acts_as_lgtm: true
+- repos:
+  - openshift-priv/vmware-vsphere-csi-driver-operator
+  - openshift/vmware-vsphere-csi-driver-operator
+  review_acts_as_lgtm: true
+- repos:
+  - openshift-priv/vmware-vsphere-csi-driver
+  - openshift/vmware-vsphere-csi-driver
   review_acts_as_lgtm: true
 override:
   allow_top_level_owners: true
@@ -4523,6 +4570,9 @@ plugins:
     - trigger
     - verify-owners
     - wip
+  open-cluster-management/addon-framework:
+    plugins:
+    - dco
   open-cluster-management/api:
     plugins:
     - dco
@@ -5297,6 +5347,9 @@ plugins:
   openshift-priv/openstack-cinder-csi-driver-operator:
     plugins:
     - approve
+  openshift-priv/operator-framework-olm:
+    plugins:
+    - approve
   openshift-priv/origin:
     plugins:
     - approve
@@ -5385,6 +5438,12 @@ plugins:
     plugins:
     - approve
   openshift-priv/vertical-pod-autoscaler-operator:
+    plugins:
+    - approve
+  openshift-priv/vmware-vsphere-csi-driver:
+    plugins:
+    - approve
+  openshift-priv/vmware-vsphere-csi-driver-operator:
     plugins:
     - approve
   openshift-priv/vsphere-problem-detector:
@@ -6350,6 +6409,12 @@ plugins:
   openshift/vertical-pod-autoscaler-operator:
     plugins:
     - approve
+  openshift/vmware-vsphere-csi-driver:
+    plugins:
+    - approve
+  openshift/vmware-vsphere-csi-driver-operator:
+    plugins:
+    - approve
   openshift/vsphere-problem-detector:
     plugins:
     - approve
@@ -6416,6 +6481,10 @@ plugins:
     plugins:
     - bugzilla
     - owners-label
+  operator-framework/olm-docs:
+    plugins:
+    - approve
+    - owners-label
   operator-framework/operator-lib:
     plugins:
     - approve
@@ -6434,22 +6503,16 @@ plugins:
     - bugzilla
   ostreedev/ostree:
     plugins:
-    - approve
     - assign
-    - blunderbuss
     - cat
     - dog
     - heart
-    - golint
     - help
     - hold
     - label
-    - lgtm
-    - lifecycle
     - override
     - retitle
     - shrug
-    - sigmention
     - skip
     - trigger
     - verify-owners
