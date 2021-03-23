@@ -1,27 +1,19 @@
 periodics:
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   cron: 0 */23 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
   extra_refs:
-  - base_ref: release-4.7
+  - base_ref: release-4.8
     org: openshift-psap
     repo: ci-artifacts
   labels:
     ci-operator.openshift.io/prowgen-controlled: "true"
-    job-release: "4.7"
+    job-release: "4.8"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-psap-ci-artifacts-release-4.7-gpu-operator-e2e
-  reporter_config:
-    slack:
-      channel: '#psap-ci-alerts'
-      job_states_to_report:
-      - success
-      - failure
-      - error
-      report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark: {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning: {{end}}'
+  name: periodic-ci-openshift-psap-ci-artifacts-release-4.8-gpu-operator-e2e-master
   spec:
     containers:
     - args:
@@ -30,8 +22,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/gpu-operator-e2e-cluster-profile
-      - --target=gpu-operator-e2e
+      - --secret-dir=/usr/local/gpu-operator-e2e-master-cluster-profile
+      - --target=gpu-operator-e2e-master
       command:
       - ci-operator
       image: ci-operator:latest
@@ -47,7 +39,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/gpu-operator-e2e-cluster-profile
+      - mountPath: /usr/local/gpu-operator-e2e-master-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
