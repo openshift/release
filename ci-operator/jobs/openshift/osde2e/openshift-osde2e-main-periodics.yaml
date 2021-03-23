@@ -2130,7 +2130,70 @@ periodics:
       - name: CONFIGS
         value: aws,stage,addon-suite
       - name: NUM_WORKER_NODES
-        value: "8"
+        value: "6"
+      - name: OCM_COMPUTE_MACHINE_TYPE
+        value: m5.2xlarge
+      - name: POLLING_TIMEOUT
+        value: "14400"
+      - name: SECRET_LOCATIONS
+        value: /usr/local/osde2e-common,/usr/local/ocs-converged-credentials
+      image: quay.io/app-sre/osde2e
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/ocs-converged-credentials
+        name: ocs-converged-credentials
+        readOnly: true
+      - mountPath: /usr/local/osde2e-common
+        name: osde2e-common
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: ocs-converged-credentials
+      secret:
+        secretName: ocs-converged-credentials
+    - name: osde2e-common
+      secret:
+        secretName: osde2e-common
+- agent: kubernetes
+  cluster: build02
+  cron: 0 */12 * * *
+  decorate: true
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: osde2e
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "false"
+  name: osde2e-stage-aws-addon-ocs-converged-dev
+  reporter_config:
+    slack:
+      channel: '#forum-ocs-dedicated'
+      job_states_to_report:
+      - failure
+      report_template: Job {{.Spec.Job}} failed.
+  spec:
+    containers:
+    - args:
+      - test
+      - --secret-locations
+      - $(SECRET_LOCATIONS)
+      - --configs
+      - $(CONFIGS)
+      command:
+      - /osde2e
+      env:
+      - name: ADDON_IDS
+        value: ocs-converged-dev
+      - name: ADDON_TEST_HARNESSES
+        value: quay.io/kesavanvt/ocsci-osd
+      - name: CONFIGS
+        value: aws,stage,addon-suite
+      - name: NUM_WORKER_NODES
+        value: "6"
       - name: OCM_COMPUTE_MACHINE_TYPE
         value: m5.2xlarge
       - name: POLLING_TIMEOUT
