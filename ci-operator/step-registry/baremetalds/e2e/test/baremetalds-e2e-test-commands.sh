@@ -28,9 +28,8 @@ function mirror_test_images() {
         ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
 openshift-tests images --to-repository ${DEVSCRIPTS_TEST_IMAGE_REPO} > /tmp/mirror
 oc image mirror -f /tmp/mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json
-
-TOOLS_IMAGE=$(oc get is tools -n openshift -o json | jq -r '.spec.tags[].from.name')
-TOOLS_LOCAL_IMAGE=${DEVSCRIPTS_TEST_IMAGE_REPO}:tools
+export TOOLS_IMAGE=$(oc get is tools -n openshift -o json | jq -r '.spec.tags[].from.name')
+export TOOLS_LOCAL_IMAGE=${DEVSCRIPTS_TEST_IMAGE_REPO}:tools
 oc image mirror -a ${DS_WORKING_DIR}/pull_secret.json ${TOOLS_IMAGE} ${TOOLS_LOCAL_IMAGE}
 oc tag ${TOOLS_LOCAL_IMAGE} tools:latest -n openshift
 EOF
