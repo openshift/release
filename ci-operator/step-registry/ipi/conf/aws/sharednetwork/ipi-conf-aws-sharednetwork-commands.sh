@@ -5,12 +5,15 @@ set -o errexit
 set -o pipefail
 
 # TODO: move to image
-curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
+pip3 install --user yq
+export PATH=~/.local/bin:$PATH
+
+export AWS_SHARED_CREDENTIALS_FILE=$CLUSTER_PROFILE_DIR/.awscred
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 PATCH="${SHARED_DIR}/install-config-sharednetwork.yaml.patch"
 
-aws_region=$(/tmp/yq r "${CONFIG}" 'platform.aws.region')
+aws_region=$(yq -r '.platform.aws.region' "${CONFIG}")
 
 subnets="[]"
 case "${aws_region}_$((RANDOM % 4))" in
@@ -34,10 +37,28 @@ us-west-2_3) subnets="['subnet-072d00dcf02ad90a6','subnet-0ad913e4bd6ff53fa','su
 esac
 echo "Subnets : ${subnets}"
 
+first_subnet="$(echo ${subnets} | yq -r '.[0]')"
+
+vpc_id="$(aws --region "${aws_region}" ec2 describe-subnets --subnet-ids "${first_subnet}" | jq -r '.[][0].VpcId')"
+echo "Using vpc_id: ${vpc_id}"
+
+cluster_domain=$(yq -r '.metadata.name + "." + .baseDomain' "${CONFIG}")
+hosted_zone="$(aws route53 create-hosted-zone \
+    --name "${cluster_domain}" \
+    --vpc VPCRegion="${aws_region}",VPCId="${vpc_id}" \
+    --caller-reference "${cluster_domain}-$(date +"%Y-%m-%d-%H-%M-%S")" \
+    --hosted-zone-config Comment="BYO hosted zone for ${cluster_domain}",PrivateZone=true |
+  jq -r '.HostedZone.Id' | \
+  sed -E 's|^/hostedzone/(.+)$|\1|' \
+  )"
+echo "Using hosted zone: ${hosted_zone}"
+
 cat >> "${PATCH}" << EOF
 platform:
   aws:
     subnets: ${subnets}
+    hostedZone: ${hosted_zone}
 EOF
 
-/tmp/yq m -x -i "${CONFIG}" "${PATCH}"
+yq -y -s '.[0] * .[1]' "${CONFIG}" "${PATCH}" > "${CONFIG}.patched"
+mv "${CONFIG}.patched" "${CONFIG}"
