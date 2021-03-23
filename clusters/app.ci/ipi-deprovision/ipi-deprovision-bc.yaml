@@ -1,0 +1,67 @@
+kind: List
+apiVersion: v1
+items:
+- apiVersion: image.openshift.io/v1
+  kind: ImageStream
+  metadata:
+    name: ipi-deprovision
+    namespace: ci
+- kind: BuildConfig
+  apiVersion: v1
+  metadata:
+    name: ipi-deprovision
+    namespace: ci
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: ipi-deprovision:latest
+    source:
+      images:
+      - from:
+          kind: ImageStreamTag
+          name: 4.7:cli
+          namespace: ocp
+        paths:
+        - destinationDir: .
+          sourcePath: /usr/lib/oc
+      - from:
+          kind: ImageStreamTag
+          name: 4.7:installer
+          namespace: ocp
+        paths:
+        - destinationDir: .
+          sourcePath: /bin/openshift-install
+      git:
+        uri: "https://github.com/openshift/release"
+        ref: "master"
+      contextDir: "clusters/app.ci/ipi-deprovision"
+      dockerfile: |
+        FROM centos:8
+        LABEL maintainer="nmoraiti@redhat.com"
+
+        ARG JQ_VERSION=1.6
+
+        COPY oc /usr/bin/oc
+        COPY openshift-install /usr/bin/openshift-install
+        COPY google-cloud-sdk.repo  /etc/yum.repos.d/google-cloud-sdk.repo
+
+        RUN dnf install --nogpg -y google-cloud-sdk python3 jq less && \
+              dnf clean all && \
+              curl -O https://bootstrap.pypa.io/get-pip.py && \
+              python3 get-pip.py && \
+              rm -fv get-pip.py && \
+              pip install awscli
+      type: Dockerfile
+    strategy:
+      dockerStrategy:
+        from:
+          kind: ImageStreamTag
+          name: centos:8
+          namespace: origin
+        imageOptimizationPolicy: SkipLayers
+      type: Docker
+    triggers:
+    - type: ConfigChange
