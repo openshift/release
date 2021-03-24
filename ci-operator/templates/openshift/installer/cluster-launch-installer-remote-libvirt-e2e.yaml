@@ -589,7 +589,12 @@ objects:
         # Bump the libvirt workers disk to to 30GB
         yq write --inplace ${ARTIFACT_DIR}/installer/openshift/99_openshift-cluster-api_worker-machineset-0.yaml spec.template.spec.providerSpec.value.volume[volumeSize] 32212254720
 
-        mock-nss.sh openshift-install create cluster --dir=${ARTIFACT_DIR}/installer --log-level=debug 2>&1 | sed 's/password: .*/password: REDACTED"/g' || true &
+        RCFILE=$(mktemp)
+        {
+            mock-nss.sh openshift-install create cluster --dir=${ARTIFACT_DIR}/installer --log-level=debug 2>&1 | sed 's/password: .*/password: REDACTED"/g' || true;
+            # We need to save the individual return codes for the pipes
+            printf "RC0=%s\nRC1=%s\n" "${PIPESTATUS[0]}" "${PIPESTATUS[1]}" > ${RCFILE};
+        } &
         openshift_install="$!"
 
         # Remove block after 4.7 EOL
@@ -619,11 +624,28 @@ objects:
         done
 
         wait "${openshift_install}"
+        source ${RCFILE}
+        echo "RC0=${RC0}"
+        echo "RC1=${RC1}"
+        /bin/rm ${RCFILE}
+        RC=${RC0}
 
         # Add a step to wait for installation to complete, in case the cluster takes longer to create than the default time of 30 minutes.
-        mock-nss.sh openshift-install --dir=${ARTIFACT_DIR}/installer --log-level=debug wait-for install-complete 2>&1 | sed 's/password: .*/password: REDACTED"/g' &
-        wait "$!"
-        RC=$?
+        if [ ${RC} -gt 0 ]
+        then
+            RCFILE=$(mktemp)
+            {
+                mock-nss.sh openshift-install --dir=${ARTIFACT_DIR}/installer --log-level=debug wait-for install-complete 2>&1 | sed 's/password: .*/password: REDACTED"/g';
+                # We need to save the individual return codes for the pipes
+                printf "RC0=%s\nRC1=%s\n" "${PIPESTATUS[0]}" "${PIPESTATUS[1]}" > ${RCFILE};
+            } &
+            wait "$!"
+            source ${RCFILE}
+            echo "RC0=${RC0}"
+            echo "RC1=${RC1}"
+            /bin/rm ${RCFILE}
+            RC=${RC0}
+        fi
 
         # Password for the cluster gets leaked in the installer logs and hence removing them.
         sed -i 's/password: .*/password: REDACTED"/g' ${ARTIFACT_DIR}/installer/.openshift_install.log
