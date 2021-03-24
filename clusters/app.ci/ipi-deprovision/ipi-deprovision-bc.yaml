@@ -26,7 +26,7 @@ items:
           namespace: ocp
         paths:
         - destinationDir: .
-          sourcePath: /usr/lib/oc
+          sourcePath: /usr/bin/oc
       - from:
           kind: ImageStreamTag
           name: 4.7:installer
@@ -34,19 +34,16 @@ items:
         paths:
         - destinationDir: .
           sourcePath: /bin/openshift-install
-      git:
-        uri: "https://github.com/openshift/release"
-        ref: "master"
-      contextDir: "clusters/app.ci/ipi-deprovision"
       dockerfile: |
         FROM centos:8
         LABEL maintainer="nmoraiti@redhat.com"
 
         ARG JQ_VERSION=1.6
 
-        COPY oc /usr/bin/oc
-        COPY openshift-install /usr/bin/openshift-install
-        COPY google-cloud-sdk.repo  /etc/yum.repos.d/google-cloud-sdk.repo
+        RUN echo -e "[google-cloud-sdk]\nname=Google Cloud SDK\nbaseurl=https://packages.cloud.google.com/yum/repos/cloud-sdk-el7-x86_64\nenabled=1" > /etc/yum.repos.d/google-cloud-sdk.repo
+
+        COPY ./oc /usr/bin/oc
+        COPY ./openshift-install /usr/bin/openshift-install
 
         RUN dnf install --nogpg -y google-cloud-sdk python3 jq less && \
               dnf clean all && \
