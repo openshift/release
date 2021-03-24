@@ -1,0 +1,21 @@
+workflow:
+  as: baremetalds-e2e-ipv4-serial
+  env:
+    TEST_SUITE: openshift/conformance/serial
+    DEVSCRIPTS_CONFIG: |
+      NUM_EXTRA_WORKERS=1
+  steps:    
+    allow_skip_on_success: true
+    pre:
+    - ref: baremetalds-packet-setup
+    - ref: ipi-install-rbac
+    - ref: baremetalds-devscripts-conf-ipv4
+    - ref: baremetalds-devscripts-setup
+    test:
+      - ref: baremetalds-e2e-test
+    post:
+    - ref: baremetalds-devscripts-gather
+    - ref: baremetalds-packet-teardown
+  documentation: |-
+    This workflow executes the common end-to-end test openshift/conformance/serial suite on a IPv4 
+    based deployment by running dev-scripts on a packet server.

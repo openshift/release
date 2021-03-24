@@ -9,7 +9,7 @@ To locate platform-specific jobs which might be good candidates for moving to th
 ```console
 $ ci-operator/platform-balance/step-jobs-by-platform.py
 workflows which need alternative platforms to support balancing:
-  baremetalds-e2e
+  baremetalds-e2e-ipv4
   ipi-aws
   ipi-aws-ovn-hybrid
   openshift-e2e-aws-csi
