@@ -24,6 +24,9 @@ platform:
     externalNetwork:  ${OPENSTACK_EXTERNAL_NETWORK}
     computeFlavor:    ${OPENSTACK_COMPUTE_FLAVOR}
     lbFloatingIP:     ${LB_FIP_IP}
+    externalDNS:
+      - 1.1.1.1
+      - 1.0.0.1
 pullSecret: >
   ${PULL_SECRET}
 sshKey: |
