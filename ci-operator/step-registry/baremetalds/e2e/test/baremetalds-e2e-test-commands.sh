@@ -29,7 +29,7 @@ function mirror_test_images() {
 openshift-tests images --to-repository ${DEVSCRIPTS_TEST_IMAGE_REPO} > /tmp/mirror
 oc image mirror -f /tmp/mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json
 oc image mirror -a ${DS_WORKING_DIR}/pull_secret.json $(oc get is tools -n openshift -o json | jq -r '.spec.tags[].from.name') ${DEVSCRIPTS_TEST_IMAGE_REPO}:tools
-oc tag ${DEVSCRIPTS_TEST_IMAGE_REPO}:tools tools:latest -n openshift
+oc tag ${DEVSCRIPTS_TEST_IMAGE_REPO}:tools tools:latest --reference-policy=local --scheduled=false -n openshift
 EOF
         TEST_ARGS="--from-repository ${DEVSCRIPTS_TEST_IMAGE_REPO}"
 }
