@@ -103,12 +103,18 @@ spec:
       - name: job-config-49
         configMap:
           name: job-config-4.9
-      - name: build-cluster-kubeconfig
+      - name: build-cluster-kubeconfigs
         secret:
           secretName: ci-chat-bot-kubeconfigs
           items:
+            - key: sa.ci-chat-bot.api.ci.config
+              path: api.ci.kubeconfig
             - key: sa.ci-chat-bot.build01.config
-              path: kubeconfig
+              path: build01.kubeconfig
+            - key: sa.ci-chat-bot.build02.config
+              path: build02.kubeconfig
+            - key: sa.ci-chat-bot.vsphere.config
+              path: vsphere.kubeconfig
       containers:
       - name: bot
         image: ci-chat-bot:latest
@@ -152,8 +158,8 @@ spec:
         - name: job-config-49
           mountPath: /etc/job-config/4.9
           readOnly: true
-        - name: build-cluster-kubeconfig
-          mountPath: /var/build-cluster-kubeconfig
+        - name: build-cluster-kubeconfigs
+          mountPath: /var/build-cluster-kubeconfigs
           readOnly: true
         env:
         - name: BOT_TOKEN
@@ -168,4 +174,4 @@ spec:
         - --github-endpoint=http://ghproxy
         - --github-endpoint=https://api.github.com
         - --force-pr-owner=system:serviceaccount:ci:ci-chat-bot
-        - --build-cluster-kubeconfig=/var/build-cluster-kubeconfig/kubeconfig
+        - --build-cluster-kubeconfig=/var/build-cluster-kubeconfigs/build01.kubeconfig
