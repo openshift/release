@@ -1,26 +1,26 @@
 presubmits:
-  open-cluster-management/managedcluster-import-controller:
+  open-cluster-management/prometheus-alertmanager:
   - agent: kubernetes
     always_run: true
     branches:
-    - prow-experiment
+    - release-2.3
     cluster: build01
-    context: ci/prow/check
+    context: ci/prow/common-test
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-open-cluster-management-managedcluster-import-controller-prow-experiment-check
-    rerun_command: /test check
+    name: pull-ci-open-cluster-management-prometheus-alertmanager-release-2.3-common-test
+    rerun_command: /test common-test
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=check
+        - --target=common-test
         command:
         - ci-operator
         image: ci-operator:latest
@@ -47,11 +47,11 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )check,?($|\s.*)
+    trigger: (?m)^/test( | .* )common-test,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - prow-experiment
+    - release-2.3
     cluster: build01
     context: ci/prow/images
     decorate: true
@@ -60,7 +60,7 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-open-cluster-management-managedcluster-import-controller-prow-experiment-images
+    name: pull-ci-open-cluster-management-prometheus-alertmanager-release-2.3-images
     rerun_command: /test images
     spec:
       containers:
@@ -96,51 +96,3 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - prow-experiment
-    cluster: build01
-    context: ci/prow/unit
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-open-cluster-management-managedcluster-import-controller-prow-experiment-unit
-    rerun_command: /test unit
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=unit
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )unit,?($|\s.*)
