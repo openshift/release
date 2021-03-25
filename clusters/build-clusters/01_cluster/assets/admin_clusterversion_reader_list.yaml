@@ -1,0 +1,39 @@
+kind: List
+apiVersion: v1
+items:
+- kind: Group
+  apiVersion: user.openshift.io/v1
+  metadata:
+    name: clusterversion-reader
+  users:
+  - hamzy
+  - deepsm007
+
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    annotations:
+      openshift.io/description: This cluster role gives the permission to get clusterversion verson
+    name: clusterversion-reader
+  rules:
+  - apiGroups:
+    - 'config.openshift.io'
+    resourceNames:
+    - version
+    resources:
+    - clusterversions
+    verbs:
+    - get
+
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRoleBinding
+  metadata:
+    name: clusterversion-reader
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: clusterversion-reader
+  subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: clusterversion-reader
