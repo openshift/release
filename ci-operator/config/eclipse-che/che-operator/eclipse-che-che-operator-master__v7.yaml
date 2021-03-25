@@ -59,6 +59,25 @@ tests:
           memory: 200Mi
     workflow: optional-operators-ci-aws
 - as: devworkspace-happy-path
+  steps:
+    cluster_profile: aws
+    test:
+    - as: devworkspace-happy-path
+      cli: latest
+      commands: |
+        echo -e "[INFO] Test script content:"
+        cat .ci/oci-devworkspace-happy-path.sh
+        /bin/bash .ci/oci-devworkspace-happy-path.sh
+      dependencies:
+      - env: CI_CHE_OPERATOR_IMAGE
+        name: che-operator-image
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+- as: devworkspace-periodic-happy-path
   cron: 0 */24 * * *
   steps:
     cluster_profile: aws
@@ -68,7 +87,6 @@ tests:
       commands: |
         echo -e "[INFO] Test script content:"
         cat .ci/oci-devworkspace-happy-path.sh
-
         /bin/bash .ci/oci-devworkspace-happy-path.sh
       dependencies:
       - env: CI_CHE_OPERATOR_IMAGE
