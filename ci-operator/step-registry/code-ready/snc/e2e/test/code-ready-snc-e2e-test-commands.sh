@@ -40,14 +40,28 @@ function run-tests() {
 
 run-tests
 EOF
-
 chmod +x "${HOME}"/run-tests.sh
+
+cat  > "${HOME}"/rc.sh << 'EOF'
+exit_code=$( cat /tmp/test-return )
+if [[ $exit_code -ne 0 ]]; then
+  exit 1
+fi
+exit 0
+EOF
+chmod +x "${HOME}"/rc.sh
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \
   --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   --recurse "${HOME}"/run-tests.sh packer@"${INSTANCE_PREFIX}":~/run-tests.sh
+
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+  --quiet \
+  --project "${GOOGLE_PROJECT_ID}" \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  --recurse "${HOME}"/rc.sh packer@"${INSTANCE_PREFIX}":~/rc.sh
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \
@@ -64,9 +78,17 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   packer@"${INSTANCE_PREFIX}" \
-  --command 'sudo yum install -y unzip'
+  --command "timeout 360m bash -ce \"/home/packer/run-tests.sh\" && echo \"### Fetching results\" && tar -czvf /tmp/artifacts.tar.gz /tmp/artifacts"
+
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+  --quiet \
+  --project "${GOOGLE_PROJECT_ID}" \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  --recurse packer@"${INSTANCE_PREFIX}":/tmp/artifacts.tar.gz "${HOME}"/artifacts.tar.gz
+
+tar -xzvf "${HOME}"/artifacts.tar.gz -C "${ARTIFACT_DIR}"
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   packer@"${INSTANCE_PREFIX}" \
-  --command "timeout 360m bash -ce \"/home/packer/run-tests.sh\""
+  --command '/home/packer/rc.sh'
