@@ -77,13 +77,22 @@ wait "$!"
 sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
 
 echo "Will include manifests:"
-find "${SHARED_DIR}" -name "manifest_*.yml"
+find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \)
 
 while IFS= read -r -d '' item
 do
   manifest="$( basename "${item}" )"
   cp "${item}" "${dir}/manifests/${manifest##manifest_}"
-done <   <( find "${SHARED_DIR}" -name "manifest_*.yml" -print0)
+done <   <( find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \) -print0)
+
+find "${SHARED_DIR}" \( -name "tls_*.key" -o -name "tls_*.pub" \)
+
+mkdir -p "${dir}/tls"
+while IFS= read -r -d '' item
+do
+  manifest="$( basename "${item}" )"
+  cp "${item}" "${dir}/tls/${manifest##tls_}"
+done <   <( find "${SHARED_DIR}" \( -name "tls_*.key" -o -name "tls_*.pub" \) -print0)
 
 TF_LOG=debug openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
 
