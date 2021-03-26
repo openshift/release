@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-export LOKI_VERSION="2.1.0"
+export LOKI_VERSION="master-71aa8a6"
 export LOKI_ENDPOINT=https://observatorium.api.stage.openshift.com/api/logs/v1/dptp/loki/api/v1
 
 GRAFANACLOUND_USERNAME=$(cat /var/run/loki-grafanacloud-secret/client-id)
@@ -95,6 +95,19 @@ data:
       - labeldrop:
         - filename
         - stream
+        - pod_template_hash
+        - controller_revision_hash
+        - ingresscontroller_operator_openshift_io_hash
+        - pod_template_generation
+      - pack:
+          labels:
+          - name
+          - host
+          - namespace
+          - pod_name
+          - container
+          - container_name
+          - app
       relabel_configs:
       - source_labels:
         - __meta_kubernetes_pod_label_name
@@ -133,264 +146,20 @@ data:
         - __meta_kubernetes_pod_uid
         - __meta_kubernetes_pod_container_name
         target_label: __path__
-      - action: drop
-        regex: ''
-        source_labels:
-        - pod_template_hash
-        - controller_revision_hash
-        - ingresscontroller_operator_openshift_io_hash
-        - pod_template_generation
-    - job_name: kubernetes-pods-app
-      kubernetes_sd_configs:
-      - role: pod
-      pipeline_stages:
-      - cri: {}
-      - labeldrop:
-        - filename
-        - stream
-      relabel_configs:
-      - action: drop
-        regex: ".+"
-        source_labels:
-        - __meta_kubernetes_pod_label_name
-      - source_labels:
-        - __meta_kubernetes_pod_label_app
-        target_label: __service__
-      - source_labels:
-        - __meta_kubernetes_pod_node_name
-        target_label: __host__
-      - action: drop
-        regex: ''
-        source_labels:
-        - __service__
-      - action: labelmap
-        regex: __meta_kubernetes_pod_label_(.+)
-      - action: replace
-        replacement:
-        separator: "/"
-        source_labels:
-        - __meta_kubernetes_namespace
-        - __service__
-        target_label: job
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_namespace
-        target_label: namespace
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_pod_name
-        target_label: pod_name
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_pod_container_name
-        target_label: container_name
-      - replacement: "/var/log/pods/*\$1/*.log"
-        separator: "/"
-        source_labels:
-        - __meta_kubernetes_pod_uid
-        - __meta_kubernetes_pod_container_name
-        target_label: __path__
-      - action: drop
-        regex: ''
-        source_labels:
-        - pod_template_hash
-        - controller_revision_hash
-        - ingresscontroller_operator_openshift_io_hash
-        - pod_template_generation
-    - job_name: kubernetes-pods-direct-controllers
-      kubernetes_sd_configs:
-      - role: pod
-      pipeline_stages:
-      - cri: {}
-      - labeldrop:
-        - filename
-        - stream
-      relabel_configs:
-      - action: drop
-        regex: ".+"
-        separator: ''
-        source_labels:
-        - __meta_kubernetes_pod_label_name
-        - __meta_kubernetes_pod_label_app
-      - action: drop
-        regex: "[0-9a-z-.]+-[0-9a-f]{8,10}"
-        source_labels:
-        - __meta_kubernetes_pod_controller_name
-      - source_labels:
-        - __meta_kubernetes_pod_controller_name
-        target_label: __service__
-      - source_labels:
-        - __meta_kubernetes_pod_node_name
-        target_label: __host__
-      - action: drop
-        regex: ''
-        source_labels:
-        - __service__
-      - action: labelmap
-        regex: __meta_kubernetes_pod_label_(.+)
-      - action: replace
-        replacement:
-        separator: "/"
-        source_labels:
-        - __meta_kubernetes_namespace
-        - __service__
-        target_label: job
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_namespace
-        target_label: namespace
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_pod_name
-        target_label: pod_name
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_pod_container_name
-        target_label: container_name
-      - replacement: "/var/log/pods/*\$1/*.log"
-        separator: "/"
-        source_labels:
-        - __meta_kubernetes_pod_uid
-        - __meta_kubernetes_pod_container_name
-        target_label: __path__
-      - action: drop
-        regex: ''
-        source_labels:
-        - pod_template_hash
-        - controller_revision_hash
-        - ingresscontroller_operator_openshift_io_hash
-        - pod_template_generation
-    - job_name: kubernetes-pods-indirect-controller
-      kubernetes_sd_configs:
-      - role: pod
-      pipeline_stages:
-      - cri: {}
-      - labeldrop:
-        - filename
-        - stream
-      relabel_configs:
-      - action: drop
-        regex: ".+"
-        separator: ''
-        source_labels:
-        - __meta_kubernetes_pod_label_name
-        - __meta_kubernetes_pod_label_app
-      - action: keep
-        regex: "[0-9a-z-.]+-[0-9a-f]{8,10}"
-        source_labels:
-        - __meta_kubernetes_pod_controller_name
-      - action: replace
-        regex: "([0-9a-z-.]+)-[0-9a-f]{8,10}"
-        source_labels:
-        - __meta_kubernetes_pod_controller_name
-        target_label: __service__
-      - source_labels:
-        - __meta_kubernetes_pod_node_name
-        target_label: __host__
-      - action: drop
-        regex: ''
-        source_labels:
-        - __service__
-      - action: labelmap
-        regex: __meta_kubernetes_pod_label_(.+)
-      - action: replace
-        replacement:
-        separator: "/"
-        source_labels:
-        - __meta_kubernetes_namespace
-        - __service__
-        target_label: job
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_namespace
-        target_label: namespace
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_pod_name
-        target_label: pod_name
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_pod_container_name
-        target_label: container_name
-      - replacement: "/var/log/pods/*\$1/*.log"
-        separator: "/"
-        source_labels:
-        - __meta_kubernetes_pod_uid
-        - __meta_kubernetes_pod_container_name
-        target_label: __path__
-      - action: drop
-        regex: ''
-        source_labels:
-        - pod_template_hash
-        - controller_revision_hash
-        - ingresscontroller_operator_openshift_io_hash
-        - pod_template_generation
-    - job_name: kubernetes-pods-static
-      kubernetes_sd_configs:
-      - role: pod
-      pipeline_stages:
-      - cri: {}
-      - labeldrop:
-        - filename
-        - stream
-      relabel_configs:
-      - action: drop
-        regex: ''
-        source_labels:
-        - __meta_kubernetes_pod_annotation_kubernetes_io_config_mirror
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_pod_label_component
-        target_label: __service__
-      - source_labels:
-        - __meta_kubernetes_pod_node_name
-        target_label: __host__
-      - action: drop
-        regex: ''
-        source_labels:
-        - __meta_kubernetes_pod_annotation_kubernetes_io_config_mirror
-      - action: labelmap
-        regex: __meta_kubernetes_pod_label_(.+)
-      - action: replace
-        replacement:
-        separator: "/"
-        source_labels:
-        - __meta_kubernetes_namespace
-        - __service__
-        target_label: job
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_namespace
-        target_label: namespace
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_pod_name
-        target_label: pod_name
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_pod_container_name
-        target_label: container_name
-      - replacement: "/var/log/pods/*\$1/*.log"
-        separator: "/"
-        source_labels:
-        - __meta_kubernetes_pod_annotation_kubernetes_io_config_mirror
-        - __meta_kubernetes_pod_container_name
-        target_label: __path__
-      - action: drop
-        regex: ''
-        source_labels:
-        - pod_template_hash
-        - controller_revision_hash
-        - ingresscontroller_operator_openshift_io_hash
-        - pod_template_generation
     - job_name: journal
       journal:
         path: /var/log/journal
         labels:
           job: systemd-journal
-      relabel_configs:
-      - action: labelmap
-        regex: __journal__(boot_id|systemd_unit)
+      pipeline_stages:
+      - labeldrop:
+        - filename
+        - stream
+      - pack:
+          labels:
+          - host
+          - __journal__boot_id
+          - __journal__systemd_unit
     server:
       http_listen_port: 3101
     target_config:
