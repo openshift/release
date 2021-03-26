@@ -4,8 +4,6 @@ all:
 	@echo "target 'all' has not yet implemented"
 
 #Reusing the pull secret from secret -n ci cluster-secrets-aws
-#It requires that oc-cli logs in api.ci.openshift.org
-#and is used only for installation
 pull_secret := $(shell oc get secret -n ci cluster-secrets-aws -o jsonpath='{.data.pull-secret}' | base64 -d)
 
 .PHONY : generate-install-config
