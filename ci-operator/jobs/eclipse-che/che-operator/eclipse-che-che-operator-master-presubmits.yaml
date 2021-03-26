@@ -5,7 +5,7 @@ presubmits:
     branches:
     - master
     cluster: build01
-    context: ci/prow/3.11-che-operator-tests
+    context: ci/prow/3.11-chectl-e2e
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -13,17 +13,17 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       ci-operator.openshift.io/variant: "3.11"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-eclipse-che-che-operator-master-3.11-che-operator-tests
-    rerun_command: /test 3.11-che-operator-tests
+    name: pull-ci-eclipse-che-che-operator-master-3.11-chectl-e2e
+    rerun_command: /test 3.11-chectl-e2e
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/usr/local/che-operator-tests-cluster-profile
-        - --target=che-operator-tests
-        - --template=/usr/local/che-operator-tests
+        - --secret-dir=/usr/local/chectl-e2e-cluster-profile
+        - --target=chectl-e2e
+        - --template=/usr/local/chectl-e2e
         - --variant=3.11
         command:
         - ci-operator
@@ -31,13 +31,11 @@ presubmits:
         - name: CLUSTER_TYPE
           value: gcp
         - name: JOB_NAME_SAFE
-          value: che-operator-tests
+          value: chectl-e2e
         - name: RPM_REPO_OPENSHIFT_ORIGIN
           value: https://artifacts-rpms-openshift-origin-ci-rpms.apps.ci.l2s4.p1.openshiftapps.com/openshift-origin-v3.11/
         - name: TEST_COMMAND
-          value: |
-            oc new-project eclipse-che
-            chectl server:deploy --installer=operator --platform=openshift
+          value: chectl server:deploy --installer=operator --platform=openshift
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -45,12 +43,12 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /usr/local/che-operator-tests-cluster-profile
+        - mountPath: /usr/local/chectl-e2e-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
-        - mountPath: /usr/local/che-operator-tests
+        - mountPath: /usr/local/chectl-e2e
           name: job-definition
           subPath: cluster-launch-src.yaml
         - mountPath: /etc/pull-secret
@@ -77,7 +75,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )3.11-che-operator-tests,?($|\s.*)
+    trigger: (?m)^/test( | .* )3.11-chectl-e2e,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
