@@ -1,21 +1,10 @@
 def add_osd_rc_service_account_resources(gendoc):
     config = gendoc.context
-    sa_annotations = {
-        'serviceaccounts.openshift.io/oauth-redirecturi.ocp-priv-ingress': 'https://amd64.ocp.internal.releases.ci.openshift.org',
-        'serviceaccounts.openshift.io/oauth-redirecturi.ocp-ppc64le-priv-ingress': 'https://ppc64le.ocp.internal.releases.ci.openshift.org',
-        'serviceaccounts.openshift.io/oauth-redirecturi.ocp-s390x-priv-ingress': 'https://s390x.ocp.internal.releases.ci.openshift.org',
-    }
-    for arch in config.arches:
-        arch_priv_suffix = config.get_suffix(arch, private=True)
-        sa_annotations[
-            f'serviceaccounts.openshift.io/oauth-redirectreference.ocp{arch_priv_suffix}'] = '{"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{"kind":"Route","name":"release-controller-ocp%s"}}' % arch_priv_suffix
-
     gendoc.append_all([
         {
             'apiVersion': 'v1',
             'kind': 'ServiceAccount',
             'metadata': {
-                'annotations': sa_annotations,
                 'name': 'release-controller',
                 'namespace': config.rc_deployment_namespace,
             }
@@ -67,23 +56,6 @@ def add_osd_rc_service_account_resources(gendoc):
                     'resources': ['subjectaccessreviews'],
                     'verbs': ['create']
                 }]
-        },
-        {
-            'apiVersion': 'rbac.authorization.k8s.io/v1',
-            'kind': 'ClusterRoleBinding',
-            'metadata': {
-                'name': 'release-controller-priv-oauth'
-            },
-            'roleRef': {
-                'apiGroup': 'rbac.authorization.k8s.io',
-                'kind': 'ClusterRole',
-                'name': 'release-controller-priv-oauth'
-            },
-            'subjects': [{
-                'kind': 'ServiceAccount',
-                'name': 'release-controller',
-                'namespace': config.rc_deployment_namespace
-            }]
         },
         {
             'apiVersion': 'rbac.authorization.k8s.io/v1',
