@@ -26,67 +26,21 @@ gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
 gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
 gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
-cat > "${HOME}"/ignoretests.txt << 'EOF'
-[sig-apps] Daemon set [Serial] should rollback without unnecessary restarts [Conformance] [Suite:openshift/conformance/serial/minimal] [Suite:k8s]
-[sig-cli] Kubectl client Kubectl cluster-info should check if Kubernetes control plane services is included in cluster-info  [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]
-[sig-scheduling] SchedulerPreemption [Serial] validates basic preemption works [Conformance] [Suite:openshift/conformance/serial/minimal] [Suite:k8s]
-[sig-scheduling] SchedulerPreemption [Serial] validates lower priority pod preemption by critical pod [Conformance] [Suite:openshift/conformance/serial/minimal] [Suite:k8s]
-[k8s.io] [sig-node] NoExecuteTaintManager Multiple Pods [Serial] evicts pods with minTolerationSeconds [Disruptive] [Conformance] [Suite:k8s]
-[k8s.io] [sig-node] NoExecuteTaintManager Single Pod [Serial] removing taint cancels eviction [Disruptive] [Conformance] [Suite:k8s]
-EOF
-
 cat  > "${HOME}"/run-tests.sh << 'EOF'
 #!/bin/bash
+
 set -euo pipefail
 export PATH=/home/packer:$PATH
-mkdir -p /tmp/artifacts
 
 function run-tests() {
-  echo "### Extracting openshift-tests binary"
-  mkdir $HOME/os-test
-  export TESTS_IMAGE=$(oc -a "${HOME}"/pull-secret adm release info --image-for=tests "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}")
-  oc -a ~/pull-secret image extract "${TESTS_IMAGE}" --path=/usr/bin/openshift-tests:"${HOME}"/os-test/.
-  chmod +x "${HOME}"/os-test/openshift-tests
-  sudo mv "${HOME}"/os-test/openshift-tests /usr/local/bin/
-
   export MIRROR="https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp-dev-preview/"
-
-  export OPENSHIFT_PULL_SECRET_PATH="${HOME}"/pull-secret
-  export OPENSHIFT_VERSION="$(curl -L "${MIRROR}"/latest/release.txt | sed -n 's/^ *Version: *//p')"
-  BUNDLE_VERSION=${OPENSHIFT_VERSION}
-
   # clone the snc repo
   git clone https://github.com/code-ready/snc.git
   pushd snc
+  set -e
+  export OPENSHIFT_PULL_SECRET_PATH="${HOME}"/pull-secret
   ./ci.sh
   popd
-
-  # Unset the kubeconfig which is set by snc
-  unset KUBECONFIG
-
-  # Delete the dnsmasq config created by snc
-  # otherwise snc set the domain entry with 192.168.126.11
-  # and crc set it in another file 192.168.130.11 so
-  # better to remove the dnsmasq config after running snc
-  sudo rm -fr /etc/NetworkManager/dnsmasq.d/*
-  sudo systemctl reload NetworkManager
-
-  # clone the crc repo
-  git clone https://github.com/code-ready/crc.git
-  pushd crc
-  make BUNDLE_VERSION="${BUNDLE_VERSION}" cross
-  popd
-
-  "${HOME}"/crc/out/linux-amd64/crc setup
-  "${HOME}"/crc/out/linux-amd64/crc start -p "${HOME}"/pull-secret -m 12000 -b "${HOME}"/snc/crc_libvirt_"${BUNDLE_VERSION}".crcbundle
-
-  export KUBECONFIG="${HOME}"/.crc/machines/crc/kubeconfig
-  openshift-tests run kubernetes/conformance --dry-run  | grep -F -v -f "${HOME}"/ignoretests.txt  | openshift-tests run -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit -f -
-  rc=$?
-  echo "${rc}" > /tmp/test-return
-  set -e
-  echo "### Done! (${rc})"
-  exit 0
 }
 
 run-tests
@@ -118,18 +72,7 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \
   --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
-  --recurse "${HOME}"/ignoretests.txt packer@"${INSTANCE_PREFIX}":~/ignoretests.txt
-
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
-  --quiet \
-  --project "${GOOGLE_PROJECT_ID}" \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
   --recurse "${HOME}"/pull-secret packer@"${INSTANCE_PREFIX}":~/pull-secret
-
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  packer@"${INSTANCE_PREFIX}" \
-  --command 'sudo rm -fr /usr/local/go; sudo yum install -y podman make golang'
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
