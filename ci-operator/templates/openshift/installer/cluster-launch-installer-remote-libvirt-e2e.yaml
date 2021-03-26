@@ -630,9 +630,23 @@ objects:
         /bin/rm ${RCFILE}
         RC=${RC0}
 
+        #VM_NAME=$(jq --raw-output '.cluster_id' < ${ARTIFACT_DIR}/installer/terraform.tfvars.json)
+        VM_NAME=$(grep cluster_id "${ARTIFACT_DIR}/installer/terraform.tfvars.json" | sed -r -n -e 's,^[^"]*"cluster_id":[^"]"([^"]*)".*$,\1,p')
+        echo "VM_NAME=${VM_NAME}"
+
         # Add a step to wait for installation to complete, in case the cluster takes longer to create than the default time of 30 minutes.
         if [ ${RC} -gt 0 ]
         then
+            # Something went wrong.  Dump some virsh stuff for debugging purposes.
+            mock-nss.sh virsh -c "${CONNECT}" list --all --name | grep "${VM_NAME}" || true
+
+            while read UUID
+            do
+              [ -z "${UUID}" ] && continue
+              mock-nss.sh virsh -c "${CONNECT}" dumpxml ${UUID} | grep '<name>' || true
+              mock-nss.sh virsh -c "${CONNECT}" domifaddr ${UUID} || true
+            done < <(mock-nss.sh virsh -c "${CONNECT}" list --all --uuid || true)
+
             RCFILE=$(mktemp)
             {
                 mock-nss.sh openshift-install --dir=${ARTIFACT_DIR}/installer --log-level=debug wait-for install-complete 2>&1 | sed 's/password: .*/password: REDACTED"/g';
@@ -645,6 +659,19 @@ objects:
             echo "RC1=${RC1}"
             /bin/rm ${RCFILE}
             RC=${RC0}
+
+            if [ ${RC} -gt 0 ]
+            then
+                # Something went wrong.  Dump some virsh stuff for debugging purposes.
+                mock-nss.sh virsh -c "${CONNECT}" list --all --name | grep "${VM_NAME}" || true
+
+                while read UUID
+                do
+                  [ -z "${UUID}" ] && continue
+                  mock-nss.sh virsh -c "${CONNECT}" dumpxml ${UUID} | grep '<name>' || true
+                  mock-nss.sh virsh -c "${CONNECT}" domifaddr ${UUID} || true
+                done < <(mock-nss.sh virsh -c "${CONNECT}" list --all --uuid || true)
+            fi
         fi
 
         # Password for the cluster gets leaked in the installer logs and hence removing them.
@@ -807,11 +834,15 @@ objects:
         trap 'jobs -p | xargs -r kill || true; touch /tmp/shared/teardown-exit; exit 0' TERM
 
         for i in $(seq 1 220); do
+          if [[ -f /tmp/shared/debug ]]; then
+            continue
+          fi
           if [[ -f /tmp/shared/exit ]] || [[ -f /tmp/shared/test-exit ]]; then
             exit 0
           fi
           sleep 60 & wait
         done
+
     hostAliases:
     - ip: "${BASTION_SVC_IP}"
       hostnames:
