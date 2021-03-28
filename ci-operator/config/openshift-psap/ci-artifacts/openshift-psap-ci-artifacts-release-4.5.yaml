@@ -12,6 +12,12 @@ images:
 - dockerfile_path: build/Dockerfile
   from: os
   to: ci-artifacts
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.5"
 resources:
   '*':
     limits:
@@ -19,9 +25,6 @@ resources:
     requests:
       cpu: 2000m
       memory: 2Gi
-tag_specification:
-  name: "4.5"
-  namespace: ocp
 tests:
 - as: gpu-operator-e2e
   cron: 0 */23 * * *
@@ -31,6 +34,42 @@ tests:
     - as: nightly
       cli: latest
       commands: run gpu-ci
+      credentials:
+      - mount_path: /var/run/psap-entitlement-secret
+        name: psap-entitlement-secret
+        namespace: test-credentials
+      from: ci-artifacts
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+    workflow: ipi-aws
+- as: gpu-operator-e2e-152
+  cron: 0 */23 * * *
+  steps:
+    cluster_profile: aws
+    test:
+    - as: nightly
+      cli: latest
+      commands: run gpu-ci 1.5.2
+      credentials:
+      - mount_path: /var/run/psap-entitlement-secret
+        name: psap-entitlement-secret
+        namespace: test-credentials
+      from: ci-artifacts
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+    workflow: ipi-aws
+- as: gpu-operator-e2e-140
+  cron: 0 */23 * * *
+  steps:
+    cluster_profile: aws
+    test:
+    - as: nightly
+      cli: latest
+      commands: run gpu-ci 1.4.0
       credentials:
       - mount_path: /var/run/psap-entitlement-secret
         name: psap-entitlement-secret

@@ -3,7 +3,7 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  open-cluster-management_builder_go1.15-linux-amd64:
+  builder-go1.15:
     name: builder
     namespace: open-cluster-management
     tag: go1.15-linux-amd64
@@ -17,11 +17,19 @@ images:
 - dockerfile_path: Dockerfile.prow
   from: base
   inputs:
-    open-cluster-management_builder_go1.15-linux-amd64:
+    builder-go1.15:
       as:
       - registry.ci.openshift.org/open-cluster-management/builder:go1.15-linux-amd64
   to: discovery-operator
+- dockerfile_path: Dockerfile.test.prow
+  from: base
+  inputs:
+    builder-go1.15:
+      as:
+      - registry.ci.openshift.org/open-cluster-management/builder:go1.15-linux-amd64
+  to: discovery-operator-tests
 promotion:
+  disabled: true
   name: "2.3"
   namespace: open-cluster-management
 resources:

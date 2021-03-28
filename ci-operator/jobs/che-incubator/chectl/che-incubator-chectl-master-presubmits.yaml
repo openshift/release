@@ -5,142 +5,6 @@ presubmits:
     branches:
     - master
     cluster: build02
-    context: ci/prow/v5-chectl-e2e-olm-installer
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: v5
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-che-incubator-chectl-master-v5-chectl-e2e-olm-installer
-    rerun_command: /test v5-chectl-e2e-olm-installer
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/usr/local/chectl-e2e-olm-installer-cluster-profile
-        - --target=chectl-e2e-olm-installer
-        - --variant=v5
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/chectl-e2e-olm-installer-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )v5-chectl-e2e-olm-installer,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
-    cluster: build02
-    context: ci/prow/v5-chectl-e2e-operator-installer
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: v5
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-che-incubator-chectl-master-v5-chectl-e2e-operator-installer
-    rerun_command: /test v5-chectl-e2e-operator-installer
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/usr/local/chectl-e2e-operator-installer-cluster-profile
-        - --target=chectl-e2e-operator-installer
-        - --variant=v5
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/chectl-e2e-operator-installer-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )v5-chectl-e2e-operator-installer,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
-    cluster: build02
     context: ci/prow/v6-chectl-e2e-olm-installer
     decorate: true
     decoration_config:
@@ -158,6 +22,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --secret-dir=/usr/local/chectl-e2e-olm-installer-cluster-profile
         - --target=chectl-e2e-olm-installer
         - --variant=v6
@@ -172,6 +37,9 @@ presubmits:
         volumeMounts:
         - mountPath: /etc/boskos
           name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
           readOnly: true
         - mountPath: /usr/local/chectl-e2e-olm-installer-cluster-profile
           name: cluster-profile
@@ -192,6 +60,9 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -226,6 +97,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --secret-dir=/usr/local/chectl-e2e-operator-installer-cluster-profile
         - --target=chectl-e2e-operator-installer
         - --variant=v6
@@ -240,6 +112,9 @@ presubmits:
         volumeMounts:
         - mountPath: /etc/boskos
           name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
           readOnly: true
         - mountPath: /usr/local/chectl-e2e-operator-installer-cluster-profile
           name: cluster-profile
@@ -260,6 +135,9 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -294,6 +172,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --secret-dir=/usr/local/chectl-e2e-olm-installer-cluster-profile
         - --target=chectl-e2e-olm-installer
         - --variant=v7
@@ -308,6 +187,9 @@ presubmits:
         volumeMounts:
         - mountPath: /etc/boskos
           name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
           readOnly: true
         - mountPath: /usr/local/chectl-e2e-olm-installer-cluster-profile
           name: cluster-profile
@@ -328,6 +210,9 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -362,6 +247,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --secret-dir=/usr/local/chectl-e2e-operator-installer-cluster-profile
         - --target=chectl-e2e-operator-installer
         - --variant=v7
@@ -376,6 +262,9 @@ presubmits:
         volumeMounts:
         - mountPath: /etc/boskos
           name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
           readOnly: true
         - mountPath: /usr/local/chectl-e2e-operator-installer-cluster-profile
           name: cluster-profile
@@ -396,6 +285,9 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -408,3 +300,155 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )v7-chectl-e2e-operator-installer,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: build02
+    context: ci/prow/v8-chectl-e2e-olm-installer
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: v8
+      job-release: "4.8"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-che-incubator-chectl-master-v8-chectl-e2e-olm-installer
+    rerun_command: /test v8-chectl-e2e-olm-installer
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/chectl-e2e-olm-installer-cluster-profile
+        - --target=chectl-e2e-olm-installer
+        - --variant=v8
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/chectl-e2e-olm-installer-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )v8-chectl-e2e-olm-installer,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: build02
+    context: ci/prow/v8-chectl-e2e-operator-installer
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: v8
+      job-release: "4.8"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-che-incubator-chectl-master-v8-chectl-e2e-operator-installer
+    rerun_command: /test v8-chectl-e2e-operator-installer
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/chectl-e2e-operator-installer-cluster-profile
+        - --target=chectl-e2e-operator-installer
+        - --variant=v8
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/chectl-e2e-operator-installer-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )v8-chectl-e2e-operator-installer,?($|\s.*)

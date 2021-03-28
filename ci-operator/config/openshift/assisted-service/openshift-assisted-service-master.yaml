@@ -61,16 +61,36 @@ tests:
   commands: export GOLANGCI_LINT_CACHE=/tmp/.cache && export GOPROXY=https://proxy.golang.org && make lint
   container:
     from: test-bin
-- as: assisted-service-aws
+- as: subsystem-aws
   steps:
     cluster_profile: aws
     test:
     - as: subsystem-deploy-and-run
       cli: latest
       commands: |
-        export SERVICE=$(echo "$IMAGE_FORMAT" | component=assisted-service envsubst)
+        export SERVICE=$(echo "${IMAGE_FORMAT}" | component=assisted-service envsubst)
         make deploy-on-openshift-ci
-        make test-on-openshift-ci
+        export TARGET=oc
+        make test
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+- as: subsystem-kubeapi-aws
+  steps:
+    cluster_profile: aws
+    test:
+    - as: subsystem-deploy-and-run
+      cli: latest
+      commands: |
+        export SERVICE=$(echo "${IMAGE_FORMAT}" | component=assisted-service envsubst)
+        make deploy-on-openshift-ci
+        export TARGET=oc
+        export GENERATE_CRD=false
+        make enable-kube-api-for-subsystem
+        make test-kube-api
       from: test-bin
       resources:
         requests:

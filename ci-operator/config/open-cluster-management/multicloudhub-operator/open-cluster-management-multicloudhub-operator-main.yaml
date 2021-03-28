@@ -3,7 +3,7 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  open-cluster-management_builder_go1.13-linux-amd64:
+  builder-go1.13:
     name: builder
     namespace: open-cluster-management
     tag: go1.13-linux-amd64
@@ -17,12 +17,15 @@ images:
 - dockerfile_path: build/Dockerfile.prow
   from: base
   inputs:
-    open-cluster-management_builder_go1.13-linux-amd64:
+    builder-go1.13:
       as:
       - registry.ci.openshift.org/open-cluster-management/builder:go1.13-linux-amd64
   to: multiclusterhub-operator
+- dockerfile_path: build/Dockerfile.test.prow
+  from: builder-go1.13
+  to: multiclusterhub-operator-tests
 promotion:
-  name: latest
+  name: "2.3"
   namespace: open-cluster-management
 resources:
   '*':
@@ -36,6 +39,15 @@ tests:
     make -f Makefile.prow unit-tests
   container:
     from: src
+- as: sonarcloud
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow sonar/go/prow
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
 zz_generated_metadata:
   branch: main
   org: open-cluster-management

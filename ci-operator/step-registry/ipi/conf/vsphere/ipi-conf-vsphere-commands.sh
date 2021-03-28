@@ -15,6 +15,7 @@ TFVARS_PATH=/var/run/secrets/ci.openshift.io/cluster-profile/vmc.secret.auto.tfv
 vsphere_user=$(grep -oP 'vsphere_user\s*=\s*"\K[^"]+' ${TFVARS_PATH})
 vsphere_password=$(grep -oP 'vsphere_password\s*=\s*"\K[^"]+' ${TFVARS_PATH})
 base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
+machine_cidr=$(<"${SHARED_DIR}"/machinecidr.txt)
 
 declare -a vips
 mapfile -t vips < "${SHARED_DIR}/vips.txt"
@@ -49,4 +50,7 @@ platform:
     username: ${vsphere_user}
     apiVIP: "${vips[0]}"
     ingressVIP: "${vips[1]}"
+networking:
+  machineNetwork:
+  - cidr: "${machine_cidr}"
 EOF

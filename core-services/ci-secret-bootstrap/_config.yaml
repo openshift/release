@@ -1838,6 +1838,9 @@ secret_configs:
     sa.ci-chat-bot.build02.config:
       attachment: sa.ci-chat-bot.build02.config
       bw_item: ci-chat-bot
+    sa.ci-chat-bot.vsphere.config:
+      attachment: sa.ci-chat-bot.vsphere.config
+      bw_item: ci-chat-bot
   to:
   - cluster: app.ci
     name: ci-chat-bot-kubeconfigs
@@ -2660,3 +2663,61 @@ secret_configs:
   - cluster: vsphere
     name: github-client-secret
     namespace: openshift-config
+- from:
+    .dockerconfigjson:
+      dockerconfigJSON:
+      - auth_bw_attachment: token_image-puller_ci_reg_auth_value.txt
+        bw_item: build_farm
+        registry_url: registry.svc.ci.openshift.org
+      - auth_bw_attachment: token_image-pusher_app.ci_reg_auth_value.txt
+        bw_item: build_farm
+        registry_url: registry.ci.openshift.org
+  to:
+  - cluster: app.ci
+    name: registry-push-credentials-image-mirror-from-apici-to-appci
+    namespace: ci
+- from:
+    .awscred:
+      attachment: .awscred
+      bw_item: openshift-ci-2-aws-credentials
+    insights-live.yaml:
+      attachment: insights-live.yaml
+      bw_item: insights-ci-account
+    ops-mirror.pem:
+      attachment: cert-key.pem
+      bw_item: mirror.openshift.com
+    pull-secret:
+      dockerconfigJSON:
+      - auth_bw_attachment: auth
+        bw_item: api.ci-pull-secret
+        registry_url: registry.svc.ci.openshift.org
+      - auth_bw_attachment: token_image-puller_app.ci_reg_auth_value.txt
+        bw_item: build_farm
+        registry_url: registry.ci.openshift.org
+      - auth_bw_attachment: auth
+        bw_item: cloud.openshift.com-pull-secret
+        email_bw_field: email
+        registry_url: cloud.openshift.com
+      - auth_bw_attachment: auth
+        bw_item: quay.io-pull-secret
+        email_bw_field: email
+        registry_url: quay.io
+      - auth_bw_attachment: auth
+        bw_item: registry.connect.redhat.com-pull-secret
+        email_bw_field: email
+        registry_url: registry.connect.redhat.com
+      - auth_bw_attachment: auth
+        bw_item: registry.redhat.io-pull-secret
+        email_bw_field: email
+        registry_url: registry.redhat.io
+    ssh-privatekey:
+      attachment: id_rsa
+      bw_item: openshift-ci-2-aws-credentials
+    ssh-publickey:
+      attachment: id_rsa.pub
+      bw_item: openshift-ci-2-aws-credentials
+  to:
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-aws-2
+    namespace: ci

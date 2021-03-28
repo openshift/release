@@ -1,0 +1,89 @@
+base_images:
+  os:
+    name: centos
+    namespace: origin
+    tag: "8"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.14
+images:
+- context_dir: odh-manifests/tests/
+  dockerfile_path: Dockerfile
+  from: os
+  to: odh-tests
+- context_dir: .
+  dockerfile_path: build/Dockerfile.modh
+  from: os
+  to: opendatahub-operator
+operator:
+  bundles:
+  - dockerfile_path: Dockerfile.bundle
+  substitutions:
+  - pullspec: quay.io/opendatahub/opendatahub-operator:v0.9.0
+    with: pipeline:opendatahub-operator
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 200Mi
+tag_specification:
+  name: "4.8"
+  namespace: ocp
+tests:
+- as: modh-unit-tests-48
+  commands: |
+    go get -u github.com/jstemmer/go-junit-report
+    go mod vendor
+    make test-junit
+  container:
+    from: src
+- as: modh-opendatahub-operator-nightly
+  commands: |
+    go get -u github.com/jstemmer/go-junit-report
+    go mod vendor
+    make test-junit
+  container:
+    from: src
+  cron: 30 0 * * *
+- as: modh-operator-e2e-48
+  steps:
+    cluster_profile: gcp
+    env:
+      OO_CHANNEL: beta
+      OO_INSTALL_NAMESPACE: opendatahub-operator
+      OO_PACKAGE: opendatahub-operator
+      OO_TARGET_NAMESPACES: '!all'
+    test:
+    - as: e2e
+      commands: TESTS_REGEX=jupyterhub.sh SKIP_OPERATOR_INSTALL=true $HOME/peak/installandtest.sh
+      from: odh-tests
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-gcp
+- as: modh-operator-e2e-nightly-48
+  cron: 30 3 * * *
+  steps:
+    cluster_profile: gcp
+    env:
+      OO_CHANNEL: beta
+      OO_INSTALL_NAMESPACE: opendatahub-operator
+      OO_PACKAGE: opendatahub-operator
+      OO_TARGET_NAMESPACES: '!all'
+    test:
+    - as: e2e
+      commands: TESTS_REGEX=jupyterhub.sh SKIP_OPERATOR_INSTALL=true $HOME/peak/installandtest.sh
+      from: odh-tests
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-gcp
+zz_generated_metadata:
+  branch: master
+  org: red-hat-data-services
+  repo: opendatahub-operator
+  variant: "48"

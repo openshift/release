@@ -44,9 +44,17 @@ tests:
   steps:
     cluster_profile: aws
     test:
-    - as: bin-test
+    - as: critical-test
       cli: latest
-      commands: ./bin/extended-platform-tests run openshift/conformance/parallel --run "High-24829"
+      commands: ./bin/extended-platform-tests run all --dry-run|grep -iv "VMonly"|grep -E "OLM.*Critical"|./bin/extended-platform-tests run -f -
+      from: bin
+      resources:
+        requests:
+          cpu: "2"
+          memory: 4Gi
+    - as: pr-test
+      cli: latest
+      commands: make pr-test
       from: bin
       resources:
         requests:

@@ -13,9 +13,14 @@ images:
   from: os
   to: ci-artifacts
 promotion:
-  disabled: true
   name: "4.7"
   namespace: ocp
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.7"
 resources:
   '*':
     limits:
@@ -23,9 +28,6 @@ resources:
     requests:
       cpu: 2000m
       memory: 2Gi
-tag_specification:
-  name: "4.7"
-  namespace: ocp
 tests:
 - as: gpu-operator-e2e
   cron: 0 */23 * * *
@@ -35,6 +37,24 @@ tests:
     - as: nightly
       cli: latest
       commands: run gpu-ci
+      credentials:
+      - mount_path: /var/run/psap-entitlement-secret
+        name: psap-entitlement-secret
+        namespace: test-credentials
+      from: ci-artifacts
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+    workflow: ipi-aws
+- as: gpu-operator-e2e-master
+  cron: 0 */23 * * *
+  steps:
+    cluster_profile: aws
+    test:
+    - as: nightly
+      cli: latest
+      commands: run gpu-commit-ci
       credentials:
       - mount_path: /var/run/psap-entitlement-secret
         name: psap-entitlement-secret

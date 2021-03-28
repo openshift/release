@@ -4,79 +4,14 @@ presubmits:
     always_run: false
     branches:
     - master
-    cluster: build01
-    context: ci/prow/gpu-operator-14
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-psap-ci-artifacts-master-gpu-operator-14
-    rerun_command: /test gpu-operator-14
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/usr/local/gpu-operator-14-cluster-profile
-        - --target=gpu-operator-14
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/gpu-operator-14-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )gpu-operator-14,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - master
-    cluster: build01
+    cluster: build02
     context: ci/prow/gpu-operator-e2e
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      job-release: "4.7"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-psap-ci-artifacts-master-gpu-operator-e2e
     rerun_command: /test gpu-operator-e2e
@@ -87,6 +22,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --secret-dir=/usr/local/gpu-operator-e2e-cluster-profile
         - --target=gpu-operator-e2e
         command:
@@ -100,6 +36,9 @@ presubmits:
         volumeMounts:
         - mountPath: /etc/boskos
           name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
           readOnly: true
         - mountPath: /usr/local/gpu-operator-e2e-cluster-profile
           name: cluster-profile
@@ -120,6 +59,9 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -136,13 +78,14 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build01
+    cluster: build02
     context: ci/prow/images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      job-release: "4.7"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-psap-ci-artifacts-master-images
     rerun_command: /test images
@@ -184,7 +127,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build01
+    cluster: build02
     context: ci/prow/yamllint
     decorate: true
     labels:
@@ -195,7 +138,7 @@ presubmits:
       containers:
       - args:
         - -c
-        - configs/.yamllint.conf
+        - config/yamllint.conf
         - playbooks
         - roles
         command:

@@ -6,8 +6,7 @@ set -o pipefail
 
 SINGLE_NODE_AWS_INSTANCE_TYPE="m5d.2xlarge"
 
-echo "Install config before single-node config patch:"
-cat "${SHARED_DIR}/install-config.yaml"
+echo "Updating install-config.yaml to a single ${SINGLE_NODE_AWS_INSTANCE_TYPE} control plane node and 0 workers"
 
 pip3 install pyyaml --user
 python3 -c '
@@ -46,5 +45,3 @@ with open(output_file, "w") as f:
     yaml.safe_dump(cfg, f)
 ' "${SHARED_DIR}/install-config.yaml"
 
-echo "Install config after single-node config patch:"
-cat "${SHARED_DIR}/install-config.yaml"

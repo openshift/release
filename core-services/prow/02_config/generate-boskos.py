@@ -31,12 +31,12 @@ CONFIG = {
         'default': 7,
     },
     'openstack-vexxhost-quota-slice': {
-        'default': 3,
+        'default': 9,
     },
     'openstack-ppc64le-quota-slice': {},
     'ovirt-quota-slice': {},
     'packet-quota-slice': {
-        'default': 40,
+        'default': 60,
     },
     'kubevirt-quota-slice':{},
     'vsphere-quota-slice':{},

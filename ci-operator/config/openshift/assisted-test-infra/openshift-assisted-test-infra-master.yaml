@@ -44,11 +44,9 @@ tag_specification:
   name: "4.8"
   namespace: ocp
 tests:
-- as: unit
+- as: system-test
   steps:
     cluster_profile: packet
-    dependencies:
-      ASSISTED_SERVICE_IMAGE: pipeline:assisted-service
     env:
       ASSISTED_CONFIG: |
         MAKEFILE_TARGET="create_full_environment run test_parallel"
@@ -56,8 +54,6 @@ tests:
 - as: e2e-metal-assisted-ipv6
   steps:
     cluster_profile: packet
-    dependencies:
-      ASSISTED_SERVICE_IMAGE: pipeline:assisted-service
     env:
       ASSISTED_CONFIG: |
         IPv6=yes
@@ -65,11 +61,47 @@ tests:
         VIP_DHCP_ALLOCATION=no
         PROXY=yes
     workflow: baremetalds-assisted-install
+- as: e2e-metal-assisted-none
+  steps:
+    cluster_profile: packet
+    env:
+      ASSISTED_CONFIG: |
+        PLATFORM=none
+    workflow: baremetalds-assisted-install
+- as: e2e-metal-assisted-none-periodic
+  cron: '@daily'
+  steps:
+    cluster_profile: packet
+    env:
+      ASSISTED_CONFIG: |
+        PLATFORM=none
+    workflow: baremetalds-assisted-install
+- as: e2e-metal-assisted-none-ipv6
+  steps:
+    cluster_profile: packet
+    env:
+      ASSISTED_CONFIG: |
+        IPv6=yes
+        IPv4=no
+        VIP_DHCP_ALLOCATION=no
+        PROXY=yes
+        PLATFORM=none
+    workflow: baremetalds-assisted-install
+- as: e2e-metal-assisted-none-ipv6-periodic
+  cron: '@daily'
+  steps:
+    cluster_profile: packet
+    env:
+      ASSISTED_CONFIG: |
+        IPv6=yes
+        IPv4=no
+        VIP_DHCP_ALLOCATION=no
+        PROXY=yes
+        PLATFORM=none
+    workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-onprem
   steps:
     cluster_profile: packet
-    dependencies:
-      ASSISTED_SERVICE_IMAGE: pipeline:assisted-service
     env:
       ASSISTED_CONFIG: |
         DEPLOY_TARGET=onprem
@@ -77,14 +109,10 @@ tests:
 - as: e2e-metal-assisted
   steps:
     cluster_profile: packet
-    dependencies:
-      ASSISTED_SERVICE_IMAGE: pipeline:assisted-service
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-single-node
   steps:
     cluster_profile: packet
-    dependencies:
-      ASSISTED_SERVICE_IMAGE: pipeline:assisted-service
     env:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
@@ -97,27 +125,20 @@ tests:
   cron: '@daily'
   steps:
     cluster_profile: packet
-    dependencies:
-      ASSISTED_SERVICE_IMAGE: pipeline:assisted-service
     workflow: baremetalds-assisted
 - as: e2e-metal-assisted-single-node-periodic
   cron: '@daily'
   steps:
     cluster_profile: packet
-    dependencies:
-      ASSISTED_SERVICE_IMAGE: pipeline:assisted-service
     env:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
         NUM_WORKERS=0
         ISO_IMAGE_TYPE=minimal-iso
     workflow: baremetalds-assisted
-- as: e2e-metal-assisted-milestone-one-periodic
-  cron: '@daily'
+- as: e2e-metal-assisted-edge-ready
   steps:
     cluster_profile: packet
-    dependencies:
-      ASSISTED_SERVICE_IMAGE: pipeline:assisted-service
     env:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
@@ -125,7 +146,26 @@ tests:
         IPv6=yes
         IPv4=no
         PROXY=yes
-        ADDITIONAL_PARAMS="--with-static-ips"
+        ADDITIONAL_PARAMS="--with-static-network-config"
+        ISO_IMAGE_TYPE=minimal-iso
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}
+        OPENSHIFT_VERSION=4.8
+    workflow: baremetalds-assisted
+- as: e2e-metal-assisted-edge-ready-periodic
+  cron: '@daily'
+  steps:
+    cluster_profile: packet
+    env:
+      ASSISTED_CONFIG: |
+        NUM_MASTERS=1
+        NUM_WORKERS=0
+        IPv6=yes
+        IPv4=no
+        PROXY=yes
+        ADDITIONAL_PARAMS="--with-static-network-config"
+        ISO_IMAGE_TYPE=minimal-iso
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}
+        OPENSHIFT_VERSION=4.8
     workflow: baremetalds-assisted
 - as: e2e-metal-single-node-live-iso
   steps:
