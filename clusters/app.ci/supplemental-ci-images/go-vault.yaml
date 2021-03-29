@@ -24,6 +24,9 @@ items:
         kind: ImageStreamTag
         name: release:golang-1.16-vault
     source:
+      # NOTE: We cannot use a ConfigChange trigger on this build as it triggers on every push to
+      # openshift/release, causing this image to build ~100x a day. If you change the following
+      # Dockerfile, please ensure you run `oc start-build` yourself once the new version is applied.
       dockerfile: |
         FROM openshift/release:golang-1.16
         ENV VAULT_DISABLE_MLOCK true
@@ -40,7 +43,6 @@ items:
         imageOptimizationPolicy: SkipLayers
       type: Docker
     triggers:
-    - type: ConfigChange
     - imageChange:
         from:
           kind: ImageStreamTag
@@ -59,6 +61,9 @@ items:
         kind: ImageStreamTag
         name: release:golang-1.16-vault-typescript
     source:
+      # NOTE: We cannot use a ConfigChange trigger on this build as it triggers on every push to
+      # openshift/release, causing this image to build ~100x a day. If you change the following
+      # Dockerfile, please ensure you run `oc start-build` yourself once the new version is applied.
       dockerfile: |
         FROM openshift/release:golang-1.16-vault
         RUN yum install -y nodejs && npm install -g typescript
@@ -72,7 +77,6 @@ items:
         imageOptimizationPolicy: SkipLayers
       type: Docker
     triggers:
-    - type: ConfigChange
     - imageChange:
         from:
           kind: ImageStreamTag

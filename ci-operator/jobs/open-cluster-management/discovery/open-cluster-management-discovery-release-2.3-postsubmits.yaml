@@ -70,10 +70,6 @@ postsubmits:
         command:
         - make
         env:
-        - name: COMPONENT_NAME
-          value: discovery-operator
-        - name: COMPONENT_VERSION
-          value: "0.1"
         - name: OSCI_IMAGE_REMOTE_REPO_SRC
           value: registry.ci.openshift.org/open-cluster-management
         - name: OSCI_PUBLISH_DELAY
@@ -133,3 +129,44 @@ postsubmits:
       - name: acm-sonarcloud-token
         secret:
           secretName: acm-sonarcloud-token
+  - agent: kubernetes
+    branches:
+    - ^release-2\.3$
+    cluster: build02
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: branch-ci-open-cluster-management-discovery-tests-release-2.3-publish
+    spec:
+      containers:
+      - args:
+        - -f
+        - Makefile.prow
+        - osci/publish
+        command:
+        - make
+        env:
+        - name: OSCI_COMPONENT_NAME
+          value: discovery-operator-tests
+        - name: OSCI_IMAGE_REMOTE_REPO_SRC
+          value: registry.ci.openshift.org/open-cluster-management
+        - name: OSCI_PUBLISH_DELAY
+          value: "10"
+        - name: SELF
+          value: make -f Makefile.prow
+        image: registry.ci.openshift.org/open-cluster-management/builder:go1.15-linux-amd64
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 100m
+            memory: 200Mi
+        volumeMounts:
+        - mountPath: /etc/github
+          name: acm-cicd-github
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: acm-cicd-github
+        secret:
+          secretName: acm-cicd-github

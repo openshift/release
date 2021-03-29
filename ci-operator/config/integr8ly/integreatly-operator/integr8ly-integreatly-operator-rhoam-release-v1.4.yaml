@@ -1,0 +1,100 @@
+base_images:
+  openshift_release_golang-1.13:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+  os:
+    name: ubi
+    namespace: ocp
+    tag: "8"
+binary_build_commands: make code/compile COMPILE_TARGET="./build/_output/bin/integreatly-operator"
+build_root:
+  image_stream_tag:
+    name: intly-operator-base-image
+    namespace: integr8ly
+    tag: latest
+images:
+- dockerfile_path: build/Dockerfile
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/integr8ly/integreatly-operator/build
+  to: integreatly-operator
+- dockerfile_path: Dockerfile.osde2e
+  from: os
+  inputs:
+    openshift_release_golang-1.13:
+      as:
+      - registry.svc.ci.openshift.org/openshift/release:golang-1.13
+  to: integreatly-operator-test-harness-osde2e
+- dockerfile_path: Dockerfile.functional
+  from: os
+  inputs:
+    openshift_release_golang-1.13:
+      as:
+      - registry.svc.ci.openshift.org/openshift/release:golang-1.13
+  to: integreatly-operator-test-harness
+promotion:
+  name: "1.4"
+  namespace: integr8ly
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 250Mi
+  unit:
+    requests:
+      cpu: 200m
+      memory: 2Gi
+tag_specification:
+  name: "4.4"
+  namespace: ocp
+tests:
+- as: vendor
+  commands: make vendor/check
+  container:
+    from: src
+- as: unit
+  commands: make test/unit
+  container:
+    from: src
+- as: format
+  commands: make code/check
+  container:
+    from: src
+- as: test-cases-lint
+  commands: make test-cases/lint
+  container:
+    from: src
+- as: kubebuilder
+  commands: make kubebuilder/check
+  container:
+    from: src
+- as: rhoam-e2e
+  steps:
+    cluster_profile: aws
+    env:
+      COMPUTE_NODE_TYPE: m4.xlarge
+    test:
+    - as: test
+      cli: latest
+      commands: make test/e2e/rhoam/prow
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: manifest
+  commands: make manifest/check
+  container:
+    from: src
+- as: versions
+  commands: make versions/check
+  container:
+    from: src
+zz_generated_metadata:
+  branch: rhoam-release-v1.4
+  org: integr8ly
+  repo: integreatly-operator
