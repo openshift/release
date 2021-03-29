@@ -4,28 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# The pullspec of an index image. Required.
-OO_INDEX="$OO_INDEX"
-
-# The name of the operator package to be installed. Must be present in
-# the index image referenced by $OO_INDEX. Required.
-OO_PACKAGE="$OO_PACKAGE"
-
-# The name of the operator channel to track. Required.
-OO_CHANNEL="$OO_CHANNEL"
-
-# The namespace into which the operator and catalog will be
-# installed. Special value `!create` means that a new namespace will be created.
-OO_INSTALL_NAMESPACE="${OO_INSTALL_NAMESPACE}"
-
-# A comma-separated list of namespaces the operator will target. Special, value
-# `!all` means that all namespaces will be targeted. If no OperatorGroup exists
-# in $OO_INSTALL_NAMESPACE, a new one will be created with its target namespaces
-# set to $OO_TARGET_NAMESPACES, otherwise the existing OperatorGroup's target
-# namespace set will be replaced. The special value "!install" will set the
-# target namespace to the operator's installation namespace.
-
-OO_TARGET_NAMESPACES="${OO_TARGET_NAMESPACES}"
+# In upgrade tests, the subscribe step installs the initial version of the operator, so
+# it needs to install from the INITIAL_CHANNEL
+if [ -n "${OO_INITIAL_CHANNEL}" ]; then
+    OO_CHANNEL="${OO_INITIAL_CHANNEL}"
+fi
 
 if [[ "$OO_INSTALL_NAMESPACE" == "!create" ]]; then
     echo "OO_INSTALL_NAMESPACE is '!create': creating new namespace"
@@ -106,8 +89,7 @@ EOF
 echo "CatalogSource name is \"$CATSRC\""
 echo "Creating Subscription"
 
-SUB=$(
-    oc create -f - -o jsonpath='{.metadata.name}' <<EOF
+SUB_MANIFEST=$(cat <<EOF
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
@@ -118,25 +100,55 @@ spec:
   channel: "$OO_CHANNEL"
   source: $CATSRC
   sourceNamespace: $OO_INSTALL_NAMESPACE
+  installPlanApproval: Manual
 EOF
 )
 
-echo "Subscription name is \"$SUB\""
-echo "Waiting for ClusterServiceVersion to become ready..."
+# Add startingCSV is one is provided
+if [ -n "${OO_INITIAL_CSV}" ]; then
+    SUB_MANIFEST="${SUB_MANIFEST}"$'\n'"  startingCSV: ${OO_INITIAL_CSV}"
+fi
 
-for _ in $(seq 1 30); do
-    CSV=$(oc -n "$OO_INSTALL_NAMESPACE" get subscription "$SUB" -o jsonpath='{.status.installedCSV}' || true)
-    if [[ -n "$CSV" ]]; then
-        if [[ "$(oc -n "$OO_INSTALL_NAMESPACE" get csv "$CSV" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
-            echo "ClusterServiceVersion \"$CSV\" ready"
-            exit 0
-        fi
+SUB=$(oc create -f - -o jsonpath='{.metadata.name}' <<< "${SUB_MANIFEST}" )
+
+echo "Subscription name is \"$SUB\""
+echo "Waiting for installPlan to be created"
+
+# store subscription name and install namespace to shared directory for upgrade step
+echo "${OO_INSTALL_NAMESPACE}" > "${SHARED_DIR}"/oo-install-namespace
+echo "${SUB}" > "${SHARED_DIR}"/oo-subscription
+
+FOUND_INSTALLPLAN=false
+# wait up to 5 minutes for CSV installPlan to appear
+for _ in $(seq 1 60); do
+    INSTALL_PLAN=$(oc -n "$OO_INSTALL_NAMESPACE" get subscription "$SUB" -o jsonpath='{.status.installplan.name}' || true)
+    if [[ -n "$INSTALL_PLAN" ]]; then
+      oc -n "$OO_INSTALL_NAMESPACE" patch installPlan "${INSTALL_PLAN}" --type merge --patch '{"spec":{"approved":true}}'
+      FOUND_INSTALLPLAN=true
+      break
     fi
-    sleep 10
+    sleep 5
 done
 
-echo "Timed out waiting for csv to become ready"
+if [ "$FOUND_INSTALLPLAN" = true ] ; then
+    echo "Install Plan approved"
+    echo "Waiting for ClusterServiceVersion to become ready..."
 
+    # wait 10 minutes for operator installation to complete
+    for _ in $(seq 1 60); do
+        CSV=$(oc -n "$OO_INSTALL_NAMESPACE" get subscription "$SUB" -o jsonpath='{.status.installedCSV}' || true)
+        if [[ -n "$CSV" ]]; then
+            if [[ "$(oc -n "$OO_INSTALL_NAMESPACE" get csv "$CSV" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
+                echo "ClusterServiceVersion \"$CSV\" ready"
+                exit 0
+            fi
+        fi
+        sleep 10
+    done
+    echo "Timed out waiting for csv to become ready"
+else
+    echo "Failed to find installPlan for subscription"
+fi
 NS_ART="$ARTIFACT_DIR/ns-$OO_INSTALL_NAMESPACE.yaml"
 echo "Dumping Namespace $OO_INSTALL_NAMESPACE as $NS_ART"
 oc get namespace "$OO_INSTALL_NAMESPACE" -o yaml >"$NS_ART"
@@ -178,8 +190,13 @@ if [[ -n "$CSV" ]]; then
     done
 else
     CSV_ART="$ARTIFACT_DIR/$OO_INSTALL_NAMESPACE-all-csvs.yaml"
-    echo "ClusterServiceVersion $CSV was never created"
+    echo "ClusterServiceVersion was never created"
     echo "Dumping all ClusterServiceVersions in namespace $OO_INSTALL_NAMESPACE to $CSV_ART"
     oc get -n "$OO_INSTALL_NAMESPACE" csv -o yaml >"$CSV_ART"
 fi
+
+INSTALLPLANS_ART="$ARTIFACT_DIR/installPlans.yaml"
+echo "Dumping all installPlans in namespace $OO_INSTALL_NAMESPACE as $INSTALLPLANS_ART"
+oc get -n "$OO_INSTALL_NAMESPACE" installplans -o yaml >"$INSTALLPLANS_ART"
+
 exit 1
