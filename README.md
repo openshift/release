@@ -35,22 +35,13 @@ and are split into the following categories:
 
 ### Core Services and Configuration
 
-Manifests for important services (like [OpenShift CI cluster](https://api.ci.openshift.org/)
-and the CI service components that run on it) are present in the
-[`core-services`](./core-services) directory. The services configured in this
-directory are critical for some part of the OpenShift project development
-workflow, must meet basic quality criteria and must be deployed to the cluster
-automatically by a postsubmit job. See its [README](./core-services/README.md)
-for details.
+_Only `core-services/secrets` folder is applied to the cluster api.ci._
 
-### Additional Services and Configuration
+Except [user secret management](https://docs.ci.openshift.org/docs/how-tos/adding-a-new-secret-to-ci/), no services are running on `api.ci`.
 
-The [`services`](./services) directory contains manifests for services that run
-on [OpenShift CI cluster](https://api.ci.openshift.org/) and are not critical
-for the OpenShift project development workflow, but want to follow the same
-quality criteria and automated check and deployment process that the [core
-services](#core-services-and-configuration) do (DPTP intends to support only
-these additional services). See its [README](./services/README.md) for details.
+### Additional Services and Configuration (legacy)
+
+_This folder is no longer applied to the cluster api.ci which is going to be offline soon._
 
 ### Cluster Configuration Manifests (legacy)
 

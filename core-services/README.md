@@ -1,16 +1,8 @@
 # Core Services and Configuration
 
-Manifests for important services (like [OpenShift CI cluster](https://api.ci.openshift.org/)
-and the CI service components that run on it) are present in this directory. The
-services configured here are critical for some part of the OpenShift project
-development workflow, must meet basic quality criteria and must be deployed to
-the cluster automatically by a postsubmit job.
+_Only `core-services/secrets` folder is applied to the cluster api.ci._
 
-## How to add new service
-
-Create a new directory for your service, containing all [necessary files](#quality-criteria-and-conventions).
-You may copy the `_TEMPLATE` directory and start using the files there. Add
-manifests and other configuration as needed.
+Except [user secret management](https://docs.ci.openshift.org/docs/how-tos/adding-a-new-secret-to-ci/), no services are running on `api.ci`.
 
 ## Quality criteria and conventions
 
