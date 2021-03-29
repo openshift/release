@@ -134,8 +134,15 @@ def generate_api_ci_content(config):
             with genlib.GenDoc(config.paths.path_rc_release_resources.joinpath(f'admin_config_updater_rbac{context.suffix}.yaml'), context) as gendoc:
                 content.add_art_namespace_config_updater_rbac(gendoc)
 
-            with genlib.GenDoc(config.paths.path_rc_release_resources.joinpath(f'admin_deploy-{context.is_namespace}-controller.yaml'), context) as gendoc:
-                content.add_imagestream_namespace_rbac(gendoc)
+            # This currently generates somethign that cannot be applied on api.ci:
+            #  Apply command failed (not recoverable)",
+            #  "The ClusterRoleBinding \"release-controller-ocp-priv-oauth\" is invalid:
+            #    roleRef: Invalid value: rbac.RoleRef{APIGroup:\"rbac.authorization.k8s.io\", Kind:\"ClusterRole\", Name:\"release-controller-priv-oauth\"}:
+            #    cannot change roleRef
+            # https://prow.ci.openshift.org/view/gs/origin-ci-test/logs/branch-ci-openshift-release-master-core-apply/1376515932242841600#1:build-log.txt%3A89
+
+            # with genlib.GenDoc(config.paths.path_rc_release_resources.joinpath(f'admin_deploy-{context.is_namespace}-controller.yaml'), context) as gendoc:
+            #    content.add_imagestream_namespace_rbac(gendoc)
 
             with genlib.GenDoc(config.paths.path_rc_release_resources.joinpath(f'deploy-{context.is_namespace}-controller.yaml'), context) as gendoc:
                 content.add_redirect_resources(gendoc)
