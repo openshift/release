@@ -101,12 +101,12 @@ else
     read -r -a clusters < deployments
 fi
 
-# Verify all clusters have credential files.
-log "Verify that all clusters have credential files."
+# Verify all clusters have kubeconfig files.
+log "Verify that all clusters have kubeconfig files."
 for cluster in "${clusters[@]}"; do
-    creds="${SHARED_DIR}/${cluster}.json"
-    if [[ ! -f "$creds" ]]; then
-        log "ERROR Credential file not found for $cluster: $creds"
+    kc_file="${SHARED_DIR}/${cluster}.kc"
+    if [[ ! -f "$kc_file" ]]; then
+        log "ERROR kubeconfig file not found for $cluster: $kc_file"
         log "Contents of shared directory ${SHARED_DIR}"
         ls "${SHARED_DIR}" > >(tee -a "$log_file")
         exit 1
@@ -252,7 +252,7 @@ deploy() {
     local _cluster="$1"
     local _log="${ARTIFACT_DIR}/deploy-${_cluster}.log"
     local _status="${ARTIFACT_DIR}/deploy-${_cluster}.status"
-    local _creds="${SHARED_DIR}/${_cluster}.json"
+    local _kc="${SHARED_DIR}/${_cluster}.kc"
 
     # Cloning deploy repo
     logf "$_log" "Deploy $_cluster: Cloning deploy repo"
@@ -272,39 +272,38 @@ deploy() {
     echo "SNAPSHOT" > "${_status}"
     echo "$snapshot" > snapshot.ver
 
-    # Get cluster creds
-    logf "$_log" "Deploy $_cluster: Getting creds from file $_creds"
-    echo "CREDS" > "${_status}"
-    local _url='' _user='' _pass=''
-    _url=$(jq -r '.api_url' "$_creds" 2> >(tee -a "$_log"))
-    _user=$(jq -r '.username' "$_creds" 2> >(tee -a "$_log"))
-    _pass=$(jq -r '.password' "$_creds" 2> >(tee -a "$_log"))
-    logf "$_log" "Deploy $_cluster: $_user $_url"
-
-    # Log into cluster
-    logf "$_log" "Deploy $_cluster: Logging in to cluster"
-    echo "LOGIN" > "${_status}"
-    local _attempts=6 _delay=10
+    # Test cluster connection
+    logf "$_log" "Deploy $_cluster: Waiting up to 2 minutes to connect to cluster"
+    echo "WAIT_CONNECT" > "${_status}"
+    local _timeout=120 _elapsed='' _step=10
     while true; do
-        KUBECONFIG=kubeconfig oc login "$_url" -u "$_user" -p "$_pass" \
-            --insecure-skip-tls-verify=true > >(tee -a "$_log") 2>&1 && break
-
-        _attempts=$(( _attempts-- ))
-
-        if (( _attempts > 0 )); then
-            logf "$_log" "WARN Deploy $_cluster: Could not log into cluster. Will retry."
-            sleep "$_delay"
+        # Wait for _step seconds, except for first iteration.
+        if [[ -z "$_elapsed" ]]; then
+            _elapsed=0
         else
-            logf "$_log" "ERROR Deploy $_cluster: Failed to log into cluster: $_url $_user"
-            echo "ERROR LOGIN" > "${_status}"
-            return 1
+            sleep $_step
+            _elapsed=$(( _elapsed + _step ))
         fi
+
+        KUBECONFIG="$_kc" oc project > >(tee -a "$_log") 2>&1 && {
+            logf "$_log" "Deploy $_cluster: Connected to cluster after ${_elapsed}s"
+            break
+        }
+
+        # Check timeout
+        if (( _elapsed > _timeout )); then
+                logf "$_log" "ERROR Deploy $_cluster: Timeout (${_timeout}s) connecting to cluster"
+                echo "ERROR WAIT_CONNECT" > "${_status}"
+                return 1
+        fi
+
+        logf "$_log" "WARN Deploy $_cluster: Could not connect to cluster. Will retry (${_elapsed}/${_timeout}s)"
     done
 
     # Generate YAML files
     logf "$_log" "Deploy $_cluster: Running start.sh to generate YAML files"
     echo "YAML" > "${_status}"
-    KUBECONFIG=kubeconfig QUAY_TOKEN="$QUAY_TOKEN" ./start.sh --silent -t \
+    KUBECONFIG="$_kc" QUAY_TOKEN="$QUAY_TOKEN" ./start.sh --silent -t \
         > >(tee -a "$_log") 2>&1 || {
         logf "$_log" "ERROR Deploy $_cluster: Error generating YAML files"
         echo "ERROR YAML" > "${_status}"
@@ -314,7 +313,7 @@ deploy() {
     # Create namespace
     logf "$_log" "Deploy $_cluster: Creating namespace $NAMESPACE"
     echo "NAMESPACE" > "${_status}"
-    KUBECONFIG=kubeconfig oc create ns $NAMESPACE \
+    KUBECONFIG="$_kc" oc create ns $NAMESPACE \
         > >(tee -a "$_log") 2>&1 || {
         logf "$_log" "ERROR Deploy $_cluster: Error creating namespace $NAMESPACE"
         echo "ERROR NAMESPACE" > "${_status}"
@@ -335,7 +334,7 @@ deploy() {
         fi
 
         # Check for namespace to be created.
-        KUBECONFIG=kubeconfig oc get ns $NAMESPACE -o name > >(tee -a "$_log") 2>&1 && {
+        KUBECONFIG="$_kc" oc get ns $NAMESPACE -o name > >(tee -a "$_log") 2>&1 && {
             logf "$_log" "Deploy $_cluster: Namespace $NAMESPACE created after ${_elapsed}s"
             break
         }
@@ -353,7 +352,7 @@ deploy() {
     # Apply YAML files in prereqs directory
     logf "$_log" "Deploy $_cluster: Applying YAML files from prereqs directory"
     echo "APPLY_PREREQS" > "${_status}"
-    KUBECONFIG=kubeconfig oc -n $NAMESPACE apply --openapi-patch=true -k prereqs/ \
+    KUBECONFIG="$_kc" oc -n $NAMESPACE apply --openapi-patch=true -k prereqs/ \
         > >(tee -a "$_log") 2>&1 || {
         logf "$_log" "ERROR Deploy $_cluster: Error applying YAML files from prereqs directory"
         echo "ERROR APPLY_PREREQS" > "${_status}"
@@ -363,7 +362,7 @@ deploy() {
     # Apply YAML files in multicluster hub operator directory
     logf "$_log" "Deploy $_cluster: Applying YAML files from MCH operator directory"
     echo "APPLY_MCHO" > "${_status}"
-    KUBECONFIG=kubeconfig oc -n $NAMESPACE apply -k "${OPERATOR_DIR}/" \
+    KUBECONFIG="$_kc" oc -n $NAMESPACE apply -k "${OPERATOR_DIR}/" \
         > >(tee -a "$_log") 2>&1 || {
         logf "$_log" "ERROR Deploy $_cluster: Error applying YAML files from MCH operator directory"
         echo "ERROR APPLY_MCHO" > "${_status}"
@@ -385,7 +384,7 @@ deploy() {
         fi
 
         # Get pod names
-        KUBECONFIG=kubeconfig oc -n $NAMESPACE get pods -o name > pod_names 2> >(tee -a "$_log") || {
+        KUBECONFIG="$_kc" oc -n $NAMESPACE get pods -o name > pod_names 2> >(tee -a "$_log") || {
             logf "$_log" "WARN Deploy $_cluster: Failed to get pod names. Will retry (${_elapsed}/${_timeout}s)"
             continue
         }
@@ -399,7 +398,7 @@ deploy() {
 
         # Get IDs of all containers in MCH pod.
         _path='{range .status.containerStatuses[*]}{@.containerID}{"\n"}{end}'
-        KUBECONFIG=kubeconfig oc -n $NAMESPACE get "$_mcho_name" \
+        KUBECONFIG="$_kc" oc -n $NAMESPACE get "$_mcho_name" \
             -o jsonpath="$_path" > total_containers 2> >(tee -a "$_log") || {
             logf "$_log" "WARN Deploy $_cluster: Failed to get all container IDs. Will retry (${_elapsed}/${_timeout}s)"
             continue
@@ -407,7 +406,7 @@ deploy() {
 
         # Get IDs of all ready containers in MCH pod.
         _path='{range .status.containerStatuses[?(@.ready==true)]}{@.containerID}{"\n"}{end}'
-        KUBECONFIG=kubeconfig oc -n $NAMESPACE get "$_mcho_name" \
+        KUBECONFIG="$_kc" oc -n $NAMESPACE get "$_mcho_name" \
             -o jsonpath="$_path" > ready_containers 2> >(tee -a "$_log") || {
             logf "$_log" "WARN Deploy $_cluster: Failed to get all ready container IDs. Will retry (${_elapsed}/${_timeout}s)"
             continue
@@ -446,7 +445,7 @@ deploy() {
         fi
 
         # Get CSV name
-        KUBECONFIG=kubeconfig oc -n $NAMESPACE get csv -o name > csv_name 2> >(tee -a "$_log") || {
+        KUBECONFIG="$_kc" oc -n $NAMESPACE get csv -o name > csv_name 2> >(tee -a "$_log") || {
             logf "$_log" "WARN Deploy $_cluster: Error getting CSV name. Will retry (${_elapsed}/${_timeout}s)"
             continue
         }
@@ -459,7 +458,7 @@ deploy() {
         fi
 
         # Get CSV status
-        KUBECONFIG=kubeconfig oc -n $NAMESPACE get "$_csv_name" \
+        KUBECONFIG="$_kc" oc -n $NAMESPACE get "$_csv_name" \
             -o json > csv.json 2> >(tee -a "$_log") || {
             logf "$_log" "WARN Deploy $_cluster: Error getting CSV status. Will retry (${_elapsed}/${_timeout}s)"
             continue
@@ -501,7 +500,7 @@ deploy() {
     # Update CSV
     logf "$_log" "Deploy $_cluster: Updating CSV"
     echo "UPDATE_CSV" > "${_status}"
-    KUBECONFIG=kubeconfig oc -n $NAMESPACE replace -f csv_clean.json > >(tee -a "$_log") 2>&1 || {
+    KUBECONFIG="$_kc" oc -n $NAMESPACE replace -f csv_clean.json > >(tee -a "$_log") 2>&1 || {
         logf "$_log" "ERROR Deploy $_cluster: Failed to update CSV."
         logf "$_log" "ERROR Deploy $_cluster: New CSV contents"
         jq . csv_clean.json > >(tee -a "$_log") 2>&1
@@ -520,7 +519,7 @@ deploy() {
         _elapsed=$(( _elapsed + _step ))
 
         # Get CSV name
-        KUBECONFIG=kubeconfig oc -n $NAMESPACE get csv -o name > csv_name 2> >(tee -a "$_log") || {
+        KUBECONFIG="$_kc" oc -n $NAMESPACE get csv -o name > csv_name 2> >(tee -a "$_log") || {
             logf "$_log" "WARN Deploy $_cluster: Error getting CSV name. Will retry (${_elapsed}/${_timeout}s)"
             continue
         }
@@ -533,7 +532,7 @@ deploy() {
         fi
 
         # Get CSV status
-        KUBECONFIG=kubeconfig oc -n $NAMESPACE get "$_csv_name" \
+        KUBECONFIG="$_kc" oc -n $NAMESPACE get "$_csv_name" \
             -o json > csv.json 2> >(tee -a "$_log") || {
             logf "$_log" "WARN Deploy $_cluster: Error getting CSV status. Will retry (${_elapsed}/${_timeout}s)"
             continue
@@ -571,7 +570,7 @@ deploy() {
     # Apply YAML files in multicluster hub directory
     logf "$_log" "Deploy $_cluster: Applying YAML files from MCH directory"
     echo "APPLY_MCH" > "${_status}"
-    KUBECONFIG=kubeconfig oc -n $NAMESPACE apply -k multiclusterhub/ \
+    KUBECONFIG="$_kc" oc -n $NAMESPACE apply -k multiclusterhub/ \
         > >(tee -a "$_log") 2>&1 || {
         logf "$_log" "ERROR Deploy $_cluster: Error applying YAML files from MCH directory"
         echo "ERROR APPLY_MCH" > "${_status}"
@@ -589,7 +588,7 @@ deploy() {
         _elapsed=$(( _elapsed + _step ))
 
         # Get MCH name
-        KUBECONFIG=kubeconfig oc -n $NAMESPACE get multiclusterhub -o name > mch_name 2> >(tee -a "$_log") || {
+        KUBECONFIG="$_kc" oc -n $NAMESPACE get multiclusterhub -o name > mch_name 2> >(tee -a "$_log") || {
             logf "$_log" "WARN Deploy $_cluster: Error getting MCH name. Will retry (${_elapsed}/${_timeout}s)"
             continue
         }
@@ -602,7 +601,7 @@ deploy() {
         fi
 
         # Get MCH status
-        KUBECONFIG=kubeconfig oc -n $NAMESPACE get "$_mch_name" \
+        KUBECONFIG="$_kc" oc -n $NAMESPACE get "$_mch_name" \
             -o json > mch.json 2> >(tee -a "$_log") || {
             logf "$_log" "WARN Deploy $_cluster: Error getting MCH status. Will retry (${_elapsed}/${_timeout}s)"
             continue
@@ -730,7 +729,7 @@ donotuse() {
     # Do X
     logf "$_log" "Deploy $_cluster: Doing X"
     echo "X" > "${_status}"
-    KUBECONFIG=kubeconfig oc -n $NAMESPACE \
+    KUBECONFIG="$_kc" oc -n $NAMESPACE \
         > >(tee -a "$_log") 2>&1 || {
         logf "$_log" "ERROR Deploy $_cluster: Error doing X"
         echo "ERROR X" > "${_status}"
@@ -758,7 +757,7 @@ donotuse() {
         fi
 
         # Do X
-        KUBECONFIG=kubeconfig oc -n open-cluster-management 2> >(tee -a "$_log") && break
+        KUBECONFIG="$_kc" oc -n open-cluster-management 2> >(tee -a "$_log") && break
 
         logf "$_log" "WARN Deploy $_cluster: Failed to do X. Will retry."
     done
