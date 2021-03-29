@@ -13,7 +13,7 @@ logf() {
     echo "$ts" "$@" | tee -a "$logfile"
 }
 
-log_file="${ARCHIVE_DIR}/deploy.log"
+log_file="${ARTIFACT_DIR}/deploy.log"
 log() {
     local ts
     ts=$(date --iso-8601=seconds)
@@ -250,8 +250,8 @@ IMAGE_QUERY="quay.io/open-cluster-management/${IMAGE_NAME}@sha256:[[:alnum:]]+"
 # The first parameter is the cluster name without the suffix.
 deploy() {
     local _cluster="$1"
-    local _log="${ARCHIVE_DIR}/deploy-${_cluster}.log"
-    local _status="${ARCHIVE_DIR}/deploy-${_cluster}.status"
+    local _log="${ARTIFACT_DIR}/deploy-${_cluster}.log"
+    local _status="${ARTIFACT_DIR}/deploy-${_cluster}.status"
     local _creds="${SHARED_DIR}/${_cluster}.json"
 
     # Cloning deploy repo
@@ -704,7 +704,7 @@ trap - EXIT
 log "Deployments done. Checking status."
 err=0
 for cluster in "${clusters[@]}"; do
-    status="${ARCHIVE_DIR}/deploy-$cluster.status"
+    status="${ARTIFACT_DIR}/deploy-$cluster.status"
     if [[ ! -r "$status" ]]; then
         log "Cluster $cluster: No status file: $status"
         err=$(( err + 1 ))
