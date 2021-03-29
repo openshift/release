@@ -4,5 +4,29 @@ chain:
     - ref: baremetalds-packet-setup
     - ref: ipi-install-rbac
     - ref: baremetalds-assisted-setup
+    - env:
+        - name: PACKET_COMMAND
+          value: |-
+            bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
+            set -xeuo pipefail
+            cd /home/assisted
+            source /root/config
+            make create_full_environment
+            EOF
+        - name: PACKET_TIMEOUT
+          value: 30m
+      ref: baremetalds-packet-run
+    - env:
+        - name: PACKET_COMMAND
+          value: |-
+            bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
+            set -xeuo pipefail
+            cd /home/assisted
+            source /root/config
+            make ${MAKEFILE_TARGET:-run_full_flow_with_install}
+            EOF
+        - name: PACKET_TIMEOUT
+          value: 120m
+      ref: baremetalds-packet-run
   documentation: |-
     Steps for installing an assisted-installer cluster on a packet server.
