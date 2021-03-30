@@ -27,6 +27,10 @@ RUN yum install -y epel-release && \
     git config --system user.email origin-release@redhat.com
 
 RUN \
+    curl --fail --retry 3 -L https://ftp.gnu.org/gnu/bash/bash-4.4.tar.gz | tar -C /tmp -xzf - && \
+    pushd /tmp/bash-4.4/ && ./configure && make && make install
+
+RUN \
     set -x &&  \
     curl --fail --retry 3 -L https://golang.org/dl/go$VERSION.linux-amd64.tar.gz | tar -C /usr/local -xzf - && \
     go get golang.org/x/tools/cmd/cover \
