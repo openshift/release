@@ -123,6 +123,7 @@ GITHUB_TOKEN=$(cat "$GITHUB_TOKEN_FILE")
 COMPONENT_REPO="github.com/${REPO_OWNER}/${REPO_NAME}"
 {
     echo "https://${GITHUB_USER}:${GITHUB_TOKEN}@${PIPELINE_REPO}.git"
+    echo "https://${GITHUB_USER}:${GITHUB_TOKEN}@${RELEASE_REPO}.git"
     echo "https://${GITHUB_USER}:${GITHUB_TOKEN}@${DEPLOY_REPO}.git"
     echo "https://${GITHUB_USER}:${GITHUB_TOKEN}@${COMPONENT_REPO}.git"
 } >> ghcreds
@@ -130,6 +131,7 @@ git config --global credential.helper 'store --file=ghcreds'
 
 # Set up repo URLs.
 pipeline_url="https://${PIPELINE_REPO}.git"
+release_url="https://${RELEASE_REPO}.git"
 deploy_url="https://${DEPLOY_REPO}.git"
 component_url="https://${COMPONENT_REPO}.git"
 
@@ -137,9 +139,21 @@ component_url="https://${COMPONENT_REPO}.git"
 # https://github.com/kubernetes/test-infra/blob/master/prow/jobs.md#job-environment-variables
 release="${PULL_BASE_REF}"
 
+# See if we need to get release from the release repo.
+if [[ "$release" == "main" || "$release" == "master" ]]; then
+    log "INFO Current PR is against the $release branch."
+    log "INFO Need to get current release version from release repo at $release_url"
+    release_dir="${ocm_dir}/release"
+    git clone "$release_url" "$release_dir" || {
+        log "ERROR Could not clone release repo $release_url"
+        exit 1
+    }
+    release=$(cat "${release_dir}/CURRENT_RELEASE")
+fi
+
 # Validate release branch. We can only run on release-x.y branches.
 if [[ ! "$release" =~ ^release-[0-9]+\.[0-9]+$ ]]; then
-    log "ERROR Base branch of PR ($release) is not a release branch."
+    log "ERROR Branch ($release) is not a release branch."
     log "Base branch of PR must match release-x.y"
     exit 1
 fi
