@@ -62,7 +62,7 @@ set +x
 echo "export PULL_SECRET='\$(cat /root/pull-secret)'" >> /root/config
 set -x
 
-# Save Prow variables that might become handy
+# Save Prow variables that might become handy inside the Packet server
 echo "export RELEASE_IMAGE_LATEST=${RELEASE_IMAGE_LATEST}" >> /root/config
 
 # Override default images
@@ -74,6 +74,10 @@ echo "export INSTALLER_IMAGE=${ASSISTED_INSTALLER_IMAGE}" >> /root/config
 if [ "${JOB_TYPE}" = "presubmit" ]; then
   # We would like to keep running a stable version for PRs
   echo "export OPENSHIFT_VERSION=4.7" >> /root/config
+
+  if [ "${REPO_NAME}" = "assisted-service" ]; then
+    echo "export SERVICE_BRANCH=${PULL_PULL_SHA}" >> /root/config
+  fi
 else
   # Periodics run against latest release
   echo "export OPENSHIFT_INSTALL_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}" >> /root/config
