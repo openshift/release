@@ -138,6 +138,7 @@ component_url="https://${COMPONENT_REPO}.git"
 # Get release branch. This is a Prow variable as described here:
 # https://github.com/kubernetes/test-infra/blob/master/prow/jobs.md#job-environment-variables
 release="${PULL_BASE_REF}"
+log "INFO This PR's base branch is $release"
 
 # See if we need to get release from the release repo.
 if [[ "$release" == "main" || "$release" == "master" ]]; then
@@ -149,6 +150,7 @@ if [[ "$release" == "main" || "$release" == "master" ]]; then
         exit 1
     }
     release=$(cat "${release_dir}/CURRENT_RELEASE")
+    log "INFO Branch from CURRENT_RELEASE is $release"
 fi
 
 # Validate release branch. We can only run on release-x.y branches.
