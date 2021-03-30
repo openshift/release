@@ -344,9 +344,25 @@ objects:
         ) &
         OPENSHIFT_WATCH="$!"
 
-        ${TEST_COMMAND}
+        # Test if bastion is still up before starting the testcases
+        source ${ARTIFACT_DIR}/shared_variables
+        A=${remote_libvirt_uri#*//}
+        HOSTNAME=${A%/*}
+        nc -zv ${HOSTNAME} 16509 || exit 1
+
+        (
+          ${TEST_COMMAND}
+        ) || true
+        RC=${PIPESTATUS[0]}
+        echo "TEST_COMMAND: RC=${RC}"
 
         kill -9 ${OPENSHIFT_WATCH} >/dev/null 2>&1 || true
+
+        # Test again if bastion is still up after finishing the testcases
+        # Notice a pattern?
+        nc -zv ${HOSTNAME} 16509 || exit 1
+
+        exit ${RC}
 
     # Runs an install
     - name: setup
@@ -476,6 +492,9 @@ objects:
            remote_libvirt_uri="qemu+tcp://${REMOTE_LIBVIRT_HOSTNAME}/system"
         fi
         echo "remote_libvirt_uri=${remote_libvirt_uri}"
+
+        # Create a list of shared variables among containers
+        printf "remote_libvirt_uri=%s\n" "${remote_libvirt_uri}" > ${ARTIFACT_DIR}/shared_variables
 
         # Test the remote connection
         mock-nss.sh virsh -c ${remote_libvirt_uri} list
@@ -736,6 +755,12 @@ objects:
           set +e
           touch /tmp/shared/exit
           export PATH=$PATH:/tmp/shared
+
+          # Read the shared variables among containers
+          source ${ARTIFACT_DIR}/shared_variables
+
+          # Test the possibly flakey bastion connection before tearing down
+          mock-nss.sh virsh -c ${remote_libvirt_uri} list --all || return
 
           echo "Gathering artifacts ..."
           mkdir -p ${ARTIFACT_DIR}/pods ${ARTIFACT_DIR}/nodes ${ARTIFACT_DIR}/metrics ${ARTIFACT_DIR}/bootstrap ${ARTIFACT_DIR}/network
