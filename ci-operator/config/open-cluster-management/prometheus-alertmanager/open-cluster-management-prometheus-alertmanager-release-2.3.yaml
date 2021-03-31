@@ -39,11 +39,20 @@ tag_specification:
   namespace: ocp
 test_binary_build_commands: "true"
 tests:
-- as: common-test
+- as: test
   commands: |
     export SELF="make -f Makefile"
     make -f Makefile build
     make -f Makefile common-test
+  container:
+    from: src
+- as: test-frontend
+  commands: |
+    export SELF="make -f Makefile"
+    make -f Makefile all
+    make -f Makefile assets
+    make -f Makefile apiv2
+    git diff --exit-code
   container:
     from: src
 zz_generated_metadata:
