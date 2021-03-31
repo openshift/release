@@ -210,7 +210,7 @@ git_repository="${REPO_OWNER}/${REPO_NAME}"
 image_name_query=".[] | select(.[\"git-repository\"]==\"${git_repository}\") | .[\"image-name\"]"
 IMAGE_NAME=$(jq -r "$image_name_query" "$manifest_file" 2> >(tee -a "$log_file"))
 if [[ -z "$IMAGE_NAME" ]]; then
-    log "ERROR Could not find image-name for $REPO in manifest $manifest_file"
+    log "ERROR Could not find image-name for $REPO_NAME in manifest $manifest_file"
     log "Contents of manifest $manifest_file"
     cat "$manifest_file" > >(tee -a "$log_file")
     exit 1
