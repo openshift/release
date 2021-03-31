@@ -24,6 +24,26 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- as: e2e
+  steps:
+    dependencies:
+      COMPONENT_IMAGE_REF: helloprow-go
+    env:
+      CLUSTERPOOL_GROUP_NAME: system:masters
+      CLUSTERPOOL_HOST_NAMESPACE: cicd
+      CLUSTERPOOL_HOST_PROW_KUBE_SECRET: acm-cicd-clusterpool-shared
+      PIPELINE_STAGE: integration
+    test:
+    - as: e2e
+      commands: |
+        make test-e2e
+      from: bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-e2e-clusterpool
 zz_generated_metadata:
   branch: main
   org: open-cluster-management
