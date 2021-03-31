@@ -76,7 +76,7 @@ if [ "${JOB_TYPE:-}" = "presubmit" ]; then
   echo "export OPENSHIFT_VERSION=4.7" >> /root/config
 
   if [ "${REPO_NAME:-}" = "assisted-service" ]; then
-    echo "export SERVICE_BRANCH=${PULL_PULL_SHA}" >> /root/config
+    echo "export SERVICE_BRANCH=${PULL_PULL_SHA:-master}" >> /root/config
   fi
 else
   # Periodics run against latest release
