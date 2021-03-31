@@ -71,11 +71,11 @@ echo "export AGENT_DOCKER_IMAGE=${ASSISTED_AGENT_IMAGE}" >> /root/config
 echo "export CONTROLLER_IMAGE=${ASSISTED_CONTROLLER_IMAGE}" >> /root/config
 echo "export INSTALLER_IMAGE=${ASSISTED_INSTALLER_IMAGE}" >> /root/config
 
-if [ "${JOB_TYPE}" = "presubmit" ]; then
+if [ "${JOB_TYPE:-}" = "presubmit" ]; then
   # We would like to keep running a stable version for PRs
   echo "export OPENSHIFT_VERSION=4.7" >> /root/config
 
-  if [ "${REPO_NAME}" = "assisted-service" ]; then
+  if [ "${REPO_NAME:-}" = "assisted-service" ]; then
     echo "export SERVICE_BRANCH=${PULL_PULL_SHA}" >> /root/config
   fi
 else
