@@ -301,9 +301,13 @@ gcloud iam service-accounts keys create service-account-key.json "--iam-account=
 
 ## Create the cluster image.
 echo "$(date -u --rfc-3339=seconds) - Creating the cluster image..."
-IMAGE_SOURCE="$(jq -r .gcp.url /var/lib/openshift-install/rhcos.json)"
-gcloud compute images create "${INFRA_ID}-rhcos-image" --source-uri="${IMAGE_SOURCE}"
-CLUSTER_IMAGE="$(gcloud compute images describe "${INFRA_ID}-rhcos-image" --format json | jq -r .selfLink)"
+if test -f /var/lib/openshift-install/coreos-stream.json; then
+  CLUSTER_IMAGE=$(jq -r '.architectures["'"$(arch)"'"].images.gcp as $gcp | "projects/" + $gcp.project + "/global/images/" + $gcp.name' < /var/lib/openshift-install/coreos-stream.json) 
+else
+  IMAGE_SOURCE="$(jq -r .gcp.url /var/lib/openshift-install/rhcos.json)"
+  gcloud compute images create "${INFRA_ID}-rhcos-image" --source-uri="${IMAGE_SOURCE}"
+  CLUSTER_IMAGE="$(gcloud compute images describe "${INFRA_ID}-rhcos-image" --format json | jq -r .selfLink)"
+fi
 
 ## Upload the bootstrap.ign to a new bucket
 echo "$(date -u --rfc-3339=seconds) - Uploading the bootstrap.ign to a new bucket..."
