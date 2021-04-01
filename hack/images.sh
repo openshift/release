@@ -1,2 +1,2 @@
-MKPJ_IMG=gcr.io/k8s-prow/mkpj:v20210401-0101566d4c
-MKPOD_IMG=gcr.io/k8s-prow/mkpod:v20210401-0101566d4c
+MKPJ_IMG=gcr.io/k8s-prow/mkpj:v20210401-1e772aaa42
+MKPOD_IMG=gcr.io/k8s-prow/mkpod:v20210401-1e772aaa42
