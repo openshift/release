@@ -654,11 +654,10 @@ deploy() {
 # https://stackoverflow.com/a/50436152/1437822
 #
 deploy_with_timeout() {
-    # Refresh stdin to make read work.
-    exec 0</dev/tty
     # Store the timeout and cluster name.
     local _timeout=$1
     local _cluster=$2
+    local _step=5
     # Execute the command in the background.
     deploy "$_cluster" &
     # Store the PID of the command in the background.
@@ -670,13 +669,13 @@ deploy_with_timeout() {
     #   exit code 0 if the command is running, but does not affect the command
     #   exit code 1 if the command is not running
     while kill -0 $_pid >/dev/null 2>&1 ; do
-        # command is still running. wait 1 second
-        read -r -t 1
+        # command is still running. wait _step seconds
+        sleep $_step
         # increment elapsed time
-        _elapsed=$(( _elapsed + 1 ))
+        _elapsed=$(( _elapsed + _step ))
         # Check if timeout has been reached.
-        if [[ $_elapsed -ge $_timeout ]] ; then 
-            log "Deploy $_cluster: Killing pid $_pid due to timeout"
+        if (( _elapsed >= _timeout )); then 
+            log "Deploy $_cluster: Killing pid $_pid due to timeout (${_elapsed}/${_timeout}s)"
             # Update status
             echo "TIMEOUT at $(date --iso-8601=seconds)" > "${_cluster}.status"
             # Kill deployment
