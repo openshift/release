@@ -393,19 +393,24 @@ deploy() {
     while true; do
         # Wait for _step seconds, except for first iteration.
         if [[ -z "$_elapsed" ]]; then
+            logf "$_log" "INFO Deploy $_cluster: Setting elapsed time to 0"
             _elapsed=0
         else
+            logf "$_log" "INFO Deploy $_cluster: Sleeping for $_step s"
             sleep $_step
             _elapsed=$(( _elapsed + _step ))
         fi
+        logf "$_log" "INFO Deploy $_cluster: Elapsed time is ${_elapsed}/${_timeout}s"
 
         # Get pod names
+        logf "$_log" "INFO Deploy $_cluster: Getting pod names."
         KUBECONFIG="$_kc" oc -n $NAMESPACE get pods -o name > pod_names 2> >(tee -a "$_log") || {
             logf "$_log" "WARN Deploy $_cluster: Failed to get pod names. Will retry (${_elapsed}/${_timeout}s)"
             continue
         }
 
         # Check for multiclusterhub-operator pod name
+        logf "$_log" "INFO Deploy $_cluster: Checking for multiclusterhub-operator pod."
         _mcho_name=$(grep -E --max-count=1 "^pod/multiclusterhub-operator(-[[:alnum:]]+)+$" pod_names)
         if [[ -z "$_mcho_name" ]]; then
             logf "$_log" "WARN Deploy $_cluster: multiclusterhub-operator pod not created yet. Will retry (${_elapsed}/${_timeout}s)"
@@ -413,6 +418,7 @@ deploy() {
         fi
 
         # Get IDs of all containers in MCH pod.
+        logf "$_log" "INFO Deploy $_cluster: Getting IDs of all containers in MCH-O pod $_mcho_name"
         _path='{range .status.containerStatuses[*]}{@.containerID}{"\n"}{end}'
         KUBECONFIG="$_kc" oc -n $NAMESPACE get "$_mcho_name" \
             -o jsonpath="$_path" > total_containers 2> >(tee -a "$_log") || {
@@ -421,6 +427,7 @@ deploy() {
         }
 
         # Get IDs of all ready containers in MCH pod.
+        logf "$_log" "INFO Deploy $_cluster: Getting IDs of all ready containers in MCH-O pod $_mcho_name"
         _path='{range .status.containerStatuses[?(@.ready==true)]}{@.containerID}{"\n"}{end}'
         KUBECONFIG="$_kc" oc -n $NAMESPACE get "$_mcho_name" \
             -o jsonpath="$_path" > ready_containers 2> >(tee -a "$_log") || {
@@ -429,6 +436,7 @@ deploy() {
         }
 
         # Check if all containers are ready.
+        logf "$_log" "INFO Deploy $_cluster: Checking if all containers are ready in MCH-O pod."
         _total=$(wc -l < total_containers) # redirect into wc so it doesn't print file name as well
         _ready=$(wc -l < ready_containers)
         if (( _total > 0 && _ready == _total )); then
@@ -437,6 +445,7 @@ deploy() {
         fi
 
         # Check timeout
+        logf "$_log" "INFO Deploy $_cluster: Checking for timeout."
         if (( _elapsed > _timeout )); then
                 logf "$_log" "ERROR Deploy $_cluster: Timeout (${_timeout}s) waiting for multiclusterhub-operator pod"
                 echo "ERROR WAIT_MCHO" > "${_status}"
