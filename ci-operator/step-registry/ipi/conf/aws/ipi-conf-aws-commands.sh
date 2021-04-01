@@ -8,23 +8,20 @@ CONFIG="${SHARED_DIR}/install-config.yaml"
 
 expiration_date=$(date -d '4 hours' --iso=minutes --utc)
 
-function join_by { local IFS="$1"; shift; echo "$*"; }
+export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
+export AWS_MAX_ATTEMPTS=7
+export AWS_RETRY_MODE=adaptive
 
 REGION="${LEASED_RESOURCE}"
-case "${REGION}" in
-us-east-1)
-    ZONES=("us-east-1b" "us-east-1c")
-    ;;
-*)
-    ZONES=("${REGION}a" "${REGION}b")
-esac
+ZONES=$(aws ec2 describe-availability-zones --region=${REGION} | jq  -r '.[] | .[].ZoneName' | awk -vORS=, '{print $1}' | sed 's/,$/\n/')
 
 ZONES_COUNT=${ZONES_COUNT:-2}
 ZONES=("${ZONES[@]:0:${ZONES_COUNT}}")
 ZONES_STR="[ "
-ZONES_STR+=$(join_by , "${ZONES[@]}")
+ZONES_STR+=${ZONES}
 ZONES_STR+=" ]"
-echo "AWS region: ${REGION} (zones: ${ZONES_STR})"
+
+echo "AWS region: ${REGION} (zones: ${ZONES})"
 
 workers=3
 if [[ "${SIZE_VARIANT}" == "compact" ]]; then
