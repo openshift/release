@@ -408,14 +408,19 @@ deploy() {
             logf "$_log" "WARN Deploy $_cluster: Failed to get pod names. Will retry (${_elapsed}/${_timeout}s)"
             continue
         }
+        logf "$_log" "INFO Deploy $_cluster: Current pod names:"
+        cat pod_names > >(tee -a "$_log") 2>&1
 
         # Check for multiclusterhub-operator pod name
         logf "$_log" "INFO Deploy $_cluster: Checking for multiclusterhub-operator pod."
-        _mcho_name=$(grep -E --max-count=1 "^pod/multiclusterhub-operator(-[[:alnum:]]+)+$" pod_names)
+        grep -E --max-count=1 "^pod/multiclusterhub-operator(-[[:alnum:]]+)+$" pod_names > >(tee -a "$_log") 2>&1
+        _mcho_name=$(grep -E --max-count=1 "^pod/multiclusterhub-operator(-[[:alnum:]]+)+$" pod_names 2> /dev/null)
+        logf "$_log" "INFO Deploy $_cluster: Testing MCHO pod name: '$_mcho_name'"
         if [[ -z "$_mcho_name" ]]; then
             logf "$_log" "WARN Deploy $_cluster: multiclusterhub-operator pod not created yet. Will retry (${_elapsed}/${_timeout}s)"
             continue
         fi
+        logf "$_log" "INFO Deploy $_cluster: Found MCHO pod: '$_mcho_name'"
 
         # Get IDs of all containers in MCH pod.
         logf "$_log" "INFO Deploy $_cluster: Getting IDs of all containers in MCH-O pod $_mcho_name"
