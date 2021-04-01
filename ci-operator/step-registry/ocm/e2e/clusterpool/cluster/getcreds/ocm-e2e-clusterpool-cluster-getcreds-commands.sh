@@ -13,7 +13,8 @@ export OC_CLUSTER_URL="$CLUSTERPOOL_HOST_API"
 while read -r claim; do 
     # strip off the -abcde suffix
     cluster=$( sed -e "s/-[[:alnum:]]\+$//" <<<"$claim" )
-    output="${SHARED_DIR}/${cluster}.kc"
+    kc_output="${SHARED_DIR}/${cluster}.kc"
+    json_output="${SHARED_DIR}/${cluster}.json"
 
     # Get cluster claim namespace
     oc_command="get clusterclaim.hive $claim -o jsonpath='{.spec.namespace}'"
@@ -33,10 +34,21 @@ while read -r claim; do
 
     # Get the cluster claim kubeconfig file
     oc_command="get -n $ns secret $kc -o jsonpath='{.data.kubeconfig}'"
-    if make -s oc/command OC_COMMAND="$oc_command" > >(base64 --decode > "$output"); then
-        echo "Cluster kubeconfig for $claim saved to $output"
+    if make -s oc/command OC_COMMAND="$oc_command" > >(base64 --decode > "$kc_output"); then
+        echo "Cluster kubeconfig for $claim saved to $kc_output"
     else
         echo "Error getting cluster kubeconfig for $claim"
         exit 1
     fi
+
+    # Get the metadata file for the cluster
+    if make clusterpool/get-cluster-metadata \
+        CLUSTERPOOL_CLUSTER_CLAIM="$claim" \
+        CLUSTERPOOL_METADATA_FILE="$json_output" > /dev/null ; then
+        echo "Cluster meta data for $claim saved to $json_output"
+    else
+        echo "Error getting cluster metadata for $claim"
+        exit 1
+    fi
+    
 done < "${SHARED_DIR}/${CLUSTER_CLAIM_FILE}"
