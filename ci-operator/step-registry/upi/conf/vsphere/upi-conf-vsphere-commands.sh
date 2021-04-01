@@ -48,7 +48,7 @@ if openshift-install coreos print-stream-json 2>/tmp/err.txt >${SHARED_DIR}/core
    echo "Using stream metadata"
    ova_url=$(jq -r '.architectures.x86_64.artifacts.vmware.formats.ova.disk.location' < ${SHARED_DIR}/coreos.json)
 else
-  if ! grep -qF 'unknown command "coreos"' /tmp/err.txt; then
+  if ! grep -qF 'unknown command \"coreos\"' /tmp/err.txt; then
     echo "Unhandled error from openshift-install" 1>&2
     cat /tmp/err.txt
     exit 1
