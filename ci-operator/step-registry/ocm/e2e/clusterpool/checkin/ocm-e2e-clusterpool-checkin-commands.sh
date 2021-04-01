@@ -5,7 +5,14 @@ cd $temp || exit 1
 
 cp "$MAKEFILE" ./Makefile
 
-for claim in $(cat "${SHARED_DIR}/${CLUSTER_CLAIM_FILE}"); do
+cluster_claims="${SHARED_DIR}/${CLUSTER_CLAIM_FILE}"
+
+if [[ ! -r "$cluster_claims" ]]; then
+    echo "The cluster claim file does not exist. Not checking in any clusters."
+    exit 0
+fi
+
+for claim in $(cat "$cluster_claims"); do
     make clusterpool/checkin CLUSTERPOOL_CLUSTER_CLAIM="$claim"
 
     if [[ "$?" == 0 ]]; then
