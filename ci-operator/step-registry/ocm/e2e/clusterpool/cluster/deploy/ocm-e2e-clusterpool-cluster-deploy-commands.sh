@@ -210,7 +210,7 @@ git_repository="${REPO_OWNER}/${REPO_NAME}"
 image_name_query=".[] | select(.[\"git-repository\"]==\"${git_repository}\") | .[\"image-name\"]"
 IMAGE_NAME=$(jq -r "$image_name_query" "$manifest_file" 2> >(tee -a "$log_file"))
 if [[ -z "$IMAGE_NAME" ]]; then
-    log "ERROR Could not find image-name for $REPO in manifest $manifest_file"
+    log "ERROR Could not find image-name for $REPO_NAME in manifest $manifest_file"
     log "Contents of manifest $manifest_file"
     cat "$manifest_file" > >(tee -a "$log_file")
     exit 1
@@ -393,26 +393,38 @@ deploy() {
     while true; do
         # Wait for _step seconds, except for first iteration.
         if [[ -z "$_elapsed" ]]; then
+            logf "$_log" "INFO Deploy $_cluster: Setting elapsed time to 0"
             _elapsed=0
         else
+            logf "$_log" "INFO Deploy $_cluster: Sleeping for $_step s"
             sleep $_step
             _elapsed=$(( _elapsed + _step ))
         fi
+        logf "$_log" "INFO Deploy $_cluster: Elapsed time is ${_elapsed}/${_timeout}s"
 
         # Get pod names
+        logf "$_log" "INFO Deploy $_cluster: Getting pod names."
         KUBECONFIG="$_kc" oc -n $NAMESPACE get pods -o name > pod_names 2> >(tee -a "$_log") || {
             logf "$_log" "WARN Deploy $_cluster: Failed to get pod names. Will retry (${_elapsed}/${_timeout}s)"
             continue
         }
+        logf "$_log" "INFO Deploy $_cluster: Current pod names:"
+        cat pod_names > >(tee -a "$_log") 2>&1
 
         # Check for multiclusterhub-operator pod name
-        _mcho_name=$(grep -E --max-count=1 "^pod/multiclusterhub-operator(-[[:alnum:]]+)+$" pod_names)
+        logf "$_log" "INFO Deploy $_cluster: Manual check for multiclusterhub-operator pod."
+        grep -E --max-count=1 "^pod/multiclusterhub-operator(-[[:alnum:]]+)+$" pod_names > >(tee -a "$_log") 2>&1
+        logf "$_log" "INFO Deploy $_cluster: Checking for multiclusterhub-operator pod."
+        _mcho_name=$(grep -E --max-count=1 "^pod/multiclusterhub-operator(-[[:alnum:]]+)+$" pod_names 2> /dev/null)
+        logf "$_log" "INFO Deploy $_cluster: Testing MCHO pod name: '$_mcho_name'"
         if [[ -z "$_mcho_name" ]]; then
             logf "$_log" "WARN Deploy $_cluster: multiclusterhub-operator pod not created yet. Will retry (${_elapsed}/${_timeout}s)"
             continue
         fi
+        logf "$_log" "INFO Deploy $_cluster: Found MCHO pod: '$_mcho_name'"
 
         # Get IDs of all containers in MCH pod.
+        logf "$_log" "INFO Deploy $_cluster: Getting IDs of all containers in MCH-O pod $_mcho_name"
         _path='{range .status.containerStatuses[*]}{@.containerID}{"\n"}{end}'
         KUBECONFIG="$_kc" oc -n $NAMESPACE get "$_mcho_name" \
             -o jsonpath="$_path" > total_containers 2> >(tee -a "$_log") || {
@@ -421,6 +433,7 @@ deploy() {
         }
 
         # Get IDs of all ready containers in MCH pod.
+        logf "$_log" "INFO Deploy $_cluster: Getting IDs of all ready containers in MCH-O pod $_mcho_name"
         _path='{range .status.containerStatuses[?(@.ready==true)]}{@.containerID}{"\n"}{end}'
         KUBECONFIG="$_kc" oc -n $NAMESPACE get "$_mcho_name" \
             -o jsonpath="$_path" > ready_containers 2> >(tee -a "$_log") || {
@@ -429,6 +442,7 @@ deploy() {
         }
 
         # Check if all containers are ready.
+        logf "$_log" "INFO Deploy $_cluster: Checking if all containers are ready in MCH-O pod."
         _total=$(wc -l < total_containers) # redirect into wc so it doesn't print file name as well
         _ready=$(wc -l < ready_containers)
         if (( _total > 0 && _ready == _total )); then
@@ -437,6 +451,7 @@ deploy() {
         fi
 
         # Check timeout
+        logf "$_log" "INFO Deploy $_cluster: Checking for timeout."
         if (( _elapsed > _timeout )); then
                 logf "$_log" "ERROR Deploy $_cluster: Timeout (${_timeout}s) waiting for multiclusterhub-operator pod"
                 echo "ERROR WAIT_MCHO" > "${_status}"
@@ -654,11 +669,10 @@ deploy() {
 # https://stackoverflow.com/a/50436152/1437822
 #
 deploy_with_timeout() {
-    # Refresh stdin to make read work.
-    exec 0</dev/tty
     # Store the timeout and cluster name.
     local _timeout=$1
     local _cluster=$2
+    local _step=5
     # Execute the command in the background.
     deploy "$_cluster" &
     # Store the PID of the command in the background.
@@ -670,13 +684,13 @@ deploy_with_timeout() {
     #   exit code 0 if the command is running, but does not affect the command
     #   exit code 1 if the command is not running
     while kill -0 $_pid >/dev/null 2>&1 ; do
-        # command is still running. wait 1 second
-        read -r -t 1
+        # command is still running. wait _step seconds
+        sleep $_step
         # increment elapsed time
-        _elapsed=$(( _elapsed + 1 ))
+        _elapsed=$(( _elapsed + _step ))
         # Check if timeout has been reached.
-        if [[ $_elapsed -ge $_timeout ]] ; then 
-            log "Deploy $_cluster: Killing pid $_pid due to timeout"
+        if (( _elapsed >= _timeout )); then 
+            log "Deploy $_cluster: Killing pid $_pid due to timeout (${_elapsed}/${_timeout}s)"
             # Update status
             echo "TIMEOUT at $(date --iso-8601=seconds)" > "${_cluster}.status"
             # Kill deployment

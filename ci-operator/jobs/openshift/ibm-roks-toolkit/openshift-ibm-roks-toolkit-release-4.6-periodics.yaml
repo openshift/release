@@ -1,0 +1,47 @@
+periodics:
+- agent: kubernetes
+  cluster: build01
+  decorate: true
+  decoration_config:
+    timeout: 10h0m0s
+  extra_refs:
+  - base_ref: release-4.6
+    org: openshift
+    repo: ibm-roks-toolkit
+  interval: 12h
+  name: openshift-ibm-roks-toolkit-release-4.6-create-cluster-periodics
+  spec:
+    containers:
+    - args:
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --repo=ibm-roks-toolkit
+      - --secret-dir=/usr/ibm-gate-test-secrets/
+      - --target=create-cluster
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/ibm-gate-test-secrets/
+        name: ibm-gate-test-secrets
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: ibm-gate-test-secrets
+      secret:
+        secretName: ibm-gate-test-secrets
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
