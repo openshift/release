@@ -1,19 +1,45 @@
+base_images:
+  coreos_coreos-assembler_latest:
+    name: coreos-assembler
+    namespace: coreos
+    tag: latest
+  coreos_cosa-buildroot_latest:
+    name: cosa-buildroot
+    namespace: coreos
+    tag: latest
 binary_build_commands: make && make install
 build_root:
   image_stream_tag:
     name: cosa-buildroot
     namespace: coreos
     tag: latest
+images:
+- dockerfile_path: ci/prow/Dockerfile
+  inputs:
+    coreos_coreos-assembler_latest:
+      as:
+      - registry.svc.ci.openshift.org/coreos/coreos-assembler:latest
+    coreos_cosa-buildroot_latest:
+      as:
+      - registry.svc.ci.openshift.org/coreos/cosa-buildroot:latest
+  to: component-fcos-e2e
 resources:
   '*':
     requests:
       cpu: 1000m
-      memory: 3Gi
+      memory: 1Gi
+  fcos-e2e:
+    limits:
+      devices.kubevirt.io/kvm: "1"
+    requests:
+      cpu: 1000m
+      devices.kubevirt.io/kvm: "1"
+      memory: 2Gi
 tests:
-- as: test
-  commands: bootupctl --help
+- as: fcos-e2e
+  commands: fcos-e2e
   container:
-    from: bin
+    from: component-fcos-e2e
 zz_generated_metadata:
   branch: master
   org: coreos
