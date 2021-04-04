@@ -96,10 +96,17 @@ then
   cat /root/assisted-additional-config >> /root/config
 fi
 
-echo "export KUBECONFIG=\${REPO_DIR}/build/kubeconfig" >> /root/.bashrc
-
 source /root/config
 
 make \${MAKEFILE_TARGET:-all}
+
+EOF
+
+# Post-installation commands
+ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths\{0,1\}".*/*** PULL_SECRET ***/g'
+
+set -xeuo pipefail
+
+echo "export KUBECONFIG=/home/assisted/build/kubeconfig" >> /root/.bashrc
 
 EOF
