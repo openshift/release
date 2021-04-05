@@ -317,14 +317,33 @@ deploy() {
     done
 
     # Generate YAML files
-    logf "$_log" "Deploy $_cluster: Running start.sh to generate YAML files"
-    echo "YAML" > "${_status}"
-    KUBECONFIG="$_kc" QUAY_TOKEN="$QUAY_TOKEN" ./start.sh --silent -t \
-        > >(tee -a "$_log") 2>&1 || {
-        logf "$_log" "ERROR Deploy $_cluster: Error generating YAML files"
-        echo "ERROR YAML" > "${_status}"
-        return 1
-    }
+    logf "$_log" "Deploy $_cluster: Waiting up to 2 minutes for start.sh to generate YAML files"
+    echo "WAIT_YAML" > "${_status}"
+    local _timeout=120 _elapsed='' _step=10
+    while true; do
+        # Wait for _step seconds, except for first iteration.
+        if [[ -z "$_elapsed" ]]; then
+            _elapsed=0
+        else
+            sleep $_step
+            _elapsed=$(( _elapsed + _step ))
+        fi
+
+        KUBECONFIG="$_kc" QUAY_TOKEN="$QUAY_TOKEN" ./start.sh --silent -t \
+            > >(tee -a "$_log") 2>&1 && {
+            logf "$_log" "Deploy $_cluster: start.sh generated YAML files after ${_elapsed}s"
+            break
+        }
+
+        # Check timeout
+        if (( _elapsed > _timeout )); then
+                logf "$_log" "ERROR Deploy $_cluster: Timeout (${_timeout}s) waiting for start.sh to generate YAML files"
+                echo "ERROR WAIT_YAML" > "${_status}"
+                return 1
+        fi
+
+        logf "$_log" "WARN Deploy $_cluster: Could not create YAML files. Will retry (${_elapsed}/${_timeout}s)"
+    done
 
     # Create namespace
     logf "$_log" "Deploy $_cluster: Creating namespace $NAMESPACE"
