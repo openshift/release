@@ -1318,6 +1318,9 @@ objects:
             --query "HostedZones[? Config.PrivateZone != \`true\` && Name == \`${base_domain}.\`].Id" \
             --output text)"
 
+          # Create s3 bucket for bootstrap and proxy ignition configs
+          aws s3 mb s3://"${CLUSTER_NAME}-infra"
+
           # If we are using a proxy, create a 'black-hole' private subnet vpc TODO
           # For now this is just a placeholder...
           if [[ "${CLUSTER_VARIANT}" =~ "proxy" ]]; then
@@ -1477,6 +1480,9 @@ objects:
 
             echo ${PROXY_IP} > ${ARTIFACT_DIR}/installer/proxyip
           fi
+          
+          S3_BOOTSTRAP_URI="s3://${CLUSTER_NAME}-infra/bootstrap.ign"
+          aws s3 cp ${ARTIFACT_DIR}/installer/bootstrap.ign "$S3_BOOTSTRAP_URI"
 
           aws cloudformation create-stack \
             --stack-name "${CLUSTER_NAME}-bootstrap" \
@@ -1490,7 +1496,7 @@ objects:
               ParameterKey=PublicSubnet,ParameterValue="${PUBLIC_SUBNETS%%,*}\"" \
               ParameterKey=MasterSecurityGroupId,ParameterValue="${MASTER_SECURITY_GROUP}" \
               ParameterKey=VpcId,ParameterValue="${VPC_ID}" \
-              ParameterKey=BootstrapIgnitionLocation,ParameterValue="${BOOTSTRAP_URI}" \
+              ParameterKey=BootstrapIgnitionLocation,ParameterValue="${S3_BOOTSTRAP_URI}" \
               ParameterKey=RegisterNlbIpTargetsLambdaArn,ParameterValue="${NLB_IP_TARGETS_LAMBDA}" \
               ParameterKey=ExternalApiTargetGroupArn,ParameterValue="${EXTERNAL_API_TARGET_GROUP}" \
               ParameterKey=InternalApiTargetGroupArn,ParameterValue="${INTERNAL_API_TARGET_GROUP}" \
