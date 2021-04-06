@@ -4,6 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# This value serves as a default when the parameters are not set, which should
+# only happen in rehearsals. Production jobs should always set the OO_* variable.
+REHEARSAL_BUNDLE="registry-proxy.engineering.redhat.com/rh-osbs/rhacm2-acm-operator-bundle:v2.1.5-6"
+OO_BUNDLE="${OO_BUNDLE:-$REHEARSAL_BUNDLE}"
+
 # Steps for running the basic operator-sdk scorecard test
 # Expects the standard Prow environment variables to be set and
 # the brew proxy registry credentials to be mounted
