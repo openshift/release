@@ -51,7 +51,7 @@ packet)
 
     echo "### Checking release version"
     # Mirroring test images is supported only for versions greater than or equal to 4.7
-    if printf '%s\n%s' "4.7" "${DS_OPENSHIFT_VERSION}" | sort -C -V; then
+    if printf '%s\n%s' "4.8" "${DS_OPENSHIFT_VERSION}" | sort -C -V; then
         mirror_test_images       
     else
         use_minimal_test_list
