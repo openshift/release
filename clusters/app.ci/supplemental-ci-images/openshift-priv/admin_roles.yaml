@@ -1,0 +1,41 @@
+kind: List
+apiVersion: v1
+items:
+- kind: Namespace
+  apiVersion: v1
+  metadata:
+    name: ocp-private
+
+- kind: Role
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: image-tagger
+    namespace: ocp-private
+  rules:
+  - apiGroups:
+    - ""
+    - image.openshift.io
+    resources:
+    - imagestreamtags
+    - imagestreams
+    - imagestreamimports
+    - imagestreams/layers
+    verbs:
+    - update
+    - patch
+    - get
+    - create
+
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: image-tagger-ci-operator
+    namespace: ocp-private
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: Role
+    name: image-tagger
+  subjects:
+  - kind: ServiceAccount
+    name: ci-operator
+    namespace: ci

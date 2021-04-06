@@ -49,6 +49,13 @@ branch-protection:
         rpm-ostree:
           protect: false
     cri-o:
+      repos:
+        cri-o:
+          exclude:
+          - main
+          - master
+          - release-*
+          protect: false
       required_status_checks:
         contexts:
         - dco
@@ -138,29 +145,31 @@ branch-protection:
         cert-policy-controller:
           branches:
             main:
+              protect: true
               required_status_checks:
                 contexts:
                 - KinD tests (1.14, v1.18.15)
                 - KinD tests (1.14, latest)
             release-2.3:
+              protect: true
               required_status_checks:
                 contexts:
                 - KinD tests (1.14, v1.18.15)
                 - KinD tests (1.14, latest)
-          protect: true
         config-policy-controller:
           branches:
             main:
+              protect: true
               required_status_checks:
                 contexts:
                 - KinD tests (1.14, v1.18.15)
                 - KinD tests (1.14, v1.19.7)
             release-2.3:
+              protect: true
               required_status_checks:
                 contexts:
                 - KinD tests (1.14, v1.18.15)
                 - KinD tests (1.14, v1.19.7)
-          protect: true
         console:
           required_pull_request_reviews:
             dismiss_stale_reviews: true
@@ -168,16 +177,91 @@ branch-protection:
         governance-policy-propagator:
           branches:
             main:
+              protect: true
               required_status_checks:
                 contexts:
                 - KinD tests (1.14, v1.18.15)
                 - KinD tests (1.14, latest)
             release-2.3:
+              protect: true
               required_status_checks:
                 contexts:
                 - KinD tests (1.14, v1.18.15)
                 - KinD tests (1.14, latest)
-          protect: true
+        governance-policy-spec-sync:
+          branches:
+            main:
+              protect: true
+              required_status_checks:
+                contexts:
+                - KinD tests (1.14, v1.18.15)
+                - KinD tests (1.14, latest)
+            release-2.3:
+              protect: true
+              required_status_checks:
+                contexts:
+                - KinD tests (1.14, v1.18.15)
+                - KinD tests (1.14, latest)
+        governance-policy-status-sync:
+          branches:
+            main:
+              protect: true
+              required_status_checks:
+                contexts:
+                - KinD tests (1.14, v1.18.15)
+                - KinD tests (1.14, latest)
+            release-2.3:
+              protect: true
+              required_status_checks:
+                contexts:
+                - KinD tests (1.14, v1.18.15)
+                - KinD tests (1.14, latest)
+        governance-policy-template-sync:
+          branches:
+            main:
+              protect: true
+              required_status_checks:
+                contexts:
+                - KinD tests (1.14, v1.18.15)
+                - KinD tests (1.14, latest)
+            release-2.3:
+              protect: true
+              required_status_checks:
+                contexts:
+                - KinD tests (1.14, v1.18.15)
+                - KinD tests (1.14, latest)
+        grc-ui:
+          branches:
+            main:
+              enforce_admins: true
+              protect: true
+              required_status_checks:
+                contexts:
+                - SonarCloud Code Analysis
+                - Travis CI - Pull Request
+        grc-ui-api:
+          branches:
+            main:
+              enforce_admins: true
+              protect: true
+              required_status_checks:
+                contexts:
+                - SonarCloud Code Analysis
+                - Travis CI - Pull Request
+        iam-policy-controller:
+          branches:
+            main:
+              protect: true
+              required_status_checks:
+                contexts:
+                - KinD tests (1.14, v1.18.15)
+                - KinD tests (1.14, latest)
+            release-2.3:
+              protect: true
+              required_status_checks:
+                contexts:
+                - KinD tests (1.14, v1.18.15)
+                - KinD tests (1.14, latest)
     openshift:
       repos:
         assisted-installer:
@@ -473,7 +557,7 @@ deck:
       - jupierce
   spyglass:
     gcs_browser_prefixes:
-      '*': https://gcsweb-ci.svc.ci.openshift.org/gcs/
+      '*': https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift-priv: https://gcsweb-private-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
     lenses:
     - lens:
@@ -539,7 +623,7 @@ jenkins_operators:
   max_goroutines: 20
   report_templates:
     '*': '[Full PR test history](https://prow.ci.openshift.org/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://prow.ci.openshift.org/pr?query=is:pr+state:open+author:{{with index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
-    openshift-priv: '[Full PR test history](https://deck-internal-ci.svc.ci.openshift.org/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://deck-internal-ci.svc.ci.openshift.org/pr?query=is:pr+state:open+author:{{with index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
+    openshift-priv: '[Full PR test history](https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/pr?query=is:pr+state:open+author:{{with index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
 - job_url_template: http://jenkins.katacontainers.io/job/{{.Spec.Job}}/{{.Status.JenkinsBuildID}}
   label_selector: master=jenkins.katacontainers.io
   max_concurrency: 10
@@ -594,10 +678,10 @@ plank:
             memory: 250Mi
       timeout: 4h0m0s
       utility_images:
-        clonerefs: gcr.io/k8s-prow/clonerefs:v20210325-3d0524bbd0
-        entrypoint: gcr.io/k8s-prow/entrypoint:v20210325-3d0524bbd0
-        initupload: gcr.io/k8s-prow/initupload:v20210325-3d0524bbd0
-        sidecar: gcr.io/k8s-prow/sidecar:v20210325-3d0524bbd0
+        clonerefs: gcr.io/k8s-prow/clonerefs:v20210405-6dbf38e7a2
+        entrypoint: gcr.io/k8s-prow/entrypoint:v20210405-6dbf38e7a2
+        initupload: gcr.io/k8s-prow/initupload:v20210405-6dbf38e7a2
+        sidecar: gcr.io/k8s-prow/sidecar:v20210405-6dbf38e7a2
     openshift-priv:
       gcs_configuration:
         bucket: origin-ci-private
@@ -608,7 +692,7 @@ plank:
       timeout: 6h0m0s
   job_url_prefix_config:
     '*': https://prow.ci.openshift.org/view/
-    openshift-priv: https://deck-internal-ci.svc.ci.openshift.org/view/
+    openshift-priv: https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
   job_url_template: https://{{if .Spec.Hidden }}deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/view/gcs/origin-ci-private/{{else}}prow.ci.openshift.org/view/gcs/origin-ci-test/{{end}} {{if eq .Spec.Type "presubmit"}}pr-logs/pull{{else if eq .Spec.Type "batch"}}pr-logs/pull{{else}}logs{{end}}{{if ne .Spec.Refs.Repo "origin"}}/{{.Spec.Refs.Org}}_{{.Spec.Refs.Repo}}{{end}}{{if eq .Spec.Type "presubmit"}}/{{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}{{else if eq .Spec.Type "batch"}}/batch{{end}}/{{.Spec.Job}}/{{.Status.BuildID}}/
   max_concurrency: 1000
   max_goroutines: 20
@@ -620,7 +704,7 @@ plank:
     integr8ly/integreatly-operator: |-
       ### Report flaky E2E tests and PROW issues in [INTLY-7197](https://issues.redhat.com/browse/INTLY-7197) epic. Detailed instructions can be found in the description of said epic.
       [Full PR test history](https://prow.ci.openshift.org/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://prow.ci.openshift.org/pr?query=is:pr+state:open+author:{{with index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).
-    openshift-priv: '[Full PR test history](https://deck-internal-ci.svc.ci.openshift.org/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://deck-internal-ci.svc.ci.openshift.org/pr?query=is:pr+state:open+author:{{with index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
+    openshift-priv: '[Full PR test history](https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/pr?query=is:pr+state:open+author:{{with index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
 pod_namespace: ci
 prowjob_namespace: ci
 push_gateway:
@@ -731,6 +815,7 @@ tide:
     open-cluster-management/search-api: squash
     open-cluster-management/search-collector: squash
     open-cluster-management/search-operator: squash
+    open-cluster-management/search-ui: squash
     open-cluster-management/security-middleware: squash
     open-cluster-management/thanos: squash
     opendatahub-io/manifests: squash
@@ -807,7 +892,7 @@ tide:
     redhat-developer/service-binding-operator: squash
   pr_status_base_urls:
     '*': https://prow.ci.openshift.org/pr
-    openshift-priv: https://deck-internal-ci.svc.ci.openshift.org/pr
+    openshift-priv: https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
   priority:
   - labels:
     - bugzilla/severity-urgent
@@ -2324,6 +2409,7 @@ tide:
     - openshift-knative/serverless-operator
     - openshift-knative/serving-operator
     - openshift-kni/cnf-features-deploy
+    - openshift-kni/debug-tools
     - openshift-kni/node-label-operator
     - openshift-kni/performance-addon-operators
     - openshift-kni/poison-pill
@@ -2390,6 +2476,7 @@ tide:
     - openshift/okd-machine-os
     - openshift/online-registration
     - openshift/openshift-gitops-examples
+    - openshift/openshift-restclient-python
     - openshift/openshift-tests
     - openshift/openshift-tests-private
     - openshift/operator-framework-olm
@@ -2404,6 +2491,8 @@ tide:
     - openshift/pagerduty-operator
     - openshift/pipelines-catalog
     - openshift/pipelines-tutorial
+    - openshift/pipelines-vote-api
+    - openshift/pipelines-vote-ui
     - openshift/private-cluster-rhapi-apischeme-updater
     - openshift/rbac-permissions-operator
     - openshift/release

@@ -344,9 +344,30 @@ objects:
         ) &
         OPENSHIFT_WATCH="$!"
 
-        ${TEST_COMMAND}
+        # Test if bastion is still up before starting the testcases
+        source ${ARTIFACT_DIR}/shared_variables
+        A=${remote_libvirt_uri#*//}
+        HOSTNAME=${A%/*}
+        nc -zv ${HOSTNAME} 16509 || exit 1
+
+        RCFILE=$(mktemp)
+        (
+          ${TEST_COMMAND}
+          RC=$?
+          echo "RC=${RC}"
+          printf "RC=%s\n" "${RC}" > ${RCFILE};
+        ) || true
+        source ${RCFILE}
+        /bin/rm ${RCFILE}
+        echo "TEST_COMMAND: RC=${RC}"
 
         kill -9 ${OPENSHIFT_WATCH} >/dev/null 2>&1 || true
+
+        # Test again if bastion is still up after finishing the testcases
+        # Notice a pattern?
+        nc -zv ${HOSTNAME} 16509 || exit 1
+
+        exit ${RC}
 
     # Runs an install
     - name: setup
@@ -476,6 +497,9 @@ objects:
            remote_libvirt_uri="qemu+tcp://${REMOTE_LIBVIRT_HOSTNAME}/system"
         fi
         echo "remote_libvirt_uri=${remote_libvirt_uri}"
+
+        # Create a list of shared variables among containers
+        printf "remote_libvirt_uri=%s\n" "${remote_libvirt_uri}" > ${ARTIFACT_DIR}/shared_variables
 
         # Test the remote connection
         mock-nss.sh virsh -c ${remote_libvirt_uri} list
@@ -630,9 +654,23 @@ objects:
         /bin/rm ${RCFILE}
         RC=${RC0}
 
+        #VM_NAME=$(jq --raw-output '.cluster_id' < ${ARTIFACT_DIR}/installer/terraform.tfvars.json)
+        VM_NAME=$(grep cluster_id "${ARTIFACT_DIR}/installer/terraform.tfvars.json" | sed -r -n -e 's,^[^"]*"cluster_id":[^"]"([^"]*)".*$,\1,p')
+        echo "VM_NAME=${VM_NAME}"
+
         # Add a step to wait for installation to complete, in case the cluster takes longer to create than the default time of 30 minutes.
         if [ ${RC} -gt 0 ]
         then
+            # Something went wrong.  Dump some virsh stuff for debugging purposes.
+            mock-nss.sh virsh -c "${CONNECT}" list --all --name | grep "${VM_NAME}" || true
+
+            while read UUID
+            do
+              [ -z "${UUID}" ] && continue
+              mock-nss.sh virsh -c "${CONNECT}" dumpxml ${UUID} | grep '<name>' || true
+              mock-nss.sh virsh -c "${CONNECT}" domifaddr ${UUID} || true
+            done < <(mock-nss.sh virsh -c "${CONNECT}" list --all --uuid || true)
+
             RCFILE=$(mktemp)
             {
                 mock-nss.sh openshift-install --dir=${ARTIFACT_DIR}/installer --log-level=debug wait-for install-complete 2>&1 | sed 's/password: .*/password: REDACTED"/g';
@@ -645,6 +683,19 @@ objects:
             echo "RC1=${RC1}"
             /bin/rm ${RCFILE}
             RC=${RC0}
+
+            if [ ${RC} -gt 0 ]
+            then
+                # Something went wrong.  Dump some virsh stuff for debugging purposes.
+                mock-nss.sh virsh -c "${CONNECT}" list --all --name | grep "${VM_NAME}" || true
+
+                while read UUID
+                do
+                  [ -z "${UUID}" ] && continue
+                  mock-nss.sh virsh -c "${CONNECT}" dumpxml ${UUID} | grep '<name>' || true
+                  mock-nss.sh virsh -c "${CONNECT}" domifaddr ${UUID} || true
+                done < <(mock-nss.sh virsh -c "${CONNECT}" list --all --uuid || true)
+            fi
         fi
 
         # Password for the cluster gets leaked in the installer logs and hence removing them.
@@ -709,6 +760,12 @@ objects:
           set +e
           touch /tmp/shared/exit
           export PATH=$PATH:/tmp/shared
+
+          # Read the shared variables among containers
+          source ${ARTIFACT_DIR}/shared_variables
+
+          # Test the possibly flakey bastion connection before tearing down
+          mock-nss.sh virsh -c ${remote_libvirt_uri} list --all || return
 
           echo "Gathering artifacts ..."
           mkdir -p ${ARTIFACT_DIR}/pods ${ARTIFACT_DIR}/nodes ${ARTIFACT_DIR}/metrics ${ARTIFACT_DIR}/bootstrap ${ARTIFACT_DIR}/network
@@ -807,11 +864,15 @@ objects:
         trap 'jobs -p | xargs -r kill || true; touch /tmp/shared/teardown-exit; exit 0' TERM
 
         for i in $(seq 1 220); do
+          if [[ -f /tmp/shared/debug ]]; then
+            continue
+          fi
           if [[ -f /tmp/shared/exit ]] || [[ -f /tmp/shared/test-exit ]]; then
             exit 0
           fi
           sleep 60 & wait
         done
+
     hostAliases:
     - ip: "${BASTION_SVC_IP}"
       hostnames:

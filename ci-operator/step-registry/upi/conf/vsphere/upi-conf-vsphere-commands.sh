@@ -41,9 +41,24 @@ install_config="${SHARED_DIR}/install-config.yaml"
 tfvars_path=/var/run/secrets/ci.openshift.io/cluster-profile/vmc.secret.auto.tfvars
 vsphere_user=$(grep -oP 'vsphere_user\s*=\s*"\K[^"]+' ${tfvars_path})
 vsphere_password=$(grep -oP 'vsphere_password\s*=\s*"\K[^"]+' ${tfvars_path})
-ova_url="$(jq -r '.baseURI + .images["vmware"].path' /var/lib/openshift-install/rhcos.json)"
-vm_template="${ova_url##*/}"
 
+# https://github.com/openshift/installer/blob/master/docs/user/overview.md#coreos-bootimages
+# This code needs to handle pre-4.8 installers though too.
+if openshift-install coreos print-stream-json 2>/tmp/err.txt >${SHARED_DIR}/coreos.json; then
+   echo "Using stream metadata"
+   ova_url=$(jq -r '.architectures.x86_64.artifacts.vmware.formats.ova.disk.location' < ${SHARED_DIR}/coreos.json)
+else
+  if ! grep -qF 'unknown command \"coreos\"' /tmp/err.txt; then
+    echo "Unhandled error from openshift-install" 1>&2
+    cat /tmp/err.txt
+    exit 1
+  fi
+  legacy_installer_json=/var/lib/openshift-install/rhcos.json
+  echo "Falling back to parsing ${legacy_installer_json}"
+  ova_url="$(jq -r '.baseURI + .images["vmware"].path' ${legacy_installer_json})"
+fi
+rm -f /tmp/err.txt
+vm_template="${ova_url##*/}"
 
 echo "$(date -u --rfc-3339=seconds) - Creating govc.sh file..."
 cat >> "${SHARED_DIR}/govc.sh" << EOF
