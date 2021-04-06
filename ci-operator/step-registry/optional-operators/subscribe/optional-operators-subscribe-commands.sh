@@ -4,19 +4,27 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# These values serve as defaults when the parameters are not set, which should
+# only happen in rehearsals. Production jobs should always set the OO_* variables.
+REHEARSAL_INDEX="brew.registry.redhat.io/rh-osbs-stage/iib:23576"
+REHEARSAL_PACKAGE="e2e-test-operator"
+REHEARSAL_CHANNEL="4.3"
+REHEARSAL_INSTALL_NAMESPACE="!create"
+REHEARSAL_TARGET_NAMESPACES="!install"
+
 # The pullspec of an index image. Required.
-OO_INDEX="${OO_INDEX:-brew.registry.redhat.io/rh-osbs/iib:50789}"
+OO_INDEX="${OO_INDEX:-$REHEARSAL_INDEX}"
 
 # The name of the operator package to be installed. Must be present in
 # the index image referenced by $OO_INDEX. Required.
-OO_PACKAGE="${OO_PACKAGE:-advanced-cluster-management}"
+OO_PACKAGE="${OO_PACKAGE:-$REHEARSAL_PACKAGE}"
 
 # The name of the operator channel to track. Required.
-OO_CHANNEL="${OO_CHANNEL:-release-2.1}"
+OO_CHANNEL="${OO_CHANNEL:-$REHEARSAL_CHANNEL}"
 
 # The namespace into which the operator and catalog will be
 # installed. Special value `!create` means that a new namespace will be created.
-OO_INSTALL_NAMESPACE="${OO_INSTALL_NAMESPACE:-open-cluster-management}"
+OO_INSTALL_NAMESPACE="${OO_INSTALL_NAMESPACE:-$REHEARSAL_INSTALL_NAMESPACE}"
 
 # A comma-separated list of namespaces the operator will target. Special, value
 # `!all` means that all namespaces will be targeted. If no OperatorGroup exists
@@ -25,7 +33,7 @@ OO_INSTALL_NAMESPACE="${OO_INSTALL_NAMESPACE:-open-cluster-management}"
 # namespace set will be replaced. The special value "!install" will set the
 # target namespace to the operator's installation namespace.
 
-OO_TARGET_NAMESPACES="${OO_TARGET_NAMESPACES:-!install}"
+OO_TARGET_NAMESPACES="${OO_TARGET_NAMESPACES:-$REHEARSAL_TARGET_NAMESPACES}"
 
 if [[ "$OO_INSTALL_NAMESPACE" == "!create" ]]; then
     echo "OO_INSTALL_NAMESPACE is '!create': creating new namespace"
