@@ -672,7 +672,7 @@ objects:
         }
 
         function generate_proxy_ignition() {
-          cat > /srv/proxy.ign << EOF
+          cat > /tmp/proxy.ign << EOF
         {
           "ignition": {
             "config": {},
@@ -1445,6 +1445,10 @@ objects:
             generate_proxy_ignition
             generate_proxy_template
 
+            # host proxy ignition on s3
+            S3_PROXY_URI="s3://${CLUSTER_NAME}-infra/proxy.ign"
+            aws s3 cp /tmp/proxy.ign "$S3_PROXY_URI"
+
             PROXY_URI="https://${JOB_NAME_SAFE}-bootstrap-exporter-${NAMESPACE}.svc.ci.openshift.org/proxy.ign"
 
             aws cloudformation create-stack \
@@ -1461,7 +1465,7 @@ objects:
                 ParameterKey=VpcId,ParameterValue="${VPC_ID}" \
                 ParameterKey=PublicSubnet,ParameterValue="${PUBLIC_SUBNETS%%,*}\"" \
                 ParameterKey=MasterSecurityGroupId,ParameterValue="${MASTER_SECURITY_GROUP}" \
-                ParameterKey=ProxyIgnitionLocation,ParameterValue="${PROXY_URI}" \
+                ParameterKey=ProxyIgnitionLocation,ParameterValue="${S3_PROXY_URI}" \
                 ParameterKey=PrivateSubnets,ParameterValue="${PRIVATE_SUBNETS}" \
                 ParameterKey=RegisterNlbIpTargetsLambdaArn,ParameterValue="${NLB_IP_TARGETS_LAMBDA}" \
                 ParameterKey=ExternalApiTargetGroupArn,ParameterValue="${EXTERNAL_API_TARGET_GROUP}" \
