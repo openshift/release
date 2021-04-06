@@ -154,6 +154,11 @@ trap 'echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"' EXIT
 case "${TEST_TYPE}" in
 upgrade-conformance)
     upgrade
+    for FILE in e2e-events.json e2e-intervals.html e2e-intervals.json; do
+        if test -f "${ARTIFACT_DIR}/${FILE}"; then
+            mv "${ARTIFACT_DIR}/${FILE}" "${ARTIFACT_DIR}/upgrade-${FILE}"
+        fi
+    done
     TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/conformance/parallel suite
     ;;
 upgrade)
