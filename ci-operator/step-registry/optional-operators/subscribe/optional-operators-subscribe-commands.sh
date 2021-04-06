@@ -5,18 +5,18 @@ set -o errexit
 set -o pipefail
 
 # The pullspec of an index image. Required.
-OO_INDEX="$OO_INDEX"
+OO_INDEX="${OO_INDEX:-brew.registry.redhat.io/rh-osbs/iib:50789}"
 
 # The name of the operator package to be installed. Must be present in
 # the index image referenced by $OO_INDEX. Required.
-OO_PACKAGE="$OO_PACKAGE"
+OO_PACKAGE="${OO_PACKAGE:-advanced-cluster-management}"
 
 # The name of the operator channel to track. Required.
-OO_CHANNEL="$OO_CHANNEL"
+OO_CHANNEL="${OO_CHANNEL:-release-2.1}"
 
 # The namespace into which the operator and catalog will be
 # installed. Special value `!create` means that a new namespace will be created.
-OO_INSTALL_NAMESPACE="${OO_INSTALL_NAMESPACE}"
+OO_INSTALL_NAMESPACE="${OO_INSTALL_NAMESPACE:-open-cluster-management}"
 
 # A comma-separated list of namespaces the operator will target. Special, value
 # `!all` means that all namespaces will be targeted. If no OperatorGroup exists
@@ -25,7 +25,7 @@ OO_INSTALL_NAMESPACE="${OO_INSTALL_NAMESPACE}"
 # namespace set will be replaced. The special value "!install" will set the
 # target namespace to the operator's installation namespace.
 
-OO_TARGET_NAMESPACES="${OO_TARGET_NAMESPACES}"
+OO_TARGET_NAMESPACES="${OO_TARGET_NAMESPACES:-!install}"
 
 if [[ "$OO_INSTALL_NAMESPACE" == "!create" ]]; then
     echo "OO_INSTALL_NAMESPACE is '!create': creating new namespace"
