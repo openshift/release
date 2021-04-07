@@ -17,6 +17,11 @@ releases:
     candidate:
       product: ocp
       stream: nightly
+      version: "4.6"
+  target:
+    candidate:
+      product: ocp
+      stream: nightly
       version: "4.7"
 resources:
   '*':
@@ -26,11 +31,11 @@ resources:
       cpu: 2000m
       memory: 2Gi
 tests:
-- as: gpu-operator-e2e
+- as: gpu-operator-e2e-upgrade
   steps:
     cluster_profile: aws
     test:
-    - as: presubmit-operatorhub
+    - as: 0-preupgrade-operatorhub-deploy
       cli: latest
       commands: run gpu-operator_test-operatorhub
       credentials:
@@ -42,7 +47,7 @@ tests:
         requests:
           cpu: 2000m
           memory: 2Gi
-    - as: presubmit-operatorhub-cleanup
+    - as: 1-preupgrade-operatorhub-cleanup
       cli: latest
       commands: run gpu-operator_undeploy-operatorhub
       credentials:
@@ -54,9 +59,26 @@ tests:
         requests:
           cpu: 2000m
           memory: 2Gi
-    - as: presubmit-master
+    - as: 2-upgrade
       cli: latest
-      commands: run gpu-operator_test-master-branch
+      commands: run cluster-upgrade
+      credentials:
+      - mount_path: /var/run/psap-entitlement-secret
+        name: psap-entitlement-secret
+        namespace: test-credentials
+      dependencies:
+      - env: CLUSTER_UPGRADE_INITIAL_IMAGE
+        name: release:latest
+      - env: CLUSTER_UPGRADE_TARGET_IMAGE
+        name: release:target
+      from: ci-artifacts
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+    - as: 3-postupgrade-operatorhub-deploy
+      cli: latest
+      commands: run gpu-operator_test-operatorhub
       credentials:
       - mount_path: /var/run/psap-entitlement-secret
         name: psap-entitlement-secret
@@ -68,6 +90,6 @@ tests:
           memory: 2Gi
     workflow: ipi-aws
 zz_generated_metadata:
-  branch: master
+  branch: release-next
   org: openshift-psap
   repo: ci-artifacts
