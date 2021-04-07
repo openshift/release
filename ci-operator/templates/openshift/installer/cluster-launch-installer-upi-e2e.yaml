@@ -672,7 +672,7 @@ objects:
         }
 
         function generate_proxy_ignition() {
-          cat > /srv/proxy.ign << EOF
+          cat > /tmp/proxy.ign << EOF
         {
           "ignition": {
             "config": {},
@@ -1307,11 +1307,6 @@ objects:
         if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
           RHCOS_AMI="$(jq -r .amis[\"${AWS_REGION}\"].hvm /var/lib/openshift-install/rhcos.json)"
 
-          # FIXME: get epel-release or otherwise add awscli to our UPI image
-          export PATH="${HOME}/.local/bin:${PATH}"
-          easy_install --user 'pip<21'  # our Python 2.7.5 is even too old for ensurepip
-          pip install --user awscli
-
           export AWS_DEFAULT_REGION="${AWS_REGION}"  # CLI prefers the former
 
           INFRA_ID="$(jq -r .infraID ${ARTIFACT_DIR}/installer/metadata.json)"
@@ -1322,6 +1317,9 @@ objects:
             --dns-name "${base_domain}" \
             --query "HostedZones[? Config.PrivateZone != \`true\` && Name == \`${base_domain}.\`].Id" \
             --output text)"
+
+          # Create s3 bucket for bootstrap and proxy ignition configs
+          aws s3 mb s3://"${CLUSTER_NAME}-infra"
 
           # If we are using a proxy, create a 'black-hole' private subnet vpc TODO
           # For now this is just a placeholder...
@@ -1447,6 +1445,10 @@ objects:
             generate_proxy_ignition
             generate_proxy_template
 
+            # host proxy ignition on s3
+            S3_PROXY_URI="s3://${CLUSTER_NAME}-infra/proxy.ign"
+            aws s3 cp /tmp/proxy.ign "$S3_PROXY_URI"
+
             PROXY_URI="https://${JOB_NAME_SAFE}-bootstrap-exporter-${NAMESPACE}.svc.ci.openshift.org/proxy.ign"
 
             aws cloudformation create-stack \
@@ -1463,7 +1465,7 @@ objects:
                 ParameterKey=VpcId,ParameterValue="${VPC_ID}" \
                 ParameterKey=PublicSubnet,ParameterValue="${PUBLIC_SUBNETS%%,*}\"" \
                 ParameterKey=MasterSecurityGroupId,ParameterValue="${MASTER_SECURITY_GROUP}" \
-                ParameterKey=ProxyIgnitionLocation,ParameterValue="${PROXY_URI}" \
+                ParameterKey=ProxyIgnitionLocation,ParameterValue="${S3_PROXY_URI}" \
                 ParameterKey=PrivateSubnets,ParameterValue="${PRIVATE_SUBNETS}" \
                 ParameterKey=RegisterNlbIpTargetsLambdaArn,ParameterValue="${NLB_IP_TARGETS_LAMBDA}" \
                 ParameterKey=ExternalApiTargetGroupArn,ParameterValue="${EXTERNAL_API_TARGET_GROUP}" \
@@ -1482,6 +1484,9 @@ objects:
 
             echo ${PROXY_IP} > ${ARTIFACT_DIR}/installer/proxyip
           fi
+          
+          S3_BOOTSTRAP_URI="s3://${CLUSTER_NAME}-infra/bootstrap.ign"
+          aws s3 cp ${ARTIFACT_DIR}/installer/bootstrap.ign "$S3_BOOTSTRAP_URI"
 
           aws cloudformation create-stack \
             --stack-name "${CLUSTER_NAME}-bootstrap" \
@@ -1495,7 +1500,7 @@ objects:
               ParameterKey=PublicSubnet,ParameterValue="${PUBLIC_SUBNETS%%,*}\"" \
               ParameterKey=MasterSecurityGroupId,ParameterValue="${MASTER_SECURITY_GROUP}" \
               ParameterKey=VpcId,ParameterValue="${VPC_ID}" \
-              ParameterKey=BootstrapIgnitionLocation,ParameterValue="${BOOTSTRAP_URI}" \
+              ParameterKey=BootstrapIgnitionLocation,ParameterValue="${S3_BOOTSTRAP_URI}" \
               ParameterKey=RegisterNlbIpTargetsLambdaArn,ParameterValue="${NLB_IP_TARGETS_LAMBDA}" \
               ParameterKey=ExternalApiTargetGroupArn,ParameterValue="${EXTERNAL_API_TARGET_GROUP}" \
               ParameterKey=InternalApiTargetGroupArn,ParameterValue="${INTERNAL_API_TARGET_GROUP}" \
