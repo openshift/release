@@ -105,3 +105,4 @@ echo "export DS_WORKING_DIR=\$WORKING_DIR" >> /tmp/ds-vars.conf
 EOF
 
 scp "${SSHOPTS[@]}" "root@${IP}:/tmp/ds-vars.conf" "${SHARED_DIR}/ds-vars.conf"
+scp "${SSHOPTS[@]}" "root@${IP}:/root/dev-scripts/ocp/ostest/auth/kubeconfig" "${SHARED_DIR}/kubeconfig"
