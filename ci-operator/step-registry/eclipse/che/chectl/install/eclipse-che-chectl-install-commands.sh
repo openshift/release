@@ -1,8 +1,13 @@
 #!/bin/bash
 set -e
 
-mkdir /usr/chectl
-cd /usr/chectl
+echo "id"
+id 
+echo "pwd"
+pwd
+
+mkdir /tmp/workspace
+cd /tmp/workspace
 
 
 echo "$CHECTL_PARAMS"
@@ -16,7 +21,7 @@ cat checluster_patch.yaml
 curl "$(curl https://che-incubator.github.io/chectl/download-link/next-linux-x64)" -L -o /tmp/chectl.tar.gz
 
 tar -xvf /tmp/chectl.tar.gz -C /tmp
-ln -s /usr/bin/chectl /tmp/chectl/bin/chectl
+ln -s /usr/bin/chectl /tmp/chectl/bin/chectl || true
 
 /tmp/chectl/bin/chectl --version
 chectl --version
