@@ -20,8 +20,8 @@ cat checluster_patch.yaml
 
 curl "$(curl https://che-incubator.github.io/chectl/download-link/next-linux-x64)" -L -o /tmp/chectl.tar.gz
 
-tar -xvf /tmp/chectl.tar.gz -C /tmp
-ln -s /usr/bin/chectl /tmp/chectl/bin/chectl || true
+tar -xf /tmp/chectl.tar.gz -C /tmp
+ln -s /tmp/chectl/bin/chectl /usr/bin/chectl || true
 
 /tmp/chectl/bin/chectl --version
 chectl --version
