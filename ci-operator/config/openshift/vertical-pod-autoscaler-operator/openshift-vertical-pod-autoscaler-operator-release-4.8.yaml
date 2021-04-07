@@ -3,14 +3,22 @@ base_images:
     name: "4.8"
     namespace: ocp
     tag: base
-  openshift_release_golang-1.12:
-    name: release
-    namespace: openshift
-    tag: golang-1.12
   openshift_release_golang-1.15:
     name: release
     namespace: openshift
     tag: golang-1.15
+  operand:
+    name: "4.8"
+    namespace: ocp
+    tag: vertical-pod-autoscaler
+  operator-index:
+    name: redhat-operator-index
+    namespace: ci
+    tag: v4.8
+  operator-registry:
+    name: "4.8"
+    namespace: ocp
+    tag: operator-registry
 build_root:
   image_stream_tag:
     name: release
@@ -23,6 +31,17 @@ images:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.15
   to: vertical-pod-autoscaler-operator
+operator:
+  bundles:
+  - as: vpa-operator-bundle
+    base_index: operator-index
+    context_dir: .
+    dockerfile_path: images/ci/bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/openshift/vertical-pod-autoscaler:4.8
+    with: pipeline:operand
+  - pullspec: quay.io/openshift/vertical-pod-autoscaler-operator:4.8
+    with: pipeline:vertical-pod-autoscaler-operator
 promotion:
   disabled: true
   name: "4.8"
@@ -52,6 +71,26 @@ tests:
   commands: IS_CONTAINER=TRUE make lint
   container:
     from: src
+- as: e2e-operator-aws
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-vpa-operator-bundle
+    env:
+      OO_CHANNEL: "4.8"
+      OO_INSTALL_NAMESPACE: openshift-vertical-pod-autoscaler
+      OO_PACKAGE: vertical-pod-autoscaler
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: e2e-test
+      commands: |
+        make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-aws
 zz_generated_metadata:
   branch: release-4.8
   org: openshift
