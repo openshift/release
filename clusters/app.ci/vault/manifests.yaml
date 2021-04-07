@@ -41,10 +41,15 @@ spec:
       kind: DockerImage
       # Mirror of docker.io/library/vault:1.6.2 because the cluster hit the ratelimit for that
       name: quay.io/alvaroaleman/vault:1.6.2
+    referencePolicy:
+      type: Local
   - name: 1.7.0
     from:
       kind: DockerImage
-      name: docker.io/library/vault:1.7.0
+      # Mirror of docker.io/library/vault:1.6.2 because the cluster hit the ratelimit for that
+      name: quay.io/alvaroaleman/vault:1.7.0
+    referencePolicy:
+      type: Local
 ---
 apiVersion: policy/v1beta1
 kind: PodDisruptionBudget
@@ -259,3 +264,24 @@ spec:
           - path: config.hcl
             fieldRef:
               fieldPath: metadata.annotations['config.hcl']
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: role-tokenreview-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+subjects:
+  - kind: ServiceAccount
+    name: vault
+    namespace: vault
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: secret-generator
+  namespace: ci
+  labels:
+    purpose: vault
