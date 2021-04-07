@@ -385,24 +385,64 @@ deploy() {
     done
 
     # Apply YAML files in prereqs directory
-    logf "$_log" "Deploy $_cluster: Applying YAML files from prereqs directory"
-    echo "APPLY_PREREQS" > "${_status}"
-    KUBECONFIG="$_kc" oc -n $NAMESPACE apply --openapi-patch=true -k prereqs/ \
-        > >(tee -a "$_log") 2>&1 || {
-        logf "$_log" "ERROR Deploy $_cluster: Error applying YAML files from prereqs directory"
-        echo "ERROR APPLY_PREREQS" > "${_status}"
-        return 1
-    }
+    logf "$_log" "Deploy $_cluster: Waiting up to 5 minutes to apply YAML files from prereqs directory"
+    echo "WAIT_APPLY_PREREQS" > "${_status}"
+    local _timeout=300 _elapsed='' _step=15
+    local _mch_name='' _mch_status=''
+    while true; do
+        # Wait for _step seconds, except for first iteration.
+        if [[ -z "$_elapsed" ]]; then
+            _elapsed=0
+        else
+            sleep $_step
+            _elapsed=$(( _elapsed + _step ))
+        fi
+
+        KUBECONFIG="$_kc" oc -n $NAMESPACE apply --openapi-patch=true -k prereqs/ \
+            > >(tee -a "$_log") 2>&1 && {
+            logf "$_log" "Deploy $_cluster: YAML files from prereqs directory applied after ${_elapsed}s"
+            break
+        }
+
+        # Check timeout
+        if (( _elapsed > _timeout )); then
+                logf "$_log" "ERROR Deploy $_cluster: Timeout (${_timeout}s) waiting to apply prereq YAML files"
+                echo "ERROR WAIT_APPLY_PREREQS" > "${_status}"
+                return 1
+        fi
+
+        logf "$_log" "WARN Deploy $_cluster: Unable to apply YAML files from prereqs directory. Will retry (${_elapsed}/${_timeout}s)"
+    done
 
     # Apply YAML files in multicluster hub operator directory
-    logf "$_log" "Deploy $_cluster: Applying YAML files from MCH operator directory"
-    echo "APPLY_MCHO" > "${_status}"
-    KUBECONFIG="$_kc" oc -n $NAMESPACE apply -k "${OPERATOR_DIR}/" \
-        > >(tee -a "$_log") 2>&1 || {
-        logf "$_log" "ERROR Deploy $_cluster: Error applying YAML files from MCH operator directory"
-        echo "ERROR APPLY_MCHO" > "${_status}"
-        return 1
-    }
+    logf "$_log" "Deploy $_cluster: Waitint up to 5 minutes to apply YAML files from MCH operator directory"
+    echo "WAIT_APPLY_MCHO" > "${_status}"
+    local _timeout=300 _elapsed='' _step=15
+    local _mch_name='' _mch_status=''
+    while true; do
+        # Wait for _step seconds, except for first iteration.
+        if [[ -z "$_elapsed" ]]; then
+            _elapsed=0
+        else
+            sleep $_step
+            _elapsed=$(( _elapsed + _step ))
+        fi
+
+        KUBECONFIG="$_kc" oc -n $NAMESPACE apply -k "${OPERATOR_DIR}/" \
+            > >(tee -a "$_log") 2>&1 && {
+            logf "$_log" "Deploy $_cluster: YAML files from MCH operator directory applied after ${_elapsed}s"
+            break
+        }
+
+        # Check timeout
+        if (( _elapsed > _timeout )); then
+                logf "$_log" "ERROR Deploy $_cluster: Timeout (${_timeout}s) waiting to apply MCH operator YAML files"
+                echo "ERROR WAIT_APPLY_MCHO" > "${_status}"
+                return 1
+        fi
+
+        logf "$_log" "WARN Deploy $_cluster: Unable to apply YAML files from MCH operator directory. Will retry (${_elapsed}/${_timeout}s)"
+    done
 
     # Wait for MCH pod
     logf "$_log" "Deploy $_cluster: Waiting up to 5 minutes for multiclusterhub-operator pod"
@@ -564,9 +604,13 @@ deploy() {
     local _timeout=300 _elapsed='' _step=15
     local _csv_name='' _csv_status=''
     while true; do
-        # Wait for _step seconds
-        sleep $_step
-        _elapsed=$(( _elapsed + _step ))
+        # Wait for _step seconds, except for first iteration.
+        if [[ -z "$_elapsed" ]]; then
+            _elapsed=0
+        else
+            sleep $_step
+            _elapsed=$(( _elapsed + _step ))
+        fi
 
         # Get CSV name
         KUBECONFIG="$_kc" oc -n $NAMESPACE get csv -o name > csv_name 2> >(tee -a "$_log") || {
@@ -618,14 +662,34 @@ deploy() {
     done
 
     # Apply YAML files in multicluster hub directory
-    logf "$_log" "Deploy $_cluster: Applying YAML files from MCH directory"
-    echo "APPLY_MCH" > "${_status}"
-    KUBECONFIG="$_kc" oc -n $NAMESPACE apply -k multiclusterhub/ \
-        > >(tee -a "$_log") 2>&1 || {
-        logf "$_log" "ERROR Deploy $_cluster: Error applying YAML files from MCH directory"
-        echo "ERROR APPLY_MCH" > "${_status}"
-        return 1
-    }
+    logf "$_log" "Deploy $_cluster: Wait up to 5 minutes to apply YAML files from MCH directory"
+    echo "WAIT_APPLY_MCH" > "${_status}"
+    local _timeout=300 _elapsed='' _step=15
+    local _mch_name='' _mch_status=''
+    while true; do
+        # Wait for _step seconds, except for first iteration.
+        if [[ -z "$_elapsed" ]]; then
+            _elapsed=0
+        else
+            sleep $_step
+            _elapsed=$(( _elapsed + _step ))
+        fi
+
+        KUBECONFIG="$_kc" oc -n $NAMESPACE apply -k multiclusterhub/ \
+            > >(tee -a "$_log") 2>&1 && {
+            logf "$_log" "Deploy $_cluster: MCH YAML files applied after ${_elapsed}s"
+            break
+        }
+
+        # Check timeout
+        if (( _elapsed > _timeout )); then
+                logf "$_log" "ERROR Deploy $_cluster: Timeout (${_timeout}s) waiting to apply MCH YAML files"
+                echo "ERROR APPLY_MCH" > "${_status}"
+                return 1
+        fi
+
+        logf "$_log" "WARN Deploy $_cluster: Unable to apply YAML files from MCH directory. Will retry (${_elapsed}/${_timeout}s)"
+    done
 
     # Wait for MultiClusterHub CR to be ready
     logf "$_log" "Deploy $_cluster: Waiting up to 15 minutes for MCH CR"
@@ -633,9 +697,13 @@ deploy() {
     local _timeout=900 _elapsed='' _step=15
     local _mch_name='' _mch_status=''
     while true; do
-        # Wait for _step seconds
-        sleep $_step
-        _elapsed=$(( _elapsed + _step ))
+        # Wait for _step seconds, except for first iteration.
+        if [[ -z "$_elapsed" ]]; then
+            _elapsed=0
+        else
+            sleep $_step
+            _elapsed=$(( _elapsed + _step ))
+        fi
 
         # Get MCH name
         KUBECONFIG="$_kc" oc -n $NAMESPACE get multiclusterhub -o name > mch_name 2> >(tee -a "$_log") || {
