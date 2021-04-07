@@ -37,19 +37,7 @@ if [[ -s "${SHARED_DIR}/xpn.json" ]]; then
   HOST_PROJECT_COMPUTE_SUBNET_NAME="$(basename "${HOST_PROJECT_COMPUTE_SUBNET}")"
 fi
 
-if ! pip -V; then
-    echo "pip is not installed: installing"
-    if python -c "import sys; assert(sys.version_info >= (3,0))"; then
-      python -m ensurepip --user || easy_install --user 'pip'
-    else
-      echo "python < 3, installing pip<21"
-      python -m ensurepip --user || easy_install --user 'pip<21'
-    fi
-fi
 export PATH="${HOME}/.local/bin:${PATH}"
-
-echo "Installing python modules: yaml"
-python -c "import yaml" || pip install --user pyyaml
 
 ### Empty the compute pool (optional)
 echo "Emptying the compute pool..."
