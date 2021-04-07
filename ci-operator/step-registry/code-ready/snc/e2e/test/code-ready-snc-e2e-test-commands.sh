@@ -69,4 +69,4 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJE
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   packer@"${INSTANCE_PREFIX}" \
-  --command "timeout 360m bash -ce \"/home/packer/run-tests.sh\""
+  --command "export PULL_NUMBER=${PULL_NUMBER} && timeout 360m bash -ce \"/home/packer/run-tests.sh\""
