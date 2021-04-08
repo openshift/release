@@ -17,15 +17,21 @@ export HOME=/tmp
 
 if ! command -v aws &> /dev/null
 then
-
     echo "$(date -u --rfc-3339=seconds) - Install AWS cli..."
     export PATH="${HOME}/.local/bin:${PATH}"
-    if ! command -v pip3 &> /dev/null
+    if command -v pip3 &> /dev/null
     then
-        echo "$(date -u --rfc-3339=seconds) - No pip available exiting..."
-        exit 1
+        pip3 install --user awscli
+    else
+        if [ "$(python -c 'import sys;print(sys.version_info.major)')" -eq 2 ]
+        then
+          easy_install --user 'pip<21' 
+          pip install --user awscli
+        else
+          echo "$(date -u --rfc-3339=seconds) - No pip available exiting..."
+          exit 1
+        fi
     fi
-    pip3 install --user awscli
 fi
 
 # Load array created in setup-vips:

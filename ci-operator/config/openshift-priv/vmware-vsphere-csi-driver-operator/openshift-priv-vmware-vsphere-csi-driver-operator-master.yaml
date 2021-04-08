@@ -21,6 +21,9 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
   to: vmware-vsphere-csi-driver-operator
+- dockerfile_path: Dockerfile.test
+  from: src
+  to: vmware-vsphere-csi-driver-operator-test
 promotion:
   name: 4.8-priv
   namespace: ocp-private
@@ -39,6 +42,16 @@ tests:
   commands: "true"
   container:
     from: src
+- as: e2e-vsphere
+  steps:
+    cluster_profile: vsphere
+    env:
+      TEST_SUITE: openshift/conformance/parallel
+    workflow: openshift-e2e-vsphere-upi
+- as: e2e-vsphere-csi
+  steps:
+    cluster_profile: vsphere
+    workflow: openshift-e2e-vsphere-csi
 zz_generated_metadata:
   branch: master
   org: openshift-priv

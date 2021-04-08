@@ -350,10 +350,15 @@ objects:
         HOSTNAME=${A%/*}
         nc -zv ${HOSTNAME} 16509 || exit 1
 
+        RCFILE=$(mktemp)
         (
           ${TEST_COMMAND}
+          RC=$?
+          echo "RC=${RC}"
+          printf "RC=%s\n" "${RC}" > ${RCFILE};
         ) || true
-        RC=${PIPESTATUS[0]}
+        source ${RCFILE}
+        /bin/rm ${RCFILE}
         echo "TEST_COMMAND: RC=${RC}"
 
         kill -9 ${OPENSHIFT_WATCH} >/dev/null 2>&1 || true
