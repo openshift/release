@@ -46,6 +46,23 @@ spec:
       kind: DockerImage
       name: docker.io/library/vault:1.7.0
 ---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: haproxy
+  namespace: vault
+spec:
+  lookupPolicy:
+    local: true
+  tags:
+  - name: 2.3.9
+    from:
+      kind: DockerImage
+      # Mirror of docker.io/library/haproxy:2.3.9 because the cluster hit the dockerhub ratelimit
+      name: quay.io/alvaroaleman/haproxy:2.3.9
+    referencePolicy:
+      type: Local
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -56,7 +73,7 @@ metadata:
   name: vault
   namespace: vault
 spec:
-  replicas: 3
+  replicas: 0
   selector:
     matchLabels:
       app: vault
@@ -192,3 +209,188 @@ spec:
     protocol: TCP
   selector:
     app: vault
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vault-statefulset
+  namespace: vault
+spec:
+  ports:
+  - port: 8300
+    name: vault
+  clusterIP: None
+  selector:
+    app: vault
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app: vault
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"vault-subpath-proxy:latest","namespace":"ci"},"fieldPath":"spec.template.spec.containers[?(@.name==\"subpath-proxy\")].image"}]'
+  name: vault
+  namespace: vault
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: vault
+  serviceName: vault-statefulset
+  template:
+    metadata:
+      labels:
+        app: vault
+      annotations:
+        config.hcl: |
+          api_addr = "https://vault.ci.openshift.org"
+          listener "tcp" {
+            address       = "127.0.0.1:8200"
+            # The subpath proxy does the tls termination
+            tls_disable   = "true"
+          }
+
+          storage "gcs" {
+            bucket        = "vault-ci-openshift"
+            ha_enabled    = "true"
+          }
+          disable_mlock = "true"
+          ui = "true"
+        # We need the haproxy to proxy the traffic to the
+        # active replica. We need to mark all replicas as
+        # live, otherwise rollouts get stuck.
+        haproxy.cfg: |
+          global
+            log stdout format raw local0
+
+          defaults
+            mode tcp
+            timeout client      30000ms
+            timeout server      30000ms
+            timeout connect      3000ms
+            retries 3
+
+          frontend vault_listener
+            bind 0.0.0.0:8300
+            default_backend vault_backend
+
+          # This is the normal clusterdns but we need to explicitly configure
+          # a resolver, otherwise it won't retry, which means we have a chicken-egg
+          # problem during startup: DNS doesn't get up because Pod isn't up and Pod
+          # doesn't get up until DNS is up.
+          resolvers clusterdns
+            nameserver dns0 172.30.0.10:53
+
+          backend vault_backend
+            option httpchk GET /v1/sys/health
+            http-check expect status 200
+            default-server inter 3s fall 3 rise 2
+            server vault-0 vault-0.vault-statefulset.vault.svc.cluster.local.:8400 check check-ssl verify none resolvers clusterdns
+            server vault-1 vault-1.vault-statefulset.vault.svc.cluster.local.:8400 check check-ssl verify none resolvers clusterdns
+            server vault-2 vault-2.vault-statefulset.vault.svc.cluster.local.:8400 check check-ssl verify none resolvers clusterdns
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - vault
+              topologyKey: "kubernetes.io/hostname"
+      containers:
+      - image: vault-subpath-proxy:latest
+        name: subpath-proxy
+        args:
+        - -kv-mount-path=kv
+        - -listen-addr=0.0.0.0:8400
+        - -tls-cert-file=/var/run/serving-cert/tls.crt
+        - -tls-key-file=/var/run/serving-cert/tls.key
+        - -vault-addr=http://127.0.0.1:8200
+        volumeMounts:
+        - name: serving-cert
+          mountPath: /var/run/serving-cert
+      - image: vault:1.7.0
+        name: unsealer
+        command:
+        - /bin/sh
+        - -c
+        - |-
+          set -u
+          export VAULT_ADDR=http://127.0.0.1:8200
+          until vault status 2>&1 >/dev/null; do
+            vault operator unseal $UNSEAL_KEY
+          done
+          echo "$(date --rfc-2822): Successfully unsealed, starting to sleep"
+          sleep 365d
+        env:
+        - name: UNSEAL_KEY
+          valueFrom:
+            secretKeyRef:
+              name: vault-unseal
+              key: unseal
+      - image: vault:1.6.2
+        name: vault
+        args:
+        - server
+        - -config
+        - /etc/vault/cfg/config.hcl
+        readinessProbe:
+          httpGet:
+            path: /v1/sys/health?standbyok=true
+            port: 8400
+            scheme: HTTPS
+        ports:
+        - name: https
+          containerPort: 8300
+        env:
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: /var/run/gcs-key/vault-sa-key.json
+        - name: SKIP_SETCAP
+          value: "true"
+        # Need to define this here so it can
+        # be referenced in VAULT_CLUSTER_ADDR
+        - name: MY_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: VAULT_CLUSTER_ADDR
+          value: https://$(MY_IP):8201
+        volumeMounts:
+        - name: config
+          mountPath: /etc/vault/cfg
+        - name: gcs-key
+          mountPath: /var/run/gcs-key
+      - image: haproxy:2.3.9
+        name: haproxy
+        command:
+        - /usr/local/sbin/haproxy
+        - -f
+        - /usr/local/etc/haproxy/haproxy.cfg
+        volumeMounts:
+        - name: haproxy-config
+          mountPath: /usr/local/etc/haproxy
+          readOnly: true
+      volumes:
+      - name: serving-cert
+        secret:
+          secretName: vault-tls
+      - name: gcs-key
+        secret:
+          secretName: vault-gcs
+      - name: config
+        downwardAPI:
+          items:
+          - path: config.hcl
+            fieldRef:
+              fieldPath: metadata.annotations['config.hcl']
+      - name: haproxy-config
+        downwardAPI:
+          items:
+          - path: haproxy.cfg
+            fieldRef:
+              fieldPath: metadata.annotations['haproxy.cfg']
