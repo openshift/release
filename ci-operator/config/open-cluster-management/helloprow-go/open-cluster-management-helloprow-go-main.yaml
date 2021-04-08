@@ -16,6 +16,12 @@ images:
       as:
       - registry.ci.openshift.org/open-cluster-management/builder:go1.15-linux-amd64
   to: helloprow-go
+- dockerfile_path: Dockerfile.prow
+  inputs:
+    open-cluster-management_builder_go1.15-linux-amd64:
+      as:
+      - registry.ci.openshift.org/open-cluster-management/builder:go1.15-linux-amd64
+  to: helloprow-go-e2e
 promotion:
   name: "2.3"
   namespace: open-cluster-management
@@ -39,6 +45,9 @@ tests:
       commands: |
         export SELF="make -f Makefile.prow"
         make -f Makefile.prow test-e2e
+      dependencies:
+      - env: E2E_IMAGE_REF
+        name: helloprow-go-e2e
       from: bin
       resources:
         requests:
