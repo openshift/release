@@ -11,13 +11,7 @@ expiration_date=$(date -d '4 hours' --iso=minutes --utc)
 function join_by { local IFS="$1"; shift; echo "$*"; }
 
 REGION="${LEASED_RESOURCE}"
-case "${REGION}" in
-us-east-1)
-    ZONES=("us-east-1b" "us-east-1c")
-    ;;
-*)
-    ZONES=("${REGION}a" "${REGION}b")
-esac
+ZONES=("${REGION}a" "${REGION}b")
 
 ZONES_COUNT=${ZONES_COUNT:-2}
 ZONES=("${ZONES[@]:0:${ZONES_COUNT}}")
