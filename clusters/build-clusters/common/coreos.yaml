@@ -16,6 +16,7 @@ kind: ServiceAccount
 metadata:
   name: coreos-builder
   namespace: coreos
+
 ---
 # Gangplank uses similar permissions as Jenkins in order to
 # create pods and read secrets.
@@ -62,6 +63,24 @@ subjects:
   - kind: Group
     apiGroup: rbac.authorization.k8s.io
     name: coreos-team
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: admin
+
+---
+# Grant the ci-operator admin into the CoreOS namespace.
+# This will allow gangplank to use the ci-operator's to use the
+# coreos namespace un-restricted.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: coreos-ci-operator-0
+  namespace: coreos
+subjects:
+  - kind: ServiceAccount
+    name: ci-operator
+    namespace: ci
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
