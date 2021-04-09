@@ -1,8 +1,8 @@
 postsubmits:
-  open-cluster-management/klusterlet-addon-operator:
+  openshift/knative-eventing:
   - agent: kubernetes
     branches:
-    - ^release-2\.3$
+    - ^release-v0\.22\.0$
     cluster: build02
     decorate: true
     decoration_config:
@@ -10,8 +10,10 @@ postsubmits:
     labels:
       ci-operator.openshift.io/is-promotion: "true"
       ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: "47"
     max_concurrency: 1
-    name: branch-ci-open-cluster-management-klusterlet-addon-operator-release-2.3-images
+    name: branch-ci-openshift-knative-eventing-release-v0.22.0-47-images
+    path_alias: knative.dev/eventing
     spec:
       containers:
       - args:
@@ -21,6 +23,8 @@ postsubmits:
         - --promote
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
+        - --target=src
+        - --variant=47
         command:
         - ci-operator
         image: ci-operator:latest
@@ -53,41 +57,3 @@ postsubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-  - agent: kubernetes
-    branches:
-    - ^release-2\.3$
-    cluster: build02
-    decorate: true
-    name: branch-ci-open-cluster-management-klusterlet-addon-operator-release-2.3-publish
-    spec:
-      containers:
-      - args:
-        - -f
-        - /opt/build-harness/Makefile.prow
-        - osci/publish
-        command:
-        - make
-        env:
-        - name: COMPONENT_NAME
-          value: klusterlet-addon-operator
-        - name: COMPONENT_VERSION
-          value: 2.3.0
-        - name: OSCI_IMAGE_REMOTE_REPO_SRC
-          value: registry.ci.openshift.org/open-cluster-management
-        - name: SELF
-          value: make -f /opt/build-harness/Makefile.prow
-        image: registry.ci.openshift.org/open-cluster-management/builder:go1.15-linux
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/github
-          name: acm-cicd-github
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: acm-cicd-github
-        secret:
-          secretName: acm-cicd-github
