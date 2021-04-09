@@ -10,6 +10,9 @@ base_images:
 build_root:
   project_image:
     dockerfile_path: .ci/openshift-ci/Dockerfile
+images:
+- dockerfile_path: Dockerfile
+  to: che-operator-image
 resources:
   '*':
     limits:
@@ -38,6 +41,25 @@ tests:
       resources:
         requests:
           cpu: 100m
+    workflow: ipi-aws
+- as: devworkspace-happy-path
+  steps:
+    cluster_profile: aws
+    test:
+    - as: devworkspace-happy-path
+      cli: latest
+      commands: |
+        echo -e "[INFO] Test script content:"
+        cat .ci/oci-devworkspace-happy-path.sh
+        /bin/bash .ci/oci-devworkspace-happy-path.sh
+      dependencies:
+      - env: CI_CHE_OPERATOR_IMAGE
+        name: che-operator-image
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     workflow: ipi-aws
 zz_generated_metadata:
   branch: "7"
