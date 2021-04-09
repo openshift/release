@@ -28,6 +28,7 @@ function mirror_test_images() {
         ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
 openshift-tests images --to-repository ${DEVSCRIPTS_TEST_IMAGE_REPO} > /tmp/mirror
 oc image mirror -f /tmp/mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json
+oc patch configs.samples cluster --type merge --patch "{\"spec\":{\"samplesRegistry\":\"${DS_REGISTRY}\"}}"
 EOF
         TEST_ARGS="--from-repository ${DEVSCRIPTS_TEST_IMAGE_REPO}"
 }
