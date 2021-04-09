@@ -23,7 +23,7 @@ function copy_test_binaries() {
 function mirror_test_images() {
         echo "### Mirroring test images"
 
-        DEVSCRIPTS_TEST_IMAGE_REPO=${DS_REGISTRY}/localimages/local-test-image  
+        DEVSCRIPTS_TEST_IMAGE_REPO=${DS_REGISTRY}/localimages/local-test-image
         # shellcheck disable=SC2087
         ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
 openshift-tests images --to-repository ${DEVSCRIPTS_TEST_IMAGE_REPO} > /tmp/mirror
@@ -34,7 +34,7 @@ EOF
 
 function use_minimal_test_list() {
         echo "### Skipping test images mirroring, fall back to minimal tests list"
-        
+
         TEST_ARGS="--file /tmp/tests"
         TEST_SKIPS=""
         echo "${TEST_MINIMAL_LIST}" > /tmp/tests
@@ -47,14 +47,25 @@ packet)
     # shellcheck source=/dev/null
     source "${SHARED_DIR}/ds-vars.conf"
     copy_test_binaries
-    export TEST_PROVIDER=\"\"
+
+    # Currently all v6 deployments are disconnected, so we have to tell
+    # openshift-tests to exclude those tests that require internet
+    # access.
+    if [[ "${DS_IP_STACK}" == "v6" ]];
+    then
+        export TEST_PROVIDER='\{\"type\":\"baremetal\",\"disconnected\":true\}'
+    else
+        export TEST_PROVIDER='\{\"type\":\"baremetal\"\}'
+    fi
 
     echo "### Checking release version"
     # Mirroring test images is supported only for versions greater than or equal to 4.7
-    if printf '%s\n%s' "4.8" "${DS_OPENSHIFT_VERSION}" | sort -C -V; then
-        mirror_test_images       
-    else
+    if ! printf '%s\n%s' "4.8" "${DS_OPENSHIFT_VERSION}" | sort -C -V; then
         use_minimal_test_list
+    elif [[ "${DS_IP_STACK}" == "v6" ]]; then
+        # If we are on 4.8 or later, and IPv6 (disconnected) then let's
+        # mirror images
+        mirror_test_images
     fi
     ;;
 *) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"; exit 1;;
@@ -65,7 +76,7 @@ function upgrade() {
     ssh "${SSHOPTS[@]}" "root@${IP}" \
         openshift-tests run-upgrade all \
         --to-image "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}" \
-        --provider "${TEST_PROVIDER}" \
+        --provider "${TEST_PROVIDER:-}" \
         -o "/tmp/artifacts/e2e.log" \
         --junit-dir "/tmp/artifacts/junit"
     set +x
@@ -81,11 +92,11 @@ function suite() {
     fi
 
     scp "${SSHOPTS[@]}" /tmp/tests "root@${IP}:/tmp/tests"
-    
+
     set -x
     ssh "${SSHOPTS[@]}" "root@${IP}" \
         openshift-tests run "${TEST_SUITE}" "${TEST_ARGS:-}" \
-        --provider "${TEST_PROVIDER}" \
+        --provider "${TEST_PROVIDER:-}" \
         -o "/tmp/artifacts/e2e.log" \
         --junit-dir "/tmp/artifacts/junit"
     set +x

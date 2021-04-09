@@ -102,6 +102,7 @@ source ocp_install_env.sh
 echo "export DS_OPENSHIFT_VERSION=\$(openshift_version)" >> /tmp/ds-vars.conf
 echo "export DS_REGISTRY=\$LOCAL_REGISTRY_DNS_NAME:\$LOCAL_REGISTRY_PORT" >> /tmp/ds-vars.conf
 echo "export DS_WORKING_DIR=\$WORKING_DIR" >> /tmp/ds-vars.conf
+echo "export DS_IP_STACK=\$IP_STACK" >> /tmp/ds-vars.conf
 EOF
 
 scp "${SSHOPTS[@]}" "root@${IP}:/tmp/ds-vars.conf" "${SHARED_DIR}/ds-vars.conf"
