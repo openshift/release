@@ -70,7 +70,7 @@ else
         log "Applying CLUSTER_INCLUSION_FILTER /$CLUSTER_INCLUSION_FILTER/"
         grep "$CLUSTER_INCLUSION_FILTER" deployments > deployments.bak
 
-        if [[ $(wc -l deployments.bak) == 0 ]]; then
+        if [[ $(cat deployments.bak | wc -l) == 0 ]]; then
             log "ERROR No clusters left after applying inclusion filter."
             log "Inclusion filter: $CLUSTER_INCLUSION_FILTER"
             log "Original clusters:"
@@ -86,7 +86,7 @@ else
         log "Applying CLUSTER_EXCLUSION_FILTER /$CLUSTER_INCLUSION_FILTER/"
         grep -v "$CLUSTER_EXCLUSION_FILTER" > deployments.bak
 
-        if [[ $(wc -l deployments.bak) == 0 ]]; then
+        if [[ $(cat deployments.bak | wc -l) == 0 ]]; then
             log "ERROR No clusters left after applying exclusion filter."
             log "Exclusion filter: $CLUSTER_EXCLUSION_FILTER"
             log "Original clusters:"

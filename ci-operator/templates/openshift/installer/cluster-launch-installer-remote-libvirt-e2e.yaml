@@ -80,6 +80,24 @@ parameters:
   required: false
 - name: INSTALL_INITIAL_RELEASE
   required: false
+- name: MASTER_DISK
+  value: "17179869184"
+  required: false
+- name: MASTER_MEMORY
+  value: "16384"
+  required: false
+- name: MASTER_REPLICAS
+  value: "3"
+  required: false
+- name: WORKER_DISK
+  value: "32212254720"
+  required: false
+- name: WORKER_MEMORY
+  value: "16384"
+  required: false
+- name: WORKER_REPLICAS
+  value: "2"
+  required: false
 
 objects:
 
@@ -407,10 +425,6 @@ objects:
         value: test
       - name: NSS_GROUPNAME
         value: test
-      - name: MASTER_REPLICAS
-        value: "3"
-      - name: WORKER_REPLICAS
-        value: "2"
       - name: INSTALL_INITIAL_RELEASE
       - name: RELEASE_IMAGE_INITIAL
       command:
@@ -598,20 +612,19 @@ objects:
         mock-nss.sh openshift-install create manifests --dir=${ARTIFACT_DIR}/installer
         sed -i '/^  channel:/d' ${ARTIFACT_DIR}/installer/manifests/cvo-overrides.yaml
 
-        # Bump the libvirt masters memory to 16GB
-        export TF_VAR_libvirt_master_memory=16384
+        export TF_VAR_libvirt_master_memory=${MASTER_MEMORY}
         ls ${ARTIFACT_DIR}/installer/openshift
-        for ((i=0; i<$MASTER_REPLICAS; i++))
+        for ((i=0; i<${MASTER_REPLICAS}; i++))
         do
-            yq write --inplace ${ARTIFACT_DIR}/installer/openshift/99_openshift-cluster-api_master-machines-${i}.yaml spec.providerSpec.value[domainMemory] 16384
+            yq write --inplace ${ARTIFACT_DIR}/installer/openshift/99_openshift-cluster-api_master-machines-${i}.yaml spec.providerSpec.value[domainMemory] ${MASTER_MEMORY}
+            yq write --inplace ${ARTIFACT_DIR}/installer/openshift/99_openshift-cluster-api_master-machines-${i}.yaml spec.providerSpec.value.volume[volumeSize] ${MASTER_DISK}
         done
 
-        # Bump the libvirt workers memory to 16GB
-        worker_memory=16384
-        yq write --inplace ${ARTIFACT_DIR}/installer/openshift/99_openshift-cluster-api_worker-machineset-0.yaml spec.template.spec.providerSpec.value[domainMemory] ${worker_memory}
+        # Bump the libvirt workers memory
+        yq write --inplace ${ARTIFACT_DIR}/installer/openshift/99_openshift-cluster-api_worker-machineset-0.yaml spec.template.spec.providerSpec.value[domainMemory] ${WORKER_MEMORY}
 
-        # Bump the libvirt workers disk to to 30GB
-        yq write --inplace ${ARTIFACT_DIR}/installer/openshift/99_openshift-cluster-api_worker-machineset-0.yaml spec.template.spec.providerSpec.value.volume[volumeSize] 32212254720
+        # Bump the libvirt workers disk
+        yq write --inplace ${ARTIFACT_DIR}/installer/openshift/99_openshift-cluster-api_worker-machineset-0.yaml spec.template.spec.providerSpec.value.volume[volumeSize] ${WORKER_DISK}
 
         RCFILE=$(mktemp)
         {

@@ -3,7 +3,7 @@ ref:
   from_image:
     namespace: open-cluster-management
     name: builder
-    tag: go1.15-linux-amd64
+    tag: go1.16-linux
   commands: ocm-e2e-clusterpool-checkout-commands.sh
   resources:
     requests:
@@ -60,10 +60,11 @@ ref:
       default: "cluster-claims"
       documentation: |-
         File name to use to store the cluster claim names.
+    - name: CLUSTERPOOL_LIFETIME
+      default: "48h"
+      documentation: |-
+        Lifetime of each cluster that's checked out of the clusterpool. Set to
+        an empty string to not have a lifetime. The lifetime can be any
+        positive value accepted by Go's time.ParseDuration function.
   documentation: |-
-    This step checks out a cluster from the cluster pool host. It tries to
-    check out a cluster from the cluster pools specified in CLUSTERPOOL_LIST.
-    If CLUSTERPOOL_LIST is empty, it will use the cluster pools listed in the
-    in CLUSTERPOOL_LIST_FILE to get the list of cluster pools to try
-    to checkout a cluster from. The cluster claim will be stored in 
-    "${SHARED_DIR}/${CLUSTER_CLAIM_FILE}"
+    This step checks out hub and managed clusters from the given cluster pools. 
