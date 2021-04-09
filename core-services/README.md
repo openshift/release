@@ -1,9 +1,6 @@
 # Core Services and Configuration
 
-_Only `core-services/secrets` folder is applied to the cluster api.ci._
-
-Except [user secret management](https://docs.ci.openshift.org/docs/how-tos/adding-a-new-secret-to-ci/), no services are running on `api.ci`.
-
+This folder is _no longer_ applied to the cluster api.ci.
 ## Quality criteria and conventions
 
 1. All directories should contain `OWNERS` and `README.md` files. This is

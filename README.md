@@ -33,12 +33,11 @@ and are split into the following categories:
 
 ## Cluster and Service Configuration Manifests
 
-### Core Services and Configuration
 
-_Only `core-services/secrets` folder is applied to the cluster api.ci._
 
-Except [user secret management](https://docs.ci.openshift.org/docs/how-tos/adding-a-new-secret-to-ci/), no services are running on `api.ci`.
+### Core Services and Configuration (legacy)
 
+_This folder is no longer applied to the cluster api.ci which is going to be offline soon._
 ### Additional Services and Configuration (legacy)
 
 _This folder is no longer applied to the cluster api.ci which is going to be offline soon._
