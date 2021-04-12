@@ -7,6 +7,8 @@ echo "pwd:"
 pwd
 echo "CI_CHE_OPERATOR_IMAGE:"
 echo $CI_CHE_OPERATOR_IMAGE
+echo "DEVWORKSPACE_OPERATOR:"
+echo $DEVWORKSPACE_OPERATOR
 
 mkdir /tmp/workspace
 cd /tmp/workspace
