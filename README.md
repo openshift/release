@@ -22,7 +22,7 @@ and are split into the following categories:
    of the contribution document and the [upstream configuration document](https://github.com/kubernetes/test-infra/blob/master/prow/README.md#how-to-add-new-jobs). Prefer the `ci-operator` config whenever possible.
  - [`ci-operator/step-registry`](./ci-operator/step-registry/) contains the
    registry of reusable test steps and workflows. See the documentation for
-   this content [here](https://steps.ci.openshift.org/help).
+   this content [here](https://docs.ci.openshift.org/docs/architecture/step-registry/).
  - **[LEGACY]** [`ci-operator/templates`](./ci-operator/templates/) contains black-box test
    workflows for use by the `ci-operator`. The parent directory's
    [README](./ci-operator#end-to-end-tests) documents how to use them. See the
@@ -35,22 +35,13 @@ and are split into the following categories:
 
 ### Core Services and Configuration
 
-Manifests for important services (like [OpenShift CI cluster](https://api.ci.openshift.org/)
-and the CI service components that run on it) are present in the
-[`core-services`](./core-services) directory. The services configured in this
-directory are critical for some part of the OpenShift project development
-workflow, must meet basic quality criteria and must be deployed to the cluster
-automatically by a postsubmit job. See its [README](./core-services/README.md)
-for details.
+_Only `core-services/secrets` folder is applied to the cluster api.ci._
 
-### Additional Services and Configuration
+Except [user secret management](https://docs.ci.openshift.org/docs/how-tos/adding-a-new-secret-to-ci/), no services are running on `api.ci`.
 
-The [`services`](./services) directory contains manifests for services that run
-on [OpenShift CI cluster](https://api.ci.openshift.org/) and are not critical
-for the OpenShift project development workflow, but want to follow the same
-quality criteria and automated check and deployment process that the [core
-services](#core-services-and-configuration) do (DPTP intends to support only
-these additional services). See its [README](./services/README.md) for details.
+### Additional Services and Configuration (legacy)
+
+_This folder is no longer applied to the cluster api.ci which is going to be offline soon._
 
 ### Cluster Configuration Manifests (legacy)
 

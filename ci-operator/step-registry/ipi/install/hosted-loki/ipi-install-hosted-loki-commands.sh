@@ -87,27 +87,26 @@ data:
     positions:
       filename: "/run/promtail/positions.yaml"
     scrape_configs:
-    - job_name: kubernetes-pods-name
+    - job_name: kubernetes
       kubernetes_sd_configs:
       - role: pod
       pipeline_stages:
       - cri: {}
       - labeldrop:
         - filename
-        - stream
-        - pod_template_hash
-        - controller_revision_hash
-        - ingresscontroller_operator_openshift_io_hash
-        - pod_template_generation
       - pack:
           labels:
           - name
-          - host
           - namespace
           - pod_name
           - container
           - container_name
           - app
+          - stream
+          - pod_template_hash
+          - controller_revision_hash
+          - ingresscontroller_operator_openshift_io_hash
+          - pod_template_generation
       relabel_configs:
       - source_labels:
         - __meta_kubernetes_pod_label_name
@@ -115,12 +114,6 @@ data:
       - source_labels:
         - __meta_kubernetes_pod_node_name
         target_label: __host__
-      - action: drop
-        regex: ''
-        source_labels:
-        - __service__
-      - action: labelmap
-        regex: __meta_kubernetes_pod_label_(.+)
       - action: replace
         replacement:
         separator: "/"
@@ -157,7 +150,6 @@ data:
         - stream
       - pack:
           labels:
-          - host
           - __journal__boot_id
           - __journal__systemd_unit
     server:
@@ -260,8 +252,6 @@ spec:
         - mountPath: "/var/log/pods"
           name: pods
           readOnly: true
-        - mountPath: "/tmp/shared"
-          name: shared-data
         - mountPath: "/var/log/journal"
           name: journal
           readOnly: true
@@ -290,8 +280,6 @@ spec:
       - hostPath:
           path: "/var/log/journal"
         name: journal
-      - emptyDir: {}
-        name: shared-data
   updateStrategy:
     type: RollingUpdate
 EOF
@@ -361,4 +349,4 @@ metadata:
 EOF
 
 
-echo "Promtail manifests created, the cluster can be found at https://grafana-loki.ci.openshift.org/explore using '{invoker=\"${OPENSHIFT_INSTALL_INVOKER}\"}' query"
+echo "Promtail manifests created, the cluster can be found at https://grafana-loki.ci.openshift.org/explore using '{invoker=\"${OPENSHIFT_INSTALL_INVOKER}\"} | unpack' query"

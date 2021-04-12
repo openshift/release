@@ -1,0 +1,37 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.14
+images:
+- dockerfile_path: Dockerfile
+  to: observatorium
+promotion:
+  name: "2.3"
+  namespace: open-cluster-management
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 100m
+      memory: 1Gi
+tag_specification:
+  name: "4.6"
+  namespace: ocp
+test_binary_build_commands: "true"
+tests:
+- as: lint
+  commands: |
+    GOLANGCI_LINT_CACHE=/tmp/golangci-cache make lint --always-make
+  container:
+    from: src
+- as: test
+  commands: |
+    make test --always-make
+  container:
+    from: test-bin
+zz_generated_metadata:
+  branch: main
+  org: open-cluster-management
+  repo: observatorium

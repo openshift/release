@@ -77,7 +77,7 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   packer@"${INSTANCE_PREFIX}" \
-  --command "export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${RELEASE_IMAGE_LATEST}  && timeout 360m bash -ce \"/home/packer/run-tests.sh\" && echo \"### Fetching results\" && tar -czvf /tmp/artifacts.tar.gz /tmp/artifacts"
+  --command "export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${RELEASE_IMAGE_LATEST} && export PULL_NUMBER=${PULL_NUMBER} && timeout 360m bash -ce \"/home/packer/run-tests.sh\" && echo \"### Fetching results\" && tar -czvf /tmp/artifacts.tar.gz /tmp/artifacts"
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \

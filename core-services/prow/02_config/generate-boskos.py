@@ -11,6 +11,12 @@ CONFIG = {
         'us-west-1': 35,
         'us-west-2': 35,
     },
+    'aws-2-quota-slice': {
+        'us-east-1': 10,
+        'us-east-2': 10,
+        'us-west-1': 10,
+        'us-west-2': 10,
+    },
     'azure4-quota-slice': {
         'centralus': 33,
         'eastus': 10,
@@ -91,7 +97,7 @@ for typeName, data in sorted(CONFIG.items()):
                 raise ValueError('double-dashes are used internally, so {!r} is invalid'.format(name))
             if count > 1:
                 width = len(str(count-1))
-                resource['names'].extend(['{name}--{i:0>{width}}'.format(name=name, i=i, width=width) for i in range(count)])
+                resource['names'].extend(['{name}--{typeName}-{i:0>{width}}'.format(name=name,typeName=typeName, i=i, width=width) for i in range(count)])
             else:
                 resource['names'].append(name)
     config['resources'].append(resource)

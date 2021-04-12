@@ -78,7 +78,7 @@ postsubmits:
           value: registry.ci.openshift.org/open-cluster-management
         - name: SELF
           value: make -f Makefile.prow
-        image: registry.ci.openshift.org/open-cluster-management/builder:go1.15-linux-amd64
+        image: registry.ci.openshift.org/open-cluster-management/builder:go1.14-linux
         imagePullPolicy: Always
         name: ""
         resources:
@@ -94,3 +94,40 @@ postsubmits:
       - name: acm-cicd-github
         secret:
           secretName: acm-cicd-github
+  - agent: kubernetes
+    branches:
+    - ^release-2\.3$
+    cluster: build02
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: branch-ci-open-cluster-management-governance-policy-template-sync-release-2.3-sonarcloud
+    spec:
+      containers:
+      - args:
+        - -f
+        - Makefile.prow
+        - sonar/go/prow
+        command:
+        - make
+        env:
+        - name: ARTIFACT_DIR
+          value: $(ARTIFACTS)
+        - name: SELF
+          value: make -f Makefile.prow
+        image: registry.ci.openshift.org/open-cluster-management/builder:go1.14-linux
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 100m
+            memory: 200Mi
+        volumeMounts:
+        - mountPath: /etc/sonarcloud
+          name: acm-sonarcloud-token
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: acm-sonarcloud-token
+        secret:
+          secretName: acm-sonarcloud-token

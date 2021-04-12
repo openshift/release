@@ -68,9 +68,12 @@ tests:
     - as: subsystem-deploy-and-run
       cli: latest
       commands: |
+        export BUILD_TYPE=CI
+        export REPORTS=${ARTIFACT_DIR}
         export SERVICE=$(echo "${IMAGE_FORMAT}" | component=assisted-service envsubst)
-        make deploy-on-openshift-ci
         export TARGET=oc
+
+        make deploy-on-openshift-ci
         make test
       from: test-bin
       resources:
@@ -85,10 +88,13 @@ tests:
     - as: subsystem-deploy-and-run
       cli: latest
       commands: |
+        export BUILD_TYPE=CI
+        export REPORTS=${ARTIFACT_DIR}
         export SERVICE=$(echo "${IMAGE_FORMAT}" | component=assisted-service envsubst)
-        make deploy-on-openshift-ci
         export TARGET=oc
         export GENERATE_CRD=false
+
+        make deploy-on-openshift-ci
         make enable-kube-api-for-subsystem
         make test-kube-api
       from: test-bin
@@ -136,6 +142,25 @@ tests:
         ISO_IMAGE_TYPE=minimal-iso
         OPENSHIFT_INSTALL_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}
         OPENSHIFT_VERSION=4.8
+    workflow: baremetalds-assisted-install
+- as: e2e-metal-assisted-kube-api
+  steps:
+    cluster_profile: packet
+    dependencies:
+      ASSISTED_SERVICE_IMAGE: pipeline:assisted-service
+    env:
+      ASSISTED_CONFIG: |
+        NUM_MASTERS=1
+        NUM_WORKERS=0
+        IPv6=yes
+        IPv4=no
+        PROXY=yes
+        ADDITIONAL_PARAMS="--with-static-network-config"
+        ISO_IMAGE_TYPE=minimal-iso
+        KUBE_API=yes
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}
+        OPENSHIFT_VERSION=4.8
+        ENABLE_KUBE_API=true
     workflow: baremetalds-assisted-install
 zz_generated_metadata:
   branch: master

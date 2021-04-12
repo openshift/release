@@ -196,7 +196,7 @@ if [[ -n "$CSV" ]]; then
     done
 else
     CSV_ART="$ARTIFACT_DIR/$OO_INSTALL_NAMESPACE-all-csvs.yaml"
-    echo "ClusterServiceVersion $CSV was never created"
+    echo "ClusterServiceVersion was never created"
     echo "Dumping all ClusterServiceVersions in namespace $OO_INSTALL_NAMESPACE to $CSV_ART"
     oc get -n "$OO_INSTALL_NAMESPACE" csv -o yaml >"$CSV_ART"
 fi

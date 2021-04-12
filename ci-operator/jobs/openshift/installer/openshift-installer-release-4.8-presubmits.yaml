@@ -149,7 +149,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-disruptive,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - release-4.8
     cluster: build01
@@ -163,6 +163,7 @@ presubmits:
     name: pull-ci-openshift-installer-release-4.8-e2e-aws-fips
     optional: true
     rerun_command: /test e2e-aws-fips
+    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
     spec:
       containers:
       - args:
@@ -469,7 +470,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-shared-vpc,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - release-4.8
     cluster: build01
@@ -535,7 +536,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-single-node,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - release-4.8
     cluster: build01
@@ -548,6 +549,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.8-e2e-aws-upgrade
     rerun_command: /test e2e-aws-upgrade
+    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
     spec:
       containers:
       - args:
@@ -682,7 +684,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-upi,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - release-4.8
     cluster: build01
@@ -696,6 +698,7 @@ presubmits:
     name: pull-ci-openshift-installer-release-4.8-e2e-aws-workers-rhel7
     optional: true
     rerun_command: /test e2e-aws-workers-rhel7
+    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
     spec:
       containers:
       - args:
@@ -816,6 +819,72 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-azure,?($|\s.*)
   - agent: kubernetes
+    always_run: true
+    branches:
+    - release-4.8
+    cluster: build01
+    context: ci/prow/e2e-azure-resourcegroup
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-release-4.8-e2e-azure-resourcegroup
+    rerun_command: /test e2e-azure-resourcegroup
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-azure-resourcegroup-cluster-profile
+        - --target=e2e-azure-resourcegroup
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-azure-resourcegroup-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-azure4
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-azure-resourcegroup,?($|\s.*)
+  - agent: kubernetes
     always_run: false
     branches:
     - release-4.8
@@ -883,7 +952,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-azure-shared-vpc,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - release-4.8
     cluster: build01
@@ -977,6 +1046,7 @@ presubmits:
     name: pull-ci-openshift-installer-release-4.8-e2e-crc
     optional: true
     rerun_command: /test e2e-crc
+    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
     spec:
       containers:
       - args:
@@ -1376,7 +1446,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-gcp-upi-xpn,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - release-4.8
     cluster: build01
@@ -1577,7 +1647,7 @@ presubmits:
           secretName: registry-pull-credentials
     trigger: (?m)^/test( | .* )e2e-metal,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - release-4.8
     cluster: build01
@@ -1645,7 +1715,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-metal-assisted,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - release-4.8
     cluster: build01
@@ -1713,7 +1783,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-metal-ipi,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - release-4.8
     cluster: build01
@@ -1781,7 +1851,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-metal-ipi-ovn-dualstack,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - release-4.8
     cluster: build01
@@ -1794,6 +1864,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.8-e2e-metal-ipi-ovn-ipv6
     rerun_command: /test e2e-metal-ipi-ovn-ipv6
+    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
     spec:
       containers:
       - args:
@@ -1849,7 +1920,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-metal-ipi-ovn-ipv6,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - release-4.8
     cluster: build01
@@ -1917,7 +1988,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-metal-ipi-virtualmedia,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - release-4.8
     cluster: build01
@@ -1930,6 +2001,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.8-e2e-metal-single-node-live-iso
     rerun_command: /test e2e-metal-single-node-live-iso
+    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
     spec:
       containers:
       - args:
@@ -2063,7 +2135,7 @@ presubmits:
           secretName: registry-pull-credentials
     trigger: (?m)^/test( | .* )e2e-openstack,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - release-4.8
     cluster: build01
@@ -2343,7 +2415,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-vsphere,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - release-4.8
     cluster: vsphere
@@ -2409,7 +2481,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-vsphere-upi,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - release-4.8
     cluster: build01
@@ -2422,6 +2494,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.8-gofmt
     rerun_command: /test gofmt
+    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
     spec:
       containers:
       - args:
@@ -2457,7 +2530,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )gofmt,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - release-4.8
     cluster: build01
@@ -2470,6 +2543,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.8-golint
     rerun_command: /test golint
+    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
     spec:
       containers:
       - args:
@@ -2505,7 +2579,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )golint,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - release-4.8
     cluster: build01
@@ -2518,6 +2592,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.8-govet
     rerun_command: /test govet
+    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
     spec:
       containers:
       - args:
@@ -2553,7 +2628,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )govet,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - release-4.8
     cluster: build01
@@ -2566,6 +2641,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.8-images
     rerun_command: /test images
+    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
     spec:
       containers:
       - args:
@@ -2601,7 +2677,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - release-4.8
     cluster: build01
@@ -2614,6 +2690,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.8-openstack-manifests
     rerun_command: /test openstack-manifests
+    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
     spec:
       containers:
       - args:
@@ -2667,7 +2744,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )openstack-manifests,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - release-4.8
     cluster: build01
@@ -2677,6 +2754,7 @@ presubmits:
       ci.openshift.io/manually-branched: "true"
     name: pull-ci-openshift-installer-release-4.8-shellcheck
     rerun_command: /test shellcheck
+    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
     spec:
       containers:
       - args:
@@ -2694,7 +2772,7 @@ presubmits:
             cpu: 500m
     trigger: (?m)^/test shellcheck
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - release-4.8
     cluster: build01
@@ -2705,6 +2783,7 @@ presubmits:
     name: pull-ci-openshift-installer-release-4.8-tf-fmt
     optional: true
     rerun_command: /test tf-fmt
+    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
     spec:
       containers:
       - args:
@@ -2722,7 +2801,7 @@ presubmits:
             cpu: 500m
     trigger: (?m)^/test( | .* )tf-fmt,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - release-4.8
     cluster: build01
@@ -2732,6 +2811,7 @@ presubmits:
       ci.openshift.io/manually-branched: "true"
     name: pull-ci-openshift-installer-release-4.8-tf-lint
     rerun_command: /test tf-lint
+    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
     spec:
       containers:
       - args:
@@ -2749,7 +2829,7 @@ presubmits:
             cpu: 500m
     trigger: (?m)^/test tf-lint
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - release-4.8
     cluster: build01
@@ -2762,6 +2842,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.8-unit
     rerun_command: /test unit
+    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
     spec:
       containers:
       - args:
@@ -2845,7 +2926,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )verify-codegen,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - release-4.8
     cluster: build01
@@ -2858,6 +2939,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.8-verify-vendor
     rerun_command: /test verify-vendor
+    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
     spec:
       containers:
       - args:
@@ -2893,7 +2975,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )verify-vendor,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - release-4.8
     cluster: build01
@@ -2903,6 +2985,7 @@ presubmits:
       ci.openshift.io/manually-branched: "true"
     name: pull-ci-openshift-installer-release-4.8-yaml-lint
     rerun_command: /test yaml-lint
+    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
     spec:
       containers:
       - args:

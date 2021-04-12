@@ -4,7 +4,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-agnostic
     decorate: true
     decoration_config:
@@ -72,7 +72,7 @@ presubmits:
     always_run: false
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-aws
     decorate: true
     decoration_config:
@@ -139,7 +139,7 @@ presubmits:
     always_run: false
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-metal-assisted
     decorate: true
     decoration_config:
@@ -208,7 +208,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-metal-ipi
     decorate: true
     decoration_config:
@@ -276,7 +276,7 @@ presubmits:
     always_run: false
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-metal-ipi-ovn-dualstack
     decorate: true
     decoration_config:
@@ -345,7 +345,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-metal-ipi-ovn-ipv6
     decorate: true
     decoration_config:
@@ -410,10 +410,78 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-metal-ipi-ovn-ipv6,?($|\s.*)
   - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: build01
+    context: ci/prow/e2e-metal-ipi-serial-ipv4
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-baremetal-operator-master-e2e-metal-ipi-serial-ipv4
+    rerun_command: /test e2e-metal-ipi-serial-ipv4
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-metal-ipi-serial-ipv4-cluster-profile
+        - --target=e2e-metal-ipi-serial-ipv4
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-metal-ipi-serial-ipv4-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-packet
+          - configMap:
+              name: cluster-profile-packet
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-metal-ipi-serial-ipv4,?($|\s.*)
+  - agent: kubernetes
     always_run: false
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-metal-ipi-upgrade
     decorate: true
     decoration_config:
@@ -482,7 +550,7 @@ presubmits:
     always_run: false
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-metal-ipi-virtualmedia
     decorate: true
     decoration_config:
@@ -551,7 +619,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/generate-check
     decorate: true
     decoration_config:
@@ -599,7 +667,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/gofmt
     decorate: true
     decoration_config:
@@ -647,7 +715,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/govet
     decorate: true
     decoration_config:
@@ -695,7 +763,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -744,7 +812,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/lint
     decorate: true
     decoration_config:
@@ -792,7 +860,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/unit
     decorate: true
     decoration_config:

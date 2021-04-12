@@ -1,0 +1,48 @@
+base_images:
+  os:
+    name: ubi
+    namespace: ocp
+    tag: "8"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- dockerfile_path: test/Dockerfile
+  from: os
+  to: python-openshift-test-runner
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.6"
+  namespace: ocp
+tests:
+- as: lint
+  commands: make test-lint
+  container:
+    from: python-openshift-test-runner
+- as: unit
+  commands: make test-unit
+  container:
+    from: python-openshift-test-runner
+- as: e2e-python-client
+  steps:
+    cluster_profile: aws
+    test:
+    - as: e2e-python-client
+      commands: make test-integration
+      from: python-openshift-test-runner
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: openshift-restclient-python

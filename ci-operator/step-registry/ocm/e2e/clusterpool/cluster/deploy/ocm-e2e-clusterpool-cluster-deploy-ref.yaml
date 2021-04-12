@@ -3,8 +3,11 @@ ref:
   from_image:
     namespace: open-cluster-management
     name: builder
-    tag: go1.16-linux-amd64
+    tag: go1.16-linux
   commands: ocm-e2e-clusterpool-cluster-deploy-commands.sh
+  dependencies:
+  -  env: COMPONENT_IMAGE_REF
+     name: bin
   resources:
     requests:
       cpu: 100m
@@ -26,7 +29,7 @@ ref:
       documentation: |-
         File name that has the cluster claim names.
     - name: CLUSTER_INCLUSION_FILTER
-      default: "^hub-.*"
+      default: "^hub-"
       documentation: |-
         A filter used by grep to pick a set of cluster claims from the
         CLUSTER_CLAIM_FILE to deploy to. If empty, all clusters will be included.
@@ -51,6 +54,18 @@ ref:
         
         The special value "none" can be used to indicate that no deploy is to
         take place.
+    - name: DEPLOY_TIMEOUT
+      default: "900"
+      documentation: |-
+        The timeout, in seconds, to wait for an ACM delployment to complete
+        before cancelling it.
+    - name: COMPONENT_NAME
+      default: ""
+      documentation: |-
+        The name of the component used in manifest files. If not given, the
+        value stored in the file COMPONENT_NAME will be used. It can be
+        overridden here if you're using another component from your repo
+        such as an end-to-end test image.
     - name: GITHUB_USER
       default: "acm-cicd-prow-bot"
       documentation: |-
@@ -65,33 +80,26 @@ ref:
       documentation: |-
         The GitHub repo where CICD pipeline data is stored. Do not include
         the "https://" prefix or the ".git" suffix.
+    - name: RELEASE_REPO
+      default: "github.com/open-cluster-management/release"
+      documentation: |-
+        The GitHub repo where ACM release data is stored. Do not include
+        the "https://" prefix or the ".git" suffix.
     - name: PIPELINE_STAGE
       default: "edge"
       documentation: |-
         The pipeline stage to use as the base deployment of ACM. Value is
         either "edge" or "integration". An invalid value will cause an error.
-    - name: COMPONENT_NAME
-      default: ""
-      documentation: |-
-        The name of the component used in manifest files. If not given, the
-        value stored in the file COMPONENT_NAME will be used. It can be
-        overridden here if you're using another component from your repo
-        such as an end-to-end test image.
-    - name: QUAY_TOKEN_FILE
-      default: "/etc/acm-cicd-quay-pull/token"
-      documentation: |-
-        The file that stores the Quay token. Should match credentials stanza
-        mount path.
     - name: DEPLOY_REPO
       default: "github.com/open-cluster-management/deploy"
       documentation: |-
         The GitHub repo where the ACM deployment code is stored. Do not include
         the "https://" prefix or the ".git" suffix.
-    - name: DEPLOY_TIMEOUT
-      default: "900"
+    - name: QUAY_TOKEN_FILE
+      default: "/etc/acm-cicd-quay-pull/token"
       documentation: |-
-        The timeout, in seconds, to wait for an ACM delployment to complete
-        before cancelling it.
+        The file that stores the Quay token. Should match credentials stanza
+        mount path.
   documentation: |-
     This step deploys ACM on the selected clusters.  All name matching is done
     after stripping the suffix from the cluster claim name. For example, the
@@ -100,8 +108,8 @@ ref:
     Unless CLUSTER_NAMES is set to "none", at least one cluster must be selected
     for deployment.
     
-    The latest edge version of ACM for a particular stream will be deployed
-    first. After this version of ACM is running, the CSV CR for the
-    multiclusterhub-operator will be modified to use the component image from
+    The latest edge version of ACM for a particular stream (edge or integration)
+    will be deployed first. After this version of ACM is running, the CSV CR for
+    the multiclusterhub-operator will be modified to use the component image from
     the CI Registry that was built for the PR.
 

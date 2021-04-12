@@ -41,9 +41,80 @@ spec:
       kind: DockerImage
       # Mirror of docker.io/library/vault:1.6.2 because the cluster hit the ratelimit for that
       name: quay.io/alvaroaleman/vault:1.6.2
+  - name: 1.7.0
+    from:
+      kind: DockerImage
+      name: docker.io/library/vault:1.7.0
+---
+apiVersion: policy/v1beta1
+kind: PodDisruptionBudget
+metadata:
+  name: vault
+  namespace: vault
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: vault
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vault
+  namespace: vault
+spec:
+  ports:
+  - name: vault
+    port: 8300
+    protocol: TCP
+  selector:
+    vault-active: "true"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vault-statefulset
+  namespace: vault
+spec:
+  ports:
+  - port: 8300
+    name: vault
+  clusterIP: None
+  selector:
+    app: vault
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vault
+  namespace: vault
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: vault
+  name: vault-service-discovery
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "watch", "list", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: vault-service-discovery
+  namespace: vault
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: vault-service-discovery
+subjects:
+- kind: ServiceAccount
+  name: vault
+  namespace: vault
 ---
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   labels:
     app: vault
@@ -56,6 +127,7 @@ spec:
   selector:
     matchLabels:
       app: vault
+  serviceName: vault-statefulset
   template:
     metadata:
       labels:
@@ -65,6 +137,7 @@ spec:
           api_addr = "https://vault.ci.openshift.org"
           listener "tcp" {
             address       = "127.0.0.1:8200"
+            cluster_address = "[::]:8201"
             # The subpath proxy does the tls termination
             tls_disable   = "true"
           }
@@ -75,6 +148,7 @@ spec:
           }
           disable_mlock = "true"
           ui = "true"
+          service_registration "kubernetes" {}
     spec:
       affinity:
         podAntiAffinity:
@@ -88,6 +162,7 @@ spec:
                   values:
                   - vault
               topologyKey: "kubernetes.io/hostname"
+      serviceAccountName: vault
       containers:
       - image: vault-subpath-proxy:latest
         name: subpath-proxy
@@ -100,7 +175,7 @@ spec:
         volumeMounts:
         - name: serving-cert
           mountPath: /var/run/serving-cert
-      - image: vault:1.6.2
+      - image: vault:1.7.0
         name: unsealer
         command:
         - /bin/sh
@@ -140,12 +215,32 @@ spec:
           value: "true"
         # Need to define this here so it can
         # be referenced in VAULT_CLUSTER_ADDR
-        - name: MY_IP
+        - name: POD_IP
           valueFrom:
             fieldRef:
               fieldPath: status.podIP
+        - name: VAULT_K8S_POD_NAME
+          valueFrom:
+            fieldRef:
+             fieldPath: metadata.name
+        - name: VAULT_K8S_NAMESPACE
+          valueFrom:
+            fieldRef:
+             fieldPath: metadata.namespace
+        - name: VAULT_ADDR
+          value: "http://127.0.0.1:8200"
+        - name: VAULT_API_ADDR
+          value: "http://$(POD_IP):8200"
+        - name: SKIP_CHOWN
+          value: "true"
+        - name: SKIP_SETCAP
+          value: "true"
+        - name: HOSTNAME
+          valueFrom:
+            fieldRef:
+             fieldPath: metadata.name
         - name: VAULT_CLUSTER_ADDR
-          value: https://$(MY_IP):8201
+          value: "https://$(HOSTNAME).vault-statefulset:8201"
         volumeMounts:
         - name: config
           mountPath: /etc/vault/cfg
@@ -164,27 +259,3 @@ spec:
           - path: config.hcl
             fieldRef:
               fieldPath: metadata.annotations['config.hcl']
----
-apiVersion: policy/v1beta1
-kind: PodDisruptionBudget
-metadata:
-  name: vault
-  namespace: vault
-spec:
-  minAvailable: 2
-  selector:
-    matchLabels:
-      app: vault
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: vault
-  namespace: vault
-spec:
-  ports:
-  - name: vault
-    port: 8300
-    protocol: TCP
-  selector:
-    app: vault
