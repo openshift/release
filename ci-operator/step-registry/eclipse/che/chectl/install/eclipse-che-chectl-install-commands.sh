@@ -1,10 +1,12 @@
 #!/bin/bash
 set -e
 
-echo "id"
+echo "id:"
 id 
-echo "pwd"
+echo "pwd:"
 pwd
+echo "CI_CHE_OPERATOR_IMAGE:"
+echo $CI_CHE_OPERATOR_IMAGE
 
 mkdir /tmp/workspace
 cd /tmp/workspace
