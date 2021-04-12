@@ -3,10 +3,10 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  open-cluster-management_builder_go1.15-linux-amd64:
+  open-cluster-management_builder_go1.15-linux:
     name: builder
     namespace: open-cluster-management
-    tag: go1.15-linux-amd64
+    tag: go1.15-linux
 binary_build_commands: |-
   GOFLAGS="" go build ./cmd/clusterlifecycle-state-metrics; \
   GOFLAGS="" go test -covermode=atomic -coverpkg=github.com/open-cluster-management/clusterlifecycle-state-metrics/pkg/... -c -tags testrunmain ./cmd/clusterlifecycle-state-metrics -o clusterlifecycle-state-metrics-coverage
@@ -14,14 +14,14 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: open-cluster-management
-    tag: go1.15-linux-amd64
+    tag: go1.15-linux
 images:
 - dockerfile_path: build/Dockerfile.prow
   from: base
   inputs:
-    open-cluster-management_builder_go1.15-linux-amd64:
+    open-cluster-management_builder_go1.15-linux:
       as:
-      - registry.ci.openshift.org/open-cluster-management/builder:go1.15-linux-amd64
+      - registry.ci.openshift.org/open-cluster-management/builder:go1.15-linux
   to: clusterlifecycle-state-metrics
 - dockerfile_path: build/Dockerfile.coverage.prow
   from: clusterlifecycle-state-metrics

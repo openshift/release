@@ -347,54 +347,6 @@ metadata:
   name: loki-promtail
   namespace: loki
 EOF
-cat >> "${SHARED_DIR}/manifest_metrics.yml" << EOF
-apiVersion: monitoring.coreos.com/v1
-kind: PodMonitor
-metadata:
-  name: promtail-monitor
-  namespace: openshift-monitoring
-spec:
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: promtail
-  podMetricsEndpoints:
-  - port: http-metrics
-    interval: 15s
-    scheme: http
-  namespaceSelector:
-    matchNames:
-    - loki
-EOF
-cat >> "${SHARED_DIR}/manifest_metrics_role.yml" << EOF
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: promtail-prometheus
-  namespace: loki
-rules:
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  verbs:
-  - get
-  - list
-  - watch
-EOF
-cat >> "${SHARED_DIR}/manifest_metrics_rb.yml" << EOF
-kind: RoleBinding
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: prom-scrape-loki
-  namespace: loki
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: promtail-prometheus
-subjects:
-  - kind: ServiceAccount
-    name: prometheus-k8s
-    namespace: openshift-monitoring
-EOF
+
 
 echo "Promtail manifests created, the cluster can be found at https://grafana-loki.ci.openshift.org/explore using '{invoker=\"${OPENSHIFT_INSTALL_INVOKER}\"} | unpack' query"
