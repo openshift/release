@@ -4,9 +4,9 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-SINGLE_NODE_AWS_INSTANCE_TYPE="m5d.2xlarge"
+SINGLE_NODE_GCP_INSTANCE_TYPE="n1-standard-16"
 
-echo "Updating install-config.yaml to a single ${SINGLE_NODE_AWS_INSTANCE_TYPE} control plane node and 0 workers"
+echo "Updating install-config.yaml to a single ${SINGLE_NODE_GCP_INSTANCE_TYPE} control plane node and 0 workers"
 
 pip3 install pyyaml --user
 python3 -c '
@@ -26,8 +26,9 @@ if not "controlPlane" in cfg:
 cfg["controlPlane"]["replicas"] = 1
 
 # Single Node Openshift requires extra memory and compute resources
-assert "aws" in cfg["controlPlane"]["platform"], "Only AWS single-node is supported for now"
-cfg["controlPlane"]["platform"]["aws"]["type"] = "'${SINGLE_NODE_AWS_INSTANCE_TYPE}'"
+platform = cfg["controlPlane"]["platform"]
+assert "gcp" in platform
+platform["gcp"]["type"] = "'${SINGLE_NODE_GCP_INSTANCE_TYPE}'"
 
 # Some workflows do not define any compute machine pools in install-config.yaml
 if not "compute" in cfg:
