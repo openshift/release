@@ -14,7 +14,15 @@ VAULT_OIDC_CLIENT_SECRET="$(echo $RAW_VAULT_OIDC_VALUES|jq '.data["vault-secret"
 # Enable kv backend
 vault secrets list|grep -q kv || vault secrets enable -version=2 kv
 
-# Enable and configure OIDC auth
+# Enable and configure kubernetes and OIDC auth
+vault auth list|grep -q kubernetes ||  vault auth enable kubernetes
+VAULT_KUBE_TOKEN="$(oc --context=app.ci serviceaccounts -n vault get-token vault)"
+APP_CI_CA_CERT="$(oc --context=app.ci get configmap -n kube-public kube-root-ca.crt -o json|jq '.data["ca.crt"]' -r)"
+vault write auth/kubernetes/config \
+    token_reviewer_jwt="${VAULT_KUBE_TOKEN}" \
+    kubernetes_host=https://kubernetes.default.svc.cluster.local \
+    kubernetes_ca_cert="${APP_CI_CA_CERT}"
+
 vault auth list |grep -q oidc || vault auth enable oidc
 echo "Configuring OIDC"
 vault write auth/oidc/config -<<EOH
@@ -29,8 +37,8 @@ EOH
 echo "Configuring OIDC role"
 vault write auth/oidc/role/oidc_default_role \
   allowed_redirect_uris="https://vault.ci.openshift.org/ui/vault/auth/oidc/oidc/callback,http://localhost:8250/oidc/callback" \
-  token_ttl=600 \
-  token_max_ttl=600 \
+  token_ttl=3600 \
+  token_max_ttl=3600 \
   oidc_scopes="profile" \
   user_claim="preferred_username"
 
@@ -127,14 +135,30 @@ path "sys/control-group/request" {
     capabilities = ["update"]
 }
 # Allow everyone to have a personal space for themselves in the KV store
-path "secret/personal/data/{{identity.entity.aliases.${OIDC_ACCESSOR_ID}.name}}/*" {
+path "kv/data/personal/{{identity.entity.aliases.${OIDC_ACCESSOR_ID}.name}}/*" {
   capabilities = ["create", "update", "read", "delete"]
 }
 
-path "secret/personal/metadata/{{identity.entity.aliases.${OIDC_ACCESSOR_ID}.name}}/*" {
+path "kv/metadata/personal/{{identity.entity.aliases.${OIDC_ACCESSOR_ID}.name}}/*" {
   capabilities = ["list"]
 }
 EOH
+
+# Create the secret generator policy and approle and fetch the role-id and secret-id
+vault policy write secret-generator -<<EOH
+path "kv/data/dptp/*" {
+  capabilities = ["create", "update", "read"]
+}
+
+path "kv/metadata/dptp/*" {
+  capabilities = ["list"]
+}
+EOH
+vault write auth/kubernetes/role/secret-generator \
+    bound_service_account_names=secret-generator \
+    bound_service_account_namespaces=ci \
+    policies=secret-generator \
+    ttl=1h
 
 # Make dptp members admins
 echo "Setting up admin policy"
