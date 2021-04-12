@@ -340,15 +340,14 @@ periodics:
         # export JOB_SPEC="$( echo "${JOB_SPEC}" | jq -r ".extra_refs[0].base_sha = \"${origin_commit_id}\"" )"
 
         # fetch fcos release info and check whether we've already built this image
-        stream=next-devel
-        build_url="https://builds.coreos.fedoraproject.org/prod/streams/${stream}/builds"
+        build_url="https://builds.coreos.fedoraproject.org/prod/streams/${STREAM}/builds"
         curl "${build_url}/builds.json" 2>/dev/null >${dir}/builds.json
         build_id="$( <"${dir}/builds.json" jq -r '.builds[0].id' )"
         base_url="${build_url}/${build_id}/x86_64"
         curl "${base_url}/meta.json" 2>/dev/null >${dir}/meta.json
         tar_url="${base_url}/$( <${dir}/meta.json jq -r .images.ostree.path )"
         commit_id="$( <${dir}/meta.json jq -r '."ostree-commit"' )"
-        ostree_ref="fedora/x86_64/coreos/${stream}"
+        ostree_ref="fedora/x86_64/coreos/${STREAM}"
 
         # Build a semantic version as best we can from the build id, dropping any other
         # segments. Each version of machine-os-content is responsible for setting a
@@ -449,6 +448,8 @@ periodics:
         value: machine-os-content
       - name: BRANCH
         value: "4.7"
+      - name: STREAM
+        value: stable
       - name: TAG_SOURCE
         value: $(TAG):$(BRANCH)
       - name: UNRESOLVED_CONFIG
