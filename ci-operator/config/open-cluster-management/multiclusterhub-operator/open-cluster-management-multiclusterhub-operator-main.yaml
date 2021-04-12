@@ -14,15 +14,17 @@ build_root:
     namespace: open-cluster-management
     tag: go1.16-linux
 images:
-- dockerfile_path: Dockerfile.prow
+- dockerfile_path: build/Dockerfile.prow
   from: base
   inputs:
     builder-go1.16:
       as:
       - registry.ci.openshift.org/open-cluster-management/builder:go1.16-linux
-  to: multiclusterhub-repo
+  to: multiclusterhub-operator
+- dockerfile_path: build/Dockerfile.test.prow
+  from: builder-go1.16
+  to: multiclusterhub-operator-tests
 promotion:
-  disabled: true
   name: "2.3"
   namespace: open-cluster-management
 resources:
@@ -47,6 +49,6 @@ tests:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
 zz_generated_metadata:
-  branch: release-2.3
+  branch: main
   org: open-cluster-management
-  repo: multicloudhub-repo
+  repo: multiclusterhub-operator
