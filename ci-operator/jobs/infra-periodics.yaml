@@ -1518,15 +1518,16 @@ periodics:
         log: text/plain
     gcs_credentials_secret: gce-sa-credentials-gcs-private
   hidden: true
-  interval: 12h
+  interval: 1h
   labels:
     ci.openshift.io/role: infra-internal
   name: periodic-ci-secret-bootstrap
   spec:
     containers:
     - args:
-      - --bw-password-path=/etc/ci-secret-bootstrap-bitwarden/bw_password
-      - --bw-user=openshift-dev-infra+ci-bitwarden-bot@redhat.com
+      - --vault-addr=https://vault.ci.openshift.org
+      - --vault-role=secret-bootstrap
+      - --vault-prefix=kv/dptp
       - --config=/etc/ci-secret-bootstrap/_config.yaml
       - --dry-run=false
       - --force=true
@@ -1572,6 +1573,7 @@ periodics:
         name: config-volume
       - mountPath: /etc/ci-secret-bootstrap
         name: ci-secret-bootstrap
+    serviceAccountName: secret-bootstrap
     volumes:
     - name: ci-secret-bootstrap-bitwarden
       secret:
