@@ -14,8 +14,14 @@ if [[ ! -d "${base_dir}" ]]; then
   exit 1
 fi
 
+rcPaths=(
+  "${base_dir}/core-services/release-controller"
+  "${base_dir}/clusters/app.ci/release-controller"
+  "${base_dir}/clusters/build-clusters/common/release-controller"
+)
+
 gather_rc_md5s() {
-    find "${base_dir}/core-services/release-controller" "${base_dir}/clusters/build-clusters/01_cluster/common/release-controller" "${base_dir}/clusters/app.ci/release-controller" -type f -exec md5sum '{}' + | sort
+    find "${rcPaths[@]}" -type f -exec md5sum '{}' + | sort
 }
 
 PRE_RC_GEN=$(gather_rc_md5s)
