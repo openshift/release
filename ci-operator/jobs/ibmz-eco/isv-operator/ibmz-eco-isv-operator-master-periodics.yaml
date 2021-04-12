@@ -1,59 +1,30 @@
 periodics:
 - agent: kubernetes
   cluster: build01
+  cron: '@yearly'
   decorate: true
-  interval: 2h
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: ibmz-eco
+    repo: isv-operator
   labels:
     ci-operator.openshift.io/prowgen-controlled: "true"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: pull-ibmz-eco-isv-operator-master-test-e2e
+  name: periodic-ci-ibmz-eco-isv-operator-master-test-e2e
   spec:
     containers:
     - args:
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --secret-dir=/usr/local/pull-secret
-      - --target=e2e-remote-ibmz-eco
-      - --template=/usr/local/e2e-remote-ibmz-eco
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/test-e2e-cluster-profile
+      - --target=test-e2e
       command:
       - ci-operator
-      env:
-      - name: RELEASE_IMAGE_LATEST
-        value: registry.ci.openshift.org/ocp/release:4.6
-      - name: OPENSTACK_COMPUTE_FLAVOR
-        value: medium
-      - name: OS_CLOUD
-        value: rhcert
-      - name: CLOUD_DOMAIN
-        value: ibmz-eco-isv.ihost.com
-      - name: ARCH
-        value: s390x
-      - name: CONFIG_SPEC
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 4Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
-          tests:
-          - as: e2e-ibmz-eco-all
-            commands: $(TEST_COMMAND)
-            openshift_installer:
-              cluster_profile: "ibmz-eco"
-      - name: JOB_NAME_SAFE
-        value: e2e-ibmz-eco
-      - name: TEST_COMMAND
-        value: |
-          # TODO: tests to run
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -64,11 +35,20 @@ periodics:
       - mountPath: /etc/boskos
         name: boskos
         readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/test-e2e-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
       - mountPath: /etc/pull-secret
         name: pull-secret
         readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -77,9 +57,17 @@ periodics:
         - key: credentials
           path: credentials
         secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
-    - name: release-pull-secret
+    - name: result-aggregator
       secret:
-        secretName: ci-pull-credentials
+        secretName: result-aggregator
