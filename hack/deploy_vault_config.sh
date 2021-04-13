@@ -4,6 +4,7 @@ set -euo pipefail
 
 export VAULT_ADDR=https://vault.ci.openshift.org
 
+VAULT_TOKEN="${VAULT_TOKEN:-$(vault token lookup --format=json|jq .data.id -r)}"
 [[ -z ${VAULT_TOKEN:-} ]] && echo '$VAULT_TOKEN is undefined' && exit 1
 
 RAW_VAULT_OIDC_VALUES="$(kubectl --context=app.ci get secret -n dex vault-secret -o json)"
@@ -144,7 +145,7 @@ path "kv/metadata/personal/{{identity.entity.aliases.${OIDC_ACCESSOR_ID}.name}}/
 }
 EOH
 
-# Create the secret generator policy and approle and fetch the role-id and secret-id
+# Create the secret generator policy and role
 vault policy write secret-generator -<<EOH
 path "kv/data/dptp/*" {
   capabilities = ["create", "update", "read"]
@@ -158,6 +159,22 @@ vault write auth/kubernetes/role/secret-generator \
     bound_service_account_names=secret-generator \
     bound_service_account_namespaces=ci \
     policies=secret-generator \
+    ttl=1h
+
+# Create the secret bootstrap policy and role
+vault policy write secret-bootstrap -<<EOH
+path "kv/data/dptp/*" {
+  capabilities = ["read"]
+}
+
+path "kv/metadata/dptp/*" {
+  capabilities = ["list"]
+}
+EOH
+vault write auth/kubernetes/role/secret-bootstrap \
+    bound_service_account_names=secret-bootstrap \
+    bound_service_account_namespaces=ci \
+    policies=secret-bootstrap \
     ttl=1h
 
 # Make dptp members admins
