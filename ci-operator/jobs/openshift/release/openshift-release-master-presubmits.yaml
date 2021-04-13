@@ -14,8 +14,9 @@ presubmits:
     spec:
       containers:
       - args:
-        - --bw-password-path=/etc/ci-secret-bootstrap-bitwarden/bw_password
-        - --bw-user=openshift-dev-infra+ci-bitwarden-bot@redhat.com
+        - --vault-addr=https://vault.ci.openshift.org
+        - --vault-role=secret-bootstrap
+        - --vault-prefix=kv/dptp
         - --config=core-services/ci-secret-bootstrap/_config.yaml
         - --validate-only
         command:
@@ -26,18 +27,7 @@ presubmits:
         resources:
           requests:
             cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/ci-secret-bootstrap-bitwarden
-          name: ci-secret-bootstrap-bitwarden
-          readOnly: true
-        - mountPath: /.config
-          name: config-volume
-      volumes:
-      - name: ci-secret-bootstrap-bitwarden
-        secret:
-          secretName: bitwarden-credentials-openshift-ci-bitwarden-bot
-      - emptyDir: {}
-        name: config-volume
+      serviceAccountName: secret-bootstrap
     trigger: (?m)^/test( | .* )ci-secret-bootstrap-config-validation,?($|\s.*)
   - agent: kubernetes
     always_run: true
