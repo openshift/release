@@ -1,0 +1,62 @@
+base_images:
+  cli:
+    name: "4.7"
+    namespace: ocp
+    tag: cli
+build_root:
+  project_image:
+    dockerfile_path: .ci/openshift-ci/Dockerfile
+images:
+- dockerfile_path: .ci/openshift-ci/build/Dockerfile
+  to: che-plugin-registry
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.7"
+  namespace: ocp
+tests:
+- as: plugins-test-nightly
+  cron: 0 */12 * * *
+  steps:
+    cluster_profile: aws
+    test:
+    - as: plugins-nightly
+      cli: latest
+      commands: |
+        /bin/bash .ci/openshift-ci/test.sh
+      dependencies:
+      - env: CHE_PLUGIN_REGISTRY
+        name: che-plugin-registry
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+- as: plugins-test-pr-check
+  steps:
+    cluster_profile: aws
+    test:
+    - as: plugins-pr-check
+      cli: latest
+      commands: |
+        /bin/bash .ci/openshift-ci/test.sh
+      dependencies:
+      - env: CHE_PLUGIN_REGISTRY
+        name: che-plugin-registry
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: master
+  org: eclipse-che
+  repo: che-plugin-registry
+  variant: v7
