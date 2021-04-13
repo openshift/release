@@ -27,8 +27,10 @@ cfg["controlPlane"]["replicas"] = 1
 
 # Single Node Openshift requires extra memory and compute resources
 platform = cfg["controlPlane"]["platform"]
-assert "aws" in platform
-platform["aws"]["type"] = "'${SINGLE_NODE_AWS_INSTANCE_TYPE}'"
+if "aws" in platform:
+    platform["aws"]["type"] = "'${SINGLE_NODE_AWS_INSTANCE_TYPE}'"
+else:
+    raise ValueError("This step only applies to AWS, please use the correct step for your platform")
 
 # Some workflows do not define any compute machine pools in install-config.yaml
 if not "compute" in cfg:
