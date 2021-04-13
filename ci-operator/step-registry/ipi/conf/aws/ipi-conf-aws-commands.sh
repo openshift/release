@@ -26,6 +26,8 @@ ZONES_STR+=$(join_by , "${ZONES[@]}")
 ZONES_STR+=" ]"
 echo "AWS region: ${REGION} (zones: ${ZONES_STR})"
 
+masters="${CONTROL_PLANE_REPLICAS}"
+
 workers=3
 if [[ "${SIZE_VARIANT}" == "compact" ]]; then
   workers=0
@@ -52,6 +54,7 @@ controlPlane:
     aws:
       type: ${master_type}
       zones: ${ZONES_STR}
+  replicas: ${masters}
 compute:
 - name: worker
   replicas: ${workers}
