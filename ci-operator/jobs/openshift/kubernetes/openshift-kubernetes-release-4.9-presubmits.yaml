@@ -294,8 +294,16 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/usr/local/e2e-aws-disruptive-cluster-profile
         - --target=e2e-aws-disruptive
+        - --template=/usr/local/e2e-aws-disruptive
         command:
         - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: JOB_NAME_SAFE
+          value: e2e-aws-disruptive
+        - name: TEST_COMMAND
+          value: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_SUITE=openshift/conformance/parallel run-tests
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -311,6 +319,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/e2e-aws-disruptive
+          name: job-definition
+          subPath: cluster-launch-installer-e2e.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -330,6 +341,9 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-e2e
+        name: job-definition
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
