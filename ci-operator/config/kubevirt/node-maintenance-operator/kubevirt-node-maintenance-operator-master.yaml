@@ -3,10 +3,6 @@ base_images:
     name: "4.8"
     namespace: ocp
     tag: base
-  operator-registry:
-    name: "4.8"
-    namespace: ocp
-    tag: operator-registry
 binary_build_commands: make build
 build_root:
   image_stream_tag:
@@ -17,47 +13,44 @@ images:
 - dockerfile_path: build/Dockerfile
   from: base
   to: node-maintenance-operator
-- dockerfile_path: build/index.Dockerfile.ci.base
-  from: operator-registry
-  to: node-maintenance-operator-index-base
-- dockerfile_path: build/index.Dockerfile.ci.intermediate
-  from: node-maintenance-operator-index-base
-  to: node-maintenance-operator-index-intermediate
-- dockerfile_path: build/index.Dockerfile.ci
-  from: node-maintenance-operator-index-intermediate
-  inputs:
-    node-maintenance-operator-index-intermediate:
-      paths:
-      - destination_dir: database
-        source_path: /registry/index.db
-  to: node-maintenance-operator-index
+operator:
+  bundles:
+  - dockerfile_path: build/bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/kubevirt/node-maintenance-operator:latest
+    with: pipeline:node-maintenance-operator
 promotion:
-  excluded_images:
-  - node-maintenance-operator-index-base
-  - node-maintenance-operator-index-intermediate
   name: "4.8"
   namespace: kubevirt
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.8"
 resources:
   '*':
     requests:
-      cpu: 100m
-      memory: 200Mi
-tag_specification:
-  name: "4.8"
-  namespace: ocp
+      cpu: 500m
+      memory: 1000Mi
 tests:
 - as: openshift-e2e
   steps:
     cluster_profile: aws
+    env:
+      OO_CHANNEL: "4.8"
+      OO_INSTALL_NAMESPACE: default
+      OO_PACKAGE: node-maintenance-operator
+      OO_TARGET_NAMESPACES: '!install'
     test:
-    - as: test
-      cli: latest
-      commands: make cluster-sync-deploy cluster-functest
+    - as: e2e
+      commands: make cluster-functest
       from: src
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+          memory: 200Mi
+    workflow: optional-operators-ci-aws
 zz_generated_metadata:
   branch: master
   org: kubevirt
