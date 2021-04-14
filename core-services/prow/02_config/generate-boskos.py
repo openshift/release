@@ -53,6 +53,9 @@ CONFIG = {
         'us-east-1': 8,
         'us-east-2': 8,
         'us-west-2': 8
+    },
+    'hypershift-quota-slice': {
+        'default': 15,
     }
 }
 
