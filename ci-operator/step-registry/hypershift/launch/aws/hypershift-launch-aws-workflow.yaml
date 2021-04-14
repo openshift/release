@@ -1,0 +1,81 @@
+workflow:
+  as: hypershift-launch-aws
+  steps:
+    post:
+    - as: destroy
+      cli: latest
+      commands: |-
+        set -exuo pipefail
+        export KUBECONFIG=/var/run/hypershift/kubeconfig
+        
+        echo "$(date) Deleting HyperShift cluster ${NAMESPACE}-clusters/${NAMESPACE}"
+        /usr/bin/hypershift destroy cluster \
+          --aws-creds ${CLUSTER_PROFILE_DIR}/.awscred \
+          --namespace "${NAMESPACE}-clusters" \
+          --name ${NAMESPACE} \
+          --region us-east-1 \
+          --infra-id ${NAMESPACE} \
+          --base-domain origin-ci-int-aws.dev.rhcloud.com \
+          --cluster-grace-period 40m
+        
+        echo "$(date) Deleting cluster namespace ${NAMESPACE}-clusters"
+        oc delete namespace "${NAMESPACE}-clusters"
+
+        echo "$(date) Finished deleting cluster"
+      from: hypershift
+      grace_period: 5m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 10m0s
+      credentials:
+      - namespace: test-credentials
+        name: hypershift-clusterbot-credentials
+        mount_path: /var/run/hypershift
+    pre:
+    - ref: openshift-cluster-bot-rbac
+    - ref: ipi-install-rbac
+    - as: create
+      cli: latest
+      commands: |-
+        set -exuo pipefail
+        export KUBECONFIG=/var/run/hypershift/kubeconfig
+        
+        echo "$(date) Creating HyperShift cluster ${NAMESPACE}-clusters/${NAMESPACE}"
+        /usr/bin/hypershift create cluster \
+          --namespace "${NAMESPACE}-clusters" \
+          --name ${NAMESPACE} \
+          --base-domain origin-ci-int-aws.dev.rhcloud.com \
+          --region us-east-1 \
+          --infra-id ${NAMESPACE} \
+          --pull-secret ${CLUSTER_PROFILE_DIR}/pull-secret \
+          --aws-creds ${CLUSTER_PROFILE_DIR}/.awscred \
+          --release-image ${RELEASE_IMAGE_LATEST}
+        
+        echo "$(date) Waiting for the cluster to publish a kubeconfig"
+        oc wait --namespace "${NAMESPACE}-clusters" hostedclusters/${NAMESPACE} --for condition=Available --timeout 24h
+        /usr/bin/hypershift create kubeconfig > ${SHARED_DIR}/kubeconfig
+
+        echo "$(date) Waiting for the cluster API server to become available"
+        while true; do
+          oc --kubeconfig ${SHARED_DIR}/kubeconfig whoami 2>&1 >/dev/null && break
+          sleep 3
+        done
+
+        echo "$(date) The cluster is now available"
+        oc --kubeconfig ${SHARED_DIR}/kubeconfig config view
+      from: hypershift
+      grace_period: 5m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 15m0s
+      credentials:
+      - namespace: test-credentials
+        name: hypershift-clusterbot-credentials
+        mount_path: /var/run/hypershift
+      dependencies:
+      - name: "release:latest"
+        env: RELEASE_IMAGE_LATEST

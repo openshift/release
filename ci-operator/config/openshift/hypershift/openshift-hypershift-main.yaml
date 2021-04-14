@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: "4.7"
+    name: "4.8"
     namespace: ocp
     tag: base
   openshift_release_golang-1.16:
@@ -24,6 +24,13 @@ images:
 promotion:
   namespace: hypershift
   tag: latest
+releases:
+  latest:
+    prerelease:
+      product: ocp
+      version_bounds:
+        lower: 4.8.0-fc.0
+        upper: 4.8.0-fc.2
 resources:
   '*':
     limits:
@@ -31,10 +38,33 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: "4.7"
-  namespace: ocp
 tests:
+- as: e2e-aws-quick
+  steps:
+    cluster_profile: hypershift
+    test:
+    - as: test-e2e-quick
+      cli: latest
+      commands: |-
+        set -euo pipefail
+
+        echo "$(date) Waiting for all nodes to join the cluster"
+        while true; do
+          [[ $(oc get nodes --output go-template='{{ len .items }}') -eq "2" ]] && break
+          sleep 5
+        done
+
+        echo "$(date) Waiting for all nodes to become ready"
+        oc wait nodes --all --for condition=Ready --timeout 24h
+
+        echo "$(date) All nodes are ready"
+      from: src
+      grace_period: 1m0s
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    workflow: hypershift-launch-aws
 - as: verify
   commands: make verify
   container:
