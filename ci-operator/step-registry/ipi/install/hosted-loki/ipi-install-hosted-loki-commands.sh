@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-export LOKI_VERSION="master-71aa8a6"
+export LOKI_VERSION="2.2.1"
 export LOKI_ENDPOINT=https://observatorium.api.stage.openshift.com/api/logs/v1/dptp/loki/api/v1
 
 GRAFANACLOUND_USERNAME=$(cat /var/run/loki-grafanacloud-secret/client-id)
