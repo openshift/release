@@ -62,7 +62,9 @@ items:
       dockerfile: |
         FROM golang:latest as builder
         RUN git clone https://github.com/coredns/coredns.git /coredns
-        RUN cd /coredns && make
+        WORKDIR /coredns
+        RUN echo "alias:github.com/serverwentdown/alias" >> plugin.cfg
+        RUN go get github.com/serverwentdown/alias && make
         FROM registry.access.redhat.com/ubi8/ubi-minimal:latest as ubi
         COPY --from=builder /coredns/coredns /coredns
         EXPOSE 53 53/udp
