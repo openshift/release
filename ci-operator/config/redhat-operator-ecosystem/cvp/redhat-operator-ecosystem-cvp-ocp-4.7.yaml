@@ -11,11 +11,29 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: cvp-common-aws
+- as: fast-as-heck-aws
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: dpp
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.7"
   cron: '@yearly'
   steps:
-    cluster_profile: aws-cpaas
-    workflow: optional-operators-cvp-common-aws
+    post:
+    - as: a-post-step
+      commands: echo "Bogus Output"; /bin/false
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    pre:
+    - ref: optional-operators-subscribe
+    test:
+    - ref: optional-operators-cvp-common-scorecard
+    - ref: optional-operators-cvp-common-test
 zz_generated_metadata:
   branch: ocp-4.7
   org: redhat-operator-ecosystem
