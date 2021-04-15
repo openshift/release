@@ -251,10 +251,10 @@ periodics:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --hive-kubeconfig=/secrets/app.ci-hive-credentials/kubeconfig
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/usr/local/integration-e2e-periodic-cluster-profile
+      - --secret-dir=/secrets/ci-pull-credentials
       - --target=integration-e2e-periodic
       - --variant=v4.8
       command:
@@ -266,11 +266,12 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
+      - mountPath: /secrets/app.ci-hive-credentials
+        name: app-ci-hive-credentials
         readOnly: true
-      - mountPath: /usr/local/integration-e2e-periodic-cluster-profile
-        name: cluster-profile
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -282,17 +283,12 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: boskos
+    - name: app-ci-hive-credentials
       secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-aws
+        secretName: app.ci-hive-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
