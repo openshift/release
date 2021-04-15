@@ -87,7 +87,8 @@ function suite() {
         openshift-tests run "${TEST_SUITE}" "${TEST_ARGS:-}" \
         --provider "${TEST_PROVIDER}" \
         -o "/tmp/artifacts/e2e.log" \
-        --junit-dir "/tmp/artifacts/junit"
+        --junit-dir "/tmp/artifacts/junit" \
+        --max-parallel-tests 15
     set +x
 }
 
