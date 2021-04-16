@@ -4,7 +4,7 @@ base_images:
     namespace: ocp
     tag: latest
   operator-registry:
-    name: "4.7"
+    name: "4.8"
     namespace: ocp
     tag: operator-registry
 build_root:
@@ -25,7 +25,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: "4.7"
+  name: "4.8"
   namespace: ocp
 tests:
 - as: olm-nightly-deployment
@@ -58,45 +58,6 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: optional-operators-ci-aws
-- as: devworkspace-happy-path
-  steps:
-    cluster_profile: aws
-    test:
-    - as: devworkspace-happy-path
-      cli: latest
-      commands: |
-        echo -e "[INFO] Test script content:"
-        cat .ci/oci-devworkspace-happy-path.sh
-        /bin/bash .ci/oci-devworkspace-happy-path.sh
-      dependencies:
-      - env: CI_CHE_OPERATOR_IMAGE
-        name: che-operator-image
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: ipi-aws
-- as: devworkspace-periodic-happy-path
-  cron: 0 */24 * * *
-  steps:
-    cluster_profile: aws
-    test:
-    - as: devworkspace-happy-path
-      cli: latest
-      commands: |
-        echo -e "[INFO] Test script content:"
-        cat .ci/oci-devworkspace-happy-path.sh
-        /bin/bash .ci/oci-devworkspace-happy-path.sh
-      dependencies:
-      - env: CI_CHE_OPERATOR_IMAGE
-        name: che-operator-image
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: ipi-aws
 - as: single-host-nightly-deployment
   steps:
     cluster_profile: aws
@@ -106,10 +67,10 @@ tests:
       OO_PACKAGE: eclipse-che-preview-openshift
       OO_TARGET_NAMESPACES: '!install'
     test:
-    - as: single-host-nightly-deployment
+    - as: single-host-deployment
       cli: latest
       commands: |
-        echo -e "[INFO] Test script content"
+        echo -e "[INFO] Test script content:"
         cat .ci/oci-single-host.sh
 
         /bin/bash .ci/oci-single-host.sh
@@ -127,8 +88,37 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: optional-operators-ci-aws
+- as: che-behind-proxy
+  steps:
+    cluster_profile: aws
+    env:
+      TEST_SKIPS: ""
+    test:
+    - as: che-behind-proxy
+      cli: latest
+      commands: |
+        echo ${TEST_SKIPS}
+
+        echo -e "Kubernetes proxy object:"
+        oc get proxy/cluster -o yaml
+
+        echo -e "[INFO] Test script content"
+        cat .ci/oci-proxy.sh
+
+        /bin/bash .ci/oci-proxy.sh
+      dependencies:
+      - env: CI_CHE_OPERATOR_IMAGE
+        name: che-operator-image
+      env:
+      - name: TEST_SKIPS
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-aws-proxy
 zz_generated_metadata:
-  branch: master
+  branch: main
   org: eclipse-che
   repo: che-operator
-  variant: v7
+  variant: v8
