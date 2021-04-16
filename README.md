@@ -22,7 +22,7 @@ and are split into the following categories:
    of the contribution document and the [upstream configuration document](https://github.com/kubernetes/test-infra/blob/master/prow/README.md#how-to-add-new-jobs). Prefer the `ci-operator` config whenever possible.
  - [`ci-operator/step-registry`](./ci-operator/step-registry/) contains the
    registry of reusable test steps and workflows. See the documentation for
-   this content [here](https://steps.ci.openshift.org/help).
+   this content [here](https://docs.ci.openshift.org/docs/architecture/step-registry/).
  - **[LEGACY]** [`ci-operator/templates`](./ci-operator/templates/) contains black-box test
    workflows for use by the `ci-operator`. The parent directory's
    [README](./ci-operator#end-to-end-tests) documents how to use them. See the

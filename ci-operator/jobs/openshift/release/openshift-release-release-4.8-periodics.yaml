@@ -2,7 +2,7 @@ periodics:
 - agent: kubernetes
   cluster: build02
   decorate: true
-  interval: 4h
+  interval: 15m
   labels:
     job-release: "4.8"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -159,7 +159,7 @@ periodics:
 - agent: kubernetes
   cluster: build02
   decorate: true
-  interval: 24h
+  interval: 15m
   labels:
     job-release: "4.8"
   name: promote-release-openshift-machine-os-content-e2e-aws-4.8-s390x
@@ -223,7 +223,7 @@ periodics:
 - agent: kubernetes
   cluster: build02
   decorate: true
-  interval: 24h
+  interval: 15m
   labels:
     job-release: "4.8"
   name: promote-release-openshift-machine-os-content-e2e-aws-4.8-ppc64le
@@ -340,15 +340,14 @@ periodics:
         # export JOB_SPEC="$( echo "${JOB_SPEC}" | jq -r ".extra_refs[0].base_sha = \"${origin_commit_id}\"" )"
 
         # fetch fcos release info and check whether we've already built this image
-        stream=next-devel
-        build_url="https://builds.coreos.fedoraproject.org/prod/streams/${stream}/builds"
+        build_url="https://builds.coreos.fedoraproject.org/prod/streams/${STREAM}/builds"
         curl "${build_url}/builds.json" 2>/dev/null >${dir}/builds.json
         build_id="$( <"${dir}/builds.json" jq -r '.builds[0].id' )"
         base_url="${build_url}/${build_id}/x86_64"
         curl "${base_url}/meta.json" 2>/dev/null >${dir}/meta.json
         tar_url="${base_url}/$( <${dir}/meta.json jq -r .images.ostree.path )"
         commit_id="$( <${dir}/meta.json jq -r '."ostree-commit"' )"
-        ostree_ref="fedora/x86_64/coreos/${stream}"
+        ostree_ref="fedora/x86_64/coreos/${STREAM}"
 
         # Build a semantic version as best we can from the build id, dropping any other
         # segments. Each version of machine-os-content is responsible for setting a
@@ -449,6 +448,8 @@ periodics:
         value: machine-os-content
       - name: BRANCH
         value: "4.8"
+      - name: STREAM
+        value: next-devel
       - name: TAG_SOURCE
         value: $(TAG):$(BRANCH)
       - name: UNRESOLVED_CONFIG
@@ -1103,106 +1104,6 @@ periodics:
         name: boskos
         readOnly: true
       - mountPath: /usr/local/e2e-azure-ovn-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /usr/local/e2e-azure
-        name: job-definition
-        subPath: cluster-launch-installer-e2e.yaml
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-azure4
-    - configMap:
-        name: prow-job-cluster-launch-installer-e2e
-      name: job-definition
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-- agent: kubernetes
-  cluster: build02
-  decorate: true
-  interval: 48h
-  labels:
-    job-release: "4.8"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: release-openshift-ocp-installer-e2e-azure-4.8
-  spec:
-    containers:
-    - args:
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --secret-dir=/usr/local/e2e-azure-cluster-profile
-      - --secret-dir=/usr/local/pull-secret
-      - --target=e2e-azure
-      - --template=/usr/local/e2e-azure
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      command:
-      - ci-operator
-      env:
-      - name: RELEASE_IMAGE_LATEST
-        value: registry.ci.openshift.org/ocp/release:4.8
-      - name: BRANCH
-        value: "4.8"
-      - name: CLUSTER_TYPE
-        value: azure4
-      - name: CONFIG_SPEC
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 6Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
-          tests:
-          - as: e2e-$(CLUSTER_TYPE)
-            commands: TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-$(CLUSTER_TYPE)-serial
-            commands: TEST_SUITE=openshift/conformance/serial run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-      - name: JOB_NAME_SAFE
-        value: e2e-azure
-      - name: TEST_COMMAND
-        value: TEST_SUITE=openshift/conformance/parallel run-tests
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/e2e-azure-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials

@@ -26,6 +26,9 @@ CONFIG = {
     'gcp-quota-slice': {
         'us-east1': 70,
     },
+    'gcp-openshift-gce-devel-ci-2-quota-slice': {
+        'us-east1': 70,
+    },
     'libvirt-s390x-quota-slice': {},
     'libvirt-ppc64le-quota-slice': {},
     'metal-quota-slice': {
@@ -53,6 +56,9 @@ CONFIG = {
         'us-east-1': 8,
         'us-east-2': 8,
         'us-west-2': 8
+    },
+    'hypershift-quota-slice': {
+        'default': 15,
     }
 }
 

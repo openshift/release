@@ -4,7 +4,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build01
+    cluster: app.ci
     context: ci/prow/ci-secret-bootstrap-config-validation
     decorate: true
     labels:
@@ -14,6 +14,9 @@ presubmits:
     spec:
       containers:
       - args:
+        - --vault-addr=https://vault.ci.openshift.org
+        - --vault-role=secret-bootstrap
+        - --vault-prefix=kv/dptp
         - --config=core-services/ci-secret-bootstrap/_config.yaml
         - --validate-only
         command:
@@ -24,6 +27,7 @@ presubmits:
         resources:
           requests:
             cpu: 10m
+      serviceAccountName: secret-bootstrap
     trigger: (?m)^/test( | .* )ci-secret-bootstrap-config-validation,?($|\s.*)
   - agent: kubernetes
     always_run: true
@@ -402,7 +406,7 @@ presubmits:
         - mismatched-tide-lenient
         command:
         - /checkconfig
-        image: gcr.io/k8s-prow/checkconfig:v20210409-985ef5e721
+        image: gcr.io/k8s-prow/checkconfig:v20210415-ecffc9c27e
         imagePullPolicy: Always
         name: ""
         resources:

@@ -34,6 +34,9 @@ if [[ -f "${CLUSTER_PROFILE_DIR}/insights-live.yaml" ]]; then
 fi
 
 # if this test requires an SSH bastion and one is not installed, configure it
+KUBE_SSH_BASTION="$( oc --insecure-skip-tls-verify get node -l node-role.kubernetes.io/master -o 'jsonpath={.items[0].status.addresses[?(@.type=="ExternalIP")].address}' ):22"
+KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+export KUBE_SSH_BASTION KUBE_SSH_KEY_PATH
 if [[ -n "${TEST_REQUIRES_SSH-}" ]]; then
     export SSH_BASTION_NAMESPACE=test-ssh-bastion
     echo "Setting up ssh bastion"
@@ -73,16 +76,15 @@ fi
 
 
 # set up cloud-provider-specific env vars
-KUBE_SSH_BASTION="$( oc --insecure-skip-tls-verify get node -l node-role.kubernetes.io/master -o 'jsonpath={.items[0].status.addresses[?(@.type=="ExternalIP")].address}' ):22"
-KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
-export KUBE_SSH_BASTION KUBE_SSH_KEY_PATH
 case "${CLUSTER_TYPE}" in
 gcp)
     export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
     export KUBE_SSH_USER=core
     mkdir -p ~/.ssh
     cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/google_compute_engine || true
-    export TEST_PROVIDER='{"type":"gce","region":"us-east1","multizone": true,"multimaster":true,"projectid":"openshift-gce-devel-ci"}'
+    # TODO: make openshift-tests auto-discover this from cluster config
+    REGION="$(oc get -o jsonpath='{.status.platformStatus.gcp.region}' infrastructure cluster)"
+    export TEST_PROVIDER="{\"type\":\"gce\",\"region\":\"${REGION}\",\"multizone\": true,\"multimaster\":true,\"projectid\":\"openshift-gce-devel-ci\"}"
     ;;
 aws)
     mkdir -p ~/.ssh

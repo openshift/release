@@ -1,4 +1,8 @@
 base_images:
+  open-cluster-management_builder_go1.15-linux:
+    name: builder
+    namespace: open-cluster-management
+    tag: go1.15-linux
   open-cluster-management_builder_go1.15-linux-amd64:
     name: builder
     namespace: open-cluster-management
@@ -7,7 +11,7 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: open-cluster-management
-    tag: go1.15-linux-amd64
+    tag: go1.15-linux
 images:
 - dockerfile_path: Dockerfile.prow
   to: cluster-curator-controller
@@ -28,6 +32,7 @@ tests:
     from: src
 - as: sonar
   commands: |
+    export SONAR_GO_TEST_ARGS="-short ./..."
     export SELF="make -f Makefile.prow"
     make -f Makefile.prow sonar/go/prow
   container:
