@@ -4,8 +4,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
-    context: ci/prow/ci-index
+    context: ci/prow/ci-index-dev-master-dependencies
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -13,9 +12,9 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-ocs-operator-master-ci-index
+    name: pull-ci-openshift-priv-ocs-operator-master-ci-index-dev-master-dependencies
     path_alias: github.com/openshift/ocs-operator
-    rerun_command: /test ci-index
+    rerun_command: /test ci-index-dev-master-dependencies
     spec:
       containers:
       - args:
@@ -23,7 +22,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
-        - --target=ci-index
+        - --target=ci-index-dev-master-dependencies
         command:
         - ci-operator
         image: ci-operator:latest
@@ -56,7 +55,63 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ci-index,?($|\s.*)
+    trigger: (?m)^/test( | .* )ci-index-dev-master-dependencies,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    context: ci/prow/ci-index-fixed-dependencies
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    hidden: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-ocs-operator-master-ci-index-fixed-dependencies
+    path_alias: github.com/openshift/ocs-operator
+    rerun_command: /test ci-index-fixed-dependencies
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --target=ci-index-fixed-dependencies
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ci-index-fixed-dependencies,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
