@@ -127,7 +127,7 @@ function upgrade() {
         TARGET_RELEASES="$(< "${SHARED_DIR}/override-releases")"
         echo "Overriding upgrade target to ${TARGET_RELEASES}"
     fi
-    openshift-tests run-upgrade all \
+    openshift-tests run-upgrade "${TEST_UPGRADE_SUITE}" \
         --to-image "${TARGET_RELEASES}" \
         --options "${TEST_UPGRADE_OPTIONS-}" \
         --provider "${TEST_PROVIDER}" \
