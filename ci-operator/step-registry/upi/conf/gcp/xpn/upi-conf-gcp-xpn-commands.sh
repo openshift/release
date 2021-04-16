@@ -11,7 +11,7 @@
 # - IAM roles in the HOST_PROJECT
 #   - The openshift-gce-devel-ci service account (1053217076791@cloudservices.gserviceaccount.com)
 #     - Compute Network User
-#   - ${CLUSTER_PROFILE_DIR}/gce.json (ci-provisioner@openshift-gce-devel-ci.iam.gserviceaccount.com)
+#   - ${CLUSTER_PROFILE_DIR}/gce.json (do-not-delete-ci-provisioner@openshift-gce-devel-ci.iam.gserviceaccount.com)
 #     - Compute Network User on both XPN Subnets (https://console.cloud.google.com/networking/xpn)
 #     - Deployment Manager Editor
 #     - DNS Administrator on the
