@@ -26,6 +26,7 @@ cp -t "${cluster_dir}" \
     "${SHARED_DIR}/pull-secret"
 
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
+date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 
 echo "$(date -u --rfc-3339=seconds) - Deploying cluster on IBM Z Ecosystem Cloud..."
 /entrypoint.sh apply &
@@ -37,7 +38,7 @@ ret="$?"
 set -e
 
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_END"
-
+date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 touch /tmp/install-complete
 
 sed 's/password: .*/password: REDACTED/' "${cluster_dir}/.openshift_install.log" >>"${ARTIFACT_DIR}/.openshift_install.log"

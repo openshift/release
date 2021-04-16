@@ -113,6 +113,7 @@ echo "$(date -u --rfc-3339=seconds) - terraform init..."
 terraform init -input=false -no-color &
 wait "$!"
 
+date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 echo "$(date -u --rfc-3339=seconds) - terraform apply..."
 terraform apply -auto-approve -no-color &
 wait "$!"
@@ -165,6 +166,7 @@ ret="$?"
 set -e
 
 date +%s > "${SHARED_DIR}/TEST_TIME_INSTALL_END"
+date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 
 touch /tmp/install-complete
 
