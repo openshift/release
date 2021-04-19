@@ -1,0 +1,40 @@
+binary_build_commands: make all
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.16
+promotion:
+  name: "4.8"
+  namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.8"
+  namespace: ocp
+test_binary_build_commands: make test-binaries
+tests:
+- as: unit
+  commands: make ci-test
+  container:
+    from: src
+- as: e2e-operator
+  steps:
+    cluster_profile: aws
+    test:
+    - as: e2e-operator
+      commands: make e2e-test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: addon-operator
