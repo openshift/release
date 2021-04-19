@@ -45,6 +45,25 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ocm-e2e-clusterpool
+- as: kind
+  steps:
+    env:
+      AWS_CREDENTIALS_SECRET: ocm-cicd-aws-kind
+    test:
+    - as: kind-check
+      commands: |
+        echo "IMAGE_REF=$IMAGE_REF"
+        export SELF="make -f Makefile.prow"
+        make -f Makefile.prow test-kind
+      dependencies:
+      - env: IMAGE_REF
+        name: helloprow-go
+      from: bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-e2e-kind
 zz_generated_metadata:
   branch: main
   org: open-cluster-management
