@@ -3,7 +3,7 @@
 KIND_DIR="$SHARED_DIR/kind"
 PVT_KEY="$KIND_DIR/private.pem"
 PUB_KEY="$KIND_DIR/public.pem"
-IP_FILE="$KIND_DIR/private_ip"
+IP_FILE="$KIND_DIR/public_ip"
 
 mkdir -p "$KIND_DIR"
 
