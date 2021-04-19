@@ -124,7 +124,7 @@ function upgrade() {
     set -x
     TARGET_RELEASES="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"
     if [[ -f "${SHARED_DIR}/override-upgrade" ]]; then
-        TARGET_RELEASES="$(< "${SHARED_DIR}/override-releases")"
+        TARGET_RELEASES="$(< "${SHARED_DIR}/override-upgrade")"
         echo "Overriding upgrade target to ${TARGET_RELEASES}"
     fi
     openshift-tests run-upgrade "${TEST_UPGRADE_SUITE}" \
