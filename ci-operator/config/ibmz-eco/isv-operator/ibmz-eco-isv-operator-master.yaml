@@ -1,9 +1,8 @@
-binary_build_commands: make install
-build_root:
-  image_stream_tag:
-    name: release
+base_images:
+  os:
+    name: centos
     namespace: openshift
-    tag: golang-1.13
+    tag: "7"
 releases:
   latest:
     release:
@@ -20,14 +19,12 @@ tests:
 - as: test-e2e
   cron: '@yearly'
   steps:
-    cluster_profile: aws
     test:
     - as: test-e2e
       cli: latest
       commands: |
-        unset GOFLAGS
-        make test-e2e
-      from: src
+        oc get nodes
+      from: os
       resources:
         requests:
           cpu: 100m
