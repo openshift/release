@@ -2,11 +2,13 @@ cluster_groups:
   build_farm:
   - api.ci
   - app.ci
+  - arm01
   - build01
   - build02
   - vsphere
   non_app_ci:
   - api.ci
+  - arm01
   - build01
   - build02
   - vsphere
@@ -697,35 +699,13 @@ secret_configs:
         email_bw_field: email
         registry_url: registry.redhat.io
   to:
-  - cluster: api.ci
+  - cluster_groups:
+    - non_app_ci
     name: ci-pull-credentials
     namespace: ci
     type: kubernetes.io/dockerconfigjson
-  - cluster: build01
-    name: ci-pull-credentials
-    namespace: ci
-    type: kubernetes.io/dockerconfigjson
-  - cluster: build02
-    name: ci-pull-credentials
-    namespace: ci
-    type: kubernetes.io/dockerconfigjson
-  - cluster: api.ci
-    name: ci-pull-credentials
-    namespace: test-credentials
-    type: kubernetes.io/dockerconfigjson
-  - cluster: app.ci
-    name: ci-pull-credentials
-    namespace: test-credentials
-    type: kubernetes.io/dockerconfigjson
-  - cluster: vsphere
-    name: ci-pull-credentials
-    namespace: ci
-    type: kubernetes.io/dockerconfigjson
-  - cluster: build01
-    name: ci-pull-credentials
-    namespace: test-credentials
-    type: kubernetes.io/dockerconfigjson
-  - cluster: build02
+  - cluster_groups:
+    - build_farm
     name: ci-pull-credentials
     namespace: test-credentials
     type: kubernetes.io/dockerconfigjson
@@ -1503,14 +1483,14 @@ secret_configs:
     build02_github_client_id:
       bw_item: build_farm_02_cluster
       field: github_client_id
-    sa.ci-operator.vsphere.config:
-      attachment: sa.ci-operator.vsphere.config
-      bw_item: build_farm
     sa.config-updater.api.ci.config:
       attachment: sa.config-updater.api.ci.config
       bw_item: build_farm
     sa.config-updater.app.ci.config:
       attachment: sa.config-updater.app.ci.config
+      bw_item: build_farm
+    sa.config-updater.arm01.config:
+      attachment: sa.config-updater.arm01.config
       bw_item: build_farm
     sa.config-updater.build01.config:
       attachment: sa.config-updater.build01.config
@@ -1527,6 +1507,9 @@ secret_configs:
     sa.crier.app.ci.config:
       attachment: sa.crier.app.ci.config
       bw_item: build_farm
+    sa.crier.arm01.config:
+      attachment: sa.crier.arm01.config
+      bw_item: build_farm
     sa.crier.build01.config:
       attachment: sa.crier.build01.config
       bw_item: build_farm
@@ -1542,6 +1525,9 @@ secret_configs:
     sa.deck.app.ci.config:
       attachment: sa.deck.app.ci.config
       bw_item: build_farm
+    sa.deck.arm01.config:
+      attachment: sa.deck.arm01.config
+      bw_item: build_farm
     sa.deck.build01.config:
       attachment: sa.deck.build01.config
       bw_item: build_farm
@@ -1551,14 +1537,14 @@ secret_configs:
     sa.deck.vsphere.config:
       attachment: sa.deck.vsphere.config
       bw_item: build_farm
-    sa.dptp-controller-manager.vsphere.config:
-      attachment: sa.dptp-controller-manager.vsphere.config
-      bw_item: build_farm
     sa.hook.api.ci.config:
       attachment: sa.hook.api.ci.config
       bw_item: build_farm
     sa.hook.app.ci.config:
       attachment: sa.hook.app.ci.config
+      bw_item: build_farm
+    sa.hook.arm01.config:
+      attachment: sa.hook.arm01.config
       bw_item: build_farm
     sa.hook.build01.config:
       attachment: sa.hook.build01.config
@@ -1578,6 +1564,9 @@ secret_configs:
     sa.prow-controller-manager.app.ci.config:
       attachment: sa.prow-controller-manager.app.ci.config
       bw_item: build_farm
+    sa.prow-controller-manager.arm01.config:
+      attachment: sa.prow-controller-manager.arm01.config
+      bw_item: build_farm
     sa.prow-controller-manager.build01.config:
       attachment: sa.prow-controller-manager.build01.config
       bw_item: build_farm
@@ -1592,6 +1581,9 @@ secret_configs:
       bw_item: build_farm
     sa.sinker.app.ci.config:
       attachment: sa.sinker.app.ci.config
+      bw_item: build_farm
+    sa.sinker.arm01.config:
+      attachment: sa.sinker.arm01.config
       bw_item: build_farm
     sa.sinker.build01.config:
       attachment: sa.sinker.build01.config
@@ -1618,6 +1610,14 @@ secret_configs:
       bw_item: build_farm
   to:
   - cluster: api.ci
+    name: ci-operator
+    namespace: test-credentials
+- from:
+    kubeconfig:
+      attachment: sa.ci-operator.arm01.config
+      bw_item: build_farm
+  to:
+  - cluster: arm01
     name: ci-operator
     namespace: test-credentials
 - from:
@@ -1654,6 +1654,10 @@ secret_configs:
     - non_app_ci
     name: app.ci-hive-credentials
     namespace: ci
+  - cluster_groups:
+    - non_app_ci
+    name: app.ci-hive-credentials
+    namespace: test-credentials
 - from:
     ci.htpasswd:
       attachment: ci.htpasswd
@@ -1811,6 +1815,9 @@ secret_configs:
     api-ci-kubeconfig:
       attachment: sa.dptp-controller-manager.api.ci.config
       bw_item: build_farm
+    arm01-kubeconfig:
+      attachment: sa.dptp-controller-manager.arm01.config
+      bw_item: build_farm
     build01-kubeconfig:
       attachment: sa.dptp-controller-manager.build01.config
       bw_item: build_farm
@@ -1840,6 +1847,9 @@ secret_configs:
     sa.ci-operator.api.ci.config:
       attachment: sa.ci-operator.api.ci.config
       bw_item: build_farm
+    sa.ci-operator.arm01.config:
+      attachment: sa.ci-operator.arm01.config
+      bw_item: build_farm
     sa.ci-operator.build01.config:
       attachment: sa.ci-operator.build01.config
       bw_item: build_farm
@@ -1860,6 +1870,9 @@ secret_configs:
 - from:
     sa.ci-chat-bot.api.ci.config:
       attachment: sa.ci-chat-bot.api.ci.config
+      bw_item: ci-chat-bot
+    sa.ci-chat-bot.arm01.config:
+      attachment: sa.ci-chat-bot.arm01.config
       bw_item: ci-chat-bot
     sa.ci-chat-bot.build01.config:
       attachment: sa.ci-chat-bot.build01.config
@@ -1972,6 +1985,7 @@ secret_configs:
 - from:
     openshift-ci.gpg:
       attachment: openshift-ci.gpg
+      base64_decode: true
       bw_item: openshift-ci-release-signature-signer
   to:
   - cluster: app.ci
@@ -2078,6 +2092,33 @@ secret_configs:
     namespace: ci
     type: kubernetes.io/dockerconfigjson
   - cluster: app.ci
+    name: registry-push-credentials-ci-central
+    namespace: test-credentials
+    type: kubernetes.io/dockerconfigjson
+- from:
+    .dockerconfigjson:
+      dockerconfigJSON:
+      - auth_bw_attachment: token_image-puller_arm01_reg_auth_value.txt
+        bw_item: build_farm
+        registry_url: image-registry.openshift-image-registry.svc.cluster.local:5000
+      - auth_bw_attachment: token_image-puller_arm01_reg_auth_value.txt
+        bw_item: build_farm
+        registry_url: image-registry.openshift-image-registry.svc:5000
+      - auth_bw_attachment: token_image-puller_arm01_reg_auth_value.txt
+        bw_item: build_farm
+        registry_url: registry.arm01.not.defined.yet
+      - auth_bw_attachment: token_image-pusher_api.ci_reg_auth_value.txt
+        bw_item: build_farm
+        registry_url: registry.svc.ci.openshift.org
+      - auth_bw_attachment: token_image-pusher_app.ci_reg_auth_value.txt
+        bw_item: build_farm
+        registry_url: registry.ci.openshift.org
+  to:
+  - cluster: arm01
+    name: registry-push-credentials-ci-central
+    namespace: ci
+    type: kubernetes.io/dockerconfigjson
+  - cluster: arm01
     name: registry-push-credentials-ci-central
     namespace: test-credentials
     type: kubernetes.io/dockerconfigjson
@@ -2241,6 +2282,33 @@ secret_configs:
 - from:
     .dockerconfigjson:
       dockerconfigJSON:
+      - auth_bw_attachment: token_image-puller_arm01_reg_auth_value.txt
+        bw_item: build_farm
+        registry_url: image-registry.openshift-image-registry.svc.cluster.local:5000
+      - auth_bw_attachment: token_image-puller_arm01_reg_auth_value.txt
+        bw_item: build_farm
+        registry_url: image-registry.openshift-image-registry.svc:5000
+      - auth_bw_attachment: token_image-puller_arm01_reg_auth_value.txt
+        bw_item: build_farm
+        registry_url: registry.arm01.not.defined.yet
+      - auth_bw_attachment: token_image-puller_ci_reg_auth_value.txt
+        bw_item: build_farm
+        registry_url: registry.svc.ci.openshift.org
+      - auth_bw_attachment: token_image-puller_app.ci_reg_auth_value.txt
+        bw_item: build_farm
+        registry_url: registry.ci.openshift.org
+  to:
+  - cluster: arm01
+    name: registry-pull-credentials
+    namespace: ci
+    type: kubernetes.io/dockerconfigjson
+  - cluster: arm01
+    name: registry-pull-credentials
+    namespace: test-credentials
+    type: kubernetes.io/dockerconfigjson
+- from:
+    .dockerconfigjson:
+      dockerconfigJSON:
       - auth_bw_attachment: token_image-puller_build01_reg_auth_value.txt
         bw_item: build_farm
         registry_url: image-registry.openshift-image-registry.svc.cluster.local:5000
@@ -2350,6 +2418,9 @@ secret_configs:
       - auth_bw_attachment: token_image-puller_app.ci_reg_auth_value.txt
         bw_item: build_farm
         registry_url: registry.ci.openshift.org
+      - auth_bw_attachment: token_image-puller_arm01_reg_auth_value.txt
+        bw_item: build_farm
+        registry_url: registry.arm01.not.defined.yet
       - auth_bw_attachment: token_image-puller_build01_reg_auth_value.txt
         bw_item: build_farm
         registry_url: registry.build01.ci.openshift.org
@@ -2399,6 +2470,9 @@ secret_configs:
       - auth_bw_attachment: token_image-puller_app.ci_reg_auth_value.txt
         bw_item: build_farm
         registry_url: registry.ci.openshift.org
+      - auth_bw_attachment: token_image-puller_arm01_reg_auth_value.txt
+        bw_item: build_farm
+        registry_url: registry.arm01.not.defined.yet
       - auth_bw_attachment: token_image-puller_build01_reg_auth_value.txt
         bw_item: build_farm
         registry_url: registry.build01.ci.openshift.org
@@ -2414,6 +2488,58 @@ secret_configs:
     namespace: ci
     type: kubernetes.io/dockerconfigjson
   - cluster: app.ci
+    name: registry-pull-credentials-all
+    namespace: test-credentials
+    type: kubernetes.io/dockerconfigjson
+- from:
+    .dockerconfigjson:
+      dockerconfigJSON:
+      - auth_bw_attachment: token_image-puller_arm01_reg_auth_value.txt
+        bw_item: build_farm
+        registry_url: image-registry.openshift-image-registry.svc.cluster.local:5000
+      - auth_bw_attachment: token_image-puller_arm01_reg_auth_value.txt
+        bw_item: build_farm
+        registry_url: image-registry.openshift-image-registry.svc:5000
+      - auth_bw_attachment: auth
+        bw_item: cloud.openshift.com-pull-secret
+        email_bw_field: email
+        registry_url: cloud.openshift.com
+      - auth_bw_attachment: auth
+        bw_item: quay.io-pull-secret
+        email_bw_field: email
+        registry_url: quay.io
+      - auth_bw_attachment: auth
+        bw_item: registry.connect.redhat.com-pull-secret
+        email_bw_field: email
+        registry_url: registry.connect.redhat.com
+      - auth_bw_attachment: auth
+        bw_item: registry.redhat.io-pull-secret
+        email_bw_field: email
+        registry_url: registry.redhat.io
+      - auth_bw_attachment: token_image-puller_ci_reg_auth_value.txt
+        bw_item: build_farm
+        registry_url: registry.svc.ci.openshift.org
+      - auth_bw_attachment: token_image-puller_app.ci_reg_auth_value.txt
+        bw_item: build_farm
+        registry_url: registry.ci.openshift.org
+      - auth_bw_attachment: token_image-puller_arm01_reg_auth_value.txt
+        bw_item: build_farm
+        registry_url: registry.arm01.not.defined.yet
+      - auth_bw_attachment: token_image-puller_build01_reg_auth_value.txt
+        bw_item: build_farm
+        registry_url: registry.build01.ci.openshift.org
+      - auth_bw_attachment: token_image-puller_build02_reg_auth_value.txt
+        bw_item: build_farm
+        registry_url: registry.build02.ci.openshift.org
+      - auth_bw_attachment: token_image-puller_vsphere_reg_auth_value.txt
+        bw_item: build_farm
+        registry_url: registry.apps.build01-us-west-2.vmc.ci.openshift.org
+  to:
+  - cluster: arm01
+    name: registry-pull-credentials-all
+    namespace: ci
+    type: kubernetes.io/dockerconfigjson
+  - cluster: arm01
     name: registry-pull-credentials-all
     namespace: test-credentials
     type: kubernetes.io/dockerconfigjson
@@ -2448,6 +2574,9 @@ secret_configs:
       - auth_bw_attachment: token_image-puller_app.ci_reg_auth_value.txt
         bw_item: build_farm
         registry_url: registry.ci.openshift.org
+      - auth_bw_attachment: token_image-puller_arm01_reg_auth_value.txt
+        bw_item: build_farm
+        registry_url: registry.arm01.not.defined.yet
       - auth_bw_attachment: token_image-puller_build01_reg_auth_value.txt
         bw_item: build_farm
         registry_url: registry.build01.ci.openshift.org
@@ -2497,6 +2626,9 @@ secret_configs:
       - auth_bw_attachment: token_image-puller_app.ci_reg_auth_value.txt
         bw_item: build_farm
         registry_url: registry.ci.openshift.org
+      - auth_bw_attachment: token_image-puller_arm01_reg_auth_value.txt
+        bw_item: build_farm
+        registry_url: registry.arm01.not.defined.yet
       - auth_bw_attachment: token_image-puller_build01_reg_auth_value.txt
         bw_item: build_farm
         registry_url: registry.build01.ci.openshift.org
@@ -2546,6 +2678,9 @@ secret_configs:
       - auth_bw_attachment: token_image-puller_app.ci_reg_auth_value.txt
         bw_item: build_farm
         registry_url: registry.ci.openshift.org
+      - auth_bw_attachment: token_image-puller_arm01_reg_auth_value.txt
+        bw_item: build_farm
+        registry_url: registry.arm01.not.defined.yet
       - auth_bw_attachment: token_image-puller_build01_reg_auth_value.txt
         bw_item: build_farm
         registry_url: registry.build01.ci.openshift.org
