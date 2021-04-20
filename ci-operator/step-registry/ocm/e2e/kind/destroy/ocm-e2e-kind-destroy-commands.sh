@@ -1,8 +1,13 @@
 #!/bin/bash
 
 KIND_DIR="$SHARED_DIR/kind"
-
 echo "KIND_DIR=$SHARED_DIR/kind"
+
+echo "Contents of $SHARED_DIR"
+ls -la "$SHARED_DIR"
+
+echo "Contents of $KIND_DIR"
+ls -la "$KIND_DIR"
 
 echo "Changing to $KIND_DIR"
 cd "$KIND_DIR" || exit 1
