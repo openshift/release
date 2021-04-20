@@ -4,17 +4,17 @@ presubmits:
     always_run: false
     branches:
     - main
-    cluster: build01
-    context: ci/prow/v5-devworkspaces-operator-e2e
+    cluster: build02
+    context: ci/prow/v7-devworkspace-happy-path
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: v5
+      ci-operator.openshift.io/variant: v7
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-devfile-devworkspace-operator-main-v5-devworkspaces-operator-e2e
-    rerun_command: /test v5-devworkspaces-operator-e2e
+    name: pull-ci-devfile-devworkspace-operator-main-v7-devworkspace-happy-path
+    rerun_command: /test v7-devworkspace-happy-path
     spec:
       containers:
       - args:
@@ -22,9 +22,10 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/usr/local/devworkspaces-operator-e2e-cluster-profile
-        - --target=devworkspaces-operator-e2e
-        - --variant=v5
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/devworkspace-happy-path-cluster-profile
+        - --target=devworkspace-happy-path
+        - --variant=v7
         command:
         - ci-operator
         image: ci-operator:latest
@@ -36,6 +37,84 @@ presubmits:
         volumeMounts:
         - mountPath: /etc/boskos
           name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/devworkspace-happy-path-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )v7-devworkspace-happy-path,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - main
+    cluster: build02
+    context: ci/prow/v7-devworkspaces-operator-e2e
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: v7
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-devfile-devworkspace-operator-main-v7-devworkspaces-operator-e2e
+    rerun_command: /test v7-devworkspaces-operator-e2e
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/devworkspaces-operator-e2e-cluster-profile
+        - --target=devworkspaces-operator-e2e
+        - --variant=v7
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
           readOnly: true
         - mountPath: /usr/local/devworkspaces-operator-e2e-cluster-profile
           name: cluster-profile
@@ -56,6 +135,9 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -67,22 +149,22 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )v5-devworkspaces-operator-e2e,?($|\s.*)
+    trigger: (?m)^/test( | .* )v7-devworkspaces-operator-e2e,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - main
-    cluster: build01
-    context: ci/prow/v5-images
+    cluster: build02
+    context: ci/prow/v7-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-      ci-operator.openshift.io/variant: v5
+      ci-operator.openshift.io/variant: v7
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-devfile-devworkspace-operator-main-v5-images
-    rerun_command: /test v5-images
+    name: pull-ci-devfile-devworkspace-operator-main-v7-images
+    rerun_command: /test v7-images
     spec:
       containers:
       - args:
@@ -90,7 +172,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --variant=v5
+        - --variant=v7
         command:
         - ci-operator
         image: ci-operator:latest
@@ -117,4 +199,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )v5-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )v7-images,?($|\s.*)

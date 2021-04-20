@@ -7,10 +7,6 @@ base_images:
     name: "4.8"
     namespace: ocp
     tag: cli
-  installer:
-    name: "4.7"
-    namespace: ocp
-    tag: installer
   os:
     name: centos
     namespace: origin
@@ -425,6 +421,17 @@ images:
       - destination_dir: .
         source_path: /go/bin/vault-subpath-proxy
   to: vault-subpath-proxy
+- dockerfile_literal: |-
+    FROM centos:8
+    ADD vault-secret-collection-manager /usr/bin/vault-secret-collection-manager
+    ENTRYPOINT ["/usr/bin/vault-secret-collection-manager"]
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/vault-secret-collection-manager
+  to: vault-secret-collection-manager
 promotion:
   excluded_images:
   - e2e-bin
@@ -458,7 +465,7 @@ tests:
     test:
     - as: e2e
       commands: |
-        GCS_CREDENTIALS_FILE=/tmp/gcs/service-account.json REMOTE_REGISTRY_SECRET_DIR=/tmp/import-secret LOCAL_REGISTRY_SECRET_DIR=/tmp/pull-secret KUBECONFIG=/auth/kubeconfig make e2e
+        GCS_CREDENTIALS_FILE=/tmp/gcs/service-account.json REMOTE_REGISTRY_SECRET_DIR=/tmp/import-secret LOCAL_REGISTRY_SECRET_DIR=/tmp/pull-secret KUBECONFIG=/auth/kubeconfig HIVE_KUBECONFIG=/tmp/hive/kubeconfig make e2e
       credentials:
       - mount_path: /auth
         name: ci-operator
@@ -474,6 +481,9 @@ tests:
         namespace: test-credentials
       - mount_path: /tmp/gcs
         name: gce-sa-credentials-gcs-publisher
+        namespace: test-credentials
+      - mount_path: /tmp/hive
+        name: app.ci-hive-credentials
         namespace: test-credentials
       from: e2e-bin
       resources:

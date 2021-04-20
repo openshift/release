@@ -1,0 +1,134 @@
+base_images:
+  cli-jq:
+    name: cli-jq
+    namespace: ocp
+    tag: latest
+  operator-registry:
+    name: "4.7"
+    namespace: ocp
+    tag: operator-registry
+build_root:
+  project_image:
+    dockerfile_path: .ci/openshift-ci/Dockerfile
+images:
+- dockerfile_path: Dockerfile
+  to: che-operator-image
+operator:
+  bundles:
+  - context_dir: deploy/olm-catalog/nightly/eclipse-che-preview-openshift
+    dockerfile_path: bundle.Dockerfile
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.7"
+  namespace: ocp
+tests:
+- as: olm-nightly-deployment
+  steps:
+    cluster_profile: aws
+    env:
+      OO_CHANNEL: nightly
+      OO_INSTALL_NAMESPACE: eclipse-che
+      OO_PACKAGE: eclipse-che-preview-openshift
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: olm-nightly-deployment
+      cli: latest
+      commands: |
+        echo -e "[INFO] Test script content:"
+        cat .ci/oci-nightly-olm.sh
+
+        /bin/bash .ci/oci-nightly-olm.sh
+      dependencies:
+      - env: CI_CHE_OPERATOR_IMAGE
+        name: che-operator-image
+      env:
+      - name: OO_CHANNEL
+      - name: OO_INSTALL_NAMESPACE
+      - name: OO_PACKAGE
+      - name: OO_TARGET_NAMESPACES
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-aws
+- as: devworkspace-happy-path
+  steps:
+    cluster_profile: aws
+    test:
+    - as: devworkspace-happy-path
+      cli: latest
+      commands: |
+        echo -e "[INFO] Test script content:"
+        cat .ci/oci-devworkspace-happy-path.sh
+        /bin/bash .ci/oci-devworkspace-happy-path.sh
+      dependencies:
+      - env: CI_CHE_OPERATOR_IMAGE
+        name: che-operator-image
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+- as: devworkspace-periodic-happy-path
+  cron: 0 */24 * * *
+  steps:
+    cluster_profile: aws
+    test:
+    - as: devworkspace-happy-path
+      cli: latest
+      commands: |
+        echo -e "[INFO] Test script content:"
+        cat .ci/oci-devworkspace-happy-path.sh
+        /bin/bash .ci/oci-devworkspace-happy-path.sh
+      dependencies:
+      - env: CI_CHE_OPERATOR_IMAGE
+        name: che-operator-image
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+- as: single-host-nightly-deployment
+  steps:
+    cluster_profile: aws
+    env:
+      OO_CHANNEL: nightly
+      OO_INSTALL_NAMESPACE: eclipse-che
+      OO_PACKAGE: eclipse-che-preview-openshift
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: single-host-nightly-deployment
+      cli: latest
+      commands: |
+        echo -e "[INFO] Test script content"
+        cat .ci/oci-single-host.sh
+
+        /bin/bash .ci/oci-single-host.sh
+      dependencies:
+      - env: CI_CHE_OPERATOR_IMAGE
+        name: che-operator-image
+      env:
+      - name: OO_CHANNEL
+      - name: OO_INSTALL_NAMESPACE
+      - name: OO_PACKAGE
+      - name: OO_TARGET_NAMESPACES
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-aws
+zz_generated_metadata:
+  branch: main
+  org: eclipse-che
+  repo: che-operator
+  variant: v7

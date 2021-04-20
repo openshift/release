@@ -92,6 +92,7 @@ approve:
   repos:
   - shipwright-io/build
   - shipwright-io/cli
+  - shipwright-io/community
   - shipwright-io/operator
   - shipwright-io/website
   require_self_approval: true
@@ -444,6 +445,14 @@ approve:
   repos:
   - openshift/openshift-restclient-python
   require_self_approval: false
+- commandHelpLink: ""
+  repos:
+  - eclipse-che/che-plugin-registry
+  require_self_approval: false
+- commandHelpLink: ""
+  repos:
+  - openshift/addon-operator
+  require_self_approval: false
 blunderbuss:
   max_request_count: 2
   request_count: 2
@@ -768,6 +777,7 @@ bugzilla:
               target_release: 4.5.z
               validate_by_default: true
             release-4.6:
+              exclude_defaults: true
               target_release: 4.6.z
               validate_by_default: true
         elasticsearch-operator:
@@ -866,6 +876,7 @@ bugzilla:
               target_release: 4.5.z
               validate_by_default: true
             release-4.6:
+              exclude_defaults: true
               target_release: 4.6.z
               validate_by_default: true
         elasticsearch-proxy:
@@ -964,6 +975,7 @@ bugzilla:
               target_release: 4.5.z
               validate_by_default: true
             release-4.6:
+              exclude_defaults: true
               target_release: 4.6.z
               validate_by_default: true
         ocs-operator:
@@ -1121,6 +1133,7 @@ bugzilla:
               target_release: 4.5.z
               validate_by_default: true
             release-4.6:
+              exclude_defaults: true
               target_release: 4.6.z
               validate_by_default: true
     openshift-priv:
@@ -1221,6 +1234,7 @@ bugzilla:
               target_release: 4.5.z
               validate_by_default: true
             release-4.6:
+              exclude_defaults: true
               target_release: 4.6.z
               validate_by_default: true
         elasticsearch-operator:
@@ -1319,6 +1333,7 @@ bugzilla:
               target_release: 4.5.z
               validate_by_default: true
             release-4.6:
+              exclude_defaults: true
               target_release: 4.6.z
               validate_by_default: true
         elasticsearch-proxy:
@@ -1417,6 +1432,7 @@ bugzilla:
               target_release: 4.5.z
               validate_by_default: true
             release-4.6:
+              exclude_defaults: true
               target_release: 4.6.z
               validate_by_default: true
         ocs-operator:
@@ -1574,6 +1590,7 @@ bugzilla:
               target_release: 4.5.z
               validate_by_default: true
             release-4.6:
+              exclude_defaults: true
               target_release: 4.6.z
               validate_by_default: true
 cat: {}
@@ -1854,11 +1871,11 @@ config_updater:
         - ci
       gzip: true
       name: ci-operator-misc-configs
-    ci-operator/config/eclipse-che/che-operator/*-master.yaml:
+    ci-operator/config/eclipse-che/che-operator/*-main.yaml:
       clusters:
         app.ci:
         - ci
-      name: ci-operator-master-configs
+      name: ci-operator-misc-configs
     ci-operator/config/integr8ly/integreatly-operator/integr8ly-integreatly-operator-*-next-*.yaml:
       clusters:
         app.ci:
@@ -2275,11 +2292,11 @@ config_updater:
         app.ci:
         - ci
       name: job-config-misc
-    ci-operator/jobs/eclipse-che/che-operator/*-master.yaml:
+    ci-operator/jobs/eclipse-che/che-operator/*-main.yaml:
       clusters:
         app.ci:
         - ci
-      name: job-config-master
+      name: job-config-misc
     ci-operator/jobs/integr8ly/integreatly-operator/integr8ly-integreatly-operator-*-next-*.yaml:
       clusters:
         app.ci:
@@ -2732,6 +2749,17 @@ config_updater:
         vsphere:
         - ci
       name: cluster-profile-gcp-logging
+    cluster/test-deploy/gcp-openshift-gce-devel-ci-2/*:
+      clusters:
+        app.ci:
+        - ci
+        build01:
+        - ci
+        build02:
+        - ci
+        vsphere:
+        - ci
+      name: cluster-profile-gcp-openshift-gce-devel-ci-2
     cluster/test-deploy/gcp/*:
       clusters:
         app.ci:
@@ -3172,6 +3200,26 @@ external_plugins:
     events:
     - pull_request
     name: needs-rebase
+  eclipse-che/che-plugin-registry:
+  - endpoint: http://refresh
+    events:
+    - issue_comment
+    name: refresh
+  - endpoint: http://cherrypick
+    events:
+    - issue_comment
+    - pull_request
+    name: cherrypick
+  - endpoint: http://needs-rebase
+    events:
+    - issue_comment
+    - pull_request
+    name: needs-rebase
+  - endpoint: http://backport-verifier
+    events:
+    - issue_comment
+    - pull_request
+    name: backport-verifier
   freeipa/freeipa-operator:
   - endpoint: http://refresh
     events:
@@ -3800,6 +3848,15 @@ external_plugins:
     events:
     - pull_request
     name: needs-rebase
+  shipwright-io/community:
+  - endpoint: http://refresh
+    events:
+    - issue_comment
+    name: refresh
+  - endpoint: http://needs-rebase
+    events:
+    - pull_request
+    name: needs-rebase
   shipwright-io/operator:
   - endpoint: http://refresh
     events:
@@ -4096,6 +4153,12 @@ lgtm:
   review_acts_as_lgtm: true
 - repos:
   - openshift/openshift-restclient-python
+  review_acts_as_lgtm: true
+- repos:
+  - eclipse-che/che-plugin-registry
+  review_acts_as_lgtm: true
+- repos:
+  - openshift/addon-operator
   review_acts_as_lgtm: true
 override:
   allow_top_level_owners: true
@@ -4646,6 +4709,34 @@ plugins:
     - wip
     - yuks
     - approve
+  eclipse-che/che-plugin-registry:
+    plugins:
+    - assign
+    - blunderbuss
+    - bugzilla
+    - cat
+    - dog
+    - heart
+    - golint
+    - goose
+    - help
+    - hold
+    - jira
+    - label
+    - lgtm
+    - lifecycle
+    - override
+    - pony
+    - retitle
+    - shrug
+    - sigmention
+    - skip
+    - trigger
+    - verify-owners
+    - owners-label
+    - wip
+    - yuks
+    - approve
   freeipa/freeipa-operator:
     plugins:
     - assign
@@ -5105,13 +5196,64 @@ plugins:
   open-cluster-management/api:
     plugins:
     - dco
+  open-cluster-management/application-chart:
+    plugins:
+    - dco
+  open-cluster-management/application-ui:
+    plugins:
+    - dco
   open-cluster-management/applier:
+    plugins:
+    - dco
+  open-cluster-management/cert-policy-controller:
     plugins:
     - dco
   open-cluster-management/cluster-curator-controller:
     plugins:
     - dco
   open-cluster-management/clusterlifecycle-state-metrics:
+    plugins:
+    - dco
+  open-cluster-management/config-policy-controller:
+    plugins:
+    - dco
+  open-cluster-management/console:
+    plugins:
+    - dco
+  open-cluster-management/console-api:
+    plugins:
+    - dco
+  open-cluster-management/endpoint-metrics-operator:
+    plugins:
+    - dco
+  open-cluster-management/governance-policy-framework:
+    plugins:
+    - dco
+  open-cluster-management/governance-policy-propagator:
+    plugins:
+    - dco
+  open-cluster-management/governance-policy-spec-sync:
+    plugins:
+    - dco
+  open-cluster-management/governance-policy-status-sync:
+    plugins:
+    - dco
+  open-cluster-management/governance-policy-template-sync:
+    plugins:
+    - dco
+  open-cluster-management/grafana-dashboard-loader:
+    plugins:
+    - dco
+  open-cluster-management/grc-chart:
+    plugins:
+    - dco
+  open-cluster-management/grc-ui:
+    plugins:
+    - dco
+  open-cluster-management/grc-ui-api:
+    plugins:
+    - dco
+  open-cluster-management/iam-policy-controller:
     plugins:
     - dco
   open-cluster-management/klusterlet-addon-controller:
@@ -5124,6 +5266,12 @@ plugins:
     plugins:
     - dco
   open-cluster-management/managedcluster-import-controller:
+    plugins:
+    - dco
+  open-cluster-management/management-ingress:
+    plugins:
+    - dco
+  open-cluster-management/metrics-collector:
     plugins:
     - dco
   open-cluster-management/multicloud-operators-application:
@@ -5144,13 +5292,28 @@ plugins:
   open-cluster-management/multicloud-operators-subscription-release:
     plugins:
     - dco
+  open-cluster-management/multicluster-observability-operator:
+    plugins:
+    - dco
+  open-cluster-management/observability-e2e-test:
+    plugins:
+    - dco
+  open-cluster-management/policy-collection:
+    plugins:
+    - dco
   open-cluster-management/provider-credential-controller:
+    plugins:
+    - dco
+  open-cluster-management/rbac-query-proxy:
     plugins:
     - dco
   open-cluster-management/registration:
     plugins:
     - dco
   open-cluster-management/registration-operator:
+    plugins:
+    - dco
+  open-cluster-management/security-middleware:
     plugins:
     - dco
   open-cluster-management/website:
@@ -6158,6 +6321,9 @@ plugins:
     - verify-owners
     - wip
     - yuks
+  openshift/addon-operator:
+    plugins:
+    - approve
   openshift/ansible-service-broker:
     plugins:
     - approve
@@ -7283,6 +7449,9 @@ plugins:
     - release-note
     - require-matching-label
   shipwright-io/cli:
+    plugins:
+    - approve
+  shipwright-io/community:
     plugins:
     - approve
   shipwright-io/operator:

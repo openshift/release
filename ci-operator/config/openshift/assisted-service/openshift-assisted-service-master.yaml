@@ -40,6 +40,12 @@ images:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.15
   to: assisted-service
+operator:
+  bundles:
+  - dockerfile_path: Dockerfile.bundle
+  substitutions:
+  - pullspec: quay.io/ocpmetal/assisted-service:latest
+    with: assisted-service
 promotion:
   name: assisted
   namespace: ocp-kni
@@ -162,6 +168,24 @@ tests:
         OPENSHIFT_VERSION=4.8
         ENABLE_KUBE_API=true
     workflow: baremetalds-assisted-install
+- as: assisted-operator-install-aws
+  steps:
+    cluster_profile: aws
+    env:
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: assisted-installer
+      OO_PACKAGE: assisted-service-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: tests
+      commands: |
+        echo "operator installed"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-aws
 zz_generated_metadata:
   branch: master
   org: openshift
