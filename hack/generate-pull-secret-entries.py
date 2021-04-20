@@ -70,6 +70,11 @@ def config_for_cluster(cluster):
                 },
                 {
                     "bw_item": "build_farm",
+                    "registry_url": "registry.arm01.not.defined.yet",
+                    "auth_bw_attachment": "token_image-puller_arm01_reg_auth_value.txt",
+                },
+                {
+                    "bw_item": "build_farm",
                     "registry_url": "registry.build01.ci.openshift.org",
                     "auth_bw_attachment": "token_image-puller_build01_reg_auth_value.txt",
                 },
