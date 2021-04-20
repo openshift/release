@@ -6,8 +6,8 @@ set -o pipefail
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
-GCP_BASE_DOMAIN="origin-ci-int-gce.dev.openshift.com"
-GCP_PROJECT="openshift-gce-devel-ci"
+GCP_BASE_DOMAIN="$(< ${CLUSTER_PROFILE_DIR}/public_hosted_zone)"
+GCP_PROJECT="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 GCP_REGION="${LEASED_RESOURCE}"
 
 masters="${CONTROL_PLANE_REPLICAS}"
