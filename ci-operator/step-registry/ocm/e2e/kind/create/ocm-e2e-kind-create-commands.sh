@@ -67,3 +67,9 @@ terraform output -raw public_ip > "$IP_FILE"
 echo "Contents of $IP_FILE"
 cat "$IP_FILE"
 echo
+
+echo "Contents of $SHARED_DIR"
+ls -la "$SHARED_DIR"
+
+echo "Contents of $KIND_DIR"
+ls -la "$KIND_DIR"
