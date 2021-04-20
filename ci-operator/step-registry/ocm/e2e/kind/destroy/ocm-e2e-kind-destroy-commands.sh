@@ -11,5 +11,8 @@ export TF_PLUGIN_CACHE_DIR="$tf_dir"
 export TF_VAR_aws_secret="$AWS_KIND_CREDENTIALS"
 export TF_VAR_public_key=""
 
+export TF_LOG_PATH="$ARTIFACT_DIR/terraform_destroy_init.logs"
+terraform init
+
 export TF_LOG_PATH="$ARTIFACT_DIR/terraform_destroy.logs"
 terraform destroy -auto-approve
