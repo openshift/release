@@ -97,6 +97,24 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   name: system:image-puller
 subjects:
-- apiGroup: rbac.authorization.k8s.io
-  kind: Group
-  name: system:authenticated
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: system:authenticated
+
+---
+# Grant custom-build stategy to the CoreOS team.
+# CoreOS builds are snow-flakes. The custom build stategy will allow
+# for builds to be run via hand-crafted prow jobs.
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: coreos-coreos-custom-build-stategy-0
+  namespace: coreos
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: system:build-strategy-custom
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: coreos-team
