@@ -63,8 +63,7 @@ items:
         FROM registry.ci.openshift.org/openshift/release:golang-1.16 as builder
         RUN git clone https://github.com/coredns/coredns.git /coredns
         WORKDIR /coredns
-        RUN echo "alias:github.com/serverwentdown/alias" >> plugin.cfg
-        RUN go get github.com/serverwentdown/alias && make
+        RUN go mod vendor && make all
         FROM registry.access.redhat.com/ubi8/ubi-minimal:latest as ubi
         COPY --from=builder /coredns/coredns /coredns
         EXPOSE 53 53/udp
