@@ -10,6 +10,22 @@ echo "************ baremetalds assisted operator setup command ************"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
 
+# shellcheck disable=SC2087
+ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
+echo "Applying CatalogSource for assisted-service-operator bundle..."
+
+cat <<EOCR | oc create -f -
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: assisted-service-catalog
+  namespace: openshift-marketplace
+spec:
+  sourceType: grpc
+  image: $ASSISTED_OPERATOR_INDEX
+EOCR
+EOF
+
 ssh "${SSHOPTS[@]}" "root@${IP}" bash - << "EOF" |& sed -e 's/.*auths\{0,1\}".*/*** PULL_SECRET ***/g'
 
 set -xeo pipefail
@@ -89,9 +105,8 @@ metadata:
 spec:
   installPlanApproval: Automatic
   name: assisted-service-operator
-  source: community-operators
+  source: assisted-service-catalog
   sourceNamespace: openshift-marketplace
-  startingCSV: assisted-service-operator.v0.0.2
 EOCR
 
 wait_for_crd "agentserviceconfigs.agent-install.openshift.io"
