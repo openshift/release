@@ -50,6 +50,7 @@ terraform output -raw public_ip > "$IP_FILE"
 
 # Wait for VM to be ready
 KEY="$SHARED_DIR/private.pem"
+OPT="-o StrictHostKeyChecking=no -i $KEY"
 IP="$(cat "$SHARED_DIR/public_ip")"
 HOST="ec2-user@$IP"
 echo "VM is $HOST"
@@ -69,7 +70,7 @@ while true; do
     fi
     # Try to connect
     echo "Trying to connect to VM..."
-    ssh -i "$KEY" "$HOST" hostname && {
+    ssh "$OPT" "$HOST" hostname && {
         # Successfully connected
         echo "VM ready after ${_elapsed}s"
         break
