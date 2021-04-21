@@ -46,7 +46,7 @@ cp -t "${SHARED_DIR}" \
     "${cluster_dir}/ocp_install/auth/kubeconfig" \
     "${cluster_dir}/ocp_install/metadata.json"
 
-KUBECONFIG="${cluster_dir}/ocp_install/auth/kubeconfig"
+KUBECONFIG="${SHARED_DIR}/ocp_install/auth/kubeconfig"
 export KUBECONFIG
 
 exit "$ret"
