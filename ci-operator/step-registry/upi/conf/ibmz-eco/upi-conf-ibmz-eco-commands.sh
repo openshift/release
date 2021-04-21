@@ -41,7 +41,7 @@ cp ${pull_secret_in} ${pull_secret_out}
 # Create terraform.tfvars
 echo "$(date -u --rfc-3339=seconds) - Creating terraform variables file..."
 cat > "${tfvars_out}" <<-EOF
-cluster_domain = "${CLUSTER_DOMAIN}"
+cloud_domain = "${CLUSTER_DOMAIN}"
 openshift_version = "${ocp_version}"
 image_override = "${RELEASE_IMAGE_LATEST}"
 worker_count = "2"
