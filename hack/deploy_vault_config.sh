@@ -200,6 +200,28 @@ getUserIDByLDAPName() {
 getUserIDByLDAPName brawilli
 vault write identity/group name="release-controller" policies="release-controller" member_entity_ids="$(getUserIDByLDAPName brawilli)"
 
+vault policy write vault-secret-collection-manager -<<EOH
+path "identity/group/*" {
+  capabilities = ["read", "list", "create", "update", "delete"]
+}
+
+path "sys/policies/acl/*" {
+  capabilities = ["read", "list", "create", "update", "delete"]
+}
+
+path "identity/entity-alias/id" {
+  capabilities = ["list"]
+}
+
+path "identity/entity/id/*"  {
+  capabilities = ["read"]
+}
+EOH
+vault write auth/kubernetes/role/vault-secret-collection-manager \
+  bound_service_account_names=vault-secret-collection-manager \
+  bound_service_account_namespaces=ci \
+  policies=vault-secret-collection-manager \
+  ttl=1h
 
 # Make dptp members admins
 echo "Setting up admin policy"
