@@ -325,7 +325,7 @@ dashboard.new(
 .addPanel(
     (graphPanel.new(
         'Token Consumption by User Agent',
-        description='sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED"}[1h])) by (user_agent)',
+        description='sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED"}[1h])) by (user_agent) != 0',
         datasource='prometheus',
         legend_alignAsTable=true,
         legend_rightSide=true,
@@ -337,7 +337,7 @@ dashboard.new(
         stack=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED"}[1h]) * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login)) by (user_agent)',
+        'sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED"}[1h])) by (user_agent) != 0',
          legendFormat='{{user_agent}}',
     )), gridPos={
     h: 9,
@@ -348,7 +348,7 @@ dashboard.new(
 .addPanel(
     (graphPanel.new(
         'Token Consumption by Path',
-        description='sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED"}[1h])) by (path)',
+        description='sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED"}[1h])) by (path) != 0',
         datasource='prometheus',
         legend_alignAsTable=true,
         legend_rightSide=true,
@@ -360,7 +360,7 @@ dashboard.new(
         stack=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED"}[1h]) * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login)) by (path)',
+        'sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED"}[1h])) by (path) != 0',
          legendFormat='{{path}}',
     )), gridPos={
     h: 9,
@@ -371,7 +371,7 @@ dashboard.new(
 .addPanel(
     (graphPanel.new(
         'Token Consumption For Path ${path} by User Agent',
-        description='sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED",path="${path}"}[1h])) by (user_agent)',
+        description='sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED",path="${path}"}[1h])) by (user_agent) != 0',
         datasource='prometheus',
         legend_alignAsTable=true,
         legend_rightSide=true,
@@ -382,7 +382,7 @@ dashboard.new(
         legend_sortDesc=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED",path="${path}"}[1h]) * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login)) by (user_agent)',
+        'sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED",path="${path}"}[1h])) by (user_agent) != 0',
          legendFormat='{{user_agent}}',
     )), gridPos={
     h: 9,
@@ -393,7 +393,7 @@ dashboard.new(
 .addPanel(
     (graphPanel.new(
         'Token Consumption for User Agent ${user_agent} by Path',
-        description='sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED",user_agent="${user_agent}"}[1h])) by (path)',
+        description='sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED",user_agent="${user_agent}"}[1h])) by (path) != 0',
         datasource='prometheus',
         legend_alignAsTable=true,
         legend_rightSide=true,
@@ -404,7 +404,7 @@ dashboard.new(
         legend_sortDesc=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED",user_agent="${user_agent}"}[1h]) * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login)) by (path)',
+        'sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED",user_agent="${user_agent}"}[1h])) by (path) != 0',
          legendFormat='{{path}}',
     )), gridPos={
     h: 9,

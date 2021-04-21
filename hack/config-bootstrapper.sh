@@ -15,4 +15,5 @@ config-bootstrapper \
     --source-path "${dir}" \
     --source-path "${roe_release_dir}" \
     --config-path "${dir}/core-services/prow/02_config/_config.yaml" \
-    --plugin-config "${dir}/core-services/prow/02_config/_plugins.yaml"
+    --plugin-config "${dir}/core-services/prow/02_config/_plugins.yaml" \
+    --supplemental-prow-config-dir="${dir}/core-services/prow/02_config"
