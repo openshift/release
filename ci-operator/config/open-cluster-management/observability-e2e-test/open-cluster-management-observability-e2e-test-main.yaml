@@ -39,27 +39,24 @@ tests:
     from: src
 - as: test-e2e
   steps:
-    dependencies:
-      COMPONENT_IMAGE_REF: observability-e2e-test
-    env:
-      CLUSTERPOOL_GROUP_NAME: Core-Services
-      CLUSTERPOOL_HOST_NAMESPACE: acm-observability-china
-      CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-obs-china-clusterpool
-      CLUSTERPOOL_LIST_INCLUSION_FILTER: prow
+    cluster_profile: aws
     test:
     - as: run-e2e
       cli: latest
       commands: |
-        export COMPONENT_IMAGE_NAME=COMPONENT_IMAGE_REF
+        export COMPONENT_IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:observability-e2e-test}
         set -o pipefail
         make test-e2e 2>&1 | tee ${ARTIFACT_DIR}/e2e_tests_out.log
         set +o pipefail
+      env:
+      - default: oc
+        name: KUBECTL
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: ocm-e2e-clusterpool
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: main
   org: open-cluster-management
