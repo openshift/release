@@ -50,7 +50,8 @@ terraform output -raw public_ip > "$IP_FILE"
 
 # Wait for VM to be ready
 KEY="$SHARED_DIR/private.pem"
-HOST="ec2-user@$(cat "$SHARED_DIR/public_ip")"
+IP="$(cat "$SHARED_DIR/public_ip")"
+HOST="ec2-user@$IP"
 echo "VM is $HOST"
 echo "Waiting up to 5 minutes for VM to be ready"
 _timeout=300
