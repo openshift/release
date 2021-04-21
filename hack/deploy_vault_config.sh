@@ -177,6 +177,30 @@ vault write auth/kubernetes/role/secret-bootstrap \
     policies=secret-bootstrap \
     ttl=1h
 
+vault policy write release-controller -<<EOH
+path "kv/data/dptp/openshift-ci-release-signature-signer" {
+  capabilities = ["create", "update", "read"]
+}
+
+path "kv/data/dptp/openshift-ci-release-signature-publisher" {
+  capabilities = ["create", "update", "read"]
+}
+
+# Doesn't allow access to the actual data and we can not give
+# list for individual names
+path "kv/metadata/dptp/*" {
+  capabilities = ["list"]
+}
+EOH
+
+getUserIDByLDAPName() {
+  curl -Ss --fail -H "X-vault-token: ${VAULT_TOKEN}" "$VAULT_ADDR/v1/identity/entity/id?list=true" \
+   |jq --arg user "$1" '.data.key_info|to_entries[]|select(.value.aliases[0].name == $user)|.key' -r
+}
+getUserIDByLDAPName brawilli
+vault write identity/group name="release-controller" policies="release-controller" member_entity_ids="$(getUserIDByLDAPName brawilli)"
+
+
 # Make dptp members admins
 echo "Setting up admin policy"
 vault policy write admin -<<EOF
