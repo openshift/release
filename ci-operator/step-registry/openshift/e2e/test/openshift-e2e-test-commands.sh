@@ -83,8 +83,9 @@ gcp)
     mkdir -p ~/.ssh
     cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/google_compute_engine || true
     # TODO: make openshift-tests auto-discover this from cluster config
+    PROJECT="$(oc get -o jsonpath='{.status.platformStatus.gcp.projectID}' infrastructure cluster)"
     REGION="$(oc get -o jsonpath='{.status.platformStatus.gcp.region}' infrastructure cluster)"
-    export TEST_PROVIDER="{\"type\":\"gce\",\"region\":\"${REGION}\",\"multizone\": true,\"multimaster\":true,\"projectid\":\"openshift-gce-devel-ci\"}"
+    export TEST_PROVIDER="{\"type\":\"gce\",\"region\":\"${REGION}\",\"multizone\": true,\"multimaster\":true,\"projectid\":\"${PROJECT}\"}"
     ;;
 aws)
     mkdir -p ~/.ssh
@@ -116,7 +117,7 @@ if [[ "${CLUSTER_TYPE}" == gcp ]]; then
     mkdir gcloudconfig
     export CLOUDSDK_CONFIG=/tmp/gcloudconfig
     gcloud auth activate-service-account --key-file="${GCP_SHARED_CREDENTIALS_FILE}"
-    gcloud config set project openshift-gce-devel-ci
+    gcloud config set project "${PROJECT}"
     popd
 fi
 
