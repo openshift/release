@@ -86,9 +86,10 @@ objects:
         serviceAccountName: deck
         containers:
         - name: deck
-          image: gcr.io/k8s-prow/deck:v20210414-c67eb894db
+          image: gcr.io/k8s-prow/deck:v20210422-9720cce6f1
           args:
           - --config-path=/etc/config/config.yaml
+          - --supplemental-prow-config-dir=/etc/config
           - --cookie-secret=/etc/cookie/cookie
           - --github-oauth-config-file=/etc/github/config.json
           - --github-token-path=/etc/oauth/oauth
@@ -105,7 +106,7 @@ objects:
           env:
           # Multiple configs can only be passed via the env var and not via the flag
           - name: KUBECONFIG
-            value: /etc/build-farm-credentials/build01.kubeconfig:/etc/build-farm-credentials/app.ci.kubeconfig:/etc/build-farm-credentials/build02.kubeconfig:/etc/build-farm-credentials/vsphere.kubeconfig
+            value: /etc/build-farm-credentials/build01.kubeconfig:/etc/build-farm-credentials/app.ci.kubeconfig:/etc/build-farm-credentials/build02.kubeconfig:/etc/build-farm-credentials/vsphere.kubeconfig:/etc/build-farm-credentials/arm01.kubeconfig
           ports:
             - name: main
               containerPort: 8080
@@ -245,6 +246,8 @@ objects:
         - name: build-farm-credentials
           secret:
             items:
+            - key: sa.deck.arm01.config
+              path: arm01.kubeconfig
             - key: sa.deck.build01.config
               path: build01.kubeconfig
             - key: sa.deck.app.ci.config
@@ -342,7 +345,7 @@ objects:
           - mountPath: /etc/proxy/secrets
             name: session-secret
         - name: deck
-          image: gcr.io/k8s-prow/deck:v20210414-c67eb894db
+          image: gcr.io/k8s-prow/deck:v20210422-9720cce6f1
           args:
           - --github-oauth-config-file=/etc/github/config.json
           - --github-token-path=/etc/oauth/oauth
@@ -351,6 +354,7 @@ objects:
           - --github-graphql-endpoint=http://ghproxy/graphql
           - --oauth-url=/github-login
           - --config-path=/etc/config/config.yaml
+          - --supplemental-prow-config-dir=/etc/config
           - --job-config-path=/etc/job-config
           - --tide-url=http://tide/
           - --hook-url=http://hook:8888/plugin-help
@@ -365,7 +369,7 @@ objects:
               containerPort: 8080
           env:
           - name: KUBECONFIG
-            value: /etc/build-farm-credentials/build01.kubeconfig:/etc/build-farm-credentials/app.ci.kubeconfig:/etc/build-farm-credentials/build02.kubeconfig:/etc/build-farm-credentials/vsphere.kubeconfig
+            value: /etc/build-farm-credentials/build01.kubeconfig:/etc/build-farm-credentials/app.ci.kubeconfig:/etc/build-farm-credentials/build02.kubeconfig:/etc/build-farm-credentials/vsphere.kubeconfig:/etc/build-farm-credentials/arm01.kubeconfig
           volumeMounts:
           - name: service-account-token
             mountPath: /var/sa-token
@@ -495,6 +499,8 @@ objects:
         - name: build-farm-credentials
           secret:
             items:
+            - key: sa.deck.arm01.config
+              path: arm01.kubeconfig
             - key: sa.deck.build01.config
               path: build01.kubeconfig
             - key: sa.deck.build02.config

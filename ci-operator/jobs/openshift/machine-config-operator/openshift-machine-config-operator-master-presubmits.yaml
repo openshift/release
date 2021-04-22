@@ -4,7 +4,7 @@ presubmits:
     always_run: false
     branches:
     - master
-    cluster: build01
+    cluster: build02
     context: ci/prow/cluster-bootimages
     decorate: true
     decoration_config:
@@ -70,7 +70,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-agnostic-upgrade
     decorate: true
     decoration_config:
@@ -138,7 +138,7 @@ presubmits:
     always_run: false
     branches:
     - master
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-aws
     decorate: true
     decoration_config:
@@ -205,7 +205,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-aws-disruptive
     decorate: true
     decoration_config:
@@ -272,7 +272,7 @@ presubmits:
     always_run: false
     branches:
     - master
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-aws-proxy
     decorate: true
     decoration_config:
@@ -339,7 +339,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-aws-serial
     decorate: true
     decoration_config:
@@ -405,7 +405,7 @@ presubmits:
     always_run: false
     branches:
     - master
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-aws-single-node
     decorate: true
     decoration_config:
@@ -472,7 +472,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-aws-workers-rhel7
     decorate: true
     decoration_config:
@@ -539,7 +539,7 @@ presubmits:
     always_run: false
     branches:
     - master
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-azure
     decorate: true
     decoration_config:
@@ -606,7 +606,7 @@ presubmits:
     always_run: false
     branches:
     - master
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-gcp-op
     decorate: true
     decoration_config:
@@ -675,7 +675,76 @@ presubmits:
     always_run: false
     branches:
     - master
-    cluster: build01
+    cluster: build02
+    context: ci/prow/e2e-gcp-op-single-node
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-machine-config-operator-master-e2e-gcp-op-single-node
+    optional: true
+    rerun_command: /test e2e-gcp-op-single-node
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-gcp-op-single-node-cluster-profile
+        - --target=e2e-gcp-op-single-node
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-gcp-op-single-node-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-gcp-op-single-node,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - master
+    cluster: build02
     context: ci/prow/e2e-gcp-single-node
     decorate: true
     decoration_config:
@@ -744,7 +813,7 @@ presubmits:
     always_run: false
     branches:
     - master
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-metal-assisted
     decorate: true
     decoration_config:
@@ -813,7 +882,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-metal-ipi
     decorate: true
     decoration_config:
@@ -882,7 +951,7 @@ presubmits:
     always_run: false
     branches:
     - master
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-metal-ipi-ovn-dualstack
     decorate: true
     decoration_config:
@@ -951,7 +1020,7 @@ presubmits:
     always_run: false
     branches:
     - master
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-openstack
     decorate: true
     decoration_config:
@@ -1046,7 +1115,7 @@ presubmits:
     always_run: false
     branches:
     - master
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-ovirt
     decorate: true
     decoration_config:
@@ -1115,7 +1184,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-ovn-step-registry
     decorate: true
     decoration_config:
@@ -1383,7 +1452,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build01
+    cluster: build02
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -1432,7 +1501,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build01
+    cluster: build02
     context: ci/prow/okd-e2e-aws
     decorate: true
     decoration_config:
@@ -1501,7 +1570,7 @@ presubmits:
     always_run: false
     branches:
     - master
-    cluster: build01
+    cluster: build02
     context: ci/prow/okd-e2e-gcp-op
     decorate: true
     decoration_config:
@@ -1572,7 +1641,7 @@ presubmits:
     always_run: false
     branches:
     - master
-    cluster: build01
+    cluster: build02
     context: ci/prow/okd-e2e-upgrade
     decorate: true
     decoration_config:
@@ -1712,7 +1781,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build01
+    cluster: build02
     context: ci/prow/okd-images
     decorate: true
     decoration_config:
@@ -1763,7 +1832,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build01
+    cluster: build02
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -1811,7 +1880,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build01
+    cluster: build02
     context: ci/prow/verify
     decorate: true
     decoration_config:

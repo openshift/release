@@ -45,10 +45,11 @@ items:
         serviceAccountName: crier
         containers:
         - name: crier
-          image: gcr.io/k8s-prow/crier:v20210414-c67eb894db
+          image: gcr.io/k8s-prow/crier:v20210422-9720cce6f1
           args:
           - --github-workers=100
           - --config-path=/etc/config/config.yaml
+          - --supplemental-prow-config-dir=/etc/config
           - --job-config-path=/etc/job-config
           - --github-token-path=/etc/github/oauth
           - --github-endpoint=http://ghproxy
@@ -63,7 +64,7 @@ items:
           env:
           # Multiple configs can only be passed via the env var and not via the flag
           - name: KUBECONFIG
-            value: /etc/build-farm-credentials/build01.kubeconfig:/etc/build-farm-credentials/app.ci.kubeconfig:/etc/build-farm-credentials/build02.kubeconfig:/etc/build-farm-credentials/vsphere.kubeconfig
+            value: /etc/build-farm-credentials/build01.kubeconfig:/etc/build-farm-credentials/app.ci.kubeconfig:/etc/build-farm-credentials/build02.kubeconfig:/etc/build-farm-credentials/vsphere.kubeconfig:/etc/build-farm-credentials/arm01.kubeconfig
           volumeMounts:
           - name: service-account-token
             mountPath: /var/sa-token
@@ -176,6 +177,8 @@ items:
         - name: build-farm-credentials
           secret:
             items:
+            - key: sa.crier.arm01.config
+              path: arm01.kubeconfig
             - key: sa.crier.build01.config
               path: build01.kubeconfig
             - key: sa.crier.app.ci.config
@@ -217,10 +220,11 @@ items:
         serviceAccountName: crier
         containers:
         - name: crier
-          image: gcr.io/k8s-prow/crier:v20210414-c67eb894db
+          image: gcr.io/k8s-prow/crier:v20210422-9720cce6f1
           args:
           - --github-workers=100
           - --config-path=/etc/config/config.yaml
+          - --supplemental-prow-config-dir=/etc/config
           - --job-config-path=/etc/job-config
           - --github-app-id=$(GITHUB_APP_ID)
           - --github-app-private-key-path=/etc/github/cert
@@ -236,7 +240,7 @@ items:
           env:
           # Multiple configs can only be passed via the env var and not via the flag
           - name: KUBECONFIG
-            value: /etc/build-farm-credentials/build01.kubeconfig:/etc/build-farm-credentials/app.ci.kubeconfig:/etc/build-farm-credentials/build02.kubeconfig:/etc/build-farm-credentials/vsphere.kubeconfig
+            value: /etc/build-farm-credentials/build01.kubeconfig:/etc/build-farm-credentials/app.ci.kubeconfig:/etc/build-farm-credentials/build02.kubeconfig:/etc/build-farm-credentials/vsphere.kubeconfig:/etc/build-farm-credentials/arm01.kubeconfig
           - name: GITHUB_APP_ID
             valueFrom:
               secretKeyRef:
@@ -358,6 +362,8 @@ items:
               path: build01.kubeconfig
             - key: sa.crier.app.ci.config
               path: app.ci.kubeconfig
+            - key: sa.crier.arm01.config
+              path: arm01.kubeconfig
             - key: sa.crier.build02.config
               path: build02.kubeconfig
             - key: sa.crier.vsphere.config

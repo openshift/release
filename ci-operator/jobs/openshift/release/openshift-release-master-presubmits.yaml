@@ -79,6 +79,53 @@ presubmits:
     always_run: true
     branches:
     - master
+    cluster: app.ci
+    context: ci/build-farm/arm01-dry
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-arm01-dry
+    rerun_command: /test arm01-dry
+    spec:
+      containers:
+      - args:
+        - --config-dir
+        - clusters/build-clusters/arm01
+        - --kubeconfig
+        - /etc/build-farm-credentials/kubeconfig
+        - --as=
+        command:
+        - applyconfig
+        env:
+        - name: HOME
+          value: /tmp
+        image: registry.ci.openshift.org/ci/applyconfig:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+        - mountPath: /tmp
+          name: tmp
+      serviceAccountName: config-updater
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.arm01.config
+            path: kubeconfig
+          secretName: build-farm-credentials
+      - emptyDir: {}
+        name: tmp
+    trigger: (?m)^/test( | .* )arm01-dry,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
     cluster: build01
     context: ci/prow/boskos-config
     decorate: true
@@ -93,7 +140,7 @@ presubmits:
         - core-services/prow/02_config/_boskos.yaml
         command:
         - /app
-        image: gcr.io/k8s-staging-boskos/checkconfig:v20210406-69ca1df
+        image: gcr.io/k8s-staging-boskos/checkconfig:v20210419-e2193a3
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -316,8 +363,6 @@ presubmits:
         - --registry
         - ./ci-operator/step-registry/
         - --validate-only
-        - --prow-config
-        - ./core-services/prow/02_config/_config.yaml
         command:
         - ci-operator-configresolver
         image: ci-operator-configresolver:latest
@@ -395,6 +440,8 @@ presubmits:
       - args:
         - --config-path
         - ./core-services/prow/02_config/_config.yaml
+        - --supplemental-prow-config-dir
+        - core-services/prow/02_config
         - --job-config-path
         - ./ci-operator/jobs/
         - --plugin-config
@@ -406,7 +453,7 @@ presubmits:
         - mismatched-tide-lenient
         command:
         - /checkconfig
-        image: gcr.io/k8s-prow/checkconfig:v20210414-c67eb894db
+        image: gcr.io/k8s-prow/checkconfig:v20210422-9720cce6f1
         imagePullPolicy: Always
         name: ""
         resources:

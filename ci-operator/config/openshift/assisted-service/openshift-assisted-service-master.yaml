@@ -115,6 +115,15 @@ tests:
     dependencies:
       ASSISTED_SERVICE_IMAGE: pipeline:assisted-service
     workflow: baremetalds-assisted-install
+- as: e2e-metal-assisted-operator
+  steps:
+    cluster_profile: packet
+    workflow: baremetalds-assisted-operator
+- as: e2e-metal-assisted-operator-periodic
+  cron: '@daily'
+  steps:
+    cluster_profile: packet
+    workflow: baremetalds-assisted-operator
 - as: e2e-metal-assisted-onprem
   steps:
     cluster_profile: packet
@@ -168,6 +177,24 @@ tests:
         OPENSHIFT_VERSION=4.8
         ENABLE_KUBE_API=true
     workflow: baremetalds-assisted-install
+- as: assisted-operator-install-aws
+  steps:
+    cluster_profile: aws
+    env:
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: assisted-installer
+      OO_PACKAGE: assisted-service-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: tests
+      commands: |
+        echo "operator installed"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-aws
 zz_generated_metadata:
   branch: master
   org: openshift

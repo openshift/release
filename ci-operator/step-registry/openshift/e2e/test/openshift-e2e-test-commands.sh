@@ -82,7 +82,10 @@ gcp)
     export KUBE_SSH_USER=core
     mkdir -p ~/.ssh
     cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/google_compute_engine || true
-    export TEST_PROVIDER='{"type":"gce","region":"us-east1","multizone": true,"multimaster":true,"projectid":"openshift-gce-devel-ci"}'
+    # TODO: make openshift-tests auto-discover this from cluster config
+    PROJECT="$(oc get -o jsonpath='{.status.platformStatus.gcp.projectID}' infrastructure cluster)"
+    REGION="$(oc get -o jsonpath='{.status.platformStatus.gcp.region}' infrastructure cluster)"
+    export TEST_PROVIDER="{\"type\":\"gce\",\"region\":\"${REGION}\",\"multizone\": true,\"multimaster\":true,\"projectid\":\"${PROJECT}\"}"
     ;;
 aws)
     mkdir -p ~/.ssh
@@ -114,14 +117,19 @@ if [[ "${CLUSTER_TYPE}" == gcp ]]; then
     mkdir gcloudconfig
     export CLOUDSDK_CONFIG=/tmp/gcloudconfig
     gcloud auth activate-service-account --key-file="${GCP_SHARED_CREDENTIALS_FILE}"
-    gcloud config set project openshift-gce-devel-ci
+    gcloud config set project "${PROJECT}"
     popd
 fi
 
 function upgrade() {
     set -x
-    openshift-tests run-upgrade all \
-        --to-image "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}" \
+    TARGET_RELEASES="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"
+    if [[ -f "${SHARED_DIR}/override-upgrade" ]]; then
+        TARGET_RELEASES="$(< "${SHARED_DIR}/override-upgrade")"
+        echo "Overriding upgrade target to ${TARGET_RELEASES}"
+    fi
+    openshift-tests run-upgrade "${TEST_UPGRADE_SUITE}" \
+        --to-image "${TARGET_RELEASES}" \
         --options "${TEST_UPGRADE_OPTIONS-}" \
         --provider "${TEST_PROVIDER}" \
         -o "${ARTIFACT_DIR}/e2e.log" \
