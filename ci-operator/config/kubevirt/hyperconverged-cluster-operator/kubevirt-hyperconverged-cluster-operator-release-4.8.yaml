@@ -7,6 +7,14 @@ base_images:
     name: "4.8"
     namespace: ocp
     tag: cli
+  hco-index:
+    name: hyperconverged-cluster-index
+    namespace: ci
+    tag: 1.4.0-unstable
+  hco-index-prev:
+    name: hyperconverged-cluster-index
+    namespace: ci
+    tag: 1.3.0
   operator-registry:
     name: "4.8"
     namespace: ocp
@@ -60,6 +68,16 @@ operator:
   bundles:
   - context_dir: deploy/index-image
     dockerfile_path: bundle.Dockerfile
+  - as: hco-upgrade-bundle
+    base_index: hco-index
+    context_dir: deploy/index-image
+    dockerfile_path: Dockerfile.bundle.ci-index-image-upgrade
+    update_graph: semver
+  - as: hco-upgrade-prev-bundle
+    base_index: hco-index-prev
+    context_dir: deploy/index-image
+    dockerfile_path: Dockerfile.bundle.ci-index-image-upgrade
+    update_graph: semver
   substitutions:
   - pullspec: +IMAGE_TO_REPLACE+
     with: hyperconverged-cluster-operator
@@ -180,6 +198,82 @@ tests:
           cpu: 500m
           memory: 1Gi
     workflow: optional-operators-ci-gcp
+- as: hco-e2e-upgrade-index-aws
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-hco-upgrade-bundle
+    env:
+      OO_CHANNEL: 1.4.0
+      OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
+      OO_PACKAGE: community-kubevirt-hyperconverged
+      OO_TARGET_NAMESPACES: '!all'
+    test:
+    - as: e2e-index-image-upgrade-aws
+      commands: RELEASE_DELTA=1 make upgrade-test-index-image
+      from: hco-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-aws
+- as: hco-e2e-upgrade-index-azure
+  steps:
+    cluster_profile: azure4
+    dependencies:
+      OO_INDEX: ci-index-hco-upgrade-bundle
+    env:
+      OO_CHANNEL: 1.4.0
+      OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
+      OO_PACKAGE: community-kubevirt-hyperconverged
+      OO_TARGET_NAMESPACES: '!all'
+    test:
+    - as: e2e-index-image-upgrade-azure
+      commands: RELEASE_DELTA=1 make upgrade-test-index-image
+      from: hco-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-azure
+- as: hco-e2e-upgrade-prev-index-aws
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-hco-upgrade-prev-bundle
+    env:
+      OO_CHANNEL: 1.3.0
+      OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
+      OO_PACKAGE: community-kubevirt-hyperconverged
+      OO_TARGET_NAMESPACES: kubevirt-hyperconverged
+    test:
+    - as: e2e-upgrade-test
+      commands: RELEASE_DELTA=2 make upgrade-test-index-image
+      from: hco-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-aws
+- as: hco-e2e-upgrade-prev-index-azure
+  steps:
+    cluster_profile: azure4
+    dependencies:
+      OO_INDEX: ci-index-hco-upgrade-prev-bundle
+    env:
+      OO_CHANNEL: 1.3.0
+      OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
+      OO_PACKAGE: community-kubevirt-hyperconverged
+      OO_TARGET_NAMESPACES: kubevirt-hyperconverged
+    test:
+    - as: e2e-upgrade-test
+      commands: RELEASE_DELTA=2 make upgrade-test-index-image
+      from: hco-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-azure
 - as: hco-e2e-upgrade-aws
   steps:
     cluster_profile: aws

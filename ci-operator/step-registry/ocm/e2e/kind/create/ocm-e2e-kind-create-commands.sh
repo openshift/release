@@ -52,6 +52,7 @@ terraform output -raw public_ip > "$IP_FILE"
 KEY="$SHARED_DIR/private.pem"
 IP="$(cat "$SHARED_DIR/public_ip")"
 HOST="ec2-user@$IP"
+OPT=(-o "UserKnownHostsFile=/dev/null" -o "StrictHostKeyChecking=no" -i "$KEY" "$HOST")
 echo "VM is $HOST"
 echo "Waiting up to 5 minutes for VM to be ready"
 _timeout=300
@@ -69,14 +70,14 @@ while true; do
     fi
     # Try to connect
     echo "Trying to connect to VM..."
-    ssh -i "$KEY" "$HOST" hostname && {
+    if ssh "${OPT[@]}" hostname ; then
         # Successfully connected
         echo "VM ready after ${_elapsed}s"
         break
-    } || {
+    else
         # Failed to connect
         echo "Could not connect to $IP"
-    }
+    fi
     # Check elapsed time againe
     if (( _elapsed > _timeout )); then
         # Timeout has passed, so exit with error
