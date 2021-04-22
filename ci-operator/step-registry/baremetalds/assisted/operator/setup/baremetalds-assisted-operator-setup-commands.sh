@@ -10,6 +10,22 @@ echo "************ baremetalds assisted operator setup command ************"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
 
+# shellcheck disable=SC2087
+ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
+echo "Applying CatalogSource for assisted-service-operator bundle..."
+
+cat <<EOCR | oc create -f -
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: assisted-service-catalog
+  namespace: openshift-marketplace
+spec:
+  sourceType: grpc
+  image: $ASSISTED_OPERATOR_INDEX
+EOCR
+EOF
+
 ssh "${SSHOPTS[@]}" "root@${IP}" bash - << "EOF" |& sed -e 's/.*auths\{0,1\}".*/*** PULL_SECRET ***/g'
 
 set -xeo pipefail
@@ -51,18 +67,16 @@ metadata:
   name: hive-operator
   namespace: openshift-operators
 spec:
-  channel: alpha
   installPlanApproval: Automatic
   name: hive-operator
   source: community-operators
   sourceNamespace: openshift-marketplace
-  startingCSV: hive-operator.v1.1.1
 EOCR
 
 wait_for_operator "hive-operator" "openshift-operators"
 wait_for_crd "clusterdeployments.hive.openshift.io"
 
-echo "Installing prerequisites for assisted-installer operator..."
+echo "Creating assisted-installer namespace..."
 cat <<EOCR | oc create -f -
 apiVersion: v1
 kind: Namespace
@@ -77,8 +91,8 @@ cat <<EOCR | oc create -f -
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
-    name: assisted-installer-group
-    namespace: assisted-installer
+  name: assisted-installer-group
+  namespace: assisted-installer
 spec:
   targetNamespaces:
     - assisted-installer
@@ -89,16 +103,10 @@ metadata:
   name: assisted-service-operator
   namespace: assisted-installer
 spec:
-  channel: alpha
   installPlanApproval: Automatic
   name: assisted-service-operator
-  source: community-operators
+  source: assisted-service-catalog
   sourceNamespace: openshift-marketplace
-  startingCSV: assisted-service-operator.v0.0.2
-  config:
-    env:
-      - name: DEPLOY_TARGET
-        value: "onprem"
 EOCR
 
 wait_for_crd "agentserviceconfigs.agent-install.openshift.io"
@@ -111,14 +119,14 @@ metadata:
  name: agent
 spec:
  databaseStorage:
-  storageClassName: "fs-lso"
+  storageClassName: assisted-service
   accessModes:
   - ReadWriteOnce
   resources:
    requests:
     storage: 8Gi
  filesystemStorage:
-  storageClassName: "fs-lso"
+  storageClassName: assisted-service
   accessModes:
   - ReadWriteOnce
   resources:
@@ -127,6 +135,8 @@ spec:
 EOCR
 
 wait_for_operator "assisted-service-operator" "assisted-installer"
+oc wait -n assisted-installer --for=condition=Ready pod -l app=assisted-service --timeout=90s
+
 echo "Installation of Assisted Install operator passed successfully!"
 
 EOF
