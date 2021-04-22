@@ -135,14 +135,6 @@ path "sys/tools/hash/*" {
 path "sys/control-group/request" {
     capabilities = ["update"]
 }
-# Allow everyone to have a personal space for themselves in the KV store
-path "kv/data/personal/{{identity.entity.aliases.${OIDC_ACCESSOR_ID}.name}}/*" {
-  capabilities = ["create", "update", "read", "delete"]
-}
-
-path "kv/metadata/personal/{{identity.entity.aliases.${OIDC_ACCESSOR_ID}.name}}/*" {
-  capabilities = ["list"]
-}
 EOH
 
 # Create the secret generator policy and role
@@ -201,6 +193,10 @@ getUserIDByLDAPName brawilli
 vault write identity/group name="release-controller" policies="release-controller" member_entity_ids="$(getUserIDByLDAPName brawilli)"
 
 vault policy write vault-secret-collection-manager -<<EOH
+path "identity/group" {
+  capabilities = ["create", "update"]
+}
+
 path "identity/group/*" {
   capabilities = ["read", "list", "create", "update", "delete"]
 }
@@ -213,8 +209,20 @@ path "identity/entity-alias/id" {
   capabilities = ["list"]
 }
 
+path "identity/entity/id"  {
+  capabilities = ["list"]
+}
+
 path "identity/entity/id/*"  {
   capabilities = ["read"]
+}
+
+path "kv/metadata/selfservice/*" {
+  capabilities = ["list", "delete"]
+}
+
+path "kv/data/selfservice/*" {
+  capabilities = ["create"]
 }
 EOH
 vault write auth/kubernetes/role/vault-secret-collection-manager \
