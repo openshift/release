@@ -41,11 +41,31 @@ tests:
 - as: plugins-test-pr-check
   steps:
     cluster_profile: aws
+    pre:
+    - as: install-che
+      commands: echo "install che"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     test:
     - as: plugins-pr-check
       cli: latest
       commands: |
         /bin/bash .ci/openshift-ci/test.sh
+      dependencies:
+      - env: CHE_PLUGIN_REGISTRY
+        name: che-plugin-registry
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: test-2
+      cli: latest
+      commands: |
+        echo "test 2"
       dependencies:
       - env: CHE_PLUGIN_REGISTRY
         name: che-plugin-registry
