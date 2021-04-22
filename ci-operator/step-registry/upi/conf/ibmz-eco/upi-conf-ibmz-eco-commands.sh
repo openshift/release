@@ -25,7 +25,7 @@ fi
 
 export HOME=/tmp
 
-pull_secret_in=/etc/pull-secret
+pull_secret_in=/etc/pull-secret/.dockerconfigjson
 pull_secret_out=${SHARED_DIR}/pull-secret
 tfvars_out=${SHARED_DIR}/terraform.tfvars
 ocp_version=$(echo $RELEASE_IMAGE_LATEST | cut -d: -f2)
