@@ -87,6 +87,7 @@ cat > ovirt_remove_old_resources.yaml <<-EOF
           dest: "/tmp/ca.pem"
           validate_certs: no
       - name: Login to RHV
+        no_log: true
         ovirt_auth:
           url: "{{ lookup('env','OVIRT_ENGINE_URL') }}"
           username: "{{ lookup('env','OVIRT_ENGINE_USERNAME') }}"
@@ -125,6 +126,7 @@ cat > ovirt_remove_old_resources.yaml <<-EOF
         register: vms_json
 
       - name: delete old vms
+        no_log: true
         include_tasks: delete_vm_if_older.yaml
         vars:
           vm_creation_epoch: "{{ item['creation_time'] | int }}"
@@ -151,6 +153,7 @@ cat > ovirt_remove_old_resources.yaml <<-EOF
 
       - name: delete old templates
         include_tasks: delete_template_if_older.yaml
+        no_log: true
         vars:
           template_creation_epoch: "{{ item['creation_time'] | int }}"
           engine_time: "{{token_json.json.time | int}}"
@@ -181,6 +184,7 @@ cat > remove_yesterday_disks.yaml <<-EOF
           url: "https://{{ lookup('env','OVIRT_ENGINE_URL') | urlsplit('hostname') }}/ovirt-engine/services/pki-resource?resource=ca-certificate&format=X509-PEM-CA"
           dest: "/tmp/ca.pem"
           validate_certs: no
+        no_log: true
       - name: Login to RHV
         ovirt_auth:
           url: "{{ lookup('env','OVIRT_ENGINE_URL') }}"
@@ -198,6 +202,7 @@ cat > remove_yesterday_disks.yaml <<-EOF
       - debug: msg="found Number of PVC events {{ result['ovirt_events'] | length }}"
       - name: delete disk if its exists
         include_tasks: delete_disk_if_older.yaml
+        no_log: true
         vars:
           disk_id: "{{ (item['description'] | regex_search('The disk (.+) was', '\\\1') | first )[1:-1]}}"
           create_time: "{{ item['time'] }}"
@@ -213,6 +218,7 @@ cat > remove_yesterday_disks.yaml <<-EOF
       - debug: msg="found Number of ovirt Disk events {{ result['ovirt_events'] | length }}"
       - name: delete disk if its exists
         include_tasks: delete_disk_if_older.yaml
+        no_log: true
         vars:
           disk_id: "{{ (item['description'] | regex_search('The disk (.+) was', '\\\1') | first )[1:-1]}}"
           create_time: "{{ item['time'] }}"
@@ -228,6 +234,8 @@ cat > remove_yesterday_disks.yaml <<-EOF
           - always
 EOF
 
-
+echo "######### running playbook `ansible-playbook ovirt_remove_old_resources.yaml` - removing leftover VMs  \n"
 ansible-playbook ovirt_remove_old_resources.yaml
+
+echo "######### running playbook `ansible-playbook remove_yesterday_disks.yaml` - removing leftover Disks - VMs and PVCs  \n"
 ansible-playbook remove_yesterday_disks.yaml
