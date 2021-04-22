@@ -52,7 +52,7 @@ terraform output -raw public_ip > "$IP_FILE"
 KEY="$SHARED_DIR/private.pem"
 IP="$(cat "$SHARED_DIR/public_ip")"
 HOST="ec2-user@$IP"
-OPT=(-o "StrictHostKeyChecking=no" -i "$KEY" "$HOST")
+OPT=(-o "UserKnownHostsFile=/dev/null" -o "StrictHostKeyChecking=no" -i "$KEY" "$HOST")
 echo "VM is $HOST"
 echo "Waiting up to 5 minutes for VM to be ready"
 _timeout=300
