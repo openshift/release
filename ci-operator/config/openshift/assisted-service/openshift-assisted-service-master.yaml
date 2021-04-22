@@ -146,6 +146,35 @@ tests:
         IP_STACK=v4
       DISCONNECTED: "true"
     workflow: baremetalds-assisted-operator
+- as: e2e-metal-assisted-operator-bmh
+  steps:
+    cluster_profile: packet
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NUM_WORKERS=2
+        NUM_EXTRA_WORKERS=1
+        PROVISIONING_NETWORK_PROFILE=Disabled
+    post:
+    - ref: baremetalds-assisted-operator-gather
+    - ref: baremetalds-devscripts-gather
+    - ref: baremetalds-packet-teardown
+    pre:
+    - ref: baremetalds-packet-setup
+    - ref: ipi-install-rbac
+    - ref: baremetalds-devscripts-setup
+    - chain: baremetalds-assisted-operator-lso
+    - ref: baremetalds-assisted-operator-setup
+    - ref: baremetalds-assisted-operator-bmh
+- as: e2e-metal-assisted-onprem
+  steps:
+    cluster_profile: packet
+    dependencies:
+      ASSISTED_SERVICE_IMAGE: pipeline:assisted-service
+    env:
+      ASSISTED_CONFIG: |
+        DEPLOY_TARGET=onprem
+    workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-ipv6
   steps:
     cluster_profile: packet
