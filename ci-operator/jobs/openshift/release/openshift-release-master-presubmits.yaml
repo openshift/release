@@ -76,7 +76,7 @@ presubmits:
         name: tmp
     trigger: (?m)^/test( | .* )app-ci-config-dry,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - master
     cluster: app.ci
@@ -85,6 +85,7 @@ presubmits:
     labels:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-release-master-arm01-dry
+    optional: true
     rerun_command: /test arm01-dry
     spec:
       containers:
@@ -140,7 +141,7 @@ presubmits:
         - core-services/prow/02_config/_boskos.yaml
         command:
         - /app
-        image: gcr.io/k8s-staging-boskos/checkconfig:v20210419-e2193a3
+        image: gcr.io/k8s-staging-boskos/checkconfig:v20210422-faafeaa
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -363,8 +364,6 @@ presubmits:
         - --registry
         - ./ci-operator/step-registry/
         - --validate-only
-        - --prow-config
-        - ./core-services/prow/02_config/_config.yaml
         command:
         - ci-operator-configresolver
         image: ci-operator-configresolver:latest
@@ -442,6 +441,8 @@ presubmits:
       - args:
         - --config-path
         - ./core-services/prow/02_config/_config.yaml
+        - --supplemental-prow-config-dir
+        - core-services/prow/02_config
         - --job-config-path
         - ./ci-operator/jobs/
         - --plugin-config
@@ -453,7 +454,7 @@ presubmits:
         - mismatched-tide-lenient
         command:
         - /checkconfig
-        image: gcr.io/k8s-prow/checkconfig:v20210419-8262f2d0c6
+        image: gcr.io/k8s-prow/checkconfig:v20210422-26f7676d97
         imagePullPolicy: Always
         name: ""
         resources:
@@ -725,7 +726,7 @@ presubmits:
         - ./hack/pj-rehearse.sh
         env:
         - name: KUBECONFIG
-          value: /var/kubeconfigs/sa.ci-operator.build01.config:/var/kubeconfigs/sa.ci-operator.build02.config:/var/kubeconfigs/sa.pj-rehearse.app.ci.config:/var/kubeconfigs/sa.ci-operator.vsphere.config:/var/kubeconfigs/sa.ci-operator.api.ci.config
+          value: /var/kubeconfigs/sa.ci-operator.build01.config:/var/kubeconfigs/sa.ci-operator.build02.config:/var/kubeconfigs/sa.pj-rehearse.app.ci.config:/var/kubeconfigs/sa.ci-operator.vsphere.config:/var/kubeconfigs/sa.ci-operator.api.ci.config:/var/kubeconfigs/sa.ci-operator.arm01.config
         image: pj-rehearse:latest
         imagePullPolicy: Always
         name: ""

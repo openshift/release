@@ -178,6 +178,7 @@ def _add_osd_rc_deployment(gendoc):
                                         # '--to=release',  # Removed according to release controller help
                                         *extra_rc_args,
                                         '--prow-config=/etc/config/config.yaml',
+                                        '--supplemental-prow-config-dir=/etc/config',
                                         '--job-config=/etc/job-config',
                                         f'--artifacts={context.fc_app_url}',
                                         '--listen=' + ('127.0.0.1:8080' if context.private else ':8080'),
@@ -194,7 +195,8 @@ def _add_osd_rc_deployment(gendoc):
                                         '--bugzilla-endpoint=https://bugzilla.redhat.com',
                                         '--bugzilla-api-key-path=/etc/bugzilla/api',
                                         '--plugin-config=/etc/plugins/plugins.yaml',
-                                        '--verify-bugzilla'],
+                                        '--verify-bugzilla',
+                                        '--authentication-message="Pulling these images requires <a href=\"https://docs.ci.openshift.org/docs/how-tos/use-registries-in-build-farm/\">authenticating to the app.ci cluster</a>."'],
                             'image': 'release-controller:latest',
                             'name': 'controller',
                             'volumeMounts': get_rc_volume_mounts(context)
