@@ -18,6 +18,24 @@ images:
       - destination_dir: .
         source_path: /go/bin/ci-ns-ttl-controller
   to: ci-ns-ttl-controller
+- build_args:
+    - name: user
+      value: jack
+    - name: password
+      secret_key_ref:
+        #oc --context build01 create secret generic build-credentials --from-literal=password=123 -n hongkliu-test
+        namespace: hongkliu-test
+        name: build-credentials
+        key: password
+  dockerfile_literal: |-
+    FROM centos:8
+    ARG user=tom
+    ARG password=secret
+    RUN echo "$user=$password="
+    RUN echo -n "$user=$password=" > /tmp/password.txt
+    RUN base64 /tmp/password.txt
+  from: os
+  to: test-image
 promotion:
   namespace: ci
   tag: latest
