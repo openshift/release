@@ -119,14 +119,14 @@ metadata:
  name: agent
 spec:
  databaseStorage:
-  storageClassName: assisted-service
+  storageClassName: my-local-storage
   accessModes:
   - ReadWriteOnce
   resources:
    requests:
     storage: 8Gi
  filesystemStorage:
-  storageClassName: assisted-service
+  storageClassName: my-local-storage
   accessModes:
   - ReadWriteOnce
   resources:
