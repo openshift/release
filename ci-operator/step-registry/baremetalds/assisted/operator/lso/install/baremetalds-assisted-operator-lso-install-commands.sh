@@ -14,13 +14,13 @@ ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths\{0,1\}".*/**
 
 set -xeo pipefail
 
-echo "Subscribing to local-storage-operator installation..."
+echo "Creating namespace 'openshift-local-storage'..."
+oc adm new-project openshift-local-storage || true
+
+oc annotate project openshift-local-storage openshift.io/node-selector=''
+
+echo "Subscribing for local-storage-operator installation..."
 cat <<EOCR | oc create -f -
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: openshift-local-storage
----
 apiVersion: operators.coreos.com/v1alpha2
 kind: OperatorGroup
 metadata:
@@ -31,24 +31,15 @@ spec:
   - openshift-local-storage
 ---
 apiVersion: operators.coreos.com/v1alpha1
-kind: CatalogSource
-metadata:
-  name: localstorage-operator-manifests
-  namespace: openshift-local-storage
-spec:
-  sourceType: grpc
-  image: quay.io/gnufied/gnufied-index:1.0.0
----
-apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
-  name: local-storage-subscription
+  name: local-storage-operator
   namespace: openshift-local-storage
 spec:
-  channel: preview
+  installPlanApproval: Automatic
   name: local-storage-operator
-  source: localstorage-operator-manifests
-  sourceNamespace: openshift-local-storage
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace
 EOCR
 
 echo "Waiting for LocalVolume CRD to be defined..."
@@ -64,7 +55,7 @@ cat <<EOCR | oc create -f -
 apiVersion: local.storage.openshift.io/v1
 kind: LocalVolume
 metadata:
-  name: fs
+  name: assisted-service
   namespace: openshift-local-storage
 spec:
   logLevel: Normal
@@ -76,8 +67,7 @@ spec:
         - /dev/sdd
         - /dev/sde
         - /dev/sdf
-      fsType: ext4
-      storageClassName: fs-lso
+      storageClassName: assisted-service
       volumeMode: Filesystem
 EOCR
 EOF
