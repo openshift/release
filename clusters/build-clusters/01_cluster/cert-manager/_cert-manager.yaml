@@ -10,7 +10,7 @@ metadata:
     app.kubernetes.io/instance: cert-manager
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: "cainjector"
-    helm.sh/chart: cert-manager-v0.15.1
+    helm.sh/chart: cert-manager-v0.16.0
 spec:
   replicas: 1
   selector:
@@ -26,12 +26,12 @@ spec:
         app.kubernetes.io/instance: cert-manager
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/component: "cainjector"
-        helm.sh/chart: cert-manager-v0.15.1
+        helm.sh/chart: cert-manager-v0.16.0
     spec:
       serviceAccountName: cert-manager-cainjector
       containers:
         - name: cert-manager
-          image: "quay.io/jetstack/cert-manager-cainjector:v0.15.1"
+          image: "quay.io/jetstack/cert-manager-cainjector:v0.16.0"
           imagePullPolicy: IfNotPresent
           args:
           - --v=2
@@ -56,7 +56,7 @@ metadata:
     app.kubernetes.io/instance: cert-manager
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: "controller"
-    helm.sh/chart: cert-manager-v0.15.1
+    helm.sh/chart: cert-manager-v0.16.0
 spec:
   replicas: 1
   selector:
@@ -72,7 +72,7 @@ spec:
         app.kubernetes.io/instance: cert-manager
         app.kubernetes.io/component: "controller"
         app.kubernetes.io/managed-by: Helm
-        helm.sh/chart: cert-manager-v0.15.1
+        helm.sh/chart: cert-manager-v0.16.0
       annotations:
         prometheus.io/path: "/metrics"
         prometheus.io/scrape: 'true'
@@ -81,7 +81,7 @@ spec:
       serviceAccountName: cert-manager
       containers:
         - name: cert-manager
-          image: "quay.io/jetstack/cert-manager-controller:v0.15.1"
+          image: "quay.io/jetstack/cert-manager-controller:v0.16.0"
           imagePullPolicy: IfNotPresent
           args:
           - --v=2
@@ -121,7 +121,7 @@ metadata:
     app.kubernetes.io/instance: cert-manager
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: "webhook"
-    helm.sh/chart: cert-manager-v0.15.1
+    helm.sh/chart: cert-manager-v0.16.0
 spec:
   replicas: 2
   selector:
@@ -137,17 +137,17 @@ spec:
         app.kubernetes.io/instance: cert-manager
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/component: "webhook"
-        helm.sh/chart: cert-manager-v0.15.1
+        helm.sh/chart: cert-manager-v0.16.0
     spec:
       serviceAccountName: cert-manager-webhook
       containers:
         - name: cert-manager
-          image: "quay.io/jetstack/cert-manager-webhook:v0.15.1"
+          image: "quay.io/jetstack/cert-manager-webhook:v0.16.0"
           imagePullPolicy: IfNotPresent
           args:
           - --v=2
           - --secure-port=10250
-          - --dynamic-serving-ca-secret-namespace=cert-manager
+          - --dynamic-serving-ca-secret-namespace=$(POD_NAMESPACE)
           - --dynamic-serving-ca-secret-name=cert-manager-webhook-ca
           - --dynamic-serving-dns-names=cert-manager-webhook,cert-manager-webhook.cert-manager,cert-manager-webhook.cert-manager.svc
           ports:
