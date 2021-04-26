@@ -119,6 +119,22 @@ echo "Snapshotting prometheus (may take 15s) ..."
 # Use logs and data the "last" monitoring pod in order to catch issues that occur when the first prometheus pod upgrades
 monitoring_pod="$( oc --insecure-skip-tls-verify get pods -n openshift-monitoring -o name | grep prometheus-k8s- | tail -1 )"
 queue ${ARTIFACT_DIR}/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${monitoring_pod}" -- tar cvzf - -C /prometheus .
+
+cat >> ${ARTIFACT_DIR}/custom-link-promecieus.html << EOF
+<html>
+<body>
+<script>
+function buildURL(item)
+{
+    item.href="https://promecieus.dptools.openshift.org/?search="+window.location.href;
+    return true;
+}
+</script>
+<a onclick="return buildURL(this)" href="">PromeCIeus</a>
+</body>
+</html>
+EOF
+
 FILTER=gzip queue ${ARTIFACT_DIR}/metrics/prometheus-target-metadata.json.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${monitoring_pod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/targets/metadata --data-urlencode 'match_target={instance!=\"\"}'"
 FILTER=gzip queue ${ARTIFACT_DIR}/metrics/prometheus-config.json.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${monitoring_pod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/config"
 queue ${ARTIFACT_DIR}/metrics/prometheus-tsdb-status.json oc --insecure-skip-tls-verify exec -n openshift-monitoring "${monitoring_pod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/tsdb"
