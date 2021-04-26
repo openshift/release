@@ -30,6 +30,8 @@ pull_secret_out=${SHARED_DIR}/pull-secret
 tfvars_out=${SHARED_DIR}/terraform.tfvars
 ocp_version=$(echo $RELEASE_IMAGE_LATEST | cut -d: -f2)
 ocp_version=$(echo $ocp_version | cut -d- -f1)
+echo "${NAMESPACE}-${JOB_NAME_HASH}" > "${SHARED_DIR}"/clustername.txt
+cluster_name=$(<"${SHARED_DIR}"/clustername.txt)
 
 export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${RELEASE_IMAGE_LATEST}
 # Ensure ignition assets are configured with the correct invoker to track CI jobs.
@@ -41,6 +43,7 @@ cp ${pull_secret_in} ${pull_secret_out}
 # Create terraform.tfvars
 echo "$(date -u --rfc-3339=seconds) - Creating terraform variables file..."
 cat > "${tfvars_out}" <<-EOF
+cluster_id = "${cluster_name}"
 cloud_domain = "${CLUSTER_DOMAIN}"
 openshift_version = "${ocp_version}"
 image_override = "${RELEASE_IMAGE_LATEST}"
