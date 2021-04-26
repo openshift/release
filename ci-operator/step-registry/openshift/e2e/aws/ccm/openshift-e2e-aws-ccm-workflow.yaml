@@ -1,0 +1,19 @@
+workflow:
+  as: openshift-e2e-aws-ccm
+  steps:
+    pre:
+    - chain: ipi-aws-pre
+    - ref: ccm-conf-apply-feature-gate
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - chain: gather-core-dump
+    - chain: ipi-aws-post
+    env:
+      TEST_SKIPS: >-
+        \[sig-arch\]\[Early\] Managed cluster should start all core operators \[Skipped:Disconnected\]\|
+        \[sig-instrumentation\] Prometheus when installed on the cluster shouldn't report any alerts in firing state apart from Watchdog and AlertmanagerReceiversNotConfigured \[Early\] \[Skipped:Disconnected\]\|
+        Alerts shouldn't report any alerts in firing or pending state
+  documentation: |-
+    The Openshift E2E AWS workflow using CCM as a primary mean to initialize nodes and create external LoadBalancers.
+    Executes the common end-to-end test suite on AWS to test updated cluster configuration.

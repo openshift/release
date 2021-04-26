@@ -189,6 +189,18 @@ getUserIDByLDAPName() {
   curl -Ss --fail -H "X-vault-token: ${VAULT_TOKEN}" "$VAULT_ADDR/v1/identity/entity/id?list=true" \
    |jq --arg user "$1" '.data.key_info|to_entries[]|select(.value.aliases[0].name == $user)|.key' -r
 }
+
+# unused but left for documentation purposes
+upsertUser() {
+  user=$1
+  if [[ -n "$(getUserIDByLDAPName $1)" ]]; then echo "User $user already exists, skipping create"; return; fi
+  oidc_acessor="$(vault auth list --format=json |jq '."oidc/".accessor' -r)"
+  create_response="$(vault write -format=json identity/entity name="$user" policies="default")"
+  id="$(echo $create_response|jq .data.id -r)"
+  vault write identity/entity-alias name="$user" canonical_id="$id" mount_accessor="$oidc_acessor" >/dev/null
+  echo "Successfully created user $user"
+}
+
 getUserIDByLDAPName brawilli
 vault write identity/group name="release-controller" policies="release-controller" member_entity_ids="$(getUserIDByLDAPName brawilli)"
 
@@ -247,7 +259,8 @@ dptp_member_aliases='[
   "bbarcaro",
   "apavel",
   "nmoraiti",
-  "pmuller"
+  "pmuller",
+  "eberglin"
  ]'
 dptp_ids="$(curl -Ss --fail -H "X-vault-token: ${VAULT_TOKEN}" "$VAULT_ADDR/v1/identity/entity/id?list=true" \
             |jq \

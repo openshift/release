@@ -96,8 +96,13 @@ tag_specification:
   name: "4.7"
   namespace: ocp
 tests:
+- as: lint
+  commands: make lint
+  container:
+    from: src
 - as: unit
-  commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/es-proxy-logs ARTIFACT_DIR=${ARTIFACT_DIR}/es-proxy-artifacts make test
+  commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/es-proxy-logs ARTIFACT_DIR=${ARTIFACT_DIR}/es-proxy-artifacts
+    make test
   container:
     from: src
 - as: cluster-logging-operator-e2e
@@ -108,7 +113,8 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts make test-e2e-olm E2E_TEST_INCLUDES=logforwarding CLF_TEST_INCLUDES=elasticsearchmanaged
+      commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts
+        make test-e2e-olm E2E_TEST_INCLUDES=logforwarding CLF_TEST_INCLUDES=elasticsearchmanaged
       dependencies:
       - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
         name: pipeline:cluster-logging-operator-registry
@@ -141,7 +147,8 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts make test-e2e-olm
+      commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts
+        make test-e2e-olm
       dependencies:
       - env: IMAGE_ELASTICSEARCH_OPERATOR_REGISTRY
         name: pipeline:elasticsearch-operator-registry

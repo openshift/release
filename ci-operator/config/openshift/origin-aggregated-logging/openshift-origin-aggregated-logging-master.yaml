@@ -39,6 +39,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-openshift-4.6
+  logging-eventrouter:
+    name: "5.1"
+    namespace: logging
+    tag: logging-eventrouter
   oauth-proxy:
     name: "4.7"
     namespace: ocp
@@ -91,10 +95,6 @@ images:
   dockerfile_path: Dockerfile
   from: ubi8-python36
   to: logging-curator5
-- context_dir: eventrouter/
-  dockerfile_path: Dockerfile.centos7
-  from: golang-builder
-  to: logging-eventrouter
 promotion:
   additional_images:
     logging-ci-test-runner: src
@@ -113,6 +113,10 @@ tag_specification:
   name: "4.7"
   namespace: ocp
 tests:
+- as: lint
+  commands: make lint
+  container:
+    from: src
 - as: unit
   commands: /tmp/run.sh
   container:
@@ -189,7 +193,8 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts make test-e2e-olm
+      commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts
+        make test-e2e-olm
       dependencies:
       - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
         name: pipeline:cluster-logging-operator-registry
@@ -224,7 +229,8 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts make test-functional
+      commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts
+        make test-functional
       dependencies:
       - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
         name: pipeline:cluster-logging-operator-registry
