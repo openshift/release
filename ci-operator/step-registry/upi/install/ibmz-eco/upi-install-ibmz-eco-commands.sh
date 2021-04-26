@@ -9,7 +9,7 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 export http_proxy="http://204.90.115.172:8080"
 export https_proxy="http://204.90.115.172:8080"
 
-ibmz_eco_cloud_auth=/var/run/secrets/clouds.yaml
+ibmz_eco_cloud_auth=/var/run/secrets/openstack/clouds.yaml
 cluster_name=$(<"${SHARED_DIR}"/clustername.txt)
 installer_dir=/deploy
 cluster_dir=/deploy/ocp_clusters/${cluster_name}
