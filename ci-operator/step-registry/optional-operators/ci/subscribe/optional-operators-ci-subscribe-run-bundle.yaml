@@ -1,0 +1,34 @@
+ref:
+  as: optional-operators-ci-run-bundle
+  from: cli
+  commands: optional-operators-ci-subscribe-run-bundle.sh
+  resources:
+    requests:
+      cpu: 300m
+      memory: 300Mi
+  env:
+  - name: OO_BUNDLE_IMG
+    documentation: |
+      Bundle Image specifies the Operator bundle image, and this is a required parameter. 
+      The bundle image must be pullable and it should contain the full registry path specified.
+  - name: OO_INSTALL_NAMESPACE
+    default: "!create"
+    documentation: | 
+      This namespace must already exist in the cluster. 
+      This is an optional field which will default to the kubeconfig context if not provided.
+  - name: OO_TARGET_NAMESPACE
+    default: "!all"
+    documentation: |
+      The default value `!all` means the Operator will watch all namespaces (cluster-scoped Operators).
+      If the value is `!own`, then the Operator will watch its own namespace (from namespace or the kubeconfig default).
+      If the value is `!single`, the the Operator will watch a namespace, not necessarily its own.
+      This is an optional parameter, but if the CSV does not support AllNamespaces, 
+      then this parameter becomes required to instruct run bundle with the appropriate target namespace.
+  - name: OO_INDEX_IMG
+    default: "quay.io/operator-framework/upstream-opm-builder:latest"
+    documentation: |
+      This specifies an index image in which to inject the given bundle. 
+      This is an optional field which will default to quay.io/operator-framework/upstream-opm-builder:latest
+  documentation: |-
+    The run bundle step installs an optional operator bundle using the operator bundle image.
+
