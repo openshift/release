@@ -17,6 +17,7 @@ cluster_dir=/deploy/ocp_clusters/${cluster_name}
 echo "$(date -u --rfc-3339=seconds) - Copying config from shared dir..."
 
 pushd ${installer_dir}
+mkdir -p ${cluster_dir}
 
 cp -t "${installer_dir}" \
     "${SHARED_DIR}/terraform.tfvars" \
