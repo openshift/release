@@ -238,8 +238,11 @@ path "kv/metadata/selfservice/*" {
   capabilities = ["list", "delete"]
 }
 
+# We create a marker item and create is
+# actually upsert, so needs both read and
+# create
 path "kv/data/selfservice/*" {
-  capabilities = ["create"]
+  capabilities = ["create", "read"]
 }
 EOH
 vault write auth/kubernetes/role/vault-secret-collection-manager \
