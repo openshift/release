@@ -28,14 +28,14 @@ tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/dev-scripts.tar.gz"
 # Prepare configuration and run dev-scripts
 scp "${SSHOPTS[@]}" "${CLUSTER_PROFILE_DIR}/pull-secret" "root@${IP}:pull-secret"
 
-# Additional mechanism to inject dev-scripts additional variables directly 
+# Additional mechanism to inject dev-scripts additional variables directly
 # from a multistage step configuration.
 # Backward compatible with the previous approach based on creating the
 # dev-scripts-additional-config file from a multistage step command
 if [[ -n "${DEVSCRIPTS_CONFIG:-}" ]]; then
   readarray -t config <<< "${DEVSCRIPTS_CONFIG}"
   for var in "${config[@]}"; do
-    if [[ ! -z "${var}" ]]; then 
+    if [[ ! -z "${var}" ]]; then
       echo "export ${var}" >> "${SHARED_DIR}/dev-scripts-additional-config"
     fi
   done
@@ -104,4 +104,4 @@ echo "export DS_REGISTRY=\$LOCAL_REGISTRY_DNS_NAME:\$LOCAL_REGISTRY_PORT" >> /tm
 echo "export DS_WORKING_DIR=\$WORKING_DIR" >> /tmp/ds-vars.conf
 EOF
 
-scp "${SSHOPTS[@]}" "root@${IP}:/tmp/ds-vars.conf" "${SHARED_DIR}/ds-vars.conf"
+scp "${SSHOPTS[@]}" "root@${IP}:/root/dev-scripts/ocp/ostest/auth/kubeconfig /tmp/ds-vars.conf" "${SHARED_DIR}/"
