@@ -183,6 +183,11 @@ path "kv/data/dptp/openshift-ci-release-signature-publisher" {
 path "kv/metadata/dptp/*" {
   capabilities = ["list"]
 }
+
+# Allows getting the old revisions
+path "kv/metadata/dptp/openshift-ci-release-signature-*" {
+  capabilities = ["read"]
+}
 EOH
 
 getUserIDByLDAPName() {
