@@ -104,17 +104,13 @@ data:
         - filename
       - pack:
           labels:
-          - name
           - namespace
           - pod_name
-          - container
           - container_name
           - app
-          - stream
-          - pod_template_hash
-          - controller_revision_hash
-          - ingresscontroller_operator_openshift_io_hash
-          - pod_template_generation
+      - labelallow:
+          - host
+          - invoker
       relabel_configs:
       - source_labels:
         - __meta_kubernetes_pod_label_name
@@ -147,6 +143,8 @@ data:
         - __meta_kubernetes_pod_uid
         - __meta_kubernetes_pod_container_name
         target_label: __path__
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_(.+)
     - job_name: journal
       journal:
         path: /var/log/journal
@@ -158,8 +156,14 @@ data:
         - stream
       - pack:
           labels:
-          - __journal__boot_id
-          - __journal__systemd_unit
+          - boot_id
+          - systemd_unit
+      - labelallow:
+          - host
+          - invoker
+      relabel_configs:
+      - action: labelmap
+        regex: __journal__(.+)
     server:
       http_listen_port: 3101
     target_config:
