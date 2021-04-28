@@ -15,7 +15,8 @@ images:
   to: node-maintenance-operator
 operator:
   bundles:
-  - dockerfile_path: build/bundle.Dockerfile
+  - as: nmo-bundle
+    dockerfile_path: build/bundle.Dockerfile
   substitutions:
   - pullspec: quay.io/kubevirt/node-maintenance-operator:latest
     with: pipeline:node-maintenance-operator
@@ -37,11 +38,14 @@ tests:
 - as: openshift-e2e
   steps:
     cluster_profile: aws
+    dependencies:
+      OO_BUNDLE_IMG: nmo-bundle
     env:
-      OO_CHANNEL: "4.8"
       OO_INSTALL_NAMESPACE: default
-      OO_PACKAGE: node-maintenance-operator
       OO_TARGET_NAMESPACES: '!install'
+    pre:
+    - chain: ipi-aws-pre
+    - ref: optional-operators-ci-run-bundle
     test:
     - as: e2e
       commands: make cluster-functest
