@@ -772,20 +772,13 @@ periodics:
       - --supplemental-prow-config-dir=./core-services/prow/02_config
       - --job-config-path=./ci-operator/jobs
       - --confirm=true
-      - --github-app-id=$(GITHUB_APP_ID)
-      - --github-app-private-key-path=/etc/github/cert
+      - --github-token-path=/etc/github/oauth
       - --github-endpoint=http://ghproxy
       - --github-endpoint=https://api.github.com
       - --github-graphql-endpoint=http://ghproxy/graphql
-      - --tokens=6000
+      - --tokens=3000
       command:
       - /app/prow/cmd/branchprotector/app.binary
-      env:
-      - name: GITHUB_APP_ID
-        valueFrom:
-          secretKeyRef:
-            key: appid
-            name: openshift-prow-github-app
       image: gcr.io/k8s-prow/branchprotector:v20210428-518ab2b454
       imagePullPolicy: Always
       name: ""
@@ -799,7 +792,7 @@ periodics:
     volumes:
     - name: github-app-credentials
       secret:
-        secretName: openshift-prow-github-app
+        secretName: github-credentials-openshift-merge-robot
 - agent: kubernetes
   cluster: app.ci
   decorate: true
