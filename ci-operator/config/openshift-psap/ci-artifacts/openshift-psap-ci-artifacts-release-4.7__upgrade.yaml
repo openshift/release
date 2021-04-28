@@ -17,6 +17,11 @@ releases:
     candidate:
       product: ocp
       stream: nightly
+      version: "4.6"
+  target:
+    candidate:
+      product: ocp
+      stream: nightly
       version: "4.7"
 resources:
   '*':
@@ -26,14 +31,14 @@ resources:
       cpu: 2000m
       memory: 2Gi
 tests:
-- as: gpu-operator-e2e
-  cron: 0 */23 * * *
+- as: gpu-operator-e2e-upgrade
+  cron: 0 12 * * 3
   steps:
     cluster_profile: aws
     test:
-    - as: nightly
+    - as: 0-preupgrade-gpu-operator-test-master-branch
       cli: latest
-      commands: run gpu-operator_test-operatorhub
+      commands: run gpu-operator test_master_branch
       credentials:
       - mount_path: /var/run/psap-entitlement-secret
         name: psap-entitlement-secret
@@ -43,15 +48,26 @@ tests:
         requests:
           cpu: 2000m
           memory: 2Gi
-    workflow: ipi-aws
-- as: gpu-operator-e2e-master
-  cron: 0 */23 * * *
-  steps:
-    cluster_profile: aws
-    test:
-    - as: nightly
+    - as: 1-upgrade
       cli: latest
-      commands: run gpu-operator_test-master-branch
+      commands: run cluster upgrade
+      credentials:
+      - mount_path: /var/run/psap-entitlement-secret
+        name: psap-entitlement-secret
+        namespace: test-credentials
+      dependencies:
+      - env: CLUSTER_UPGRADE_INITIAL_IMAGE
+        name: release:latest
+      - env: CLUSTER_UPGRADE_TARGET_IMAGE
+        name: release:target
+      from: ci-artifacts
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+    - as: 2-postupgrade-gpu-operator-validate-deployment
+      cli: latest
+      commands: run gpu-operator validate_deployment
       credentials:
       - mount_path: /var/run/psap-entitlement-secret
         name: psap-entitlement-secret
@@ -66,3 +82,4 @@ zz_generated_metadata:
   branch: release-4.7
   org: openshift-psap
   repo: ci-artifacts
+  variant: upgrade
