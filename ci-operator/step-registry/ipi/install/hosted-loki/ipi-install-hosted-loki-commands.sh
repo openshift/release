@@ -214,7 +214,7 @@ spec:
               fieldPath: spec.nodeName
         - name: INVOKER
           value: "${OPENSHIFT_INSTALL_INVOKER}"
-        image: grafana/promtail:${LOKI_VERSION}
+        image: quay.io/vrutkovs/promtail:${LOKI_VERSION}
         imagePullPolicy: IfNotPresent
         lifecycle:
           preStop:
