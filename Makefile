@@ -114,7 +114,7 @@ all: roles prow projects
 roles: cluster-operator-roles
 .PHONY: roles
 
-prow: ci-ns prow-jobs
+prow: ci-ns
 .PHONY: prow
 
 ci-ns:
@@ -124,20 +124,6 @@ ci-ns:
 openshift-ns:
 	oc project openshift
 .PHONY: openshift-ns
-
-prow-jobs: prow-artifacts
-	$(MAKE) apply WHAT=ci-operator/templates/os.yaml
-.PHONY: prow-jobs
-
-prow-artifacts:
-	oc create ns ci-pr-images -o yaml --dry-run | oc apply -f -
-	oc policy add-role-to-group system:image-puller system:unauthenticated -n ci-pr-images
-	oc policy add-role-to-group system:image-puller system:authenticated -n ci-pr-images
-	oc tag --source=docker centos:7 openshift/centos:7 --scheduled
-
-	oc create ns ci-rpms -o yaml --dry-run | oc apply -f -
-	oc apply -f ci-operator/infra/openshift/origin/
-.PHONY: prow-artifacts
 
 prow-release-controller-definitions:
 	hack/annotate.sh

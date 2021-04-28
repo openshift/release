@@ -183,6 +183,11 @@ path "kv/data/dptp/openshift-ci-release-signature-publisher" {
 path "kv/metadata/dptp/*" {
   capabilities = ["list"]
 }
+
+# Allows getting the old revisions
+path "kv/metadata/dptp/openshift-ci-release-signature-*" {
+  capabilities = ["read"]
+}
 EOH
 
 getUserIDByLDAPName() {
@@ -233,8 +238,11 @@ path "kv/metadata/selfservice/*" {
   capabilities = ["list", "delete"]
 }
 
+# We create a marker item and create is
+# actually upsert, so needs both read and
+# create
 path "kv/data/selfservice/*" {
-  capabilities = ["create"]
+  capabilities = ["create", "read"]
 }
 EOH
 vault write auth/kubernetes/role/vault-secret-collection-manager \

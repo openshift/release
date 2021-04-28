@@ -68,7 +68,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210425-90a51ec731
+      image: gcr.io/k8s-prow/commenter:v20210428-434e3960c2
       imagePullPolicy: Always
       name: ""
       resources:
@@ -154,7 +154,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210425-90a51ec731
+      image: gcr.io/k8s-prow/commenter:v20210428-434e3960c2
       imagePullPolicy: Always
       name: ""
       resources:
@@ -207,7 +207,7 @@ periodics:
       - --random
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210425-90a51ec731
+      image: gcr.io/k8s-prow/commenter:v20210428-434e3960c2
       imagePullPolicy: Always
       name: ""
       resources:
@@ -252,7 +252,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210425-90a51ec731
+      image: gcr.io/k8s-prow/commenter:v20210428-434e3960c2
       imagePullPolicy: Always
       name: ""
       resources:
@@ -301,7 +301,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210425-90a51ec731
+      image: gcr.io/k8s-prow/commenter:v20210428-434e3960c2
       imagePullPolicy: Always
       name: ""
       resources:
@@ -349,7 +349,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210425-90a51ec731
+      image: gcr.io/k8s-prow/commenter:v20210428-434e3960c2
       imagePullPolicy: Always
       name: ""
       resources:
@@ -383,7 +383,7 @@ periodics:
       - --debug
       command:
       - /app/label_sync/app.binary
-      image: gcr.io/k8s-prow/label_sync:v20210425-90a51ec731
+      image: gcr.io/k8s-prow/label_sync:v20210428-434e3960c2
       imagePullPolicy: Always
       name: ""
       resources:
@@ -772,14 +772,21 @@ periodics:
       - --supplemental-prow-config-dir=./core-services/prow/02_config
       - --job-config-path=./ci-operator/jobs
       - --confirm=true
-      - --github-token-path=/etc/github/oauth
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
       - --github-endpoint=http://ghproxy
       - --github-endpoint=https://api.github.com
       - --github-graphql-endpoint=http://ghproxy/graphql
-      - --tokens=3000
+      - --tokens=6000
       command:
       - /app/prow/cmd/branchprotector/app.binary
-      image: gcr.io/k8s-prow/branchprotector:v20210425-90a51ec731
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-prow-github-app
+      image: gcr.io/k8s-prow/branchprotector:v20210428-434e3960c2
       imagePullPolicy: Always
       name: ""
       resources:
@@ -787,12 +794,12 @@ periodics:
           cpu: 500m
       volumeMounts:
       - mountPath: /etc/github
-        name: token
+        name: github-app-credentials
         readOnly: true
     volumes:
-    - name: token
+    - name: github-app-credentials
       secret:
-        secretName: github-credentials-openshift-merge-robot
+        secretName: openshift-prow-github-app
 - agent: kubernetes
   cluster: app.ci
   decorate: true
@@ -826,7 +833,7 @@ periodics:
       - --fix-repos
       command:
       - /app/prow/cmd/peribolos/app.binary
-      image: gcr.io/k8s-prow/peribolos:v20210425-90a51ec731
+      image: gcr.io/k8s-prow/peribolos:v20210428-434e3960c2
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1101,7 +1108,7 @@ periodics:
       env:
       - name: KUBECONFIG
         value: /etc/build-farm-credentials/api.ci.kubeconfig:/etc/build-farm-credentials/build01.kubeconfig:/etc/build-farm-credentials/app.ci.kubeconfig:/etc/build-farm-credentials/build02.kubeconfig:/etc/build-farm-credentials/vsphere.kubeconfig
-      image: gcr.io/k8s-prow/config-bootstrapper:v20210425-90a51ec731
+      image: gcr.io/k8s-prow/config-bootstrapper:v20210428-434e3960c2
       imagePullPolicy: Always
       name: ""
       resources:
