@@ -94,7 +94,7 @@ def get_rc_volumes(context, namespace=None):
             'name': 'oauth',
             'secret': {
                 'defaultMode': 420,
-                'secretName': 'github-credentials-openshift-ci-robot'
+                'secretName': 'github-credentials-openshift-merge-robot'
             }
         },
         {

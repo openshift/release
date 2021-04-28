@@ -14,7 +14,7 @@ metadata:
 spec:
   config:
     ignition:
-      version: 3.1.0
+      version: "${IGNITIONVERSION}"
     systemd:
       units:
         - contents: |
