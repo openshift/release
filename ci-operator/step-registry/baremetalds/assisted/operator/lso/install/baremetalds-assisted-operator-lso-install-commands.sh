@@ -55,7 +55,7 @@ cat <<EOCR | oc create -f -
 apiVersion: local.storage.openshift.io/v1
 kind: LocalVolume
 metadata:
-  name: assisted-service
+  name: my-local-storage
   namespace: openshift-local-storage
 spec:
   logLevel: Normal
@@ -67,7 +67,7 @@ spec:
         - /dev/sdd
         - /dev/sde
         - /dev/sdf
-      storageClassName: assisted-service
+      storageClassName: my-local-storage
       volumeMode: Filesystem
 EOCR
 EOF
