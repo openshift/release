@@ -4,6 +4,10 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if [[ -n $(echo "$JOB_NAME" | grep -P '\-master\-') ]]; then
+exit 0
+fi
+
 if [ "$(id -u)" -ge 500 ]; then
     echo "runner:x:$(id -u):$(id -g):,,,:/runner:/bin/bash" > /tmp/passwd
     cat /tmp/passwd >> /etc/passwd
