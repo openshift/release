@@ -7,10 +7,6 @@ base_images:
     name: release
     namespace: openshift
     tag: golang-1.15
-  rust:
-    name: rust
-    namespace: ci
-    tag: 1.47.0
   ubi:
     name: ubi
     namespace: ocp
@@ -22,16 +18,27 @@ build_root:
     tag: golang-1.15
 images:
 - dockerfile_literal: |
-    FROM rust
+    FROM ubi
     COPY . /opt/app-root/src/
     WORKDIR /opt/app-root/src/cincinnati
     USER 0
+    ENV HOME="/root"
+    ENV PATH="${HOME}/.cargo/bin:${HOME}/.local/bin:${PATH}"
     RUN chgrp root /opt/app-root/src/cincinnati && \
         chmod g+w /opt/app-root/src/cincinnati && \
-        dnf install -y jq && \
+        dnf install -y jq python3 && \
         dnf clean all
+    # build: Rust stable toolchain
+    RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain 1.50.0 -y && \
+      rustup install 1.46.0
+    # install yamllint
+    RUN pip3 install --user yamllint
+    RUN \
+      mkdir -p $HOME/.cargo/git/ && \
+      find $HOME/. -type d -exec chmod 777 {} \; && \
+      find $HOME/. -type f -exec chmod ugo+rw {} \;
     USER 1001
-  from: rust
+  from: ubi
   inputs:
     src:
       paths:
@@ -40,9 +47,6 @@ images:
   to: src-base
 - dockerfile_path: dist/Dockerfile.rust-toolset/Dockerfile
   inputs:
-    src-base:
-      as:
-      - registry.redhat.io/rhel8/rust-toolset:1.47.0
     ubi:
       as:
       - registry.access.redhat.com/ubi8/ubi:latest
@@ -52,9 +56,6 @@ images:
     openshift_release_golang-1.13:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.13
-    src-base:
-      as:
-      - registry.redhat.io/rhel8/rust-toolset:1.47.0
     ubi:
       as:
       - registry.access.redhat.com/ubi8/ubi:latest
@@ -126,6 +127,18 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+- as: yaml-lint
+  commands: dist/prow_yaml_lint.sh
+  container:
+    from: src-base
+- as: rustfmt-1.50.0
+  commands: dist/prow_rustfmt.sh 1.50.0
+  container:
+    from: src-base
+- as: rustfmt-1.46.0
+  commands: dist/prow_rustfmt.sh 1.46.0
+  container:
+    from: src-base
 - as: e2e
   steps:
     cluster_profile: aws
