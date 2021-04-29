@@ -16,8 +16,9 @@ cluster_dir=${installer_dir}/ocp_clusters/${cluster_name}
 
 echo "$(date -u --rfc-3339=seconds) - Copying config from shared dir..."
 
-pushd ${installer_dir}
 mkdir -p ${cluster_dir}
+pushd ${installer_dir}
+
 
 cp -t "${installer_dir}" \
     "${SHARED_DIR}/terraform.tfvars" \
@@ -29,6 +30,8 @@ cp -t "${cluster_dir}" \
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
 echo "$(date -u --rfc-3339=seconds) - Deploying cluster on IBM Z Ecosystem Cloud..."
+# Modify /deploy path to /tmp/deploy for rootless
+sed -i "s#/deploy/#/tmp/deploy/#g" entrypoint.sh 
 /entrypoint.sh apply &
 wait "$!"
 
