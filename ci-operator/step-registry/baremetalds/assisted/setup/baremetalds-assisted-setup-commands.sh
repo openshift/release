@@ -96,6 +96,7 @@ echo "export ASSISTED_SERVICE_HOST=${IP}" >> /root/config
 echo "export CHECK_CLUSTER_VERSION=True" >> /root/config
 echo "export NUM_WORKERS=2" >> /root/config
 echo "export TEST_TEARDOWN=false" >> /root/config
+echo "export INSTALLER_KUBECONFIG=\${REPO_DIR}/build/kubeconfig" >> /root/config
 
 if [[ -e /root/assisted-additional-config ]]
 then
@@ -113,6 +114,12 @@ ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths\{0,1\}".*/**
 
 set -xeuo pipefail
 
+cd /home/assisted
+source /root/config
+
 echo "export KUBECONFIG=/home/assisted/build/kubeconfig" >> /root/.bashrc
+export KUBECONFIG=/home/assisted/build/kubeconfig
+
+\${POST_INSTALL_COMMAND:-}
 
 EOF
