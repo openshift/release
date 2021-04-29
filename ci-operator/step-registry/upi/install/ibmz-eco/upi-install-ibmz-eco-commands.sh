@@ -34,6 +34,7 @@ echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 echo "$(date -u --rfc-3339=seconds) - Deploying cluster on IBM Z Ecosystem Cloud..."
 # Modify /deploy path to /tmp/deploy for rootless
 sed -i "s#/deploy/#/tmp/deploy/#g" ./entrypoint.sh 
+terraform init
 ./entrypoint.sh apply &
 wait "$!"
 
