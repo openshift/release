@@ -28,7 +28,9 @@ export HOME=/tmp
 pull_secret_in=/etc/pull-secret/.dockerconfigjson
 pull_secret_out=${SHARED_DIR}/pull-secret
 tfvars_out=${SHARED_DIR}/terraform.tfvars
-ocp_version=$(echo $RELEASE_IMAGE_LATEST | cut -d: -f2)
+ocp_version=$(oc adm release info "${RELEASE_IMAGE_LATEST}" --output=jsonpath={.metadata.version})
+echo "Configuring deployment of OpenShift ${ocp_version}"
+ocp_version=$(echo $ocp_version | cut -d: -f2)
 ocp_version=$(echo $ocp_version | cut -d- -f1)
 echo "${NAMESPACE}-${JOB_NAME_HASH}" > "${SHARED_DIR}"/clustername.txt
 cluster_name=$(<"${SHARED_DIR}"/clustername.txt)
@@ -52,5 +54,5 @@ openstack_master_flavor_name = "large"
 openstack_worker_flavor_name = "${OPENSTACK_COMPUTE_FLAVOR}"
 openstack_bastion_flavor_name = "medium"
 openstack_credentials_cloud = "${OS_CLOUD}"
-openshift_pull_secret_filepath = "/tmp/deploy/ocp_clusters/${cluster_name}/pull-secret"
+openshift_pull_secret_filepath = "./ocp_clusters/${cluster_name}/pull-secret"
 EOF
