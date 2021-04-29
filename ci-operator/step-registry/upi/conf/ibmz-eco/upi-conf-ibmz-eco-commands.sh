@@ -52,5 +52,5 @@ openstack_master_flavor_name = "large"
 openstack_worker_flavor_name = "${OPENSTACK_COMPUTE_FLAVOR}"
 openstack_bastion_flavor_name = "medium"
 openstack_credentials_cloud = "${OS_CLOUD}"
-openshift_pull_secret_filepath = "/tmp/deploy/pull-secret"
+openshift_pull_secret_filepath = "/tmp/deploy/ocp_clusters/${cluster_name}/pull-secret"
 EOF
