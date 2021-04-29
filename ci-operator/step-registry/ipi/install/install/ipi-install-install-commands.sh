@@ -34,7 +34,7 @@ function prepare_next_steps() {
   fi
 }
 
-trap 'prepare_next_steps' EXIT
+trap 'prepare_next_steps' EXIT TERM
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 if [[ -z "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" ]]; then
