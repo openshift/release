@@ -38,10 +38,10 @@ spec:
           RuntimeDirectory=container-mount-namespace
           Environment=RUNTIME_DIRECTORY=%t/container-mount-namespace
           Environment=BIND_POINT=%t/container-mount-namespace/mnt
-          ExecStartPre=bash -c "findmnt ${RUNTIME_DIRECTORY} || mount --make-unbindable --bind ${RUNTIME_DIRECTORY} ${RUNTIME_DIRECTORY}"
-          ExecStartPre=touch ${BIND_POINT}
-          ExecStart=unshare --mount=${BIND_POINT} --propagation slave mount --make-rshared /
-          ExecStop=umount -R ${RUNTIME_DIRECTORY}
+          ExecStartPre=bash -c "findmnt \${RUNTIME_DIRECTORY} || mount --make-unbindable --bind \${RUNTIME_DIRECTORY} \${RUNTIME_DIRECTORY}"
+          ExecStartPre=touch \${BIND_POINT}
+          ExecStart=unshare --mount=\${BIND_POINT} --propagation slave mount --make-rshared /
+          ExecStop=umount -R \${RUNTIME_DIRECTORY}
       - name: crio.service
         dropins:
         - name: 20-container-mount-namespace.conf
@@ -55,7 +55,7 @@ spec:
             EnvironmentFile=-/%t/%N-execstart.env
             ExecStart=
             ExecStart=bash -c "nsenter --mount=%t/container-mount-namespace/mnt \
-                ${ORIG_EXECSTART}"
+                \${ORIG_EXECSTART}"
       - name: kubelet.service
         dropins:
         - name: 20-container-mount-namespace.conf
@@ -69,5 +69,5 @@ spec:
             EnvironmentFile=-/%t/%N-execstart.env
             ExecStart=
             ExecStart=bash -c "nsenter --mount=%t/container-mount-namespace/mnt \
-                ${ORIG_EXECSTART}"
+                \${ORIG_EXECSTART}"
 EOF
