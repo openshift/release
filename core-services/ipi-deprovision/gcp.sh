@@ -23,12 +23,13 @@ function deprovision() {
 logdir="${ARTIFACTS}/deprovision"
 mkdir -p "${logdir}"
 
-
-gce_cluster_age_cutoff="$(TZ=":America/Los_Angeles" date --date="${CLUSTER_TTL}-4 hours" '+%Y-%m-%dT%H:%M%z')"
-echo "deprovisioning clusters with a creationTimestamp before ${gce_cluster_age_cutoff} in GCE ..."
+echo 'Activating service account using provided credentials ...'
 export CLOUDSDK_CONFIG=/tmp/gcloudconfig
 mkdir -p "${CLOUDSDK_CONFIG}"
 gcloud auth activate-service-account --key-file="${GOOGLE_APPLICATION_CREDENTIALS}"
+
+gce_cluster_age_cutoff="$(TZ=":America/Los_Angeles" date --date="${CLUSTER_TTL}-4 hours" '+%Y-%m-%dT%H:%M%z')"
+echo "deprovisioning clusters with a creationTimestamp before ${gce_cluster_age_cutoff} in GCE ..."
 
 GCP_PROJECT=$(gcloud projects list --format 'value(projectId)' | tr -d '\n')
 echo "GCP project: ${GCP_PROJECT}"
