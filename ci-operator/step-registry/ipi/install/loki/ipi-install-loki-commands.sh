@@ -598,7 +598,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
-        image: grafana/promtail:${LOKI_VERSION}
+        image: quay.io/vrutkovs/promtail:${LOKI_VERSION}
         imagePullPolicy: IfNotPresent
         name: promtail
         ports:
