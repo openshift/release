@@ -18,7 +18,8 @@ cd /root/dev-scripts
 source common.sh
 
 echo "Creating disks..."
-for node in $(virsh list --name | grep ${CLUSTER_NAME}_worker); do
+for node in $(virsh list --name | grep ${CLUSTER_NAME}_worker ||
+              virsh list --name | grep ${CLUSTER_NAME}_master); do
     for disk in sd{b..f}; do
         qemu-img create -f raw "/tmp/${node}-${disk}.img" 50G
         virsh attach-disk "${node}" "/tmp/${node}-${disk}.img" "${disk}"
