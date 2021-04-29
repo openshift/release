@@ -17,6 +17,7 @@ cluster_dir=${installer_dir}/ocp_clusters/${cluster_name}
 echo "$(date -u --rfc-3339=seconds) - Copying config from shared dir..."
 
 mkdir -p ${cluster_dir}
+cp -R /deploy/* ${installer_dir}/
 pushd ${installer_dir}
 
 
@@ -31,7 +32,6 @@ echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
 echo "$(date -u --rfc-3339=seconds) - Deploying cluster on IBM Z Ecosystem Cloud..."
 # Modify /deploy path to /tmp/deploy for rootless
-cp /entrypoint.sh ./entrypoint.sh 
 sed -i "s#/deploy/#/tmp/deploy/#g" ./entrypoint.sh 
 ./entrypoint.sh apply &
 wait "$!"
