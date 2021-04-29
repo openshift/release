@@ -29,10 +29,14 @@ echo "deprovisioning clusters with a creationTimestamp before ${gce_cluster_age_
 export CLOUDSDK_CONFIG=/tmp/gcloudconfig
 mkdir -p "${CLOUDSDK_CONFIG}"
 gcloud auth activate-service-account --key-file="${GOOGLE_APPLICATION_CREDENTIALS}"
+
+GCP_PROJECT=$(gcloud projects list --format 'value(projectId)' | tr -d '\n')
+echo "GCP project: ${GCP_PROJECT}"
+
 export FILTER="creationTimestamp.date('%Y-%m-%dT%H:%M%z')<${gce_cluster_age_cutoff} AND autoCreateSubnetworks=false AND name~'ci-'"
-for network in $( gcloud --project=openshift-gce-devel-ci compute networks list --filter "${FILTER}" --format "value(name)" ); do
+for network in $( gcloud --project=${GCP_PROJECT} compute networks list --filter "${FILTER}" --format "value(name)" ); do
   infraID="${network%"-network"}"
-  region="$( gcloud --project=openshift-gce-devel-ci compute networks describe "${network}" --format="value(subnetworks[0])" | grep -Po "(?<=regions/)[^/]+" || true )"
+  region="$( gcloud --project=${GCP_PROJECT} compute networks describe "${network}" --format="value(subnetworks[0])" | grep -Po "(?<=regions/)[^/]+" || true )"
   if [[ -z "${region:-}" ]]; then
     region=us-east1
   fi
@@ -43,7 +47,7 @@ for network in $( gcloud --project=openshift-gce-devel-ci compute networks list 
   "infraID":"${infraID}",
   "gcp":{
     "region":"${region}",
-    "projectID":"openshift-gce-devel-ci"
+    "projectID":"${GCP_PROJECT}"
   }
 }
 EOF
@@ -66,7 +70,7 @@ while read -r bucket; do
   if [[ ${gcs_bucket_age_cutoff_seconds} -ge $( date --date="${creationTime}" '+%s' ) ]]; then
     buckets+=("${bucket}")
   fi
-done <<< $( gsutil -m ls -p 'openshift-gce-devel-ci' -L -b 'gs://ci-op-*' | grep -Po "(gs:[^ ]+)|(?<=Time created:).*" )
+done <<< $( gsutil -m ls -p "${GCP_PROJECT}" -L -b 'gs://ci-op-*' | grep -Po "(gs:[^ ]+)|(?<=Time created:).*" )
 if [[ "${#buckets[@]}" -gt 0 ]]; then
   timeout 30m gsutil -m rm -r "${buckets[@]}"
 fi
