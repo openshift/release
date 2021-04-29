@@ -11,8 +11,8 @@ export https_proxy="http://204.90.115.172:8080"
 
 ibmz_eco_cloud_auth=/var/run/secrets/openstack/clouds.yaml
 cluster_name=$(<"${SHARED_DIR}"/clustername.txt)
-installer_dir=${SHARED_DIR}/deploy
-cluster_dir=${installer_dir}/deploy/ocp_clusters/${cluster_name}
+installer_dir=/tmp/deploy
+cluster_dir=${installer_dir}/ocp_clusters/${cluster_name}
 
 echo "$(date -u --rfc-3339=seconds) - Copying config from shared dir..."
 
@@ -45,7 +45,8 @@ sed 's/password: .*/password: REDACTED/' "${cluster_dir}/.openshift_install.log"
 
 cp -t "${SHARED_DIR}" \
     "${cluster_dir}/ocp_install/auth/kubeconfig" \
-    "${cluster_dir}/ocp_install/metadata.json"
+    "${cluster_dir}/ocp_install/metadata.json" \
+    "${cluster_dir}/terraform.tfstate"
 
 KUBECONFIG="${SHARED_DIR}/ocp_install/auth/kubeconfig"
 export KUBECONFIG
