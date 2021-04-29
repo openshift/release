@@ -90,7 +90,7 @@ fi
 
 echo 'export KUBECONFIG=/root/dev-scripts/ocp/ostest/auth/kubeconfig' >> /root/.bashrc
 
-timeout -s 9 105m make
+timeout -s 9 135m make
 EOF
 
 # Copy dev-scripts variables to be shared with the test step
