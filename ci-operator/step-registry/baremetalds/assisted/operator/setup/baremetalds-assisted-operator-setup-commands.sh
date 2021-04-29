@@ -20,7 +20,7 @@ ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
 set -xeo pipefail
 
 REPO_DIR="/home/assisted-service"
-if [ ! -d "\$REPO_DIR" ]; then
+if [ ! -d "\${REPO_DIR}" ]; then
   mkdir -p "\${REPO_DIR}"
 
   echo "### Untar assisted-service code..."

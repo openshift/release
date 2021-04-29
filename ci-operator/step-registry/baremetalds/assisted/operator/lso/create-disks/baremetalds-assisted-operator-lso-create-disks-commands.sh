@@ -10,19 +10,26 @@ echo "************ baremetalds assisted operator setup lso create disks command 
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
 
-ssh "${SSHOPTS[@]}" "root@${IP}" bash - << "EOF" |& sed -e 's/.*auths\{0,1\}".*/*** PULL_SECRET ***/g'
+git clone https://github.com/openshift/assisted-service
+cd assisted-service/
+tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/assisted-service.tar.gz"
+
+ssh "${SSHOPTS[@]}" "root@${IP}" bash - << "EOF"
 
 set -xeo pipefail
 
-cd /root/dev-scripts
-source common.sh
+REPO_DIR="/home/assisted-service"
+if [ ! -d "${REPO_DIR}" ]; then
+  mkdir -p "${REPO_DIR}"
 
-echo "Creating disks..."
-for node in $(virsh list --name | grep ${CLUSTER_NAME}_worker ||
-              virsh list --name | grep ${CLUSTER_NAME}_master); do
-    for disk in sd{b..f}; do
-        qemu-img create -f raw "/tmp/${node}-${disk}.img" 50G
-        virsh attach-disk "${node}" "/tmp/${node}-${disk}.img" "${disk}"
-    done
-done
+  echo "### Untar assisted-service code..."
+  tar -xzvf /root/assisted-service.tar.gz -C "${REPO_DIR}"
+fi
+
+cd "${REPO_DIR}/deploy/operator/"
+
+echo "### Creating extra disks..."
+export DISKS=$(echo sd{b..f})
+source libvirt_disks.sh create
+
 EOF
