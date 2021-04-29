@@ -17,7 +17,7 @@ cluster_dir=${installer_dir}/ocp_clusters/${cluster_name}
 echo "$(date -u --rfc-3339=seconds) - Copying config from shared dir..."
 
 mkdir -p ${cluster_dir}
-cp -r /deploy/ ${installer_dir}/
+cp -r /deploy/. ${installer_dir}
 cp /entrypoint.sh ${installer_dir}/
 pushd ${installer_dir}
 
