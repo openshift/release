@@ -1,0 +1,30 @@
+ref:
+  as: hypershift-launch-wait-for-nodes
+  env:
+  - name: KUBECONFIG
+    documentation: "A path to the Kube config of the cluster to check."
+  - name: WAIT_FOR_NODES_COUNT
+    default: "2"
+    documentation: "The number nodes which should become ready before proceeding."
+  cli: latest
+  commands: |-
+    set -euo pipefail
+
+    echo "$(date) Waiting for all nodes to join the cluster"
+    while true; do
+      [[ $(oc get nodes --output go-template='{{ len .items }}') -eq "${WAIT_FOR_NODES_COUNT}" ]] && break
+      sleep 5
+    done
+
+    echo "$(date) Waiting for all nodes to become ready"
+    oc wait nodes --all --for condition=Ready --timeout 24h
+
+    echo "$(date) All nodes are ready"
+  resources:
+    requests:
+      cpu: 100m
+  timeout: 15m
+  grace_period: 5s
+  documentation: |-
+    This step simply blocks indefinitely until the specified nubmer of nodes
+    have a `Ready` condition value of `True`.

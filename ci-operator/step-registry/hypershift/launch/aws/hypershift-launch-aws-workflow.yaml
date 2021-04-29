@@ -1,5 +1,41 @@
 workflow:
   as: hypershift-launch-aws
+  env:
+  - name: RELEASE_IMAGE_LATEST
+    documentation: "The OCP release image to launch."
+  - name: HYPERSHIFT_NODE_COUNT
+    default: "2"
+    documentation: "The number nodes to automatically create and join to the cluster."
+  - name: HYPERSHIFT_BASE_DOMAIN
+    default: "origin-ci-int-aws.dev.rhcloud.com"
+    documentation: "The cluster's FQDN will be a subdomain of the base domain."
+  - name: HYPERSHIFT_AWS_REGION
+    default: "us-east-1"
+    documentation: "The AWS region of the cluster."
+  documentation: |-
+    The HyperShift launch workflow executes tests against a new ephemeral
+    HyperShift cluster. Administrative access to the control plane is provided
+    via the `KUBECONFIG` environment variable.
+
+    Note that tests will execute once the control plane is ready, regardless of
+    whether nodes have been requested, have joined, or are available.
+
+    The control plane is hosted on a dedicated standalone OCP cluster running
+    HyperShift in the `osd-hypershift` AWS account and is destroyed after tests
+    complete.
+
+    The HyperShift launch capability is currently supported by the HyperShift
+    team. For now, please direct all questions and comments to:
+
+    - Alberto Lamela (agarcial@redhat.com)
+    - Seth Jennings (sjenning@redhat.com)
+    - Dan Mace (dmace@redhat.com)
+    - Cesar Wong (cewong@redhat.com)
+
+    Learn more about HyperShift here: https://github.com/openshift/hypershift
+
+    Track HyperShift's development here: https://issues.redhat.com/projects/HOSTEDCP
+    
   steps:
     post:
     - as: destroy
@@ -13,9 +49,9 @@ workflow:
           --aws-creds ${CLUSTER_PROFILE_DIR}/.awscred \
           --namespace "${NAMESPACE}-clusters" \
           --name ${NAMESPACE} \
-          --region us-east-1 \
+          --region ${HYPERSHIFT_AWS_REGION} \
           --infra-id ${NAMESPACE} \
-          --base-domain origin-ci-int-aws.dev.rhcloud.com \
+          --base-domain ${HYPERSHIFT_BASE_DOMAIN} \
           --cluster-grace-period 40m
         
         echo "$(date) Deleting cluster namespace ${NAMESPACE}-clusters"
@@ -28,7 +64,7 @@ workflow:
         requests:
           cpu: 100m
           memory: 100Mi
-      timeout: 10m0s
+      timeout: 15m0s
       credentials:
       - namespace: test-credentials
         name: hypershift-clusterbot-credentials
@@ -46,8 +82,9 @@ workflow:
         /usr/bin/hypershift create cluster \
           --namespace "${NAMESPACE}-clusters" \
           --name ${NAMESPACE} \
-          --base-domain origin-ci-int-aws.dev.rhcloud.com \
-          --region us-east-1 \
+          --node-pool-replicas ${HYPERSHIFT_NODE_COUNT} \
+          --base-domain ${HYPERSHIFT_BASE_DOMAIN} \
+          --region ${HYPERSHIFT_AWS_REGION} \
           --infra-id ${NAMESPACE} \
           --pull-secret ${CLUSTER_PROFILE_DIR}/pull-secret \
           --aws-creds ${CLUSTER_PROFILE_DIR}/.awscred \

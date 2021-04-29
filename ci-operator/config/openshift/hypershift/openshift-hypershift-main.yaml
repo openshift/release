@@ -39,31 +39,37 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-aws-quick
+- as: launch-demo
   steps:
     cluster_profile: hypershift
     test:
-    - as: wait-for-nodes
+    - ref: hypershift-launch-wait-for-nodes
+    - as: verify-cluster
       cli: latest
       commands: |-
         set -euo pipefail
 
-        echo "$(date) Waiting for all nodes to join the cluster"
-        while true; do
-          [[ $(oc get nodes --output go-template='{{ len .items }}') -eq "2" ]] && break
-          sleep 5
-        done
+        oc config view
+        oc whoami
+        oc get nodes
+        oc get pods --all-namespaces
 
-        echo "$(date) Waiting for all nodes to become ready"
-        oc wait nodes --all --for condition=Ready --timeout 24h
-
-        echo "$(date) All nodes are ready"
+        echo "$(date) The cluster seems basically working"
       from: src
-      grace_period: 1m0s
+      grace_period: 15m0s
       resources:
         requests:
           cpu: 100m
-      timeout: 20m0s
+      timeout: 2m0s
+    workflow: hypershift-launch-aws
+- as: e2e-aws-nested
+  steps:
+    cluster_profile: hypershift
+    env:
+      HYPERSHIFT_NODE_COUNT: "3"
+      WAIT_FOR_NODES_COUNT: "3"
+    test:
+    - ref: hypershift-launch-wait-for-nodes
     - as: install-hypershift
       cli: latest
       commands: go run . install --hypershift-image "${HYPERSHIFT_RELEASE_LATEST}"
