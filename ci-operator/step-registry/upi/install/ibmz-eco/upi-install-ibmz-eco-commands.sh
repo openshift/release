@@ -29,6 +29,8 @@ cp -t "${installer_dir}" \
 cp -t "${cluster_dir}" \
     "${SHARED_DIR}/pull-secret"
 
+ocp_version=$(cat $installer_dir/terraform.tfvars | grep openshift_version | cut -d= -f2 | sed -e 's/"//' -e 's/"$//')
+
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
 echo "$(date -u --rfc-3339=seconds) - Deploying cluster on IBM Z Ecosystem Cloud... OpenShift ${ocp_version}"
