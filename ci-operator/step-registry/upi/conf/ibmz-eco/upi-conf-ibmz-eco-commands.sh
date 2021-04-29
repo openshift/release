@@ -32,6 +32,8 @@ ocp_version=${RELEASE_IMAGE_LATEST}
 echo "Configuring deployment of OpenShift ${ocp_version}"
 ocp_version=$(echo $ocp_version | cut -d: -f2)
 ocp_version=$(echo $ocp_version | cut -d- -f1)
+# extract major and minor only
+ocp_version=$(echo $ocp_version | cut -d. -f1,2)
 echo "${NAMESPACE}-${JOB_NAME_HASH}" > "${SHARED_DIR}"/clustername.txt
 cluster_name=$(<"${SHARED_DIR}"/clustername.txt)
 
