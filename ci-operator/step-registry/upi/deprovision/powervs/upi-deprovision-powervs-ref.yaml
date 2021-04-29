@@ -1,10 +1,25 @@
 ref:
   as: upi-deprovision-powervs
-  from: upi-installer
+  from_image:
+    namespace: ocp-on-powervs
+    name: powervs-container-host
+    tag: powervs-ocp-jenkins-deployment
   commands: upi-deprovision-powervs-commands.sh
+  grace_period: 10m
   resources:
     requests:
       cpu: 10m
       memory: 100Mi
+  credentials:
+  - namespace: test-credentials
+    name: powervs
+    mount_path: /etc/credentials
+  env:
+  - name: CLUSTER_ID
+    default: ''
+    documentation: The ID of the cluster that must be deleted.
+  - name: REQUESTOR_EMAIL
+    default: ""
+    documentation: The e-mail address for the engineer deleting the cluster.
   documentation: >-
-    This step deprovisions the resource allocated for a RedHat OpenShift Cluster at IBM Cloud on PowerVS.
+    This step destroys a OCP cluster running at IBM Cloud on PowerVS.
