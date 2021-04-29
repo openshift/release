@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-if [[ -n $(echo "$JOB_NAME" | grep -P '\-master\-') ]]; then
+if [[ ! -n $(echo "$JOB_NAME" | grep -P '\-master\-') ]]; then
 exit 0
 fi
 
