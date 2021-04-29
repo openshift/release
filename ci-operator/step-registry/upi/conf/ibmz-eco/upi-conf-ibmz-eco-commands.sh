@@ -28,7 +28,7 @@ export HOME=/tmp
 pull_secret_in=/etc/pull-secret/.dockerconfigjson
 pull_secret_out=${SHARED_DIR}/pull-secret
 tfvars_out=${SHARED_DIR}/terraform.tfvars
-ocp_version=$(oc adm release info "${RELEASE_IMAGE_LATEST}" --output=jsonpath="{".metadata.version"}")
+ocp_version=${RELEASE_IMAGE_LATEST}
 echo "Configuring deployment of OpenShift ${ocp_version}"
 ocp_version=$(echo $ocp_version | cut -d: -f2)
 ocp_version=$(echo $ocp_version | cut -d- -f1)
