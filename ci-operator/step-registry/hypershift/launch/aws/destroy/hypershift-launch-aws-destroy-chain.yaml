@@ -1,0 +1,41 @@
+chain:
+  as: hypershift-launch-aws-destroy
+  steps:
+  - as: destroy
+    cli: latest
+    env:
+    - name: HYPERSHIFT_BASE_DOMAIN
+      default: "origin-ci-int-aws.dev.rhcloud.com"
+      documentation: "The cluster's FQDN will be a subdomain of the base domain."
+    - name: HYPERSHIFT_AWS_REGION
+      default: "us-east-1"
+      documentation: "The AWS region of the cluster."
+    commands: |-
+      set -exuo pipefail
+      export KUBECONFIG=/var/run/hypershift/kubeconfig
+      
+      echo "$(date) Deleting HyperShift cluster ${NAMESPACE}-clusters/${NAMESPACE}"
+      /usr/bin/hypershift destroy cluster \
+        --aws-creds ${CLUSTER_PROFILE_DIR}/.awscred \
+        --namespace "${NAMESPACE}-clusters" \
+        --name ${NAMESPACE} \
+        --region ${HYPERSHIFT_AWS_REGION} \
+        --infra-id ${NAMESPACE} \
+        --base-domain ${HYPERSHIFT_BASE_DOMAIN} \
+        --cluster-grace-period 40m
+      
+      echo "$(date) Deleting cluster namespace ${NAMESPACE}-clusters"
+      oc delete namespace "${NAMESPACE}-clusters"
+
+      echo "$(date) Finished deleting cluster"
+    from: hypershift
+    grace_period: 5m0s
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    timeout: 15m0s
+    credentials:
+    - namespace: test-credentials
+      name: hypershift-clusterbot-credentials
+      mount_path: /var/run/hypershift
