@@ -19,9 +19,9 @@ CONFIG = {
     },
     'azure4-quota-slice': {
         'centralus': 33,
-        'eastus': 10,
-        'eastus2': 10,
-        'westus': 10
+        'eastus': 8,
+        'eastus2': 8,
+        'westus': 8
     },
     'gcp-quota-slice': {
         'us-east1': 70,
