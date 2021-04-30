@@ -29,7 +29,7 @@ cp -t "${installer_dir}" \
 cp -t "${cluster_dir}" \
     "${SHARED_DIR}/pull-secret"
 
-ocp_version=$(cat $installer_dir/terraform.tfvars | grep openshift_version | cut -d= -f2 | sed -e 's/"//' -e 's/"$//')
+ocp_version=$(cat ${installer_dir}/terraform.tfvars | grep openshift_version | cut -d= -f2 | sed -e 's/"//' -e 's/"$//')
 
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
