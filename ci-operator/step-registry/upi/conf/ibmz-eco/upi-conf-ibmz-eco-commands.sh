@@ -22,9 +22,9 @@ if [[ -z "${CLUSTER_DOMAIN}" ]]; then
   echo "Cluster's base domain must be specified in CLUSTER_DOMAIN."
   exit 1
 fi
-if [[ -z "${OS_VERSION}" ]]; then
+if [[ -z "${OCP_VERSION}" ]]; then
   echo "OpenShift target version isn't specified. Using '4.6' by default."
-  export OS_VERSION="4.6"
+  export OCP_VERSION="4.6"
 fi
 
 export HOME=/tmp
@@ -35,7 +35,7 @@ tfvars_out=${SHARED_DIR}/terraform.tfvars
 ocp_version=${RELEASE_IMAGE_LATEST}
 echo "${NAMESPACE}-${JOB_NAME_HASH}" > "${SHARED_DIR}"/clustername.txt
 cluster_name=$(<"${SHARED_DIR}"/clustername.txt)
-echo "Configuring deployment of OpenShift ${OS_VERSION} under the name ${cluster_name}"
+echo "Configuring deployment of OpenShift ${OCP_VERSION} under the name ${cluster_name}"
 
 export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${RELEASE_IMAGE_LATEST}
 # Ensure ignition assets are configured with the correct invoker to track CI jobs.
@@ -49,7 +49,7 @@ echo "$(date -u --rfc-3339=seconds) - Creating terraform variables file..."
 cat > "${tfvars_out}" <<-EOF
 cluster_id = "${cluster_name}"
 cloud_domain = "${CLUSTER_DOMAIN}"
-openshift_version = "${OS_VERSION}"
+openshift_version = "${OCP_VERSION}"
 image_override = "${RELEASE_IMAGE_LATEST}"
 worker_count = "2"
 openstack_master_flavor_name = "large"
