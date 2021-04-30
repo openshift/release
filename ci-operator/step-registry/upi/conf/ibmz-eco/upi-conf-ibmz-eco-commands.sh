@@ -32,7 +32,6 @@ export HOME=/tmp
 pull_secret_in=/etc/pull-secret/.dockerconfigjson
 pull_secret_out=${SHARED_DIR}/pull-secret
 tfvars_out=${SHARED_DIR}/terraform.tfvars
-ocp_version=${RELEASE_IMAGE_LATEST}
 echo "${NAMESPACE}-${JOB_NAME_HASH}" > "${SHARED_DIR}"/clustername.txt
 cluster_name=$(<"${SHARED_DIR}"/clustername.txt)
 echo "Configuring deployment of OpenShift ${OCP_VERSION} under the name ${cluster_name}"
