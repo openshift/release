@@ -16,9 +16,31 @@ SSH_PUB_KEY=$(<"${CLUSTER_PROFILE_DIR}"/ssh-publickey)
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 if [[ "${CONFIG_TYPE}" == "minimal" ]]; then
-cat > "${CONFIG}" << EOF
+  cat > "${CONFIG}" << EOF
 apiVersion: ${CONFIG_API_VERSION}
 baseDomain: ${BASE_DOMAIN}
+compute:
+- name: worker
+  platform:
+    openstack:
+EOF
+  if [[ -f "${SHARED_DIR}/ADDITIONAL_NETWORK_IDS" ]]; then
+    cat >> "${CONFIG}" <<EOF
+      additionalNetworkIDs:
+EOF
+
+    while IFS= read -r NET_ID;
+    do
+        cat >> "${CONFIG}" << EOF
+      - ${NET_ID}
+EOF
+    done < "${SHARED_DIR}/ADDITIONAL_NETWORK_IDS"
+  else
+    cat >> "${CONFIG}" << EOF
+     {}
+EOF
+  fi
+  cat >> "${CONFIG}" << EOF
 metadata:
   name: ${CLUSTER_NAME}
 networking:

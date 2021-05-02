@@ -1,0 +1,33 @@
+workflow:
+  as: openstack-install-multiplenetworks
+  steps:
+    pre:
+    # from chain: ipi-conf-openstack
+    - ref: openstack-conf-clouds
+    - ref: openstack-conf-resourcenames
+    - ref: openstack-conf-createfips
+    - ref: openstack-conf-createadditionalnetworks
+    - ref: openstack-conf-generateconfig
+    - ref: openstack-conf-creatednsrecords
+    - ref: ipi-conf-etcd-on-ramfs
+    - ref: ipi-conf-openstack-precheck
+    - ref: ipi-install-monitoringpvc
+    # From chain: ipi-install
+    - ref: ipi-install-rbac
+    - ref: ipi-install-install
+
+    test:
+#      - ref: openshift-e2e-test
+    post:
+    - chain: ipi-deprovision
+    # from - chain: ipi-deprovision-openstack
+    - ref: openstack-deprovision-deletednsrecords
+    - ref: openstack-deprovision-deletefips
+    - ref: openstack-deprovision-deleteadditionalnetworks
+    env:
+      CONFIG_API_VERSION: "v1beta4"
+      CONFIG_TYPE: "minimal"
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+  documentation: |-
+    The openstack-install-mulitplenetworks workflow deploys a cluster
+    attached to mulitple networks.
