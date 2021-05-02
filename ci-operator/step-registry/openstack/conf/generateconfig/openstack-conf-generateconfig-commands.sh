@@ -4,8 +4,10 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-#Read necessary variables
-CLUSTER_NAME=$(<"${SHARED_DIR}"/CLUSTER_NAME)
+CLUSTER_NAME=$(<"${SHARED_DIR}/CLUSTER_NAME")
+OPENSTACK_EXTERNAL_NETWORK="${OPENSTACK_EXTERNAL_NETWORK:-$(<"${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK")}"
+OPENSTACK_COMPUTE_FLAVOR="${OPENSTACK_COMPUTE_FLAVOR:-$(<"${SHARED_DIR}/OPENSTACK_COMPUTE_FLAVOR")}"
+
 LB_FIP_IP=$(<"${SHARED_DIR}"/LB_FIP_IP)
 INGRESS_FIP_IP=$(<"${SHARED_DIR}"/INGRESS_FIP_IP)
 
@@ -14,9 +16,31 @@ SSH_PUB_KEY=$(<"${CLUSTER_PROFILE_DIR}"/ssh-publickey)
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 if [[ "${CONFIG_TYPE}" == "minimal" ]]; then
-cat > "${CONFIG}" << EOF
+  cat > "${CONFIG}" << EOF
 apiVersion: ${CONFIG_API_VERSION}
 baseDomain: ${BASE_DOMAIN}
+compute:
+- name: worker
+  platform:
+    openstack:
+EOF
+  if [[ -f "${SHARED_DIR}/ADDITIONAL_NETWORK_IDS" ]]; then
+    cat >> "${CONFIG}" <<EOF
+      additionalNetworkIDs:
+EOF
+
+    while IFS= read -r NET_ID;
+    do
+        cat >> "${CONFIG}" << EOF
+      - ${NET_ID}
+EOF
+    done < "${SHARED_DIR}/ADDITIONAL_NETWORK_IDS"
+  else
+    cat >> "${CONFIG}" << EOF
+     {}
+EOF
+  fi
+  cat >> "${CONFIG}" << EOF
 metadata:
   name: ${CLUSTER_NAME}
 networking:
@@ -37,11 +61,11 @@ sshKey: |
   ${SSH_PUB_KEY}
 EOF
 else
-    echo "NO valid install config type specified. Please check  CONFIG_TYPE"
+    echo "No valid install config type specified. Please check CONFIG_TYPE"
     exit 1
 fi
 
 # Lets  check the syntax of yaml file by reading it.
 python -c 'import yaml;
 import sys;
-data = yaml.safe_load(open(sys.argv[1]))' ${SHARED_DIR}/install-config.yaml
+data = yaml.safe_load(open(sys.argv[1]))' "${SHARED_DIR}/install-config.yaml"
