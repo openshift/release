@@ -69,7 +69,7 @@ git checkout "$branch" || {
     log "ERROR Could not checkout branch $branch in release repo"
     exit 1
 }
-release=$(cat "$release_dir}/Z_RELEASE_VERSION")
+release=$(cat "$release_dir/Z_RELEASE_VERSION")
 log "INFO Z-stream version is $release"
 
 # Get IMAGE_REPO if not provided
