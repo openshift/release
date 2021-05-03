@@ -25,7 +25,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e
+- as: e2e-cluster
   steps:
     dependencies:
       COMPONENT_IMAGE_REF: helloprow-go
@@ -35,7 +35,7 @@ tests:
       CLUSTERPOOL_HOST_PROW_KUBE_SECRET: acm-cicd-clusterpool-shared
       CLUSTERPOOL_LIST_INCLUSION_FILTER: prow
     test:
-    - as: e2e
+    - as: test
       commands: |
         export SELF="make -f Makefile.prow"
         make -f Makefile.prow test-e2e
@@ -45,12 +45,12 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ocm-e2e-clusterpool
-- as: kind
+- as: e2e-kind
   steps:
     env:
       AWS_CREDENTIALS_SECRET: ocm-cicd-aws-kind
     test:
-    - as: kind-check
+    - as: test
       commands: |
         echo "IMAGE_REF=$IMAGE_REF"
         export SELF="make -f Makefile.prow"
@@ -64,21 +64,24 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ocm-e2e-kind
-- as: wait-images
+- as: precommit-image-mirror
   steps:
-    test:
-    - as: wait
-      commands: |
-        sleep 28800
-      credentials:
-      - mount_path: /etc/acm-cicd-quay-push
-        name: acm-cicd-quay-push
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
+    dependencies:
+      SOURCE_IMAGE_REF: helloprow-go
+    env:
+      IMAGE_REPO: helloprow-go
+      REGISTRY_ORG: open-cluster-management
+    workflow: ocm-ci-image-mirror
+- as: postcommit-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: helloprow-go
+    env:
+      IMAGE_REPO: helloprow-go
+      IMAGE_TAG: latest
+      REGISTRY_ORG: open-cluster-management
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
   branch: main
   org: open-cluster-management
