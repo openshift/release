@@ -155,11 +155,11 @@ vault write auth/kubernetes/role/secret-generator \
 
 # Create the secret bootstrap policy and role
 vault policy write secret-bootstrap -<<EOH
-path "kv/data/dptp/*" {
+path "kv/data/*" {
   capabilities = ["read"]
 }
 
-path "kv/metadata/dptp/*" {
+path "kv/metadata/*" {
   capabilities = ["list"]
 }
 EOH
