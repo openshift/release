@@ -5,6 +5,6 @@ set -euo pipefail
 exec /usr/bin/ci-secret-bootstrap \
 		--vault-addr=https://vault.ci.openshift.org \
 		--vault-role=secret-bootstrap \
-		--vault-prefix=kv/dptp \
+		--vault-prefix=kv \
 		--config=core-services/ci-secret-bootstrap/_config.yaml \
 		--validate-only
