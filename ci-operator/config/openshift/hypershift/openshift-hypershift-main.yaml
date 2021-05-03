@@ -79,42 +79,6 @@ tests:
           cpu: 100m
       timeout: 40m0s
     workflow: ipi-aws
-- as: e2e-aws-nested
-  steps:
-    cluster_profile: hypershift
-    env:
-      HYPERSHIFT_NODE_COUNT: "3"
-      WAIT_FOR_NODES_COUNT: "3"
-    test:
-    - ref: hypershift-launch-wait-for-nodes
-    - as: install-hypershift
-      cli: latest
-      commands: go run . install --hypershift-image "${HYPERSHIFT_RELEASE_LATEST}"
-      dependencies:
-      - env: HYPERSHIFT_RELEASE_LATEST
-        name: hypershift
-      from: src
-      grace_period: 1m0s
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 5m0s
-    - as: test-e2e
-      cli: latest
-      commands: |-
-        make e2e && \
-        bin/test-e2e \
-          -test.v \
-          -test.timeout 0 \
-          --e2e.aws-credentials-file ${CLUSTER_PROFILE_DIR}/.awscred \
-          --e2e.pull-secret-file ${CLUSTER_PROFILE_DIR}/pull-secret
-      from: src
-      grace_period: 15m0s
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 40m0s
-    workflow: hypershift-launch-aws
 zz_generated_metadata:
   branch: main
   org: openshift
