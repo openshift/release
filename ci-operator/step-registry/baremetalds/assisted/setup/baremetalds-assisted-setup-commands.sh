@@ -71,7 +71,8 @@ echo "export AGENT_DOCKER_IMAGE=${ASSISTED_AGENT_IMAGE}" >> /root/config
 echo "export CONTROLLER_IMAGE=${ASSISTED_CONTROLLER_IMAGE}" >> /root/config
 echo "export INSTALLER_IMAGE=${ASSISTED_INSTALLER_IMAGE}" >> /root/config
 
-if [ "${JOB_TYPE:-}" = "presubmit" ]; then
+IS_REHEARSAL=\$(expr "${REPO_OWNER:-}" = "openshift" "&" "${REPO_NAME:-}" = "release")
+if [ "${JOB_TYPE:-}" = "presubmit" ] && (( ! \${IS_REHEARSAL} )); then
   # We would like to keep running a stable version for PRs
   echo "export OPENSHIFT_VERSION=4.7" >> /root/config
 
