@@ -122,5 +122,3 @@ pullSecret: >
 sshKey: |
   ${ssh_pub_key}
 EOF
-
-cat ${CONFIG}
