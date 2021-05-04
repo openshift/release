@@ -1,5 +1,5 @@
 base_images:
-  open-cluster-management_builder_go1.15-linux-amd64:
+  builder-go1.16-linux:
     name: builder
     namespace: open-cluster-management
     tag: go1.16-linux
@@ -12,7 +12,7 @@ build_root:
 images:
 - dockerfile_path: Dockerfile.prow
   inputs:
-    open-cluster-management_builder_go1.15-linux-amd64:
+    builder-go1.16-linux:
       as:
       - registry.ci.openshift.org/open-cluster-management/builder:go1.15-linux-amd64
   to: helloprow-go
@@ -39,7 +39,7 @@ tests:
       commands: |
         export SELF="make -f Makefile.prow"
         make -f Makefile.prow test-e2e
-      from: bin
+      from: src
       resources:
         requests:
           cpu: 100m
@@ -58,13 +58,13 @@ tests:
       dependencies:
       - env: IMAGE_REF
         name: helloprow-go
-      from: bin
+      from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
     workflow: ocm-e2e-kind
-- as: precommit-image-mirror
+- as: pr-image-mirror
   steps:
     dependencies:
       SOURCE_IMAGE_REF: helloprow-go
@@ -72,7 +72,7 @@ tests:
       IMAGE_REPO: helloprow-go
       REGISTRY_ORG: open-cluster-management
     workflow: ocm-ci-image-mirror
-- as: postcommit-image-mirror
+- as: latest-image-mirror
   postsubmit: true
   steps:
     dependencies:
