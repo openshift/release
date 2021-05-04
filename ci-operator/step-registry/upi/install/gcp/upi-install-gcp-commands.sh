@@ -347,14 +347,14 @@ resources:
 EOF
 
 gcloud deployment-manager deployments create "${INFRA_ID}-bootstrap" --config 04_bootstrap.yaml
-
+BOOTSTRAP_INSTANCE_GROUP=$(gcloud compute instance-groups list --filter "network:${CLUSTER_NETWORK} AND name~^${INFRA_ID}-bootstrap-" --format "value(name)")
 ## Add the bootstrap instance to the load balancers
 echo "$(date -u --rfc-3339=seconds) - Adding the bootstrap instance to the load balancers..."
 if [ -f 02_lb_int.py ]; then # for workflow using internal load balancers
   # https://github.com/openshift/installer/pull/3270
   # https://github.com/openshift/installer/pull/3309
-  gcloud compute instance-groups unmanaged add-instances "${INFRA_ID}-bootstrap-instance-group" "--zone=${ZONE_0}" "--instances=${INFRA_ID}-bootstrap"
-  gcloud compute backend-services add-backend "${INFRA_ID}-api-internal-backend-service" "--region=${REGION}" "--instance-group=${INFRA_ID}-bootstrap-instance-group" "--instance-group-zone=${ZONE_0}"
+  gcloud compute instance-groups unmanaged add-instances "${BOOTSTRAP_INSTANCE_GROUP}" "--zone=${ZONE_0}" "--instances=${INFRA_ID}-bootstrap"
+  gcloud compute backend-services add-backend "${INFRA_ID}-api-internal-backend-service" "--region=${REGION}" "--instance-group=${BOOTSTRAP_INSTANCE_GROUP}" "--instance-group-zone=${ZONE_0}"
 else # for workflow before internal load balancers
   gcloud compute target-pools add-instances "${INFRA_ID}-ign-target-pool" "--instances-zone=${ZONE_0}" "--instances=${INFRA_ID}-bootstrap"
   gcloud compute target-pools add-instances "${INFRA_ID}-api-target-pool" "--instances-zone=${ZONE_0}" "--instances=${INFRA_ID}-bootstrap"
@@ -422,13 +422,16 @@ gcloud "--project=${HOST_PROJECT}" dns record-sets transaction add \
   --name "_etcd-server-ssl._tcp.${CLUSTER_NAME}.${BASE_DOMAIN}." --ttl 60 --type SRV --zone "${PRIVATE_ZONE_NAME}"
 gcloud "--project=${HOST_PROJECT}" dns record-sets transaction execute --zone "${PRIVATE_ZONE_NAME}"
 
+MASTER_IG_0="$(gcloud compute instance-groups list --filter "network:${CLUSTER_NETWORK} AND name~^${INFRA_ID}-master-${ZONE_0}-" --format "value(name)")"
+MASTER_IG_1="$(gcloud compute instance-groups list --filter "network:${CLUSTER_NETWORK} AND name~^${INFRA_ID}-master-${ZONE_1}-" --format "value(name)")"
+MASTER_IG_2="$(gcloud compute instance-groups list --filter "network:${CLUSTER_NETWORK} AND name~^${INFRA_ID}-master-${ZONE_2}-" --format "value(name)")"
 ## Add control plane instances to load balancers
 echo "$(date -u --rfc-3339=seconds) - Adding control plane instances to load balancers..."
 if [ -f 02_lb_int.py ]; then # for workflow using internal load balancers
   # https://github.com/openshift/installer/pull/3270
-  gcloud compute instance-groups unmanaged add-instances "${INFRA_ID}-master-${ZONE_0}-instance-group" "--zone=${ZONE_0}" "--instances=${INFRA_ID}-${MASTER}-0"
-  gcloud compute instance-groups unmanaged add-instances "${INFRA_ID}-master-${ZONE_1}-instance-group" "--zone=${ZONE_1}" "--instances=${INFRA_ID}-${MASTER}-1"
-  gcloud compute instance-groups unmanaged add-instances "${INFRA_ID}-master-${ZONE_2}-instance-group" "--zone=${ZONE_2}" "--instances=${INFRA_ID}-${MASTER}-2"
+  gcloud compute instance-groups unmanaged add-instances "${MASTER_IG_0}" "--zone=${ZONE_0}" "--instances=${INFRA_ID}-${MASTER}-0"
+  gcloud compute instance-groups unmanaged add-instances "${MASTER_IG_1}" "--zone=${ZONE_1}" "--instances=${INFRA_ID}-${MASTER}-1"
+  gcloud compute instance-groups unmanaged add-instances "${MASTER_IG_2}" "--zone=${ZONE_2}" "--instances=${INFRA_ID}-${MASTER}-2"
 else # for workflow before internal load balancers
   gcloud compute target-pools add-instances "${INFRA_ID}-ign-target-pool" "--instances-zone=${ZONE_0}" "--instances=${INFRA_ID}-${MASTER}-0"
   gcloud compute target-pools add-instances "${INFRA_ID}-ign-target-pool" "--instances-zone=${ZONE_1}" "--instances=${INFRA_ID}-${MASTER}-1"
@@ -492,7 +495,7 @@ echo "$(date -u --rfc-3339=seconds) - Bootstrap complete, destroying bootstrap r
 if [ -f 02_lb_int.py ]; then # for workflow using internal load balancers
   # https://github.com/openshift/installer/pull/3270
   # https://github.com/openshift/installer/pull/3309
-  gcloud compute backend-services remove-backend "${INFRA_ID}-api-internal-backend-service" "--region=${REGION}" "--instance-group=${INFRA_ID}-bootstrap-instance-group" "--instance-group-zone=${ZONE_0}"
+  gcloud compute backend-services remove-backend "${INFRA_ID}-api-internal-backend-service" "--region=${REGION}" "--instance-group=${BOOTSTRAP_INSTANCE_GROUP}" "--instance-group-zone=${ZONE_0}"
 else # for workflow before internal load balancers
   gcloud compute target-pools remove-instances "${INFRA_ID}-ign-target-pool" "--instances-zone=${ZONE_0}" "--instances=${INFRA_ID}-bootstrap"
   gcloud compute target-pools remove-instances "${INFRA_ID}-api-target-pool" "--instances-zone=${ZONE_0}" "--instances=${INFRA_ID}-bootstrap"
