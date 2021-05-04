@@ -30,6 +30,7 @@ cd "${REPO_DIR}/deploy/operator/"
 
 echo "### Setup LSO..."
 export DISKS=$(echo sd{b..f})
-source ./setup_lso.sh
+source ./setup_lso.sh install_lso
+source ./setup_lso.sh create_local_volume
 
 EOF
