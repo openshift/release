@@ -35,15 +35,24 @@ echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
 echo "$(date -u --rfc-3339=seconds) - Deploying cluster on IBM Z Ecosystem Cloud... OpenShift ${ocp_version}"
 # Modify /deploy path to /tmp/deploy for rootless
-sed -i "s#/deploy/#/tmp/deploy/#g" ./entrypoint.sh 
+sed -i "s#/deploy/#/tmp/deploy/#g" ./entrypoint.sh
 terraform init
 ./entrypoint.sh apply &
-wait "$!"
 
 set +e
 wait "$!"
 ret="$?"
 set -e
+
+if [ $ret -ne 0 ]; then
+  set +e
+  # Attempt to gather tfstate file and logs.
+  echo "$(date -u --rfc-3339=seconds) - Install failed, gathering tfstate file and logs..."
+  cp -t "${SHARED_DIR}" \
+      "${cluster_dir}/terraform.tfstate"
+  set -e
+  exit "$ret"
+fi
 
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_END"
 
@@ -56,7 +65,7 @@ cp -t "${SHARED_DIR}" \
     "${cluster_dir}/ocp_install/metadata.json" \
     "${cluster_dir}/terraform.tfstate"
 
-KUBECONFIG="${SHARED_DIR}/ocp_install/auth/kubeconfig"
+KUBECONFIG="${SHARED_DIR}/kubeconfig"
 export KUBECONFIG
 
 exit "$ret"
