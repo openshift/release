@@ -1,66 +1,65 @@
 base_images:
-  centos:
-    name: centos
-    namespace: ci
-    tag: "7"
   openshift_release_golang-1.13:
     name: release
     namespace: openshift
     tag: golang-1.13
+  openshift_release_golang-1.15:
+    name: release
+    namespace: openshift
+    tag: golang-1.15
+  ubi:
+    name: ubi
+    namespace: ocp
+    tag: "8"
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: golang-1.15
 images:
-- dockerfile_path: dist/Dockerfile.build/Dockerfile
+- dockerfile_literal: |
+    FROM ubi
+    COPY . /opt/app-root/src/
+    WORKDIR /opt/app-root/src/cincinnati
+    USER 0
+    ENV HOME="/root"
+    ENV PATH="${HOME}/.cargo/bin:${HOME}/.local/bin:${PATH}"
+    RUN chgrp root /opt/app-root/src/cincinnati && \
+        chmod g+w /opt/app-root/src/cincinnati && \
+        dnf install -y jq python3 && \
+        dnf clean all
+    # build: Rust stable toolchain
+    RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain 1.50.0 -y && \
+      rustup install 1.46.0
+    # install yamllint
+    RUN pip3 install --user yamllint
+    RUN \
+      mkdir -p $HOME/.cargo/git/ && \
+      find $HOME/. -type d -exec chmod 777 {} \; && \
+      find $HOME/. -type f -exec chmod ugo+rw {} \;
+    USER 1001
+  from: ubi
   inputs:
-    base:
-      as:
-      - registry.centos.org/centos/centos:7
-  to: rust
-- dockerfile_path: dist/Dockerfile.deploy/Dockerfile
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/cincinnati
+  to: src-base
+- dockerfile_path: dist/Dockerfile.rust-toolset/Dockerfile
   inputs:
-    centos:
+    ubi:
       as:
-      - registry.centos.org/centos/centos:7
-    rust:
-      as:
-      - quay.io/app-sre/cincinnati:builder
+      - registry.access.redhat.com/ubi8/ubi:latest
   to: deploy
-- dockerfile_path: dist/Dockerfile.e2e/Dockerfile
+- dockerfile_path: dist/Dockerfile.e2e-ubi8/Dockerfile
   inputs:
-    centos:
-      as:
-      - registry.centos.org/centos/centos:7
     openshift_release_golang-1.13:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.13
-    rust:
+    ubi:
       as:
-      - quay.io/app-sre/cincinnati:builder
+      - registry.access.redhat.com/ubi8/ubi:latest
   to: e2e-test
-promotion:
-  name: cincinnati-build-root
-  namespace: cincinnati-ci
-raw_steps:
-- pipeline_image_cache_step:
-    commands: |
-      cat <<DOCKERFILE > /opt/Dockerfile
-      FROM centos
-      WORKDIR /go/src/github.com/openshift/cincinnati/
-      COPY . .
-      DOCKERFILE
-    from: centos
-    to: src-dockerfile
-- project_directory_image_build_step:
-    from: src
-    inputs:
-      src-dockerfile:
-        paths:
-        - destination_dir: .
-          source_path: /opt/Dockerfile
-    to: base
 resources:
   '*':
     requests:
@@ -78,9 +77,8 @@ tests:
   steps:
     pre:
     - as: prepare-credentials
-      commands: env CINCINNATI_CI_DOCKERJSON_PATH="${SHARED_DIR}/${CINCINNATI_CI_DOCKERJSON_FILE}"
-        CINCINNATI_CI_PUBLIC_DOCKERJSON_PATH="${SHARED_DIR}/${CINCINNATI_CI_PUBLIC_DOCKERJSON_FILE}"
-        dist/prepare_ci_credentials.sh
+      commands: |
+        env CINCINNATI_CI_DOCKERJSON_PATH="${SHARED_DIR}/${CINCINNATI_CI_DOCKERJSON_FILE}" CINCINNATI_CI_PUBLIC_DOCKERJSON_PATH="${SHARED_DIR}/${CINCINNATI_CI_PUBLIC_DOCKERJSON_FILE}" dist/prepare_ci_credentials.sh
       credentials:
       - mount_path: /usr/local/ci-secrets/cincy-credentials
         name: cincy-credentials
@@ -102,16 +100,15 @@ tests:
         name: CINCINNATI_CI_DOCKERJSON_FILE
       - default: public-ci-image-sa-dockerjson
         name: CINCINNATI_CI_PUBLIC_DOCKERJSON_FILE
-      from: rust
+      from: src-base
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
     test:
     - as: cargo-test
-      commands: env CINCINNATI_CI_DOCKERJSON_PATH="${SHARED_DIR}/${CINCINNATI_CI_DOCKERJSON_FILE}"
-        CINCINNATI_TEST_CREDENTIALS_PATH="${SHARED_DIR}/${CINCINNATI_TEST_CREDENTIALS_FILE}"
-        dist/cargo_test.sh
+      commands: |
+        env CINCINNATI_CI_DOCKERJSON_PATH="${SHARED_DIR}/${CINCINNATI_CI_DOCKERJSON_FILE}" CINCINNATI_TEST_CREDENTIALS_PATH="${SHARED_DIR}/${CINCINNATI_TEST_CREDENTIALS_FILE}" dist/cargo_test.sh
       credentials:
       - mount_path: /usr/local/ci-secrets/cincy-credentials
         name: cincy-credentials
@@ -125,7 +122,7 @@ tests:
         name: CINCINNATI_TEST_QUAY_API_TOKEN_PATH
       - default: /usr/local/ci-secrets/cincy-credentials/github_token.key
         name: CINCINNATI_GITHUB_SCRAPER_OAUTH_TOKEN_PATH
-      from: rust
+      from: src-base
       resources:
         requests:
           cpu: 100m
@@ -133,15 +130,15 @@ tests:
 - as: yaml-lint
   commands: dist/prow_yaml_lint.sh
   container:
-    from: rust
+    from: src-base
 - as: rustfmt-1.50.0
   commands: dist/prow_rustfmt.sh 1.50.0
   container:
-    from: rust
+    from: src-base
 - as: rustfmt-1.46.0
   commands: dist/prow_rustfmt.sh 1.46.0
   container:
-    from: rust
+    from: src-base
 - as: e2e
   steps:
     cluster_profile: aws
