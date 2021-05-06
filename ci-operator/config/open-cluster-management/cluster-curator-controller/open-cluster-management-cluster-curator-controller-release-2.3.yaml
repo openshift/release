@@ -1,17 +1,13 @@
 base_images:
-  open-cluster-management_builder_go1.15-linux:
+  open-cluster-management_builder_go1.16-linux:
     name: builder
     namespace: open-cluster-management
-    tag: go1.15-linux
-  open-cluster-management_builder_go1.15-linux-amd64:
-    name: builder
-    namespace: open-cluster-management
-    tag: go1.15-linux-amd64
+    tag: go1.16-linux
 build_root:
   image_stream_tag:
     name: builder
     namespace: open-cluster-management
-    tag: go1.15-linux
+    tag: go1.16-linux
 images:
 - dockerfile_path: Dockerfile.prow
   to: cluster-curator-controller
@@ -29,6 +25,23 @@ tests:
   commands: make unit-tests
   container:
     from: src
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cluster-curator-controller
+    env:
+      IMAGE_REPO: cluster-curator-controller
+      REGISTRY_ORG: open-cluster-management
+    workflow: ocm-ci-image-mirror
+- as: pr-merge-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cluster-curator-controller
+    env:
+      IMAGE_REPO: cluster-curator-controller
+      REGISTRY_ORG: open-cluster-management
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
   branch: release-2.3
   org: open-cluster-management
