@@ -20,6 +20,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/osde2e-credentials
         - --target=verify
         command:
         - ci-operator
@@ -33,6 +34,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/osde2e-credentials
+          name: osde2e-credentials
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -41,6 +45,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: osde2e-credentials
+        secret:
+          secretName: osde2e-credentials
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
