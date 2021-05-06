@@ -10,10 +10,13 @@ echo "************ baremetalds devscripts setup command ************"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
 
-# Get dev-scripts logs
+# Get dev-scripts logs and other configuration
 finished()
 {
   set +e
+
+  echo "Fetching kubeconfig..."
+  scp "${SSHOPTS[@]}" "root@${IP}:/root/dev-scripts/ocp/ostest/auth/kubeconfig" "${SHARED_DIR}/"
 
   # Get dev-scripts logs
   echo "dev-scripts setup completed, fetching logs"
@@ -104,4 +107,4 @@ echo "export DS_REGISTRY=\$LOCAL_REGISTRY_DNS_NAME:\$LOCAL_REGISTRY_PORT" >> /tm
 echo "export DS_WORKING_DIR=\$WORKING_DIR" >> /tmp/ds-vars.conf
 EOF
 
-scp "${SSHOPTS[@]}" "root@${IP}:/root/dev-scripts/ocp/ostest/auth/kubeconfig /tmp/ds-vars.conf" "${SHARED_DIR}/"
+scp "${SSHOPTS[@]}" "root@${IP}:/tmp/ds-vars.conf" "${SHARED_DIR}/"
