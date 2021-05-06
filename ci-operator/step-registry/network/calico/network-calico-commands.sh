@@ -4,19 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-cat > "${SHARED_DIR}/manifest_cluster-network-03-config.yml" << EOF
-apiVersion: operator.openshift.io/v1
-kind: Network
-metadata:
-  name: cluster
-spec:
-  clusterNetwork:
-  - cidr: 10.128.0.0/14
-    hostPrefix: 23
-  networkType: None
-  serviceNetwork:
-  - 172.30.0.0/16
+cat >> "${SHARED_DIR}/install-config.yaml" << EOF
+networking:
+  networkType: Calico
 EOF
+
 
 # Copied exactly from https://docs.projectcalico.org/getting-started/openshift/installation
 curl --silent --location --fail --show-error https://docs.projectcalico.org/manifests/ocp/crds/01-crd-installation.yaml -o ${SHARED_DIR}/manifest_01-crd-installation.yaml
