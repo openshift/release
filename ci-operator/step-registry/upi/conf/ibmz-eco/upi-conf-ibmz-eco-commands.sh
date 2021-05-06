@@ -35,6 +35,7 @@ tfvars_out=${SHARED_DIR}/terraform.tfvars
 echo "${NAMESPACE}-${JOB_NAME_HASH}" > "${SHARED_DIR}"/clustername.txt
 cluster_name=$(<"${SHARED_DIR}"/clustername.txt)
 echo "Configuring deployment of OpenShift ${OCP_VERSION} under the name ${cluster_name}"
+dns_key=$(</var/run/secrets/ibmz-eco/dns-key)
 
 export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${RELEASE_IMAGE_LATEST}
 # Ensure ignition assets are configured with the correct invoker to track CI jobs.
@@ -56,4 +57,7 @@ openstack_worker_flavor_name = "${OPENSTACK_COMPUTE_FLAVOR}"
 openstack_bastion_flavor_name = "medium"
 openstack_credentials_cloud = "${OS_CLOUD}"
 openshift_pull_secret_filepath = "./ocp_clusters/${cluster_name}/pull-secret"
+proxy_enabled = "true"
+project_dns_ip = "204.90.115.172"
+project_dns_key = "${dns_key}"
 EOF
