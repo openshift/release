@@ -23,6 +23,30 @@ function getlogs() {
 # Gather logs regardless of what happens after this
 trap getlogs EXIT
 
+echo "### Fetching must-gather image information..."
+ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
+cd /root/dev-scripts
+source common.sh
+source ocp_install_env.sh
+source utils.sh
+source network.sh
+
+# In releases prior to 4.8, must-gather won't work on disconnected
+# without specifying an image to use. This looks at the release payload,
+# and generates the pullspec for the must-gather in our mirrored
+# registry.
+OPENSHIFT_VERSION=\$(openshift_version)
+if printf '%s\n4.7\n' "\$OPENSHIFT_VERSION" | sort -V -C; then
+  if [[ -n "\${MIRROR_IMAGES}" ]]; then
+      MUST_GATHER_RELEASE_IMAGE=\$(image_for must-gather | cut -d '@' -f2)
+      LOCAL_REGISTRY_PREFIX="\${LOCAL_REGISTRY_DNS_NAME}:\${LOCAL_REGISTRY_PORT}/localimages/local-release-image"
+      echo "export MUST_GATHER_IMAGE=\"--image=\${LOCAL_REGISTRY_PREFIX}@\${MUST_GATHER_RELEASE_IMAGE}\"" >> /tmp/must-gather-image.sh
+  fi
+fi
+EOF
+
+scp "${SSHOPTS[@]}" "root@${IP}:/tmp/must-gather-image.sh" "${SHARED_DIR}/" || true
+
 echo "### Gathering logs..."
 timeout -s 9 15m ssh "${SSHOPTS[@]}" "root@${IP}" bash - <<EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
 cd dev-scripts
