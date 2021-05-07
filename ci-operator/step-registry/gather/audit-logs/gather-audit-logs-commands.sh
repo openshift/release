@@ -17,7 +17,17 @@ then
 	source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+# Allow a job to override the must-gather image, this is needed for
+# disconnected environments prior to 4.8.
+if test -f "${SHARED_DIR}/must-gather-image.sh"
+then
+	# shellcheck source=/dev/null
+	source "${SHARED_DIR}/must-gather-image.sh"
+else
+	MUST_GATHER_IMAGE=${MUST_GATHER_IMAGE:-""}
+fi
+
 mkdir -p "${ARTIFACT_DIR}/audit-logs"
-oc adm must-gather --dest-dir="${ARTIFACT_DIR}/audit-logs" -- /usr/bin/gather_audit_logs
+oc adm must-gather $MUST_GATHER_IMAGE --dest-dir="${ARTIFACT_DIR}/audit-logs" -- /usr/bin/gather_audit_logs
 tar -czC "${ARTIFACT_DIR}/audit-logs" -f "${ARTIFACT_DIR}/audit-logs.tar.gz" .
 rm -rf "${ARTIFACT_DIR}/audit-logs"

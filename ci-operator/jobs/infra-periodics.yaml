@@ -68,7 +68,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210504-af1ac03335
+      image: gcr.io/k8s-prow/commenter:v20210507-9901b188a1
       imagePullPolicy: Always
       name: ""
       resources:
@@ -154,7 +154,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210504-af1ac03335
+      image: gcr.io/k8s-prow/commenter:v20210507-9901b188a1
       imagePullPolicy: Always
       name: ""
       resources:
@@ -207,7 +207,7 @@ periodics:
       - --random
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210504-af1ac03335
+      image: gcr.io/k8s-prow/commenter:v20210507-9901b188a1
       imagePullPolicy: Always
       name: ""
       resources:
@@ -252,7 +252,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210504-af1ac03335
+      image: gcr.io/k8s-prow/commenter:v20210507-9901b188a1
       imagePullPolicy: Always
       name: ""
       resources:
@@ -301,7 +301,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210504-af1ac03335
+      image: gcr.io/k8s-prow/commenter:v20210507-9901b188a1
       imagePullPolicy: Always
       name: ""
       resources:
@@ -349,7 +349,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210504-af1ac03335
+      image: gcr.io/k8s-prow/commenter:v20210507-9901b188a1
       imagePullPolicy: Always
       name: ""
       resources:
@@ -383,7 +383,7 @@ periodics:
       - --debug
       command:
       - /app/label_sync/app.binary
-      image: gcr.io/k8s-prow/label_sync:v20210504-af1ac03335
+      image: gcr.io/k8s-prow/label_sync:v20210507-9901b188a1
       imagePullPolicy: Always
       name: ""
       resources:
@@ -415,7 +415,6 @@ periodics:
     workdir: true
   interval: 5m
   labels:
-    ci.openshift.io/role: infra
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   max_concurrency: 1
   name: periodic-ipi-deprovision-aws
@@ -468,7 +467,6 @@ periodics:
     workdir: true
   interval: 5m
   labels:
-    ci.openshift.io/role: infra
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   max_concurrency: 1
   name: periodic-ipi-deprovision-aws-2
@@ -636,7 +634,7 @@ periodics:
       - --config=core-services/prow/02_config/_bumper.yaml
       command:
       - /app/prow/cmd/generic-autobumper/app.binary
-      image: gcr.io/k8s-prow/generic-autobumper:v20210504-af1ac03335
+      image: gcr.io/k8s-prow/generic-autobumper:v20210507-9901b188a1
       imagePullPolicy: IfNotPresent
       name: autobump
       resources:
@@ -860,7 +858,7 @@ periodics:
           secretKeyRef:
             key: appid
             name: openshift-prow-github-app
-      image: gcr.io/k8s-prow/branchprotector:v20210504-af1ac03335
+      image: gcr.io/k8s-prow/branchprotector:v20210507-9901b188a1
       imagePullPolicy: Always
       name: ""
       resources:
@@ -907,7 +905,7 @@ periodics:
       - --fix-repos
       command:
       - /app/prow/cmd/peribolos/app.binary
-      image: gcr.io/k8s-prow/peribolos:v20210504-af1ac03335
+      image: gcr.io/k8s-prow/peribolos:v20210507-9901b188a1
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1182,7 +1180,7 @@ periodics:
       env:
       - name: KUBECONFIG
         value: /etc/build-farm-credentials/api.ci.kubeconfig:/etc/build-farm-credentials/build01.kubeconfig:/etc/build-farm-credentials/app.ci.kubeconfig:/etc/build-farm-credentials/build02.kubeconfig:/etc/build-farm-credentials/vsphere.kubeconfig
-      image: gcr.io/k8s-prow/config-bootstrapper:v20210504-af1ac03335
+      image: gcr.io/k8s-prow/config-bootstrapper:v20210507-9901b188a1
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1739,12 +1737,17 @@ periodics:
     containers:
     - args:
       - --config-dir=clusters/build-clusters/arm01
-      - --ignore-file=clusters/build-clusters/common/cert-manager.yaml
       - --confirm=true
       - --as=
       - --kubeconfig=/etc/build-farm-credentials/kubeconfig
       command:
       - applyconfig
+      env:
+      - name: arm01_id
+        valueFrom:
+          secretKeyRef:
+            key: arm01-id
+            name: arm01-dex-oidc
       image: applyconfig:latest
       imagePullPolicy: Always
       name: ""
@@ -1763,3 +1766,67 @@ periodics:
         - key: sa.config-updater.arm01.config
           path: kubeconfig
         secretName: build-farm-credentials
+- agent: kubernetes
+  cluster: app.ci
+  decorate: true
+  interval: 12h
+  labels:
+    ci.openshift.io/role: infra
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-openshift-release-master-accept-invitations-merge-robot
+  spec:
+    containers:
+    - args:
+      - --github-token-path=/etc/github/oauth
+      - --github-endpoint=http://ghproxy
+      - --github-endpoint=https://api.github.com
+      - --github-graphql-endpoint=http://ghproxy/graphql
+      - --dry-run=false
+      command:
+      - /app/prow/cmd/invitations-accepter/app.binary
+      image: gcr.io/k8s-prow/invitations-accepter:v20210507-9901b188a1
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: token
+        readOnly: true
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-merge-robot
+- agent: kubernetes
+  cluster: app.ci
+  decorate: true
+  interval: 12h
+  labels:
+    ci.openshift.io/role: infra
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-openshift-release-master-accept-invitations-ci-robot
+  spec:
+    containers:
+    - args:
+      - --github-token-path=/etc/github/oauth
+      - --github-endpoint=http://ghproxy
+      - --github-endpoint=https://api.github.com
+      - --github-graphql-endpoint=http://ghproxy/graphql
+      - --dry-run=false
+      command:
+      - /app/prow/cmd/invitations-accepter/app.binary
+      image: gcr.io/k8s-prow/invitations-accepter:v20210507-9901b188a1
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: token
+        readOnly: true
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-ci-robot

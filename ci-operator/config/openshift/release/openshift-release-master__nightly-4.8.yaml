@@ -71,6 +71,10 @@ releases:
       product: ocp
       stream: nightly
       version: "4.8"
+  oldest-supported-z-rollback:
+    release:
+      channel: candidate
+      version: 4.8.0-fc.2
 resources:
   '*':
     requests:
@@ -163,6 +167,7 @@ tests:
     - ref: baremetalds-packet-setup
     - ref: ipi-install-rbac
     - ref: baremetalds-devscripts-conf-compact
+    - ref: baremetalds-devscripts-proxy
     - ref: baremetalds-devscripts-setup
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-virtualmedia
@@ -332,6 +337,17 @@ tests:
     cluster_profile: aws
     env:
       TEST_TYPE: upgrade-conformance
+    workflow: openshift-upgrade-aws
+- as: e2e-aws-upgrade-rollback-oldest-supported
+  interval: 48h
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:oldest-supported-z-rollback
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      TEST_TYPE: upgrade-conformance
+      TEST_UPGRADE_OPTIONS: abort-at=random
     workflow: openshift-upgrade-aws
 - as: e2e-aws
   interval: 48h

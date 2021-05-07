@@ -7,7 +7,7 @@ echo "************ libvirt cert rotation conf command ************"
 # This script sets up a mirrored local registry with the installer.
 # This enables testing certificate rotation in a cluster older than 1 year
 # Instead of waiting 1 year, fake the time and install with a local image-registry
-# and long-lived certs. 
+# and long-lived certs.
 #
 # This file gets scp'd to the gcp instance where the nested libvirt install will take place
 cat > "${SHARED_DIR}"/create-cluster-mirrored-local-registry << 'END'
@@ -350,7 +350,7 @@ checkDegradedCOs () {
   # image-pruner job in openshift-image-registry namespace may be stuck due to time skew. This would not
   # happen if time was progressing naturally. Kill image-prune jobs here.
   oc delete jobs --all -n openshift-image-registry
-  # supposedly fixed but still lingering pod trip up insights-operator: https://bugzilla.redhat.com/show_bug.cgi?id=1919778 
+  # supposedly fixed but still lingering pod trip up insights-operator: https://bugzilla.redhat.com/show_bug.cgi?id=1919778
   oc delete pods --all -n openshift-insights --force --grace-period=0
   sleep 10
   while ! oc wait co --all --for='condition=Degraded=False' --timeout=20s && [ $retries -lt 100 ]; do

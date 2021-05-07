@@ -475,6 +475,10 @@ spec:
       for: 1m
       labels:
         severity: critical
+    - expr: count(label_replace(count(github_token_usage{token_hash =~ "openshift.*"})
+        by (token_hash), "login", "$1", "token_hash", "(.*)") or github_user_info{login=~"openshift-.*"})
+        by (login)
+      record: github:identity_names
   - name: release-controller-down
     rules:
     - alert: releaseControllerDown
