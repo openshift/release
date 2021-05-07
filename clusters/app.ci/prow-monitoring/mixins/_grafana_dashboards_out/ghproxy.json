@@ -785,14 +785,14 @@
                "expr": "sum(rate(github_request_duration_count{path=~\"${path}\", status=\"${status}\", token_hash=~\"${login}\"}[${range}])) by (login, path, status)",
                "format": "time_series",
                "intervalFactor": 2,
-               "legendFormat": "{{status}}:{{token_hash}}:{{path}}",
+               "legendFormat": "{{status}}: {{path}}",
                "refId": "A"
             },
             {
                "expr": "sum(rate(github_request_duration_count{path=~\"${path}\", status=\"${status}\"}[${range}]) * on(token_hash) group_left(login) max(github_user_info{login=~\"${login}\"}) by (token_hash, login)) by (login, path, status)",
                "format": "time_series",
                "intervalFactor": 2,
-               "legendFormat": "{{status}}:{{login}}:{{path}}",
+               "legendFormat": "{{status}}: {{path}}",
                "refId": "B"
             }
          ],
@@ -979,31 +979,52 @@
          "steppedLine": false,
          "targets": [
             {
-               "expr": "histogram_quantile(0.99, sum(rate(github_request_duration_bucket{path=\"${path}\", status=\"${status}\"}[5m]) * on(token_hash) group_left(login) max(github_user_info{login=~\"${login}\"}) by (token_hash, login)) by (le))",
+               "expr": "histogram_quantile(0.99, sum(rate(github_request_duration_bucket{path=~\"${path}\", status=\"${status}\", token_hash=~\"${login}\"}[5m])) by (le))",
                "format": "time_series",
                "intervalFactor": 2,
                "legendFormat": "phi=0.99",
                "refId": "A"
             },
             {
-               "expr": "histogram_quantile(0.95, sum(rate(github_request_duration_bucket{path=\"${path}\", status=\"${status}\"}[5m]) * on(token_hash) group_left(login) max(github_user_info{login=~\"${login}\"}) by (token_hash, login)) by (le))",
+               "expr": "histogram_quantile(0.95, sum(rate(github_request_duration_bucket{path=~\"${path}\", status=\"${status}\", token_hash=~\"${login}\"}[5m])) by (le))",
                "format": "time_series",
                "intervalFactor": 2,
                "legendFormat": "phi=0.95",
                "refId": "B"
             },
             {
-               "expr": "histogram_quantile(0.5, sum(rate(github_request_duration_bucket{path=\"${path}\", status=\"${status}\"}[5m]) * on(token_hash) group_left(login) max(github_user_info{login=~\"${login}\"}) by (token_hash, login)) by (le))",
+               "expr": "histogram_quantile(0.5, sum(rate(github_request_duration_bucket{path=~\"${path}\", status=\"${status}\", token_hash=~\"${login}\"}[5m])) by (le))",
                "format": "time_series",
                "intervalFactor": 2,
                "legendFormat": "phi=0.5",
                "refId": "C"
+            },
+            {
+               "expr": "histogram_quantile(0.99, sum(rate(github_request_duration_bucket{path=~\"${path}\", status=\"${status}\"}[5m]) * on(token_hash) group_left(login) max(github_user_info{login=~\"${login}\"}) by (token_hash, login)) by (le))",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "phi=0.99",
+               "refId": "D"
+            },
+            {
+               "expr": "histogram_quantile(0.95, sum(rate(github_request_duration_bucket{path=~\"${path}\", status=\"${status}\"}[5m]) * on(token_hash) group_left(login) max(github_user_info{login=~\"${login}\"}) by (token_hash, login)) by (le))",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "phi=0.95",
+               "refId": "E"
+            },
+            {
+               "expr": "histogram_quantile(0.5, sum(rate(github_request_duration_bucket{path=~\"${path}\", status=\"${status}\"}[5m]) * on(token_hash) group_left(login) max(github_user_info{login=~\"${login}\"}) by (token_hash, login)) by (le))",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "phi=0.5",
+               "refId": "F"
             }
          ],
          "thresholds": [ ],
          "timeFrom": null,
          "timeShift": null,
-         "title": "Latency Distribution for ${login}, ${path}, and ${status} with ${range}",
+         "title": "Latency Distribution for path ${path} and ${status} with ${range}",
          "tooltip": {
             "shared": true,
             "sort": 0,
@@ -1081,17 +1102,24 @@
          "steppedLine": false,
          "targets": [
             {
-               "expr": "sum(increase(ghcache_responses{mode=~\"MISS|NO-STORE|CHANGED\"}[1h])) by (user_agent) != 0",
+               "expr": "sum(increase(ghcache_responses{mode=~\"MISS|NO-STORE|CHANGED\",token_hash=~\"${login}\"}[1h])) by (user_agent)",
                "format": "time_series",
                "intervalFactor": 2,
                "legendFormat": "{{user_agent}}",
                "refId": "A"
+            },
+            {
+               "expr": "sum(increase(ghcache_responses{mode=~\"MISS|NO-STORE|CHANGED\"}[1h]) * on(token_hash) group_left(login) max(github_user_info{login=~\"${login}\"}) by (token_hash, login)) by (user_agent)",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "{{user_agent}}",
+               "refId": "B"
             }
          ],
          "thresholds": [ ],
          "timeFrom": null,
          "timeShift": null,
-         "title": "Token Consumption by User Agent",
+         "title": "Token Consumption for identity ${login} by User Agent",
          "tooltip": {
             "shared": true,
             "sort": 0,
@@ -1169,17 +1197,24 @@
          "steppedLine": false,
          "targets": [
             {
-               "expr": "sum(increase(ghcache_responses{mode=~\"MISS|NO-STORE|CHANGED\"}[1h])) by (path) != 0",
+               "expr": "sum(increase(ghcache_responses{mode=~\"MISS|NO-STORE|CHANGED\",token_hash=~\"${login}\"}[1h])) by (path)",
                "format": "time_series",
                "intervalFactor": 2,
                "legendFormat": "{{path}}",
                "refId": "A"
+            },
+            {
+               "expr": "sum(increase(ghcache_responses{mode=~\"MISS|NO-STORE|CHANGED\"}[1h]) * on(token_hash) group_left(login) max(github_user_info{login=~\"${login}\"}) by (token_hash, login)) by (path)",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "{{path}}",
+               "refId": "B"
             }
          ],
          "thresholds": [ ],
          "timeFrom": null,
          "timeShift": null,
-         "title": "Token Consumption by Path",
+         "title": "Token Consumption for identity ${login} by Path",
          "tooltip": {
             "shared": true,
             "sort": 0,
@@ -1257,17 +1292,24 @@
          "steppedLine": false,
          "targets": [
             {
-               "expr": "sum(increase(ghcache_responses{mode=~\"MISS|NO-STORE|CHANGED\",path=\"${path}\"}[1h])) by (user_agent) != 0",
+               "expr": "sum(increase(ghcache_responses{mode=~\"MISS|NO-STORE|CHANGED\",path=~\"${path}\",token_hash=~\"${login}\"}[1h])) by (user_agent)",
                "format": "time_series",
                "intervalFactor": 2,
                "legendFormat": "{{user_agent}}",
                "refId": "A"
+            },
+            {
+               "expr": "sum(increase(ghcache_responses{mode=~\"MISS|NO-STORE|CHANGED\",path=~\"${path}\"}[1h]) * on(token_hash) group_left(login) max(github_user_info{login=~\"${login}\"}) by (token_hash, login)) by (user_agent)",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "{{user_agent}}",
+               "refId": "B"
             }
          ],
          "thresholds": [ ],
          "timeFrom": null,
          "timeShift": null,
-         "title": "Token Consumption For Path ${path} by User Agent",
+         "title": "Token Consumption for identity ${login} at Path ${path} by User Agent",
          "tooltip": {
             "shared": true,
             "sort": 0,
@@ -1345,17 +1387,24 @@
          "steppedLine": false,
          "targets": [
             {
-               "expr": "sum(increase(ghcache_responses{mode=~\"MISS|NO-STORE|CHANGED\",user_agent=\"${user_agent}\"}[1h])) by (path) != 0",
+               "expr": "sum(increase(ghcache_responses{mode=~\"MISS|NO-STORE|CHANGED\",user_agent=~\"${user_agent}\",token_hash=~\"${login}\"}[1h])) by (path)",
                "format": "time_series",
                "intervalFactor": 2,
                "legendFormat": "{{path}}",
                "refId": "A"
+            },
+            {
+               "expr": "sum(increase(ghcache_responses{mode=~\"MISS|NO-STORE|CHANGED\",user_agent=~\"${user_agent}\"}[1h]) * on(token_hash) group_left(login) max(github_user_info{login=~\"${login}\"}) by (token_hash, login)) by (path)",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "{{path}}",
+               "refId": "B"
             }
          ],
          "thresholds": [ ],
          "timeFrom": null,
          "timeShift": null,
-         "title": "Token Consumption for User Agent ${user_agent} by Path",
+         "title": "Token Consumption for identity ${login} and User Agent ${user_agent} by Path",
          "tooltip": {
             "shared": true,
             "sort": 0,
