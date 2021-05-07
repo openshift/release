@@ -3,6 +3,8 @@ set -euo pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
+GOOGLE_COMPUTE_REGION="${LEASED_RESOURCE}"
 INSTANCE_PREFIX="${NAMESPACE}-${JOB_NAME_HASH}"
 
 echo "$(date -u --rfc-3339=seconds) - Configuring VM on GCP..."
@@ -16,8 +18,12 @@ cp "${CLUSTER_PROFILE_DIR}/ssh-publickey" "${HOME}/.ssh/google_compute_engine.pu
 
 gcloud auth activate-service-account --quiet --key-file "${CLUSTER_PROFILE_DIR}/gce.json"
 gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
-gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
 gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
+
+GOOGLE_COMPUTE_ZONE="$(gcloud compute zones list --filter="region=$GOOGLE_COMPUTE_REGION" --format='csv[no-heading](name)' | head -n 1)"
+echo "$GOOGLE_COMPUTE_ZONE" > "$SHARED_DIR/openshift_gcp_compute_zone"
+gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
+
 set -x
 
 # Create the network and firewall rules to attach it to VM
