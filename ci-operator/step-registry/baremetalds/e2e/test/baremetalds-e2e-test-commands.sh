@@ -32,6 +32,19 @@ EOF
         TEST_ARGS="--from-repository ${DEVSCRIPTS_TEST_IMAGE_REPO}"
 }
 
+function mirror_cso_images() {
+        echo "### Mirroring images required by cluster-samples-operator"
+
+        DEVSCRIPTS_CSO_IMAGE_REPO=${DS_REGISTRY}/localimages/local-cso-image  
+        # shellcheck disable=SC2087
+        ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
+oc patch configs.samples cluster --type merge --patch "{\"spec\":{\"managementState\":\"Removed\"}}"
+oc get cm imagestreamtag-to-image -o "jsonpath={.data}" -n openshift-cluster-samples-operator | jq -r --arg repo "$DEVSCRIPTS_CSO_IMAGE_REPO" 'to_entries | map( "\(.value) " + \$repo + "/\(.value | sub( "(?<head>.[^/]*)/(?<tail>.*)"; "\(.tail)"))")|unique|.[]' > /tmp/mirror-cso
+oc image mirror -f /tmp/mirror-cso --registry-config ${DS_WORKING_DIR}/pull_secret.json
+oc patch configs.samples cluster --type merge --patch "{\"spec\":{\"managementState\":\"Managed\"}}"
+EOF
+}
+
 function use_minimal_test_list() {
         echo "### Skipping test images mirroring, fall back to minimal tests list"
         
@@ -52,7 +65,8 @@ packet)
     echo "### Checking release version"
     # Mirroring test images is supported only for versions greater than or equal to 4.7
     if printf '%s\n%s' "4.8" "${DS_OPENSHIFT_VERSION}" | sort -C -V; then
-        mirror_test_images       
+        mirror_test_images
+        mirror_cso_images
     else
         use_minimal_test_list
     fi
