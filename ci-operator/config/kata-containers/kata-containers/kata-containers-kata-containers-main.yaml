@@ -8,6 +8,11 @@ base_images:
     namespace: ci
     tag: "20.04"
 binary_build_commands: |
+  dnf install -y wget
+  wget https://raw.githubusercontent.com/kata-containers/kata-containers/a23ee685bddc1ba850a15f06bf46011ea7c47d27/src/runtime/virtcontainers/kata_agent.go
+  mv -f kata_agent.go src/runtime/virtcontainers/
+  wget https://raw.githubusercontent.com/kata-containers/kata-containers/bad5b5f25b5a8e9e119329f790d4f367305d4fef/src/agent/src/mount.rs
+  mv -f mount.rs src/agent/src
   # The CentOS 8 build root does not have golang package installed so that we
   # use the golang installed by Kata Containers setup script. Here it is
   # ensured the tools are searcheable.
@@ -66,7 +71,7 @@ tag_specification:
   name: "4.7"
   namespace: ocp
 tests:
-- as: e2e-tests
+- as: e2e-tests-check-fix
   cron: 2 7 * * *
   steps:
     cluster_profile: azure4
