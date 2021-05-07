@@ -3,7 +3,7 @@
 This document overviews the secrets that are available and the means by which
 they should be deployed to the cluster.
 
-There are currently two ways to manager secrets:
+There are currently two ways to manage secrets:
 
 * DPTP-managed Secrets: We store secrets in a private secret storage system: [Bitwarden](https://bitwarden.com/).
 To add new secrets to this storage please reach out to `#forum-testplatform` on Slack
