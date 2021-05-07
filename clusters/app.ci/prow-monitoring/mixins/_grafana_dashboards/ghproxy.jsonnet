@@ -43,7 +43,8 @@ dashboard.new(
 .addTemplate(template.new(
         'login',
         'prometheus',
-        'label_values(github_user_info{login=~"openshift-.*"}, login)',
+        'label_values(github:identity_names, login)',
+        includeAll=true,
         label='login',
         refresh='time',
     ))
@@ -133,8 +134,12 @@ dashboard.new(
         #y_axis_label='% Cacheable Request Fulfilled for Free',
     ) + legendConfig)
     .addTarget(prometheus.target(
+        'sum(increase(ghcache_responses{mode=~"COALESCED|REVALIDATED", token_hash=~"openshift-ci - .*"}[1h]))  / sum(increase(ghcache_responses{mode=~"COALESCED|REVALIDATED|MISS|CHANGED", token_hash=~"openshift-ci - .*"}[1h]))',
+        legendFormat='App',
+    ))
+    .addTarget(prometheus.target(
         'sum(increase(ghcache_responses{mode=~"COALESCED|REVALIDATED"}[1h]) * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login)) \n/ sum(increase(ghcache_responses{mode=~"COALESCED|REVALIDATED|MISS|CHANGED"}[1h]) * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login))',
-        legendFormat='Efficiency',
+        legendFormat='Token',
     )), gridPos={
     h: 6,
     w: 24,
@@ -211,11 +216,11 @@ dashboard.new(
         max='12500',
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(github_token_usage{token_hash=~"openshift.*"}) by (token_hash, api_version)',
+        'sum(github_token_usage{token_hash=~"${login}"}) by (token_hash, api_version)',
          legendFormat='{{token_hash}} : {{api_version}}',
     ))
     .addTarget(prometheus.target(
-        'sum(github_token_usage * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login)) by (api_version, login)',
+        'sum(github_token_usage * on(token_hash) group_left(login) max(github_user_info{login=~"${login}"}) by (token_hash, login)) by (api_version, login)',
          legendFormat='{{login}} : {{api_version}}',
     )), gridPos={
     h: 9,
@@ -271,6 +276,10 @@ dashboard.new(
         legend_sort='current',
         legend_sortDesc=true,
     ) + legendConfig)
+    .addTarget(prometheus.target(
+        'sum(rate(github_request_duration_count{path="${path}", status="${status}", token_hash="${login}"}[${range}])) by (login, path, status)',
+         legendFormat='{{status}}:{{token_hash}}:{{path}}',
+    ))
     .addTarget(prometheus.target(
         'sum(rate(github_request_duration_count{path="${path}", status="${status}"}[${range}]) * on(token_hash) group_left(login) max(github_user_info{login=~"${login}"}) by (token_hash, login)) by (login, path, status)',
          legendFormat='{{status}}:{{login}}:{{path}}',
