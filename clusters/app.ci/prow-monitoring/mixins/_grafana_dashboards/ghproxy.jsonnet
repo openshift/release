@@ -230,7 +230,7 @@ dashboard.new(
   })
 .addPanel(
     (graphPanel.new(
-        'Request Rates: Overview by status with ${range}',
+        'Request Rates: Overview for identity ${login} by status with ${range}',
         description='GitHub request rates by status.',
         datasource='prometheus',
         legend_alignAsTable=true,
@@ -238,7 +238,11 @@ dashboard.new(
         stack=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(rate(github_request_duration_count[${range}]) * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login)) by (status)',
+        'sum(rate(github_request_duration_count{token_hash=~"${login}"}[${range}])) by (status)',
+         legendFormat='{{status}}',
+    ))
+    .addTarget(prometheus.target(
+        'sum(rate(github_request_duration_count[${range}]) * on(token_hash) group_left(login) max(github_user_info{login=~"${login}"}) by (token_hash, login)) by (status)',
          legendFormat='{{status}}',
     )), gridPos={
     h: 9,
