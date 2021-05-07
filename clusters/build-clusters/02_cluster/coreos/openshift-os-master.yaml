@@ -1,0 +1,125 @@
+# CoreOS Assembler has an execution engine called Gangplank that is
+# runs as a custom-build strategy. Prow jobs will trigger the build
+# to track the builds.
+
+---
+# Create the image stream used for running the buildconfig
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: coreos-assembler
+  namespace: coreos
+spec:
+  lookupPolicy:
+    local: true
+  tags:
+  - annotations: null
+    from:
+      kind: DockerImage
+      name: quay.io/coreos-assembler/coreos-assembler:latest
+    importPolicy:
+      scheduled: true
+    name: master
+    referencePolicy:
+      type: Source
+---
+# Create the BuildConfig image
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: coreos-assembler-buildconfig-image
+  namespace: coreos
+spec:
+  completionDeadlineSeconds: 13200
+  failedBuildsHistoryLimit: 5
+  output:
+    to:
+      kind: ImageStreamTag
+      name: coreos-assembler:buildconfig-master
+  postCommit: {}
+  resources: {}
+  runPolicy: Serial
+  source:
+    git:
+      ref: master
+      uri: https://github.com/coreos/coreos-assembler
+    type: Git
+  strategy:
+    dockerStrategy:
+      dockerfilePath: ocp/Dockerfile.buildconfig
+      from:
+        kind: ImageStreamTag
+        name: coreos-assembler:master
+    type: Docker
+  successfulBuildsHistoryLimit: 5
+  triggers:
+  - imageChange:
+      from:
+        kind: ImageStreamTag
+        name: coreos-assembler:master
+    type: ImageChange
+
+---
+# Custom build config for Openshift OS
+# The runs the Gangplank as a native buildconfig.
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: openshift-os-master
+  namespace: coreos
+spec:
+  failedBuildsHistoryLimit: 15
+  successfulBuildsHistoryLimit: 15
+  nodeSelector: null
+  output: {}
+  postCommit: {}
+  resources: {}
+  runPolicy: Parallel
+  serviceAccount: coreos-builder
+  source:
+    git:
+      ref: "master"
+      uri: "https://github.com/openshift/os"
+    type: Git
+  strategy:
+    customStrategy:
+      from:
+        kind: DockerImage
+        name: "registry.ci.openshift.org/coreos/coreos-assembler:latest"
+      forcePull: true
+    type: Custom
+  triggers: []
+
+---
+# Create the rolebinding to allow service accounts to trigger
+# builds for OpenShift OS.
+apiVersion: authorization.openshift.io/v1
+kind: Role
+metadata:
+  name: coreos-openshift-os-builders
+  namespace: coreos
+rules:
+  - apiGroups:
+      - build.openshift.io
+    resources:
+      - builds
+    verbs:
+      - create
+      - get
+
+---
+# Allow service accounts (i.e. Prow) permission to trigger builds
+# in the coreos namespace.
+apiVersion: authorization.openshift.io/v1
+kind: RoleBinding
+metadata:
+  name: coreos-openshift-os-builders-0
+  namespace: coreos
+roleRef:
+  name: coreos-openshift-os-builders
+  namespace: coreos
+subjects:
+  - kind: SystemUser
+    name: system:serviceaccounts
+userNames:
+  - system:serviceaccounts
