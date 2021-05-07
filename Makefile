@@ -2,7 +2,7 @@ SHELL=/usr/bin/env bash -o errexit
 
 .PHONY: help check check-boskos check-core check-services dry-core core dry-services services all
 
-CONTAINER_ENGINE ?= docker
+CONTAINER_ENGINE ?= podman
 
 help:
 	@echo "Run 'make all' to update configuration against the current KUBECONFIG"
