@@ -36,6 +36,9 @@ tests:
         cd hyperconverged-cluster-operator
         sed -i "s#15m#30m#g" ./deploy/kustomize/deploy_kustomize.sh
         CONTENT_ONLY=false MARKETPLACE_MODE=false ./deploy/kustomize/deploy_kustomize.sh
+        oc apply -n default -f https://raw.githubusercontent.com/kubevirt/kubevirt.github.io/master/labs/manifests/vm.yaml
+        oc patch -n default virtualmachine testvm --type merge -p '{"spec":{"running":true}}'
+        oc apply -n default -f https://raw.githubusercontent.com/kubevirt/containerized-data-importer/master/manifests/example/blank-image-datavolume.yaml
         image=$(component=kubevirt-must-gather eval echo ${IMAGE_FORMAT})
         oc adm must-gather --image="${image}"
       from: src
