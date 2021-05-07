@@ -293,11 +293,11 @@ dashboard.new(
     ) + legendConfig)
     .addTarget(prometheus.target(
         'sum(rate(github_request_duration_count{path=~"${path}", status="${status}", token_hash=~"${login}"}[${range}])) by (login, path, status)',
-         legendFormat='{{status}}:{{token_hash}}:{{path}}',
+         legendFormat='{{status}}: {{path}}',
     ))
     .addTarget(prometheus.target(
         'sum(rate(github_request_duration_count{path=~"${path}", status="${status}"}[${range}]) * on(token_hash) group_left(login) max(github_user_info{login=~"${login}"}) by (token_hash, login)) by (login, path, status)',
-         legendFormat='{{status}}:{{login}}:{{path}}',
+         legendFormat='{{status}}: {{path}}',
     )), gridPos={
     h: 9,
     w: 24,
@@ -327,7 +327,7 @@ dashboard.new(
   })
 .addPanel(
     (graphPanel.new(
-        'Latency Distribution for ${login}, ${path}, and ${status} with ${range}',
+        'Latency Distribution for path ${path} and ${status} with ${range}',
         description='histogram_quantile(<phi>, sum(rate(github_request_duration_bucket{path=~"${path}", status=~"${status}"}[${range}])) by (le))',
         datasource='prometheus',
         legend_alignAsTable=true,
@@ -414,11 +414,11 @@ dashboard.new(
         legend_sortDesc=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED",path=~"${path}",user_agent="${user_agent}",token_hash=~"${login}"}[1h])) by (user_agent)',
+        'sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED",path=~"${path}",token_hash=~"${login}"}[1h])) by (user_agent)',
          legendFormat='{{user_agent}}',
     ))
     .addTarget(prometheus.target(
-        'sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED",path=~"${path}",user_agent="${user_agent}"}[1h]) * on(token_hash) group_left(login) max(github_user_info{login=~"${login}"}) by (token_hash, login)) by (user_agent)',
+        'sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED",path=~"${path}"}[1h]) * on(token_hash) group_left(login) max(github_user_info{login=~"${login}"}) by (token_hash, login)) by (user_agent)',
          legendFormat='{{user_agent}}',
     )), gridPos={
     h: 9,
@@ -440,7 +440,11 @@ dashboard.new(
         legend_sortDesc=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED",user_agent=~"${user_agent}"[1h]) * on(token_hash) group_left(login) max(github_user_info{login=~"${login}"}) by (token_hash, login)) by (path)'
+        'sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED",user_agent=~"${user_agent}",token_hash=~"${login}"}[1h])) by (path)',
+         legendFormat='{{path}}',
+    ))
+    .addTarget(prometheus.target(
+        'sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED",user_agent=~"${user_agent}"}[1h]) * on(token_hash) group_left(login) max(github_user_info{login=~"${login}"}) by (token_hash, login)) by (path)',
          legendFormat='{{path}}',
     )), gridPos={
     h: 9,
