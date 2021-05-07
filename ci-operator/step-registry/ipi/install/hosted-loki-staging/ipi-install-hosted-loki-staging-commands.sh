@@ -4,9 +4,10 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-export LOKI_VERSION="2.2.1"
 export LOKI_STAGE_ENDPOINT=https://observatorium.api.stage.openshift.com/api/logs/v1/dptp/loki/api/v1
 export LOKI_PROD_ENDPOINT=https://observatorium.api.openshift.com/api/logs/v1/dptp/loki/api/v1
+export PROMTAIL_IMAGE="quay.io/openshift-logging/promtail"
+export PROMTAIL_VERSION="v2.2.1"
 
 GRAFANACLOUND_USERNAME=$(cat /var/run/loki-grafanacloud-secret/client-id)
 
@@ -228,7 +229,7 @@ spec:
         app.kubernetes.io/instance: loki-promtail
         app.kubernetes.io/name: promtail
         app.kubernetes.io/part-of: loki
-        app.kubernetes.io/version: ${LOKI_VERSION}
+        app.kubernetes.io/version: ${PROMTAIL_VERSION}
     spec:
       containers:
       - args:
@@ -287,7 +288,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
-        image: quay.io/vrutkovs/promtail:${LOKI_VERSION}
+        image: ${PROMTAIL_IMAGE}:${PROMTAIL_VERSION}
         imagePullPolicy: IfNotPresent
         name: promtail
         ports:
