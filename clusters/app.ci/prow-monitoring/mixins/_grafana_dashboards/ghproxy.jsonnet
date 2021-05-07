@@ -48,7 +48,14 @@ dashboard.new(
         label='login',
         refresh='time',
     ))
-.addTemplate(requestLabels('path', 'path'))
+.addTemplate(template.new(
+       'path',
+       'prometheus',
+       'label_values(github_request_duration_count, path)',
+       includeAll=true,
+       label='path',
+       refresh='time',
+))
 .addTemplate(requestLabels('status', 'status'))
 .addTemplate(requestLabels('user_agent', 'user_agent'))
 .addTemplate(
@@ -252,7 +259,7 @@ dashboard.new(
   })
 .addPanel(
     (graphPanel.new(
-        'Request Rates: Overview for identity ${login} by path for ${status} with ${range}',
+        'Request Rates: Overview for identity ${login} by path for status ${status} with ${range}',
         description='GitHub request rates by path.',
         datasource='prometheus',
         legend_alignAsTable=true,
@@ -274,7 +281,7 @@ dashboard.new(
   })
 .addPanel(
     (graphPanel.new(
-        'Request Rates: ${login}, ${path}, and ${status} with ${range}',
+        'Request Rates: Identity ${login}, path ${path}, and status ${status} with ${range}',
         description='GitHub request rates by login, path and status.',
         datasource='prometheus',
         legend_alignAsTable=true,
@@ -285,11 +292,11 @@ dashboard.new(
         legend_sortDesc=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(rate(github_request_duration_count{path="${path}", status="${status}", token_hash="${login}"}[${range}])) by (login, path, status)',
+        'sum(rate(github_request_duration_count{path=~"${path}", status="${status}", token_hash=~"${login}"}[${range}])) by (login, path, status)',
          legendFormat='{{status}}:{{token_hash}}:{{path}}',
     ))
     .addTarget(prometheus.target(
-        'sum(rate(github_request_duration_count{path="${path}", status="${status}"}[${range}]) * on(token_hash) group_left(login) max(github_user_info{login=~"${login}"}) by (token_hash, login)) by (login, path, status)',
+        'sum(rate(github_request_duration_count{path=~"${path}", status="${status}"}[${range}]) * on(token_hash) group_left(login) max(github_user_info{login=~"${login}"}) by (token_hash, login)) by (login, path, status)',
          legendFormat='{{status}}:{{login}}:{{path}}',
     )), gridPos={
     h: 9,
