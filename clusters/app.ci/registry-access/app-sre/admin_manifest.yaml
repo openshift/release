@@ -1,0 +1,62 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  annotations:
+    openshift.io/description: Automation ServiceAccounts for the AppSRE team
+    openshift.io/display-name: AppSRE team CI
+  name: app-sre
+---
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: image-puller
+  namespace: app-sre
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: app-sre-image-puller-binding
+  namespace: ocp
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: system:image-puller
+subjects:
+  - kind: ServiceAccount
+    namespace: app-sre
+    name: image-puller
+---
+kind: Group
+apiVersion: v1
+metadata:
+  name: app-sre-admins
+users:
+  - aditya-konarde
+  - jfchevrette
+  - rrati
+  - jmelis
+  - skryzhny
+  - rporres
+  - arilivigni
+  - apahim
+  - erdii
+  - maorfr
+  - pbergene
+  - BumbleFeng
+  - mmclanerh
+  - aproddut
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: app-sre-admins-binding
+  namespace: app-sre
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: pull-secret-namespace-manager
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: app-sre-admins
+    namespace: app-sre
