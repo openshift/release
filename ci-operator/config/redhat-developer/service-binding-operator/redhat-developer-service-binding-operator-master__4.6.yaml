@@ -22,7 +22,11 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: VERBOSE=2 make -k test-acceptance test-acceptance-artifacts
+      commands: CONTAINER_RUNTIME=podman OPERATOR_REPO_REF=$(cat /usr/local/secrets/quay.credentials | cut -d "=" -f1) OPERATOR_INDEX_IMAGE_REF=$(cat /usr/local/secrets/quay.credentials | cut -d "=" -f1):index-$PULL_PULL_SHA QUAY_USERNAME=$(cat /usr/local/secrets/quay.credentials | cut -d "=" -f2) QUAY_TOKEN=$(cat /usr/local/secrets/quay.credentials | cut -d "=" -f3) VERBOSE=2 make -k release-operator test-acceptance-with-bundle test-acceptance-artifacts
+      credentials:
+      - mount_path: /usr/local/secrets
+        name: rhd-sbo-test-quay-credentials
+        namespace: test-credentials
       from: src
       resources:
         requests:
