@@ -51,7 +51,7 @@ else
         run \
         "openshift/conformance/parallel" \
         --dry-run \
-        \| grep 'Feature:ProjectAPI' \| openshift-tests run -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit -f -
+        \| openshift-tests run -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit -f -
 fi
 
 rv=$?
