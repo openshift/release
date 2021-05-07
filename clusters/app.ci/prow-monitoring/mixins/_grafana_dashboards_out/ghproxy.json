@@ -687,17 +687,24 @@
          "steppedLine": false,
          "targets": [
             {
-               "expr": "sum(rate(github_request_duration_count{status=\"${status}\"}[${range}]) * on(token_hash) group_left(login) max(github_user_info{login=~\"openshift-.*\"}) by (token_hash, login)) by (path)",
+               "expr": "sum(rate(github_request_duration_count{status=\"${status}\",token_hash=~\"${login}\"}[${range}])) by (path)",
                "format": "time_series",
                "intervalFactor": 2,
                "legendFormat": "{{path}}",
                "refId": "A"
+            },
+            {
+               "expr": "sum(rate(github_request_duration_count{status=\"${status}\"}[${range}]) * on(token_hash) group_left(login) max(github_user_info{login=~\"${login}\"}) by (token_hash, login)) by (path)",
+               "format": "time_series",
+               "intervalFactor": 2,
+               "legendFormat": "{{path}}",
+               "refId": "B"
             }
          ],
          "thresholds": [ ],
          "timeFrom": null,
          "timeShift": null,
-         "title": "Request Rates: Overview by path for ${status} with ${range}",
+         "title": "Request Rates: Overview for identity ${login} by path for ${status} with ${range}",
          "tooltip": {
             "shared": true,
             "sort": 0,
