@@ -25,7 +25,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: "4.7"
+  name: "4.8"
   namespace: ocp
 tests:
 - as: unit
@@ -36,6 +36,21 @@ tests:
   commands: make lint
   container:
     from: src
+- as: e2e
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      commands: make test-e2e
+      dependencies:
+      - env: ADDON_OPERATOR_MANAGER_IMAGE
+        name: addon-operator-manager
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: openshift
