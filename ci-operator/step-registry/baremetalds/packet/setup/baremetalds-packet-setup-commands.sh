@@ -37,6 +37,7 @@ cat > packet-setup.yaml <<-EOF
         plan: m2.xlarge.x86
         facility: any
         wait_for_public_IPv: 4
+        wait_timeout: 900
         state: active
         tags: "{{ 'PR:', lookup('env', 'PULL_NUMBER'), 'Job name:', lookup('env', 'JOB_NAME'), 'Job id:', lookup('env', 'PROW_JOB_ID') }}"
       register: hosts
@@ -107,4 +108,4 @@ cat > packet-setup.yaml <<-EOF
       dest: "${SHARED_DIR}/packet-conf.sh"
 EOF
 
-ansible-playbook packet-setup.yaml -e "packet_hostname=ipi-${NAMESPACE}-${JOB_NAME_HASH}-${BUILD_ID}"
+ansible-playbook packet-setup.yaml -e "packet_hostname=ipi-${NAMESPACE}-${JOB_NAME_HASH}-${BUILD_ID}"  |& gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0; fflush(); }'

@@ -32,7 +32,7 @@ cat > packet-teardown.yaml <<-EOF
         project_id: "{{ packet_project_id }}"
         hostnames: "{{ packet_hostname }}"
         state: absent
-      retries: 3
+      retries: 5
       delay: 120
       register: hosts
       until: hosts.failed == false
@@ -50,4 +50,4 @@ cat > packet-teardown.yaml <<-EOF
         msg: "Packet teardown failed."
 EOF
 
-ansible-playbook packet-teardown.yaml -e "packet_hostname=ipi-${NAMESPACE}-${JOB_NAME_HASH}-${BUILD_ID}"
+ansible-playbook packet-teardown.yaml -e "packet_hostname=ipi-${NAMESPACE}-${JOB_NAME_HASH}-${BUILD_ID}"  |& gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0; fflush(); }'
