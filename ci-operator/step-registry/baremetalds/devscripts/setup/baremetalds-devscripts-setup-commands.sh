@@ -50,6 +50,23 @@ then
   scp "${SSHOPTS[@]}" "${SHARED_DIR}/dev-scripts-additional-config" "root@${IP}:dev-scripts-additional-config"
 fi
 
+if [[ ! -z "${GATEWAY_MODE}" ]]; then
+  echo "Overriding OVN gateway mode with \"${GATEWAY_MODE}\""
+  cat >> "${ASSETS_EXTRA_FOLDER}/manifest_cluster-network-00-gateway-mode.yaml" << EOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+    name: gateway-mode-config
+    namespace: openshift-network-operator
+data:
+    mode: "${GATEWAY_MODE}"
+immutable: true
+EOF
+
+  scp "${SSHOPTS[@]}" "${ASSETS_EXTRA_FOLDER}/manifest_cluster-network-00-gateway-mode.yaml" \
+                      "root@${IP}:${ASSETS_EXTRA_FOLDER}/manifest_cluster-network-00-gateway-mode.yaml"
+fi
+
 timeout -s 9 175m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
 
 set -xeuo pipefail
