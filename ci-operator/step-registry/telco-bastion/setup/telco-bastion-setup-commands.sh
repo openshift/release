@@ -17,6 +17,8 @@ cat << EOF > ~/inventory
 sshd.bastion-telco ansible_ssh_user=tester ansible_ssh_common_args="-o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" ansible_password=$SSH_PASS
 EOF
 
+set -x
+
 KCLI_PARAM=""
 if [ ! -z $OO_CHANNEL ] ; then
     KCLI_PARAM="-P openshift_image=registry.ci.openshift.org/ocp/release:$OO_CHANNEL"
@@ -62,5 +64,5 @@ cat << EOF > ~/fetch-kubeconfig.yml
     delegate_to: localhost
 EOF
 
-ansible-playbook -i ~/inventory ~/ocp-install.yml
-ansible-playbook -i ~/inventory ~/fetch-kubeconfig.yml
+ansible-playbook -i ~/inventory ~/ocp-install.yml -v
+ansible-playbook -i ~/inventory ~/fetch-kubeconfig.yml -v
