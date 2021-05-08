@@ -106,7 +106,7 @@ data:
         source_labels:
         - __meta_kubernetes_pod_container_name
         target_label: container_name
-      - replacement: "/var/log/pods/*\$1/*.log"
+      - replacement: "/var/log/pods/*$1/*.log"
         separator: "/"
         source_labels:
         - __meta_kubernetes_pod_uid
@@ -179,6 +179,9 @@ spec:
               secretKeyRef:
                 name: promtail-prod-creds
                 key: client-secret
+        volumeMounts:
+        - mountPath: "/tmp/shared"
+          name: shared-data
         image: quay.io/observatorium/token-refresher
       - command:
         - sh
@@ -228,6 +231,8 @@ spec:
         - mountPath: "/var/log/pods"
           name: pods
           readOnly: true
+        - mountPath: "/tmp/shared"
+          name: shared-data
         - mountPath: "/var/log/journal"
           name: journal
           readOnly: true
@@ -252,6 +257,8 @@ spec:
       - hostPath:
           path: "/var/log/journal"
         name: journal
+      - emptyDir: {}
+        name: shared-data
   updateStrategy:
     type: RollingUpdate
 ---
