@@ -103,6 +103,29 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: openshift-e2e-gcp
+- as: origin-tests
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: origin-tests
+      commands: |
+        export SHARED_DIR=/tmp/shared
+        rm -rf /tmp/gcloudconfig/
+        export TEST_CSI_DRIVER_MANIFEST=""
+        export TEST_TYPE=""
+        ci_operator_source_file="/go/src/github.com/openshift/release/ci-operator/step-registry/openshift/e2e/test/openshift-e2e-test-commands.sh"
+        function_suite_start_line=$(grep --text -n "function suite" $ci_operator_source_file | cut -f1 -d:)
+        source_file_cut_line=$(($function_suite_start_line-1))
+        head --lines=+$source_file_cut_line $ci_operator_source_file >> temp_source_file.sh
+        source temp_source_file.sh
+        cd /go/src/github.com/openshift-kni/cnf-features-deploy/
+        CLUSTER_PROVIDER="${TEST_PROVIDER}" make skopeo-origin-tests
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-gcp-ovn
 zz_generated_metadata:
   branch: master
   org: openshift-kni
