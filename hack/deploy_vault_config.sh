@@ -43,6 +43,9 @@ vault write auth/oidc/role/oidc_default_role \
   oidc_scopes="profile" \
   user_claim="preferred_username"
 
+# Set this as default, ref https://support.hashicorp.com/hc/en-us/articles/360001922527-Configuring-a-Default-UI-Auth-Method
+vault write sys/auth/oidc/tune listing_visibility="unauth"
+
 # Extend the default policy to allow everyone to manage secrets at
 # secrets/personal/{{ldap_name}}
 OIDC_ACCESSOR_ID="$(vault auth list -format=json|jq '.["oidc/"].accessor' -r)"
