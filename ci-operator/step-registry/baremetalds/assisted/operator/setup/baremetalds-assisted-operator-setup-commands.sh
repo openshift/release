@@ -6,11 +6,6 @@ set -o pipefail
 
 echo "************ baremetalds assisted operator setup command ************"
 
-if [ "${DISCONNECTED}" = "true" ]; then
-  echo "Not yet implemented"
-  exit 0
-fi
-
 # Fetch packet basic configuration
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
@@ -34,8 +29,24 @@ fi
 
 cd "\${REPO_DIR}/deploy/operator/"
 
+export DISCONNECTED="${DISCONNECTED}"
+
 echo "### Setup hive..."
-source ./setup_hive.sh
+
+if [ "\${DISCONNECTED}" = "true" ]; then
+  source ../../hack/setup_env.sh hive_from_upstream
+
+  export LOCAL_REGISTRY="virthost.ostest.test.metalkube.org:5000"
+  export AUTHFILE="/root/private-mirror-ostest.json"
+  source ./setup_hive.sh from_upstream
+else
+  source ./setup_hive.sh with_olm
+fi
+
+if [ "\${DISCONNECTED}" = "true" ]; then
+  echo "AI operator installation on disconnected environment not yet implemented"
+  exit 0
+fi
 
 echo "### Setup assisted installer..."
 export INDEX_IMAGE=${INDEX_IMAGE}
