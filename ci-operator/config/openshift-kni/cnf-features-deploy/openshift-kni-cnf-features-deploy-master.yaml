@@ -106,8 +106,8 @@ tests:
 - as: origin-tests
   steps:
     cluster_profile: gcp
-    test:
-    - as: origin-tests
+    pre:
+    - as: origin-tests-cnf-deploy
       commands: |
         export SHARED_DIR=/tmp/shared
         rm -rf /tmp/gcloudconfig/
@@ -119,12 +119,14 @@ tests:
         head --lines=+$source_file_cut_line $ci_operator_source_file >> temp_source_file.sh
         source temp_source_file.sh
         cd /go/src/github.com/openshift-kni/cnf-features-deploy/
-        CLUSTER_PROVIDER="${TEST_PROVIDER}" make skopeo-origin-tests
+        make functests-on-ci
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
+    test:
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-gcp-ovn
 zz_generated_metadata:
   branch: master
