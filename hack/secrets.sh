@@ -24,8 +24,6 @@ source "$BASE/images.sh"
 
 make ci-secret-generator
 run --job "periodic-ci-secret-bootstrap"
-run --job "periodic-openshift-release-master-core-apply"
-run --job "periodic-openshift-release-master-services-apply"
 run --job "periodic-openshift-release-master-app-ci-apply"
 run --job "periodic-openshift-release-master-build01-apply"
 run --job "periodic-openshift-release-master-build02-apply"
