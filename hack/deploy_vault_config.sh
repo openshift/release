@@ -225,6 +225,10 @@ path "sys/policies/acl/*" {
   capabilities = ["read", "list", "create", "update", "delete"]
 }
 
+path "sys/auth" {
+  capabilities = ["read"]
+}
+
 path "identity/entity-alias/id" {
   capabilities = ["list"]
 }
@@ -233,7 +237,19 @@ path "identity/entity/id"  {
   capabilities = ["list"]
 }
 
+path "identity/entity" {
+  capabilities = ["create", "update"]
+}
+
+path "identity/entity-alias" {
+  capabilities = ["create", "update"]
+}
+
 path "identity/entity/id/*"  {
+  capabilities = ["read"]
+}
+
+path "identity/entity/name/*"  {
   capabilities = ["read"]
 }
 
