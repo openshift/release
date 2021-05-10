@@ -304,6 +304,10 @@ ${t_test}    cluster:version:updates:seconds count_over_time(max by (version) ((
 ${t_all}     job:duration:total:seconds vector(${s_all})
 ${t_install} job:duration:install:seconds vector(${s_install})
 ${t_test}    job:duration:test:seconds vector(${s_test})
+
+${t_all}     cluster:promtail:failed_targets   sum by (pod) (promtail_targets_failed_total{reason!="exists"})
+${t_all}     cluster:promtail:dropped_entries  sum by (pod) (promtail_dropped_entries_total)
+${t_all}     cluster:promtail:request:duration sum by (status_code) (rate(promtail_request_duration_seconds_count[${d_all}]))
 END
 
 # topk(1, max by (image, version) (max_over_time(cluster_version{type="completed"}[30m])))
