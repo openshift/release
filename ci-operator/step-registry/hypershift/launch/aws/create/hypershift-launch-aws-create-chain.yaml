@@ -18,6 +18,9 @@ chain:
     - name: HYPERSHIFT_NAMESPACE
       default: "ci-clusters"
       documentation: "The namespace in which to create hosted clusters."
+    - name: HYPERSHIFT_MGMT_INGRESS_DOMAIN
+      default: "apps.clusterbot.hypershift.devcluster.openshift.com"
+      documentation: "The ingress subdomain of the managenemt cluster."
     commands: |-
       set -exuo pipefail
       export KUBECONFIG=/var/run/hypershift/kubeconfig
@@ -33,7 +36,8 @@ chain:
         --infra-id "${HYPERSHIFT_NAMESPACE}-${CLUSTER_NAME}" \
         --pull-secret ${CLUSTER_PROFILE_DIR}/pull-secret \
         --aws-creds ${CLUSTER_PROFILE_DIR}/.awscred \
-        --release-image ${RELEASE_IMAGE_LATEST}
+        --release-image ${RELEASE_IMAGE_LATEST} \
+        --issuer-url=https://oidc-${CLUSTER_NAME}-${HYPERSHIFT_NAMESPACE}.${HYPERSHIFT_MGMT_INGRESS_DOMAIN}
       
       echo "$(date) Waiting for the cluster to publish a kubeconfig"
       oc wait --namespace "${HYPERSHIFT_NAMESPACE}" hostedclusters/${CLUSTER_NAME} --for condition=Available --timeout 24h
