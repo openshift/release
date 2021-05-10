@@ -4,6 +4,13 @@ set -euo pipefail
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 INSTANCE_PREFIX="${NAMESPACE}"-"${JOB_NAME_HASH}"
+GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
+GOOGLE_COMPUTE_REGION="${LEASED_RESOURCE}"
+GOOGLE_COMPUTE_ZONE="$(< ${SHARED_DIR}/openshift_gcp_compute_zone)"
+if [[ -z "${GOOGLE_COMPUTE_ZONE}" ]]; then
+  echo "Expected \${SHARED_DIR}/openshift_gcp_compute_zone to contain the GCP zone"
+  exit 1
+fi
 
 mkdir -p "${HOME}"/.ssh
 chmod 0700 "${HOME}"/.ssh
