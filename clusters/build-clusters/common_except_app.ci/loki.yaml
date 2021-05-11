@@ -49,88 +49,6 @@ subjects:
   name: loki-promtail
   namespace: loki
 ---
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: loki-promtail
-  namespace: loki
-data:
-  promtail.yaml: |-
-    clients:
-      - backoff_config:
-          max_period: 5m
-          max_retries: 20
-          min_period: 1s
-        batchsize: 102400
-        batchwait: 10s
-        bearer_token_file: /tmp/shared/prod_bearer_token
-        timeout: 10s
-        url: https://observatorium.api.openshift.com/api/logs/v1/dptp/loki/api/v1/push
-    positions:
-      filename: "/run/promtail/positions.yaml"
-    scrape_configs:
-    - job_name: kubernetes
-      kubernetes_sd_configs:
-      - role: pod
-      pipeline_stages:
-      - cri: {}
-      - labeldrop:
-        - filename
-      relabel_configs:
-      - action: keep
-        regex: '^openshift-.+'
-        source_labels:
-        - __meta_kubernetes_namespace
-      - source_labels:
-        - __meta_kubernetes_pod_label_name
-        target_label: __service__
-      - source_labels:
-        - __meta_kubernetes_pod_node_name
-        target_label: __host__
-      - action: replace
-        replacement:
-        separator: "/"
-        source_labels:
-        - __meta_kubernetes_namespace
-        - __service__
-        target_label: job
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_namespace
-        target_label: namespace
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_pod_name
-        target_label: pod_name
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_pod_container_name
-        target_label: container_name
-      - replacement: "/var/log/pods/*$1/*.log"
-        separator: "/"
-        source_labels:
-        - __meta_kubernetes_pod_uid
-        - __meta_kubernetes_pod_container_name
-        target_label: __path__
-      - action: labelmap
-        regex: __meta_kubernetes_pod_label_(.+)
-    - job_name: journal
-      journal:
-        path: /var/log/journal
-        labels:
-          job: systemd-journal
-      pipeline_stages:
-      - labeldrop:
-        - filename
-        - stream
-      relabel_configs:
-      - action: labelmap
-        regex: __journal__(.+)
-    server:
-      http_listen_port: 3101
-    target_config:
-      sync_period: 10s
----
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -151,6 +69,93 @@ spec:
         app.kubernetes.io/name: promtail
         app.kubernetes.io/part-of: loki
         app.kubernetes.io/version: "2.2.1"
+      annotations:
+        promtail.yaml: |-
+          clients:
+            - backoff_config:
+                max_period: 5m
+                max_retries: 20
+                min_period: 1s
+              batchsize: 102400
+              batchwait: 10s
+              bearer_token_file: /tmp/shared/prod_bearer_token
+              timeout: 10s
+              url: https://observatorium.api.openshift.com/api/logs/v1/dptp/loki/api/v1/push
+          positions:
+            filename: "/run/promtail/positions.yaml"
+          scrape_configs:
+          - job_name: kubernetes
+            kubernetes_sd_configs:
+            - role: pod
+            pipeline_stages:
+            - cri: {}
+            - labeldrop:
+              - filename
+            - pack:
+                labels:
+                - namespace
+                - pod_name
+                - container_name
+                - app
+                - k8s_app
+                - name
+            - labelallow:
+              - host
+              - cluster_name
+            relabel_configs:
+            - action: keep
+              regex: '^openshift-.+'
+              source_labels:
+              - __meta_kubernetes_namespace
+            - source_labels:
+              - __meta_kubernetes_pod_label_name
+              target_label: __service__
+            - source_labels:
+              - __meta_kubernetes_pod_node_name
+              target_label: __host__
+            - action: replace
+              replacement:
+              separator: "/"
+              source_labels:
+              - __meta_kubernetes_namespace
+              - __service__
+              target_label: job
+            - action: replace
+              source_labels:
+              - __meta_kubernetes_namespace
+              target_label: namespace
+            - action: replace
+              source_labels:
+              - __meta_kubernetes_pod_name
+              target_label: pod_name
+            - action: replace
+              source_labels:
+              - __meta_kubernetes_pod_container_name
+              target_label: container_name
+            - replacement: "/var/log/pods/*$1/*.log"
+              separator: "/"
+              source_labels:
+              - __meta_kubernetes_pod_uid
+              - __meta_kubernetes_pod_container_name
+              target_label: __path__
+            - action: labelmap
+              regex: __meta_kubernetes_pod_label_(.+)
+          - job_name: journal
+            journal:
+              path: /var/log/journal
+              labels:
+                job: systemd-journal
+            pipeline_stages:
+            - labeldrop:
+              - filename
+              - stream
+            relabel_configs:
+            - action: labelmap
+              regex: __journal__(.+)
+          server:
+            http_listen_port: 3101
+          target_config:
+            sync_period: 10s
     spec:
       containers:
       - args:
@@ -234,9 +239,12 @@ spec:
         key: node-role.kubernetes.io/master
         operator: Exists
       volumes:
-      - configMap:
-          name: loki-promtail
-        name: config
+      - name: config
+        downwardAPI:
+          items:
+          - path: promtail.yaml
+            fieldRef:
+              fieldPath: metadata.annotations['promtail.yaml']
       - hostPath:
           path: "/run/promtail"
         name: run
