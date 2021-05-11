@@ -50,6 +50,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=""
+        TEST_FUNC=test_install
         MAKEFILE_TARGET="create_full_environment run test_parallel"
     workflow: baremetalds-assisted-install
 - as: system-test-olm
@@ -57,10 +58,31 @@ tests:
     cluster_profile: packet
     env:
       ASSISTED_CONFIG: |
-        OLM_OPERATORS="cnv"
+        TEST_FUNC=test_olm_operator
+        MAKEFILE_TARGET="create_full_environment run test_parallel"
+    workflow: baremetalds-assisted-install
+- as: system-test-olm-periodic
+  cron: '@daily'
+  steps:
+    cluster_profile: packet
+    env:
+      ASSISTED_CONFIG: |
+        TEST_FUNC=test_olm_operator
         MAKEFILE_TARGET="create_full_environment run test_parallel"
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-ipv6
+  steps:
+    cluster_profile: packet
+    env:
+      ASSISTED_CONFIG: |
+        IPv6=yes
+        IPv4=no
+        VIP_DHCP_ALLOCATION=no
+        PROXY=yes
+        OPENSHIFT_VERSION=4.8
+    workflow: baremetalds-assisted-install
+- as: e2e-metal-assisted-ipv6-periodic
+  cron: '@daily'
   steps:
     cluster_profile: packet
     env:
@@ -94,6 +116,7 @@ tests:
         IPv4=no
         VIP_DHCP_ALLOCATION=no
         PROXY=yes
+        OPENSHIFT_VERSION=4.8
         PLATFORM=none
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-none-ipv6-periodic
@@ -107,13 +130,6 @@ tests:
         VIP_DHCP_ALLOCATION=no
         PROXY=yes
         PLATFORM=none
-    workflow: baremetalds-assisted-install
-- as: e2e-metal-assisted-onprem
-  steps:
-    cluster_profile: packet
-    env:
-      ASSISTED_CONFIG: |
-        DEPLOY_TARGET=onprem
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted
   steps:

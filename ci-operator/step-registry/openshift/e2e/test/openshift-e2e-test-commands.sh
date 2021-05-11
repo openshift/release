@@ -10,6 +10,18 @@ export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
 export HOME=/tmp/home
 export PATH=/usr/libexec/origin:$PATH
 
+# HACK: HyperShift clusters use their own profile type, but the cluster type
+# underneath is actually AWS and the type identifier is derived from the profile
+# type. For now, just treat the `hypershift` type the same as `aws` until
+# there's a clean way to decouple the notion of a cluster provider and the
+# platform type.
+#
+# See also: https://issues.redhat.com/browse/DPTP-1988
+if [[ "${CLUSTER_TYPE}" == "hypershift" ]]; then
+    export CLUSTER_TYPE="aws"
+    echo "Overriding 'hypershift' cluster type to be 'aws'"
+fi
+
 if [[ -n "${TEST_CSI_DRIVER_MANIFEST}" ]]; then
     export TEST_CSI_DRIVER_FILES=${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
 fi

@@ -13,14 +13,8 @@ presubmits:
     rerun_command: /test ci-secret-bootstrap-config-validation
     spec:
       containers:
-      - args:
-        - --vault-addr=https://vault.ci.openshift.org
-        - --vault-role=secret-bootstrap
-        - --vault-prefix=kv/dptp
-        - --config=core-services/ci-secret-bootstrap/_config.yaml
-        - --validate-only
-        command:
-        - /usr/bin/ci-secret-bootstrap
+      - command:
+        - ./hack/validate-ci-secret-boostrap.sh
         image: registry.ci.openshift.org/ci/ci-secret-bootstrap:latest
         imagePullPolicy: Always
         name: ""
@@ -92,7 +86,7 @@ presubmits:
         - --config-dir
         - clusters/build-clusters/arm01
         - --ignore-file
-        - clusters/build-clusters/common/cert-manager.yaml
+        - clusters/build-clusters/common/assets/pod-scaler-admission.yaml
         - --kubeconfig
         - /etc/build-farm-credentials/kubeconfig
         - --as=
@@ -101,6 +95,11 @@ presubmits:
         env:
         - name: HOME
           value: /tmp
+        - name: arm01_id
+          valueFrom:
+            secretKeyRef:
+              key: arm01-id
+              name: arm01-dex-oidc
         image: registry.ci.openshift.org/ci/applyconfig:latest
         imagePullPolicy: Always
         name: ""
@@ -128,7 +127,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/boskos-config
     decorate: true
     labels:
@@ -153,7 +152,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/boskos-config-generation
     decorate: true
     labels:
@@ -299,7 +298,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/ci-operator-config
     decorate: true
     labels:
@@ -326,7 +325,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/ci-operator-config-metadata
     decorate: true
     labels:
@@ -350,7 +349,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/ci-operator-registry
     decorate: true
     labels:
@@ -378,7 +377,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/ci-secret-generator-config
     decorate: true
     labels:
@@ -402,7 +401,7 @@ presubmits:
     always_run: false
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/ci-testgrid-allow-list
     decorate: true
     labels:
@@ -430,7 +429,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/config
     decorate: true
     labels:
@@ -455,7 +454,7 @@ presubmits:
         - mismatched-tide-lenient
         command:
         - /checkconfig
-        image: gcr.io/k8s-prow/checkconfig:v20210429-1d7ef9028f
+        image: gcr.io/k8s-prow/checkconfig:v20210511-861f7a3019
         imagePullPolicy: Always
         name: ""
         resources:
@@ -466,53 +465,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: app.ci
-    context: ci/prow/core-dry
-    decorate: true
-    labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-release-master-core-dry
-    rerun_command: /test core-dry
-    spec:
-      containers:
-      - args:
-        - --config-dir
-        - core-services/secrets
-        - --kubeconfig
-        - /etc/build-farm-credentials/kubeconfig
-        - --as=
-        command:
-        - applyconfig
-        env:
-        - name: slack_api_url
-          valueFrom:
-            secretKeyRef:
-              key: url
-              name: ci-slack-api-url
-        image: registry.ci.openshift.org/ci/applyconfig:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/build-farm-credentials
-          name: build-farm-credentials
-          readOnly: true
-      serviceAccountName: config-updater
-      volumes:
-      - name: build-farm-credentials
-        secret:
-          items:
-          - key: sa.config-updater.api.ci.config
-            path: kubeconfig
-          secretName: build-farm-credentials
-    trigger: (?m)^/test( | .* )core-dry,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/core-valid
     decorate: true
     decoration_config:
@@ -560,7 +513,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/correctly-sharded-config
     decorate: true
     labels:
@@ -584,7 +537,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/deprecate-templates
     decorate: true
     labels:
@@ -608,7 +561,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/generated-config
     decorate: true
     labels:
@@ -632,7 +585,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/generated-dashboards
     decorate: true
     labels:
@@ -656,7 +609,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/ordered-prow-config
     decorate: true
     labels:
@@ -680,7 +633,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/owners
     decorate: true
     labels:
@@ -705,7 +658,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/pj-rehearse
     decorate: true
     extra_refs:
@@ -727,7 +680,7 @@ presubmits:
         - ./hack/pj-rehearse.sh
         env:
         - name: KUBECONFIG
-          value: /var/kubeconfigs/sa.ci-operator.build01.config:/var/kubeconfigs/sa.ci-operator.build02.config:/var/kubeconfigs/sa.pj-rehearse.app.ci.config:/var/kubeconfigs/sa.ci-operator.vsphere.config:/var/kubeconfigs/sa.ci-operator.api.ci.config:/var/kubeconfigs/sa.ci-operator.arm01.config
+          value: /var/kubeconfigs/sa.ci-operator.build01.config:/var/kubeconfigs/sa.ci-operator.build02.config:/var/kubeconfigs/sa.pj-rehearse.app.ci.config:/var/kubeconfigs/sa.ci-operator.vsphere.config:/var/kubeconfigs/sa.ci-operator.arm01.config
         image: pj-rehearse:latest
         imagePullPolicy: Always
         name: ""
@@ -747,7 +700,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/prow-config
     decorate: true
     labels:
@@ -771,7 +724,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/prow-config-filenames
     decorate: true
     labels:
@@ -796,7 +749,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/prow-config-semantics
     decorate: true
     labels:
@@ -820,7 +773,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/release-config
     decorate: true
     labels:
@@ -844,7 +797,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/release-controller-config
     decorate: true
     labels:
@@ -868,7 +821,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/secret-generator-config-valid
     decorate: true
     labels:
@@ -894,7 +847,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/services-valid
     decorate: true
     decoration_config:
@@ -942,7 +895,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/step-registry-metadata
     decorate: true
     labels:
@@ -966,7 +919,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/step-registry-shellcheck
     decorate: true
     labels:
@@ -1042,7 +995,7 @@ presubmits:
     always_run: false
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/pylint
     decorate: true
     labels:
@@ -1070,7 +1023,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: build01
     context: ci/prow/yamllint
     decorate: true
     labels:

@@ -68,7 +68,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210429-1d7ef9028f
+      image: gcr.io/k8s-prow/commenter:v20210511-861f7a3019
       imagePullPolicy: Always
       name: ""
       resources:
@@ -97,7 +97,7 @@ periodics:
       - /usr/bin/serviceaccount-secret-rotation-trigger
       env:
       - name: KUBECONFIG
-        value: /etc/build-farm-credentials/sa.config-updater.api.ci.config:/etc/build-farm-credentials/sa.config-updater.app.ci.config:/etc/build-farm-credentials/sa.config-updater.build01.config:/etc/build-farm-credentials/sa.config-updater.build02.config:/etc/build-farm-credentials/sa.config-updater.vsphere.config
+        value: /etc/build-farm-credentials/sa.config-updater.app.ci.config:/etc/build-farm-credentials/sa.config-updater.build01.config:/etc/build-farm-credentials/sa.config-updater.build02.config:/etc/build-farm-credentials/sa.config-updater.vsphere.config
       image: serviceaccount-secret-rotation-trigger:latest
       imagePullPolicy: Always
       name: ""
@@ -112,8 +112,6 @@ periodics:
     - name: build-farm-credentials
       secret:
         items:
-        - key: sa.config-updater.api.ci.config
-          path: sa.config-updater.api.ci.config
         - key: sa.config-updater.app.ci.config
           path: sa.config-updater.app.ci.config
         - key: sa.config-updater.build01.config
@@ -154,7 +152,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210429-1d7ef9028f
+      image: gcr.io/k8s-prow/commenter:v20210511-861f7a3019
       imagePullPolicy: Always
       name: ""
       resources:
@@ -207,7 +205,7 @@ periodics:
       - --random
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210429-1d7ef9028f
+      image: gcr.io/k8s-prow/commenter:v20210511-861f7a3019
       imagePullPolicy: Always
       name: ""
       resources:
@@ -252,7 +250,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210429-1d7ef9028f
+      image: gcr.io/k8s-prow/commenter:v20210511-861f7a3019
       imagePullPolicy: Always
       name: ""
       resources:
@@ -301,7 +299,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210429-1d7ef9028f
+      image: gcr.io/k8s-prow/commenter:v20210511-861f7a3019
       imagePullPolicy: Always
       name: ""
       resources:
@@ -349,7 +347,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210429-1d7ef9028f
+      image: gcr.io/k8s-prow/commenter:v20210511-861f7a3019
       imagePullPolicy: Always
       name: ""
       resources:
@@ -383,7 +381,7 @@ periodics:
       - --debug
       command:
       - /app/label_sync/app.binary
-      image: gcr.io/k8s-prow/label_sync:v20210429-1d7ef9028f
+      image: gcr.io/k8s-prow/label_sync:v20210511-861f7a3019
       imagePullPolicy: Always
       name: ""
       resources:
@@ -415,10 +413,17 @@ periodics:
     workdir: true
   interval: 5m
   labels:
-    ci.openshift.io/role: infra
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   max_concurrency: 1
   name: periodic-ipi-deprovision-aws
+  reporter_config:
+    slack:
+      channel: '#ops-ci'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: '@aws-ci-admin Job *{{.Spec.Job}}* failed. <{{.Status.URL}}|View
+        logs>'
   spec:
     containers:
     - command:
@@ -460,10 +465,17 @@ periodics:
     workdir: true
   interval: 5m
   labels:
-    ci.openshift.io/role: infra
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   max_concurrency: 1
   name: periodic-ipi-deprovision-aws-2
+  reporter_config:
+    slack:
+      channel: '#ops-ci'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: '@aws-ci-admin Job *{{.Spec.Job}}* failed. <{{.Status.URL}}|View
+        logs>'
   spec:
     containers:
     - command:
@@ -505,10 +517,18 @@ periodics:
     workdir: true
   interval: 5m
   labels:
-    ci.openshift.io/role: infra
+    ci.openshift.io/role: cloud-gcp
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   max_concurrency: 1
   name: periodic-ipi-deprovision-gcp
+  reporter_config:
+    slack:
+      channel: '#ops-ci'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: '@gcp-ci-admin Job *{{.Spec.Job}}* failed. <{{.Status.URL}}|View
+        logs>'
   spec:
     containers:
     - command:
@@ -516,6 +536,8 @@ periodics:
       env:
       - name: HOME
         value: /tmp
+      - name: GCP_PROJECT
+        value: openshift-gce-devel-ci
       - name: GOOGLE_APPLICATION_CREDENTIALS
         value: /gcp/gce.json
       - name: CLUSTER_TTL
@@ -539,6 +561,61 @@ periodics:
           path: gce.json
         secretName: cluster-secrets-gcp
 - agent: kubernetes
+  cluster: build02
+  decorate: true
+  decoration_config:
+    timeout: 8h0m0s
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+    workdir: true
+  interval: 5m
+  labels:
+    ci.openshift.io/role: cloud-gcp
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  max_concurrency: 1
+  name: periodic-ipi-deprovision-gcp-2
+  reporter_config:
+    slack:
+      channel: '#ops-ci'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: '@gcp-ci-admin Job *{{.Spec.Job}}* failed. <{{.Status.URL}}|View
+        logs>'
+  spec:
+    containers:
+    - command:
+      - ./core-services/ipi-deprovision/gcp.sh
+      env:
+      - name: HOME
+        value: /tmp
+      - name: GCP_PROJECT
+        value: openshift-gce-devel-ci-2
+      - name: GOOGLE_APPLICATION_CREDENTIALS
+        value: /gcp/gce.json
+      - name: CLUSTER_TTL
+        value: 30 minutes ago
+      image: registry.ci.openshift.org/ci/ipi-deprovision:latest
+      imagePullPolicy: Always
+      name: ipi-deprovision
+      resources:
+        requests:
+          cpu: "1"
+          memory: 300Mi
+      volumeMounts:
+      - mountPath: /gcp
+        name: cluster-secrets-gcp-openshift-gce-devel-ci-2
+    serviceAccountName: ipi-deprovisioner
+    volumes:
+    - name: cluster-secrets-gcp-openshift-gce-devel-ci-2
+      secret:
+        items:
+        - key: gce.json
+          path: gce.json
+        secretName: cluster-secrets-gcp-openshift-gce-devel-ci-2
+- agent: kubernetes
   cluster: app.ci
   decorate: true
   extra_refs:
@@ -555,7 +632,7 @@ periodics:
       - --config=core-services/prow/02_config/_bumper.yaml
       command:
       - /app/prow/cmd/generic-autobumper/app.binary
-      image: gcr.io/k8s-prow/generic-autobumper:v20210429-1d7ef9028f
+      image: gcr.io/k8s-prow/generic-autobumper:v20210511-861f7a3019
       imagePullPolicy: IfNotPresent
       name: autobump
       resources:
@@ -779,7 +856,7 @@ periodics:
           secretKeyRef:
             key: appid
             name: openshift-prow-github-app
-      image: gcr.io/k8s-prow/branchprotector:v20210429-1d7ef9028f
+      image: gcr.io/k8s-prow/branchprotector:v20210511-861f7a3019
       imagePullPolicy: Always
       name: ""
       resources:
@@ -826,7 +903,7 @@ periodics:
       - --fix-repos
       command:
       - /app/prow/cmd/peribolos/app.binary
-      image: gcr.io/k8s-prow/peribolos:v20210429-1d7ef9028f
+      image: gcr.io/k8s-prow/peribolos:v20210511-861f7a3019
       imagePullPolicy: Always
       name: ""
       resources:
@@ -840,50 +917,6 @@ periodics:
     - name: token
       secret:
         secretName: github-credentials-openshift-merge-robot
-- agent: kubernetes
-  cluster: app.ci
-  decorate: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: release
-  interval: 12h
-  labels:
-    ci.openshift.io/role: infra
-  name: periodic-openshift-release-master-core-apply
-  spec:
-    containers:
-    - args:
-      - --config-dir=core-services/secrets
-      - --confirm=true
-      - --kubeconfig=/etc/build-farm-credentials/kubeconfig
-      - --as=
-      command:
-      - applyconfig
-      env:
-      - name: slack_api_url
-        valueFrom:
-          secretKeyRef:
-            key: url
-            name: ci-slack-api-url
-      image: applyconfig:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/build-farm-credentials
-        name: build-farm-credentials
-        readOnly: true
-    serviceAccountName: config-updater
-    volumes:
-    - name: build-farm-credentials
-      secret:
-        items:
-        - key: sa.config-updater.api.ci.config
-          path: kubeconfig
-        secretName: build-farm-credentials
 - agent: kubernetes
   cluster: app.ci
   decorate: true
@@ -1100,8 +1133,8 @@ periodics:
       - /app/prow/cmd/config-bootstrapper/app.binary
       env:
       - name: KUBECONFIG
-        value: /etc/build-farm-credentials/api.ci.kubeconfig:/etc/build-farm-credentials/build01.kubeconfig:/etc/build-farm-credentials/app.ci.kubeconfig:/etc/build-farm-credentials/build02.kubeconfig:/etc/build-farm-credentials/vsphere.kubeconfig
-      image: gcr.io/k8s-prow/config-bootstrapper:v20210429-1d7ef9028f
+        value: /etc/build-farm-credentials/build01.kubeconfig:/etc/build-farm-credentials/app.ci.kubeconfig:/etc/build-farm-credentials/build02.kubeconfig:/etc/build-farm-credentials/vsphere.kubeconfig
+      image: gcr.io/k8s-prow/config-bootstrapper:v20210511-861f7a3019
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1116,8 +1149,6 @@ periodics:
     - name: build-farm-credentials
       secret:
         items:
-        - key: sa.hook.api.ci.config
-          path: api.ci.kubeconfig
         - key: sa.hook.app.ci.config
           path: app.ci.kubeconfig
         - key: sa.hook.build01.config
@@ -1422,7 +1453,7 @@ periodics:
       - --dry-run=false
       env:
       - name: KUBECONFIG
-        value: /etc/build-farm-credentials/sa.config-updater.api.ci.config:/etc/build-farm-credentials/sa.config-updater.app.ci.config:/etc/build-farm-credentials/sa.config-updater.build01.config:/etc/build-farm-credentials/sa.config-updater.build02.config:/etc/build-farm-credentials/sa.config-updater.vsphere.config:/etc/build-farm-credentials/sa.config-updater.arm01.config
+        value: /etc/build-farm-credentials/sa.config-updater.app.ci.config:/etc/build-farm-credentials/sa.config-updater.build01.config:/etc/build-farm-credentials/sa.config-updater.build02.config:/etc/build-farm-credentials/sa.config-updater.vsphere.config:/etc/build-farm-credentials/sa.config-updater.arm01.config
       - name: HOME
         value: /tmp
       image: registry.ci.openshift.org/ci/ci-secret-generator:latest
@@ -1450,8 +1481,6 @@ periodics:
     - name: build-farm-credentials
       secret:
         items:
-        - key: sa.config-updater.api.ci.config
-          path: sa.config-updater.api.ci.config
         - key: sa.config-updater.app.ci.config
           path: sa.config-updater.app.ci.config
         - key: sa.config-updater.build01.config
@@ -1483,35 +1512,37 @@ periodics:
     - args:
       - --vault-addr=https://vault.ci.openshift.org
       - --vault-role=secret-bootstrap
-      - --vault-prefix=kv/dptp
+      - --vault-prefix=kv
       - --config=/etc/ci-secret-bootstrap/_config.yaml
+      - --log-level=debug
       - --dry-run=false
       - --force=true
       - --validate-bitwarden-items-usage
-      - --bw-allow-unused=openshift-ci-robot
-      - --bw-allow-unused=openshift-merge-robot
-      - --bw-allow-unused=openshift-build-robot
-      - --bw-allow-unused=openshift-publish-robot
-      - --bw-allow-unused=openshift-bugzilla-robot
-      - --bw-allow-unused=openshift-cherrypick-robot
-      - --bw-allow-unused=openshift-bugzilla-robot@redhat.com
-      - --bw-allow-unused=openshift-bot
-      - --bw-allow-unused=openshift-github-robots@redhat.com
-      - --bw-allow-unused=aos-cicd@redhat.com
-      - --bw-allow-unused=aos-team-dp-testplatform@redhat.com mailing list
-      - --bw-allow-unused=AWS ci-longlivedcluster-bot
-      - --bw-allow-unused=bugzilla.redhat.com
-      - --bw-allow-unused=build_farm_01_cluster
-      - --bw-allow-unused=build_farm_02_cluster
-      - --bw-allow-unused=kata-jenkins-ci.westus2.cloudapp.azure.com
-      - --bw-allow-unused=quay.io
-      - --bw-allow-unused=cluster-bot-cloud-sso-for-ocm-ephemeral-osd
-      - --bw-allow-unused=cluster-bot-aws-account-for-ephemeral-osd
+      - --bw-allow-unused=dptp/openshift-ci-robot
+      - --bw-allow-unused=dptp/openshift-merge-robot
+      - --bw-allow-unused=dptp/openshift-build-robot
+      - --bw-allow-unused=dptp/openshift-publish-robot
+      - --bw-allow-unused=dptp/openshift-bugzilla-robot
+      - --bw-allow-unused=dptp/openshift-cherrypick-robot
+      - --bw-allow-unused=dptp/openshift-bugzilla-robot@redhat.com
+      - --bw-allow-unused=dptp/openshift-bot
+      - --bw-allow-unused=dptp/openshift-github-robots@redhat.com
+      - --bw-allow-unused=dptp/aos-cicd@redhat.com
+      - --bw-allow-unused=dptp/aos-team-dp-testplatform@redhat.com mailing list
+      - --bw-allow-unused=dptp/AWS ci-longlivedcluster-bot
+      - --bw-allow-unused=dptp/bugzilla.redhat.com
+      - --bw-allow-unused=dptp/build_farm_01_cluster
+      - --bw-allow-unused=dptp/build_farm_02_cluster
+      - --bw-allow-unused=dptp/kata-jenkins-ci.westus2.cloudapp.azure.com
+      - --bw-allow-unused=dptp/quay.io
+      - --bw-allow-unused=dptp/quay.io/multi-arch
+      - --bw-allow-unused=dptp/cluster-bot-cloud-sso-for-ocm-ephemeral-osd
+      - --bw-allow-unused=dptp/cluster-bot-aws-account-for-ephemeral-osd
       command:
       - /usr/bin/ci-secret-bootstrap
       env:
       - name: KUBECONFIG
-        value: /etc/build-farm-credentials/sa.config-updater.api.ci.config:/etc/build-farm-credentials/sa.config-updater.app.ci.config:/etc/build-farm-credentials/sa.config-updater.build01.config:/etc/build-farm-credentials/sa.config-updater.build02.config:/etc/build-farm-credentials/sa.config-updater.vsphere.config:/etc/build-farm-credentials/sa.config-updater.arm01.config
+        value: /etc/build-farm-credentials/sa.config-updater.app.ci.config:/etc/build-farm-credentials/sa.config-updater.build01.config:/etc/build-farm-credentials/sa.config-updater.build02.config:/etc/build-farm-credentials/sa.config-updater.vsphere.config:/etc/build-farm-credentials/sa.config-updater.arm01.config
       image: registry.ci.openshift.org/ci/ci-secret-bootstrap:latest
       imagePullPolicy: Always
       name: ci-secret-bootstrap
@@ -1540,8 +1571,6 @@ periodics:
     - name: build-farm-credentials
       secret:
         items:
-        - key: sa.config-updater.api.ci.config
-          path: sa.config-updater.api.ci.config
         - key: sa.config-updater.app.ci.config
           path: sa.config-updater.app.ci.config
         - key: sa.config-updater.build01.config
@@ -1657,12 +1686,18 @@ periodics:
     containers:
     - args:
       - --config-dir=clusters/build-clusters/arm01
-      - --ignore-file=clusters/build-clusters/common/cert-manager.yaml
+      - --ignore-file=clusters/build-clusters/common/assets/pod-scaler-admission.yaml
       - --confirm=true
       - --as=
       - --kubeconfig=/etc/build-farm-credentials/kubeconfig
       command:
       - applyconfig
+      env:
+      - name: arm01_id
+        valueFrom:
+          secretKeyRef:
+            key: arm01-id
+            name: arm01-dex-oidc
       image: applyconfig:latest
       imagePullPolicy: Always
       name: ""
@@ -1681,3 +1716,67 @@ periodics:
         - key: sa.config-updater.arm01.config
           path: kubeconfig
         secretName: build-farm-credentials
+- agent: kubernetes
+  cluster: app.ci
+  decorate: true
+  interval: 12h
+  labels:
+    ci.openshift.io/role: infra
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-openshift-release-master-accept-invitations-merge-robot
+  spec:
+    containers:
+    - args:
+      - --github-token-path=/etc/github/oauth
+      - --github-endpoint=http://ghproxy
+      - --github-endpoint=https://api.github.com
+      - --github-graphql-endpoint=http://ghproxy/graphql
+      - --dry-run=false
+      command:
+      - /app/prow/cmd/invitations-accepter/app.binary
+      image: gcr.io/k8s-prow/invitations-accepter:v20210511-861f7a3019
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: token
+        readOnly: true
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-merge-robot
+- agent: kubernetes
+  cluster: app.ci
+  decorate: true
+  interval: 12h
+  labels:
+    ci.openshift.io/role: infra
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-openshift-release-master-accept-invitations-ci-robot
+  spec:
+    containers:
+    - args:
+      - --github-token-path=/etc/github/oauth
+      - --github-endpoint=http://ghproxy
+      - --github-endpoint=https://api.github.com
+      - --github-graphql-endpoint=http://ghproxy/graphql
+      - --dry-run=false
+      command:
+      - /app/prow/cmd/invitations-accepter/app.binary
+      image: gcr.io/k8s-prow/invitations-accepter:v20210511-861f7a3019
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: token
+        readOnly: true
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-ci-robot

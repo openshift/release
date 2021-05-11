@@ -43,6 +43,9 @@ vault write auth/oidc/role/oidc_default_role \
   oidc_scopes="profile" \
   user_claim="preferred_username"
 
+# Set this as default, ref https://support.hashicorp.com/hc/en-us/articles/360001922527-Configuring-a-Default-UI-Auth-Method
+vault write sys/auth/oidc/tune listing_visibility="unauth"
+
 # Extend the default policy to allow everyone to manage secrets at
 # secrets/personal/{{ldap_name}}
 OIDC_ACCESSOR_ID="$(vault auth list -format=json|jq '.["oidc/"].accessor' -r)"
@@ -155,11 +158,11 @@ vault write auth/kubernetes/role/secret-generator \
 
 # Create the secret bootstrap policy and role
 vault policy write secret-bootstrap -<<EOH
-path "kv/data/dptp/*" {
+path "kv/data/*" {
   capabilities = ["read"]
 }
 
-path "kv/metadata/dptp/*" {
+path "kv/metadata/*" {
   capabilities = ["list"]
 }
 EOH
@@ -222,6 +225,10 @@ path "sys/policies/acl/*" {
   capabilities = ["read", "list", "create", "update", "delete"]
 }
 
+path "sys/auth" {
+  capabilities = ["read"]
+}
+
 path "identity/entity-alias/id" {
   capabilities = ["list"]
 }
@@ -230,7 +237,19 @@ path "identity/entity/id"  {
   capabilities = ["list"]
 }
 
+path "identity/entity" {
+  capabilities = ["create", "update"]
+}
+
+path "identity/entity-alias" {
+  capabilities = ["create", "update"]
+}
+
 path "identity/entity/id/*"  {
+  capabilities = ["read"]
+}
+
+path "identity/entity/name/*"  {
   capabilities = ["read"]
 }
 

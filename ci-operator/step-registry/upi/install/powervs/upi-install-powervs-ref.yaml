@@ -1,10 +1,28 @@
 ref:
   as: upi-install-powervs
-  from: upi-installer
+  from_image:
+    namespace: ocp-on-powervs
+    name: powervs-container-host
+    tag: powervs-ocp-jenkins-deployment
   commands: upi-install-powervs-commands.sh
+  grace_period: 10m
   resources:
     requests:
       cpu: 10m
       memory: 100Mi
+  credentials:
+  - namespace: test-credentials
+    name: powervs
+    mount_path: /etc/credentials
+  env:
+  - name: OPENSHIFT_CLUSTER_FLAVOR
+    default: small
+    documentation: The flavor of OpenShift cluster to install.
+  - name: OPENSHIFT_VERSION
+    default: "4.7"
+    documentation: The version of OpenShift to install, in MAJOR.MINOR format.
+  - name: REQUESTOR_EMAIL
+    default: ""
+    documentation: The e-mail address for the engineer requesting this cluster.
   documentation: >-
-    This step deploys a UPI cluster at IBM Cloud on PowerVS.
+    This step deploys a OCP Cluster at IBM Cloud on PowerVS.

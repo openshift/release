@@ -6,6 +6,8 @@ build_root:
 images:
 - dockerfile_path: Dockerfile
   to: ssp-operator-container
+- dockerfile_path: validator.Dockerfile
+  to: template-validator-container
 resources:
   '*':
     limits:
@@ -37,6 +39,8 @@ tests:
         ./hack/deploy-kubevirt-and-cdi.sh
         export component=ssp-operator-container
         export IMG=$(echo $IMAGE_FORMAT | envsubst)
+        export component=template-validator-container
+        export VALIDATOR_IMG=$(echo $IMAGE_FORMAT | envsubst)
         export GOFLAGS=
         export SKIP_CLEANUP_AFTER_TESTS=true
         make deploy functest
@@ -55,6 +59,8 @@ tests:
       commands: |
         export component=ssp-operator-container
         export IMG=$(echo $IMAGE_FORMAT | envsubst)
+        export component=template-validator-container
+        export VALIDATOR_IMG=$(echo $IMAGE_FORMAT | envsubst)
         ./automation/ocp-ci-run-e2e-upgrade-tests.sh
       from: src
       resources:
@@ -73,6 +79,8 @@ tests:
         ./hack/deploy-old-ssp-operator.sh
         export component=ssp-operator-container
         export IMG=$(echo $IMAGE_FORMAT | envsubst)
+        export component=template-validator-container
+        export VALIDATOR_IMG=$(echo $IMAGE_FORMAT | envsubst)
         export GOFLAGS=
         export SKIP_CLEANUP_AFTER_TESTS=true
         make deploy functest

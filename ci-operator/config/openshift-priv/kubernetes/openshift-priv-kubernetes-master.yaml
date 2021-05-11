@@ -39,6 +39,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.16-openshift-4.8
+  ocp_builder_ubi8.art:
+    name: builder
+    namespace: ocp
+    tag: ubi8.art
   tools:
     name: 4.8-priv
     namespace: ocp-private
@@ -75,6 +79,14 @@ images:
       as:
       - registry.svc.ci.openshift.org/openshift/origin-v4.0:machine-os-content
   to: machine-os-content
+- context_dir: build/pause
+  dockerfile_path: Dockerfile.Rhel
+  from: base
+  inputs:
+    ocp_builder_ubi8.art:
+      as:
+      - registry.ci.openshift.org/ocp/builder:ubi8.art
+  to: pod
 promotion:
   additional_images:
     artifacts: artifacts
@@ -232,10 +244,9 @@ tests:
       TEST_SUITE: openshift/test-cmd
     workflow: openshift-e2e-azure
 - as: e2e-aws-disruptive
-  commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_SUITE=openshift/conformance/parallel
-    run-tests
-  openshift_installer:
+  steps:
     cluster_profile: aws
+    workflow: openshift-e2e-aws-disruption
 - as: e2e-aws-jenkins
   steps:
     cluster_profile: aws
