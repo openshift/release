@@ -321,6 +321,71 @@ presubmits:
     always_run: true
     branches:
     - master
+    cluster: app.ci
+    context: ci/prow/secret-bootstrapper-validation
+    decorate: true
+    extra_refs:
+    - base_ref: master
+      org: openshift
+      repo: release
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ci-tools-master-secret-bootstrapper-validation
+    optional: true
+    rerun_command: /test secret-bootstrapper-validation
+    spec:
+      containers:
+      - command:
+        - ./../release/hack/validate-ci-secret-boostrap.sh
+        env:
+        - name: BOOTSTRAP_BINARY
+          value: /tmp/ci-secret-bootstrap
+        image: image-registry.openshift-image-registry.svc:5000/openshift/release:golang-1.16
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+      serviceAccountName: secret-bootstrap
+    trigger: (?m)^/test( | .* )secret-bootstrapper-validation,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: build01
+    context: ci/prow/secret-generator-validation
+    decorate: true
+    extra_refs:
+    - base_ref: master
+      org: openshift
+      repo: release
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ci-tools-master-secret-generator-validation
+    optional: true
+    rerun_command: /test secret-generator-validation
+    spec:
+      containers:
+      - args:
+        - --config=../release/core-services/ci-secret-generator/_config.yaml
+        - --bootstrap-config=../release/core-services/ci-secret-bootstrap/_config.yaml
+        - --validate-only=true
+        command:
+        - go
+        - run
+        - -race
+        - ./cmd/ci-secret-generator
+        image: image-registry.openshift-image-registry.svc:5000/openshift/release:golang-1.16
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )secret-generator-validation,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
     cluster: build01
     context: ci/prow/unit
     decorate: true

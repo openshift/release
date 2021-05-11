@@ -5,22 +5,22 @@ presubmits:
     branches:
     - main
     cluster: build01
-    context: ci/prow/e2e
+    context: ci/prow/e2e-cluster
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-open-cluster-management-helloprow-go-main-e2e
-    rerun_command: /test e2e
+    name: pull-ci-open-cluster-management-helloprow-go-main-e2e-cluster
+    rerun_command: /test e2e-cluster
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=e2e
+        - --target=e2e-cluster
         command:
         - ci-operator
         image: ci-operator:latest
@@ -47,7 +47,55 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-cluster,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - main
+    cluster: build01
+    context: ci/prow/e2e-kind
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-open-cluster-management-helloprow-go-main-e2e-kind
+    rerun_command: /test e2e-kind
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=e2e-kind
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-kind,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -101,22 +149,22 @@ presubmits:
     branches:
     - main
     cluster: build01
-    context: ci/prow/kind
+    context: ci/prow/pr-image-mirror
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-open-cluster-management-helloprow-go-main-kind
-    rerun_command: /test kind
+    name: pull-ci-open-cluster-management-helloprow-go-main-pr-image-mirror
+    rerun_command: /test pr-image-mirror
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=kind
+        - --target=pr-image-mirror
         command:
         - ci-operator
         image: ci-operator:latest
@@ -143,52 +191,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )kind,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - main
-    cluster: build01
-    context: ci/prow/wait-images
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-open-cluster-management-helloprow-go-main-wait-images
-    rerun_command: /test wait-images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=wait-images
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )wait-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )pr-image-mirror,?($|\s.*)

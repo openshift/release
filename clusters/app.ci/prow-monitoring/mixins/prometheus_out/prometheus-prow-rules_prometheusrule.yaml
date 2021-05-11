@@ -48,6 +48,14 @@ spec:
       for: 5m
       labels:
         severity: critical
+    - alert: hook-appsDown
+      annotations:
+        message: The service hook-apps has been down for 5 minutes.
+      expr: |
+        absent(up{job="hook-apps"} == 1)
+      for: 5m
+      labels:
+        severity: critical
     - alert: jenkins-operatorDown
       annotations:
         message: The service jenkins-operator has been down for 5 minutes.
@@ -467,6 +475,10 @@ spec:
       for: 1m
       labels:
         severity: critical
+    - expr: count(label_replace(count(github_token_usage{token_hash =~ "openshift.*"})
+        by (token_hash), "login", "$1", "token_hash", "(.*)") or github_user_info{login=~"openshift-.*"})
+        by (login)
+      record: github:identity_names
   - name: release-controller-down
     rules:
     - alert: releaseControllerDown

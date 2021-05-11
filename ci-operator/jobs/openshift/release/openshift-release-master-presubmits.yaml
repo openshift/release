@@ -13,14 +13,8 @@ presubmits:
     rerun_command: /test ci-secret-bootstrap-config-validation
     spec:
       containers:
-      - args:
-        - --vault-addr=https://vault.ci.openshift.org
-        - --vault-role=secret-bootstrap
-        - --vault-prefix=kv/dptp
-        - --config=core-services/ci-secret-bootstrap/_config.yaml
-        - --validate-only
-        command:
-        - /usr/bin/ci-secret-bootstrap
+      - command:
+        - ./hack/validate-ci-secret-boostrap.sh
         image: registry.ci.openshift.org/ci/ci-secret-bootstrap:latest
         imagePullPolicy: Always
         name: ""
@@ -92,7 +86,7 @@ presubmits:
         - --config-dir
         - clusters/build-clusters/arm01
         - --ignore-file
-        - clusters/build-clusters/common/cert-manager.yaml
+        - clusters/build-clusters/common/assets/pod-scaler-admission.yaml
         - --kubeconfig
         - /etc/build-farm-credentials/kubeconfig
         - --as=
@@ -101,6 +95,11 @@ presubmits:
         env:
         - name: HOME
           value: /tmp
+        - name: arm01_id
+          valueFrom:
+            secretKeyRef:
+              key: arm01-id
+              name: arm01-dex-oidc
         image: registry.ci.openshift.org/ci/applyconfig:latest
         imagePullPolicy: Always
         name: ""
@@ -455,59 +454,13 @@ presubmits:
         - mismatched-tide-lenient
         command:
         - /checkconfig
-        image: gcr.io/k8s-prow/checkconfig:v20210502-ba10239e8c
+        image: gcr.io/k8s-prow/checkconfig:v20210510-9df9f3186f
         imagePullPolicy: Always
         name: ""
         resources:
           requests:
             cpu: 10m
     trigger: (?m)^/test( | .* )config,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
-    cluster: app.ci
-    context: ci/prow/core-dry
-    decorate: true
-    labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-release-master-core-dry
-    rerun_command: /test core-dry
-    spec:
-      containers:
-      - args:
-        - --config-dir
-        - core-services/secrets
-        - --kubeconfig
-        - /etc/build-farm-credentials/kubeconfig
-        - --as=
-        command:
-        - applyconfig
-        env:
-        - name: slack_api_url
-          valueFrom:
-            secretKeyRef:
-              key: url
-              name: ci-slack-api-url
-        image: registry.ci.openshift.org/ci/applyconfig:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/build-farm-credentials
-          name: build-farm-credentials
-          readOnly: true
-      serviceAccountName: config-updater
-      volumes:
-      - name: build-farm-credentials
-        secret:
-          items:
-          - key: sa.config-updater.api.ci.config
-            path: kubeconfig
-          secretName: build-farm-credentials
-    trigger: (?m)^/test( | .* )core-dry,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -727,7 +680,7 @@ presubmits:
         - ./hack/pj-rehearse.sh
         env:
         - name: KUBECONFIG
-          value: /var/kubeconfigs/sa.ci-operator.build01.config:/var/kubeconfigs/sa.ci-operator.build02.config:/var/kubeconfigs/sa.pj-rehearse.app.ci.config:/var/kubeconfigs/sa.ci-operator.vsphere.config:/var/kubeconfigs/sa.ci-operator.api.ci.config:/var/kubeconfigs/sa.ci-operator.arm01.config
+          value: /var/kubeconfigs/sa.ci-operator.build01.config:/var/kubeconfigs/sa.ci-operator.build02.config:/var/kubeconfigs/sa.pj-rehearse.app.ci.config:/var/kubeconfigs/sa.ci-operator.vsphere.config:/var/kubeconfigs/sa.ci-operator.arm01.config
         image: pj-rehearse:latest
         imagePullPolicy: Always
         name: ""

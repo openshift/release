@@ -1,8 +1,22 @@
+binary_build_commands: make
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: golang-1.16
+images:
+- dockerfile_path: config/docker/addon-operator-manager.Dockerfile
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/addon-operator/bin/linux_amd64/addon-operator-manager
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/addon-operator/config/docker/passwd
+  to: addon-operator-manager
+promotion:
+  name: addon-operator-manager
+  namespace: addon-operator
 resources:
   '*':
     limits:
@@ -11,7 +25,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: "4.7"
+  name: "4.8"
   namespace: ocp
 tests:
 - as: unit
@@ -22,6 +36,21 @@ tests:
   commands: make lint
   container:
     from: src
+- as: e2e
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      commands: make test-e2e
+      dependencies:
+      - env: ADDON_OPERATOR_MANAGER_IMAGE
+        name: addon-operator-manager
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: openshift

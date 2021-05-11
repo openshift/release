@@ -75,7 +75,7 @@ items:
         serviceAccountName: hook
         containers:
         - name: hook
-          image: gcr.io/k8s-prow/hook:v20210502-ba10239e8c
+          image: gcr.io/k8s-prow/hook:v20210510-9df9f3186f
           args:
           - --config-path=/etc/config/config.yaml
           - --supplemental-prow-config-dir=/etc/config
@@ -85,6 +85,7 @@ items:
           - --job-config-path=/etc/job-config
           - --github-endpoint=http://ghproxy
           - --github-endpoint=https://api.github.com
+          - --github-enabled-org=ansible-collections
           - --github-graphql-endpoint=http://ghproxy/graphql
           - --bugzilla-endpoint=https://bugzilla.redhat.com
           - --bugzilla-api-key-path=/etc/bugzilla/api
@@ -192,6 +193,264 @@ items:
         - name: oauth
           secret:
             secretName: github-credentials-openshift-ci-robot
+        - name: bugzilla
+          secret:
+            secretName: bugzilla-credentials-openshift-bugzilla-robot
+        - name: jira
+          secret:
+            secretName: jira-credentials-dptp-bot
+        - name: unsplash-api
+          secret:
+            secretName: unsplash-api-key
+        - name: config
+          configMap:
+            name: config
+        - name: plugins
+          configMap:
+            name: plugins
+        - name: job-config-misc
+          configMap:
+            name: job-config-misc
+        - name: job-config-master
+          configMap:
+            name: job-config-master
+        - name: job-config-3x
+          configMap:
+            name: job-config-3.x
+        - name: job-config-41
+          configMap:
+            name: job-config-4.1
+        - name: job-config-42
+          configMap:
+            name: job-config-4.2
+        - name: job-config-43
+          configMap:
+            name: job-config-4.3
+        - name: job-config-44
+          configMap:
+            name: job-config-4.4
+        - name: job-config-45
+          configMap:
+            name: job-config-4.5
+        - name: job-config-46
+          configMap:
+            name: job-config-4.6
+        - name: job-config-47
+          configMap:
+            name: job-config-4.7
+        - name: job-config-48
+          configMap:
+            name: job-config-4.8
+        - name: job-config-49
+          configMap:
+            name: job-config-4.9
+        - name: build-farm-credentials
+          secret:
+            items:
+            - key: sa.hook.app.ci.config
+              path: app.ci.kubeconfig
+            - key: sa.hook.arm01.config
+              path: arm01.kubeconfig
+            - key: sa.hook.build01.config
+              path: build01.kubeconfig
+            - key: sa.hook.build02.config
+              path: build02.kubeconfig
+            - key: sa.hook.vsphere.config
+              path: vsphere.kubeconfig
+            secretName: build-farm-credentials
+        - name: tmp
+          emptyDir: {}
+- apiVersion: route.openshift.io/v1
+  kind: Route
+  metadata:
+    namespace: ci
+    name: hook-apps
+  spec:
+    port:
+      targetPort: 8888
+    tls:
+      insecureEdgeTerminationPolicy: Redirect
+      termination: edge
+    to:
+      kind: Service
+      name: hook-apps
+- apiVersion: v1
+  kind: Service
+  metadata:
+    namespace: ci
+    name: hook-apps
+    labels:
+      app: prow
+      component: hook-apps
+    annotations:
+      prometheus.io/scrape: "true"
+      prometheus.io/port: "8888"
+  spec:
+    selector:
+      app: prow
+      component: hook-apps
+    ports:
+    - name: main
+      port: 8888
+    - name: metrics
+      port: 9090
+      protocol: TCP
+      targetPort: 9090
+    type: ClusterIP
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    namespace: ci
+    name: hook-apps
+    labels:
+      app: prow
+      component: hook-apps
+  spec:
+    replicas: 2
+    revisionHistoryLimit: 2
+    selector:
+      matchLabels:
+        app: prow
+        component: hook-apps
+    template:
+      metadata:
+        labels:
+          app: prow
+          component: hook-apps
+      spec:
+        affinity:
+          podAntiAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                  - key: component
+                    operator: In
+                    values:
+                    - hook
+                topologyKey: "kubernetes.io/hostname"
+        serviceAccountName: hook
+        containers:
+        - name: hook
+          image: gcr.io/k8s-prow/hook:v20210510-9df9f3186f
+          args:
+          - --config-path=/etc/config/config.yaml
+          - --supplemental-prow-config-dir=/etc/config
+          - --hmac-secret-file=/etc/github/hmac
+          - --dry-run=false
+          - --job-config-path=/etc/job-config
+          - --github-app-id=$(GITHUB_APP_ID)
+          - --github-app-private-key-path=/etc/github/cert
+          - --github-endpoint=http://ghproxy
+          - --github-endpoint=https://api.github.com
+          - --github-disabled-org=ansible-collections
+          - --github-graphql-endpoint=http://ghproxy/graphql
+          - --bugzilla-endpoint=https://bugzilla.redhat.com
+          - --bugzilla-api-key-path=/etc/bugzilla/api
+          - --jira-endpoint=https://issues.redhat.com
+          - --jira-username=dptp-bot
+          - --jira-password-file=/etc/jira/password
+          - --projected-token-file=/var/sa-token/token
+          env:
+          # Multiple configs can only be passed via the env var and not via the flag
+          - name: KUBECONFIG
+            value: /etc/build-farm-credentials/app.ci.kubeconfig:/etc/build-farm-credentials/build01.kubeconfig:/etc/build-farm-credentials/build02.kubeconfig:/etc/build-farm-credentials/vsphere.kubeconfig:/etc/build-farm-credentials/arm01.kubeconfig
+          - name: GITHUB_APP_ID
+            valueFrom:
+              secretKeyRef:
+                name: openshift-prow-github-app
+                key: appid
+          ports:
+            - name: main
+              containerPort: 8888
+            - name: metrics
+              containerPort: 9090
+          volumeMounts:
+          - name: service-account-token
+            mountPath: /var/sa-token
+          - name: github-app-credentials
+            mountPath: /etc/github
+            readOnly: true
+          - name: config
+            mountPath: /etc/config
+            readOnly: true
+          - name: bugzilla
+            mountPath: /etc/bugzilla
+            readOnly: true
+          - name: jira
+            mountPath: /etc/jira
+            readOnly: true
+          - name: unsplash-api
+            mountPath: /etc/unsplash-api
+            readOnly: true
+          - name: plugins
+            mountPath: /etc/plugins
+            readOnly: true
+          - name: tmp
+            mountPath: /tmp
+          - name: job-config-misc
+            mountPath: /etc/job-config/misc
+            readOnly: true
+          - name: job-config-master
+            mountPath: /etc/job-config/master
+            readOnly: true
+          - name: job-config-3x
+            mountPath: /etc/job-config/3.x
+            readOnly: true
+          - name: job-config-41
+            mountPath: /etc/job-config/4.1
+            readOnly: true
+          - name: job-config-42
+            mountPath: /etc/job-config/4.2
+            readOnly: true
+          - name: job-config-43
+            mountPath: /etc/job-config/4.3
+            readOnly: true
+          - name: job-config-44
+            mountPath: /etc/job-config/4.4
+            readOnly: true
+          - name: job-config-45
+            mountPath: /etc/job-config/4.5
+            readOnly: true
+          - name: job-config-46
+            mountPath: /etc/job-config/4.6
+            readOnly: true
+          - name: job-config-47
+            mountPath: /etc/job-config/4.7
+            readOnly: true
+          - name: job-config-48
+            mountPath: /etc/job-config/4.8
+            readOnly: true
+          - name: job-config-49
+            mountPath: /etc/job-config/4.9
+            readOnly: true
+          - mountPath: /etc/build-farm-credentials
+            name: build-farm-credentials
+            readOnly: true
+          resources:
+            requests:
+              memory: "3Gi"
+              cpu: "200m"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 45
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /healthz/ready
+              port: 8081
+        volumes:
+        - name: service-account-token
+          projected:
+            sources:
+            - serviceAccountToken:
+                path: token
+        - name: github-app-credentials
+          secret:
+            secretName: openshift-prow-github-app
         - name: bugzilla
           secret:
             secretName: bugzilla-credentials-openshift-bugzilla-robot

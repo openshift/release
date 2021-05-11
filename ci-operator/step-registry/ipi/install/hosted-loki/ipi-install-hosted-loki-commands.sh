@@ -4,7 +4,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-export LOKI_VERSION="2.2.1"
+export PROMTAIL_IMAGE="quay.io/openshift-logging/promtail"
+export PROMTAIL_VERSION="v2.2.1"
 export LOKI_ENDPOINT=https://observatorium.api.stage.openshift.com/api/logs/v1/dptp/loki/api/v1
 
 GRAFANACLOUND_USERNAME=$(cat /var/run/loki-grafanacloud-secret/client-id)
@@ -200,7 +201,7 @@ spec:
         app.kubernetes.io/instance: loki-promtail
         app.kubernetes.io/name: promtail
         app.kubernetes.io/part-of: loki
-        app.kubernetes.io/version: ${LOKI_VERSION}
+        app.kubernetes.io/version: ${PROMTAIL_VERSION}
     spec:
       containers:
       - command:
@@ -214,7 +215,7 @@ spec:
               fieldPath: spec.nodeName
         - name: INVOKER
           value: "${OPENSHIFT_INSTALL_INVOKER}"
-        image: quay.io/vrutkovs/promtail:${LOKI_VERSION}
+        image: ${PROMTAIL_IMAGE}:${PROMTAIL_VERSION}
         imagePullPolicy: IfNotPresent
         lifecycle:
           preStop:
@@ -515,11 +516,7 @@ echo "Promtail manifests created, the cluster can be found at https://grafana-lo
 
 if [[ -f "/usr/bin/python3" ]]; then
   ENCODED_INVOKER="$(python3 -c "import urllib.parse; print(urllib.parse.quote('${OPENSHIFT_INSTALL_INVOKER}'))")"
-  cat >> ${ARTIFACT_DIR}/custom-link-loki.html << EOF
-  <html>
-  <body>
-  <a target="_blank" href="https://grafana-loki.ci.openshift.org/explore?orgId=1&left=%5B%22now-24h%22,%22now%22,%22Grafana%20Cloud%22,%7B%22expr%22:%22%7Binvoker%3D%5C%22${ENCODED_INVOKER}%5C%22%7D%22%7D%5D">Loki</a>
-  </body>
-  </html>
+  cat >> ${SHARED_DIR}/custom-links.txt << EOF
+  <a href="https://grafana-loki.ci.openshift.org/explore?orgId=1&left=%5B%22now-24h%22,%22now%22,%22Grafana%20Cloud%22,%7B%22expr%22:%22%7Binvoker%3D%5C%22${ENCODED_INVOKER}%5C%22%7D%20%7C%20unpack%22%7D%5D">Loki</a>
 EOF
 fi
