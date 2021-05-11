@@ -9,14 +9,18 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 export http_proxy="http://204.90.115.172:8080"
 export https_proxy="http://204.90.115.172:8080"
 
-ibmz_eco_cloud_auth=/var/run/secrets/clouds.yaml
+ibmz_eco_cloud_auth=/var/run/secrets/openstack/clouds.yaml
 cluster_name=$(<"${SHARED_DIR}"/clustername.txt)
-installer_dir=/deploy
-cluster_dir=/deploy/ocp_clusters/${cluster_name}
+installer_dir=/tmp/deploy
+cluster_dir=${installer_dir}/ocp_clusters/${cluster_name}
 
 echo "$(date -u --rfc-3339=seconds) - Copying config from shared dir..."
 
+mkdir -p ${cluster_dir}
+cp -r /deploy/. ${installer_dir}
+cp /entrypoint.sh ${installer_dir}/
 pushd ${installer_dir}
+
 
 cp -t "${installer_dir}" \
     "${SHARED_DIR}/terraform.tfvars" \
@@ -25,16 +29,30 @@ cp -t "${installer_dir}" \
 cp -t "${cluster_dir}" \
     "${SHARED_DIR}/pull-secret"
 
+ocp_version=$(cat ${installer_dir}/terraform.tfvars | grep openshift_version | cut -d= -f2 | sed -e 's/"//' -e 's/"$//')
+
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
-echo "$(date -u --rfc-3339=seconds) - Deploying cluster on IBM Z Ecosystem Cloud..."
-/entrypoint.sh apply &
-wait "$!"
+echo "$(date -u --rfc-3339=seconds) - Deploying cluster on IBM Z Ecosystem Cloud... OpenShift ${ocp_version}"
+# Modify /deploy path to /tmp/deploy for rootless
+sed -i "s#/deploy/#/tmp/deploy/#g" ./entrypoint.sh
+terraform init
+./entrypoint.sh apply &
 
 set +e
 wait "$!"
 ret="$?"
 set -e
+
+if [ $ret -ne 0 ]; then
+  set +e
+  # Attempt to gather tfstate file and logs.
+  echo "$(date -u --rfc-3339=seconds) - Install failed, gathering tfstate file and logs..."
+  cp -t "${SHARED_DIR}" \
+      "${cluster_dir}/terraform.tfstate"
+  set -e
+  exit "$ret"
+fi
 
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_END"
 
@@ -44,6 +62,10 @@ sed 's/password: .*/password: REDACTED/' "${cluster_dir}/.openshift_install.log"
 
 cp -t "${SHARED_DIR}" \
     "${cluster_dir}/ocp_install/auth/kubeconfig" \
-    "${cluster_dir}/ocp_install/metadata.json"
+    "${cluster_dir}/ocp_install/metadata.json" \
+    "${cluster_dir}/terraform.tfstate"
+
+KUBECONFIG="${SHARED_DIR}/kubeconfig"
+export KUBECONFIG
 
 exit "$ret"
