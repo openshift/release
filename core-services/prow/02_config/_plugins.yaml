@@ -448,6 +448,7 @@ approve:
   require_self_approval: false
 - commandHelpLink: ""
   repos:
+  - konveyor/mig-operator
   - openshift/openshift-restclient-python
   require_self_approval: false
 - commandHelpLink: ""
@@ -1843,6 +1844,12 @@ config_updater:
         - ci
       gzip: true
       name: ci-operator-misc-configs
+    ci-operator/config/**/eventrouter/openshift*-eventrouter-release-5.*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
     ci-operator/config/**/oauth-proxy/openshift*-samples-operator-*.yaml:
       clusters:
         app.ci:
@@ -1868,6 +1875,18 @@ config_updater:
       gzip: true
       name: ci-operator-misc-configs
     ci-operator/config/**/windows-machine-config-operator/*-community-*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
+    ci-operator/config/3scale/3scale-operator/*-3scale-2.11-*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
+    ci-operator/config/che-incubator/chectl/*-7.yaml:
       clusters:
         app.ci:
         - ci
@@ -2259,6 +2278,12 @@ config_updater:
         - ci
       gzip: true
       name: job-config-misc
+    ci-operator/jobs/**/eventrouter/openshift-eventrouter-release-5.*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
     ci-operator/jobs/**/infra-image-mirroring.yaml:
       clusters:
         app.ci:
@@ -2294,6 +2319,17 @@ config_updater:
         app.ci:
         - ci
       gzip: true
+      name: job-config-misc
+    ci-operator/jobs/3scale/3scale-operator/*-3scale-2.11-*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
+    ci-operator/jobs/che-incubator/chectl/*7-presubmits.yaml:
+      clusters:
+        app.ci:
+        - ci
       name: job-config-misc
     ci-operator/jobs/code-ready/snc/*4.*.yaml:
       clusters:
@@ -2916,16 +2952,6 @@ config_updater:
         vsphere:
         - ocp
       name: base-repos
-    core-services/secret-mirroring/_mapping.yaml:
-      clusters:
-        app.ci:
-        - ci
-        build01:
-        - ci
-        build02:
-        - ci
-      key: mapping.yaml
-      name: secret-mirroring
 external_plugins:
   3scale/3scale-operator:
   - endpoint: http://refresh
@@ -3431,6 +3457,25 @@ external_plugins:
     events:
     - pull_request
     name: needs-rebase
+  konveyor/mig-operator:
+  - endpoint: http://refresh
+    events:
+    - issue_comment
+    name: refresh
+  - endpoint: http://cherrypick
+    events:
+    - issue_comment
+    - pull_request
+    name: cherrypick
+  - endpoint: http://needs-rebase
+    events:
+    - pull_request
+    name: needs-rebase
+  - endpoint: http://backport-verifier
+    events:
+    - issue_comment
+    - pull_request
+    name: backport-verifier
   kube-reporting:
   - endpoint: http://refresh
     events:
@@ -4206,6 +4251,7 @@ lgtm:
   - openshift/vmware-vsphere-csi-driver
   review_acts_as_lgtm: true
 - repos:
+  - konveyor/mig-operator
   - openshift/openshift-restclient-python
   review_acts_as_lgtm: true
 - repos:
@@ -5104,6 +5150,9 @@ plugins:
     - verify-owners
     - wip
     - yuks
+  konveyor/mig-operator:
+    plugins:
+    - trigger
   kube-reporting:
     plugins:
     - assign
@@ -7268,6 +7317,9 @@ plugins:
     plugins:
     - approve
   openshift/tektoncd-cli:
+    plugins:
+    - approve
+  openshift/tektoncd-operator:
     plugins:
     - approve
   openshift/tektoncd-pipeline:

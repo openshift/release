@@ -17,7 +17,7 @@
               message: 'The service %s has been down for 5 minutes.' % name,
             },
           }
-          for name in ['deck', 'deck-internal', 'hook', 'jenkins-operator', 'kata-jenkins-operator', 'prow-controller-manager', 'sinker', 'tide', "dptp-controller-manager", "crier"]
+          for name in ['deck', 'deck-internal', 'hook', 'hook-apps', 'jenkins-operator', 'kata-jenkins-operator', 'prow-controller-manager', 'sinker', 'tide', "dptp-controller-manager", "crier"]
         ],
       },
       {

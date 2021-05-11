@@ -17,7 +17,11 @@ local dashboardConfig = {
     };
 
 local histogramQuantileTarget(phi) = prometheus.target(
-        std.format('histogram_quantile(%s, sum(rate(github_request_duration_bucket{path="${path}", status="${status}"}[5m]) * on(token_hash) group_left(login) max(github_user_info{login=~"${login}"}) by (token_hash, login)) by (le))', phi),
+        std.format('histogram_quantile(%s, sum(rate(github_request_duration_bucket{path=~"${path}", status="${status}"}[5m]) * on(token_hash) group_left(login) max(github_user_info{login=~"${login}"}) by (token_hash, login)) by (le))', phi),
+        legendFormat=std.format('phi=%s', phi),
+    );
+local histogramQuantileTargetApps(phi) = prometheus.target(
+        std.format('histogram_quantile(%s, sum(rate(github_request_duration_bucket{path=~"${path}", status="${status}", token_hash=~"${login}"}[5m])) by (le))', phi),
         legendFormat=std.format('phi=%s', phi),
     );
 
@@ -43,11 +47,19 @@ dashboard.new(
 .addTemplate(template.new(
         'login',
         'prometheus',
-        'label_values(github_user_info{login=~"openshift-.*"}, login)',
+        'label_values(github:identity_names, login)',
+        includeAll=true,
         label='login',
         refresh='time',
     ))
-.addTemplate(requestLabels('path', 'path'))
+.addTemplate(template.new(
+       'path',
+       'prometheus',
+       'label_values(github_request_duration_count, path)',
+       includeAll=true,
+       label='path',
+       refresh='time',
+))
 .addTemplate(requestLabels('status', 'status'))
 .addTemplate(requestLabels('user_agent', 'user_agent'))
 .addTemplate(
@@ -133,8 +145,12 @@ dashboard.new(
         #y_axis_label='% Cacheable Request Fulfilled for Free',
     ) + legendConfig)
     .addTarget(prometheus.target(
+        'sum(increase(ghcache_responses{mode=~"COALESCED|REVALIDATED", token_hash=~"openshift-ci - .*"}[1h]))  / sum(increase(ghcache_responses{mode=~"COALESCED|REVALIDATED|MISS|CHANGED", token_hash=~"openshift-ci - .*"}[1h]))',
+        legendFormat='App',
+    ))
+    .addTarget(prometheus.target(
         'sum(increase(ghcache_responses{mode=~"COALESCED|REVALIDATED"}[1h]) * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login)) \n/ sum(increase(ghcache_responses{mode=~"COALESCED|REVALIDATED|MISS|CHANGED"}[1h]) * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login))',
-        legendFormat='Efficiency',
+        legendFormat='Token',
     )), gridPos={
     h: 6,
     w: 24,
@@ -211,11 +227,11 @@ dashboard.new(
         max='12500',
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(github_token_usage{token_hash=~"openshift.*"}) by (token_hash, api_version)',
+        'sum(github_token_usage{token_hash=~"${login}"}) by (token_hash, api_version)',
          legendFormat='{{token_hash}} : {{api_version}}',
     ))
     .addTarget(prometheus.target(
-        'sum(github_token_usage * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login)) by (api_version, login)',
+        'sum(github_token_usage * on(token_hash) group_left(login) max(github_user_info{login=~"${login}"}) by (token_hash, login)) by (api_version, login)',
          legendFormat='{{login}} : {{api_version}}',
     )), gridPos={
     h: 9,
@@ -225,7 +241,7 @@ dashboard.new(
   })
 .addPanel(
     (graphPanel.new(
-        'Request Rates: Overview by status with ${range}',
+        'Request Rates: Overview for identity ${login} by status with ${range}',
         description='GitHub request rates by status.',
         datasource='prometheus',
         legend_alignAsTable=true,
@@ -233,7 +249,11 @@ dashboard.new(
         stack=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(rate(github_request_duration_count[${range}]) * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login)) by (status)',
+        'sum(rate(github_request_duration_count{token_hash=~"${login}"}[${range}])) by (status)',
+         legendFormat='{{status}}',
+    ))
+    .addTarget(prometheus.target(
+        'sum(rate(github_request_duration_count[${range}]) * on(token_hash) group_left(login) max(github_user_info{login=~"${login}"}) by (token_hash, login)) by (status)',
          legendFormat='{{status}}',
     )), gridPos={
     h: 9,
@@ -243,7 +263,7 @@ dashboard.new(
   })
 .addPanel(
     (graphPanel.new(
-        'Request Rates: Overview by path for ${status} with ${range}',
+        'Request Rates: Overview for identity ${login} by path for status ${status} with ${range}',
         description='GitHub request rates by path.',
         datasource='prometheus',
         legend_alignAsTable=true,
@@ -251,7 +271,11 @@ dashboard.new(
         stack=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(rate(github_request_duration_count{status="${status}"}[${range}]) * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login)) by (path)',
+        'sum(rate(github_request_duration_count{status="${status}",token_hash=~"${login}"}[${range}])) by (path)',
+         legendFormat='{{path}}',
+    ))
+    .addTarget(prometheus.target(
+        'sum(rate(github_request_duration_count{status="${status}"}[${range}]) * on(token_hash) group_left(login) max(github_user_info{login=~"${login}"}) by (token_hash, login)) by (path)',
          legendFormat='{{path}}',
     )), gridPos={
     h: 9,
@@ -261,7 +285,7 @@ dashboard.new(
   })
 .addPanel(
     (graphPanel.new(
-        'Request Rates: ${login}, ${path}, and ${status} with ${range}',
+        'Request Rates: Identity ${login}, path ${path}, and status ${status} with ${range}',
         description='GitHub request rates by login, path and status.',
         datasource='prometheus',
         legend_alignAsTable=true,
@@ -272,8 +296,12 @@ dashboard.new(
         legend_sortDesc=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(rate(github_request_duration_count{path="${path}", status="${status}"}[${range}]) * on(token_hash) group_left(login) max(github_user_info{login=~"${login}"}) by (token_hash, login)) by (login, path, status)',
-         legendFormat='{{status}}:{{login}}:{{path}}',
+        'sum(rate(github_request_duration_count{path=~"${path}", status="${status}", token_hash=~"${login}"}[${range}])) by (login, path, status)',
+         legendFormat='{{status}}: {{path}}',
+    ))
+    .addTarget(prometheus.target(
+        'sum(rate(github_request_duration_count{path=~"${path}", status="${status}"}[${range}]) * on(token_hash) group_left(login) max(github_user_info{login=~"${login}"}) by (token_hash, login)) by (login, path, status)',
+         legendFormat='{{status}}: {{path}}',
     )), gridPos={
     h: 9,
     w: 24,
@@ -303,7 +331,7 @@ dashboard.new(
   })
 .addPanel(
     (graphPanel.new(
-        'Latency Distribution for ${login}, ${path}, and ${status} with ${range}',
+        'Latency Distribution for path ${path} and ${status} with ${range}',
         description='histogram_quantile(<phi>, sum(rate(github_request_duration_bucket{path=~"${path}", status=~"${status}"}[${range}])) by (le))',
         datasource='prometheus',
         legend_alignAsTable=true,
@@ -314,6 +342,9 @@ dashboard.new(
         legend_sort='avg',
         legend_sortDesc=true,
     ) + legendConfig)
+    .addTarget(histogramQuantileTargetApps('0.99'))
+    .addTarget(histogramQuantileTargetApps('0.95'))
+    .addTarget(histogramQuantileTargetApps('0.5'))
     .addTarget(histogramQuantileTarget('0.99'))
     .addTarget(histogramQuantileTarget('0.95'))
     .addTarget(histogramQuantileTarget('0.5')), gridPos={
@@ -324,7 +355,7 @@ dashboard.new(
   })
 .addPanel(
     (graphPanel.new(
-        'Token Consumption by User Agent',
+        'Token Consumption for identity ${login} by User Agent',
         description='sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED"}[1h])) by (user_agent) != 0',
         datasource='prometheus',
         legend_alignAsTable=true,
@@ -337,7 +368,11 @@ dashboard.new(
         stack=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED"}[1h])) by (user_agent) != 0',
+        'sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED",token_hash=~"${login}"}[1h])) by (user_agent)',
+         legendFormat='{{user_agent}}',
+    ))
+    .addTarget(prometheus.target(
+        'sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED"}[1h]) * on(token_hash) group_left(login) max(github_user_info{login=~"${login}"}) by (token_hash, login)) by (user_agent)',
          legendFormat='{{user_agent}}',
     )), gridPos={
     h: 9,
@@ -347,7 +382,7 @@ dashboard.new(
   })
 .addPanel(
     (graphPanel.new(
-        'Token Consumption by Path',
+        'Token Consumption for identity ${login} by Path',
         description='sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED"}[1h])) by (path) != 0',
         datasource='prometheus',
         legend_alignAsTable=true,
@@ -360,7 +395,11 @@ dashboard.new(
         stack=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED"}[1h])) by (path) != 0',
+        'sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED",token_hash=~"${login}"}[1h])) by (path)',
+         legendFormat='{{path}}',
+    ))
+    .addTarget(prometheus.target(
+        'sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED"}[1h]) * on(token_hash) group_left(login) max(github_user_info{login=~"${login}"}) by (token_hash, login)) by (path)',
          legendFormat='{{path}}',
     )), gridPos={
     h: 9,
@@ -370,7 +409,7 @@ dashboard.new(
   })
 .addPanel(
     (graphPanel.new(
-        'Token Consumption For Path ${path} by User Agent',
+        'Token Consumption for identity ${login} at Path ${path} by User Agent',
         description='sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED",path="${path}"}[1h])) by (user_agent) != 0',
         datasource='prometheus',
         legend_alignAsTable=true,
@@ -382,7 +421,11 @@ dashboard.new(
         legend_sortDesc=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED",path="${path}"}[1h])) by (user_agent) != 0',
+        'sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED",path=~"${path}",token_hash=~"${login}"}[1h])) by (user_agent)',
+         legendFormat='{{user_agent}}',
+    ))
+    .addTarget(prometheus.target(
+        'sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED",path=~"${path}"}[1h]) * on(token_hash) group_left(login) max(github_user_info{login=~"${login}"}) by (token_hash, login)) by (user_agent)',
          legendFormat='{{user_agent}}',
     )), gridPos={
     h: 9,
@@ -392,7 +435,7 @@ dashboard.new(
   })
 .addPanel(
     (graphPanel.new(
-        'Token Consumption for User Agent ${user_agent} by Path',
+        'Token Consumption for identity ${login} and User Agent ${user_agent} by Path',
         description='sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED",user_agent="${user_agent}"}[1h])) by (path) != 0',
         datasource='prometheus',
         legend_alignAsTable=true,
@@ -404,7 +447,11 @@ dashboard.new(
         legend_sortDesc=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
-        'sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED",user_agent="${user_agent}"}[1h])) by (path) != 0',
+        'sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED",user_agent=~"${user_agent}",token_hash=~"${login}"}[1h])) by (path)',
+         legendFormat='{{path}}',
+    ))
+    .addTarget(prometheus.target(
+        'sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED",user_agent=~"${user_agent}"}[1h]) * on(token_hash) group_left(login) max(github_user_info{login=~"${login}"}) by (token_hash, login)) by (path)',
          legendFormat='{{path}}',
     )), gridPos={
     h: 9,
