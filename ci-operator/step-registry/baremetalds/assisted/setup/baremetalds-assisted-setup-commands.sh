@@ -38,14 +38,14 @@ timeout -s 9 175m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*
 
 set -xeuo pipefail
 
-yum install -y git sysstat sos
+yum install -y git sysstat sos unzip
 systemctl start sysstat
 
 mkdir -p /tmp/artifacts
 
 # NVMe makes it faster
 NVME_DEVICE="/dev/nvme0n1"
-REPO_DIR="/home/assisted"
+REPO_DIR="/home/assisted-test-infra-master"
 if [ -e "\$NVME_DEVICE" ];
 then
   mkfs.xfs -f "\${NVME_DEVICE}"
@@ -53,8 +53,12 @@ then
   mount "\${NVME_DEVICE}" "\${REPO_DIR}"
 fi
 
-tar -xzvf assisted.tar.gz -C "\${REPO_DIR}"
-chown -R root:root "\${REPO_DIR}"
+wget https://github.com/openshift/assisted-test-infra/archive/refs/heads/master.zip
+unzip master.zip -d /home
+mkdir "\${REPO_DIR}/assisted-service"
+
+tar -xzvf assisted.tar.gz -C "\${REPO_DIR}/assisted-service"
+chown -R root:root "\${REPO_DIR}/assisted-service"
 
 cd "\${REPO_DIR}"
 
@@ -79,10 +83,6 @@ set -e
 if [ "${JOB_TYPE:-}" = "presubmit" ] && (( ! \${IS_REHEARSAL} )); then
   # We would like to keep running a stable version for PRs
   echo "export OPENSHIFT_VERSION=4.7" >> /root/config
-
-  if [ "${REPO_NAME:-}" = "assisted-service" ]; then
-    echo "export SERVICE_BRANCH=${PULL_PULL_SHA:-master}" >> /root/config
-  fi
 else
   # Periodics run against latest release
   echo "export OPENSHIFT_INSTALL_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}" >> /root/config
