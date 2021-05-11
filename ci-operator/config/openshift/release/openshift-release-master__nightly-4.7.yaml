@@ -55,6 +55,10 @@ releases:
       product: ocp
       stream: nightly
       version: "4.7"
+  oldest-supported-z-rollback:
+    release:
+      channel: stable
+      version: 4.7.1
 resources:
   '*':
     requests:
@@ -70,19 +74,6 @@ tests:
       ASSISTED_CONTROLLER_IMAGE: pipeline:assisted-installer-controller
       ASSISTED_INSTALLER_IMAGE: pipeline:assisted-installer
       ASSISTED_SERVICE_IMAGE: pipeline:assisted-service
-    workflow: baremetalds-assisted
-- as: e2e-metal-assisted-onprem
-  cron: 0 0 * * 1
-  steps:
-    cluster_profile: packet
-    dependencies:
-      ASSISTED_AGENT_IMAGE: pipeline:assisted-installer-agent
-      ASSISTED_CONTROLLER_IMAGE: pipeline:assisted-installer-controller
-      ASSISTED_INSTALLER_IMAGE: pipeline:assisted-installer
-      ASSISTED_SERVICE_IMAGE: pipeline:assisted-service
-    env:
-      ASSISTED_CONFIG: |
-        DEPLOY_TARGET=onprem
     workflow: baremetalds-assisted
 - as: e2e-metal-ipi
   cron: 0 0 1 1 *
@@ -129,6 +120,7 @@ tests:
     - ref: baremetalds-packet-setup
     - ref: ipi-install-rbac
     - ref: baremetalds-devscripts-conf-compact
+    - ref: baremetalds-devscripts-proxy
     - ref: baremetalds-devscripts-setup
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-virtualmedia
@@ -209,12 +201,12 @@ tests:
 - as: e2e-gcp
   interval: 48h
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-openshift-gce-devel-ci-2
     workflow: openshift-e2e-gcp
 - as: e2e-gcp-fips
   interval: 48h
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-openshift-gce-devel-ci-2
     env:
       FIPS_ENABLED: "true"
     pre:
@@ -246,7 +238,7 @@ tests:
 - as: e2e-gcp-fips-serial
   interval: 48h
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-openshift-gce-devel-ci-2
     env:
       FIPS_ENABLED: "true"
       TEST_SUITE: openshift/conformance/serial
@@ -273,7 +265,7 @@ tests:
 - as: e2e-gcp-rt
   interval: 48h
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-openshift-gce-devel-ci-2
     env:
       RT_ENABLED: "true"
     workflow: openshift-e2e-gcp
@@ -283,6 +275,17 @@ tests:
     cluster_profile: aws
     env:
       TEST_TYPE: upgrade-conformance
+    workflow: openshift-upgrade-aws
+- as: e2e-aws-upgrade-rollback-oldest-supported
+  interval: 48h
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:oldest-supported-z-rollback
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      TEST_TYPE: upgrade-conformance
+      TEST_UPGRADE_OPTIONS: abort-at=random
     workflow: openshift-upgrade-aws
 - as: e2e-aws
   interval: 48h
@@ -299,6 +302,19 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
+- as: e2e-powervs
+  cron: 0 0 * * 1
+  steps:
+    test:
+    - as: test-e2e
+      cli: latest
+      commands: |
+        oc get nodes
+      from: base
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-powervs-upi
 zz_generated_metadata:
   branch: master
   org: openshift

@@ -8,23 +8,17 @@ config = {}
 with open(sys.argv[1]) as raw:
     config = yaml.load(raw)
 
-def alias_for_cluster(cluster):
-    if cluster == "api.ci":
-        return "ci" # why do we still do this??
-    return cluster
 
-def internal_hostnames_for_cluster(cluster):
-    if cluster == "api.ci":
-        return ["docker-registry.default.svc.cluster.local:5000", "docker-registry.default.svc:5000"]
+def internal_hostnames_for_cluster():
     return ["image-registry.openshift-image-registry.svc.cluster.local:5000", "image-registry.openshift-image-registry.svc:5000"]
 
 def internal_auths_for_cluster(cluster):
     auths = []
-    for hostname in internal_hostnames_for_cluster(cluster):
+    for hostname in internal_hostnames_for_cluster():
         auths.append({
             "bw_item": "build_farm",
             "registry_url": hostname,
-            "auth_bw_attachment": "token_image-puller_{}_reg_auth_value.txt".format(alias_for_cluster(cluster)),
+            "auth_bw_attachment": "token_image-puller_{}_reg_auth_value.txt".format(cluster),
         })
     return auths
 
@@ -70,7 +64,7 @@ def config_for_cluster(cluster):
                 },
                 {
                     "bw_item": "build_farm",
-                    "registry_url": "registry.arm01.not.defined.yet",
+                    "registry_url": "registry.arm-build01.arm-build.devcluster.openshift.com",
                     "auth_bw_attachment": "token_image-puller_arm01_reg_auth_value.txt",
                 },
                 {
@@ -104,7 +98,7 @@ def config_for_cluster(cluster):
         }],
     }
 
-clusters = ["api.ci", "app.ci", "build01", "build02", "vsphere"]
+clusters = ["app.ci", "build01", "build02", "vsphere"]
 configs = dict(zip(clusters, [config_for_cluster(cluster) for cluster in clusters]))
 found = dict(zip(clusters, [False for cluster in clusters]))
 
