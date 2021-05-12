@@ -419,6 +419,7 @@ dashboard.new(
         legend_avg=true,
         legend_sort='avg',
         legend_sortDesc=true,
+        stack=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
         'sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED",path=~"${path}",token_hash=~"${login}"}[1h])) by (user_agent)',
@@ -445,6 +446,7 @@ dashboard.new(
         legend_avg=true,
         legend_sort='avg',
         legend_sortDesc=true,
+        stack=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
         'sum(increase(ghcache_responses{mode=~"MISS|NO-STORE|CHANGED",user_agent=~"${user_agent}",token_hash=~"${login}"}[1h])) by (path)',
