@@ -3,7 +3,7 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - main
+    - master
     cluster: build01
     context: ci/prow/v4.5-images
     decorate: true
@@ -13,7 +13,7 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       ci-operator.openshift.io/variant: v4.5
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-devfile-registry-main-v4.5-images
+    name: pull-ci-devfile-registry-master-v4.5-images
     rerun_command: /test v4.5-images
     spec:
       containers:
@@ -53,9 +53,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - main
+    - master
     cluster: build01
-    context: ci/prow/v4.5-registry-integration-test
+    context: ci/prow/v4.5-registry-test
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -63,8 +63,8 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       ci-operator.openshift.io/variant: v4.5
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-devfile-registry-main-v4.5-registry-integration-test
-    rerun_command: /test v4.5-registry-integration-test
+    name: pull-ci-devfile-registry-master-v4.5-registry-test
+    rerun_command: /test v4.5-registry-test
     spec:
       containers:
       - args:
@@ -72,8 +72,8 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/usr/local/registry-integration-test-cluster-profile
-        - --target=registry-integration-test
+        - --secret-dir=/usr/local/registry-test-cluster-profile
+        - --target=registry-test
         - --variant=v4.5
         command:
         - ci-operator
@@ -87,7 +87,7 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/registry-integration-test-cluster-profile
+        - mountPath: /usr/local/registry-test-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -117,4 +117,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )v4.5-registry-integration-test,?($|\s.*)
+    trigger: (?m)^/test( | .* )v4.5-registry-test,?($|\s.*)
