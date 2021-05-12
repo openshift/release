@@ -62,6 +62,7 @@ function backoff() {
 }
 
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
+date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 
 ## Export variables to be used in examples below.
 echo "$(date -u --rfc-3339=seconds) - Exporting variables..."
@@ -534,6 +535,7 @@ ret="$?"
 set -e
 
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_END"
+date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 
 sed 's/password: .*/password: REDACTED/' "${dir}/.openshift_install.log" >>"${ARTIFACT_DIR}/.openshift_install.log"
 
