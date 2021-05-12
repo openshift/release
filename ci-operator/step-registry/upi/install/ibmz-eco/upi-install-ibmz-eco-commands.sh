@@ -32,6 +32,7 @@ cp -t "${cluster_dir}" \
 ocp_version=$(cat ${installer_dir}/terraform.tfvars | grep openshift_version | cut -d= -f2 | sed -e 's/"//' -e 's/"$//')
 
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
+date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 
 echo "$(date -u --rfc-3339=seconds) - Deploying cluster on IBM Z Ecosystem Cloud... OpenShift ${ocp_version}"
 # Modify /deploy path to /tmp/deploy for rootless
@@ -55,7 +56,7 @@ if [ $ret -ne 0 ]; then
 fi
 
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_END"
-
+date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 touch /tmp/install-complete
 
 sed 's/password: .*/password: REDACTED/' "${cluster_dir}/.openshift_install.log" >>"${ARTIFACT_DIR}/.openshift_install.log"
