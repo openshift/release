@@ -1,6 +1,11 @@
 #!/bin/bash
 
-echo "Deploying an operator in the bundle format"
+set -o nounset
+set -o errexit
+set -o pipefail
 
-# (todo): hardcoding this for now to test in CI; will fix
-operator-sdk run bundle "quay.io/rashmigottipati/api-operator:1.0.1"
+echo "Deploying an operator in the bundle format using operator-sdk run bundle command"
+
+echo "$OO_BUNDLE_IMG"
+cd /tmp
+operator-sdk run bundle "$OO_BUNDLE_IMG"
