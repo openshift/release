@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-echo "************ baremetalds assisted operator bmh command ************"
+echo "************ baremetalds assisted operator ztp command ************"
 
 # Fetch packet basic configuration
 # shellcheck source=/dev/null
@@ -32,10 +32,11 @@ ssh "${SSHOPTS[@]}" "root@${IP}" bash - <<"EOF" |& sed -e 's/.*auths\{0,1\}".*/*
 source /root/ds-vars.conf
 source /root/assisted-vars.conf
 
+echo "Step configuration:"
 env | sort
 
 echo "Generate Assisted Installer CRDs"
-cat > assisted-installer-crds-playbook.yaml <<EOCR
+cat > assisted-installer-crds-playbook.yaml <<EOPB
 - name: Create CRDs for Assisted Installer
   hosts: localhost
   collections:
@@ -67,7 +68,7 @@ cat > assisted-installer-crds-playbook.yaml <<EOCR
     template:
       src: "clusterDeployment.j2"
       dest: "clusterDeployment.yaml"
-EOCR
+EOPB
 
 cat > clusterImageSet.j2 <<EOCR
 apiVersion: hive.openshift.io/v1
@@ -93,14 +94,7 @@ spec:
       bla: aaa
   pullSecretRef:
     name: {{ pull_secret_name }}
-  proxy:
-    httpProxy: http://11.11.11.33
-    httpsProxy: http://22.22.22.55
   sshAuthorizedKey: '{{ ssh_public_key }}'
-  ignitionConfigOverride: '{"ignition": {"version": "3.1.0"}, "storage": {"files": [{"path": "/etc/someconfig", "contents": {"source": "data:text/plain;base64,aGVscGltdHJhcHBlZGluYXN3YWdnZXJzcGVj"}}]}}'
-  nmStateConfigLabelSelector:
-    matchLabels:
-      some-user-defined-label-name: some-user-defined-label-value
 EOCR
 
 cat > clusterDeployment.j2 <<EOCR
@@ -152,7 +146,7 @@ echo "VM status"
 virsh list --all
 vm=""
 vm=$(virsh list --all | grep "shut off" | awk '{print $2}')
-echo "Offline VM is $vm"
+echo "Offline VM for ZTP is $vm"
 
 echo "Creating Assisted Installer Pull Secret"
 oc create secret generic ${ASSISTED_PULLSECRET_NAME} --from-file=.dockerconfigjson=${ASSISTED_PULLSECRET_JSON} --type=kubernetes.io/dockerconfigjson -n ${ASSISTED_NAMESPACE}
@@ -171,24 +165,34 @@ oc create -f infraEnv.yaml
 
 echo "Creating new baremetal host using baremetal operator"
 oc create -f /root/dev-scripts/ocp/ostest/extra_host_manifests.yaml
-oc label -f /root/dev-scripts/ocp/ostest/extra_host_manifests.yaml "infraenvs.agent-install.openshift.io=myinfraenv"
+oc label -f /root/dev-scripts/ocp/ostest/extra_host_manifests.yaml "infraenvs.agent-install.openshift.io=${ASSISTED_INFRAENV_NAME}"
 oc label -f /root/dev-scripts/ocp/ostest/extra_host_manifests.yaml "bla=aaa"
 
-sleep 5m
-
 echo "VM status"
+virsh list --all
 oc get pods -A | grep metal3
 
 echo "List clusterdeploments"
-oc get clusterdeployment
-oc get clusterdeployment -o json | jq '.status.conditions[] | select(.reason | contains("AgentPlatformState"))'
+oc get clusterdeployment -n ${ASSISTED_NAMESPACE}
+oc get clusterdeployment -n ${ASSISTED_NAMESPACE} -o json | jq '.status.conditions[] | select(.reason | contains("AgentPlatformState"))'
 
-virsh list --all
 status=""
-status=$(virsh list --all | grep $vm | awk '{print $3}')
+for (( i=0; i<5; i++ ))
+do 
+  status=$(virsh list --all | grep $vm | awk '{print $3}')
+  if [ "$status" != "running" ]
+  then
+    echo "$vm is not running ($i retries)"
+    sleep 1m
+  else
+    echo "$vm was started"
+    break
+  fi
+done
+
 if [ "$status" != "running" ]
 then
-  echo "$vm is not running"
+  echo "$vm never started"
   exit 1
 else
   echo "$vm was started"
