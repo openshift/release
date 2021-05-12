@@ -37,7 +37,7 @@ cat > packet-setup.yaml <<-EOF
         plan: m2.xlarge.x86
         facility: any
         wait_for_public_IPv: 4
-        wait_timeout: 900
+        wait_timeout: 1200
         state: active
         tags: "{{ 'PR:', lookup('env', 'PULL_NUMBER'), 'Job name:', lookup('env', 'JOB_NAME'), 'Job id:', lookup('env', 'PROW_JOB_ID') }}"
       register: hosts
