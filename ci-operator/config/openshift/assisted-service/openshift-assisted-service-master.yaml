@@ -113,23 +113,42 @@ tests:
 - as: e2e-metal-assisted
   steps:
     cluster_profile: packet
-    dependencies:
-      ASSISTED_SERVICE_IMAGE: pipeline:assisted-service
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-operator
   steps:
     cluster_profile: packet
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+    workflow: baremetalds-assisted-operator
+- as: e2e-metal-assisted-operator-disconnected
+  steps:
+    cluster_profile: packet
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+      DISCONNECTED: "true"
     workflow: baremetalds-assisted-operator
 - as: e2e-metal-assisted-operator-periodic
   cron: '@daily'
   steps:
     cluster_profile: packet
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+    workflow: baremetalds-assisted-operator
+- as: e2e-metal-assisted-operator-disconnected-periodic
+  cron: '@daily'
+  steps:
+    cluster_profile: packet
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+      DISCONNECTED: "true"
     workflow: baremetalds-assisted-operator
 - as: e2e-metal-assisted-ipv6
   steps:
     cluster_profile: packet
-    dependencies:
-      ASSISTED_SERVICE_IMAGE: pipeline:assisted-service
     env:
       ASSISTED_CONFIG: |
         IPv6=yes
@@ -141,8 +160,6 @@ tests:
 - as: e2e-metal-assisted-single-node
   steps:
     cluster_profile: packet
-    dependencies:
-      ASSISTED_SERVICE_IMAGE: pipeline:assisted-service
     env:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
@@ -154,8 +171,6 @@ tests:
 - as: e2e-metal-assisted-kube-api
   steps:
     cluster_profile: packet
-    dependencies:
-      ASSISTED_SERVICE_IMAGE: pipeline:assisted-service
     env:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
@@ -188,6 +203,23 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: optional-operators-ci-aws
+- as: system-test
+  steps:
+    cluster_profile: packet
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=""
+        TEST_FUNC=test_install
+        MAKEFILE_TARGET="create_full_environment run test_parallel"
+    workflow: baremetalds-assisted-install
+- as: system-test-olm
+  steps:
+    cluster_profile: packet
+    env:
+      ASSISTED_CONFIG: |
+        TEST_FUNC=test_olm_operator
+        MAKEFILE_TARGET="create_full_environment run test_parallel"
+    workflow: baremetalds-assisted-install
 zz_generated_metadata:
   branch: master
   org: openshift
