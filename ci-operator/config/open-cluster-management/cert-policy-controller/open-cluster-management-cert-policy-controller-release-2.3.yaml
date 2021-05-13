@@ -23,6 +23,14 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cert-policy-controller
+    env:
+      IMAGE_REPO: cert-policy-controller
+      REGISTRY_ORG: open-cluster-management
+    workflow: ocm-ci-image-mirror
 - as: test-unit
   commands: make test
   container:
@@ -36,6 +44,16 @@ tests:
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
+- as: latest-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cert-policy-controller
+    env:
+      IMAGE_REPO: cert-policy-controller
+      IMAGE_TAG: latest-2.3
+      REGISTRY_ORG: open-cluster-management
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
   branch: release-2.3
   org: open-cluster-management
