@@ -52,7 +52,7 @@ packet)
     # Currently all v6 and dualstack deployments are disconnected, so we
     # have to tell openshift-tests to exclude those tests that require
     # internet access.
-    if [[ "${DS_IP_STACK}" == "v4" ]];
+    if [[ "${DS_IP_STACK}" != "v6" ]];
     then
         export TEST_PROVIDER='\{\"type\":\"baremetal\"\}'
     else
