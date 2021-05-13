@@ -323,3 +323,68 @@ kind: ServiceAccount
 metadata:
   name: loki-promtail
   namespace: loki
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: promtail-prometheus
+  namespace: loki
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - services
+  - endpoints
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: prom-scrape-loki
+  namespace: loki
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: promtail-prometheus
+subjects:
+  - kind: ServiceAccount
+    name: prometheus-k8s
+    namespace: openshift-monitoring
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: promtail
+  namespace: loki
+  labels:
+    app.kubernetes.io/name: promtail
+spec:
+  ports:
+    - name: metrics
+      protocol: TCP
+      port: 3101
+      targetPort: http-metrics
+  selector:
+    app.kubernetes.io/name: promtail
+  type: ClusterIP
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: promtail-monitor
+  namespace: openshift-monitoring
+spec:
+  endpoints:
+  - interval: 30s
+    port: metrics
+    scheme: http
+  namespaceSelector:
+    matchNames:
+      - loki
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: promtail
