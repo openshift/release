@@ -31,13 +31,16 @@ tests:
       REGISTRY_ORG: open-cluster-management
     workflow: ocm-ci-image-mirror
 - as: test-unit
-  commands: make unit-test
+  commands: |
+    make install
+    make unit-test
   container:
     from: src
 - as: sonarcloud
   commands: |
     export SELF="make -f Makefile.prow"
     make -f Makefile.prow sonar/js/jest-init
+    make install
     make unit-test
     make -f Makefile.prow sonar/js/prow
   container:
