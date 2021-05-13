@@ -1,0 +1,61 @@
+base_images:
+  base:
+    name: builder
+    namespace: open-cluster-management
+    tag: nodejs14-linux-amd64
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: open-cluster-management
+    tag: nodejs14-linux-amd64
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  to: grc-ui-api
+promotion:
+  name: "2.3"
+  namespace: open-cluster-management
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: grc-ui-api
+    env:
+      IMAGE_REPO: grc-ui-api
+      REGISTRY_ORG: open-cluster-management
+    workflow: ocm-ci-image-mirror
+- as: test-unit
+  commands: make unit-test
+  container:
+    from: src
+- as: sonarcloud
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow sonar/js/jest-init
+    make unit-test
+    make -f Makefile.prow sonar/js/prow
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+- as: latest-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: grc-ui-api
+    env:
+      IMAGE_REPO: grc-ui-api
+      IMAGE_TAG: latest
+      REGISTRY_ORG: open-cluster-management
+    workflow: ocm-ci-image-mirror
+zz_generated_metadata:
+  branch: main
+  org: open-cluster-management
+  repo: grc-ui-api
