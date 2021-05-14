@@ -1,0 +1,74 @@
+ref:
+  as: ipi-conf-ibmcloud
+  from_image:
+    namespace: origin
+    name: centos
+    tag: '8'
+  commands: ipi-conf-ibmcloud-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: CONTROL_PLANE_REPLICAS
+    default: "3"
+    documentation: |-
+      The number of control plane nodes to create for the cluster.
+
+      This variable should only be supplied in consultation with the etcd team. The
+      etcd operator has to explicitly support the specified number of control plane
+      nodes and values not documented below will result in unhealthy and/or
+      unsupportable clusters.
+
+      Valid values include:
+      * "" (default) - 3 control plane nodes. The standard for stand-alone clusters.
+      * "1" - Supportable for single-node OpenShift (SNO).
+      * "5" - Supportable only for select customers.
+
+  - name: SIZE_VARIANT
+    default: ""
+    documentation: |-
+      The size of the cluster in one of our supported t-shirt values that is standard across all CI environments.
+
+      The sizes are:
+      * "" (default) - 4 vCPU, 16GB control plane nodes, default workers
+      * "compact" - 8 vCPU, 32GB control plane nodes, no workers
+      * "large" - 16 vCPU, 64GB+ control plane nodes, default workers, suitable for clusters up to 250 nodes
+      * "xlarge" - 32 vCPU, 128GB+ control plane nodes, default workers, suitable for clusters up to 1000 nodes
+
+      These sizes are roughly consistent across all cloud providers, but we may not be able to instantiate some sizes
+      in some regions or accounts due to quota issues.
+
+  - name: COMPUTE_NODE_TYPE
+    default: "bx2-4x16"
+    documentation: |-
+      The instance type to use for compute nodes (e.g. IBM Cloud VPC
+      https://cloud.ibm.com/docs/containers?topic=containers-planning_worker_nodes#vm-table).
+      We use a 4 core worker to match the median configuration of the fleet.
+  - name: ZONES_COUNT
+    default: "3"
+    documentation: |-
+      The number of AZ's to present in the cluster. Accepted values are 1 to 3.
+  - name: BASE_DOMAIN
+    default: "origin-ci-int-ibmcloud.dev.rhcloud.com"
+    documentation: |-
+      A fully-qualified domain or subdomain name. The base domain of the cloud
+      provider is used for setting baseDomain variable of the install
+      configuration of the cluster.
+  - name: RESOURCE_GROUP
+    default: ""
+    documentation: |-
+      The Resource Group used for testing, where the cluster will be created
+      and where an existing CIS instance exists.
+  - name: CIS_INSTANCE_CRN
+    default: ""
+    documentation: |-
+      The CIS instance CRN used for the hosted domain and DNS.
+  documentation: >-
+    This step configures an install-config.yaml file to depoloy to the IBM
+    Cloud CI project.
+    An existing install-config.yaml file should already exist in the shared
+    directory.
+    The file is modified to configure the cluster to run in the IBM Cloud CI
+    project.
+    The resulting file remains in the shared directory for future consumption.
