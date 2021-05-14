@@ -30,17 +30,12 @@ tests:
       IMAGE_REPO: grc-ui-api
       REGISTRY_ORG: open-cluster-management
     workflow: ocm-ci-image-mirror
-- as: test-unit
-  commands: |
-    make install
-    make unit-test
-  container:
-    from: src
-- as: sonarcloud
+- as: lint-check-unittests-sonarcloud
   commands: |
     export SELF="make -f Makefile.prow"
-    make -f Makefile.prow sonar/js/jest-init
     make install
+    make lint
+    make -f Makefile.prow sonar/js/jest-init
     make unit-test
     make -f Makefile.prow sonar/js/prow
   container:
