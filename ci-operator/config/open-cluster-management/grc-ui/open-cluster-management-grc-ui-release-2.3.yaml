@@ -12,6 +12,8 @@ build_root:
 images:
 - dockerfile_path: Dockerfile
   to: grc-ui
+- dockerfile_path: Dockerfile.e2etest
+  to: grc-ui-tests
 promotion:
   disabled: true
   name: "2.3"
@@ -28,6 +30,14 @@ tests:
       SOURCE_IMAGE_REF: grc-ui
     env:
       IMAGE_REPO: grc-ui
+      REGISTRY_ORG: open-cluster-management
+    workflow: ocm-ci-image-mirror
+- as: pr-test-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: grc-ui-tests
+    env:
+      IMAGE_REPO: grc-ui-tests
       REGISTRY_ORG: open-cluster-management
     workflow: ocm-ci-image-mirror
 - as: lint-unittest-sonarcloud
@@ -50,6 +60,16 @@ tests:
       SOURCE_IMAGE_REF: grc-ui
     env:
       IMAGE_REPO: grc-ui
+      IMAGE_TAG: latest-2.3
+      REGISTRY_ORG: open-cluster-management
+    workflow: ocm-ci-image-mirror
+- as: latest-test-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: grc-ui-tests
+    env:
+      IMAGE_REPO: grc-ui-tests
       IMAGE_TAG: latest-2.3
       REGISTRY_ORG: open-cluster-management
     workflow: ocm-ci-image-mirror
