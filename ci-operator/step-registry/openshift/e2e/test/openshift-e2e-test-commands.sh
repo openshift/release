@@ -111,9 +111,11 @@ aws)
     ;;
 azure4) export TEST_PROVIDER=azure;;
 vsphere) export TEST_PROVIDER=vsphere;;
-openstack) export TEST_PROVIDER='{"type":"openstack"}';;
+openstack*)
+    # shellcheck disable=SC1090
+    source "${SHARED_DIR}/cinder_credentials.sh"
+    export TEST_PROVIDER='{"type":"openstack"}';;
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
-openstack-vexxhost) export TEST_PROVIDER='{"type":"openstack"}';;
 kubevirt) export TEST_PROVIDER='{"type":"kubevirt"}';;
 *) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"; exit 1;;
 esac
