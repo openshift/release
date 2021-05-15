@@ -104,46 +104,6 @@ postsubmits:
     decorate: true
     labels:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: branch-ci-open-cluster-management-grc-ui-api-release-2.3-sonar
-    spec:
-      containers:
-      - args:
-        - -c
-        - |
-          make -f Makefile.prow sonar/js/jest-init
-          make install
-          make unit-test
-          make -f Makefile.prow sonar/js/prow
-        command:
-        - /bin/bash
-        env:
-        - name: ARTIFACT_DIR
-          value: $(ARTIFACTS)
-        - name: SELF
-          value: make -f Makefile.prow
-        image: registry.ci.openshift.org/open-cluster-management/builder:nodejs14-linux
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 100m
-            memory: 200Mi
-        volumeMounts:
-        - mountPath: /etc/sonarcloud
-          name: acm-sonarcloud-token
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: acm-sonarcloud-token
-        secret:
-          secretName: acm-sonarcloud-token
-  - agent: kubernetes
-    branches:
-    - ^release-2\.3$
-    cluster: build02
-    decorate: true
-    labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: branch-ci-open-cluster-management-grc-ui-api-release-2.3-publish
     spec:
       containers:
@@ -180,3 +140,43 @@ postsubmits:
       - name: acm-cicd-github
         secret:
           secretName: acm-cicd-github
+  - agent: kubernetes
+    branches:
+    - ^release-2\.3$
+    cluster: build02
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: branch-ci-open-cluster-management-grc-ui-api-release-2.3-sonar
+    spec:
+      containers:
+      - args:
+        - -c
+        - |
+          make -f Makefile.prow sonar/js/jest-init
+          make install
+          make unit-test
+          make -f Makefile.prow sonar/js/prow
+        command:
+        - /bin/bash
+        env:
+        - name: ARTIFACT_DIR
+          value: $(ARTIFACTS)
+        - name: SELF
+          value: make -f Makefile.prow
+        image: registry.ci.openshift.org/open-cluster-management/builder:nodejs14-linux
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 100m
+            memory: 200Mi
+        volumeMounts:
+        - mountPath: /etc/sonarcloud
+          name: acm-sonarcloud-token
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: acm-sonarcloud-token
+        secret:
+          secretName: acm-sonarcloud-token
