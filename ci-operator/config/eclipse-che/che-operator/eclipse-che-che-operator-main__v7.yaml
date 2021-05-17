@@ -77,6 +77,31 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-aws
+- as: stable-to-nightly
+  steps:
+    cluster_profile: aws
+    test:
+    - as: stable-to-nightly
+      cli: latest
+      commands: |
+        echo -e "[INFO] Test script content:"
+        export GITHUB_TOKEN=$(cat /usr/local/ci-secrets/test-harness-secrets/github-token)
+        cat .ci/oci-nightly-update.sh
+
+        /bin/bash .ci/oci-nightly-update.sh
+      credentials:
+      - mount_path: /usr/local/ci-secrets/test-harness-secrets
+        name: test-harness-secrets
+        namespace: test-credentials
+      dependencies:
+      - env: CI_CHE_OPERATOR_IMAGE
+        name: che-operator-image
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
 - as: devworkspace-periodic-happy-path
   cron: 0 */24 * * *
   steps:
