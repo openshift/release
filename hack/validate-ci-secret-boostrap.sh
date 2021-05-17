@@ -15,4 +15,5 @@ exec ${BOOTSTRAP_BINARY} \
 		--vault-role=secret-bootstrap \
 		--vault-prefix=kv \
 		--config=core-services/ci-secret-bootstrap/_config.yaml \
+    --generator-config=core-services/ci-secret-generator/_config.yaml \
 		--validate-only
