@@ -11,7 +11,7 @@ base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
 cluster_domain="${cluster_name}.${base_domain}"
 
 export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
-export AWS_MAX_ATTEMPTS=7
+export AWS_MAX_ATTEMPTS=50
 export AWS_RETRY_MODE=adaptive
 export HOME=/tmp
 
@@ -25,7 +25,7 @@ then
     else
         if [ "$(python -c 'import sys;print(sys.version_info.major)')" -eq 2 ]
         then
-          easy_install --user 'pip<21' 
+          easy_install --user 'pip<21'
           pip install --user awscli
         else
           echo "$(date -u --rfc-3339=seconds) - No pip available exiting..."
