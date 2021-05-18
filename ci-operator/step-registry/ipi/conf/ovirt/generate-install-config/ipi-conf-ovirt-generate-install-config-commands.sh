@@ -53,8 +53,8 @@ platform:
     ovirt_storage_domain_id: ${OVIRT_ENGINE_STORAGE_DOMAIN_ID}
     api_vip: ${OVIRT_APIVIP}
     ingress_vip: ${OVIRT_INGRESSVIP}
-    dns_vip: ${OVIRT_DNSVIP}
     ovirt_network_name: ${OVIRT_ENGINE_NETWORK}
+    affinityGroups: []
 pullSecret: >
   ${PULL_SECRET}
 sshKey: |
