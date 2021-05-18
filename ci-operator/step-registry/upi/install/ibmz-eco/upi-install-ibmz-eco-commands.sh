@@ -11,7 +11,7 @@ export https_proxy="http://204.90.115.172:8080"
 
 ibmz_eco_cloud_auth=/var/run/secrets/openstack/clouds.yaml
 cluster_name=$(<"${SHARED_DIR}"/clustername.txt)
-installer_dir=/tmp/deploy
+installer_dir=/deploy
 cluster_dir=${installer_dir}/ocp_clusters/${cluster_name}
 
 echo "$(date -u --rfc-3339=seconds) - Copying config from shared dir..."
@@ -20,7 +20,6 @@ mkdir -p ${cluster_dir}
 cp -r /deploy/. ${installer_dir}
 cp /entrypoint.sh ${installer_dir}/
 pushd ${installer_dir}
-
 
 cp -t "${installer_dir}" \
     "${SHARED_DIR}/terraform.tfvars" \
@@ -35,9 +34,6 @@ echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 
 echo "$(date -u --rfc-3339=seconds) - Deploying cluster on IBM Z Ecosystem Cloud... OpenShift ${ocp_version}"
-# Modify /deploy path to /tmp/deploy for rootless
-sed -i "s#/deploy/#/tmp/deploy/#g" ./entrypoint.sh
-terraform init
 ./entrypoint.sh apply &
 
 set +e
