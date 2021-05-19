@@ -29,7 +29,7 @@ ocp_version=$(cat ${installer_dir}/terraform.tfvars | grep openshift_version | c
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_DEPROVISION_START"
 
 echo "$(date -u --rfc-3339=seconds) - Destroying cluster on IBM Z Ecosystem Cloud... OpenShift ${ocp_version}"
-./entrypoint.sh destroy &
+/entrypoint.sh destroy &
 
 set +e
 wait "$!"

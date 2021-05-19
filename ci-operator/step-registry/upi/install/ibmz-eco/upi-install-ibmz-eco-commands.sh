@@ -32,7 +32,7 @@ echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 
 echo "$(date -u --rfc-3339=seconds) - Deploying cluster on IBM Z Ecosystem Cloud... OpenShift ${ocp_version}"
-./entrypoint.sh apply &
+/entrypoint.sh apply &
 
 set +e
 wait "$!"
