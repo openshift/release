@@ -1520,7 +1520,7 @@ periodics:
       - /usr/bin/ci-secret-bootstrap
       env:
       - name: KUBECONFIG
-        value: /etc/build-farm-credentials/sa.config-updater.app.ci.config:/etc/build-farm-credentials/sa.config-updater.build01.config:/etc/build-farm-credentials/sa.config-updater.build02.config:/etc/build-farm-credentials/sa.config-updater.vsphere.config:/etc/build-farm-credentials/sa.config-updater.arm01.config
+        value: /etc/build-farm-credentials/sa.config-updater.app.ci.config:/etc/build-farm-credentials/sa.config-updater.build01.config:/etc/build-farm-credentials/sa.config-updater.build02.config:/etc/build-farm-credentials/sa.config-updater.vsphere.config:/etc/build-farm-credentials/sa.config-updater.arm01.config:/etc/build-farm-credentials/sa.config-updater.hive.config
       image: registry.ci.openshift.org/ci/ci-secret-bootstrap:latest
       imagePullPolicy: Always
       name: ci-secret-bootstrap
@@ -1559,6 +1559,8 @@ periodics:
           path: sa.config-updater.vsphere.config
         - key: sa.config-updater.arm01.config
           path: sa.config-updater.arm01.config
+        - key: sa.config-updater.hive.config
+          path: sa.config-updater.hive.config
         secretName: build-farm-credentials
     - emptyDir: {}
       name: config-volume
@@ -1692,6 +1694,44 @@ periodics:
       secret:
         items:
         - key: sa.config-updater.arm01.config
+          path: kubeconfig
+        secretName: build-farm-credentials
+- agent: kubernetes
+  cluster: app.ci
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  interval: 12h
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-openshift-release-master-hive-apply
+  spec:
+    containers:
+    - args:
+      - --config-dir=clusters/hive
+      - --confirm=true
+      - --as=
+      - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+      command:
+      - applyconfig
+      image: applyconfig:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/build-farm-credentials
+        name: build-farm-credentials
+        readOnly: true
+    serviceAccountName: config-updater
+    volumes:
+    - name: build-farm-credentials
+      secret:
+        items:
+        - key: sa.config-updater.hive.config
           path: kubeconfig
         secretName: build-farm-credentials
 - agent: kubernetes
