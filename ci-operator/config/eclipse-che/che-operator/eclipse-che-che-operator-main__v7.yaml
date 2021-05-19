@@ -28,7 +28,7 @@ tag_specification:
   name: "4.7"
   namespace: ocp
 tests:
-- as: olm-nightly-deployment
+- as: multi-host-nightly-deployment
   steps:
     cluster_profile: aws
     env:
@@ -37,13 +37,13 @@ tests:
       OO_PACKAGE: eclipse-che-preview-openshift
       OO_TARGET_NAMESPACES: '!install'
     test:
-    - as: olm-nightly-deployment
+    - as: multi-host-nightly-deployment
       cli: latest
       commands: |
         echo -e "[INFO] Test script content:"
-        cat .ci/oci-nightly-olm.sh
+        cat .ci/oci-multi-host.sh
 
-        /bin/bash .ci/oci-nightly-olm.sh
+        /bin/bash .ci/oci-multi-host.sh
       dependencies:
       - env: CI_CHE_OPERATOR_IMAGE
         name: che-operator-image
@@ -68,6 +68,31 @@ tests:
         echo -e "[INFO] Test script content:"
         cat .ci/oci-devworkspace-happy-path.sh
         /bin/bash .ci/oci-devworkspace-happy-path.sh
+      dependencies:
+      - env: CI_CHE_OPERATOR_IMAGE
+        name: che-operator-image
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+- as: stable-to-nightly
+  steps:
+    cluster_profile: aws
+    test:
+    - as: stable-to-nightly
+      cli: latest
+      commands: |
+        echo -e "[INFO] Test script content:"
+        export GITHUB_TOKEN=$(cat /usr/local/ci-secrets/test-harness-secrets/github-token)
+        cat .ci/oci-nightly-update.sh
+
+        /bin/bash .ci/oci-nightly-update.sh
+      credentials:
+      - mount_path: /usr/local/ci-secrets/test-harness-secrets
+        name: test-harness-secrets
+        namespace: test-credentials
       dependencies:
       - env: CI_CHE_OPERATOR_IMAGE
         name: che-operator-image

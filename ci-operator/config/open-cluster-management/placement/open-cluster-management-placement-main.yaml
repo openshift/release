@@ -6,16 +6,16 @@ base_images:
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.16
+    name: builder
+    namespace: open-cluster-management
+    tag: go1.16-linux
 images:
 - dockerfile_path: Dockerfile
   from: base
   to: placement
 promotion:
   name: "2.3"
-  namespace: placement
+  namespace: open-cluster-management
 resources:
   '*':
     limits:
@@ -45,7 +45,11 @@ tests:
     from: bin
 - as: unit
   commands: |
-    make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+    make test-unit --warn-undefined-variables
+  container:
+    from: test-bin
+- as: integration
+  commands: make test-integration
   container:
     from: test-bin
 zz_generated_metadata:
