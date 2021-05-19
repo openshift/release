@@ -18,7 +18,14 @@ chain:
       export KUBECONFIG=/var/run/hypershift/kubeconfig
       
       CLUSTER_NAME="${NAMESPACE}"
-      echo "$(date) Deleting HyperShift cluster ${HYPERSHIFT_NAMESPACE}/${CLUSTER_NAME}"
+
+      echo "$(date) Dumping cluster state to ${ARTIFACT_DIR}"
+      /usr/bin/hypershift dump cluster \
+        --namespace "${HYPERSHIFT_NAMESPACE}" \
+        --name "${CLUSTER_NAME}" \
+        --artifact-dir "${ARTIFACT_DIR}"
+
+      echo "$(date) Deleting cluster ${HYPERSHIFT_NAMESPACE}/${CLUSTER_NAME}"
       /usr/bin/hypershift destroy cluster \
         --aws-creds ${CLUSTER_PROFILE_DIR}/.awscred \
         --namespace "${HYPERSHIFT_NAMESPACE}" \
