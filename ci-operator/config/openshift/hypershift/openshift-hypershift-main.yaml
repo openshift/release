@@ -23,6 +23,12 @@ images:
 promotion:
   namespace: hypershift
   tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.8"
 resources:
   '*':
     limits:
@@ -75,7 +81,32 @@ tests:
   steps:
     cluster_profile: hypershift
     test:
-    - chain: hypershift-test-e2e-nested
+    - ref: hypershift-launch-wait-for-nodes
+    - ref: hypershift-launch-wait-for-operators
+    - as: install
+      commands: bin/hypershift install --hypershift-image "${HYPERSHIFT_RELEASE_LATEST}"
+      dependencies:
+      - env: HYPERSHIFT_RELEASE_LATEST
+        name: hypershift
+      from: bin
+      grace_period: 1m0s
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 5m0s
+    - as: test-e2e
+      commands: |-
+        bin/test-e2e \
+          -test.v \
+          -test.timeout 0 \
+          --e2e.aws-credentials-file ${CLUSTER_PROFILE_DIR}/.awscred \
+          --e2e.pull-secret-file ${CLUSTER_PROFILE_DIR}/pull-secret
+      from: test-bin
+      grace_period: 15m0s
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 40m0s
     workflow: hypershift-launch-aws
 zz_generated_metadata:
   branch: main
