@@ -144,6 +144,7 @@ FILTER=gzip queue ${ARTIFACT_DIR}/metrics/prometheus-target-metadata.json.gz oc 
 FILTER=gzip queue ${ARTIFACT_DIR}/metrics/prometheus-config.json.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${monitoring_pod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/config"
 queue ${ARTIFACT_DIR}/metrics/prometheus-tsdb-status.json oc --insecure-skip-tls-verify exec -n openshift-monitoring "${monitoring_pod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/tsdb"
 queue ${ARTIFACT_DIR}/metrics/prometheus-runtimeinfo.json oc --insecure-skip-tls-verify exec -n openshift-monitoring "${monitoring_pod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/runtimeinfo"
+queue ${ARTIFACT_DIR}/metrics/prometheus-targets.json oc --insecure-skip-tls-verify exec -n openshift-monitoring "${monitoring_pod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/targets"
 
 # Calculate metrics suitable for apples-to-apples comparison across CI runs.
 # Load whatever timestamps we can, generate the metrics script, and then send it to the
@@ -304,6 +305,10 @@ ${t_test}    cluster:version:updates:seconds count_over_time(max by (version) ((
 ${t_all}     job:duration:total:seconds vector(${s_all})
 ${t_install} job:duration:install:seconds vector(${s_install})
 ${t_test}    job:duration:test:seconds vector(${s_test})
+
+${t_all}     cluster:promtail:failed_targets   sum by (pod) (promtail_targets_failed_total{reason!="exists"})
+${t_all}     cluster:promtail:dropped_entries  sum by (pod) (promtail_dropped_entries_total)
+${t_all}     cluster:promtail:request:duration sum by (status_code) (rate(promtail_request_duration_seconds_count[${d_all}]))
 END
 
 # topk(1, max by (image, version) (max_over_time(cluster_version{type="completed"}[30m])))

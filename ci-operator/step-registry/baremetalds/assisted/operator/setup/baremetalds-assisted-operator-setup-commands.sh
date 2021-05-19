@@ -6,6 +6,11 @@ set -o pipefail
 
 echo "************ baremetalds assisted operator setup command ************"
 
+if [ "${DISCONNECTED}" = "true" ]; then
+  echo "Not yet implemented"
+  exit 0
+fi
+
 # Fetch packet basic configuration
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
