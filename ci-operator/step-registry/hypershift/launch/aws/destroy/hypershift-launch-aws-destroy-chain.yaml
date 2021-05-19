@@ -15,12 +15,18 @@ chain:
       documentation: "The namespace in which to create hosted clusters."
     commands: |-
       set -exuo pipefail
-      export KUBECONFIG=/var/run/hypershift/kubeconfig
       
-      CLUSTER_NAME="${NAMESPACE}"
       
       set +e
-      echo "$(date) Dumping cluster state to ${ARTIFACT_DIR}"
+      echo "$(date) Dumping user workload inspection to ${ARTIFACT_DIR}"
+      oc adm inspect --dest-dir ${ARTIFACT_DIR} clusteroperators,clusterversions
+      set -e
+      
+      CLUSTER_NAME="${NAMESPACE}"
+      export KUBECONFIG=/var/run/hypershift/kubeconfig
+      
+      set +e
+      echo "$(date) Dumping control plane inspection to ${ARTIFACT_DIR}"
       /usr/bin/hypershift dump cluster \
         --namespace "${HYPERSHIFT_NAMESPACE}" \
         --name "${CLUSTER_NAME}" \
