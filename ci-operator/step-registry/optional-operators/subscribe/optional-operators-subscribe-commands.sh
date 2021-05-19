@@ -13,8 +13,8 @@ REHEARSAL_INSTALL_NAMESPACE="!create"
 REHEARSAL_TARGET_NAMESPACES="!install"
 
 if [[ $JOB_NAME != rehearse-* ]]; then
-    if [[ -z $OO_INDEX ]] || [[ -z $OO_PACKAGE ]] || [[ -z $OO_CHANNEL ]]; then
-        echo "At least of required variables OO_INDEX=$OO_INDEX OO_PACKAGE=$OO_PACKAGE OO_CHANNEL=$OO_CHANNEL is unset"
+    if [[ -z ${OO_INDEX:-} ]] || [[ -z ${OO_PACKAGE:-} ]] || [[ -z ${OO_CHANNEL:-} ]]; then
+        echo "At least of required variables OO_INDEX=${OO_INDEX:-} OO_PACKAGE=${OO_PACKAGE:-} OO_CHANNEL=${OO_CHANNEL:-} is unset"
         echo "Variables are only allowed to be unset in rehearsals"
         exit 1
     fi
