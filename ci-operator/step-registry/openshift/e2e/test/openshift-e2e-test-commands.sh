@@ -6,6 +6,7 @@ set -o pipefail
 
 export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
 export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
+export IBMCLOUD_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/ibmcloud.json
 export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
 export HOME=/tmp/home
 export PATH=/usr/libexec/origin:$PATH
@@ -117,6 +118,7 @@ openstack*)
     export TEST_PROVIDER='{"type":"openstack"}';;
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
 kubevirt) export TEST_PROVIDER='{"type":"kubevirt"}';;
+ibmcloud) export TEST_PROVIDER=ibmcloud;;
 *) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"; exit 1;;
 esac
 
