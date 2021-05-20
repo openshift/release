@@ -21,7 +21,9 @@ pushd ${installer_dir}
 
 cp -t "${installer_dir}" \
     "${SHARED_DIR}/terraform.tfvars" \
-    ${ibmz_eco_cloud_auth} \
+    ${ibmz_eco_cloud_auth}
+
+cp -t "${cluster_dir}" \
     "${SHARED_DIR}/terraform.tfstate"
 
 ocp_version=$(cat ${installer_dir}/terraform.tfvars | grep openshift_version | cut -d= -f2 | sed -e 's/"//' -e 's/"$//')
