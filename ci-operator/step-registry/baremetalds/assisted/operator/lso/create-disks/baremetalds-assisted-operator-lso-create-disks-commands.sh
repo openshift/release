@@ -30,6 +30,6 @@ cd "${REPO_DIR}/deploy/operator/"
 
 echo "### Creating extra disks..."
 export DISKS=$(echo sd{b..f})
-source libvirt_disks.sh create
+./libvirt_disks.sh create
 
 EOF
