@@ -28,6 +28,8 @@ parameters:
 - name: PROXY_IMAGE
   value: registry.ci.openshift.org/origin/4.2:egress-http-proxy
 - name: USE_LEASE_CLIENT
+- name: LEASED_RESOURCE
+  required: true
 
 objects:
 
@@ -176,7 +178,7 @@ objects:
         mountPath: /tmp/artifacts
       env:
       - name: AWS_REGION
-        value: us-east-1
+        value: ${LEASED_RESOURCE}
       - name: AWS_SHARED_CREDENTIALS_FILE
         value: /tmp/cluster/.awscred
       - name: AZURE_AUTH_LOCATION
@@ -254,11 +256,11 @@ objects:
           export KUBE_SSH_USER=core
           mkdir -p ~/.ssh
           cp /tmp/cluster/ssh-privatekey ~/.ssh/google_compute_engine || true
-          export TEST_PROVIDER='{"type":"gce","region":"us-east1","multizone": true,"multimaster":true,"projectid":"openshift-gce-devel-ci"}'
+          export TEST_PROVIDER='{"type":"gce","region":"${LEASED_RESOURCE}","multizone": true,"multimaster":true,"projectid":"openshift-gce-devel-ci"}'
         elif [[ "${CLUSTER_TYPE}" == "aws" ]]; then
           mkdir -p ~/.ssh
           cp /tmp/cluster/ssh-privatekey ~/.ssh/kube_aws_rsa || true
-          export PROVIDER_ARGS="-provider=aws -gce-zone=us-east-1"
+          export PROVIDER_ARGS="-provider=aws -gce-zone=${LEASED_RESOURCE}"
           # TODO: make openshift-tests auto-discover this from cluster config
           REGION="$(oc get -o jsonpath='{.status.platformStatus.aws.region}' infrastructure cluster)"
           ZONE="$(oc get -o jsonpath='{.items[0].metadata.labels.failure-domain\.beta\.kubernetes\.io/zone}' nodes)"
@@ -314,7 +316,7 @@ objects:
       - name: AZURE_AUTH_LOCATION
         value: /etc/openshift-installer/osServicePrincipal.json
       - name: AWS_REGION
-        value: us-east-1
+        value: ${LEASED_RESOURCE}
       - name: CLUSTER_NAME
         value: ${NAMESPACE}-${JOB_NAME_HASH}
       - name: BASE_DOMAIN
@@ -322,7 +324,7 @@ objects:
       - name: GCP_PROJECT
         value: openshift-gce-devel-ci
       - name: GCP_REGION
-        value: us-east1
+        value: ${LEASED_RESOURCE}
       - name: GOOGLE_CLOUD_KEYFILE_JSON
         value: /etc/openshift-installer/gce.json
       - name: SSH_PUB_KEY_PATH
@@ -1041,6 +1043,12 @@ objects:
             Value: !GetAtt ProxyInstance.PublicIp
         EOF
         }
+
+        # ensure LEASED_RESOURCE is set
+        if [[ -z "${LEASED_RESOURCE}" ]]; then
+          echo "Failed to acquire lease"
+          exit 1
+        fi
 
         cp "$(command -v openshift-install)" /tmp
         mkdir ${ARTIFACT_DIR}/installer
@@ -2255,7 +2263,7 @@ objects:
       - name: TFVARS_PATH
         value: /etc/openshift-installer/vmc.secret.auto.tfvars
       - name: AWS_REGION
-        value: us-east-1
+        value: ${LEASED_RESOURCE}
       - name: GOOGLE_CLOUD_KEYFILE_JSON
         value: /etc/openshift-installer/gce.json
       - name: USER
