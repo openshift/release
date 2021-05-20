@@ -17,7 +17,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.7"
+      version: "4.8"
 resources:
   '*':
     limits:
@@ -26,14 +26,13 @@ resources:
       cpu: 2000m
       memory: 2Gi
 tests:
-- as: gpu-operator-e2e-162
-  cron: 0 */23 * * *
+- as: gpu-operator-e2e
   steps:
     cluster_profile: aws
     test:
-    - as: nightly
+    - as: presubmit-operatorhub
       cli: latest
-      commands: run gpu-operator test_operatorhub 1.6.2
+      commands: run gpu-operator test_operatorhub
       credentials:
       - mount_path: /var/run/psap-entitlement-secret
         name: psap-entitlement-secret
@@ -43,13 +42,19 @@ tests:
         requests:
           cpu: 2000m
           memory: 2Gi
-    workflow: ipi-aws
-- as: gpu-operator-e2e-master
-  cron: 0 */23 * * *
-  steps:
-    cluster_profile: aws
-    test:
-    - as: nightly
+    - as: presubmit-operatorhub-cleanup
+      cli: latest
+      commands: run gpu-operator undeploy_operatorhub
+      credentials:
+      - mount_path: /var/run/psap-entitlement-secret
+        name: psap-entitlement-secret
+        namespace: test-credentials
+      from: ci-artifacts
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+    - as: presubmit-master
       cli: latest
       commands: run gpu-operator test_master_branch
       credentials:
@@ -63,6 +68,7 @@ tests:
           memory: 2Gi
     workflow: ipi-aws
 zz_generated_metadata:
-  branch: release-4.7
+  branch: master
   org: openshift-psap
   repo: ci-artifacts
+  variant: "4.8"
