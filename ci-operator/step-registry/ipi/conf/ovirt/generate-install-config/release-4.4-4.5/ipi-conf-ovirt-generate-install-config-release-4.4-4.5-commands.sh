@@ -50,7 +50,7 @@ controlPlane:
 platform:
   ovirt:
     ovirt_cluster_id: ${OVIRT_ENGINE_CLUSTER_ID}
-    ovirt_storage_domain_id: ${OVIRT_ENGINE_STORAGE_DOMAIN_ID}
+    ovirt_storage_domain_id: ${OVIRT_STORAGE_DOMAIN_ID}
     api_vip: ${OVIRT_APIVIP}
     dns_vip: ${OVIRT_DNSVIP}
     ingress_vip: ${OVIRT_INGRESSVIP}
