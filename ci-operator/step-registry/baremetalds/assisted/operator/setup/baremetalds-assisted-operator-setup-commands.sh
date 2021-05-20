@@ -19,6 +19,9 @@ ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
 
 set -xeo pipefail
 
+cd /root/dev-scripts
+source common.sh
+
 REPO_DIR="/home/assisted-service"
 if [ ! -d "\${REPO_DIR}" ]; then
   mkdir -p "\${REPO_DIR}"
@@ -27,20 +30,20 @@ if [ ! -d "\${REPO_DIR}" ]; then
   tar -xzvf /root/assisted-service.tar.gz -C "\${REPO_DIR}"
 fi
 
-cd "\${REPO_DIR}/deploy/operator/"
+cd "\${REPO_DIR}"
 
-export DISCONNECTED="${DISCONNECTED}"
+export DISCONNECTED="${DISCONNECTED:-}"
 
 echo "### Setup hive..."
 
 if [ "\${DISCONNECTED}" = "true" ]; then
-  source ../../hack/setup_env.sh hive_from_upstream
+  hack/setup_env.sh hive_from_upstream
 
-  export LOCAL_REGISTRY="virthost.ostest.test.metalkube.org:5000"
-  export AUTHFILE="/root/private-mirror-ostest.json"
-  source ./setup_hive.sh from_upstream
+  export LOCAL_REGISTRY="\${LOCAL_REGISTRY_DNS_NAME}:\${LOCAL_REGISTRY_PORT}"
+  export AUTHFILE="\${REGISTRY_CREDS}"
+  deploy/operator/setup_hive.sh from_upstream
 else
-  source ./setup_hive.sh with_olm
+  deploy/operator/setup_hive.sh with_olm
 fi
 
 if [ "\${DISCONNECTED}" = "true" ]; then
@@ -50,6 +53,6 @@ fi
 
 echo "### Setup assisted installer..."
 export INDEX_IMAGE=${INDEX_IMAGE}
-source ./setup_assisted_operator.sh
+deploy/operator/setup_assisted_operator.sh
 
 EOF
