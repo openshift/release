@@ -24,6 +24,7 @@ cp -r "${original}" "${working}"
 template-deprecator --prow-jobs-dir "${base_dir}"/ci-operator/jobs \
     --prow-config-path "${base_dir}"/core-services/prow/02_config/_config.yaml \
     --plugin-config "${base_dir}"/core-services/prow/02_config/_plugins.yaml \
+    --supplemental-plugin-config-dir "${base_dir}"/core-services/prow/02_config \
     --allowlist-path "${working}"
 
 if ! diff -u "${original}" "${working}" >"${workdir}/diff"; then
