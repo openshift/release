@@ -26,7 +26,7 @@ images:
     ENV PATH="${HOME}/.cargo/bin:${HOME}/.local/bin:${PATH}"
     RUN chgrp root /opt/app-root/src/cincinnati && \
         chmod g+w /opt/app-root/src/cincinnati && \
-        dnf install -y jq python3 && \
+        dnf install -y jq python39 && \
         dnf clean all
     # build: Rust stable toolchain
     RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain 1.50.0 -y && \
@@ -44,7 +44,7 @@ images:
       paths:
       - destination_dir: .
         source_path: /go/src/github.com/openshift/cincinnati
-  to: src-base
+  to: src-rust
 - dockerfile_path: dist/Dockerfile.rust-toolset/Dockerfile
   inputs:
     ubi:
@@ -100,7 +100,7 @@ tests:
         name: CINCINNATI_CI_DOCKERJSON_FILE
       - default: public-ci-image-sa-dockerjson
         name: CINCINNATI_CI_PUBLIC_DOCKERJSON_FILE
-      from: src-base
+      from: src-rust
       resources:
         requests:
           cpu: 100m
@@ -122,7 +122,7 @@ tests:
         name: CINCINNATI_TEST_QUAY_API_TOKEN_PATH
       - default: /usr/local/ci-secrets/cincy-credentials/github_token.key
         name: CINCINNATI_GITHUB_SCRAPER_OAUTH_TOKEN_PATH
-      from: src-base
+      from: src-rust
       resources:
         requests:
           cpu: 100m
@@ -130,15 +130,15 @@ tests:
 - as: yaml-lint
   commands: dist/prow_yaml_lint.sh
   container:
-    from: src-base
+    from: src-rust
 - as: rustfmt-1.50.0
   commands: dist/prow_rustfmt.sh 1.50.0
   container:
-    from: src-base
+    from: src-rust
 - as: rustfmt-1.46.0
   commands: dist/prow_rustfmt.sh 1.46.0
   container:
-    from: src-base
+    from: src-rust
 - as: e2e
   steps:
     cluster_profile: aws
