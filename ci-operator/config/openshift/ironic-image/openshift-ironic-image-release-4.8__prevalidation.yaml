@@ -14,16 +14,27 @@ build_root:
     tag: golang-1.15
 images:
 - dockerfile_path: Dockerfile.ocp
-  from: ocp_builder_rhel-8-base-openshift-4.8
+  from: base
   inputs:
-    ocp_builder_rhel-8-base-openshift-4.8:
+    base:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-base-openshift-4.8
   to: ironic
-promotion:
-  disabled: true
-  name: "4.8"
-  namespace: ocp
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      cat <<EOF> /etc/yum.repos.d/base-4-8-rhel-8-ironic-prevalidation.repo
+      [rhel-8-ironic-prevalidation-ocp48]
+      id = rhel-8-ironic-prevalidation-ocp48
+      name = rhel-8-ironic-prevalidation-ocp48
+      baseurl = http://base-4-8-rhel-8-ironic-prevalidation.ocp.svc/rhel-8-ironic-prevalidation-ocp48
+      enabled = 1
+      gpgcheck = 0
+      priority = 1
+      skip_if_unavailable=FALSE
+      EOF
+    from: ocp_builder_rhel-8-base-openshift-4.8
+    to: base
 resources:
   '*':
     requests:
@@ -33,7 +44,7 @@ tag_specification:
   name: "4.8"
   namespace: ocp
 tests:
-- as: e2e-metal-ipi
+- as: e2e-metal-ipi-prevalidation
   steps:
     cluster_profile: packet
     env:
@@ -41,7 +52,7 @@ tests:
         IP_STACK=v4
         NETWORK_TYPE=OpenShiftSDN
     workflow: baremetalds-e2e
-- as: e2e-metal-ipi-virtualmedia
+- as: e2e-metal-ipi-virtualmedia-prevalidation
   steps:
     cluster_profile: packet
     workflow: baremetalds-e2e-virtualmedia
@@ -49,3 +60,4 @@ zz_generated_metadata:
   branch: release-4.8
   org: openshift
   repo: ironic-image
+  variant: prevalidation
