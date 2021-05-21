@@ -3,6 +3,10 @@ base_images:
     name: "4.8"
     namespace: ocp
     tag: base
+  iks:
+    name: ibm-roks-toolkit-testing
+    namespace: ci
+    tag: v4.6
 binary_build_commands: make build
 build_root:
   image_stream_tag:
@@ -18,6 +22,9 @@ images:
 - dockerfile_path: Dockerfile.metrics
   from: base
   to: metrics
+- dockerfile_path: DockerCITest
+  from: iks
+  to: iks-deploy
 promotion:
   name: ibm-roks-4.6
   namespace: hypershift-toolkit
@@ -34,6 +41,13 @@ tests:
   commands: make verify
   container:
     from: src
+- as: create-cluster
+  commands: export ARTIFACTS_DIR="${ARTIFACT_DIR}" && ./deploy_ci.sh
+  container:
+    from: iks-deploy
+  secret:
+    mount_path: /usr/ibm-gate-test-secrets/
+    name: ibm-gate-test-secrets
 - as: unit
   commands: make test
   container:

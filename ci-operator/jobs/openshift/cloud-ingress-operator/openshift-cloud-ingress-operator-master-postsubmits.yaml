@@ -5,19 +5,18 @@ postsubmits:
     - ^master$
     cluster: build02
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: branch-ci-openshift-cloud-ingress-operator-master-coverage
+      ci-operator.openshift.io/prowgen-controlled: "true"
+    max_concurrency: 1
+    name: branch-ci-openshift-cloud-ingress-operator-master-publish-coverage
     spec:
       containers:
       - args:
-        - --give-pr-author-access-to-namespace=true
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --secret-dir=/secrets/cloud-ingress-operator-codecov-token
-        - --target=coverage
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/cloud-ingress-operator-codecov-token
+        - --target=publish-coverage
         command:
         - ci-operator
         image: ci-operator:latest
@@ -30,11 +29,14 @@ postsubmits:
         - mountPath: /secrets/cloud-ingress-operator-codecov-token
           name: cloud-ingress-operator-codecov-token
           readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
+        - mountPath: /etc/report
+          name: result-aggregator
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
@@ -44,3 +46,6 @@ postsubmits:
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator

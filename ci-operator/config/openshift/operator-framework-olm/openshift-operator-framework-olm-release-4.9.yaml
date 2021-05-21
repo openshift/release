@@ -1,0 +1,97 @@
+base_images:
+  base:
+    name: "4.9"
+    namespace: ocp
+    tag: base
+  ocp_builder_rhel-8-golang-1.15-openshift-4.8:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.8
+  ocp_builder_rhel-8-golang-1.16-openshift-4.8:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.16-openshift-4.8
+build_root:
+  project_image:
+    context_dir: .
+    dockerfile_path: base.Dockerfile
+images:
+- dockerfile_path: operator-lifecycle-manager.Dockerfile
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.8:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
+  to: operator-lifecycle-manager
+- dockerfile_path: operator-registry.Dockerfile
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.8:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
+  to: operator-registry
+promotion:
+  name: "4.9"
+  namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.9"
+  namespace: ocp
+tests:
+- as: verify
+  commands: |
+    make vendor && git diff --stat HEAD --ignore-submodules --exit-code
+  container:
+    from: src
+- as: e2e-gcp
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp
+- as: unit-olm
+  commands: make unit/olm
+  container:
+    from: src
+- as: unit-registry
+  commands: make unit/registry
+  container:
+    from: src
+- as: unit-api
+  commands: make unit/api
+  container:
+    from: src
+- as: e2e-aws-olm
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIRECTORY=${ARTIFACT_DIR} make e2e/olm
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-console-olm
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: ./test-prow-e2e.sh olmFull
+      from: stable:console-tests
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-upgrade
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-upgrade-azure
+zz_generated_metadata:
+  branch: release-4.9
+  org: openshift
+  repo: operator-framework-olm

@@ -15,6 +15,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.15-openshift-4.8
+  ocp_builder_rhel-8-golang-1.16-openshift-4.8:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.16-openshift-4.8
   ocp_builder_rhel-8-golang-openshift-4.6:
     name: builder
     namespace: ocp
@@ -37,9 +41,9 @@ images:
 - dockerfile_path: Dockerfile
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.15-openshift-4.8:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.8:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
   to: cluster-monitoring-operator
 promotion:
   name: 4.8-priv
@@ -57,6 +61,14 @@ tests:
   commands: make generate --always-make && git diff --exit-code
   container:
     from: src
+- as: jsonnet-fmt
+  commands: make jsonnet-fmt --always-make && git diff --exit-code
+  container:
+    from: src
+- as: rules
+  commands: make test-rules
+  container:
+    from: src
 - as: vendor
   commands: make vendor && git diff --exit-code
   container:
@@ -67,11 +79,15 @@ tests:
     from: src
 - as: e2e-agnostic
   steps:
-    cluster_profile: gcp
-    workflow: openshift-e2e-gcp
-- as: e2e-agnostic-operator
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure
+- as: e2e-aws-single-node
   steps:
     cluster_profile: aws
+    workflow: openshift-e2e-aws-single-node
+- as: e2e-agnostic-operator
+  steps:
+    cluster_profile: azure4
     test:
     - as: test
       cli: latest
@@ -80,11 +96,11 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    workflow: ipi-azure
 - as: e2e-agnostic-upgrade
   steps:
-    cluster_profile: gcp
-    workflow: openshift-upgrade-gcp
+    cluster_profile: azure4
+    workflow: openshift-upgrade-azure
 zz_generated_metadata:
   branch: master
   org: openshift-priv

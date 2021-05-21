@@ -1,0 +1,44 @@
+releases:
+  initial:
+    release:
+      channel: stable
+      version: "4.6"
+  intermediate:
+    release:
+      channel: stable
+      version: "4.7"
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.8"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws-upgrade
+  interval: 48h
+  steps:
+    cluster_profile: aws
+    env:
+      TEST_UPGRADE_OPTIONS: ""
+    test:
+    - as: set-releases-release
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_LATEST}" > ${SHARED_DIR}/override-upgrade
+      dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE
+        name: release:intermediate
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: openshift-e2e-test
+    workflow: openshift-upgrade-aws
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: release
+  variant: ci-4.8-upgrade-from-from-stable-4.7-from-stable-4.6

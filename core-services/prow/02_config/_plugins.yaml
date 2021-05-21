@@ -91,6 +91,9 @@ approve:
   ignore_review_state: true
   repos:
   - shipwright-io/build
+  - shipwright-io/cli
+  - shipwright-io/community
+  - shipwright-io/operator
   - shipwright-io/website
   require_self_approval: true
 - commandHelpLink: https://go.k8s.io/bot-commands
@@ -121,17 +124,6 @@ approve:
   lgtm_acts_as_approve: true
   repos:
   - openshift-knative
-  require_self_approval: false
-- commandHelpLink: https://go.k8s.io/bot-commands
-  lgtm_acts_as_approve: true
-  repos:
-  - coreos/coreos-assembler
-  require_self_approval: false
-- commandHelpLink: https://go.k8s.io/bot-commands
-  lgtm_acts_as_approve: true
-  repos:
-  - coreos/bootupd
-  - coreos/rpm-ostree
   require_self_approval: false
 - commandHelpLink: https://go.k8s.io/bot-commands
   lgtm_acts_as_approve: true
@@ -179,6 +171,14 @@ approve:
 - commandHelpLink: https://go.k8s.io/bot-commands
   repos:
   - openshift-kni/cnf-features-deploy
+  require_self_approval: false
+- commandHelpLink: ""
+  repos:
+  - openshift-kni/node-label-operator
+  require_self_approval: false
+- commandHelpLink: ""
+  repos:
+  - openshift-kni/poison-pill
   require_self_approval: false
 - commandHelpLink: https://go.k8s.io/bot-commands
   repos:
@@ -238,10 +238,6 @@ approve:
   require_self_approval: false
 - commandHelpLink: https://go.k8s.io/bot-commands
   repos:
-  - eclipse/che-operator
-  require_self_approval: false
-- commandHelpLink: https://go.k8s.io/bot-commands
-  repos:
   - devfile
   require_self_approval: false
 - commandHelpLink: https://go.k8s.io/bot-commands
@@ -275,10 +271,6 @@ approve:
   - che-incubator/che-test-harness
 - commandHelpLink: https://go.k8s.io/bot-commands
   repos:
-  - kata-containers/runtime
-  require_self_approval: false
-- commandHelpLink: https://go.k8s.io/bot-commands
-  repos:
   - openshift-priv/csi-driver-projected-resource
   - openshift/csi-driver-projected-resource
   require_self_approval: false
@@ -303,6 +295,21 @@ approve:
   repos:
   - operator-framework/operator-lib
   require_self_approval: true
+- commandHelpLink: https://go.k8s.io/bot-commands
+  ignore_review_state: true
+  repos:
+  - operator-framework/api
+  require_self_approval: false
+- commandHelpLink: https://go.k8s.io/bot-commands
+  ignore_review_state: true
+  repos:
+  - operator-framework/kubectl-operator
+  require_self_approval: false
+- commandHelpLink: https://go.k8s.io/bot-commands
+  ignore_review_state: true
+  repos:
+  - operator-framework/olm-docs
+  require_self_approval: false
 - commandHelpLink: ""
   repos:
   - openshift-priv/cluster-baremetal-operator
@@ -410,11 +417,66 @@ approve:
   require_self_approval: false
 - commandHelpLink: https://go.k8s.io/bot-commands
   repos:
+  - openshift-priv/operator-framework-olm
   - openshift/operator-framework-olm
   require_self_approval: false
 - commandHelpLink: ""
   repos:
   - openshift/oc-compliance
+- commandHelpLink: ""
+  repos:
+  - openshift/ceph-csi
+  require_self_approval: false
+- commandHelpLink: ""
+  repos:
+  - eclipse-che/che-operator
+  require_self_approval: false
+- commandHelpLink: ""
+  repos:
+  - openshift-priv/driver-toolkit
+  - openshift/driver-toolkit
+  require_self_approval: false
+- commandHelpLink: ""
+  repos:
+  - openshift-priv/vmware-vsphere-csi-driver-operator
+  - openshift/vmware-vsphere-csi-driver-operator
+  require_self_approval: false
+- commandHelpLink: ""
+  repos:
+  - openshift-priv/vmware-vsphere-csi-driver
+  - openshift/vmware-vsphere-csi-driver
+  require_self_approval: false
+- commandHelpLink: ""
+  repos:
+  - konveyor/mig-operator
+  - openshift/openshift-restclient-python
+  require_self_approval: false
+- commandHelpLink: ""
+  repos:
+  - eclipse-che/che-plugin-registry
+  require_self_approval: false
+- commandHelpLink: ""
+  repos:
+  - openshift/eventrouter
+  require_self_approval: false
+- commandHelpLink: ""
+  repos:
+  - openshift/addon-operator
+  - openshift/reference-addon
+  require_self_approval: false
+- commandHelpLink: ""
+  repos:
+  - medik8s/node-healthcheck-operator
+  require_self_approval: false
+- commandHelpLink: ""
+  repos:
+  - openshift-priv/ironic-agent-image
+  - openshift/ironic-agent-image
+  require_self_approval: false
+- commandHelpLink: ""
+  repos:
+  - openshift-priv/cloud-provider-azure
+  - openshift/cloud-provider-azure
   require_self_approval: false
 blunderbuss:
   max_request_count: 2
@@ -431,6 +493,8 @@ bugzilla:
       - status: VERIFIED
       - status: RELEASE_PENDING
       - resolution: ERRATA
+        status: CLOSED
+      - resolution: CURRENTRELEASE
         status: CLOSED
       is_open: true
       state_after_close:
@@ -610,6 +674,335 @@ bugzilla:
   orgs:
     openshift:
       repos:
+        ceph-csi:
+          branches:
+            '*':
+              add_external_link: true
+              allowed_groups:
+              - redhat
+              - qe_staff
+              exclude_defaults: true
+              is_open: true
+              state_after_close:
+                status: NEW
+              state_after_merge:
+                status: MODIFIED
+              state_after_validation:
+                status: POST
+              valid_states:
+              - status: NEW
+              - status: ASSIGNED
+              - status: ON_DEV
+              - status: POST
+            master:
+              exclude_defaults: true
+              target_release: OCS 4.8.0
+            release-4.6:
+              target_release: OCS 4.6.0
+              validate_by_default: true
+            release-4.7:
+              target_release: OCS 4.7.0
+              validate_by_default: true
+            release-4.8:
+              target_release: OCS 4.8.0
+              validate_by_default: false
+        cluster-logging-operator:
+          branches:
+            '*':
+              add_external_link: true
+              allowed_groups:
+              - redhat
+              - qe_staff
+              dependent_bug_states:
+              - status: VERIFIED
+              - status: RELEASE_PENDING
+              - resolution: ERRATA
+                status: CLOSED
+              - resolution: CURRENTRELEASE
+                status: CLOSED
+              is_open: true
+              state_after_close:
+                status: NEW
+              state_after_merge:
+                status: MODIFIED
+              state_after_validation:
+                status: POST
+              valid_states:
+              - status: NEW
+              - status: ASSIGNED
+              - status: ON_DEV
+              - status: POST
+            master:
+              add_external_link: true
+              allowed_groups:
+              - redhat
+              - qe_staff
+              exclude_defaults: true
+              is_open: true
+              state_after_close:
+                status: NEW
+              state_after_merge:
+                status: MODIFIED
+              state_after_validation:
+                status: POST
+              target_release: 4.8.0
+              valid_states:
+              - status: NEW
+              - status: ASSIGNED
+              - status: ON_DEV
+              - status: POST
+            release-3.11:
+              add_external_link: true
+              allowed_groups:
+              - redhat
+              - qe_staff
+              exclude_defaults: true
+              is_open: true
+              state_after_close:
+                status: NEW
+              state_after_merge:
+                status: MODIFIED
+              state_after_validation:
+                status: POST
+              target_release: 3.11.z
+              valid_states:
+              - status: NEW
+              - status: ASSIGNED
+              - status: ON_DEV
+              - status: POST
+              validate_by_default: true
+            release-4.1:
+              dependent_bug_target_releases:
+              - 4.2.0
+              - 4.2.z
+              target_release: 4.1.z
+              validate_by_default: true
+            release-4.2:
+              dependent_bug_target_releases:
+              - 4.3.0
+              - 4.3.z
+              target_release: 4.2.z
+              validate_by_default: true
+            release-4.3:
+              dependent_bug_target_releases:
+              - 4.4.0
+              - 4.4.z
+              target_release: 4.3.z
+              validate_by_default: true
+            release-4.4:
+              dependent_bug_target_releases:
+              - 4.5.0
+              - 4.5.z
+              target_release: 4.4.z
+              validate_by_default: true
+            release-4.5:
+              dependent_bug_target_releases:
+              - 4.6.0
+              - 4.6.z
+              target_release: 4.5.z
+              validate_by_default: true
+            release-4.6:
+              exclude_defaults: true
+              target_release: 4.6.z
+              validate_by_default: true
+        elasticsearch-operator:
+          branches:
+            '*':
+              add_external_link: true
+              allowed_groups:
+              - redhat
+              - qe_staff
+              dependent_bug_states:
+              - status: VERIFIED
+              - status: RELEASE_PENDING
+              - resolution: ERRATA
+                status: CLOSED
+              - resolution: CURRENTRELEASE
+                status: CLOSED
+              is_open: true
+              state_after_close:
+                status: NEW
+              state_after_merge:
+                status: MODIFIED
+              state_after_validation:
+                status: POST
+              valid_states:
+              - status: NEW
+              - status: ASSIGNED
+              - status: ON_DEV
+              - status: POST
+            master:
+              add_external_link: true
+              allowed_groups:
+              - redhat
+              - qe_staff
+              exclude_defaults: true
+              is_open: true
+              state_after_close:
+                status: NEW
+              state_after_merge:
+                status: MODIFIED
+              state_after_validation:
+                status: POST
+              target_release: 4.8.0
+              valid_states:
+              - status: NEW
+              - status: ASSIGNED
+              - status: ON_DEV
+              - status: POST
+            release-3.11:
+              add_external_link: true
+              allowed_groups:
+              - redhat
+              - qe_staff
+              exclude_defaults: true
+              is_open: true
+              state_after_close:
+                status: NEW
+              state_after_merge:
+                status: MODIFIED
+              state_after_validation:
+                status: POST
+              target_release: 3.11.z
+              valid_states:
+              - status: NEW
+              - status: ASSIGNED
+              - status: ON_DEV
+              - status: POST
+              validate_by_default: true
+            release-4.1:
+              dependent_bug_target_releases:
+              - 4.2.0
+              - 4.2.z
+              target_release: 4.1.z
+              validate_by_default: true
+            release-4.2:
+              dependent_bug_target_releases:
+              - 4.3.0
+              - 4.3.z
+              target_release: 4.2.z
+              validate_by_default: true
+            release-4.3:
+              dependent_bug_target_releases:
+              - 4.4.0
+              - 4.4.z
+              target_release: 4.3.z
+              validate_by_default: true
+            release-4.4:
+              dependent_bug_target_releases:
+              - 4.5.0
+              - 4.5.z
+              target_release: 4.4.z
+              validate_by_default: true
+            release-4.5:
+              dependent_bug_target_releases:
+              - 4.6.0
+              - 4.6.z
+              target_release: 4.5.z
+              validate_by_default: true
+            release-4.6:
+              exclude_defaults: true
+              target_release: 4.6.z
+              validate_by_default: true
+        elasticsearch-proxy:
+          branches:
+            '*':
+              add_external_link: true
+              allowed_groups:
+              - redhat
+              - qe_staff
+              dependent_bug_states:
+              - status: VERIFIED
+              - status: RELEASE_PENDING
+              - resolution: ERRATA
+                status: CLOSED
+              - resolution: CURRENTRELEASE
+                status: CLOSED
+              is_open: true
+              state_after_close:
+                status: NEW
+              state_after_merge:
+                status: MODIFIED
+              state_after_validation:
+                status: POST
+              valid_states:
+              - status: NEW
+              - status: ASSIGNED
+              - status: ON_DEV
+              - status: POST
+            master:
+              add_external_link: true
+              allowed_groups:
+              - redhat
+              - qe_staff
+              exclude_defaults: true
+              is_open: true
+              state_after_close:
+                status: NEW
+              state_after_merge:
+                status: MODIFIED
+              state_after_validation:
+                status: POST
+              target_release: 4.8.0
+              valid_states:
+              - status: NEW
+              - status: ASSIGNED
+              - status: ON_DEV
+              - status: POST
+            release-3.11:
+              add_external_link: true
+              allowed_groups:
+              - redhat
+              - qe_staff
+              exclude_defaults: true
+              is_open: true
+              state_after_close:
+                status: NEW
+              state_after_merge:
+                status: MODIFIED
+              state_after_validation:
+                status: POST
+              target_release: 3.11.z
+              valid_states:
+              - status: NEW
+              - status: ASSIGNED
+              - status: ON_DEV
+              - status: POST
+              validate_by_default: true
+            release-4.1:
+              dependent_bug_target_releases:
+              - 4.2.0
+              - 4.2.z
+              target_release: 4.1.z
+              validate_by_default: true
+            release-4.2:
+              dependent_bug_target_releases:
+              - 4.3.0
+              - 4.3.z
+              target_release: 4.2.z
+              validate_by_default: true
+            release-4.3:
+              dependent_bug_target_releases:
+              - 4.4.0
+              - 4.4.z
+              target_release: 4.3.z
+              validate_by_default: true
+            release-4.4:
+              dependent_bug_target_releases:
+              - 4.5.0
+              - 4.5.z
+              target_release: 4.4.z
+              validate_by_default: true
+            release-4.5:
+              dependent_bug_target_releases:
+              - 4.6.0
+              - 4.6.z
+              target_release: 4.5.z
+              validate_by_default: true
+            release-4.6:
+              exclude_defaults: true
+              target_release: 4.6.z
+              validate_by_default: true
         ocs-operator:
           branches:
             '*':
@@ -669,8 +1062,404 @@ bugzilla:
               - redhat
               - qe_staff
               validate_by_default: false
+        origin-aggregated-logging:
+          branches:
+            '*':
+              add_external_link: true
+              allowed_groups:
+              - redhat
+              - qe_staff
+              dependent_bug_states:
+              - status: VERIFIED
+              - status: RELEASE_PENDING
+              - resolution: ERRATA
+                status: CLOSED
+              - resolution: CURRENTRELEASE
+                status: CLOSED
+              is_open: true
+              state_after_close:
+                status: NEW
+              state_after_merge:
+                status: MODIFIED
+              state_after_validation:
+                status: POST
+              valid_states:
+              - status: NEW
+              - status: ASSIGNED
+              - status: ON_DEV
+              - status: POST
+            master:
+              add_external_link: true
+              allowed_groups:
+              - redhat
+              - qe_staff
+              exclude_defaults: true
+              is_open: true
+              state_after_close:
+                status: NEW
+              state_after_merge:
+                status: MODIFIED
+              state_after_validation:
+                status: POST
+              target_release: 4.8.0
+              valid_states:
+              - status: NEW
+              - status: ASSIGNED
+              - status: ON_DEV
+              - status: POST
+            release-3.11:
+              add_external_link: true
+              allowed_groups:
+              - redhat
+              - qe_staff
+              exclude_defaults: true
+              is_open: true
+              state_after_close:
+                status: NEW
+              state_after_merge:
+                status: MODIFIED
+              state_after_validation:
+                status: POST
+              target_release: 3.11.z
+              valid_states:
+              - status: NEW
+              - status: ASSIGNED
+              - status: ON_DEV
+              - status: POST
+              validate_by_default: true
+            release-4.1:
+              dependent_bug_target_releases:
+              - 4.2.0
+              - 4.2.z
+              target_release: 4.1.z
+              validate_by_default: true
+            release-4.2:
+              dependent_bug_target_releases:
+              - 4.3.0
+              - 4.3.z
+              target_release: 4.2.z
+              validate_by_default: true
+            release-4.3:
+              dependent_bug_target_releases:
+              - 4.4.0
+              - 4.4.z
+              target_release: 4.3.z
+              validate_by_default: true
+            release-4.4:
+              dependent_bug_target_releases:
+              - 4.5.0
+              - 4.5.z
+              target_release: 4.4.z
+              validate_by_default: true
+            release-4.5:
+              dependent_bug_target_releases:
+              - 4.6.0
+              - 4.6.z
+              target_release: 4.5.z
+              validate_by_default: true
+            release-4.6:
+              exclude_defaults: true
+              target_release: 4.6.z
+              validate_by_default: true
     openshift-priv:
       repos:
+        cluster-logging-operator:
+          branches:
+            '*':
+              add_external_link: true
+              allowed_groups:
+              - redhat
+              - qe_staff
+              dependent_bug_states:
+              - status: VERIFIED
+              - status: RELEASE_PENDING
+              - resolution: ERRATA
+                status: CLOSED
+              - resolution: CURRENTRELEASE
+                status: CLOSED
+              is_open: true
+              state_after_close:
+                status: NEW
+              state_after_merge:
+                status: MODIFIED
+              state_after_validation:
+                status: POST
+              valid_states:
+              - status: NEW
+              - status: ASSIGNED
+              - status: ON_DEV
+              - status: POST
+            master:
+              add_external_link: true
+              allowed_groups:
+              - redhat
+              - qe_staff
+              exclude_defaults: true
+              is_open: true
+              state_after_close:
+                status: NEW
+              state_after_merge:
+                status: MODIFIED
+              state_after_validation:
+                status: POST
+              target_release: 4.8.0
+              valid_states:
+              - status: NEW
+              - status: ASSIGNED
+              - status: ON_DEV
+              - status: POST
+            release-3.11:
+              add_external_link: true
+              allowed_groups:
+              - redhat
+              - qe_staff
+              exclude_defaults: true
+              is_open: true
+              state_after_close:
+                status: NEW
+              state_after_merge:
+                status: MODIFIED
+              state_after_validation:
+                status: POST
+              target_release: 3.11.z
+              valid_states:
+              - status: NEW
+              - status: ASSIGNED
+              - status: ON_DEV
+              - status: POST
+              validate_by_default: true
+            release-4.1:
+              dependent_bug_target_releases:
+              - 4.2.0
+              - 4.2.z
+              target_release: 4.1.z
+              validate_by_default: true
+            release-4.2:
+              dependent_bug_target_releases:
+              - 4.3.0
+              - 4.3.z
+              target_release: 4.2.z
+              validate_by_default: true
+            release-4.3:
+              dependent_bug_target_releases:
+              - 4.4.0
+              - 4.4.z
+              target_release: 4.3.z
+              validate_by_default: true
+            release-4.4:
+              dependent_bug_target_releases:
+              - 4.5.0
+              - 4.5.z
+              target_release: 4.4.z
+              validate_by_default: true
+            release-4.5:
+              dependent_bug_target_releases:
+              - 4.6.0
+              - 4.6.z
+              target_release: 4.5.z
+              validate_by_default: true
+            release-4.6:
+              exclude_defaults: true
+              target_release: 4.6.z
+              validate_by_default: true
+        elasticsearch-operator:
+          branches:
+            '*':
+              add_external_link: true
+              allowed_groups:
+              - redhat
+              - qe_staff
+              dependent_bug_states:
+              - status: VERIFIED
+              - status: RELEASE_PENDING
+              - resolution: ERRATA
+                status: CLOSED
+              - resolution: CURRENTRELEASE
+                status: CLOSED
+              is_open: true
+              state_after_close:
+                status: NEW
+              state_after_merge:
+                status: MODIFIED
+              state_after_validation:
+                status: POST
+              valid_states:
+              - status: NEW
+              - status: ASSIGNED
+              - status: ON_DEV
+              - status: POST
+            master:
+              add_external_link: true
+              allowed_groups:
+              - redhat
+              - qe_staff
+              exclude_defaults: true
+              is_open: true
+              state_after_close:
+                status: NEW
+              state_after_merge:
+                status: MODIFIED
+              state_after_validation:
+                status: POST
+              target_release: 4.8.0
+              valid_states:
+              - status: NEW
+              - status: ASSIGNED
+              - status: ON_DEV
+              - status: POST
+            release-3.11:
+              add_external_link: true
+              allowed_groups:
+              - redhat
+              - qe_staff
+              exclude_defaults: true
+              is_open: true
+              state_after_close:
+                status: NEW
+              state_after_merge:
+                status: MODIFIED
+              state_after_validation:
+                status: POST
+              target_release: 3.11.z
+              valid_states:
+              - status: NEW
+              - status: ASSIGNED
+              - status: ON_DEV
+              - status: POST
+              validate_by_default: true
+            release-4.1:
+              dependent_bug_target_releases:
+              - 4.2.0
+              - 4.2.z
+              target_release: 4.1.z
+              validate_by_default: true
+            release-4.2:
+              dependent_bug_target_releases:
+              - 4.3.0
+              - 4.3.z
+              target_release: 4.2.z
+              validate_by_default: true
+            release-4.3:
+              dependent_bug_target_releases:
+              - 4.4.0
+              - 4.4.z
+              target_release: 4.3.z
+              validate_by_default: true
+            release-4.4:
+              dependent_bug_target_releases:
+              - 4.5.0
+              - 4.5.z
+              target_release: 4.4.z
+              validate_by_default: true
+            release-4.5:
+              dependent_bug_target_releases:
+              - 4.6.0
+              - 4.6.z
+              target_release: 4.5.z
+              validate_by_default: true
+            release-4.6:
+              exclude_defaults: true
+              target_release: 4.6.z
+              validate_by_default: true
+        elasticsearch-proxy:
+          branches:
+            '*':
+              add_external_link: true
+              allowed_groups:
+              - redhat
+              - qe_staff
+              dependent_bug_states:
+              - status: VERIFIED
+              - status: RELEASE_PENDING
+              - resolution: ERRATA
+                status: CLOSED
+              - resolution: CURRENTRELEASE
+                status: CLOSED
+              is_open: true
+              state_after_close:
+                status: NEW
+              state_after_merge:
+                status: MODIFIED
+              state_after_validation:
+                status: POST
+              valid_states:
+              - status: NEW
+              - status: ASSIGNED
+              - status: ON_DEV
+              - status: POST
+            master:
+              add_external_link: true
+              allowed_groups:
+              - redhat
+              - qe_staff
+              exclude_defaults: true
+              is_open: true
+              state_after_close:
+                status: NEW
+              state_after_merge:
+                status: MODIFIED
+              state_after_validation:
+                status: POST
+              target_release: 4.8.0
+              valid_states:
+              - status: NEW
+              - status: ASSIGNED
+              - status: ON_DEV
+              - status: POST
+            release-3.11:
+              add_external_link: true
+              allowed_groups:
+              - redhat
+              - qe_staff
+              exclude_defaults: true
+              is_open: true
+              state_after_close:
+                status: NEW
+              state_after_merge:
+                status: MODIFIED
+              state_after_validation:
+                status: POST
+              target_release: 3.11.z
+              valid_states:
+              - status: NEW
+              - status: ASSIGNED
+              - status: ON_DEV
+              - status: POST
+              validate_by_default: true
+            release-4.1:
+              dependent_bug_target_releases:
+              - 4.2.0
+              - 4.2.z
+              target_release: 4.1.z
+              validate_by_default: true
+            release-4.2:
+              dependent_bug_target_releases:
+              - 4.3.0
+              - 4.3.z
+              target_release: 4.2.z
+              validate_by_default: true
+            release-4.3:
+              dependent_bug_target_releases:
+              - 4.4.0
+              - 4.4.z
+              target_release: 4.3.z
+              validate_by_default: true
+            release-4.4:
+              dependent_bug_target_releases:
+              - 4.5.0
+              - 4.5.z
+              target_release: 4.4.z
+              validate_by_default: true
+            release-4.5:
+              dependent_bug_target_releases:
+              - 4.6.0
+              - 4.6.z
+              target_release: 4.5.z
+              validate_by_default: true
+            release-4.6:
+              exclude_defaults: true
+              target_release: 4.6.z
+              validate_by_default: true
         ocs-operator:
           branches:
             '*':
@@ -730,10 +1519,110 @@ bugzilla:
               - redhat
               - qe_staff
               validate_by_default: false
+        origin-aggregated-logging:
+          branches:
+            '*':
+              add_external_link: true
+              allowed_groups:
+              - redhat
+              - qe_staff
+              dependent_bug_states:
+              - status: VERIFIED
+              - status: RELEASE_PENDING
+              - resolution: ERRATA
+                status: CLOSED
+              - resolution: CURRENTRELEASE
+                status: CLOSED
+              is_open: true
+              state_after_close:
+                status: NEW
+              state_after_merge:
+                status: MODIFIED
+              state_after_validation:
+                status: POST
+              valid_states:
+              - status: NEW
+              - status: ASSIGNED
+              - status: ON_DEV
+              - status: POST
+            master:
+              add_external_link: true
+              allowed_groups:
+              - redhat
+              - qe_staff
+              exclude_defaults: true
+              is_open: true
+              state_after_close:
+                status: NEW
+              state_after_merge:
+                status: MODIFIED
+              state_after_validation:
+                status: POST
+              target_release: 4.8.0
+              valid_states:
+              - status: NEW
+              - status: ASSIGNED
+              - status: ON_DEV
+              - status: POST
+            release-3.11:
+              add_external_link: true
+              allowed_groups:
+              - redhat
+              - qe_staff
+              exclude_defaults: true
+              is_open: true
+              state_after_close:
+                status: NEW
+              state_after_merge:
+                status: MODIFIED
+              state_after_validation:
+                status: POST
+              target_release: 3.11.z
+              valid_states:
+              - status: NEW
+              - status: ASSIGNED
+              - status: ON_DEV
+              - status: POST
+              validate_by_default: true
+            release-4.1:
+              dependent_bug_target_releases:
+              - 4.2.0
+              - 4.2.z
+              target_release: 4.1.z
+              validate_by_default: true
+            release-4.2:
+              dependent_bug_target_releases:
+              - 4.3.0
+              - 4.3.z
+              target_release: 4.2.z
+              validate_by_default: true
+            release-4.3:
+              dependent_bug_target_releases:
+              - 4.4.0
+              - 4.4.z
+              target_release: 4.3.z
+              validate_by_default: true
+            release-4.4:
+              dependent_bug_target_releases:
+              - 4.5.0
+              - 4.5.z
+              target_release: 4.4.z
+              validate_by_default: true
+            release-4.5:
+              dependent_bug_target_releases:
+              - 4.6.0
+              - 4.6.z
+              target_release: 4.5.z
+              validate_by_default: true
+            release-4.6:
+              exclude_defaults: true
+              target_release: 4.6.z
+              validate_by_default: true
 cat: {}
 cherry_pick_unapproved:
   branchregexp: ^release-.*$
-  comment: This PR is not for the master branch but does not have the `cherry-pick-approved`  label. Adding the `do-not-merge/cherry-pick-not-approved`  label.
+  comment: This PR is not for the master branch but does not have the `cherry-pick-approved`  label.
+    Adding the `do-not-merge/cherry-pick-not-approved`  label.
 config_updater:
   gzip: false
   maps:
@@ -943,6 +1832,12 @@ config_updater:
         - ci
       gzip: true
       name: ci-operator-misc-configs
+    ci-operator/config/**/assisted-*/*-ocm-*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
     ci-operator/config/**/cluster-logging-operator/openshift*-cluster-logging-operator-feature*.yaml:
       clusters:
         app.ci:
@@ -961,6 +1856,12 @@ config_updater:
         - ci
       name: ci-operator-misc-configs
     ci-operator/config/**/elasticsearch-operator/openshift*-elasticsearch-operator-feature*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
+    ci-operator/config/**/eventrouter/openshift*-eventrouter-release-5.*.yaml:
       clusters:
         app.ci:
         - ci
@@ -996,18 +1897,42 @@ config_updater:
         - ci
       gzip: true
       name: ci-operator-misc-configs
-    ci-operator/config/eclipse/che-operator/*-7*.yaml:
+    ci-operator/config/3scale/3scale-operator/*-3scale-2.11-*.yaml:
       clusters:
         app.ci:
         - ci
       gzip: true
       name: ci-operator-misc-configs
-    ci-operator/config/eclipse/che-operator/*-master.yaml:
+    ci-operator/config/che-incubator/chectl/*-7.yaml:
       clusters:
         app.ci:
         - ci
-      name: ci-operator-master-configs
+      gzip: true
+      name: ci-operator-misc-configs
+    ci-operator/config/code-ready/snc/*4.*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
+    ci-operator/config/eclipse-che/che-operator/*-7*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
+    ci-operator/config/eclipse-che/che-operator/*-main.yaml:
+      clusters:
+        app.ci:
+        - ci
+      name: ci-operator-misc-configs
     ci-operator/config/integr8ly/integreatly-operator/integr8ly-integreatly-operator-*-next-*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
+    ci-operator/config/integr8ly/integreatly-operator/integr8ly-integreatly-operator-MGDAPI-*-*.yaml:
       clusters:
         app.ci:
         - ci
@@ -1073,6 +1998,11 @@ config_updater:
         - ci
       gzip: true
       name: ci-operator-misc-configs
+    ci-operator/config/redhat-operator-ecosystem/cvp/*-ocp-4.*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      name: ci-operator-misc-configs
     ci-operator/config/redhat-operator-ecosystem/playground/*-cvp-ocp-4.4.yaml:
       clusters:
         app.ci:
@@ -1110,64 +2040,48 @@ config_updater:
       name: ci-operator-4.9-configs
     ci-operator/jobs/**/*-branch-openshift-*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-misc
     ci-operator/jobs/**/*-fcos-*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-misc
     ci-operator/jobs/**/*-hive-ocm-*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-misc
     ci-operator/jobs/**/*-logging*/openshift*-logging*-release-5.*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-misc
     ci-operator/jobs/**/*-logging*/openshift*logging*-tech-preview*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-misc
     ci-operator/jobs/**/*-main-periodics.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-master
     ci-operator/jobs/**/*-main-postsubmits.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-master
     ci-operator/jobs/**/*-main-presubmits.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
@@ -1179,477 +2093,398 @@ config_updater:
       name: job-config-misc
     ci-operator/jobs/**/*enterprise-3.*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-3.x
     ci-operator/jobs/**/*infra-periodics*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-misc
     ci-operator/jobs/**/*master*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-master
     ci-operator/jobs/**/*openshift-3.*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-3.x
     ci-operator/jobs/**/*openshift-4.1*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-4.1
     ci-operator/jobs/**/*openshift-4.2*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-4.2
     ci-operator/jobs/**/*openshift-4.3*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-4.3
     ci-operator/jobs/**/*openshift-4.4*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-4.4
     ci-operator/jobs/**/*openshift-4.5*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-4.5
     ci-operator/jobs/**/*openshift-4.6*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-4.6
     ci-operator/jobs/**/*openshift-4.7*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-4.7
     ci-operator/jobs/**/*openshift-4.8*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-4.8
     ci-operator/jobs/**/*openshift-4.9*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-4.9
     ci-operator/jobs/**/*openshift-v4*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-misc
     ci-operator/jobs/**/*podman-v1.*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-misc
     ci-operator/jobs/**/*release-0.*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-misc
     ci-operator/jobs/**/*release-1.*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-misc
     ci-operator/jobs/**/*release-3.*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-3.x
     ci-operator/jobs/**/*release-4.1*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-4.1
     ci-operator/jobs/**/*release-4.2*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-4.2
     ci-operator/jobs/**/*release-4.3*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-4.3
     ci-operator/jobs/**/*release-4.4*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-4.4
     ci-operator/jobs/**/*release-4.5*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-4.5
     ci-operator/jobs/**/*release-4.6*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-4.6
     ci-operator/jobs/**/*release-4.7*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-4.7
     ci-operator/jobs/**/*release-4.8*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-4.8
     ci-operator/jobs/**/*release-4.9*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-4.9
     ci-operator/jobs/**/*release-next*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-misc
     ci-operator/jobs/**/*release-v*.yaml:
       clusters:
-        api.ci:
+        app.ci:
         - ci
+      gzip: true
+      name: job-config-misc
+    ci-operator/jobs/**/assisted-*/*-ocm-*.yaml:
+      clusters:
         app.ci:
         - ci
       gzip: true
       name: job-config-misc
     ci-operator/jobs/**/cluster-logging-operator/openshift*-cluster-logging-operator-feature*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-misc
     ci-operator/jobs/**/elasticsearch-*/openshift*-release-5.*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-misc
     ci-operator/jobs/**/elasticsearch-operator/openshift*-elasticsearch-operator-feature*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-misc
     ci-operator/jobs/**/elasticsearch-operator/openshift-elasticsearch-operator-tech-preview*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-misc
     ci-operator/jobs/**/elasticsearch-proxy/openshift-elasticsearch-proxy-tech-preview*.yaml:
       clusters:
-        api.ci:
+        app.ci:
         - ci
+      gzip: true
+      name: job-config-misc
+    ci-operator/jobs/**/eventrouter/openshift-eventrouter-release-5.*.yaml:
+      clusters:
         app.ci:
         - ci
       gzip: true
       name: job-config-misc
     ci-operator/jobs/**/infra-image-mirroring.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-misc
     ci-operator/jobs/**/oauth-proxy/openshift*-oauth-proxy-samples-operator-*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-misc
     ci-operator/jobs/**/origin-aggregated-logging/openshift*-origin-aggregated-logging-feature*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-misc
     ci-operator/jobs/**/tektoncd-pipeline-operator/openshift-tektoncd-pipeline-operator-v*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-misc
     ci-operator/jobs/**/windows-machine-config-bootstrapper/*windows-machine-config-bootstrapper-community-*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-misc
     ci-operator/jobs/**/windows-machine-config-operator/*-community-*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-misc
-    ci-operator/jobs/eclipse/che-operator/*-7*.yaml:
+    ci-operator/jobs/3scale/3scale-operator/*-3scale-2.11-*.yaml:
       clusters:
-        api.ci:
+        app.ci:
         - ci
+      gzip: true
+      name: job-config-misc
+    ci-operator/jobs/che-incubator/chectl/*7-presubmits.yaml:
+      clusters:
         app.ci:
         - ci
       name: job-config-misc
-    ci-operator/jobs/eclipse/che-operator/*-master.yaml:
+    ci-operator/jobs/code-ready/snc/*4.*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
-      name: job-config-master
+      gzip: true
+      name: job-config-misc
+    ci-operator/jobs/eclipse-che/che-operator/*-7*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      name: job-config-misc
+    ci-operator/jobs/eclipse-che/che-operator/*-main.yaml:
+      clusters:
+        app.ci:
+        - ci
+      name: job-config-misc
     ci-operator/jobs/integr8ly/integreatly-operator/integr8ly-integreatly-operator-*-next-*.yaml:
       clusters:
-        api.ci:
+        app.ci:
         - ci
+      gzip: true
+      name: job-config-misc
+    ci-operator/jobs/integr8ly/integreatly-operator/integr8ly-integreatly-operator-MGDAPI-*-*.yaml:
+      clusters:
         app.ci:
         - ci
       gzip: true
       name: job-config-misc
     ci-operator/jobs/open-cluster-management/**/*-prow-experiment-*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-misc
     ci-operator/jobs/open-cluster-management/**/*-release-2.0*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-misc
     ci-operator/jobs/open-cluster-management/**/*-release-2.1*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-misc
     ci-operator/jobs/open-cluster-management/**/*-release-2.2*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-misc
     ci-operator/jobs/open-cluster-management/**/*-release-2.3*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-misc
     ci-operator/jobs/openshift-priv/kubernetes/openshift-priv-kubernetes-{oc,origin,sdn}-*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-misc
     ci-operator/jobs/openshift/kubernetes/openshift-kubernetes-{oc,origin,sdn}-*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-misc
     ci-operator/jobs/operator-framework/*/*feature*.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-misc
     ci-operator/jobs/red-hat-data-services/**/*-v1*.yaml:
       clusters:
-        api.ci:
+        app.ci:
         - ci
+      gzip: true
+      name: job-config-misc
+    ci-operator/jobs/redhat-operator-ecosystem/cvp/*-ocp-4.*.yaml:
+      clusters:
         app.ci:
         - ci
       gzip: true
       name: job-config-misc
     ci-operator/jobs/redhat-operator-ecosystem/playground/*-cvp-ocp-4.4.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-4.4
     ci-operator/jobs/redhat-operator-ecosystem/playground/*-cvp-ocp-4.5.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-4.5
     ci-operator/jobs/redhat-operator-ecosystem/playground/*-cvp-ocp-4.6.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-4.6
     ci-operator/jobs/redhat-operator-ecosystem/playground/*-cvp-ocp-4.7.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-4.7
     ci-operator/jobs/redhat-operator-ecosystem/playground/*-cvp-ocp-4.8.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-4.8
     ci-operator/jobs/redhat-operator-ecosystem/playground/*-cvp-ocp-4.9.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       gzip: true
       name: job-config-4.9
     ci-operator/step-registry/**/*:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       name: step-registry
     ci-operator/templates/master-sidecar-3.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
         build01:
@@ -1659,36 +2494,8 @@ config_updater:
         vsphere:
         - ci
       name: prow-job-master-sidecar-3
-    ci-operator/templates/master-sidecar-4.2.yaml:
-      clusters:
-        api.ci:
-        - ci
-        app.ci:
-        - ci
-        build01:
-        - ci
-        build02:
-        - ci
-        vsphere:
-        - ci
-      name: prow-job-master-sidecar-4.2
-    ci-operator/templates/master-sidecar-4.3.yaml:
-      clusters:
-        api.ci:
-        - ci
-        app.ci:
-        - ci
-        build01:
-        - ci
-        build02:
-        - ci
-        vsphere:
-        - ci
-      name: prow-job-master-sidecar-4.3
     ci-operator/templates/master-sidecar-4.4.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
         build01:
@@ -1700,8 +2507,6 @@ config_updater:
       name: prow-job-master-sidecar-4.4
     ci-operator/templates/master-sidecar-4.6.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
         build01:
@@ -1713,8 +2518,6 @@ config_updater:
       name: prow-job-master-sidecar-4.6
     ci-operator/templates/openshift/endurance/endurance-install.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
         build01:
@@ -1726,8 +2529,6 @@ config_updater:
       name: prow-job-endurance-install
     ci-operator/templates/openshift/endurance/endurance-test.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
         build01:
@@ -1739,8 +2540,6 @@ config_updater:
       name: prow-job-endurance-test
     ci-operator/templates/openshift/installer/cluster-launch-installer-custom-test-image.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
         build01:
@@ -1752,8 +2551,6 @@ config_updater:
       name: prow-job-cluster-launch-installer-custom-test-image
     ci-operator/templates/openshift/installer/cluster-launch-installer-e2e.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
         build01:
@@ -1765,8 +2562,6 @@ config_updater:
       name: prow-job-cluster-launch-installer-e2e
     ci-operator/templates/openshift/installer/cluster-launch-installer-libvirt-e2e.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
         build01:
@@ -1778,8 +2573,6 @@ config_updater:
       name: prow-job-cluster-launch-installer-libvirt-e2e
     ci-operator/templates/openshift/installer/cluster-launch-installer-metal-e2e.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
         build01:
@@ -1791,8 +2584,6 @@ config_updater:
       name: prow-job-cluster-launch-installer-metal-e2e
     ci-operator/templates/openshift/installer/cluster-launch-installer-openstack-e2e.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
         build01:
@@ -1804,8 +2595,6 @@ config_updater:
       name: prow-job-cluster-launch-installer-openstack-e2e
     ci-operator/templates/openshift/installer/cluster-launch-installer-openstack-upi-e2e.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
         build01:
@@ -1817,8 +2606,6 @@ config_updater:
       name: prow-job-cluster-launch-installer-openstack-upi-e2e
     ci-operator/templates/openshift/installer/cluster-launch-installer-remote-libvirt-e2e.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
         build01:
@@ -1830,8 +2617,6 @@ config_updater:
       name: prow-job-cluster-launch-installer-remote-libvirt-e2e
     ci-operator/templates/openshift/installer/cluster-launch-installer-src.yaml:
       clusters:
-        api.ci:
-        - ci
         build01:
         - ci
         build02:
@@ -1841,8 +2626,6 @@ config_updater:
       name: prow-job-cluster-launch-installer-src
     ci-operator/templates/openshift/installer/cluster-launch-installer-upi-e2e.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
         build01:
@@ -1854,8 +2637,6 @@ config_updater:
       name: prow-job-cluster-launch-installer-upi-e2e
     ci-operator/templates/openshift/openshift-ansible/cluster-launch-e2e-openshift-ansible.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
         build01:
@@ -1867,8 +2648,6 @@ config_updater:
       name: prow-job-cluster-launch-e2e-openshift-ansible
     ci-operator/templates/openshift/openshift-ansible/cluster-launch-e2e-openshift-jenkins.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
         build01:
@@ -1880,8 +2659,6 @@ config_updater:
       name: prow-job-cluster-launch-e2e-openshift-jenkins
     ci-operator/templates/openshift/openshift-ansible/cluster-launch-e2e-upgrade.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
         build01:
@@ -1893,8 +2670,6 @@ config_updater:
       name: prow-job-cluster-launch-e2e-upgrade
     ci-operator/templates/openshift/openshift-ansible/cluster-launch-e2e.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
         build01:
@@ -1906,8 +2681,6 @@ config_updater:
       name: prow-job-cluster-launch-e2e
     ci-operator/templates/openshift/openshift-ansible/cluster-launch-src.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
         build01:
@@ -1919,8 +2692,6 @@ config_updater:
       name: prow-job-cluster-launch-src
     ci-operator/templates/openshift/openshift-ansible/cluster-scaleup-e2e-40.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
         build01:
@@ -1932,8 +2703,6 @@ config_updater:
       name: prow-job-cluster-scaleup-e2e-40
     cluster/test-deploy/aws-4.0/*:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
         build01:
@@ -1945,8 +2714,6 @@ config_updater:
       name: cluster-profile-aws-centos-40
     cluster/test-deploy/aws-atomic/*:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
         build01:
@@ -1958,8 +2725,6 @@ config_updater:
       name: cluster-profile-aws-atomic
     cluster/test-deploy/aws-centos/*:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
         build01:
@@ -1971,8 +2736,6 @@ config_updater:
       name: cluster-profile-aws-centos
     cluster/test-deploy/aws-gluster/*:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
         build01:
@@ -1984,8 +2747,6 @@ config_updater:
       name: cluster-profile-aws-gluster
     cluster/test-deploy/gcp-4.0/*:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
         build01:
@@ -1997,8 +2758,6 @@ config_updater:
       name: cluster-profile-gcp-40
     cluster/test-deploy/gcp-crio/*:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
         build01:
@@ -2010,8 +2769,6 @@ config_updater:
       name: cluster-profile-gcp-crio
     cluster/test-deploy/gcp-ha-static/*:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
         build01:
@@ -2023,8 +2780,6 @@ config_updater:
       name: cluster-profile-gcp-ha-static
     cluster/test-deploy/gcp-ha/*:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
         build01:
@@ -2036,8 +2791,6 @@ config_updater:
       name: cluster-profile-gcp-ha
     cluster/test-deploy/gcp-logging/*:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
         build01:
@@ -2047,10 +2800,19 @@ config_updater:
         vsphere:
         - ci
       name: cluster-profile-gcp-logging
+    cluster/test-deploy/gcp-openshift-gce-devel-ci-2/*:
+      clusters:
+        app.ci:
+        - ci
+        build01:
+        - ci
+        build02:
+        - ci
+        vsphere:
+        - ci
+      name: cluster-profile-gcp-openshift-gce-devel-ci-2
     cluster/test-deploy/gcp/*:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
         build01:
@@ -2062,8 +2824,6 @@ config_updater:
       name: cluster-profile-gcp
     cluster/test-deploy/ovirt/*:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
         build01:
@@ -2075,8 +2835,6 @@ config_updater:
       name: cluster-profile-ovirt
     cluster/test-deploy/packet/*:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
         build01:
@@ -2141,59 +2899,51 @@ config_updater:
       name: ci-secret-generator
     core-services/image-mirroring/**/mapping_*:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       name: image-mirror-mappings
+    core-services/prow/02_config/**/_prowconfig.yaml:
+      clusters:
+        app.ci:
+        - ci
+      name: config
+      use_full_path_as_key: true
     core-services/prow/02_config/_boskos.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       key: boskos.yaml
       name: resources
     core-services/prow/02_config/_config.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       key: config.yaml
       name: config
     core-services/prow/02_config/_labels.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       key: labels.yaml
       name: labels
     core-services/prow/02_config/_plugins.yaml:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       key: plugins.yaml
       name: plugins
     core-services/prow/02_config/deck-extensions/*:
       clusters:
-        api.ci:
-        - ci
         app.ci:
         - ci
       name: deck-extensions
-    core-services/release-controller/_releases/*:
+    core-services/prow/02_config/deck-internal-extensions/*:
       clusters:
-        api.ci:
-        - ocp
-      name: releases
+        app.ci:
+        - ci
+      name: deck-internal-extensions
     core-services/release-controller/_repos/*:
       clusters:
-        api.ci:
-        - ocp
         app.ci:
         - ocp
         build01:
@@ -2203,18 +2953,6 @@ config_updater:
         vsphere:
         - ocp
       name: base-repos
-    core-services/secret-mirroring/_mapping.yaml:
-      clusters:
-        api.ci:
-        - ci
-        app.ci:
-        - ci
-        build01:
-        - ci
-        build02:
-        - ci
-      key: mapping.yaml
-      name: secret-mirroring
 external_plugins:
   3scale/3scale-operator:
   - endpoint: http://refresh
@@ -2401,17 +3139,27 @@ external_plugins:
     events:
     - pull_request
     name: needs-rebase
-  containers/conmon:
-  - endpoint: http://needs-rebase
-    events:
-    - pull_request
-    name: needs-rebase
   containers/dnsname:
   - endpoint: http://needs-rebase
     events:
     - pull_request
     name: needs-rebase
+  containers/gvisor-tap-vsock:
+  - endpoint: http://needs-rebase
+    events:
+    - pull_request
+    name: needs-rebase
   containers/podman:
+  - endpoint: http://needs-rebase
+    events:
+    - pull_request
+    name: needs-rebase
+  containers/podman-machine-cni:
+  - endpoint: http://needs-rebase
+    events:
+    - pull_request
+    name: needs-rebase
+  containers/podman-py:
   - endpoint: http://needs-rebase
     events:
     - pull_request
@@ -2486,15 +3234,63 @@ external_plugins:
     events:
     - pull_request
     name: needs-rebase
-  eclipse/che-operator:
+  eclipse-che/che-operator:
   - endpoint: http://refresh
     events:
     - issue_comment
     name: refresh
   - endpoint: http://cherrypick
     events:
+    - issue_comment
+    - pull_request
+    name: cherrypick
+  - endpoint: http://needs-rebase
+    events:
+    - pull_request
+    name: needs-rebase
+  - endpoint: http://backport-verifier
+    events:
+    - issue_comment
+    - pull_request
+    name: backport-verifier
+  - endpoint: http://cherrypick
+    events:
     - pull_request
     - issue_comment
+    name: cherrypick
+  - endpoint: http://needs-rebase
+    events:
+    - pull_request
+    name: needs-rebase
+  eclipse-che/che-plugin-registry:
+  - endpoint: http://refresh
+    events:
+    - issue_comment
+    name: refresh
+  - endpoint: http://cherrypick
+    events:
+    - issue_comment
+    - pull_request
+    name: cherrypick
+  - endpoint: http://needs-rebase
+    events:
+    - issue_comment
+    - pull_request
+    name: needs-rebase
+  - endpoint: http://backport-verifier
+    events:
+    - issue_comment
+    - pull_request
+    name: backport-verifier
+  emilvberglind/go-rilla:
+  - endpoint: http://refresh
+    events:
+    - issue_comment
+    name: refresh
+  - endpoint: http://cherrypick
+    events:
+    - issue_comment
+    - pull_request
     name: cherrypick
   - endpoint: http://needs-rebase
     events:
@@ -2668,7 +3464,16 @@ external_plugins:
     events:
     - pull_request
     name: needs-rebase
-  kata-containers/runtime:
+  kiegroup/kie-cloud-operator:
+  - endpoint: http://refresh
+    events:
+    - issue_comment
+    name: refresh
+  - endpoint: http://needs-rebase
+    events:
+    - pull_request
+    name: needs-rebase
+  konveyor/mig-operator:
   - endpoint: http://refresh
     events:
     - issue_comment
@@ -2682,15 +3487,11 @@ external_plugins:
     events:
     - pull_request
     name: needs-rebase
-  kiegroup/kie-cloud-operator:
-  - endpoint: http://refresh
+  - endpoint: http://backport-verifier
     events:
     - issue_comment
-    name: refresh
-  - endpoint: http://needs-rebase
-    events:
     - pull_request
-    name: needs-rebase
+    name: backport-verifier
   kube-reporting:
   - endpoint: http://refresh
     events:
@@ -2747,6 +3548,26 @@ external_plugins:
     events:
     - pull_request
     name: needs-rebase
+  medik8s/node-healthcheck-operator:
+  - endpoint: http://refresh
+    events:
+    - issue_comment
+    name: refresh
+  - endpoint: http://cherrypick
+    events:
+    - issue_comment
+    - pull_request
+    name: cherrypick
+  - endpoint: http://needs-rebase
+    events:
+    - issue_comment
+    - pull_request
+    name: needs-rebase
+  - endpoint: http://backport-verifier
+    events:
+    - issue_comment
+    - pull_request
+    name: backport-verifier
   open-cluster-management:
   - endpoint: http://refresh
     events:
@@ -2793,6 +3614,7 @@ external_plugins:
     name: cherrypick
   - endpoint: http://needs-rebase
     events:
+    - issue_comment
     - pull_request
     name: needs-rebase
   - endpoint: http://backport-verifier
@@ -2851,7 +3673,49 @@ external_plugins:
     events:
     - pull_request
     name: needs-rebase
+  openshift-kni/debug-tools:
+  - endpoint: http://refresh
+    events:
+    - issue_comment
+    name: refresh
+  - endpoint: http://cherrypick
+    events:
+    - issue_comment
+    - pull_request
+    name: cherrypick
+  - endpoint: http://needs-rebase
+    events:
+    - pull_request
+    name: needs-rebase
+  openshift-kni/node-label-operator:
+  - endpoint: http://refresh
+    events:
+    - issue_comment
+    name: refresh
+  - endpoint: http://cherrypick
+    events:
+    - issue_comment
+    - pull_request
+    name: cherrypick
+  - endpoint: http://needs-rebase
+    events:
+    - pull_request
+    name: needs-rebase
   openshift-kni/performance-addon-operators:
+  - endpoint: http://refresh
+    events:
+    - issue_comment
+    name: refresh
+  - endpoint: http://cherrypick
+    events:
+    - issue_comment
+    - pull_request
+    name: cherrypick
+  - endpoint: http://needs-rebase
+    events:
+    - pull_request
+    name: needs-rebase
+  openshift-kni/poison-pill:
   - endpoint: http://refresh
     events:
     - issue_comment
@@ -3090,6 +3954,33 @@ external_plugins:
     events:
     - pull_request
     name: needs-rebase
+  shipwright-io/cli:
+  - endpoint: http://refresh
+    events:
+    - issue_comment
+    name: refresh
+  - endpoint: http://needs-rebase
+    events:
+    - pull_request
+    name: needs-rebase
+  shipwright-io/community:
+  - endpoint: http://refresh
+    events:
+    - issue_comment
+    name: refresh
+  - endpoint: http://needs-rebase
+    events:
+    - pull_request
+    name: needs-rebase
+  shipwright-io/operator:
+  - endpoint: http://refresh
+    events:
+    - issue_comment
+    name: refresh
+  - endpoint: http://needs-rebase
+    events:
+    - pull_request
+    name: needs-rebase
   shipwright-io/website:
   - endpoint: http://refresh
     events:
@@ -3124,6 +4015,7 @@ help:
 jira:
   disabled_jira_projects:
   - enterprise
+  - patch
 label:
   additional_labels:
   - platform/aws
@@ -3182,6 +4074,15 @@ lgtm:
   - openshift-kni/cnf-features-deploy
   review_acts_as_lgtm: true
 - repos:
+  - openshift-kni/debug-tools
+  review_acts_as_lgtm: true
+- repos:
+  - openshift-kni/node-label-operator
+  review_acts_as_lgtm: true
+- repos:
+  - openshift-kni/poison-pill
+  review_acts_as_lgtm: true
+- repos:
   - openshift-priv/cluster-csi-snapshot-controller-operator
   - openshift/cluster-csi-snapshot-controller-operator
   review_acts_as_lgtm: true
@@ -3224,9 +4125,6 @@ lgtm:
   - openshift/cincinnati-operator
   review_acts_as_lgtm: true
 - repos:
-  - eclipse/che-operator
-  review_acts_as_lgtm: true
-- repos:
   - devfile
   review_acts_as_lgtm: true
 - repos:
@@ -3253,9 +4151,6 @@ lgtm:
   review_acts_as_lgtm: true
 - repos:
   - che-incubator/che-test-harness
-- repos:
-  - kata-containers/runtime
-  review_acts_as_lgtm: true
 - repos:
   - openshift-priv/csi-driver-projected-resource
   - openshift/csi-driver-projected-resource
@@ -3348,10 +4243,54 @@ lgtm:
   - openshift/cloud-network-config-controller
   review_acts_as_lgtm: true
 - repos:
+  - openshift-priv/operator-framework-olm
   - openshift/operator-framework-olm
   review_acts_as_lgtm: true
 - repos:
   - openshift/oc-compliance
+  review_acts_as_lgtm: true
+- repos:
+  - openshift/ceph-csi
+  review_acts_as_lgtm: true
+- repos:
+  - openshift-priv/driver-toolkit
+  - openshift/driver-toolkit
+  review_acts_as_lgtm: true
+- repos:
+  - eclipse-che/che-operator
+  review_acts_as_lgtm: true
+- repos:
+  - openshift-priv/vmware-vsphere-csi-driver-operator
+  - openshift/vmware-vsphere-csi-driver-operator
+  review_acts_as_lgtm: true
+- repos:
+  - openshift-priv/vmware-vsphere-csi-driver
+  - openshift/vmware-vsphere-csi-driver
+  review_acts_as_lgtm: true
+- repos:
+  - konveyor/mig-operator
+  - openshift/openshift-restclient-python
+  review_acts_as_lgtm: true
+- repos:
+  - eclipse-che/che-plugin-registry
+  review_acts_as_lgtm: true
+- repos:
+  - openshift/eventrouter
+  review_acts_as_lgtm: true
+- repos:
+  - openshift/addon-operator
+  - openshift/reference-addon
+  review_acts_as_lgtm: true
+- repos:
+  - medik8s/node-healthcheck-operator
+  review_acts_as_lgtm: true
+- repos:
+  - openshift-priv/ironic-agent-image
+  - openshift/ironic-agent-image
+  review_acts_as_lgtm: true
+- repos:
+  - openshift-priv/cloud-provider-azure
+  - openshift/cloud-provider-azure
   review_acts_as_lgtm: true
 override:
   allow_top_level_owners: true
@@ -3360,7 +4299,7 @@ owners:
     openshift/kubernetes:
       owners: DOWNSTREAM_OWNERS
       owners_aliases: DOWNSTREAM_OWNERS_ALIASES
-  labels_blacklist:
+  labels_denylist:
   - approved
   - lgtm
 plugins:
@@ -3727,7 +4666,7 @@ plugins:
     - verify-owners
     - wip
     - yuks
-  containers/conmon:
+  containers/dnsname:
     plugins:
     - approve
     - assign
@@ -3749,7 +4688,7 @@ plugins:
     - verify-owners
     - wip
     - yuks
-  containers/dnsname:
+  containers/gvisor-tap-vsock:
     plugins:
     - approve
     - assign
@@ -3793,11 +4732,10 @@ plugins:
     - verify-owners
     - wip
     - yuks
-  coreos/bootupd:
+  containers/podman-machine-cni:
     plugins:
     - approve
     - assign
-    - blunderbuss
     - cat
     - dog
     - heart
@@ -3811,6 +4749,45 @@ plugins:
     - retitle
     - shrug
     - sigmention
+    - skip
+    - trigger
+    - verify-owners
+    - wip
+    - yuks
+  containers/podman-py:
+    plugins:
+    - approve
+    - assign
+    - cat
+    - dog
+    - heart
+    - golint
+    - help
+    - hold
+    - label
+    - lgtm
+    - lifecycle
+    - override
+    - retitle
+    - shrug
+    - sigmention
+    - skip
+    - trigger
+    - verify-owners
+    - wip
+    - yuks
+  coreos/bootupd:
+    plugins:
+    - assign
+    - cat
+    - dog
+    - heart
+    - help
+    - hold
+    - label
+    - override
+    - retitle
+    - shrug
     - skip
     - trigger
     - verify-owners
@@ -3818,22 +4795,16 @@ plugins:
     - yuks
   coreos/coreos-assembler:
     plugins:
-    - approve
     - assign
-    - blunderbuss
     - cat
     - dog
     - heart
-    - golint
     - help
     - hold
     - label
-    - lgtm
-    - lifecycle
     - override
     - retitle
     - shrug
-    - sigmention
     - skip
     - trigger
     - verify-owners
@@ -3841,22 +4812,16 @@ plugins:
     - yuks
   coreos/rpm-ostree:
     plugins:
-    - approve
     - assign
-    - blunderbuss
     - cat
     - dog
     - heart
-    - golint
     - help
     - hold
     - label
-    - lgtm
-    - lifecycle
     - override
     - retitle
     - shrug
-    - sigmention
     - skip
     - trigger
     - verify-owners
@@ -3871,12 +4836,14 @@ plugins:
     - dco
     - dog
     - heart
+    - goose
     - help
     - hold
     - label
     - lgtm
     - lifecycle
     - owners-label
+    - override
     - retitle
     - release-note
     - shrug
@@ -3912,7 +4879,7 @@ plugins:
     - wip
     - yuks
     - approve
-  eclipse/che-operator:
+  eclipse-che/che-operator:
     plugins:
     - assign
     - blunderbuss
@@ -3924,6 +4891,7 @@ plugins:
     - goose
     - help
     - hold
+    - jira
     - label
     - lgtm
     - lifecycle
@@ -3939,6 +4907,46 @@ plugins:
     - wip
     - yuks
     - approve
+  eclipse-che/che-plugin-registry:
+    plugins:
+    - assign
+    - blunderbuss
+    - bugzilla
+    - cat
+    - dog
+    - heart
+    - golint
+    - goose
+    - help
+    - hold
+    - jira
+    - label
+    - lgtm
+    - lifecycle
+    - override
+    - pony
+    - retitle
+    - shrug
+    - sigmention
+    - skip
+    - trigger
+    - verify-owners
+    - owners-label
+    - wip
+    - yuks
+    - approve
+  emilvberglind/go-rilla:
+    plugins:
+    - assign
+    - blunderbuss
+    - golint
+    - hold
+    - label
+    - lgtm
+    - skip
+    - trigger
+    - verify-owners
+    - wip
   freeipa/freeipa-operator:
     plugins:
     - assign
@@ -4212,33 +5220,6 @@ plugins:
   kata-containers/kata-containers:
     plugins:
     - trigger
-  kata-containers/runtime:
-    plugins:
-    - assign
-    - blunderbuss
-    - bugzilla
-    - cat
-    - dog
-    - heart
-    - golint
-    - goose
-    - help
-    - hold
-    - label
-    - lgtm
-    - lifecycle
-    - override
-    - pony
-    - retitle
-    - shrug
-    - sigmention
-    - skip
-    - trigger
-    - verify-owners
-    - owners-label
-    - wip
-    - yuks
-    - approve
   kiegroup/kie-cloud-operator:
     plugins:
     - approve
@@ -4261,6 +5242,9 @@ plugins:
     - verify-owners
     - wip
     - yuks
+  konveyor/mig-operator:
+    plugins:
+    - trigger
   kube-reporting:
     plugins:
     - assign
@@ -4379,6 +5363,34 @@ plugins:
   kubevirt/ssp-operator:
     plugins:
     - trigger
+  medik8s/node-healthcheck-operator:
+    plugins:
+    - assign
+    - blunderbuss
+    - bugzilla
+    - cat
+    - dog
+    - heart
+    - golint
+    - goose
+    - help
+    - hold
+    - jira
+    - label
+    - lgtm
+    - lifecycle
+    - override
+    - pony
+    - retitle
+    - shrug
+    - sigmention
+    - skip
+    - trigger
+    - verify-owners
+    - owners-label
+    - wip
+    - yuks
+    - approve
   monstorak/monstorak-operator:
     plugins:
     - assign
@@ -4419,13 +5431,130 @@ plugins:
     - trigger
     - verify-owners
     - wip
+  open-cluster-management/addon-framework:
+    plugins:
+    - dco
   open-cluster-management/api:
+    plugins:
+    - dco
+  open-cluster-management/application-chart:
+    plugins:
+    - dco
+  open-cluster-management/application-ui:
+    plugins:
+    - dco
+  open-cluster-management/applier:
+    plugins:
+    - dco
+  open-cluster-management/cert-policy-controller:
+    plugins:
+    - dco
+  open-cluster-management/cluster-curator-controller:
+    plugins:
+    - dco
+  open-cluster-management/clusterlifecycle-state-metrics:
+    plugins:
+    - dco
+  open-cluster-management/config-policy-controller:
+    plugins:
+    - dco
+  open-cluster-management/console:
+    plugins:
+    - dco
+  open-cluster-management/console-api:
+    plugins:
+    - dco
+  open-cluster-management/endpoint-metrics-operator:
+    plugins:
+    - dco
+  open-cluster-management/governance-policy-framework:
+    plugins:
+    - dco
+  open-cluster-management/governance-policy-propagator:
+    plugins:
+    - dco
+  open-cluster-management/governance-policy-spec-sync:
+    plugins:
+    - dco
+  open-cluster-management/governance-policy-status-sync:
+    plugins:
+    - dco
+  open-cluster-management/governance-policy-template-sync:
+    plugins:
+    - dco
+  open-cluster-management/grafana-dashboard-loader:
+    plugins:
+    - dco
+  open-cluster-management/grc-chart:
+    plugins:
+    - dco
+  open-cluster-management/grc-ui:
+    plugins:
+    - dco
+  open-cluster-management/grc-ui-api:
+    plugins:
+    - dco
+  open-cluster-management/iam-policy-controller:
+    plugins:
+    - dco
+  open-cluster-management/klusterlet-addon-controller:
+    plugins:
+    - dco
+  open-cluster-management/klusterlet-addon-operator:
+    plugins:
+    - dco
+  open-cluster-management/library-go:
+    plugins:
+    - dco
+  open-cluster-management/managedcluster-import-controller:
+    plugins:
+    - dco
+  open-cluster-management/management-ingress:
+    plugins:
+    - dco
+  open-cluster-management/metrics-collector:
+    plugins:
+    - dco
+  open-cluster-management/multicloud-operators-application:
+    plugins:
+    - dco
+  open-cluster-management/multicloud-operators-channel:
+    plugins:
+    - dco
+  open-cluster-management/multicloud-operators-deployable:
+    plugins:
+    - dco
+  open-cluster-management/multicloud-operators-placementrule:
+    plugins:
+    - dco
+  open-cluster-management/multicloud-operators-subscription:
+    plugins:
+    - dco
+  open-cluster-management/multicloud-operators-subscription-release:
+    plugins:
+    - dco
+  open-cluster-management/multicluster-observability-operator:
+    plugins:
+    - dco
+  open-cluster-management/observability-e2e-test:
+    plugins:
+    - dco
+  open-cluster-management/policy-collection:
+    plugins:
+    - dco
+  open-cluster-management/provider-credential-controller:
+    plugins:
+    - dco
+  open-cluster-management/rbac-query-proxy:
     plugins:
     - dco
   open-cluster-management/registration:
     plugins:
     - dco
   open-cluster-management/registration-operator:
+    plugins:
+    - dco
+  open-cluster-management/security-middleware:
     plugins:
     - dco
   open-cluster-management/website:
@@ -4607,6 +5736,61 @@ plugins:
     - wip
     - yuks
     - approve
+  openshift-kni/debug-tools:
+    plugins:
+    - assign
+    - blunderbuss
+    - bugzilla
+    - cat
+    - dog
+    - heart
+    - golint
+    - goose
+    - help
+    - hold
+    - label
+    - lgtm
+    - lifecycle
+    - override
+    - pony
+    - retitle
+    - shrug
+    - sigmention
+    - skip
+    - trigger
+    - verify-owners
+    - owners-label
+    - wip
+    - yuks
+    - approve
+  openshift-kni/node-label-operator:
+    plugins:
+    - assign
+    - blunderbuss
+    - bugzilla
+    - cat
+    - dog
+    - heart
+    - golint
+    - goose
+    - help
+    - hold
+    - jira
+    - label
+    - lgtm
+    - lifecycle
+    - override
+    - pony
+    - retitle
+    - shrug
+    - sigmention
+    - skip
+    - trigger
+    - verify-owners
+    - owners-label
+    - wip
+    - yuks
+    - approve
   openshift-kni/performance-addon-operators:
     plugins:
     - assign
@@ -4619,6 +5803,34 @@ plugins:
     - goose
     - help
     - hold
+    - label
+    - lgtm
+    - lifecycle
+    - override
+    - pony
+    - retitle
+    - shrug
+    - sigmention
+    - skip
+    - trigger
+    - verify-owners
+    - owners-label
+    - wip
+    - yuks
+    - approve
+  openshift-kni/poison-pill:
+    plugins:
+    - assign
+    - blunderbuss
+    - bugzilla
+    - cat
+    - dog
+    - heart
+    - golint
+    - goose
+    - help
+    - hold
+    - jira
     - label
     - lgtm
     - lifecycle
@@ -4726,6 +5938,9 @@ plugins:
   openshift-priv/build-machinery-go:
     plugins:
     - approve
+  openshift-priv/build-test-images:
+    plugins:
+    - approve
   openshift-priv/builder:
     plugins:
     - approve
@@ -4739,6 +5954,12 @@ plugins:
     plugins:
     - approve
   openshift-priv/cloud-network-config-controller:
+    plugins:
+    - approve
+  openshift-priv/cloud-provider-aws:
+    plugins:
+    - approve
+  openshift-priv/cloud-provider-azure:
     plugins:
     - approve
   openshift-priv/cloud-provider-openstack:
@@ -4927,6 +6148,9 @@ plugins:
   openshift-priv/csi-operator:
     plugins:
     - approve
+  openshift-priv/driver-toolkit:
+    plugins:
+    - approve
   openshift-priv/egress-router-cni:
     plugins:
     - approve
@@ -4976,6 +6200,9 @@ plugins:
     plugins:
     - approve
   openshift-priv/installer:
+    plugins:
+    - approve
+  openshift-priv/ironic-agent-image:
     plugins:
     - approve
   openshift-priv/ironic-hardware-inventory-recorder-image:
@@ -5134,6 +6361,9 @@ plugins:
   openshift-priv/openstack-cinder-csi-driver-operator:
     plugins:
     - approve
+  openshift-priv/operator-framework-olm:
+    plugins:
+    - approve
   openshift-priv/origin:
     plugins:
     - approve
@@ -5222,6 +6452,12 @@ plugins:
     plugins:
     - approve
   openshift-priv/vertical-pod-autoscaler-operator:
+    plugins:
+    - approve
+  openshift-priv/vmware-vsphere-csi-driver:
+    plugins:
+    - approve
+  openshift-priv/vmware-vsphere-csi-driver-operator:
     plugins:
     - approve
   openshift-priv/vsphere-problem-detector:
@@ -5335,6 +6571,9 @@ plugins:
     - verify-owners
     - wip
     - yuks
+  openshift/addon-operator:
+    plugins:
+    - approve
   openshift/ansible-service-broker:
     plugins:
     - approve
@@ -5404,7 +6643,13 @@ plugins:
   openshift/build-machinery-go:
     plugins:
     - approve
+  openshift/build-test-images:
+    plugins:
+    - approve
   openshift/builder:
+    plugins:
+    - approve
+  openshift/ceph-csi:
     plugins:
     - approve
   openshift/certman-operator:
@@ -5447,6 +6692,12 @@ plugins:
     plugins:
     - approve
   openshift/cloud-network-config-controller:
+    plugins:
+    - approve
+  openshift/cloud-provider-aws:
+    plugins:
+    - approve
+  openshift/cloud-provider-azure:
     plugins:
     - approve
   openshift/cloud-provider-openstack:
@@ -5666,6 +6917,9 @@ plugins:
   openshift/docker-distribution:
     plugins:
     - approve
+  openshift/driver-toolkit:
+    plugins:
+    - approve
   openshift/egress-router-cni:
     plugins:
     - approve
@@ -5682,6 +6936,9 @@ plugins:
     plugins:
     - approve
   openshift/etcd:
+    plugins:
+    - approve
+  openshift/eventrouter:
     plugins:
     - approve
   openshift/external-dns:
@@ -5745,6 +7002,9 @@ plugins:
     plugins:
     - approve
   openshift/installer:
+    plugins:
+    - approve
+  openshift/ironic-agent-image:
     plugins:
     - approve
   openshift/ironic-hardware-inventory-recorder-image:
@@ -5864,6 +7124,9 @@ plugins:
   openshift/managed-cluster-validating-webhooks:
     plugins:
     - approve
+  openshift/managed-notifications:
+    plugins:
+    - approve
   openshift/managed-prometheus-exporter-dns:
     plugins:
     - approve
@@ -5976,6 +7239,9 @@ plugins:
   openshift/openshift-gitops-examples:
     plugins:
     - approve
+  openshift/openshift-restclient-python:
+    plugins:
+    - approve
   openshift/openshift-state-metrics:
     plugins:
     - approve
@@ -6042,6 +7308,12 @@ plugins:
   openshift/pipelines-tutorial:
     plugins:
     - approve
+  openshift/pipelines-vote-api:
+    plugins:
+    - approve
+  openshift/pipelines-vote-ui:
+    plugins:
+    - approve
   openshift/pod-checkpointer-operator:
     plugins:
     - approve
@@ -6075,6 +7347,9 @@ plugins:
   openshift/redhat-subscription-injection-webhook:
     plugins:
     - approve
+  openshift/reference-addon:
+    plugins:
+    - approve
   openshift/release:
     plugins:
     - config-updater
@@ -6100,6 +7375,9 @@ plugins:
   openshift/router:
     plugins:
     - approve
+  openshift/runbooks:
+    plugins:
+    - approve
   openshift/runtime-utils:
     plugins:
     - approve
@@ -6122,6 +7400,9 @@ plugins:
     plugins:
     - approve
   openshift/special-resource-operator:
+    plugins:
+    - approve
+  openshift/splunk-forwarder-images:
     plugins:
     - approve
   openshift/splunk-forwarder-operator:
@@ -6154,6 +7435,9 @@ plugins:
   openshift/tektoncd-cli:
     plugins:
     - approve
+  openshift/tektoncd-operator:
+    plugins:
+    - approve
   openshift/tektoncd-pipeline:
     plugins:
     - approve
@@ -6179,6 +7463,12 @@ plugins:
     plugins:
     - approve
   openshift/vertical-pod-autoscaler-operator:
+    plugins:
+    - approve
+  openshift/vmware-vsphere-csi-driver:
+    plugins:
+    - approve
+  openshift/vmware-vsphere-csi-driver-operator:
     plugins:
     - approve
   openshift/vsphere-problem-detector:
@@ -6243,9 +7533,21 @@ plugins:
     - verify-owners
     - wip
     - yuks
+  operator-framework/api:
+    plugins:
+    - approve
+    - owners-label
   operator-framework/community-operators:
     plugins:
     - bugzilla
+    - owners-label
+  operator-framework/kubectl-operator:
+    plugins:
+    - approve
+    - owners-label
+  operator-framework/olm-docs:
+    plugins:
+    - approve
     - owners-label
   operator-framework/operator-lib:
     plugins:
@@ -6265,22 +7567,16 @@ plugins:
     - bugzilla
   ostreedev/ostree:
     plugins:
-    - approve
     - assign
-    - blunderbuss
     - cat
     - dog
     - heart
-    - golint
     - help
     - hold
     - label
-    - lgtm
-    - lifecycle
     - override
     - retitle
     - shrug
-    - sigmention
     - skip
     - trigger
     - verify-owners
@@ -6423,6 +7719,17 @@ plugins:
     - wip
     - yuks
   shipwright-io/build:
+    plugins:
+    - approve
+    - release-note
+    - require-matching-label
+  shipwright-io/cli:
+    plugins:
+    - approve
+  shipwright-io/community:
+    plugins:
+    - approve
+  shipwright-io/operator:
     plugins:
     - approve
     - release-note

@@ -51,7 +51,7 @@ items:
         serviceAccountName: jenkins-operator
         containers:
         - name: jenkins-operator
-          image: gcr.io/k8s-prow/jenkins-operator:v20210302-aa40187f73
+          image: gcr.io/k8s-prow/jenkins-operator:v20210521-0570b0687e
           args:
           - --jenkins-url=https://ci.openshift.redhat.com/jenkins
           - --jenkins-user=openshift-ci-robot
@@ -62,10 +62,10 @@ items:
           - --github-graphql-endpoint=http://ghproxy/graphql
           - --label-selector=master=ci.openshift.redhat.com
           - --config-path=/etc/config/config.yaml
+          - --supplemental-prow-config-dir=/etc/config
           - --job-config-path=/etc/job-config
           - --dry-run=false
           - --skip-report=true
-          - --kubeconfig=/etc/build-farm-credentials/kubeconfig
           - --projected-token-file=/var/sa-token/token
           ports:
           - name: main
@@ -110,9 +110,6 @@ items:
             readOnly: true
           - name: job-config-49
             mountPath: /etc/job-config/4.9
-            readOnly: true
-          - mountPath: /etc/build-farm-credentials
-            name: build-farm-credentials
             readOnly: true
           resources:
             requests:
@@ -170,12 +167,6 @@ items:
         - name: job-config-49
           configMap:
             name: job-config-4.9
-        - name: build-farm-credentials
-          secret:
-            items:
-            - key: sa.jenkins-operator.api.ci.config
-              path: kubeconfig
-            secretName: build-farm-credentials
 - apiVersion: v1
   kind: Service
   metadata:
@@ -226,7 +217,7 @@ items:
         serviceAccountName: jenkins-operator
         containers:
         - name: kata-jenkins-operator
-          image: gcr.io/k8s-prow/jenkins-operator:v20210302-aa40187f73
+          image: gcr.io/k8s-prow/jenkins-operator:v20210521-0570b0687e
           args:
           - --jenkins-url=http://jenkins.katacontainers.io/
           - --jenkins-user=katabuilder

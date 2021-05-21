@@ -3,6 +3,10 @@ base_images:
     name: 4.8-priv
     namespace: ocp-private
     tag: base
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
   ocp_builder_golang-1.14:
     name: builder
     namespace: ocp
@@ -19,6 +23,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.15-openshift-4.8
+  ocp_builder_rhel-8-golang-1.16-openshift-4.8:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.16-openshift-4.8
   ocp_builder_rhel-8-golang-openshift-4.6:
     name: builder
     namespace: ocp
@@ -28,7 +36,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.14
+    tag: golang-1.15
 canonical_go_repository: github.com/openshift/cluster-authentication-operator
 images:
 - dockerfile_path: Dockerfile.rhel7
@@ -67,8 +75,16 @@ tests:
     from: src
 - as: e2e-agnostic
   steps:
-    cluster_profile: gcp
-    workflow: openshift-e2e-gcp
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure
+- as: e2e-agnostic-ipv6
+  steps:
+    cluster_profile: packet
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        NETWORK_TYPE=OVNKubernetes
+    workflow: baremetalds-e2e
 - as: e2e-operator
   steps:
     cluster_profile: gcp
@@ -84,8 +100,8 @@ tests:
     workflow: ipi-gcp
 - as: e2e-agnostic-upgrade
   steps:
-    cluster_profile: gcp
-    workflow: openshift-upgrade-gcp
+    cluster_profile: azure4
+    workflow: openshift-upgrade-azure
 - as: e2e-console-login
   steps:
     cluster_profile: gcp
@@ -110,10 +126,25 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 4h0m0s
     workflow: ipi-gcp
-- as: e2e-aws-operator-encryption-perf
+- as: e2e-gcp-operator-encryption-rotation
   steps:
-    cluster_profile: aws
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e-encryption-rotation JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: ipi-gcp
+- as: e2e-gcp-operator-encryption-perf
+  steps:
+    cluster_profile: gcp
     test:
     - as: test
       cli: latest
@@ -123,7 +154,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    workflow: ipi-gcp
 - as: e2e-aws-single-node
   steps:
     cluster_profile: aws

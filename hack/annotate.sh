@@ -31,7 +31,7 @@ function annotate() {
 			fi
 		fi
 
-		oc annotate -n "${namespace}" "is/${name}" "release.openshift.io/config=$( cat "${conf}" )" --overwrite
+		oc annotate -n "${namespace}" "is/${name}" "release.openshift.io/config=$( cat "${conf}" | jq -c . )" --overwrite
 	fi
 }
 
@@ -41,12 +41,15 @@ for release in $( ls "${base}/core-services/release-controller/_releases/" | gre
 	annotate "ocp" "${release}-art-latest" "ocp-${release}.json"
 	annotate "ocp-s390x" "${release}-art-latest-s390x" "ocp-${release}-s390x.json"
 	annotate "ocp-ppc64le" "${release}-art-latest-ppc64le" "ocp-${release}-ppc64le.json"
+	annotate "ocp-arm64" "${release}-art-latest-arm64" "ocp-${release}-arm64.json"
 	annotate "ocp-priv" "${release}-art-latest-priv" "ocp-${release}.json" "private"
 	annotate "ocp-s390x-priv" "${release}-art-latest-s390x-priv" "ocp-${release}-s390x.json" "private"
 	annotate "ocp-ppc64le-priv" "${release}-art-latest-ppc64le-priv" "ocp-${release}-ppc64le.json" "private"
+	annotate "ocp-arm64-priv" "${release}-art-latest-arm64-priv" "ocp-${release}-arm64.json" "private"
 done
 
 annotate "origin" "release" "origin-4.y-stable.json"
 annotate "ocp" "release" "ocp-4.y-stable.json"
 annotate "ocp-s390x" "release-s390x" "ocp-4.y-stable-s390x.json"
 annotate "ocp-ppc64le" "release-ppc64le" "ocp-4.y-stable-ppc64le.json"
+annotate "ocp-arm64" "release-arm64" "ocp-4.y-stable-arm64.json"

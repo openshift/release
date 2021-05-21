@@ -1,32 +1,41 @@
 #!/bin/bash
 
-OUTPUT="$SHARED_DIR/$CLUSTERPOOL_LIST_FILE"
-
-echo "OUTPUT=$OUTPUT"
-echo "uid=$(id -u)"
-
 temp=$(mktemp -d -t ocm-XXXXX)
-echo "temp=$temp"
 cd $temp || exit 1
+
+OUTPUT="$SHARED_DIR/$CLUSTERPOOL_LIST_FILE"
 
 cp "$MAKEFILE" ./Makefile
 
-export SELF="make -d"
-make -d clusterpool/list-clusterpools CLUSTERPOOL_LIST_ARGUMENTS=" -o json" > >(tee list.json ${ARTIFACT_DIR}/list.json)
-echo "list.json:"
-cat list.json
-echo "---"
+make clusterpool/list-clusterpools CLUSTERPOOL_LIST_ARGUMENTS=" -o json" > >(tee list.json ${ARTIFACT_DIR}/list.json)
 
-jq -r '.items[] | select(.status.ready > 0) | .metadata.name' list.json > "$OUTPUT"
-echo "$OUTPUT after jq:"
-cat "$OUTPUT"
-echo "---"
+jq -r '.items[] | select(.status.ready > 0) | .metadata.name' list.json > >(tee "$OUTPUT" "${ARTIFACT_DIR}/$CLUSTERPOOL_LIST_FILE")
 
-if [[ -n "$CLUSTERPOOL_LIST_FILTER" ]]; then
-    grep -v -e "$CLUSTERPOOL_LIST_FILTER" "$OUTPUT" > "$OUTPUT.tmp"
+if [[ -n "$CLUSTERPOOL_LIST_INCLUSION_FILTER" ]]; then
+    grep -e "$CLUSTERPOOL_LIST_INCLUSION_FILTER" "$OUTPUT" > "$OUTPUT.tmp"
+    if [[ $(cat "$OUTPUT.tmp" | wc -l) == 0 ]]; then
+        echo "ERROR No clusters left after applying inclusion filter."
+        echo "Inclusion filter: $CLUSTERPOOL_LIST_INCLUSION_FILTER"
+        echo "Original clusters:"
+        cat "$OUTPUT"
+        exit 1
+    fi
     mv "$OUTPUT.tmp" "$OUTPUT"
 fi
-echo "$OUTPUT after grep:"
+
+if [[ -n "$CLUSTERPOOL_LIST_EXCLUSION_FILTER" ]]; then
+    grep -v -e "$CLUSTERPOOL_LIST_EXCLUSION_FILTER" "$OUTPUT" > "$OUTPUT.tmp"
+    if [[ $(cat "$OUTPUT.tmp" | wc -l) == 0 ]]; then
+        echo "ERROR No clusters left after applying exclusion filter."
+        echo "Exclusion filter: $CLUSTERPOOL_LIST_EXCLUSION_FILTER"
+        echo "Original clusters:"
+        cat "$OUTPUT"
+        exit 1
+    fi
+    mv "$OUTPUT.tmp" "$OUTPUT"
+fi
+
+echo "$OUTPUT after filtering:"
 cat "$OUTPUT"
 echo "---"
 

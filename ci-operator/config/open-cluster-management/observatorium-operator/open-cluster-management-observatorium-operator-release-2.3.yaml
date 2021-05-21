@@ -1,0 +1,70 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.14
+images:
+- dockerfile_path: Dockerfile
+  to: observatorium-operator
+promotion:
+  disabled: true
+  name: "2.3"
+  namespace: open-cluster-management
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 100m
+      memory: 1Gi
+tag_specification:
+  name: "4.6"
+  namespace: ocp
+test_binary_build_commands: "true"
+tests:
+- as: e2e-test
+  steps:
+    cluster_profile: aws
+    test:
+    - as: deploy-operator
+      cli: latest
+      commands: |
+        export OPERATOR_IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:observatorium-operator}
+        ./tests/e2e.sh deploy-operator
+      env:
+      - default: oc
+        name: KUBECTL
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: run-test
+      cli: latest
+      commands: |
+        ./tests/e2e.sh test --tls
+      env:
+      - default: oc
+        name: KUBECTL
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: delete-cr
+      cli: latest
+      commands: |
+        ./tests/e2e.sh delete-cr
+      env:
+      - default: oc
+        name: KUBECTL
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-aws
+zz_generated_metadata:
+  branch: release-2.3
+  org: open-cluster-management
+  repo: observatorium-operator

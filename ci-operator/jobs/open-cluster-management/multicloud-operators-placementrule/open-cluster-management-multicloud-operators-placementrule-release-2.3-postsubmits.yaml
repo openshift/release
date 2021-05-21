@@ -1,0 +1,133 @@
+postsubmits:
+  open-cluster-management/multicloud-operators-placementrule:
+  - agent: kubernetes
+    branches:
+    - ^release-2\.3$
+    cluster: build02
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/is-promotion: "true"
+      ci-operator.openshift.io/prowgen-controlled: "true"
+    max_concurrency: 1
+    name: branch-ci-open-cluster-management-multicloud-operators-placementrule-release-2.3-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+        - --promote
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/push-secret
+          name: push-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: push-secret
+        secret:
+          secretName: registry-push-credentials-ci-central
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    branches:
+    - ^release-2\.3$
+    cluster: build02
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: branch-ci-open-cluster-management-multicloud-operators-placementrule-release-2.3-publish
+    spec:
+      containers:
+      - args:
+        - -f
+        - Makefile.prow
+        - osci/publish
+        command:
+        - make
+        env:
+        - name: COMPONENT_NAME
+          value: multicloud-operators-placementrule
+        - name: COMPONENT_VERSION
+          value: 2.3.0
+        - name: OSCI_IMAGE_REMOTE_REPO_SRC
+          value: registry.ci.openshift.org/open-cluster-management
+        - name: SELF
+          value: make -f Makefile.prow
+        image: registry.ci.openshift.org/open-cluster-management/builder:go1.16-linux
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 100m
+            memory: 200Mi
+        volumeMounts:
+        - mountPath: /etc/github
+          name: acm-cicd-github
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: acm-cicd-github
+        secret:
+          secretName: acm-cicd-github
+  - agent: kubernetes
+    branches:
+    - ^release-2\.3$
+    cluster: build02
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: branch-ci-open-cluster-management-multicloud-operators-placementrule-release-2.3-sonar
+    spec:
+      containers:
+      - args:
+        - -f
+        - Makefile.prow
+        - sonar/go/prow
+        command:
+        - make
+        env:
+        - name: ARTIFACT_DIR
+          value: $(ARTIFACTS)
+        - name: SELF
+          value: make -f Makefile.prow
+        image: registry.ci.openshift.org/open-cluster-management/builder:go1.16-linux
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 100m
+            memory: 200Mi
+        volumeMounts:
+        - mountPath: /etc/sonarcloud
+          name: acm-sonarcloud-token
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: acm-sonarcloud-token
+        secret:
+          secretName: acm-sonarcloud-token

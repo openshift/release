@@ -1,0 +1,28 @@
+workflow:
+  as: openshift-e2e-vsphere-csi
+  steps:
+    pre:
+    - chain: ipi-vsphere-pre
+    - ref: storage-conf-csi-vsphere
+    - ref: storage-conf-feature-gate
+    - ref: storage-conf-wait-for-csi-driver
+    # Wait for CSI migration enabed by TechPreviewNoUpgrade to restart all nodes
+    - ref: storage-conf-wait-for-csi-migration
+    - ref: storage-pv-save
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - ref: storage-pv-check
+    - chain: gather-core-dump
+    - chain: ipi-vsphere-post
+    env:
+      # for storage-conf-feature-gate
+      FEATURESET: TechPreviewNoUpgrade
+      # for storage-conf-wait-for-csi-driver
+      CLUSTERCSIDRIVER: csi.vsphere.vmware.com
+      TRUECONDITIONS: VMwareVSphereDriverControllerServiceControllerAvailable VMwareVSphereDriverNodeServiceControllerAvailable VMwareVSphereDriverStorageClassControllerAvailable
+      # for storage-conf-csi-vsphere and openshift-e2e-test
+      TEST_CSI_DRIVER_MANIFEST: manifest-vsphere.yaml
+      TEST_SUITE: openshift/csi
+  documentation: |-
+    The Openshift E2E vSphere `csi` workflow executes the `openshift/csi` end-to-end test suite on vSphere CSI driver that was installed during cluster setup.

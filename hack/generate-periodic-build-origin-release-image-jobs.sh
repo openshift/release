@@ -29,7 +29,7 @@ JOB='- agent: kubernetes
       - --wait=true
       command:
       - oc
-      image: registry.ci.openshift.org/ocp/4.7:cli
+      image: registry.ci.openshift.org/ocp/4.8:cli
       imagePullPolicy: Always
       name: ""
       resources:

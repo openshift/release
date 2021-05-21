@@ -3,22 +3,38 @@ base_images:
     name: "4.8"
     namespace: origin
     tag: base
-  ocp_4.7_artifacts:
-    name: "4.8"
-    namespace: origin
-    tag: artifacts
-  ocp_4.7_mcd:
-    name: "4.8"
-    namespace: origin
-    tag: machine-config-operator
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: golang-1.15
 images:
-- dockerfile_path: Dockerfile
-  from: base
+- dockerfile_literal: |
+    FROM quay.io/vrutkovs/cirrus-run
+    WORKDIR /go/src/github.com/openshift/okd-machine-os
+    COPY . .
+    # Build Dockerfile.cosa in Cirrus CI
+    RUN export OPENSHIFT_BUILD_REFERENCE=$(git rev-parse FETCH_HEAD) && \
+        export FETCH_HEAD_CONTENT="$(cat ./.git/FETCH_HEAD)" && \
+        export OPENSHIFT_BUILD_SOURCE="${FETCH_HEAD_CONTENT##* }" && \
+        echo "Building ${OPENSHIFT_BUILD_REFERENCE} in ${OPENSHIFT_BUILD_SOURCE}" && \
+        cirrus-run --github vrutkovs/okd-os --branch main --show-build-log always | tee /tmp/build.log && \
+        # replace resulting image in Dockerfile
+        IMAGE=$(grep "Committing container" -A1 /tmp/build.log | tail -n1 | tr ' ' '\n' | head -n1) && \
+        sed "s;INITIAL_IMAGE;${IMAGE};g" Dockerfile.template > /tmp/Dockerfile && \
+        mkdir ./extensions
+  to: cosa-build
+- inputs:
+    cosa-build:
+      paths:
+      - destination_dir: .
+        source_path: /tmp/Dockerfile
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/okd-machine-os/manifests/
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/okd-machine-os/bootstrap/
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/okd-machine-os/extensions/
   to: machine-os-content
 promotion:
   name: "4.8"

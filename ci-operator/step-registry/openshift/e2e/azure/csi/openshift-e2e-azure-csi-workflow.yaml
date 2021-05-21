@@ -1,0 +1,27 @@
+workflow:
+  as: openshift-e2e-azure-csi
+  steps:
+    pre:
+    - chain: ipi-azure-pre
+    - ref: storage-conf-csi-azure-disk
+    - ref: storage-conf-feature-gate
+    - ref: storage-conf-wait-for-csi-driver
+    # Wait for CSI migration enabed by TechPreviewNoUpgrade to restart all nodes
+    - ref: storage-conf-wait-for-csi-migration
+    - ref: storage-pv-save
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - ref: storage-pv-check
+    - chain: gather-core-dump
+    - chain: ipi-azure-post
+    env:
+      # for storage-conf-feature-gate
+      FEATURESET: TechPreviewNoUpgrade
+      # for storage-conf-wait-for-csi-driver
+      CLUSTERCSIDRIVER: disk.csi.azure.com
+      TRUECONDITIONS: AzureDiskDriverControllerServiceControllerAvailable AzureDiskDriverNodeServiceControllerAvailable
+      TEST_CSI_DRIVER_MANIFEST: manifest-azure-disk.yaml
+      TEST_SUITE: openshift/csi
+  documentation: |-
+    The Openshift E2E GCP `csi` workflow executes the `openshift/csi` end-to-end test suite on Azure Disk CSI driver that was installed during cluster setup.

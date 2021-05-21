@@ -4,8 +4,10 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-export LOKI_VERSION="2.0.0"
-export LOKI_ENDPOINT=https://observatorium.api.stage.openshift.com/api/logs/v1/dptp/loki/api/v1
+export LOKI_STAGE_ENDPOINT=https://observatorium.api.stage.openshift.com/api/logs/v1/dptp/loki/api/v1
+export LOKI_PROD_ENDPOINT=https://observatorium.api.openshift.com/api/logs/v1/dptp/loki/api/v1
+export PROMTAIL_IMAGE="quay.io/openshift-logging/promtail"
+export PROMTAIL_VERSION="v2.2.1"
 
 GRAFANACLOUND_USERNAME=$(cat /var/run/loki-grafanacloud-secret/client-id)
 
@@ -78,9 +80,18 @@ data:
           min_period: 1s
         batchsize: 102400
         batchwait: 10s
-        bearer_token_file: /tmp/shared/bearer_token
+        bearer_token_file: /tmp/shared/prod_bearer_token
         timeout: 10s
-        url: ${LOKI_ENDPOINT}/push
+        url: ${LOKI_PROD_ENDPOINT}/push
+      - backoff_config:
+          max_period: 5m
+          max_retries: 20
+          min_period: 1s
+        batchsize: 102400
+        batchwait: 10s
+        bearer_token_file: /tmp/shared/stage_bearer_token
+        timeout: 10s
+        url: ${LOKI_STAGE_ENDPOINT}/push
       - backoff_config:
           max_period: 5m
           max_retries: 20
@@ -95,13 +106,22 @@ data:
     positions:
       filename: "/run/promtail/positions.yaml"
     scrape_configs:
-    - job_name: kubernetes-pods-name
+    - job_name: kubernetes
       kubernetes_sd_configs:
       - role: pod
       pipeline_stages:
       - cri: {}
       - labeldrop:
         - filename
+      - pack:
+          labels:
+          - namespace
+          - pod_name
+          - container_name
+          - app
+      - labelallow:
+          - host
+          - invoker
       relabel_configs:
       - source_labels:
         - __meta_kubernetes_pod_label_name
@@ -109,12 +129,6 @@ data:
       - source_labels:
         - __meta_kubernetes_pod_node_name
         target_label: __host__
-      - action: drop
-        regex: ''
-        source_labels:
-        - __service__
-      - action: labelmap
-        regex: __meta_kubernetes_pod_label_(.+)
       - action: replace
         replacement:
         separator: "/"
@@ -129,7 +143,7 @@ data:
       - action: replace
         source_labels:
         - __meta_kubernetes_pod_name
-        target_label: instance
+        target_label: pod_name
       - action: replace
         source_labels:
         - __meta_kubernetes_pod_container_name
@@ -140,239 +154,51 @@ data:
         - __meta_kubernetes_pod_uid
         - __meta_kubernetes_pod_container_name
         target_label: __path__
-    - job_name: kubernetes-pods-app
-      kubernetes_sd_configs:
-      - role: pod
-      pipeline_stages:
-      - cri: {}
-      - labeldrop:
-        - filename
-      relabel_configs:
-      - action: drop
-        regex: ".+"
-        source_labels:
-        - __meta_kubernetes_pod_label_name
-      - source_labels:
-        - __meta_kubernetes_pod_label_app
-        target_label: __service__
-      - source_labels:
-        - __meta_kubernetes_pod_node_name
-        target_label: __host__
-      - action: drop
-        regex: ''
-        source_labels:
-        - __service__
       - action: labelmap
         regex: __meta_kubernetes_pod_label_(.+)
-      - action: replace
-        replacement:
-        separator: "/"
-        source_labels:
-        - __meta_kubernetes_namespace
-        - __service__
-        target_label: job
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_namespace
-        target_label: namespace
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_pod_name
-        target_label: instance
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_pod_container_name
-        target_label: container_name
-      - replacement: "/var/log/pods/*\$1/*.log"
-        separator: "/"
-        source_labels:
-        - __meta_kubernetes_pod_uid
-        - __meta_kubernetes_pod_container_name
-        target_label: __path__
-    - job_name: kubernetes-pods-direct-controllers
-      kubernetes_sd_configs:
-      - role: pod
-      pipeline_stages:
-      - cri: {}
-      - labeldrop:
-        - filename
-      relabel_configs:
-      - action: drop
-        regex: ".+"
-        separator: ''
-        source_labels:
-        - __meta_kubernetes_pod_label_name
-        - __meta_kubernetes_pod_label_app
-      - action: drop
-        regex: "[0-9a-z-.]+-[0-9a-f]{8,10}"
-        source_labels:
-        - __meta_kubernetes_pod_controller_name
-      - source_labels:
-        - __meta_kubernetes_pod_controller_name
-        target_label: __service__
-      - source_labels:
-        - __meta_kubernetes_pod_node_name
-        target_label: __host__
-      - action: drop
-        regex: ''
-        source_labels:
-        - __service__
-      - action: labelmap
-        regex: __meta_kubernetes_pod_label_(.+)
-      - action: replace
-        replacement:
-        separator: "/"
-        source_labels:
-        - __meta_kubernetes_namespace
-        - __service__
-        target_label: job
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_namespace
-        target_label: namespace
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_pod_name
-        target_label: instance
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_pod_container_name
-        target_label: container_name
-      - replacement: "/var/log/pods/*\$1/*.log"
-        separator: "/"
-        source_labels:
-        - __meta_kubernetes_pod_uid
-        - __meta_kubernetes_pod_container_name
-        target_label: __path__
-    - job_name: kubernetes-pods-indirect-controller
-      kubernetes_sd_configs:
-      - role: pod
-      pipeline_stages:
-      - cri: {}
-      - labeldrop:
-        - filename
-      relabel_configs:
-      - action: drop
-        regex: ".+"
-        separator: ''
-        source_labels:
-        - __meta_kubernetes_pod_label_name
-        - __meta_kubernetes_pod_label_app
-      - action: keep
-        regex: "[0-9a-z-.]+-[0-9a-f]{8,10}"
-        source_labels:
-        - __meta_kubernetes_pod_controller_name
-      - action: replace
-        regex: "([0-9a-z-.]+)-[0-9a-f]{8,10}"
-        source_labels:
-        - __meta_kubernetes_pod_controller_name
-        target_label: __service__
-      - source_labels:
-        - __meta_kubernetes_pod_node_name
-        target_label: __host__
-      - action: drop
-        regex: ''
-        source_labels:
-        - __service__
-      - action: labelmap
-        regex: __meta_kubernetes_pod_label_(.+)
-      - action: replace
-        replacement:
-        separator: "/"
-        source_labels:
-        - __meta_kubernetes_namespace
-        - __service__
-        target_label: job
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_namespace
-        target_label: namespace
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_pod_name
-        target_label: instance
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_pod_container_name
-        target_label: container_name
-      - replacement: "/var/log/pods/*\$1/*.log"
-        separator: "/"
-        source_labels:
-        - __meta_kubernetes_pod_uid
-        - __meta_kubernetes_pod_container_name
-        target_label: __path__
-    - job_name: kubernetes-pods-static
-      kubernetes_sd_configs:
-      - role: pod
-      pipeline_stages:
-      - cri: {}
-      - labeldrop:
-        - filename
-      relabel_configs:
-      - action: drop
-        regex: ''
-        source_labels:
-        - __meta_kubernetes_pod_annotation_kubernetes_io_config_mirror
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_pod_label_component
-        target_label: __service__
-      - source_labels:
-        - __meta_kubernetes_pod_node_name
-        target_label: __host__
-      - action: drop
-        regex: ''
-        source_labels:
-        - __meta_kubernetes_pod_annotation_kubernetes_io_config_mirror
-      - action: labelmap
-        regex: __meta_kubernetes_pod_label_(.+)
-      - action: replace
-        replacement:
-        separator: "/"
-        source_labels:
-        - __meta_kubernetes_namespace
-        - __service__
-        target_label: job
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_namespace
-        target_label: namespace
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_pod_name
-        target_label: instance
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_pod_container_name
-        target_label: container_name
-      - replacement: "/var/log/pods/*\$1/*.log"
-        separator: "/"
-        source_labels:
-        - __meta_kubernetes_pod_annotation_kubernetes_io_config_mirror
-        - __meta_kubernetes_pod_container_name
-        target_label: __path__
     - job_name: journal
       journal:
         path: /var/log/journal
         labels:
           job: systemd-journal
+      pipeline_stages:
+      - labeldrop:
+        - filename
+        - stream
+      - pack:
+          labels:
+          - boot_id
+          - systemd_unit
+      - labelallow:
+          - host
+          - invoker
       relabel_configs:
       - action: labelmap
-        regex: __journal__(boot_id|systemd_unit)
+        regex: __journal__(.+)
     server:
       http_listen_port: 3101
     target_config:
       sync_period: 10s
 EOF
-cat >> "${SHARED_DIR}/manifest_creds.yml" << EOF
+cat >> "${SHARED_DIR}/manifest_stage_creds.yml" << EOF
 apiVersion: v1
 kind: Secret
 metadata:
-  name: promtail-creds
+  name: promtail-stage-creds
   namespace: loki
 data:
-  client-id: "$(cat /var/run/loki-secret/client-id | base64 -w 0)"
-  client-secret: "$(cat /var/run/loki-secret/client-secret | base64 -w 0)"
+  client-id: "$(cat /var/run/loki-stage-secret/client-id | base64 -w 0)"
+  client-secret: "$(cat /var/run/loki-stage-secret/client-secret | base64 -w 0)"
+EOF
+cat >> "${SHARED_DIR}/manifest_prod_creds.yml" << EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: promtail-prod-creds
+  namespace: loki
+data:
+  client-id: "$(cat /var/run/loki-prod-secret/client-id | base64 -w 0)"
+  client-secret: "$(cat /var/run/loki-prod-secret/client-secret | base64 -w 0)"
 EOF
 cat >> "${SHARED_DIR}/manifest_grafanacom_creds.yml" << EOF
 apiVersion: v1
@@ -403,7 +229,7 @@ spec:
         app.kubernetes.io/instance: loki-promtail
         app.kubernetes.io/name: promtail
         app.kubernetes.io/part-of: loki
-        app.kubernetes.io/version: ${LOKI_VERSION}
+        app.kubernetes.io/version: ${PROMTAIL_VERSION}
     spec:
       containers:
       - args:
@@ -411,18 +237,40 @@ spec:
         - --oidc.client-secret=\$(CLIENT_SECRET)
         - --oidc.issuer-url=https://sso.redhat.com/auth/realms/redhat-external
         - --margin=10m
-        - --file=/tmp/shared/bearer_token
-        name: bearer-token
+        - --file=/tmp/shared/stage_bearer_token
+        name: stage-bearer-token
         env:
           - name: CLIENT_ID
             valueFrom:
               secretKeyRef:
-                name: promtail-creds
+                name: promtail-stage-creds
                 key: client-id
           - name: CLIENT_SECRET
             valueFrom:
               secretKeyRef:
-                name: promtail-creds
+                name: promtail-stage-creds
+                key: client-secret
+        volumeMounts:
+        - mountPath: "/tmp/shared"
+          name: shared-data
+        image: quay.io/observatorium/token-refresher
+      - args:
+        - --oidc.client-id=\$(CLIENT_ID)
+        - --oidc.client-secret=\$(CLIENT_SECRET)
+        - --oidc.issuer-url=https://sso.redhat.com/auth/realms/redhat-external
+        - --margin=10m
+        - --file=/tmp/shared/prod_bearer_token
+        name: prod-bearer-token
+        env:
+          - name: CLIENT_ID
+            valueFrom:
+              secretKeyRef:
+                name: promtail-prod-creds
+                key: client-id
+          - name: CLIENT_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: promtail-prod-creds
                 key: client-secret
         volumeMounts:
         - mountPath: "/tmp/shared"
@@ -440,7 +288,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
-        image: grafana/promtail:${LOKI_VERSION}
+        image: ${PROMTAIL_IMAGE}:${PROMTAIL_VERSION}
         imagePullPolicy: IfNotPresent
         name: promtail
         ports:

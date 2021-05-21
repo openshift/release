@@ -7,6 +7,7 @@ set -o pipefail
 #Read necessary variables
 CLUSTER_NAME=$(<"${SHARED_DIR}"/CLUSTER_NAME)
 LB_FIP_IP=$(<"${SHARED_DIR}"/LB_FIP_IP)
+INGRESS_FIP_IP=$(<"${SHARED_DIR}"/INGRESS_FIP_IP)
 
 PULL_SECRET=$(<"${CLUSTER_PROFILE_DIR}"/pull-secret)
 SSH_PUB_KEY=$(<"${CLUSTER_PROFILE_DIR}"/ssh-publickey)
@@ -18,12 +19,18 @@ apiVersion: ${CONFIG_API_VERSION}
 baseDomain: ${BASE_DOMAIN}
 metadata:
   name: ${CLUSTER_NAME}
+networking:
+  networkType: ${NETWORK_TYPE}
 platform:
   openstack:
-    cloud:            ${OS_CLOUD}
-    externalNetwork:  ${OPENSTACK_EXTERNAL_NETWORK}
-    computeFlavor:    ${OPENSTACK_COMPUTE_FLAVOR}
-    lbFloatingIP:     ${LB_FIP_IP}
+    cloud:             ${OS_CLOUD}
+    externalNetwork:   ${OPENSTACK_EXTERNAL_NETWORK}
+    computeFlavor:     ${OPENSTACK_COMPUTE_FLAVOR}
+    lbFloatingIP:      ${LB_FIP_IP}
+    ingressFloatingIP: ${INGRESS_FIP_IP}
+    externalDNS:
+      - 1.1.1.1
+      - 1.0.0.1
 pullSecret: >
   ${PULL_SECRET}
 sshKey: |

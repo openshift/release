@@ -25,16 +25,17 @@ items:
         serviceAccountName: sinker
         containers:
         - name: sinker
-          image: gcr.io/k8s-prow/sinker:v20210302-aa40187f73
+          image: gcr.io/k8s-prow/sinker:v20210521-0570b0687e
           args:
           - --config-path=/etc/config/config.yaml
+          - --supplemental-prow-config-dir=/etc/config
           - --job-config-path=/etc/job-config
           - --projected-token-file=/var/sa-token/token
           - --dry-run=false
           env:
           # Multiple configs can only be passed via the env var and not via the flag
           - name: KUBECONFIG
-            value: /etc/build-farm-credentials/api.ci.kubeconfig:/etc/build-farm-credentials/build01.kubeconfig:/etc/build-farm-credentials/app.ci.kubeconfig:/etc/build-farm-credentials/build02.kubeconfig:/etc/build-farm-credentials/vsphere.kubeconfig
+            value: /etc/build-farm-credentials/build01.kubeconfig:/etc/build-farm-credentials/app.ci.kubeconfig:/etc/build-farm-credentials/build02.kubeconfig:/etc/build-farm-credentials/vsphere.kubeconfig:/etc/build-farm-credentials/arm01.kubeconfig
           ports:
           - name: metrics
             containerPort: 9090
@@ -135,8 +136,8 @@ items:
         - name: build-farm-credentials
           secret:
             items:
-            - key: sa.sinker.api.ci.config
-              path: api.ci.kubeconfig
+            - key: sa.sinker.arm01.config
+              path: arm01.kubeconfig
             - key: sa.sinker.build01.config
               path: build01.kubeconfig
             - key: sa.sinker.app.ci.config

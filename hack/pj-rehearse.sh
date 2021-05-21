@@ -12,5 +12,10 @@ echo "Copying redhat-operator-ecosystem/release content"
 cp -Rn ../../redhat-operator-ecosystem/release/ci-operator/config/* ./ci-operator/config/
 cp -Rn ../../redhat-operator-ecosystem/release/ci-operator/jobs/* ./ci-operator/jobs/
 
+if echo "${JOB_SPEC}"|grep -q '"author":"openshift-bot"'; then
+  echo "Pull request is created by openshift-bot, skipping rehearsal"
+  exit 0
+fi
+
 echo "Running pj-rehearse"
-pj-rehearse "$@"
+exec pj-rehearse "$@"

@@ -7,6 +7,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: golang-1.10
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
   ocp_builder_rhel-8-golang-openshift-4.6:
     name: builder
     namespace: ocp
@@ -15,18 +19,22 @@ base_images:
     name: release
     namespace: openshift
     tag: golang-1.10
+  openshift_release_golang-1.16:
+    name: release
+    namespace: openshift
+    tag: golang-1.16
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.10
+    tag: golang-1.16
 images:
 - dockerfile_path: Dockerfile.okd
   from: base
   inputs:
-    openshift_release_golang-1.10:
+    openshift_release_golang-1.16:
       as:
-      - registry.svc.ci.openshift.org/openshift/release:golang-1.10
+      - registry.ci.openshift.org/openshift/release:golang-1.16
   to: operator-marketplace
 promotion:
   name: "4.8"
@@ -40,38 +48,10 @@ tag_specification:
   name: "4.8"
   namespace: origin
 tests:
-- as: unit
-  commands: make unit
-  container:
-    from: src
 - as: e2e-aws
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
-- as: e2e-aws-operator
-  steps:
-    cluster_profile: aws
-    test:
-    - as: test
-      cli: latest
-      commands: make e2e-job
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
-- as: e2e-aws-console-olm
-  steps:
-    cluster_profile: aws
-    test:
-    - as: test
-      cli: latest
-      commands: ./test-prow-e2e.sh olmFull
-      from: stable:console-tests
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: operator-framework

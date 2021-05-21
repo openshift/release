@@ -4,6 +4,7 @@ set -euo pipefail
 
 export VAULT_ADDR=https://vault.ci.openshift.org
 
+VAULT_TOKEN="${VAULT_TOKEN:-$(vault token lookup --format=json|jq .data.id -r)}"
 [[ -z ${VAULT_TOKEN:-} ]] && echo '$VAULT_TOKEN is undefined' && exit 1
 
 RAW_VAULT_OIDC_VALUES="$(kubectl --context=app.ci get secret -n dex vault-secret -o json)"
@@ -14,7 +15,15 @@ VAULT_OIDC_CLIENT_SECRET="$(echo $RAW_VAULT_OIDC_VALUES|jq '.data["vault-secret"
 # Enable kv backend
 vault secrets list|grep -q kv || vault secrets enable -version=2 kv
 
-# Enable and configure OIDC auth
+# Enable and configure kubernetes and OIDC auth
+vault auth list|grep -q kubernetes ||  vault auth enable kubernetes
+VAULT_KUBE_TOKEN="$(oc --context=app.ci serviceaccounts -n vault get-token vault)"
+APP_CI_CA_CERT="$(oc --context=app.ci get configmap -n kube-public kube-root-ca.crt -o json|jq '.data["ca.crt"]' -r)"
+vault write auth/kubernetes/config \
+    token_reviewer_jwt="${VAULT_KUBE_TOKEN}" \
+    kubernetes_host=https://kubernetes.default.svc.cluster.local \
+    kubernetes_ca_cert="${APP_CI_CA_CERT}"
+
 vault auth list |grep -q oidc || vault auth enable oidc
 echo "Configuring OIDC"
 vault write auth/oidc/config -<<EOH
@@ -29,10 +38,13 @@ EOH
 echo "Configuring OIDC role"
 vault write auth/oidc/role/oidc_default_role \
   allowed_redirect_uris="https://vault.ci.openshift.org/ui/vault/auth/oidc/oidc/callback,http://localhost:8250/oidc/callback" \
-  token_ttl=600 \
-  token_max_ttl=600 \
+  token_ttl=3600 \
+  token_max_ttl=3600 \
   oidc_scopes="profile" \
   user_claim="preferred_username"
+
+# Set this as default, ref https://support.hashicorp.com/hc/en-us/articles/360001922527-Configuring-a-Default-UI-Auth-Method
+vault write sys/auth/oidc/tune listing_visibility="unauth"
 
 # Extend the default policy to allow everyone to manage secrets at
 # secrets/personal/{{ldap_name}}
@@ -126,15 +138,137 @@ path "sys/tools/hash/*" {
 path "sys/control-group/request" {
     capabilities = ["update"]
 }
-# Allow everyone to have a personal space for themselves in the KV store
-path "secret/personal/data/{{identity.entity.aliases.${OIDC_ACCESSOR_ID}.name}}/*" {
-  capabilities = ["create", "update", "read", "delete"]
+EOH
+
+# Create the secret generator policy and role
+vault policy write secret-generator -<<EOH
+path "kv/data/dptp/*" {
+  capabilities = ["create", "update", "read"]
 }
 
-path "secret/personal/metadata/{{identity.entity.aliases.${OIDC_ACCESSOR_ID}.name}}/*" {
+path "kv/metadata/dptp/*" {
   capabilities = ["list"]
 }
 EOH
+vault write auth/kubernetes/role/secret-generator \
+    bound_service_account_names=secret-generator \
+    bound_service_account_namespaces=ci \
+    policies=secret-generator \
+    ttl=1h
+
+# Create the secret bootstrap policy and role
+vault policy write secret-bootstrap -<<EOH
+path "kv/data/*" {
+  capabilities = ["read"]
+}
+
+path "kv/metadata/*" {
+  capabilities = ["list"]
+}
+EOH
+vault write auth/kubernetes/role/secret-bootstrap \
+    bound_service_account_names=secret-bootstrap \
+    bound_service_account_namespaces=ci \
+    policies=secret-bootstrap \
+    ttl=1h
+
+vault policy write release-controller -<<EOH
+path "kv/data/dptp/openshift-ci-release-signature-signer" {
+  capabilities = ["create", "update", "read"]
+}
+
+path "kv/data/dptp/openshift-ci-release-signature-publisher" {
+  capabilities = ["create", "update", "read"]
+}
+
+# Doesn't allow access to the actual data and we can not give
+# list for individual names
+path "kv/metadata/dptp/*" {
+  capabilities = ["list"]
+}
+
+# Allows getting the old revisions
+path "kv/metadata/dptp/openshift-ci-release-signature-*" {
+  capabilities = ["read"]
+}
+EOH
+
+getUserIDByLDAPName() {
+  curl -Ss --fail -H "X-vault-token: ${VAULT_TOKEN}" "$VAULT_ADDR/v1/identity/entity/id?list=true" \
+   |jq --arg user "$1" '.data.key_info|to_entries[]|select(.value.aliases[0].name == $user)|.key' -r
+}
+
+# unused but left for documentation purposes
+upsertUser() {
+  user=$1
+  if [[ -n "$(getUserIDByLDAPName $1)" ]]; then echo "User $user already exists, skipping create"; return; fi
+  oidc_acessor="$(vault auth list --format=json |jq '."oidc/".accessor' -r)"
+  create_response="$(vault write -format=json identity/entity name="$user" policies="default")"
+  id="$(echo $create_response|jq .data.id -r)"
+  vault write identity/entity-alias name="$user" canonical_id="$id" mount_accessor="$oidc_acessor" >/dev/null
+  echo "Successfully created user $user"
+}
+
+getUserIDByLDAPName brawilli
+vault write identity/group name="release-controller" policies="release-controller" member_entity_ids="$(getUserIDByLDAPName brawilli)"
+
+vault policy write vault-secret-collection-manager -<<EOH
+path "identity/group" {
+  capabilities = ["create", "update"]
+}
+
+path "identity/group/*" {
+  capabilities = ["read", "list", "create", "update", "delete"]
+}
+
+path "sys/policies/acl/*" {
+  capabilities = ["read", "list", "create", "update", "delete"]
+}
+
+path "sys/auth" {
+  capabilities = ["read"]
+}
+
+path "identity/entity-alias/id" {
+  capabilities = ["list"]
+}
+
+path "identity/entity/id"  {
+  capabilities = ["list"]
+}
+
+path "identity/entity" {
+  capabilities = ["create", "update"]
+}
+
+path "identity/entity-alias" {
+  capabilities = ["create", "update"]
+}
+
+path "identity/entity/id/*"  {
+  capabilities = ["read"]
+}
+
+path "identity/entity/name/*"  {
+  capabilities = ["read"]
+}
+
+path "kv/metadata/selfservice/*" {
+  capabilities = ["list", "delete"]
+}
+
+# We create a marker item and create is
+# actually upsert, so needs both read and
+# create
+path "kv/data/selfservice/*" {
+  capabilities = ["create", "read"]
+}
+EOH
+vault write auth/kubernetes/role/vault-secret-collection-manager \
+  bound_service_account_names=vault-secret-collection-manager \
+  bound_service_account_namespaces=ci \
+  policies=vault-secret-collection-manager \
+  ttl=1h
 
 # Make dptp members admins
 echo "Setting up admin policy"
@@ -152,7 +286,8 @@ dptp_member_aliases='[
   "bbarcaro",
   "apavel",
   "nmoraiti",
-  "pmuller"
+  "pmuller",
+  "eberglin"
  ]'
 dptp_ids="$(curl -Ss --fail -H "X-vault-token: ${VAULT_TOKEN}" "$VAULT_ADDR/v1/identity/entity/id?list=true" \
             |jq \

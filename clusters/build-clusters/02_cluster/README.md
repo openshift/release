@@ -7,7 +7,7 @@ The secrets have been uploaded to BitWarden item `build_farm_02_cluster`:
 * the key file for the service account `ocp-cluster-installer`
 * the SSH key pair (`id_rsa` and `id_rsa.pub`)
 * install-config.yaml.001 (the one with the desired instance type)
-* The auth info for `kubeadmin`
+* The auth info for `kubeadmin` and the cert-based kubeconfig file (attachment `b02.admin.cert.kubeconfig`).
 * Github application for aouth: `github_client_id` and `github_client_secret`
 
 ## Installation
@@ -46,7 +46,7 @@ Then,
 
 > ./openshift-install create  cluster --log-level=debug
 
-The installation folder is uploaded to [gdrive](https://drive.google.com/open?id=1mWdf6RnQG4JefJbBsCMqen1yhYLuDo93). We need it for destroying the cluster.
+The installation folder is uploaded to gdrive (search for "cluster.openshift4.new"). We need it for destroying the cluster.
 
 ### Regenerate `install-config.yaml`
 

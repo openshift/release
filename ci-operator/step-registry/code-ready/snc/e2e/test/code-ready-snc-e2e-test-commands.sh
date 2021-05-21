@@ -3,6 +3,14 @@ set -euo pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
+GOOGLE_COMPUTE_REGION="${LEASED_RESOURCE}"
+GOOGLE_COMPUTE_ZONE="$(< ${SHARED_DIR}/openshift_gcp_compute_zone)"
+if [[ -z "${GOOGLE_COMPUTE_ZONE}" ]]; then
+  echo "Expected \${SHARED_DIR}/openshift_gcp_compute_zone to contain the GCP zone"
+  exit 1
+fi
+
 INSTANCE_PREFIX="${NAMESPACE}"-"${JOB_NAME_HASH}"
 
 mkdir -p "${HOME}"/.ssh
@@ -24,7 +32,7 @@ gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
 gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
 gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
-cat  > "${HOME}"/run-tests.sh << 'EOF'
+cat > "${HOME}"/run-tests.sh << 'EOF'
 #!/bin/bash
 
 set -euo pipefail
@@ -69,4 +77,4 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJE
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   packer@"${INSTANCE_PREFIX}" \
-  --command "timeout 360m bash -ce \"/home/packer/run-tests.sh\""
+  --command "export PULL_NUMBER=${PULL_NUMBER} && timeout 360m bash -ce \"/home/packer/run-tests.sh\""

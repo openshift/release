@@ -149,7 +149,8 @@ tests:
   container:
     from: src
 - as: golint
-  commands: IS_CONTAINER=TRUE ./hack/go-lint.sh -min_confidence 0.3 $(go list -f '{{ .ImportPath }}' ./...)
+  commands: IS_CONTAINER=TRUE ./hack/go-lint.sh -min_confidence 0.3 $(go list -f '{{
+    .ImportPath }}' ./...)
   container:
     from: src
 - as: verify-vendor
@@ -171,7 +172,7 @@ tests:
 - as: e2e-aws-upgrade
   steps:
     cluster_profile: aws
-    workflow: openshift-upgrade-aws
+    workflow: openshift-upgrade-aws-latestinstaller
 - as: e2e-aws-upi
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer_upi:
@@ -189,13 +190,13 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws-workers-rhel7
 - as: e2e-aws-disruptive
-  commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_SUITE=openshift/conformance/parallel run-tests
-  openshift_installer:
+  steps:
     cluster_profile: aws
+    workflow: openshift-e2e-aws-disruption
 - as: e2e-gcp-upgrade
   steps:
     cluster_profile: gcp
-    workflow: openshift-upgrade-gcp
+    workflow: openshift-upgrade-gcp-latestinstaller
 - as: e2e-vsphere-upi
   steps:
     cluster_profile: vsphere
@@ -211,7 +212,7 @@ tests:
 - as: e2e-ovirt
   steps:
     cluster_profile: ovirt
-    workflow: openshift-e2e-ovirt-minimal-without-csi
+    workflow: openshift-e2e-ovirt-minimal-release-4.4-4.5
 zz_generated_metadata:
   branch: release-4.5
   org: openshift

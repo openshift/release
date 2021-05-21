@@ -1,0 +1,42 @@
+base_images:
+  os-min8:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+binary_build_commands: make build
+build_root:
+  project_image:
+    dockerfile_path: Dockerfile.tools
+images:
+- dockerfile_path: Dockerfile
+  from: os-min8
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift-kni/debug-tools/_output
+  to: debug-tools
+promotion:
+  name: debug-tools
+  namespace: ocp-kni
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.7"
+  namespace: ocp
+tests:
+- as: ci
+  commands: make ci-job
+  container:
+    from: src
+- as: ci-unit
+  commands: make test-unit
+  container:
+    from: src
+zz_generated_metadata:
+  branch: main
+  org: openshift-kni
+  repo: debug-tools

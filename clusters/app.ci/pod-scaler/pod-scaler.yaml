@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"pod-scaler:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"pod-scaler\")].image"}]'
+  labels:
+    app: pod-scaler-producer
+  name: pod-scaler-producer
+  namespace: ci
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      app: pod-scaler-producer
+  template:
+    metadata:
+      labels:
+        app: pod-scaler-producer
+    spec:
+      containers:
+      - image: pod-scaler
+        name: pod-scaler
+        args:
+        - --loglevel=debug
+        - --cache-bucket=origin-ci-resource-usage-data
+        - --gcs-credentials-file=/etc/gcs/service-account.json
+        - --mode=producer
+        env:
+        - name: KUBECONFIG
+          value: /var/kubeconfigs/app.ci.config:/var/kubeconfigs/build01.config:/var/kubeconfigs/build02.config
+        volumeMounts:
+        - name: kubeconfigs
+          mountPath: /var/kubeconfigs
+        - name: gcs-credentials
+          mountPath: /etc/gcs
+          readOnly: true
+        resources:
+          requests:
+            memory: "3Gi"
+            cpu: "500m"
+          limits:
+            memory: "4Gi"
+      volumes:
+      - name: kubeconfigs
+        secret:
+          secretName: pod-scaler-credentials
+      - name: gcs-credentials
+        secret:
+          secretName: gce-sa-credentials-resource-usage-data-publisher

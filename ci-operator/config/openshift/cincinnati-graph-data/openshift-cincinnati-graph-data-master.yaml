@@ -1,3 +1,8 @@
+base_images:
+  ubi8-python36:
+    name: builder
+    namespace: ocp
+    tag: ubi8.python.36
 build_root:
   image_stream_tag:
     name: release
@@ -6,6 +11,25 @@ build_root:
 images:
 - dockerfile_path: graph-data.rs/Dockerfile
   to: graphdata
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      cat <<DOCKERFILE > /tmp/Dockerfile
+      FROM ubi8-python36
+      WORKDIR /go/src/github.com/openshift/cincinnati-graph-data/hack
+      COPY . .
+      RUN pip3 install -r requirements.txt
+      DOCKERFILE
+    from: ubi8-python36
+    to: src-dockerfile
+- project_directory_image_build_step:
+    from: src
+    inputs:
+      src-dockerfile:
+        paths:
+        - destination_dir: .
+          source_path: /tmp/Dockerfile
+    to: hack-unittests
 resources:
   '*':
     requests:
@@ -16,6 +40,10 @@ tests:
   commands: /usr/local/bin/cincinnati-graph-data
   container:
     from: graphdata
+- as: errata-webhook-unittests
+  commands: python3 -m unittest
+  container:
+    from: hack-unittests
 zz_generated_metadata:
   branch: master
   org: openshift

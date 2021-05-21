@@ -19,6 +19,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.15-openshift-4.8
+  ocp_builder_rhel-8-golang-1.16-openshift-4.8:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.16-openshift-4.8
   ocp_builder_rhel-8-golang-openshift-4.6:
     name: builder
     namespace: ocp
@@ -35,28 +39,36 @@ base_images:
     name: release
     namespace: openshift
     tag: golang-1.14
+  openshift_release_golang-1.15:
+    name: release
+    namespace: openshift
+    tag: golang-1.15
+  openshift_release_golang-1.16:
+    name: release
+    namespace: openshift
+    tag: golang-1.16
 binary_build_commands: make build
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: golang-1.16
 canonical_go_repository: k8s.io/autoscaler
 images:
 - dockerfile_path: images/cluster-autoscaler/Dockerfile.rhel
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.15-openshift-4.8:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.8:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
   to: cluster-autoscaler
 - context_dir: vertical-pod-autoscaler
-  dockerfile_path: Dockerfile.openshift
+  dockerfile_path: Dockerfile.rhel
   from: base
   inputs:
-    openshift_release_golang-1.14:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.8:
       as:
-      - registry.svc.ci.openshift.org/openshift/release:golang-1.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
   to: vertical-pod-autoscaler
 promotion:
   name: "4.8"
@@ -88,7 +100,7 @@ tag_specification:
 test_binary_build_commands: OS_GOFLAGS='-race' make build
 tests:
 - as: unit
-  commands: JUNIT_REPORT=1 hack/test-go.sh
+  commands: JUNIT_REPORT=1 GO111MODULE=auto hack/test-go.sh
   container:
     from: src
 - as: git-history
@@ -100,7 +112,7 @@ tests:
   container:
     from: src
 - as: govet
-  commands: IS_CONTAINER=TRUE make vet
+  commands: IS_CONTAINER=TRUE GO111MODULE=auto make vet
   container:
     from: src
 - as: golint

@@ -188,6 +188,7 @@ read -d '#' INCL_EXT << EOF
 [sig-node][Late] should not have pod creation failures due to systemd timeouts [Suite:openshift/conformance/parallel]
 [sig-api-machinery][Feature:APIServer][Late] API LBs follow /readyz of kube-apiserver and stop sending requests [Suite:openshift/conformance/parallel]
 [sig-api-machinery][Feature:APIServer][Late] API LBs follow /readyz of kube-apiserver and don't send request early [Suite:openshift/conformance/parallel]
+[sig-network-edge] DNS should answer A and AAAA queries for a dual-stack service [Suite:openshift/conformance/parallel]
 #
 EOF
 

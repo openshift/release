@@ -34,6 +34,13 @@ then
   scp "${SSHOPTS[@]}" "${SHARED_DIR}/sno-additional-config" "root@${IP}:sno-additional-config"
 fi
 
+# TODO: Figure out way to get these parameters (used by deploy_ibip) without hardcoding them here
+# preferrably by making deploy_ibip / makefile perform these configurations itself in the assisted_test_infra
+# repo.
+export SINGLE_NODE_IP_ADDRESS="192.168.126.10"
+export CLUSTER_NAME="test-infra-cluster"
+export CLUSTER_API_DOMAIN="api.${CLUSTER_NAME}.redhat.com"
+
 timeout -s 9 175m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
 
 set -xeuo pipefail
@@ -71,9 +78,14 @@ then
   cat /root/sno-additional-config >> /root/config
 fi
 
-echo "export KUBECONFIG=\${REPO_DIR}/build/kubeconfig" >> /root/.bashrc
+echo "export KUBECONFIG=\${REPO_DIR}/build/ibip/auth/kubeconfig" >> /root/.bashrc
 
 source /root/config
+
+# Configure dnsmasq
+echo "${SINGLE_NODE_IP_ADDRESS} ${CLUSTER_API_DOMAIN}" | tee --append /etc/hosts
+echo Reloading NetworkManager systemd configuration
+systemctl reload NetworkManager
 
 timeout -s 9 105m make create_full_environment deploy_ibip
 

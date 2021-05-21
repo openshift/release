@@ -4,19 +4,35 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# These values serve as defaults when the parameters are not set, which should
+# only happen in rehearsals. Production jobs should always set the OO_* variables.
+REHEARSAL_INDEX="brew.registry.redhat.io/rh-osbs-stage/iib:23576"
+REHEARSAL_PACKAGE="e2e-test-operator"
+REHEARSAL_CHANNEL="4.3"
+REHEARSAL_INSTALL_NAMESPACE="!create"
+REHEARSAL_TARGET_NAMESPACES="!install"
+
+if [[ $JOB_NAME != rehearse-* ]]; then
+    if [[ -z ${OO_INDEX:-} ]] || [[ -z ${OO_PACKAGE:-} ]] || [[ -z ${OO_CHANNEL:-} ]]; then
+        echo "At least of required variables OO_INDEX=${OO_INDEX:-} OO_PACKAGE=${OO_PACKAGE:-} OO_CHANNEL=${OO_CHANNEL:-} is unset"
+        echo "Variables are only allowed to be unset in rehearsals"
+        exit 1
+    fi
+fi
+
 # The pullspec of an index image. Required.
-OO_INDEX="$OO_INDEX"
+OO_INDEX="${OO_INDEX:-$REHEARSAL_INDEX}"
 
 # The name of the operator package to be installed. Must be present in
 # the index image referenced by $OO_INDEX. Required.
-OO_PACKAGE="$OO_PACKAGE"
+OO_PACKAGE="${OO_PACKAGE:-$REHEARSAL_PACKAGE}"
 
 # The name of the operator channel to track. Required.
-OO_CHANNEL="$OO_CHANNEL"
+OO_CHANNEL="${OO_CHANNEL:-$REHEARSAL_CHANNEL}"
 
 # The namespace into which the operator and catalog will be
 # installed. Special value `!create` means that a new namespace will be created.
-OO_INSTALL_NAMESPACE="${OO_INSTALL_NAMESPACE}"
+OO_INSTALL_NAMESPACE="${OO_INSTALL_NAMESPACE:-$REHEARSAL_INSTALL_NAMESPACE}"
 
 # A comma-separated list of namespaces the operator will target. Special, value
 # `!all` means that all namespaces will be targeted. If no OperatorGroup exists
@@ -25,7 +41,14 @@ OO_INSTALL_NAMESPACE="${OO_INSTALL_NAMESPACE}"
 # namespace set will be replaced. The special value "!install" will set the
 # target namespace to the operator's installation namespace.
 
-OO_TARGET_NAMESPACES="${OO_TARGET_NAMESPACES}"
+OO_TARGET_NAMESPACES="${OO_TARGET_NAMESPACES:-$REHEARSAL_TARGET_NAMESPACES}"
+
+echo "== Parameters:"
+echo "OO_INDEX:             $OO_INDEX"
+echo "OO_PACKAGE:           $OO_PACKAGE"
+echo "OO_CHANNEL:           $OO_CHANNEL"
+echo "OO_INSTALL_NAMESPACE: $OO_INSTALL_NAMESPACE"
+echo "OO_TARGET_NAMESPACES: $OO_TARGET_NAMESPACES"
 
 if [[ "$OO_INSTALL_NAMESPACE" == "!create" ]]; then
     echo "OO_INSTALL_NAMESPACE is '!create': creating new namespace"
@@ -104,6 +127,10 @@ EOF
 )
 
 echo "CatalogSource name is \"$CATSRC\""
+
+DEPLOYMENT_START_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+echo "Set the deployment start time: ${DEPLOYMENT_START_TIME}"
+
 echo "Creating Subscription"
 
 SUB=$(
@@ -129,6 +156,20 @@ for _ in $(seq 1 60); do
     if [[ -n "$CSV" ]]; then
         if [[ "$(oc -n "$OO_INSTALL_NAMESPACE" get csv "$CSV" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
             echo "ClusterServiceVersion \"$CSV\" ready"
+
+            DEPLOYMENT_ART="oo_deployment_details.yaml"
+            echo "Saving deployment details in ${DEPLOYMENT_ART} as a shared artifact"
+            cat > "${ARTIFACT_DIR}/${DEPLOYMENT_ART}" <<EOF
+---
+csv: "${CSV}"
+operatorgroup: "${OPERATORGROUP}"
+subscription: "{SUB}"
+catalogsource: "${CATSRC}"
+install_namespace: "${OO_INSTALL_NAMESPACE}"
+target_namespaces: "${OO_TARGET_NAMESPACES}"
+deployment_start_time: "${DEPLOYMENT_START_TIME}"
+EOF
+            cp "${ARTIFACT_DIR}/${DEPLOYMENT_ART}" "${SHARED_DIR}/${DEPLOYMENT_ART}"
             exit 0
         fi
     fi
@@ -178,7 +219,7 @@ if [[ -n "$CSV" ]]; then
     done
 else
     CSV_ART="$ARTIFACT_DIR/$OO_INSTALL_NAMESPACE-all-csvs.yaml"
-    echo "ClusterServiceVersion $CSV was never created"
+    echo "ClusterServiceVersion was never created"
     echo "Dumping all ClusterServiceVersions in namespace $OO_INSTALL_NAMESPACE to $CSV_ART"
     oc get -n "$OO_INSTALL_NAMESPACE" csv -o yaml >"$CSV_ART"
 fi

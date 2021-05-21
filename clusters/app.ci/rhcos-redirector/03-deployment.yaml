@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: coreos
+  name: rhcos-redirector
+spec:
+  selector:
+    app: rhcos-redirector
+  ports:
+  - port: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: coreos
+  name: rhcos-redirector
+  labels:
+    app: rhcos-redirector
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"rhcos-redirector:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"rhcos-redirector\")].image"}]'
+spec:
+  replicas: 2
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: rhcos-redirector
+  template:
+    metadata:
+      labels:
+        app: rhcos-redirector
+    spec:
+      containers:
+      - name: rhcos-redirector
+        image: rhcos-redirector
+        resources:
+          requests:
+            memory: "250Mi"
+            cpu: "100m"

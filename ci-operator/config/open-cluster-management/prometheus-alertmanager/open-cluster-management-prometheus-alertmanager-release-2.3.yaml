@@ -1,0 +1,56 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+  open-cluster-management_builder_go1.15-linux:
+    name: builder
+    namespace: open-cluster-management
+    tag: go1.15-linux
+  open-cluster-management_builder_go1.16-linux:
+    name: builder
+    namespace: open-cluster-management
+    tag: go1.16-linux
+  openshift_release_golang-1.13:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: open-cluster-management
+    tag: go1.15-linux
+images:
+- dockerfile_path: Dockerfile.prow
+  from: base
+  inputs:
+    open-cluster-management_builder_go1.16-linux:
+      as:
+      - registry.ci.openshift.org/open-cluster-management/builder:go1.16-linux
+  to: prometheus-alertmanager
+promotion:
+  name: "2.3"
+  namespace: open-cluster-management
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 100m
+      memory: 1Gi
+tag_specification:
+  name: "4.7"
+  namespace: ocp
+test_binary_build_commands: "true"
+tests:
+- as: test
+  commands: |
+    export SELF="make -f Makefile"
+    make -f Makefile build
+    make -f Makefile common-test
+  container:
+    from: src
+zz_generated_metadata:
+  branch: release-2.3
+  org: open-cluster-management
+  repo: prometheus-alertmanager

@@ -21,7 +21,7 @@ prow_config_dir="${base_dir}/core-services/prow/02_config/"
 
 cp -r "${prow_config_dir}"* "${workdir}"
 
-determinize-prow-config --prow-config-dir "${workdir}"
+determinize-prow-config --prow-config-dir "${workdir}" --sharded-prow-config-base-dir "${workdir}"
 
 
 if ! diff -Naupr "${prow_config_dir}" "${workdir}"> "${workdir}/diff"; then

@@ -4,6 +4,13 @@ set -euo pipefail
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 INSTANCE_PREFIX="${NAMESPACE}"-"${JOB_NAME_HASH}"
+GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
+GOOGLE_COMPUTE_REGION="${LEASED_RESOURCE}"
+GOOGLE_COMPUTE_ZONE="$(< ${SHARED_DIR}/openshift_gcp_compute_zone)"
+if [[ -z "${GOOGLE_COMPUTE_ZONE}" ]]; then
+  echo "Expected \${SHARED_DIR}/openshift_gcp_compute_zone to contain the GCP zone"
+  exit 1
+fi
 
 mkdir -p "${HOME}"/.ssh
 mock-nss.sh
@@ -25,9 +32,19 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
     --zone "${GOOGLE_COMPUTE_ZONE}" \
     --recurse packer@"${INSTANCE_PREFIX}":~/snc/crc-tmp-install-data ${ARTIFACT_DIR}
 
-echo "scp bundles back to pod"
+echo "scp bundles back to pod tmp directory"
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
     --quiet \
     --project "${GOOGLE_PROJECT_ID}" \
     --zone "${GOOGLE_COMPUTE_ZONE}" \
-    --recurse packer@"${INSTANCE_PREFIX}":~/snc/*.crcbundle ${ARTIFACT_DIR}
+    --recurse packer@"${INSTANCE_PREFIX}":~/snc/*.crcbundle /tmp
+
+echo "Upload the bundle to gcp crc-bundle bucket"
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gsutil cp /tmp/*.crcbundle gs://crc-bundle/
+
+echo "Make Bundle publicly accessible from bucket"
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gsutil acl \
+   ch -r -u AllUsers:R gs://crc-bundle/
+
+echo "Create file in artifact directory, having links to storage links"
+find /tmp/ -maxdepth 1 -name "*.crcbundle" -exec basename \"{}\" \; | awk '{print "https://storage.googleapis.com/crc-bundle/" $0 ""}' > ${ARTIFACT_DIR}/bundles.txt

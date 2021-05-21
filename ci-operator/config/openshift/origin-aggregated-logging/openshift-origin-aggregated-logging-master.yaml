@@ -8,37 +8,41 @@ base_images:
     namespace: openshift
     tag: "7"
   cluster-logging-operator:
-    name: "5.1"
+    name: "5.2"
     namespace: logging
     tag: cluster-logging-operator
   cluster-logging-operator-e2e:
-    name: "5.1"
+    name: "5.2"
     namespace: logging
     tag: cluster-logging-operator-e2e
   cluster-logging-operator-registry:
-    name: "5.1"
+    name: "5.2"
     namespace: logging
     tag: cluster-logging-operator-registry
   elasticsearch-operator:
-    name: "5.1"
+    name: "5.2"
     namespace: logging
     tag: elasticsearch-operator
   elasticsearch-operator-registry:
-    name: "5.1"
+    name: "5.2"
     namespace: logging
     tag: elasticsearch-operator-registry
   elasticsearch-operator-src:
-    name: "5.1"
+    name: "5.2"
     namespace: logging
     tag: elasticsearch-operator-src
   elasticsearch-proxy:
-    name: "5.1"
+    name: "5.2"
     namespace: logging
     tag: elasticsearch-proxy
   golang-builder:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-openshift-4.6
+  logging-eventrouter:
+    name: "5.2"
+    namespace: logging
+    tag: logging-eventrouter
   oauth-proxy:
     name: "4.7"
     namespace: ocp
@@ -91,14 +95,10 @@ images:
   dockerfile_path: Dockerfile
   from: ubi8-python36
   to: logging-curator5
-- context_dir: eventrouter/
-  dockerfile_path: Dockerfile.centos7
-  from: golang-builder
-  to: logging-eventrouter
 promotion:
   additional_images:
     logging-ci-test-runner: src
-  name: "5.1"
+  name: "5.2"
   namespace: logging
 resources:
   '*':
@@ -113,6 +113,10 @@ tag_specification:
   name: "4.7"
   namespace: ocp
 tests:
+- as: lint
+  commands: make lint
+  container:
+    from: src
 - as: unit
   commands: /tmp/run.sh
   container:
@@ -127,6 +131,10 @@ tests:
       cli: latest
       commands: make test
       dependencies:
+      - env: IMAGE_ELASTICSEARCH_OPERATOR_REGISTRY
+        name: pipeline:elasticsearch-operator-registry
+      - env: IMAGE_ELASTICSEARCH_OPERATOR
+        name: pipeline:elasticsearch-operator
       - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
         name: pipeline:cluster-logging-operator-registry
       - env: IMAGE_CLUSTER_LOGGING_OPERATOR
@@ -185,7 +193,8 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts make test-e2e-olm
+      commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts
+        make test-e2e-olm
       dependencies:
       - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
         name: pipeline:cluster-logging-operator-registry
@@ -197,6 +206,8 @@ tests:
         name: pipeline:logging-curator5
       - env: IMAGE_LOGGING_FLUENTD
         name: pipeline:logging-fluentd
+      - env: IMAGE_ELASTICSEARCH_OPERATOR
+        name: pipeline:elasticsearch-operator
       - env: IMAGE_ELASTICSEARCH_PROXY
         name: pipeline:elasticsearch-proxy
       - env: IMAGE_ELASTICSEARCH6
@@ -218,7 +229,8 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts make test-functional
+      commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts
+        make test-functional
       dependencies:
       - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
         name: pipeline:cluster-logging-operator-registry
@@ -230,6 +242,8 @@ tests:
         name: pipeline:logging-curator5
       - env: IMAGE_LOGGING_FLUENTD
         name: pipeline:logging-fluentd
+      - env: IMAGE_ELASTICSEARCH_OPERATOR
+        name: pipeline:elasticsearch-operator
       - env: IMAGE_ELASTICSEARCH_PROXY
         name: pipeline:elasticsearch-proxy
       - env: IMAGE_ELASTICSEARCH6

@@ -1,0 +1,36 @@
+ref:
+  as: ocm-e2e-kind-create
+  from_image:
+    namespace: open-cluster-management
+    name: builder
+    tag: go1.16-linux
+  commands: ocm-e2e-kind-create-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  credentials:
+  - namespace: test-credentials
+    name: ocm-cicd-aws-kind
+    mount_path: /etc/ocm-cicd-aws-kind
+  env:
+    - name: AWS_CREDENTIALS_SECRET
+      default: ""
+      documentation: |-
+        The name of the kube secret with the AWS credentials.
+    - name: AWS_INSTANCE_TYPE
+      default: "t3.xlarge"
+      documentation: |-
+        The AWS EC2 instance type to use.
+    - name: AWS_REGION
+      default: "us-east-1"
+      documentation: |-
+        The AWS region to use. The KinD AMI is only available in us-east-1,
+        us-east-2, us-west-1, and us-west-2.
+  documentation: |-
+    This step creates AWS VM created to run KinD based tests. The IP address for
+    the VM is stored in ${SHARED_DIR}/public_ip. The SSH private key is stored
+    in ${SHARED_DIR}/private.pem. Because of the way Prow creates the shared
+    directory, the private key file will have 644 permissions when your test
+    starts. You will need to run `chmod 400 "${SHARED_DIR}/private.pem"`
+    before you use the private key file with ssh.

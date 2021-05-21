@@ -117,7 +117,7 @@ class GenDoc():
             comments = self.comments.get(i, None)
             if comments:
                 self.stream.writelines(comments)
-            yaml.safe_dump(res, self.stream, default_flow_style=False)
+            yaml.safe_dump(res, self.stream, default_flow_style=False, width=float("inf"))
 
         if self.owns_file:
             self.stream.close()

@@ -22,7 +22,10 @@ if [[ -f "${AWSCRED}" ]]; then
 
   # Set defaults for AWS if necessary
   COMPUTE_MACHINE_TYPE=${COMPUTE_MACHINE_TYPE:-"m5.xlarge"}
-  CLOUD_PROVIDER_REGION=${CLOUD_PROVIDER_REGION:-"us-east-1"}
+  declare -a AWS_REGIONS=('us-east-1' 'us-east-2' 'us-west-1' 'us-west-2')
+  RAND_REGION="${AWS_REGIONS[$RANDOM % ${#AWS_REGIONS[@]}]}"
+  CLOUD_PROVIDER_REGION=${CLOUD_PROVIDER_REGION:-"${RAND_REGION}"}
+  echo "Will launch in AWS region: ${CLOUD_PROVIDER_REGION}"
 else
   echo "Did not find compatible cloud provider cluster_profile"
   exit 1
@@ -42,6 +45,13 @@ if [[ "$OLD_CLUSTER_ID" != ID* ]]; then
 fi
 
 CLUSTER_INFO="${ARTIFACT_DIR}/ocm-cluster.txt"
+
+echo "Parameters for cluster request:"
+echo "  Cluster name: ${CLUSTER_NAME}"
+echo "  Compute nodes: ${COMPUTE_NODES}"
+echo "  Cluster version: ${CLUSTER_VERSION}"
+echo "  Compute machine type: ${COMPUTE_MACHINE_TYPE}"
+echo "  Cloud provider region: ${CLOUD_PROVIDER_REGION}"
 ocm create cluster ${OCM_CREATE_ARGS} \
                    --ccs "${CLUSTER_NAME}" \
                    --compute-nodes "${COMPUTE_NODES}" \

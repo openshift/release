@@ -96,7 +96,7 @@ tests:
   cron: 0 4,21 * * *
   steps:
     cluster_profile: ovirt
-    workflow: openshift-e2e-ovirt-conformance-without-csi
+    workflow: openshift-e2e-ovirt-conformance-release-4.4-4.5
 - as: e2e-gcp
   interval: 12h
   steps:
@@ -130,7 +130,8 @@ tests:
     test:
     - as: e2e-test
       cli: latest
-      commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts make test-e2e-olm
+      commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts
+        make test-e2e-olm
       from: cluster-logging-operator-e2e
       resources:
         limits:
@@ -202,6 +203,16 @@ tests:
     - chain: ipi-gcp-pre
     - ref: fips-check
     workflow: openshift-e2e-gcp
+- as: e2e-aws-serial
+  interval: 24h
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-serial
+- as: e2e-azure
+  interval: 12h
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure
 zz_generated_metadata:
   branch: master
   org: openshift

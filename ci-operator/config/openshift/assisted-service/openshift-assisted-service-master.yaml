@@ -40,6 +40,12 @@ images:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.15
   to: assisted-service
+operator:
+  bundles:
+  - dockerfile_path: Dockerfile.bundle
+  substitutions:
+  - pullspec: quay.io/ocpmetal/assisted-service:latest
+    with: assisted-service
 promotion:
   name: assisted
   namespace: ocp-kni
@@ -58,19 +64,46 @@ test_binary_build_commands: |
   mkdir /.cache && chmod 775 -R /.cache && chmod 775 -R $GOPATH
 tests:
 - as: lint
-  commands: export GOLANGCI_LINT_CACHE=/tmp/.cache && export GOPROXY=https://proxy.golang.org && make lint
+  commands: export GOLANGCI_LINT_CACHE=/tmp/.cache && export GOPROXY=https://proxy.golang.org
+    && make lint
   container:
     from: test-bin
-- as: assisted-service-aws
+- as: subsystem-aws
   steps:
     cluster_profile: aws
     test:
     - as: subsystem-deploy-and-run
       cli: latest
       commands: |
-        export SERVICE=$(echo "$IMAGE_FORMAT" | component=assisted-service envsubst)
+        export BUILD_TYPE=CI
+        export REPORTS=${ARTIFACT_DIR}
+        export SERVICE=$(echo "${IMAGE_FORMAT}" | component=assisted-service envsubst)
+        export TARGET=oc
+
         make deploy-on-openshift-ci
-        make test-on-openshift-ci
+        make test
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+- as: subsystem-kubeapi-aws
+  steps:
+    cluster_profile: aws
+    test:
+    - as: subsystem-deploy-and-run
+      cli: latest
+      commands: |
+        export BUILD_TYPE=CI
+        export REPORTS=${ARTIFACT_DIR}
+        export SERVICE=$(echo "${IMAGE_FORMAT}" | component=assisted-service envsubst)
+        export TARGET=oc
+        export GENERATE_CRD=false
+
+        make deploy-on-openshift-ci
+        make enable-kube-api-for-subsystem
+        make test-kube-api
       from: test-bin
       resources:
         requests:
@@ -80,35 +113,86 @@ tests:
 - as: e2e-metal-assisted
   steps:
     cluster_profile: packet
-    dependencies:
-      ASSISTED_SERVICE_IMAGE: pipeline:assisted-service
     workflow: baremetalds-assisted-install
-- as: e2e-metal-assisted-onprem
+- as: e2e-metal-assisted-operator
   steps:
     cluster_profile: packet
-    dependencies:
-      ASSISTED_SERVICE_IMAGE: pipeline:assisted-service
     env:
-      ASSISTED_CONFIG: |
-        DEPLOY_TARGET=onprem
-    workflow: baremetalds-assisted-install
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+    workflow: baremetalds-assisted-operator
+- as: e2e-metal-assisted-operator-disconnected
+  steps:
+    cluster_profile: packet
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+      DISCONNECTED: "true"
+    workflow: baremetalds-assisted-operator
+- as: e2e-metal-assisted-operator-disconnected-periodic
+  cron: '@daily'
+  steps:
+    cluster_profile: packet
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+      DISCONNECTED: "true"
+    workflow: baremetalds-assisted-operator
+- as: e2e-metal-assisted-operator-ztp
+  steps:
+    cluster_profile: packet
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NUM_WORKERS=2
+        NUM_EXTRA_WORKERS=1
+        PROVISIONING_NETWORK_PROFILE=Disabled
+    post:
+    - ref: baremetalds-assisted-operator-gather
+    - ref: baremetalds-devscripts-gather
+    - ref: baremetalds-packet-teardown
+    pre:
+    - ref: baremetalds-packet-setup
+    - ref: ipi-install-rbac
+    - ref: baremetalds-devscripts-setup
+    - chain: baremetalds-assisted-operator-lso
+    - ref: baremetalds-assisted-operator-setup
+    - ref: baremetalds-assisted-operator-ztp
+- as: e2e-metal-assisted-operator-ztp-periodic
+  cron: '@daily'
+  steps:
+    cluster_profile: packet
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NUM_WORKERS=2
+        NUM_EXTRA_WORKERS=1
+        PROVISIONING_NETWORK_PROFILE=Disabled
+    post:
+    - ref: baremetalds-assisted-operator-gather
+    - ref: baremetalds-devscripts-gather
+    - ref: baremetalds-packet-teardown
+    pre:
+    - ref: baremetalds-packet-setup
+    - ref: ipi-install-rbac
+    - ref: baremetalds-devscripts-setup
+    - chain: baremetalds-assisted-operator-lso
+    - ref: baremetalds-assisted-operator-setup
+    - ref: baremetalds-assisted-operator-ztp
 - as: e2e-metal-assisted-ipv6
   steps:
     cluster_profile: packet
-    dependencies:
-      ASSISTED_SERVICE_IMAGE: pipeline:assisted-service
     env:
       ASSISTED_CONFIG: |
         IPv6=yes
         IPv4=no
         VIP_DHCP_ALLOCATION=no
         PROXY=yes
+        OPENSHIFT_VERSION=4.8
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-single-node
   steps:
     cluster_profile: packet
-    dependencies:
-      ASSISTED_SERVICE_IMAGE: pipeline:assisted-service
     env:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
@@ -116,6 +200,58 @@ tests:
         ISO_IMAGE_TYPE=minimal-iso
         OPENSHIFT_INSTALL_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}
         OPENSHIFT_VERSION=4.8
+    workflow: baremetalds-assisted-install
+- as: e2e-metal-assisted-kube-api
+  steps:
+    cluster_profile: packet
+    env:
+      ASSISTED_CONFIG: |
+        NUM_MASTERS=1
+        NUM_WORKERS=0
+        IPv6=yes
+        IPv4=no
+        PROXY=yes
+        ADDITIONAL_PARAMS="--with-static-network-config"
+        ISO_IMAGE_TYPE=minimal-iso
+        KUBE_API=yes
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}
+        OPENSHIFT_VERSION=4.8
+        ENABLE_KUBE_API=true
+    workflow: baremetalds-assisted-install
+- as: assisted-operator-install-aws
+  steps:
+    cluster_profile: aws
+    env:
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: assisted-installer
+      OO_PACKAGE: assisted-service-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: tests
+      commands: |
+        echo "operator installed"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-aws
+- as: system-test
+  steps:
+    cluster_profile: packet
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=""
+        TEST_FUNC=test_install
+        MAKEFILE_TARGET="create_full_environment run test_parallel"
+    workflow: baremetalds-assisted-install
+- as: system-test-olm
+  steps:
+    cluster_profile: packet
+    env:
+      ASSISTED_CONFIG: |
+        TEST_FUNC=test_olm_operator
+        MAKEFILE_TARGET="create_full_environment run test_parallel"
     workflow: baremetalds-assisted-install
 zz_generated_metadata:
   branch: master

@@ -27,6 +27,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.15-openshift-4.8
+  ocp_builder_rhel-8-golang-1.16-openshift-4.8:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.16-openshift-4.8
   ocp_builder_rhel-8-golang-openshift-4.6:
     name: builder
     namespace: ocp
@@ -46,9 +50,9 @@ images:
 - dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.15-openshift-4.8:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.8:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
   to: cluster-etcd-operator
 promotion:
   name: 4.8-priv
@@ -87,13 +91,27 @@ tests:
     cluster_profile: aws
     workflow: openshift-upgrade-aws
 - as: e2e-aws-disruptive
-  commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/conformance/parallel run-tests
-  openshift_installer:
+  steps:
     cluster_profile: aws
+    workflow: openshift-e2e-aws-disruption
+- as: e2e-aws-disruptive-ovn
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-disruption-ovn
 - as: e2e-gcp-disruptive
-  commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/conformance/parallel run-tests
-  openshift_installer:
+  steps:
     cluster_profile: gcp
+    workflow: openshift-e2e-gcp-disruption
+- as: e2e-gcp-disruptive-five-control-plane-replicas
+  steps:
+    cluster_profile: gcp
+    env:
+      CONTROL_PLANE_REPLICAS: "5"
+    workflow: openshift-e2e-gcp-disruption
+- as: e2e-gcp-disruptive-ovn
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-disruption-ovn
 - as: e2e-operator
   steps:
     cluster_profile: aws
@@ -135,6 +153,22 @@ tests:
   steps:
     cluster_profile: packet
     workflow: baremetalds-sno
+- as: configmap-scale
+  steps:
+    cluster_profile: aws
+    workflow: openshift-perfscale-e2e-configmap-scale
+- as: e2e-gcp-five-control-plane-replicas
+  steps:
+    cluster_profile: gcp
+    env:
+      CONTROL_PLANE_REPLICAS: "5"
+    workflow: openshift-e2e-gcp
+- as: e2e-gcp-upgrade-five-control-plane-replicas
+  steps:
+    cluster_profile: gcp
+    env:
+      CONTROL_PLANE_REPLICAS: "5"
+    workflow: openshift-upgrade-gcp
 zz_generated_metadata:
   branch: master
   org: openshift-priv

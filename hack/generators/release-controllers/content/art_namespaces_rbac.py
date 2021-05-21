@@ -344,3 +344,22 @@ def add_imagestream_namespace_rbac(gendoc):
             'namespace': context.config.rc_deployment_namespace,
         }
     })
+
+    if context.private:
+        resources.append({
+            'apiVersion': 'rbac.authorization.k8s.io/v1',
+            'kind': 'ClusterRoleBinding',
+            'metadata': {
+                'name': f'release-controller-ocp{context.suffix}-oauth'
+            },
+            'roleRef': {
+                'apiGroup': 'rbac.authorization.k8s.io',
+                'kind': 'ClusterRole',
+                'name': 'release-controller-priv-oauth'
+            },
+            'subjects': [{
+                'kind': 'ServiceAccount',
+                'name': context.rc_serviceaccount_name,
+                'namespace': context.config.rc_deployment_namespace
+            }]
+        })

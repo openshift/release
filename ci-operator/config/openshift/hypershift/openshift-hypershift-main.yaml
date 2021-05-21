@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: "4.7"
+    name: "4.8"
     namespace: ocp
     tag: base
   openshift_release_golang-1.16:
@@ -19,11 +19,18 @@ images:
   inputs:
     openshift_release_golang-1.16:
       as:
-      - registry.svc.ci.openshift.org/openshift/release:golang-1.16
+      - registry.ci.openshift.org/openshift/release:golang-1.16
   to: hypershift
 promotion:
   namespace: hypershift
   tag: latest
+releases:
+  latest:
+    prerelease:
+      product: ocp
+      version_bounds:
+        lower: 4.8.0-fc.0
+        upper: 4.8.0-fc.2
 resources:
   '*':
     limits:
@@ -31,9 +38,6 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: "4.7"
-  namespace: ocp
 tests:
 - as: verify
   commands: make verify
@@ -54,39 +58,26 @@ tests:
       - env: HYPERSHIFT_RELEASE_LATEST
         name: hypershift
       from: src
+      grace_period: 1m0s
       resources:
         requests:
           cpu: 100m
+      timeout: 5m0s
     - as: test-e2e
       cli: latest
-      commands: go test -tags e2e -v ./test/e2e -args --ginkgo.v --ginkgo.trace --e2e.quick-start.aws-credentials-file ${CLUSTER_PROFILE_DIR}/.awscred --e2e.quick-start.pull-secret-file ${CLUSTER_PROFILE_DIR}/pull-secret --e2e.quick-start.ssh-key-file ${CLUSTER_PROFILE_DIR}/ssh-publickey
+      commands: |-
+        make e2e && \
+        bin/test-e2e \
+          -test.v \
+          -test.timeout 0 \
+          --e2e.aws-credentials-file ${CLUSTER_PROFILE_DIR}/.awscred \
+          --e2e.pull-secret-file ${CLUSTER_PROFILE_DIR}/pull-secret
       from: src
+      grace_period: 15m0s
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
-- as: e2e-aws-postsubmit
-  postsubmit: true
-  steps:
-    cluster_profile: aws
-    test:
-    - as: install-hypershift
-      cli: latest
-      commands: go run . install --hypershift-image "${HYPERSHIFT_RELEASE_LATEST}"
-      dependencies:
-      - env: HYPERSHIFT_RELEASE_LATEST
-        name: hypershift
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    - as: test-e2e
-      cli: latest
-      commands: go test -tags e2e -v ./test/e2e -args --ginkgo.v --ginkgo.trace --e2e.quick-start.aws-credentials-file ${CLUSTER_PROFILE_DIR}/.awscred --e2e.quick-start.pull-secret-file ${CLUSTER_PROFILE_DIR}/pull-secret --e2e.quick-start.ssh-key-file ${CLUSTER_PROFILE_DIR}/ssh-publickey
-      from: src
-      resources:
-        requests:
-          cpu: 100m
+      timeout: 40m0s
     workflow: ipi-aws
 zz_generated_metadata:
   branch: main

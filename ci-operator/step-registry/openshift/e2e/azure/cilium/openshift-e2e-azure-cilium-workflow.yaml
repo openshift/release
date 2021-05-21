@@ -1,0 +1,34 @@
+workflow:
+  as: openshift-e2e-azure-cilium
+  steps:
+    pre:
+    - chain: ipi-conf-azure
+    - ref: network-conf-disable-cno
+    - ref: cilium-conf
+    - chain: ipi-install
+    test:
+    - ref: openshift-e2e-test
+    env:
+      # 1,2,3) skip NetworkPolicy tests that Cilium doesn't pass yet
+      # 4) Cilium needs a special setting to pass pod-label update test, skip for now
+      #    https://github.com/cilium/cilium/blob/39e09f3ce77bedeac504a55c056da55270fcc6e2/test/kubernetes-test.sh#L3-L7
+      # 5) known Cilium issue
+      #    https://github.com/cilium/cilium/issues/10002
+      # 6) skip maxUnavailable test as openshift-kube-proxy doesn't pass it
+      # 7) skip router idling test as the feature is not supported by Cilium yet (pending investigation)
+      # 8) skip /config/master test (peding investigation)
+      TEST_SKIPS: >-
+        NetworkPolicy between server and client should not allow access by TCP when a policy specifies only SCTP\|
+        NetworkPolicy between server and client should allow egress access to server in CIDR block\|
+        NetworkPolicy between server and client should ensure an IP overlapping both IPBlock.CIDR and IPBlock.Except is allowed\|
+        NetworkPolicy between server and client should deny ingress access to updated pod\|
+        Services should be rejected when no endpoints exist\|
+        Managed cluster should only include cluster daemonsets that have maxUnavailable update of 10 or 33 percent\|
+        The HAProxy router should be able to connect to a service that is idled because a GET on the route will unidle it\|
+        Pods cannot access the /config/master API endpoint
+    post:
+    - chain: gather-network
+    - chain: gather-core-dump
+    - chain: ipi-deprovision
+  documentation: |-
+    The Openshift E2E Cilium workflow executes the common end-to-end test suite with the Cilium network plugin with default configuration.

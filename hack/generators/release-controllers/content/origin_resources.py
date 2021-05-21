@@ -106,6 +106,7 @@ def _add_origin_resources(gendoc):
                                     "/usr/bin/release-controller",
                                     "--release-namespace=origin",
                                     "--prow-config=/etc/config/config.yaml",
+                                    "--supplemental-prow-config-dir=/etc/config",
                                     "--job-config=/etc/job-config",
                                     "--prow-namespace=ci",
                                     "--non-prow-job-kubeconfig=/etc/kubeconfig/kubeconfig",

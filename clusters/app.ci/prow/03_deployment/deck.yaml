@@ -86,9 +86,10 @@ objects:
         serviceAccountName: deck
         containers:
         - name: deck
-          image: gcr.io/k8s-prow/deck:v20210302-aa40187f73
+          image: gcr.io/k8s-prow/deck:v20210521-0570b0687e
           args:
           - --config-path=/etc/config/config.yaml
+          - --supplemental-prow-config-dir=/etc/config
           - --cookie-secret=/etc/cookie/cookie
           - --github-oauth-config-file=/etc/github/config.json
           - --github-token-path=/etc/oauth/oauth
@@ -105,7 +106,7 @@ objects:
           env:
           # Multiple configs can only be passed via the env var and not via the flag
           - name: KUBECONFIG
-            value: /etc/build-farm-credentials/api.ci.kubeconfig:/etc/build-farm-credentials/build01.kubeconfig:/etc/build-farm-credentials/app.ci.kubeconfig:/etc/build-farm-credentials/build02.kubeconfig:/etc/build-farm-credentials/vsphere.kubeconfig
+            value: /etc/build-farm-credentials/build01.kubeconfig:/etc/build-farm-credentials/app.ci.kubeconfig:/etc/build-farm-credentials/build02.kubeconfig:/etc/build-farm-credentials/vsphere.kubeconfig:/etc/build-farm-credentials/arm01.kubeconfig
           ports:
             - name: main
               containerPort: 8080
@@ -245,8 +246,8 @@ objects:
         - name: build-farm-credentials
           secret:
             items:
-            - key: sa.deck.api.ci.config
-              path: api.ci.kubeconfig
+            - key: sa.deck.arm01.config
+              path: arm01.kubeconfig
             - key: sa.deck.build01.config
               path: build01.kubeconfig
             - key: sa.deck.app.ci.config
@@ -317,7 +318,7 @@ objects:
         serviceAccountName: deck
         containers:
         - name: oauth-proxy
-          image: openshift/oauth-proxy:latest
+          image: quay.io/openshift/origin-oauth-proxy@sha256:82719931600d90a8c3eb26b1632cc99020bc12921fa6ad13c9d4929fe2d0f025
           imagePullPolicy: IfNotPresent
           ports:
           - containerPort: 8443
@@ -335,6 +336,7 @@ objects:
           - '-openshift-delegate-urls={"/": {"verb": "get", "resource": "secrets", "namespace": "openshift-priv"}}'
           - -client-secret-file=/var/run/secrets/kubernetes.io/serviceaccount/token
           - -cookie-secret-file=/etc/proxy/secrets/session_secret
+          - -cookie-samesite=none
           - -tls-cert=/etc/tls/private/tls.crt
           - -tls-key=/etc/tls/private/tls.key
           volumeMounts:
@@ -343,7 +345,7 @@ objects:
           - mountPath: /etc/proxy/secrets
             name: session-secret
         - name: deck
-          image: gcr.io/k8s-prow/deck:v20210302-aa40187f73
+          image: gcr.io/k8s-prow/deck:v20210521-0570b0687e
           args:
           - --github-oauth-config-file=/etc/github/config.json
           - --github-token-path=/etc/oauth/oauth
@@ -352,6 +354,7 @@ objects:
           - --github-graphql-endpoint=http://ghproxy/graphql
           - --oauth-url=/github-login
           - --config-path=/etc/config/config.yaml
+          - --supplemental-prow-config-dir=/etc/config
           - --job-config-path=/etc/job-config
           - --tide-url=http://tide/
           - --hook-url=http://hook:8888/plugin-help
@@ -366,7 +369,7 @@ objects:
               containerPort: 8080
           env:
           - name: KUBECONFIG
-            value: /etc/build-farm-credentials/api.ci.kubeconfig:/etc/build-farm-credentials/build01.kubeconfig:/etc/build-farm-credentials/app.ci.kubeconfig:/etc/build-farm-credentials/build02.kubeconfig:/etc/build-farm-credentials/vsphere.kubeconfig
+            value: /etc/build-farm-credentials/build01.kubeconfig:/etc/build-farm-credentials/app.ci.kubeconfig:/etc/build-farm-credentials/build02.kubeconfig:/etc/build-farm-credentials/vsphere.kubeconfig:/etc/build-farm-credentials/arm01.kubeconfig
           volumeMounts:
           - name: service-account-token
             mountPath: /var/sa-token
@@ -441,7 +444,7 @@ objects:
             name: config
         - name: extensions
           configMap:
-            name: deck-extensions
+            name: deck-internal-extensions
         - name: oauth
           secret:
             secretName: github-credentials-openshift-ci-robot
@@ -496,8 +499,8 @@ objects:
         - name: build-farm-credentials
           secret:
             items:
-            - key: sa.deck.api.ci.config
-              path: api.ci.kubeconfig
+            - key: sa.deck.arm01.config
+              path: arm01.kubeconfig
             - key: sa.deck.build01.config
               path: build01.kubeconfig
             - key: sa.deck.build02.config

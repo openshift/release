@@ -1,0 +1,58 @@
+base_images:
+  base:
+    name: "4.8"
+    namespace: ocp
+    tag: base
+  iks:
+    name: ibm-roks-toolkit-testing
+    namespace: ci
+    tag: v4.7
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.15
+images:
+- from: base
+  to: ibm-roks-toolkit
+- dockerfile_path: Dockerfile.cpoperator
+  from: base
+  to: control-plane-operator
+- dockerfile_path: Dockerfile.metrics
+  from: base
+  to: metrics
+- dockerfile_path: DockerCITest
+  from: iks
+  to: iks-deploy
+promotion:
+  name: ibm-roks-4.7
+  namespace: hypershift-toolkit
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.7"
+  namespace: ocp
+tests:
+- as: verify
+  commands: make verify
+  container:
+    from: src
+- as: create-cluster
+  commands: export ARTIFACTS_DIR="${ARTIFACT_DIR}" && ./deploy_ci.sh
+  container:
+    from: iks-deploy
+  secret:
+    mount_path: /usr/ibm-gate-test-secrets/
+    name: ibm-gate-test-secrets
+- as: unit
+  commands: make test
+  container:
+    from: src
+zz_generated_metadata:
+  branch: release-4.7
+  org: openshift
+  repo: ibm-roks-toolkit

@@ -1,0 +1,44 @@
+base_images:
+  cli:
+    name: "4.7"
+    namespace: ocp
+    tag: cli
+binary_build_commands: make bin
+build_root:
+  project_image:
+    dockerfile_path: openshift-ci/build-root/Dockerfile
+images:
+- context_dir: openshift-ci/build-root/source-image
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: oc-bin-image
+resources:
+  '*':
+    requests:
+      cpu: 800m
+      memory: 6Gi
+tag_specification:
+  name: "4.7"
+  namespace: ocp
+tests:
+- as: e2e
+  steps:
+    cluster_profile: aws
+    test:
+    - as: e2e-steps
+      commands: scripts/openshiftci-presubmit-all-tests.sh
+      from: oc-bin-image
+      resources:
+        requests:
+          cpu: "2"
+          memory: 6Gi
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: master
+  org: redhat-developer
+  repo: gitops-operator
+  variant: v4.7

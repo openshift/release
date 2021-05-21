@@ -26,22 +26,37 @@ ZONES_STR+=$(join_by , "${ZONES[@]}")
 ZONES_STR+=" ]"
 echo "AWS region: ${REGION} (zones: ${ZONES_STR})"
 
+workers=3
+if [[ "${SIZE_VARIANT}" == "compact" ]]; then
+  workers=0
+fi
+master_type=null
+if [[ "${SIZE_VARIANT}" == "xlarge" ]]; then
+  master_type=m5.8xlarge
+elif [[ "${SIZE_VARIANT}" == "large" ]]; then
+  master_type=m5.4xlarge
+elif [[ "${SIZE_VARIANT}" == "compact" ]]; then
+  master_type=m5.2xlarge
+fi
+
 cat >> "${CONFIG}" << EOF
 baseDomain: ${BASE_DOMAIN}
-controlPlane:
-  name: master
-  platform:
-    aws:
-      zones: ${ZONES_STR}
-compute:
-- name: worker
-  platform:
-    aws:
-      type: ${COMPUTE_NODE_TYPE}
-      zones: ${ZONES_STR}
 platform:
   aws:
     region: ${REGION}
     userTags:
       expirationDate: ${expiration_date}
+controlPlane:
+  name: master
+  platform:
+    aws:
+      type: ${master_type}
+      zones: ${ZONES_STR}
+compute:
+- name: worker
+  replicas: ${workers}
+  platform:
+    aws:
+      type: ${COMPUTE_NODE_TYPE}
+      zones: ${ZONES_STR}
 EOF

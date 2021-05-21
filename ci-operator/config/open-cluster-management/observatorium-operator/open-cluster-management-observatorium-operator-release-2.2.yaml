@@ -7,7 +7,6 @@ images:
 - dockerfile_path: Dockerfile
   to: observatorium-operator
 promotion:
-  disabled: true
   name: "2.2"
   namespace: open-cluster-management
 resources:
@@ -29,12 +28,11 @@ tests:
     - as: deploy-operator
       cli: latest
       commands: |
+        export OPERATOR_IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:observatorium-operator}
         ./tests/e2e.sh deploy-operator
       env:
       - default: oc
         name: KUBECTL
-      - default: ${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:observatorium-operator}
-        name: OPERATOR_IMAGE_NAME
       from: src
       resources:
         requests:
@@ -43,7 +41,7 @@ tests:
     - as: run-test
       cli: latest
       commands: |
-        ./tests/e2e.sh run_test
+        ./tests/e2e.sh test --tls
       env:
       - default: oc
         name: KUBECTL
@@ -55,7 +53,7 @@ tests:
     - as: delete-cr
       cli: latest
       commands: |
-        ./tests/e2e.sh delete_cr
+        ./tests/e2e.sh delete-cr
       env:
       - default: oc
         name: KUBECTL

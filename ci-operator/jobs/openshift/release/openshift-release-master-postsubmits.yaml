@@ -33,7 +33,7 @@ postsubmits:
         name: ""
         resources:
           requests:
-            cpu: 10m
+            cpu: 500m
       serviceAccountName: config-updater
   - agent: kubernetes
     branches:
@@ -222,49 +222,6 @@ postsubmits:
     - ^master$
     cluster: app.ci
     decorate: true
-    labels:
-      ci.openshift.io/role: infra
-    max_concurrency: 1
-    name: branch-ci-openshift-release-master-core-apply
-    spec:
-      containers:
-      - args:
-        - --config-dir=core-services
-        - --config-dir=clusters/build-clusters/common
-        - --confirm=true
-        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
-        - --as=
-        command:
-        - applyconfig
-        env:
-        - name: slack_api_url
-          valueFrom:
-            secretKeyRef:
-              key: url
-              name: ci-slack-api-url
-        image: registry.ci.openshift.org/ci/applyconfig:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/build-farm-credentials
-          name: build-farm-credentials
-          readOnly: true
-      serviceAccountName: config-updater
-      volumes:
-      - name: build-farm-credentials
-        secret:
-          items:
-          - key: sa.config-updater.api.ci.config
-            path: kubeconfig
-          secretName: build-farm-credentials
-  - agent: kubernetes
-    branches:
-    - ^master$
-    cluster: app.ci
-    decorate: true
     decoration_config:
       grace_period: 0s
       timeout: 8h0m0s
@@ -284,7 +241,7 @@ postsubmits:
         - --debug
         command:
         - /app/label_sync/app.binary
-        image: gcr.io/k8s-prow/label_sync:v20210302-aa40187f73
+        image: gcr.io/k8s-prow/label_sync:v20210521-0570b0687e
         imagePullPolicy: Always
         name: ""
         resources:
@@ -311,7 +268,7 @@ postsubmits:
       containers:
       - command:
         - hack/annotate.sh
-        image: image-registry.openshift-image-registry.svc:5000/ocp/cli-jq:latest
+        image: registry.ci.openshift.org/ocp/cli-jq:latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -320,20 +277,63 @@ postsubmits:
       serviceAccountName: config-updater
   - agent: kubernetes
     branches:
-    - ^master$
+    - master
     cluster: app.ci
     decorate: true
     labels:
       ci.openshift.io/role: infra
     max_concurrency: 1
-    name: branch-ci-openshift-release-master-services-apply
+    name: branch-ci-openshift-release-master-arm01-apply
     spec:
       containers:
       - args:
-        - --config-dir=services
+        - --config-dir=clusters/build-clusters/arm01
+        - --ignore-file=clusters/build-clusters/common/assets/pod-scaler-admission.yaml
         - --confirm=true
-        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
         - --as=
+        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+        command:
+        - applyconfig
+        env:
+        - name: arm01_id
+          valueFrom:
+            secretKeyRef:
+              key: arm01-id
+              name: arm01-dex-oidc
+        image: registry.ci.openshift.org/ci/applyconfig:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+      serviceAccountName: config-updater
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.arm01.config
+            path: kubeconfig
+          secretName: build-farm-credentials
+  - agent: kubernetes
+    branches:
+    - master
+    cluster: app.ci
+    decorate: true
+    labels:
+      ci.openshift.io/role: infra
+    max_concurrency: 1
+    name: branch-ci-openshift-release-master-hive-apply
+    spec:
+      containers:
+      - args:
+        - --config-dir=clusters/hive
+        - --confirm=true
+        - --as=
+        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
         command:
         - applyconfig
         image: registry.ci.openshift.org/ci/applyconfig:latest
@@ -351,6 +351,6 @@ postsubmits:
       - name: build-farm-credentials
         secret:
           items:
-          - key: sa.config-updater.api.ci.config
+          - key: sa.config-updater.hive.config
             path: kubeconfig
           secretName: build-farm-credentials

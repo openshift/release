@@ -1,0 +1,62 @@
+base_images:
+  base:
+    name: "4.7"
+    namespace: origin
+    tag: base
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp_4.6_cli:
+    name: "4.7"
+    namespace: origin
+    tag: cli
+  ocp_4.7_cli:
+    name: "4.7"
+    namespace: origin
+    tag: cli
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.7
+  ocp_builder_rhel-8-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- from: base
+  inputs:
+    ocp_4.7_cli:
+      as:
+      - registry.ci.openshift.org/ocp/4.7:cli
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
+  to: ovn-kubernetes
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.7"
+  namespace: origin
+tests:
+- as: e2e-gcp-ovn
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-ovn
+zz_generated_metadata:
+  branch: release-4.7
+  org: openshift
+  repo: ovn-kubernetes
+  variant: okd

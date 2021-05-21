@@ -3,6 +3,10 @@ base_images:
     name: builder
     namespace: open-cluster-management
     tag: nodejs14-linux-amd64
+  open-cluster-management_builder_nodejs14-linux-amd64:
+    name: builder
+    namespace: open-cluster-management
+    tag: nodejs14-linux-amd64
 binary_build_commands: make build
 build_root:
   image_stream_tag:
@@ -14,6 +18,7 @@ images:
   from: base
   to: application-ui
 promotion:
+  disabled: true
   name: "2.3"
   namespace: open-cluster-management
 resources:
@@ -21,6 +26,33 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: application-ui
+    env:
+      IMAGE_REPO: application-ui
+      REGISTRY_ORG: open-cluster-management
+    workflow: ocm-ci-image-mirror
+- as: unit-tests
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow install
+    make -f Makefile.prow unit-tests
+  container:
+    from: src
+- as: sonarcloud
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow sonar/js/jest-init
+    make -f Makefile.prow unit-tests
+    make -f Makefile.prow sonar/js/prow
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
 zz_generated_metadata:
   branch: release-2.3
   org: open-cluster-management

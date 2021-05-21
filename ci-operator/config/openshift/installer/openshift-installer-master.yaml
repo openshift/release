@@ -43,6 +43,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.15-openshift-4.8
+  ocp_builder_rhel-8-golang-1.16-openshift-4.8:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.16-openshift-4.8
   ocp_builder_rhel-8-golang-openshift-4.6:
     name: builder
     namespace: ocp
@@ -128,6 +132,9 @@ images:
     ocp_builder_rhel-8-golang-1.15-openshift-4.8:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
+    ocp_builder_rhel-8-golang-1.16-openshift-4.8:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
   to: baremetal-installer
 - dockerfile_path: images/installer/Dockerfile.ci
   from: base
@@ -197,7 +204,8 @@ tests:
   container:
     from: src
 - as: golint
-  commands: IS_CONTAINER=TRUE ./hack/go-lint.sh -min_confidence 0.3 $(go list -f '{{ .ImportPath }}' ./...)
+  commands: IS_CONTAINER=TRUE ./hack/go-lint.sh -min_confidence 0.3 $(go list -f '{{
+    .ImportPath }}' ./...)
   container:
     from: src
 - as: verify-vendor
@@ -236,10 +244,14 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-sharednetwork
+- as: e2e-azure-resourcegroup
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-resourcegroup
 - as: e2e-aws-upgrade
   steps:
     cluster_profile: aws
-    workflow: openshift-upgrade-aws
+    workflow: openshift-upgrade-aws-latestinstaller
 - as: e2e-aws-upi
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer_upi:
@@ -261,13 +273,13 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws-workers-rhel7
 - as: e2e-aws-disruptive
-  commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_SUITE=openshift/conformance/parallel run-tests
-  openshift_installer:
+  steps:
     cluster_profile: aws
+    workflow: openshift-e2e-aws-disruption
 - as: e2e-gcp-upgrade
   steps:
     cluster_profile: gcp
-    workflow: openshift-upgrade-gcp
+    workflow: openshift-upgrade-gcp-latestinstaller
 - as: e2e-metal-ipi
   steps:
     cluster_profile: packet
@@ -298,7 +310,7 @@ tests:
     workflow: baremetalds-e2e-virtualmedia
 - as: e2e-openstack-ipi
   steps:
-    cluster_profile: openstack
+    cluster_profile: openstack-vexxhost
     workflow: openshift-e2e-openstack-ipi
 - as: openstack-manifests
   steps:

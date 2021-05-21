@@ -55,7 +55,7 @@ release-controllers:
 .PHONY: release-controllers
 
 checkconfig:
-	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR):/release:z" gcr.io/k8s-prow/checkconfig:v20210104-12dd8ae74d --config-path /release/core-services/prow/02_config/_config.yaml --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
+	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR):/release:z" gcr.io/k8s-prow/checkconfig:v20210408-1d94238fac --config-path /release/core-services/prow/02_config/_config.yaml --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
 
 jobs:
 	$(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/ci-operator-prowgen:latest
@@ -77,7 +77,7 @@ boskos-config:
 
 prow-config:
 	$(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/determinize-prow-config:latest
-	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR)/core-services/prow/02_config:/config:z" registry.ci.openshift.org/ci/determinize-prow-config:latest --prow-config-dir /config
+	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR)/core-services/prow/02_config:/config:z" registry.ci.openshift.org/ci/determinize-prow-config:latest --prow-config-dir /config --sharded-prow-config-base-dir /config
 
 branch-cut:
 	$(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/config-brancher:latest
@@ -114,7 +114,7 @@ all: roles prow projects
 roles: cluster-operator-roles
 .PHONY: roles
 
-prow: ci-ns prow-jobs
+prow: ci-ns
 .PHONY: prow
 
 ci-ns:
@@ -124,20 +124,6 @@ ci-ns:
 openshift-ns:
 	oc project openshift
 .PHONY: openshift-ns
-
-prow-jobs: prow-artifacts
-	$(MAKE) apply WHAT=ci-operator/templates/os.yaml
-.PHONY: prow-jobs
-
-prow-artifacts:
-	oc create ns ci-pr-images -o yaml --dry-run | oc apply -f -
-	oc policy add-role-to-group system:image-puller system:unauthenticated -n ci-pr-images
-	oc policy add-role-to-group system:image-puller system:authenticated -n ci-pr-images
-	oc tag --source=docker centos:7 openshift/centos:7 --scheduled
-
-	oc create ns ci-rpms -o yaml --dry-run | oc apply -f -
-	oc apply -f ci-operator/infra/openshift/origin/
-.PHONY: prow-artifacts
 
 prow-release-controller-definitions:
 	hack/annotate.sh

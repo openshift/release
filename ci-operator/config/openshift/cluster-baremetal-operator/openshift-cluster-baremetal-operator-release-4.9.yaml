@@ -1,4 +1,20 @@
 base_images:
+  assisted-installer:
+    name: assisted
+    namespace: ocp-kni
+    tag: assisted-installer
+  assisted-installer-agent:
+    name: assisted
+    namespace: ocp-kni
+    tag: assisted-installer-agent
+  assisted-installer-controller:
+    name: assisted
+    namespace: ocp-kni
+    tag: assisted-installer-controller
+  assisted-service:
+    name: assisted
+    namespace: ocp-kni
+    tag: assisted-service
   assisted-test-infra:
     name: assisted-test
     namespace: ocp-kni
@@ -23,6 +39,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.15-openshift-4.8
+  ocp_builder_rhel-8-golang-1.16-openshift-4.8:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.16-openshift-4.8
   openshift_release_golang-1.14:
     name: release
     namespace: openshift
@@ -35,9 +55,9 @@ build_root:
 images:
 - from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.15-openshift-4.8:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.8:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
   to: cluster-baremetal-operator
 promotion:
   name: "4.9"
@@ -75,8 +95,8 @@ tests:
     from: src
 - as: e2e-agnostic
   steps:
-    cluster_profile: gcp
-    workflow: openshift-e2e-gcp
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure
 - as: e2e-metal-ipi
   steps:
     cluster_profile: packet
@@ -85,6 +105,10 @@ tests:
         IP_STACK=v4
         NETWORK_TYPE=OpenShiftSDN
     workflow: baremetalds-e2e
+- as: e2e-metal-ipi-serial-ipv4
+  steps:
+    cluster_profile: packet
+    workflow: baremetalds-e2e-serial-ipv4
 - as: e2e-metal-ipi-upgrade
   steps:
     cluster_profile: packet

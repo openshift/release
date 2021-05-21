@@ -1,0 +1,35 @@
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: open-cluster-management
+    tag: go1.15-linux
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 80m
+      memory: 200Mi
+tests:
+- as: sonarcloud
+  commands: |
+    export SELF="make -f /opt/build-harness/Makefile.prow"
+    make -f /opt/build-harness/Makefile.prow sonar/go/prow
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+- as: check
+  commands: make check
+  container:
+    from: src
+- as: unit
+  commands: make deps test
+  container:
+    from: src
+zz_generated_metadata:
+  branch: main
+  org: open-cluster-management
+  repo: library-go

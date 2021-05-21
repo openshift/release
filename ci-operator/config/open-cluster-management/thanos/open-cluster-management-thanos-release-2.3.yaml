@@ -1,0 +1,43 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+  open-cluster-management_builder_go1.15-linux:
+    name: builder
+    namespace: open-cluster-management
+    tag: go1.15-linux
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: open-cluster-management
+    tag: go1.15-linux
+images:
+- dockerfile_path: Dockerfile.multi-stage
+  from: base
+  to: thanos
+promotion:
+  name: "2.3"
+  namespace: open-cluster-management
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 100m
+      memory: 1Gi
+tag_specification:
+  name: "4.7"
+  namespace: ocp
+test_binary_build_commands: "true"
+tests:
+- as: test-unit
+  commands: |
+    export SELF="make -f Makefile"
+    make -f Makefile test-local
+  container:
+    from: src
+zz_generated_metadata:
+  branch: release-2.3
+  org: open-cluster-management
+  repo: thanos

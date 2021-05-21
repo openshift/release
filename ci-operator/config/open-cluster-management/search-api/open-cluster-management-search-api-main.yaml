@@ -1,0 +1,46 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+  open-cluster-management_builder_nodejs14-linux:
+    name: builder
+    namespace: open-cluster-management
+    tag: nodejs14-linux
+  open-cluster-management_builder_nodejs14-linux-amd64:
+    name: builder
+    namespace: open-cluster-management
+    tag: nodejs14-linux-amd64
+binary_build_commands: make -f Makefile.prow install && make -f Makefile.prow build
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: open-cluster-management
+    tag: nodejs14-linux-amd64
+images:
+- dockerfile_path: Dockerfile
+  inputs:
+    open-cluster-management_builder_nodejs14-linux:
+      as:
+      - registry.ci.openshift.org/open-cluster-management/builder:nodejs14-linux
+  to: search-api
+promotion:
+  name: "2.3"
+  namespace: open-cluster-management
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: test-unit
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow install
+    make -f Makefile.prow unit-test
+  container:
+    from: bin
+zz_generated_metadata:
+  branch: main
+  org: open-cluster-management
+  repo: search-api

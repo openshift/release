@@ -11,7 +11,7 @@
 # - IAM roles in the HOST_PROJECT
 #   - The openshift-gce-devel-ci service account (1053217076791@cloudservices.gserviceaccount.com)
 #     - Compute Network User
-#   - ${CLUSTER_PROFILE_DIR}/gce.json (ci-provisioner@openshift-gce-devel-ci.iam.gserviceaccount.com)
+#   - ${CLUSTER_PROFILE_DIR}/gce.json (do-not-delete-ci-provisioner@openshift-gce-devel-ci.iam.gserviceaccount.com)
 #     - Compute Network User on both XPN Subnets (https://console.cloud.google.com/networking/xpn)
 #     - Deployment Manager Editor
 #     - DNS Administrator on the
@@ -28,8 +28,8 @@ HOST_PROJECT="openshift-dev-installer"
 CLUSTER_NETWORK="https://www.googleapis.com/compute/v1/projects/openshift-dev-installer/global/networks/installer-shared-vpc"
 CONTROL_SUBNET="https://www.googleapis.com/compute/v1/projects/openshift-dev-installer/regions/us-east1/subnetworks/installer-shared-vpc-subnet-1"
 COMPUTE_SUBNET="https://www.googleapis.com/compute/v1/projects/openshift-dev-installer/regions/us-east1/subnetworks/installer-shared-vpc-subnet-2"
-COMPUTE_SERVICE_ACCOUNT="do-not-delelete-ci-xpn@openshift-gce-devel-ci.iam.gserviceaccount.com"
-CONTROL_SERVICE_ACCOUNT="do-not-delelete-ci-xpn@openshift-gce-devel-ci.iam.gserviceaccount.com"
+COMPUTE_SERVICE_ACCOUNT="do-not-delete-ci-xpn@openshift-gce-devel-ci.iam.gserviceaccount.com"
+CONTROL_SERVICE_ACCOUNT="do-not-delete-ci-xpn@openshift-gce-devel-ci.iam.gserviceaccount.com"
 PRIVATE_ZONE_NAME="ci-op-xpn-private-zone"
 
 cat > "${SHARED_DIR}/xpn.json" << EOF

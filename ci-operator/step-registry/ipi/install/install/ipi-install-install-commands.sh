@@ -34,7 +34,7 @@ function prepare_next_steps() {
   fi
 }
 
-trap 'prepare_next_steps' EXIT
+trap 'prepare_next_steps' EXIT TERM
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 if [[ -z "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" ]]; then
@@ -54,8 +54,9 @@ azure4) export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.jso
 gcp) export GOOGLE_CLOUD_KEYFILE_JSON=${CLUSTER_PROFILE_DIR}/gce.json;;
 kubevirt) export KUBEVIRT_KUBECONFIG=${HOME}/.kube/config;;
 vsphere) ;;
-openstack) export OS_CLIENT_CONFIG_FILE=${CLUSTER_PROFILE_DIR}/clouds.yaml ;;
-openstack-vexxhost) export OS_CLIENT_CONFIG_FILE=${CLUSTER_PROFILE_DIR}/clouds.yaml ;;
+openstack-osuosl) ;;
+openstack-ppc64le) ;;
+openstack*) export OS_CLIENT_CONFIG_FILE=${CLUSTER_PROFILE_DIR}/clouds.yaml ;;
 ovirt) export OVIRT_CONFIG="${SHARED_DIR}/ovirt-config.yaml" ;;
 *) >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}'"
 esac
@@ -77,20 +78,31 @@ wait "$!"
 sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
 
 echo "Will include manifests:"
-find "${SHARED_DIR}" -name "manifest_*.yml"
+find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \)
 
 while IFS= read -r -d '' item
 do
   manifest="$( basename "${item}" )"
   cp "${item}" "${dir}/manifests/${manifest##manifest_}"
-done <   <( find "${SHARED_DIR}" -name "manifest_*.yml" -print0)
+done <   <( find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \) -print0)
 
+find "${SHARED_DIR}" \( -name "tls_*.key" -o -name "tls_*.pub" \)
+
+mkdir -p "${dir}/tls"
+while IFS= read -r -d '' item
+do
+  manifest="$( basename "${item}" )"
+  cp "${item}" "${dir}/tls/${manifest##tls_}"
+done <   <( find "${SHARED_DIR}" \( -name "tls_*.key" -o -name "tls_*.pub" \) -print0)
+
+date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 TF_LOG=debug openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
 
 wait "$!"
 ret="$?"
 
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_END"
+date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 
 if test "${ret}" -eq 0 ; then
   touch  "${SHARED_DIR}/success"

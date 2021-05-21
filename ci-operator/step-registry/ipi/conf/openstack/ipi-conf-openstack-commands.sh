@@ -13,4 +13,4 @@ UNSAFE_CLUSTER_NAME=${NAMESPACE}-${JOB_NAME_HASH}
 SAFE_CLUSTER_NAME=${UNSAFE_CLUSTER_NAME#"ci-op-"}
 echo "${SAFE_CLUSTER_NAME}" > ${SHARED_DIR}/CLUSTER_NAME
 
-
+cp "/var/run/cluster-secrets/${CLUSTER_TYPE}/clouds.yaml"  "${SHARED_DIR}/clouds.yaml"

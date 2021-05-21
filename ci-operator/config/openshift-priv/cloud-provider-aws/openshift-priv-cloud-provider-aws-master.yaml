@@ -1,0 +1,43 @@
+base_images:
+  base:
+    name: 4.8-priv
+    namespace: ocp-private
+    tag: base
+  ocp_builder_rhel-8-golang-1.16-openshift-4.8:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.16-openshift-4.8
+binary_build_commands: make aws-cloud-controller-manager
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.16
+canonical_go_repository: k8s.io/cloud-provider-aws
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  to: aws-cloud-controller-manager
+promotion:
+  name: 4.8-priv
+  namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: 4.8-priv
+  namespace: ocp-private
+test_binary_build_commands: make test
+tests:
+- as: e2e-aws
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+zz_generated_metadata:
+  branch: master
+  org: openshift-priv
+  repo: cloud-provider-aws

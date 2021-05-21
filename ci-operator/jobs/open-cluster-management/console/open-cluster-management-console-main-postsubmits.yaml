@@ -1,0 +1,140 @@
+postsubmits:
+  open-cluster-management/console:
+  - agent: kubernetes
+    branches:
+    - ^main$
+    cluster: build02
+    decorate: true
+    extra_refs:
+    - base_ref: master
+      org: openshift
+      repo: release
+    name: branch-ci-open-cluster-management-console-main-fast-forward
+    spec:
+      containers:
+      - args:
+        - --config-dir=../../openshift/release/ci-operator/config/open-cluster-management/console/
+        - --current-release=2.3
+        - --current-promotion-namespace=open-cluster-management
+        - --future-release=2.3
+        - --fast-forward
+        - --confirm
+        - --username=acm-cicd
+        - --token-path=/etc/github/token
+        command:
+        - repo-brancher
+        image: repo-brancher:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/github
+          name: acm-cicd-github
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: acm-cicd-github
+        secret:
+          secretName: acm-cicd-github
+  - agent: kubernetes
+    branches:
+    - ^main$
+    cluster: build02
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/is-promotion: "true"
+      ci-operator.openshift.io/prowgen-controlled: "true"
+    max_concurrency: 1
+    name: branch-ci-open-cluster-management-console-main-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --promote
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/push-secret
+          name: push-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: push-secret
+        secret:
+          secretName: registry-push-credentials-ci-central
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    branches:
+    - ^main$
+    cluster: build02
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: branch-ci-open-cluster-management-console-main-sonarcloud
+    spec:
+      containers:
+      - args:
+        - -c
+        - |
+          make -f Makefile.prow sonar/js/jest-init
+          make -f Makefile.prow install
+          make -f Makefile.prow unit-tests
+          make -f Makefile.prow sonar/js/prow
+        command:
+        - /bin/bash
+        env:
+        - name: ARTIFACT_DIR
+          value: $(ARTIFACTS)
+        - name: SELF
+          value: make -f Makefile.prow
+        image: registry.ci.openshift.org/open-cluster-management/builder:nodejs14-linux
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 100m
+            memory: 200Mi
+        volumeMounts:
+        - mountPath: /etc/sonarcloud
+          name: acm-sonarcloud-token
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: acm-sonarcloud-token
+        secret:
+          secretName: acm-sonarcloud-token

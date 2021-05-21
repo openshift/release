@@ -11,6 +11,33 @@ metadata:
   name: vector-log-shipper
   namespace: prow-logging
 ---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: vector-pod-watcher
+  namespace: prow-logging
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - watch
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: vector-pod-watcher-binding
+  namespace: prow-logging
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: vector-pod-watcher
+subjects:
+- kind: ServiceAccount
+  namespace: prow-logging
+  name: vector-log-shipper
+---
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -24,18 +51,20 @@ data:
     # Docs: https://vector.dev/docs/
     # Set global options
     data_dir = "/var/lib/vector"
+
     # Ingest logs from Kubernetes
     [sources.kubernetes]
-      type = "kubernetes"
+      type = "kubernetes_logs"
+
     # captures services in the ci namespace
     [transforms.ci-services]
       type = "filter"
       inputs = ["kubernetes"]
       condition.type = "check_fields"
-      condition."pod_namespace.eq" = "ci"
-      condition."container_name.neq" = "test"
-      condition."container_name.neq" = "sidecar"
-      condition."container_name.neq" = "namespace-ttl-controller" # generates enormous amounts of logs
+      condition."kubernetes.pod_namespace.eq" = "ci"
+      condition."kubernetes.container_name.neq" = "test"
+      condition."kubernetes.container_name.neq" = "sidecar"
+      condition."kubernetes.container_name.neq" = "namespace-ttl-controller" # generates enormous amounts of logs
 
     # parse the json so we can filter
     [transforms.json_parsed]
@@ -43,21 +72,30 @@ data:
       inputs = ["ci-services"]
       drop_invalid = true
 
-
     [sinks.aws_cloudwatch_logs]
       type = "aws_cloudwatch_logs"
       inputs = ["json_parsed"]
       group_name = "app-ci-pod-logs"
       region = "us-east-1"
-      stream_name = "{{ host }}"
-      encoding = "json"
-      batch.max_size = 1000000
-    # Can be enabled for debugging purposes
-    # [sinks.console]
-    #   type = "console"
-    #   inputs = ["json_parsed"]
-    #   target = "stdout"
-    #   encoding.codec = "json" # required
+      stream_name = "{{ kubernetes.pod_node_name }}"
+      encoding.codec = "json"
+
+    # Release-controller logs
+    [transforms.release_controllers]
+      type = "filter"
+      inputs = ["kubernetes"]
+      condition.type = "check_fields"
+      condition."kubernetes.pod_namespace.eq" = "ci"
+      condition."kubernetes.pod_name.starts_with" = "release-controller-"
+      condition."kubernetes.container_name.eq" = ["controller"]
+
+    [sinks.rc_aws_cloudwatch_logs]
+      type = "aws_cloudwatch_logs"
+      inputs = ["release_controllers"]
+      group_name = "app-ci-logs/{{ kubernetes.pod_labels.app }}"
+      region = "us-east-1"
+      stream_name = "{{ kubernetes.pod_name }}"
+      encoding.codec = "text"
 ---
 # Vector agent on each node where it collects logs from pods.
 apiVersion: apps/v1
@@ -77,15 +115,28 @@ spec:
     metadata:
       labels:
         name: vector-agent
-        rev: "14"
+        rev: "15"
     spec:
       hostNetwork: true
       serviceAccountName: vector-log-shipper
       containers:
       - name: vector
-        image: docker.io/timberio/vector:0.9.0-alpine
-        command: ["/usr/local/bin/vector", "-w"]
+        image: docker.io/timberio/vector:0.11.1-alpine
+        args:
+        - --watch-config=/etc/vector/vector.toml
         env:
+        - name: VECTOR_SELF_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: VECTOR_SELF_POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: VECTOR_SELF_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
         - name: AWS_ACCESS_KEY_ID
           valueFrom:
             secretKeyRef:

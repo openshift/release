@@ -107,10 +107,12 @@ spec:
         args:
         - --leader-election-namespace=ci
         - --config-path=/etc/config/config.yaml
+        - --supplemental-prow-config-dir=/etc/config
         - --job-config-path=/etc/job-config
         - --ci-operator-config-path=/etc/configs
         - --github-endpoint=http://ghproxy
-        - --github-token-path=/etc/github/oauth
+        - --github-app-id=$(GITHUB_APP_ID)
+        - --github-app-private-key-path=/etc/github/cert
         - --registry-cluster-name=app.ci
         - --testImagesDistributorOptions.additional-image-stream-tag=ocp/builder:golang-1.10
         - --testImagesDistributorOptions.additional-image-stream-tag=ocp/builder:golang-1.11
@@ -129,36 +131,27 @@ spec:
         - --testImagesDistributorOptions.forbidden-registry=registry.build02.ci.openshift.org
         - --enable-controller=test_images_distributor
         - --enable-controller=promotionreconciler
-        - --enable-controller=secret_syncer
-        - --secretSyncerConfigOptions.secretBoostrapConfigFile=/etc/ci-secret-bootstrap/_config.yaml
-        - --secretSyncerConfigOptions.config=/etc/secret-mirroring/mapping.yaml
         - --step-config-path=/etc/registry
         - --enable-controller=serviceaccount_secret_refresher
         - --serviceAccountRefresherOptions.enabled-namespace=ci
+        - --serviceAccountRefresherOptions.enabled-namespace=bparees
         - --serviceAccountRefresherOptions.remove-old-secrets=true
-        - --enable-controller=image_pusher
-        - --imagePusherOptions.image-stream=origin/release
-        - --imagePusherOptions.image-stream=ocp/release
-        - --imagePusherOptions.image-stream=ocp-priv/release-priv
-        - --imagePusherOptions.image-stream=ocp-ppc64le/release-ppc64le
-        - --imagePusherOptions.image-stream=ocp-ppc64le-priv/release-ppc64le-priv
-        - --imagePusherOptions.image-stream=ocp-s390x/release-s390x
-        - --imagePusherOptions.image-stream=ocp-s390x-priv/release-s390x-priv
-        - --imagePusherOptions.image-stream=ocp/release-controller-bootstrap
-        - --imagePusherOptions.image-stream=ocp-priv/release-controller-bootstrap
-        - --imagePusherOptions.image-stream=ocp-s390x/release-controller-bootstrap
-        - --imagePusherOptions.image-stream=ocp-s390x-priv/release-controller-bootstrap
-        - --imagePusherOptions.image-stream=ocp-ppc64le/release-controller-bootstrap
-        - --imagePusherOptions.image-stream=ocp-ppc64le-priv/release-controller-bootstrap
         - --dry-run=false
         env:
+        - name: GOMAXPROCS
+          value: "1024"
         - name: KUBECONFIG
-          value: /var/kubeconfigs/api-ci-kubeconfig:/var/kubeconfigs/build01-kubeconfig:/var/kubeconfigs/build02-kubeconfig:/var/kubeconfigs/vsphere-kubeconfig
+          value: /var/kubeconfigs/build01-kubeconfig:/var/kubeconfigs/build02-kubeconfig:/var/kubeconfigs/vsphere-kubeconfig
+        - name: GITHUB_APP_ID
+          valueFrom:
+            secretKeyRef:
+              name: openshift-prow-github-app
+              key: appid
         ports:
         - name: metrics
           containerPort: 8080
         volumeMounts:
-        - name: oauth
+        - name: github-app-credentials
           mountPath: /etc/github
           readOnly: true
         - name: kubeconfigs
@@ -253,9 +246,9 @@ spec:
             cpu: "250m"
       serviceAccountName: dptp-controller-manager
       volumes:
-      - name: oauth
+      - name: github-app-credentials
         secret:
-          secretName: github-credentials-openshift-merge-robot
+          secretName: openshift-prow-github-app
       - name: kubeconfigs
         secret:
           secretName: dptp-controller-manager

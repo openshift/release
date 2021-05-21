@@ -3,10 +3,6 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_builder_rhel-8-base-openshift:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-base-openshift
   ocp_builder_rhel-8-base-openshift-4.8:
     name: builder
     namespace: ocp
@@ -20,7 +16,7 @@ images:
 - dockerfile_path: Dockerfile.ocp
   from: base
   inputs:
-    ocp_builder_rhel-8-base-openshift-4.8:
+    base:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-base-openshift-4.8
   to: ironic
@@ -29,15 +25,15 @@ raw_steps:
     commands: |
       cat <<EOF> /etc/yum.repos.d/base-4-8-rhel-8-ironic-prevalidation.repo
       [rhel-8-ironic-prevalidation-ocp48]
-      id = rhel-8-ironic-prevalidation
-      name = rhel-8-ironic-prevalidation
+      id = rhel-8-ironic-prevalidation-ocp48
+      name = rhel-8-ironic-prevalidation-ocp48
       baseurl = http://base-4-8-rhel-8-ironic-prevalidation.ocp.svc/rhel-8-ironic-prevalidation-ocp48
       enabled = 1
       gpgcheck = 0
       priority = 1
       skip_if_unavailable=FALSE
       EOF
-    from: ocp_builder_rhel-8-base-openshift
+    from: ocp_builder_rhel-8-base-openshift-4.8
     to: base
 resources:
   '*':
