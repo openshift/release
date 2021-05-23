@@ -21,6 +21,8 @@ set -xeo pipefail
 
 cd /root/dev-scripts
 source common.sh
+source utils.sh
+source network.sh
 
 REPO_DIR="/home/assisted-service"
 if [ ! -d "\${REPO_DIR}" ]; then
@@ -34,25 +36,52 @@ cd "\${REPO_DIR}"
 
 export DISCONNECTED="${DISCONNECTED:-}"
 
+if [ "\${DISCONNECTED}" = "true" ]; then
+  export LOCAL_REGISTRY="\${LOCAL_REGISTRY_DNS_NAME}:\${LOCAL_REGISTRY_PORT}"
+
+  source deploy/operator/mirror_utils.sh
+
+  export AUTHFILE="\${XDG_RUNTIME_DIR}/containers/auth.json"
+  mkdir -p \$(dirname \${AUTHFILE})
+
+  merge_authfiles "\${PULL_SECRET_FILE}" "\${REGISTRY_CREDS}" "\${AUTHFILE}"
+fi
+
 echo "### Setup hive..."
 
 if [ "\${DISCONNECTED}" = "true" ]; then
   hack/setup_env.sh hive_from_upstream
-
-  export LOCAL_REGISTRY="\${LOCAL_REGISTRY_DNS_NAME}:\${LOCAL_REGISTRY_PORT}"
-  export AUTHFILE="\${REGISTRY_CREDS}"
   deploy/operator/setup_hive.sh from_upstream
 else
   deploy/operator/setup_hive.sh with_olm
 fi
 
+export OPENSHIFT_VERSIONS=\$(cat data/default_ocp_versions.json |
+  jq -rc 'with_entries(.key = "4.8") | with_entries(
+      {key: .key, value: {rhcos_image: .value.rhcos_image,
+      rhcos_version: .value.rhcos_version,
+      rhcos_rootfs: .value.rhcos_rootfs}})')
+
 if [ "\${DISCONNECTED}" = "true" ]; then
-  echo "AI operator installation on disconnected environment not yet implemented"
-  exit 0
+  echo "### Mirroring RHCOS and Rootfs images..."
+  rhcos_image=\$(echo \${OPENSHIFT_VERSIONS} | jq -r '.[].rhcos_image')
+  rhcos_rootfs=\$(echo \${OPENSHIFT_VERSIONS} | jq -r '.[].rhcos_rootfs')
+
+  assisted_images_dir="\${IRONIC_IMAGES_DIR}/assisted"
+  mkdir -p "\${assisted_images_dir}"
+  curl --retry 5 "\${rhcos_image}" -o "\${assisted_images_dir}/\${rhcos_image##*/}"
+  curl --retry 5 "\${rhcos_rootfs}" -o "\${assisted_images_dir}/\${rhcos_rootfs##*/}"
+
+  images_base_url="http://\$(wrap_if_ipv6 \${PROVISIONING_HOST_IP})/images/assisted"
+  rhcos_image="\${images_base_url}/\${rhcos_image##*/}"
+  rhcos_rootfs="\${images_base_url}/\${rhcos_rootfs##*/}"
+
+  OPENSHIFT_VERSIONS=\$(echo \$OPENSHIFT_VERSIONS |
+      jq ".[].rhcos_image=\"\${rhcos_image}\" | .[].rhcos_rootfs=\"\${rhcos_rootfs}\"")
 fi
 
 echo "### Setup assisted installer..."
-export INDEX_IMAGE=${INDEX_IMAGE}
+export INDEX_IMAGE="\$(dirname ${INDEX_IMAGE})/pipeline:ci-index"
 export OPENSHIFT_VERSIONS=\$(cat data/default_ocp_versions.json |
     jq -rc 'with_entries(.key = "4.8") | with_entries(
       {
