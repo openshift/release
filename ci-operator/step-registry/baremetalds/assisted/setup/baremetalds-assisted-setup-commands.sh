@@ -95,6 +95,7 @@ echo "export PUBLIC_CONTAINER_REGISTRIES=quay.io,\${CI_REGISTRIES}" >> /root/con
 echo "export ASSISTED_SERVICE_HOST=${IP}" >> /root/config
 echo "export CHECK_CLUSTER_VERSION=True" >> /root/config
 echo "export NUM_WORKERS=2" >> /root/config
+echo "export TEST_TEARDOWN=false" >> /root/config
 
 if [[ -e /root/assisted-additional-config ]]
 then
