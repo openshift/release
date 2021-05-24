@@ -67,14 +67,16 @@ images:
 promotion:
   name: "5.2"
   namespace: logging
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.7"
 resources:
   '*':
     requests:
       cpu: 200m
       memory: 200Mi
-tag_specification:
-  name: "4.7"
-  namespace: ocp
 tests:
 - as: lint
   commands: make lint
@@ -85,10 +87,16 @@ tests:
   container:
     from: src
 - as: e2e-operator
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: dpp
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.7"
   steps:
-    cluster_profile: aws
-    env:
-      COMPUTE_NODE_TYPE: m5.4xlarge
+    pre:
+    - ref: ipi-install-rbac
     test:
     - as: test
       cli: latest
@@ -117,12 +125,17 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: openshift-e2e-aws-hosted-loki
 - as: functional
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: dpp
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.7"
   steps:
-    cluster_profile: aws
-    env:
-      COMPUTE_NODE_TYPE: m5.4xlarge
+    pre:
+    - ref: ipi-install-rbac
     test:
     - as: test
       cli: latest
@@ -151,7 +164,6 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: master
   org: openshift
