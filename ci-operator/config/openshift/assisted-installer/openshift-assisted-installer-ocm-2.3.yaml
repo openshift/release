@@ -1,0 +1,101 @@
+base_images:
+  assisted-installer-agent:
+    name: assisted
+    namespace: ocp-kni
+    tag: assisted-installer-agent
+  assisted-service:
+    name: assisted
+    namespace: ocp-kni
+    tag: assisted-service
+  assisted-test-infra:
+    name: assisted-test
+    namespace: ocp-kni
+    tag: assisted-test-infra
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp_4.7_cli:
+    name: "4.8"
+    namespace: ocp
+    tag: cli
+  openshift_release_golang-1.15:
+    name: release
+    namespace: openshift
+    tag: golang-1.15
+binary_build_commands: go mod vendor
+build_root:
+  project_image:
+    dockerfile_path: Dockerfile.assisted-installer-build
+images:
+- dockerfile_path: Dockerfile.assisted-installer
+  from: openshift_release_golang-1.15
+  inputs:
+    openshift_release_golang-1.15:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.15
+  to: assisted-installer
+- dockerfile_path: Dockerfile.assisted-installer-controller
+  from: openshift_release_golang-1.15
+  inputs:
+    openshift_release_golang-1.15:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.15
+  to: assisted-installer-controller
+- dockerfile_path: Dockerfile.assisted-installer-controller-ocp
+  from: openshift_release_golang-1.15
+  inputs:
+    openshift_release_golang-1.15:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.15
+  to: assisted-installer-controller-ocp
+promotion:
+  disabled: true
+  name: ocm-2.3
+  namespace: openshift
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.8"
+  namespace: ocp
+tests:
+- as: lint
+  commands: export GOLANGCI_LINT_CACHE=/tmp/golangci-cache make lint
+  container:
+    from: bin
+- as: format-check
+  commands: make format-check
+  container:
+    from: bin
+- as: unit-test
+  commands: make REPORTS=${ARTIFACT_DIR} unit-test
+  container:
+    from: bin
+- as: e2e-metal-assisted
+  steps:
+    cluster_profile: packet
+    dependencies:
+      ASSISTED_CONTROLLER_IMAGE: pipeline:assisted-installer-controller
+      ASSISTED_INSTALLER_IMAGE: pipeline:assisted-installer
+    workflow: baremetalds-assisted-install
+- as: e2e-metal-assisted-ipv6
+  steps:
+    cluster_profile: packet
+    dependencies:
+      ASSISTED_CONTROLLER_IMAGE: pipeline:assisted-installer-controller
+      ASSISTED_INSTALLER_IMAGE: pipeline:assisted-installer
+    env:
+      ASSISTED_CONFIG: |
+        IPv6=yes
+        IPv4=no
+        VIP_DHCP_ALLOCATION=no
+        PROXY=yes
+        OPENSHIFT_VERSION=4.8
+    workflow: baremetalds-assisted-install
+zz_generated_metadata:
+  branch: ocm-2.3
+  org: openshift
+  repo: assisted-installer

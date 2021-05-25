@@ -169,6 +169,7 @@ spec:
               topologyKey: "kubernetes.io/hostname"
       serviceAccountName: vault
       terminationGracePeriodSeconds: 60
+      priorityClassName: openshift-user-critical
       containers:
       - image: vault-subpath-proxy:latest
         name: subpath-proxy
@@ -210,6 +211,10 @@ spec:
         - server
         - -config
         - /etc/vault/cfg/config.hcl
+        resources:
+          requests:
+            memory: 200Mi
+            cpu: 100m
         readinessProbe:
           httpGet:
             path: /v1/sys/health?standbyok=true
