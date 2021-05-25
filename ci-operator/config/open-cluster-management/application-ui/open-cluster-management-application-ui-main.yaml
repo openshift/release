@@ -18,13 +18,7 @@ images:
   from: base
   to: application-ui
 - dockerfile_path: Dockerfile.cypress
-  from: os
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /tests
-  to: iapplication-ui-tests
+  to: application-ui-tests
 promotion:
   name: "2.3"
   namespace: open-cluster-management
@@ -40,6 +34,14 @@ tests:
       SOURCE_IMAGE_REF: application-ui
     env:
       IMAGE_REPO: application-ui
+      REGISTRY_ORG: open-cluster-management
+    workflow: ocm-ci-image-mirror
+- as: pr-test-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: application-ui-tests
+    env:
+      IMAGE_REPO: application-ui-tests
       REGISTRY_ORG: open-cluster-management
     workflow: ocm-ci-image-mirror
 - as: sonarcloud
@@ -60,6 +62,16 @@ tests:
       SOURCE_IMAGE_REF: application-ui
     env:
       IMAGE_REPO: application-ui
+      IMAGE_TAG: latest
+      REGISTRY_ORG: open-cluster-management
+    workflow: ocm-ci-image-mirror
+- as: latest-test-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: application-ui-tests
+    env:
+      IMAGE_REPO: application-ui-tests
       IMAGE_TAG: latest
       REGISTRY_ORG: open-cluster-management
     workflow: ocm-ci-image-mirror
