@@ -40,14 +40,7 @@ function use_minimal_test_list() {
         echo "${TEST_MINIMAL_LIST}" > /tmp/tests
 }
 
-case "${CLUSTER_TYPE}" in
-packet)
-    # shellcheck source=/dev/null
-    source "${SHARED_DIR}/packet-conf.sh"
-    # shellcheck source=/dev/null
-    source "${SHARED_DIR}/ds-vars.conf"
-    copy_test_binaries
-
+function set_test_provider() {
     # Currently all v6 deployments are disconnected, so we have to tell
     # openshift-tests to exclude those tests that require internet
     # access.
@@ -57,12 +50,25 @@ packet)
     else
         export TEST_PROVIDER='\{\"type\":\"baremetal\",\"disconnected\":true\}'
     fi
+}
+
+case "${CLUSTER_TYPE}" in
+packet)
+    # shellcheck source=/dev/null
+    source "${SHARED_DIR}/packet-conf.sh"
+    # shellcheck source=/dev/null
+    source "${SHARED_DIR}/ds-vars.conf"
+    copy_test_binaries
 
     echo "### Checking release version"
-    # Mirroring test images is supported only for versions greater than or equal to 4.7
     if printf '%s\n%s' "4.8" "${DS_OPENSHIFT_VERSION}" | sort -C -V; then
+        # Set test provider for only versions greater than or equal to 4.8
+        set_test_provider
+
+        # Mirroring test images is supported only for versions greater than or equal to 4.8
         mirror_test_images
     else
+        export TEST_PROVIDER='\{\"type\":\"\skeleton\"\}'
         use_minimal_test_list
     fi
     ;;
