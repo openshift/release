@@ -4,7 +4,7 @@
 #
 # The standard name for this image is openshift/origin-release
 #
-FROM        centos:7
+FROM        registry.centos.org/centos/centos:7
 
 ENV VERSION=1.9.7 \
     GOARM=5 \
