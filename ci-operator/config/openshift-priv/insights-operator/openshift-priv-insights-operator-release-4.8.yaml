@@ -94,7 +94,23 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: pytest.sh
+      commands: pytest.sh --junitxml=${ARTIFACT_DIR}/test-report.xml
+      from: insights-operator-tests
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- as: insights-operator-test-time-periodic
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: gcp
+    pre:
+    - chain: ipi-gcp-pre
+    - ref: insights-live
+    test:
+    - as: test
+      cli: latest
+      commands: pytest.sh -k "test_archive_uploaded_and_result_received"
       from: insights-operator-tests
       resources:
         requests:
