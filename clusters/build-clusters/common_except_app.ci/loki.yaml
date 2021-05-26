@@ -398,3 +398,20 @@ spec:
   selector:
     matchLabels:
       app.kubernetes.io/name: promtail
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: prometheus-loki-rules
+  namespace: openshift-monitoring
+spec:
+  groups:
+  - name: loki
+    rules:
+    - alert: promtail-dropping-data
+      annotations:
+        message: Promtail is unable to ship logs and dropping data.
+      expr: rate(promtail_dropped_bytes_total[1h]) > 50
+      for: 1m
+      labels:
+        severity: critical
