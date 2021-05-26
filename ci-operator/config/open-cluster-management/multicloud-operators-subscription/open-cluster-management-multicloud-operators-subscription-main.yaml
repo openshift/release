@@ -3,26 +3,26 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  open-cluster-management_builder_go1.15-linux:
+  open-cluster-management_builder_go1.16-linux:
     name: builder
     namespace: open-cluster-management
-    tag: go1.15-linux
-  open-cluster-management_builder_go1.15-linux-amd64:
+    tag: go1.16-linux
+  open-cluster-management_builder_go1.16-linux-amd64:
     name: builder
     namespace: open-cluster-management
-    tag: go1.15-linux-amd64
+    tag: go1.16-linux-amd64
 build_root:
   image_stream_tag:
     name: builder
     namespace: open-cluster-management
-    tag: go1.15-linux
+    tag: go1.16-linux
 images:
 - dockerfile_path: build/Dockerfile.prow
   from: base
   inputs:
-    open-cluster-management_builder_go1.15-linux:
+    open-cluster-management_builder_go1.16-linux:
       as:
-      - registry.ci.openshift.org/open-cluster-management/builder:go1.15-linux
+      - registry.ci.openshift.org/open-cluster-management/builder:go1.16-linux
   to: multicluster-operators-subscription
 promotion:
   name: "2.3"
@@ -33,6 +33,9 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: ocm-ci-rbac
+  steps:
+    workflow: ocm-ci-rbac
 - as: test-unit
   commands: |
     export SELF="make -f Makefile.prow"

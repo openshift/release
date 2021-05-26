@@ -1,43 +1,45 @@
-base_images:
-  base:
-    name: ubi-minimal
-    namespace: ocp
-    tag: "8"
-  openshift_release_golang-1.12:
-    name: release
-    namespace: openshift
-    tag: golang-1.12
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.12
+  from_repository: true
 images:
 - dockerfile_path: build/Dockerfile
-  from: base
-  inputs:
-    openshift_release_golang-1.12:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.12
   to: splunk-forwarder-operator
-- dockerfile_path: containers/forwarder/Dockerfile
-  from: base
-  to: splunk-forwarder
-- dockerfile_path: containers/heavy_forwarder/Dockerfile
-  from: base
-  to: splunk-heavyforwarder
 resources:
   '*':
+    limits:
+      memory: 4Gi
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: verify
+- as: coverage
   commands: |
-    export GOLANGCI_LINT_VERSION=$(cat .golangciversion)
-    export GOLANGCI_LINT_CACHE=/tmp/.cache
-    curl -sfL "https://github.com/golangci/golangci-lint/releases/download/v${GOLANGCI_LINT_VERSION:?'golangci-lint version is unset'}/golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64.tar.gz" | tar -C /go/bin -zx --strip-components=1 "golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64/golangci-lint"
-    make verify
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  secret:
+    mount_path: /tmp/secret
+    name: splunk-forwarder-operator-codecov-token
+- as: publish-coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  postsubmit: true
+  secret:
+    mount_path: /tmp/secret
+    name: splunk-forwarder-operator-codecov-token
+- as: lint
+  commands: make lint
+  container:
+    from: src
+- as: test
+  commands: make test
+  container:
+    from: src
+- as: validate
+  commands: make validate
   container:
     from: src
 - as: vuln-check-operator
@@ -52,30 +54,6 @@ tests:
     ./jq --exit-status '.Vulnerabilities, (.Vulnerabilities|length == 0)' <<< "$ERRATA"
   container:
     from: splunk-forwarder-operator
-- as: vuln-check-forwarder
-  commands: |
-    cd /tmp
-    curl -sfL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 --output jq
-    chmod a+x jq
-    export CLAIR_SERVER=https://clair.apps.osd-v4prod-aws.n2a0.p1.openshiftapps.com
-    PACKAGES=$(/usr/bin/rpmquery -qa | sort -Vu | ./jq -cR -s  '{Packages: (.|split("\n")|select(.!="")|sort)}')
-    ERRATA=$(curl -s -X POST ${CLAIR_SERVER}/packages -H application/json --data @-<<<"${PACKAGES}")
-    echo -n "Vulnerabilties: "
-    ./jq --exit-status '.Vulnerabilities, (.Vulnerabilities|length == 0)' <<< "$ERRATA"
-  container:
-    from: splunk-forwarder
-- as: vuln-check-heavyforwarder
-  commands: |
-    cd /tmp
-    curl -sfL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 --output jq
-    chmod a+x jq
-    export CLAIR_SERVER=https://clair.apps.osd-v4prod-aws.n2a0.p1.openshiftapps.com
-    PACKAGES=$(/usr/bin/rpmquery -qa | sort -Vu | ./jq -cR -s  '{Packages: (.|split("\n")|select(.!="")|sort)}')
-    ERRATA=$(curl -s -X POST ${CLAIR_SERVER}/packages -H application/json --data @-<<<"${PACKAGES}")
-    echo -n "Vulnerabilties: "
-    ./jq --exit-status '.Vulnerabilities, (.Vulnerabilities|length == 0)' <<< "$ERRATA"
-  container:
-    from: splunk-heavyforwarder
 zz_generated_metadata:
   branch: master
   org: openshift

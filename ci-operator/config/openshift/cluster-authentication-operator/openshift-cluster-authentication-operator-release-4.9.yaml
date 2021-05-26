@@ -41,9 +41,9 @@ images:
 - dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.8:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.8:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
   to: cluster-authentication-operator
 promotion:
   name: "4.9"
@@ -74,8 +74,8 @@ tests:
     from: src
 - as: e2e-agnostic
   steps:
-    cluster_profile: gcp
-    workflow: openshift-e2e-gcp
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure
 - as: e2e-agnostic-ipv6
   steps:
     cluster_profile: packet
@@ -127,9 +127,23 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-gcp
-- as: e2e-aws-operator-encryption-perf
+- as: e2e-gcp-operator-encryption-rotation
   steps:
-    cluster_profile: aws
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e-encryption-rotation JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: ipi-gcp
+- as: e2e-gcp-operator-encryption-perf
+  steps:
+    cluster_profile: gcp
     test:
     - as: test
       cli: latest
@@ -139,7 +153,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    workflow: ipi-gcp
 - as: e2e-aws-single-node
   steps:
     cluster_profile: aws

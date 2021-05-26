@@ -50,6 +50,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=""
+        TEST_FUNC=test_install
         MAKEFILE_TARGET="create_full_environment run test_parallel"
     workflow: baremetalds-assisted-install
 - as: system-test-olm
@@ -57,8 +58,24 @@ tests:
     cluster_profile: packet
     env:
       ASSISTED_CONFIG: |
-        OLM_OPERATORS="cnv"
+        TEST_FUNC=test_olm_operator
         MAKEFILE_TARGET="create_full_environment run test_parallel"
+    workflow: baremetalds-assisted-install
+- as: system-test-olm-periodic
+  cron: '@daily'
+  steps:
+    cluster_profile: packet
+    env:
+      ASSISTED_CONFIG: |
+        TEST_FUNC=test_olm_operator
+        MAKEFILE_TARGET="create_full_environment run test_parallel"
+    workflow: baremetalds-assisted
+- as: system-test-operator
+  steps:
+    cluster_profile: packet
+    env:
+      ASSISTED_CONFIG: |
+        POST_INSTALL_COMMAND="make deploy_assisted_operator"
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-ipv6
   steps:
@@ -69,7 +86,19 @@ tests:
         IPv4=no
         VIP_DHCP_ALLOCATION=no
         PROXY=yes
+        OPENSHIFT_VERSION=4.8
     workflow: baremetalds-assisted-install
+- as: e2e-metal-assisted-ipv6-periodic
+  cron: '@daily'
+  steps:
+    cluster_profile: packet
+    env:
+      ASSISTED_CONFIG: |
+        IPv6=yes
+        IPv4=no
+        VIP_DHCP_ALLOCATION=no
+        PROXY=yes
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-none
   steps:
     cluster_profile: packet
@@ -84,7 +113,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         PLATFORM=none
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-none-ipv6
   steps:
     cluster_profile: packet
@@ -94,6 +123,7 @@ tests:
         IPv4=no
         VIP_DHCP_ALLOCATION=no
         PROXY=yes
+        OPENSHIFT_VERSION=4.8
         PLATFORM=none
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-none-ipv6-periodic
@@ -107,14 +137,7 @@ tests:
         VIP_DHCP_ALLOCATION=no
         PROXY=yes
         PLATFORM=none
-    workflow: baremetalds-assisted-install
-- as: e2e-metal-assisted-onprem
-  steps:
-    cluster_profile: packet
-    env:
-      ASSISTED_CONFIG: |
-        DEPLOY_TARGET=onprem
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted
   steps:
     cluster_profile: packet
@@ -127,7 +150,6 @@ tests:
         NUM_MASTERS=1
         NUM_WORKERS=0
         ISO_IMAGE_TYPE=minimal-iso
-        OPENSHIFT_INSTALL_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}
         OPENSHIFT_VERSION=4.8
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-periodic
@@ -144,7 +166,6 @@ tests:
         NUM_MASTERS=1
         NUM_WORKERS=0
         ISO_IMAGE_TYPE=minimal-iso
-        OPENSHIFT_INSTALL_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}
         OPENSHIFT_VERSION=4.8
     workflow: baremetalds-assisted
 - as: e2e-metal-assisted-kube-api
@@ -160,7 +181,6 @@ tests:
         ADDITIONAL_PARAMS="--with-static-network-config"
         ISO_IMAGE_TYPE=minimal-iso
         KUBE_API=yes
-        OPENSHIFT_INSTALL_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}
         OPENSHIFT_VERSION=4.8
         ENABLE_KUBE_API=true
     workflow: baremetalds-assisted-install
@@ -178,7 +198,6 @@ tests:
         ADDITIONAL_PARAMS="--with-static-network-config"
         ISO_IMAGE_TYPE=minimal-iso
         KUBE_API=yes
-        OPENSHIFT_INSTALL_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}
         OPENSHIFT_VERSION=4.8
         ENABLE_KUBE_API=true
     workflow: baremetalds-assisted
@@ -194,9 +213,8 @@ tests:
         PROXY=yes
         ADDITIONAL_PARAMS="--with-static-network-config"
         ISO_IMAGE_TYPE=minimal-iso
-        OPENSHIFT_INSTALL_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}
         OPENSHIFT_VERSION=4.8
-    workflow: baremetalds-assisted
+    workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-edge-ready-periodic
   cron: '@daily'
   steps:
@@ -210,7 +228,6 @@ tests:
         PROXY=yes
         ADDITIONAL_PARAMS="--with-static-network-config"
         ISO_IMAGE_TYPE=minimal-iso
-        OPENSHIFT_INSTALL_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}
         OPENSHIFT_VERSION=4.8
     workflow: baremetalds-assisted
 - as: e2e-metal-single-node-live-iso

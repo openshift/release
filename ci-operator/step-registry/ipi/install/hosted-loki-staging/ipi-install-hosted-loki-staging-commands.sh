@@ -4,8 +4,10 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-export LOKI_VERSION="2.2.1"
-export LOKI_ENDPOINT=https://observatorium.api.stage.openshift.com/api/logs/v1/dptp/loki/api/v1
+export LOKI_STAGE_ENDPOINT=https://observatorium.api.stage.openshift.com/api/logs/v1/dptp/loki/api/v1
+export LOKI_PROD_ENDPOINT=https://observatorium.api.openshift.com/api/logs/v1/dptp/loki/api/v1
+export PROMTAIL_IMAGE="quay.io/openshift-logging/promtail"
+export PROMTAIL_VERSION="v2.2.1"
 
 GRAFANACLOUND_USERNAME=$(cat /var/run/loki-grafanacloud-secret/client-id)
 
@@ -78,9 +80,18 @@ data:
           min_period: 1s
         batchsize: 102400
         batchwait: 10s
-        bearer_token_file: /tmp/shared/bearer_token
+        bearer_token_file: /tmp/shared/prod_bearer_token
         timeout: 10s
-        url: ${LOKI_ENDPOINT}/push
+        url: ${LOKI_PROD_ENDPOINT}/push
+      - backoff_config:
+          max_period: 5m
+          max_retries: 20
+          min_period: 1s
+        batchsize: 102400
+        batchwait: 10s
+        bearer_token_file: /tmp/shared/stage_bearer_token
+        timeout: 10s
+        url: ${LOKI_STAGE_ENDPOINT}/push
       - backoff_config:
           max_period: 5m
           max_retries: 20
@@ -104,17 +115,13 @@ data:
         - filename
       - pack:
           labels:
-          - name
           - namespace
           - pod_name
-          - container
           - container_name
           - app
-          - stream
-          - pod_template_hash
-          - controller_revision_hash
-          - ingresscontroller_operator_openshift_io_hash
-          - pod_template_generation
+      - labelallow:
+          - host
+          - invoker
       relabel_configs:
       - source_labels:
         - __meta_kubernetes_pod_label_name
@@ -147,6 +154,8 @@ data:
         - __meta_kubernetes_pod_uid
         - __meta_kubernetes_pod_container_name
         target_label: __path__
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_(.+)
     - job_name: journal
       journal:
         path: /var/log/journal
@@ -158,22 +167,38 @@ data:
         - stream
       - pack:
           labels:
-          - __journal__boot_id
-          - __journal__systemd_unit
+          - boot_id
+          - systemd_unit
+      - labelallow:
+          - host
+          - invoker
+      relabel_configs:
+      - action: labelmap
+        regex: __journal__(.+)
     server:
       http_listen_port: 3101
     target_config:
       sync_period: 10s
 EOF
-cat >> "${SHARED_DIR}/manifest_creds.yml" << EOF
+cat >> "${SHARED_DIR}/manifest_stage_creds.yml" << EOF
 apiVersion: v1
 kind: Secret
 metadata:
-  name: promtail-creds
+  name: promtail-stage-creds
   namespace: loki
 data:
-  client-id: "$(cat /var/run/loki-secret/client-id | base64 -w 0)"
-  client-secret: "$(cat /var/run/loki-secret/client-secret | base64 -w 0)"
+  client-id: "$(cat /var/run/loki-stage-secret/client-id | base64 -w 0)"
+  client-secret: "$(cat /var/run/loki-stage-secret/client-secret | base64 -w 0)"
+EOF
+cat >> "${SHARED_DIR}/manifest_prod_creds.yml" << EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: promtail-prod-creds
+  namespace: loki
+data:
+  client-id: "$(cat /var/run/loki-prod-secret/client-id | base64 -w 0)"
+  client-secret: "$(cat /var/run/loki-prod-secret/client-secret | base64 -w 0)"
 EOF
 cat >> "${SHARED_DIR}/manifest_grafanacom_creds.yml" << EOF
 apiVersion: v1
@@ -204,7 +229,7 @@ spec:
         app.kubernetes.io/instance: loki-promtail
         app.kubernetes.io/name: promtail
         app.kubernetes.io/part-of: loki
-        app.kubernetes.io/version: ${LOKI_VERSION}
+        app.kubernetes.io/version: ${PROMTAIL_VERSION}
     spec:
       containers:
       - args:
@@ -212,18 +237,40 @@ spec:
         - --oidc.client-secret=\$(CLIENT_SECRET)
         - --oidc.issuer-url=https://sso.redhat.com/auth/realms/redhat-external
         - --margin=10m
-        - --file=/tmp/shared/bearer_token
-        name: bearer-token
+        - --file=/tmp/shared/stage_bearer_token
+        name: stage-bearer-token
         env:
           - name: CLIENT_ID
             valueFrom:
               secretKeyRef:
-                name: promtail-creds
+                name: promtail-stage-creds
                 key: client-id
           - name: CLIENT_SECRET
             valueFrom:
               secretKeyRef:
-                name: promtail-creds
+                name: promtail-stage-creds
+                key: client-secret
+        volumeMounts:
+        - mountPath: "/tmp/shared"
+          name: shared-data
+        image: quay.io/observatorium/token-refresher
+      - args:
+        - --oidc.client-id=\$(CLIENT_ID)
+        - --oidc.client-secret=\$(CLIENT_SECRET)
+        - --oidc.issuer-url=https://sso.redhat.com/auth/realms/redhat-external
+        - --margin=10m
+        - --file=/tmp/shared/prod_bearer_token
+        name: prod-bearer-token
+        env:
+          - name: CLIENT_ID
+            valueFrom:
+              secretKeyRef:
+                name: promtail-prod-creds
+                key: client-id
+          - name: CLIENT_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: promtail-prod-creds
                 key: client-secret
         volumeMounts:
         - mountPath: "/tmp/shared"
@@ -241,7 +288,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
-        image: grafana/promtail:${LOKI_VERSION}
+        image: ${PROMTAIL_IMAGE}:${PROMTAIL_VERSION}
         imagePullPolicy: IfNotPresent
         name: promtail
         ports:

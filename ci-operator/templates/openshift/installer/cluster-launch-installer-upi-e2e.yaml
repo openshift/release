@@ -28,6 +28,8 @@ parameters:
 - name: PROXY_IMAGE
   value: registry.ci.openshift.org/origin/4.2:egress-http-proxy
 - name: USE_LEASE_CLIENT
+- name: LEASED_RESOURCE
+  required: true
 
 objects:
 
@@ -176,7 +178,7 @@ objects:
         mountPath: /tmp/artifacts
       env:
       - name: AWS_REGION
-        value: us-east-1
+        value: ${LEASED_RESOURCE}
       - name: AWS_SHARED_CREDENTIALS_FILE
         value: /tmp/cluster/.awscred
       - name: AZURE_AUTH_LOCATION
@@ -254,11 +256,11 @@ objects:
           export KUBE_SSH_USER=core
           mkdir -p ~/.ssh
           cp /tmp/cluster/ssh-privatekey ~/.ssh/google_compute_engine || true
-          export TEST_PROVIDER='{"type":"gce","region":"us-east1","multizone": true,"multimaster":true,"projectid":"openshift-gce-devel-ci"}'
+          export TEST_PROVIDER='{"type":"gce","region":"${LEASED_RESOURCE}","multizone": true,"multimaster":true,"projectid":"openshift-gce-devel-ci"}'
         elif [[ "${CLUSTER_TYPE}" == "aws" ]]; then
           mkdir -p ~/.ssh
           cp /tmp/cluster/ssh-privatekey ~/.ssh/kube_aws_rsa || true
-          export PROVIDER_ARGS="-provider=aws -gce-zone=us-east-1"
+          export PROVIDER_ARGS="-provider=aws -gce-zone=${LEASED_RESOURCE}"
           # TODO: make openshift-tests auto-discover this from cluster config
           REGION="$(oc get -o jsonpath='{.status.platformStatus.aws.region}' infrastructure cluster)"
           ZONE="$(oc get -o jsonpath='{.items[0].metadata.labels.failure-domain\.beta\.kubernetes\.io/zone}' nodes)"
@@ -313,8 +315,10 @@ objects:
         value: /etc/openshift-installer/.awscred
       - name: AZURE_AUTH_LOCATION
         value: /etc/openshift-installer/osServicePrincipal.json
+      - name: AZURE_REGION
+        value: ${LEASED_RESOURCE}
       - name: AWS_REGION
-        value: us-east-1
+        value: ${LEASED_RESOURCE}
       - name: CLUSTER_NAME
         value: ${NAMESPACE}-${JOB_NAME_HASH}
       - name: BASE_DOMAIN
@@ -322,7 +326,7 @@ objects:
       - name: GCP_PROJECT
         value: openshift-gce-devel-ci
       - name: GCP_REGION
-        value: us-east1
+        value: ${LEASED_RESOURCE}
       - name: GOOGLE_CLOUD_KEYFILE_JSON
         value: /etc/openshift-installer/gce.json
       - name: SSH_PUB_KEY_PATH
@@ -1042,6 +1046,12 @@ objects:
         EOF
         }
 
+        # ensure LEASED_RESOURCE is set
+        if [[ -z "${LEASED_RESOURCE}" ]]; then
+          echo "Failed to acquire lease"
+          exit 1
+        fi
+
         cp "$(command -v openshift-install)" /tmp
         mkdir ${ARTIFACT_DIR}/installer
 
@@ -1238,17 +1248,6 @@ objects:
             sed -i "s;mastersSchedulable: true;mastersSchedulable: false;g" ${ARTIFACT_DIR}/installer/manifests/cluster-scheduler-02-config.yml
 
         elif [[ "${CLUSTER_TYPE}" == "azure4" ]]; then
-            case $((RANDOM % 8)) in
-            0) AZURE_REGION=centralus;;
-            1) AZURE_REGION=centralus;;
-            2) AZURE_REGION=centralus;;
-            3) AZURE_REGION=centralus;;
-            4) AZURE_REGION=centralus;;
-            5) AZURE_REGION=centralus;;
-            6) AZURE_REGION=eastus2;;
-            7) AZURE_REGION=westus;;
-            *) echo >&2 "invalid Azure region index"; exit 1;;
-            esac
             echo "Azure region: ${AZURE_REGION}"
 
             export BASE_DOMAIN_RESOURCE_GROUP="os4-common"
@@ -1302,6 +1301,7 @@ objects:
 
         cp ${ARTIFACT_DIR}/installer/bootstrap.ign /srv
         BOOTSTRAP_URI="https://${JOB_NAME_SAFE}-bootstrap-exporter-${NAMESPACE}.svc.ci.openshift.org/bootstrap.ign"
+        START_TIME=$(date "+%F %X")
 
         # begin bootstrapping
         if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
@@ -2209,6 +2209,14 @@ objects:
         openshift-install --dir=${ARTIFACT_DIR}/installer wait-for install-complete 2>&1 | grep --line-buffered -v password &
         wait "$!"
 
+        END_TIME=$(date "+%F %X")
+
+        echo "Updating openshift-install ConfigMap with the start and end times."
+        if ! oc patch configmap openshift-install -n openshift-config -p '{"data":{"startTime":"'"$START_TIME"'","endTime":"'"$END_TIME"'"}}'
+        then
+          oc create configmap openshift-install -n openshift-config --from-literal=startTime="$START_TIME" --from-literal=endTime="$END_TIME"
+        fi
+
         # Password for the cluster gets leaked in the installer logs and hence removing them.
         sed -i 's/password: .*/password: REDACTED"/g' ${ARTIFACT_DIR}/installer/.openshift_install.log
         # The image registry in some instances the config object
@@ -2246,7 +2254,7 @@ objects:
       - name: TFVARS_PATH
         value: /etc/openshift-installer/vmc.secret.auto.tfvars
       - name: AWS_REGION
-        value: us-east-1
+        value: ${LEASED_RESOURCE}
       - name: GOOGLE_CLOUD_KEYFILE_JSON
         value: /etc/openshift-installer/gce.json
       - name: USER

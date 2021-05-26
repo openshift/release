@@ -19,9 +19,9 @@ CONFIG = {
     },
     'azure4-quota-slice': {
         'centralus': 33,
-        'eastus': 10,
-        'eastus2': 10,
-        'westus': 10
+        'eastus': 8,
+        'eastus2': 8,
+        'westus': 8
     },
     'gcp-quota-slice': {
         'us-east1': 70,
@@ -42,6 +42,9 @@ CONFIG = {
     'openstack-vexxhost-quota-slice': {
         'default': 9,
     },
+    'openstack-kuryr-quota-slice': {
+        'default': 3,
+    },
     'openstack-ppc64le-quota-slice': {},
     'ovirt-quota-slice': {},
     'packet-quota-slice': {
@@ -55,7 +58,9 @@ CONFIG = {
     'aws-cpaas-quota-slice': {
         'us-east-1': 8,
         'us-east-2': 8,
-        'us-west-2': 8
+        'us-west-2': 8,
+        'eu-west-1': 8,
+        'eu-west-2': 8
     },
     'hypershift-quota-slice': {
         'default': 15,
@@ -70,7 +75,7 @@ for i in range(3):
     for j in range(4):
         CONFIG['libvirt-ppc64le-quota-slice']['libvirt-ppc64le-{}-{}'.format(i, j)] = 1
 
-for i in range(1, 5):
+for i in range(2):
     CONFIG['openstack-osuosl-quota-slice']['openstack-osuosl-{0:0>2}'.format(i)] = 1
 
 for i in range(4):
@@ -82,7 +87,7 @@ for i in range(10, 20):
 for i in range(1, 3):
     CONFIG['kubevirt-quota-slice']['tenant-cluster-{}'.format(i)] = 1
 
-for i in range(0,10):
+for i in range(0,12):
     CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 config = {

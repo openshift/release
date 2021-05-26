@@ -10,11 +10,11 @@ base_images:
   hco-index:
     name: hyperconverged-cluster-index
     namespace: ci
-    tag: 1.4.0-unstable
+    tag: 1.5.0-unstable
   hco-index-prev:
     name: hyperconverged-cluster-index
     namespace: ci
-    tag: 1.3.0
+    tag: 1.4.0-unstable
   operator-registry:
     name: "4.8"
     namespace: ocp
@@ -50,12 +50,6 @@ images:
 - dockerfile_path: deploy/Dockerfile.registry.ci
   from: operator-registry-base
   to: hco-registry
-- dockerfile_path: deploy/Dockerfile.registry.upgrade
-  from: operator-registry-base
-  to: hco-registry-upgrade
-- dockerfile_path: deploy/Dockerfile.registry.upgrade-prev
-  from: operator-registry-base
-  to: hco-registry-upgrade-prev
 - dockerfile_path: deploy/Dockerfile.src.ci
   from: src
   inputs:
@@ -90,8 +84,6 @@ promotion:
   excluded_images:
   - operator-registry-base
   - hco-registry
-  - hco-registry-upgrade
-  - hco-registry-upgrade-prev
   name: "4.8"
   namespace: ocp
 resources:
@@ -107,7 +99,7 @@ tests:
   steps:
     cluster_profile: azure4
     env:
-      OO_CHANNEL: 1.4.0
+      OO_CHANNEL: 1.5.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
@@ -126,7 +118,7 @@ tests:
   steps:
     cluster_profile: azure4
     env:
-      OO_CHANNEL: 1.4.0
+      OO_CHANNEL: 1.5.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
@@ -145,7 +137,7 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      OO_CHANNEL: 1.4.0
+      OO_CHANNEL: 1.5.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
@@ -164,7 +156,7 @@ tests:
   steps:
     cluster_profile: gcp
     env:
-      OO_CHANNEL: 1.4.0
+      OO_CHANNEL: 1.5.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
@@ -183,7 +175,7 @@ tests:
   steps:
     cluster_profile: gcp
     env:
-      OO_CHANNEL: 1.4.0
+      OO_CHANNEL: 1.5.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
@@ -204,7 +196,7 @@ tests:
     dependencies:
       OO_INDEX: ci-index-hco-upgrade-bundle
     env:
-      OO_CHANNEL: 1.4.0
+      OO_CHANNEL: 1.5.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
@@ -223,7 +215,7 @@ tests:
     dependencies:
       OO_INDEX: ci-index-hco-upgrade-bundle
     env:
-      OO_CHANNEL: 1.4.0
+      OO_CHANNEL: 1.5.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
@@ -242,10 +234,10 @@ tests:
     dependencies:
       OO_INDEX: ci-index-hco-upgrade-prev-bundle
     env:
-      OO_CHANNEL: 1.3.0
+      OO_CHANNEL: 1.4.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
-      OO_TARGET_NAMESPACES: kubevirt-hyperconverged
+      OO_TARGET_NAMESPACES: '!all'
     test:
     - as: e2e-upgrade-test
       commands: RELEASE_DELTA=2 make upgrade-test-index-image
@@ -261,10 +253,10 @@ tests:
     dependencies:
       OO_INDEX: ci-index-hco-upgrade-prev-bundle
     env:
-      OO_CHANNEL: 1.3.0
+      OO_CHANNEL: 1.4.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
-      OO_TARGET_NAMESPACES: kubevirt-hyperconverged
+      OO_TARGET_NAMESPACES: '!all'
     test:
     - as: e2e-upgrade-test
       commands: RELEASE_DELTA=2 make upgrade-test-index-image
@@ -274,51 +266,7 @@ tests:
           cpu: 500m
           memory: 1Gi
     workflow: optional-operators-ci-azure
-- as: hco-e2e-upgrade-aws
-  steps:
-    cluster_profile: aws
-    test:
-    - as: test
-      commands: RELEASE_DELTA=1 make upgrade-test
-      from: hco-oc-bin-image
-      resources:
-        requests:
-          cpu: 500m
-    workflow: ipi-aws
-- as: hco-e2e-upgrade-prev-aws
-  steps:
-    cluster_profile: aws
-    test:
-    - as: test
-      commands: RELEASE_DELTA=2 PREV=true make upgrade-test
-      from: hco-oc-bin-image
-      resources:
-        requests:
-          cpu: 500m
-    workflow: ipi-aws
-- as: hco-e2e-upgrade-azure
-  steps:
-    cluster_profile: azure4
-    test:
-    - as: test
-      commands: RELEASE_DELTA=1 make upgrade-test
-      from: hco-oc-bin-image
-      resources:
-        requests:
-          cpu: 500m
-    workflow: ipi-azure
-- as: hco-e2e-upgrade-prev-azure
-  steps:
-    cluster_profile: azure4
-    test:
-    - as: test
-      commands: RELEASE_DELTA=2 PREV=true make upgrade-test
-      from: hco-oc-bin-image
-      resources:
-        requests:
-          cpu: 500m
-    workflow: ipi-azure
-- as: hco-e2e-deploy-nightly-master-aws
+- as: hco-e2e-deploy-nightly-main-aws
   cron: 2 4 * * *
   steps:
     cluster_profile: aws

@@ -168,6 +168,8 @@ spec:
                   - vault
               topologyKey: "kubernetes.io/hostname"
       serviceAccountName: vault
+      terminationGracePeriodSeconds: 60
+      priorityClassName: openshift-user-critical
       containers:
       - image: vault-subpath-proxy:latest
         name: subpath-proxy
@@ -180,6 +182,10 @@ spec:
         volumeMounts:
         - name: serving-cert
           mountPath: /var/run/serving-cert
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sleep", "30"]
       - image: vault:1.7.0
         name: unsealer
         command:
@@ -199,17 +205,25 @@ spec:
             secretKeyRef:
               name: vault-unseal
               key: unseal
-      - image: vault:1.6.2
+      - image: vault:1.7.0
         name: vault
         args:
         - server
         - -config
         - /etc/vault/cfg/config.hcl
+        resources:
+          requests:
+            memory: 200Mi
+            cpu: 100m
         readinessProbe:
           httpGet:
             path: /v1/sys/health?standbyok=true
             port: 8300
             scheme: HTTPS
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sleep", "30"]
         ports:
         - name: https
           containerPort: 8300

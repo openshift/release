@@ -5,9 +5,11 @@ workflow:
     - chain: ipi-aws-pre
     - ref: storage-conf-feature-gate
     - ref: storage-conf-wait-for-csi-migration
+    - ref: storage-pv-save
     test:
     - ref: openshift-e2e-test
     post:
+    - ref: storage-pv-check
     - chain: ipi-aws-post
     env:
       # For storage-conf-feature-gate
@@ -15,8 +17,8 @@ workflow:
       # For openshift-e2e-test: TechPreviewNoUpgrade raises an alert and sets kube-apiserver Upgradeable=false, which
       # we need to ignore here.
       TEST_SKIPS: >-
-        Alerts shouldn't report any alerts in firing or pending state\|
         Managed cluster should start all core operators\|
-        Managed cluster should report ready nodes the entire duration of the test run
+        Alerts shouldn't report any alerts in firing or pending state\|
+        Prometheus when installed on the cluster shouldn't report any alerts in firing state apart from Watchdog and AlertmanagerReceiversNotConfigured
   documentation: |-
     This workflow enables CSI migration for all volume plugins and runs e2e tests (which include AWS EBS in-tree tests).

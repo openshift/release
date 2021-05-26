@@ -48,6 +48,14 @@ spec:
       for: 5m
       labels:
         severity: critical
+    - alert: hook-appsDown
+      annotations:
+        message: The service hook-apps has been down for 5 minutes.
+      expr: |
+        absent(up{job="hook-apps"} == 1)
+      for: 5m
+      labels:
+        severity: critical
     - alert: jenkins-operatorDown
       annotations:
         message: The service jenkins-operator has been down for 5 minutes.
@@ -197,7 +205,12 @@ spec:
           on <https://grafana-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/d/8ce131e226b7fd2901c2fce45d4e21c1/dptp-dashboard?orgId=1&fullscreen&panelId=4|grafana>
           and <https://prow.ci.openshift.org/?job={{ $labels.job_name }}|deck>.
       expr: |
-        sum(rate(prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state="failure"}[5m])) by (job_name) * on (job_name) group_left prow_job_labels{job_agent="kubernetes",label_ci_openshift_io_role="infra"} > 0
+        sum by (job_name) (
+          rate(
+            prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state="failure"}[5m]
+          )
+        )
+        * on (job_name) group_left max by (job_name) (prow_job_labels{job_agent="kubernetes",label_ci_openshift_io_role="infra"}) > 0
       for: 1m
       labels:
         severity: critical
@@ -207,7 +220,12 @@ spec:
           Check on <https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/?job={{
           $labels.job_name }}|deck-internal>.
       expr: |
-        sum(rate(prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state="failure"}[5m])) by (job_name) * on (job_name) group_left prow_job_labels{job_agent="kubernetes",label_ci_openshift_io_role="infra-internal"} > 0
+        sum by (job_name) (
+          rate(
+            prowjob_state_transitions{job="prow-controller-manager",job_name!~"rehearse.*",state="failure"}[5m]
+          )
+        )
+        * on (job_name) group_left max by (job_name) (prow_job_labels{job_agent="kubernetes",label_ci_openshift_io_role="infra-internal"}) > 0
       for: 1m
       labels:
         severity: critical
@@ -301,6 +319,15 @@ spec:
           Check the <https://grafana-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1|dashboard>'
       expr: |
         github_token_usage * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login) + deriv(github_token_usage[20m]) * github_token_reset * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login) / 1e9 < 100
+      for: 5m
+      labels:
+        severity: critical
+    - alert: ghproxy-running-out-github-tokens-in-a-hour
+      annotations:
+        message: '{{ $labels.token_hash }} may run out of API quota before the next
+          reset. Check the <https://grafana-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1|dashboard>'
+      expr: |
+        github_token_usage{token_hash=~"openshift-ci - .*"} + deriv(github_token_usage{token_hash=~"openshift-ci - .*"}[20m]) * github_token_reset  / 1e9 < 100
       for: 5m
       labels:
         severity: critical
@@ -467,6 +494,10 @@ spec:
       for: 1m
       labels:
         severity: critical
+    - expr: count(label_replace(count(github_token_usage{token_hash =~ "openshift.*"})
+        by (token_hash), "login", "$1", "token_hash", "(.*)") or github_user_info{login=~"openshift-.*"})
+        by (login)
+      record: github:identity_names
   - name: release-controller-down
     rules:
     - alert: releaseControllerDown

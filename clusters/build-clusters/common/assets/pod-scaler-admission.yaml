@@ -1,0 +1,119 @@
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: "pod-scaling.ci.openshift.io"
+  annotations:
+    service.beta.openshift.io/inject-cabundle: "true"
+webhooks:
+- name: "pod-scaling.ci.openshift.io"
+  namespaceSelector:
+    matchExpressions:
+    - key: "ci.openshift.io/scale-pods"
+      operator: In
+      values: ["true"]
+  rules:
+  - apiGroups: [""]
+    apiVersions: ["v1"]
+    operations: ["CREATE"]
+    resources: ["pods"]
+    scope: "Namespaced"
+  clientConfig:
+    service:
+      namespace: "ci"
+      name: "pod-scaler-consumer-admission"
+      path: "/pods"
+  admissionReviewVersions: ["v1"]
+  sideEffects: None
+  timeoutSeconds: 5
+  failurePolicy: Ignore
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pod-scaler-consumer-admission
+  namespace: ci
+  annotations:
+    service.beta.openshift.io/serving-cert-secret-name: pod-scaler-admission-serving-cert
+spec:
+  ports:
+  - name: main
+    port: 443
+    protocol: TCP
+    targetPort: 8080
+  - name: metrics
+    port: 9090
+    protocol: TCP
+    targetPort: metrics
+  selector:
+    app: pod-scaler-consumer-admission
+  sessionAffinity: None
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"pod-scaler:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"pod-scaler\")].image"}]'
+  labels:
+    app: pod-scaler-consumer-admission
+  name: pod-scaler-consumer-admission
+  namespace: ci
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: pod-scaler-consumer-admission
+  template:
+    metadata:
+      labels:
+        app: pod-scaler-consumer-admission
+    spec:
+      serviceAccountName: pod-scaler
+      containers:
+      - image: pod-scaler
+        name: pod-scaler
+        args:
+        - --loglevel=debug
+        - --cache-bucket=origin-ci-resource-usage-data
+        - --gcs-credentials-file=/etc/gcs/service-account.json
+        - --mode=consumer.admission
+        - --serving-cert-dir=/etc/pki/tls/certs/admission
+        - --port=8080
+        ports:
+          - name: main
+            containerPort: 8080
+          - name: metrics
+            containerPort: 9090
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /healthz/ready
+            port: 8081
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 1200
+        volumeMounts:
+        - name: gcs-credentials
+          mountPath: /etc/gcs
+          readOnly: true
+        - name: serving-cert
+          mountPath: /etc/pki/tls/certs/admission
+          readOnly: true
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "250m"
+      volumes:
+      - name: gcs-credentials
+        secret:
+          secretName: gce-sa-credentials-resource-usage-data-publisher
+      - name: serving-cert
+        secret:
+          defaultMode: 420
+          secretName: pod-scaler-admission-serving-cert

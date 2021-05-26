@@ -41,3 +41,12 @@ govc ls -json -t OpaqueNetwork "/SDDC-Datacenter/network/${LEASED_RESOURCE}" |\
     jq '.elements[].Path | select(contains("ova") | not)' |\
     xargs -I {} --no-run-if-empty govc vm.destroy {}
 
+
+# The release controller starts four CI jobs concurrently: UPI, IPI, parallel and serial
+# We are currently having high CPU ready time in the vSphere CI cluster and this
+# does not help the situation. For periodics create a slight random delay
+# before continuing job progression.
+
+if [[ "${JOB_TYPE}" = "periodic" ]]; then
+    sleep "$(( RANDOM % 240 + 60 ))"s
+fi

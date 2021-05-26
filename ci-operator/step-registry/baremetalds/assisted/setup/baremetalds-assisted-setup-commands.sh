@@ -71,7 +71,12 @@ echo "export AGENT_DOCKER_IMAGE=${ASSISTED_AGENT_IMAGE}" >> /root/config
 echo "export CONTROLLER_IMAGE=${ASSISTED_CONTROLLER_IMAGE}" >> /root/config
 echo "export INSTALLER_IMAGE=${ASSISTED_INSTALLER_IMAGE}" >> /root/config
 
-if [ "${JOB_TYPE:-}" = "presubmit" ]; then
+# expr command's return value is 1 in case of a false expression. We don't want to exit in this case.
+set +e
+IS_REHEARSAL=\$(expr "${REPO_OWNER:-}" = "openshift" "&" "${REPO_NAME:-}" = "release")
+set -e
+
+if [ "${JOB_TYPE:-}" = "presubmit" ] && (( ! \${IS_REHEARSAL} )); then
   # We would like to keep running a stable version for PRs
   echo "export OPENSHIFT_VERSION=4.7" >> /root/config
 
@@ -90,6 +95,8 @@ echo "export PUBLIC_CONTAINER_REGISTRIES=quay.io,\${CI_REGISTRIES}" >> /root/con
 echo "export ASSISTED_SERVICE_HOST=${IP}" >> /root/config
 echo "export CHECK_CLUSTER_VERSION=True" >> /root/config
 echo "export NUM_WORKERS=2" >> /root/config
+echo "export TEST_TEARDOWN=false" >> /root/config
+echo "export INSTALLER_KUBECONFIG=\${REPO_DIR}/build/kubeconfig" >> /root/config
 
 if [[ -e /root/assisted-additional-config ]]
 then
@@ -107,6 +114,12 @@ ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths\{0,1\}".*/**
 
 set -xeuo pipefail
 
+cd /home/assisted
+source /root/config
+
 echo "export KUBECONFIG=/home/assisted/build/kubeconfig" >> /root/.bashrc
+export KUBECONFIG=/home/assisted/build/kubeconfig
+
+\${POST_INSTALL_COMMAND:-}
 
 EOF

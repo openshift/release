@@ -96,6 +96,50 @@ postsubmits:
     - ^main$
     cluster: build02
     decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+    max_concurrency: 1
+    name: branch-ci-open-cluster-management-cluster-curator-controller-main-pr-merge-image-mirror
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=pr-merge-image-mirror
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    branches:
+    - ^main$
+    cluster: build02
+    decorate: true
     labels:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: branch-ci-open-cluster-management-cluster-curator-controller-main-sonar
@@ -103,7 +147,7 @@ postsubmits:
       containers:
       - args:
         - -f
-        - Makefile.prow
+        - /opt/build-harness/Makefile.prow
         - sonar/go/prow
         command:
         - make
@@ -111,7 +155,7 @@ postsubmits:
         - name: ARTIFACT_DIR
           value: $(ARTIFACTS)
         - name: SELF
-          value: make -f Makefile.prow
+          value: make -f /opt/build-harness/Makefile.prow
         - name: SONAR_GO_TEST_ARGS
           value: -short ./...
         image: registry.ci.openshift.org/open-cluster-management/builder:go1.15-linux

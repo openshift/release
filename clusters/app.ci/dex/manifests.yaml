@@ -44,6 +44,9 @@ spec:
         app: dex
       annotations:
         config.yaml: |
+          logger:
+            level: debug
+            format: json
           issuer: https://idp.ci.openshift.org
           storage:
             type: kubernetes
@@ -68,6 +71,16 @@ spec:
               claimMapping:
                 preferred_username: preferred_username
           staticClients:
+          - idEnv: ARM01-ID
+            name: arm01
+            secretEnv: ARM01-SECRET
+            redirectURIs:
+            - https://oauth-openshift.apps.arm-build01.arm-build.devcluster.openshift.com/oauth2callback/RedHat_Internal_SSO
+          - idEnv: ART-ID
+            name: art
+            secretEnv: ART-SECRET
+            redirectURIs:
+            - https://oauth-openshift.apps.art.xq1c.p1.openshiftapps.com/oauth2callback/RedHat_Internal_SSO
           - idEnv: BUILD01-ID
             name: build01
             secretEnv: BUILD01-SECRET
@@ -83,6 +96,11 @@ spec:
             secretEnv: DPCR-SECRET
             redirectURIs:
             - https://oauth-openshift.apps.cr.j7t7.p1.openshiftapps.com/oauth2callback/RedHat_Internal_SSO
+          - idEnv: HIVE-ID
+            name: hive
+            secretEnv: HIVE-SECRET
+            redirectURIs:
+            - https://oauth-openshift.apps.hive.9xw5.p1.openshiftapps.com/oauth2callback/RedHat_Internal_SSO
           - idEnv: VAULT_ID
             name: vault
             secretEnv: VAULT_SECRET
@@ -109,7 +127,7 @@ spec:
               topologyKey: "kubernetes.io/hostname"
       serviceAccountName: dex
       containers:
-      - image: ghcr.io/dexidp/dex:v2.27.0
+      - image: ghcr.io/dexidp/dex:v2.28.1
         name: dex
         command: ["/usr/local/bin/dex", "serve", "/etc/dex/cfg/config.yaml"]
         readinessProbe:
@@ -122,6 +140,26 @@ spec:
             secretKeyRef:
               name: dex-static-user
               key: pw
+        - name: ARM01-ID
+          valueFrom:
+            secretKeyRef:
+              name: arm01-secret
+              key: arm01-id
+        - name: ARM01-SECRET
+          valueFrom:
+            secretKeyRef:
+              name: arm01-secret
+              key: arm01-secret
+        - name: ART-ID
+          valueFrom:
+            secretKeyRef:
+              name: art-secret
+              key: art-id
+        - name: ART-SECRET
+          valueFrom:
+            secretKeyRef:
+              name: art-secret
+              key: art-secret
         - name: BUILD01-SECRET
           valueFrom:
             secretKeyRef:
@@ -152,6 +190,16 @@ spec:
             secretKeyRef:
               name: dpcr-secret
               key: dpcr-id
+        - name: HIVE-SECRET
+          valueFrom:
+            secretKeyRef:
+              name: hive-secret
+              key: hive-secret
+        - name: HIVE-ID
+          valueFrom:
+            secretKeyRef:
+              name: hive-secret
+              key: hive-id
         - name: VAULT_ID
           valueFrom:
             secretKeyRef:

@@ -3,16 +3,18 @@ base_images:
     name: release
     namespace: openshift
     tag: golang-1.13
+  openshift_release_golang-1.16:
+    name: release
+    namespace: openshift
+    tag: golang-1.16
   os:
     name: ubi
     namespace: ocp
     tag: "8"
 binary_build_commands: make code/compile COMPILE_TARGET="./build/_output/bin/integreatly-operator"
 build_root:
-  image_stream_tag:
-    name: intly-operator-base-image
-    namespace: integr8ly
-    tag: latest
+  project_image:
+    dockerfile_path: openshift-ci/Dockerfile.tools
 images:
 - dockerfile_path: build/Dockerfile
   from: os
@@ -25,16 +27,16 @@ images:
 - dockerfile_path: Dockerfile.osde2e
   from: os
   inputs:
-    openshift_release_golang-1.13:
+    openshift_release_golang-1.16:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.13
+      - registry.ci.openshift.org/openshift/release:golang-1.16
   to: integreatly-operator-test-harness-osde2e
 - dockerfile_path: Dockerfile.functional
   from: os
   inputs:
-    openshift_release_golang-1.13:
+    openshift_release_golang-1.16:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.13
+      - registry.ci.openshift.org/openshift/release:golang-1.16
   to: integreatly-operator-test-harness
 promotion:
   name: integreatly-operator
@@ -49,7 +51,7 @@ resources:
       cpu: 200m
       memory: 2Gi
 tag_specification:
-  name: "4.6"
+  name: "4.7"
   namespace: ocp
 tests:
 - as: vendor
