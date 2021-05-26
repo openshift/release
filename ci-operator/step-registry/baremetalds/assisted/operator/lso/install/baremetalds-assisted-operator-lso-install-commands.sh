@@ -37,12 +37,10 @@ export DISKS=\$(echo sd{b..f})
 export DISCONNECTED="${DISCONNECTED}"
 
 if [ "\${DISCONNECTED}" = "true" ]; then
+  export AUTHFILE="\${XDG_RUNTIME_DIR}/containers/auth.json"
   export LOCAL_REGISTRY="\${LOCAL_REGISTRY_DNS_NAME}:\${LOCAL_REGISTRY_PORT}"
 
   source mirror_utils.sh
-  # must define 'XDG_RUNTIME_DIR' again because sourcing 'common.sh' unsets it
-  export XDG_RUNTIME_DIR="/run/user/0"
-  export AUTHFILE="\${XDG_RUNTIME_DIR}/containers/auth.json"
   mkdir -p \$(dirname \${AUTHFILE})
 
   merge_authfiles "\${PULL_SECRET_FILE}" "\${REGISTRY_CREDS}" "\${AUTHFILE}"
