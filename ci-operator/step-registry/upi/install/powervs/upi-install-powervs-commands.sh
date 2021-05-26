@@ -15,7 +15,7 @@ export ACTION="create"
 export POWERVS_JENKINS_URL
 export POWERVS_JENKINS_USER
 export POWERVS_JENKINS_TOKEN
-
+echo "testing..."
 echo "$(date -u --rfc-3339=seconds) - Deploying cluster on PowerVS"
 /usr/local/bin/python3.9 /cluster/powervs.py
 
