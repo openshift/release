@@ -111,10 +111,6 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-aws
-- as: e2e-metal-assisted
-  steps:
-    cluster_profile: packet
-    workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-operator-disconnected
   steps:
     cluster_profile: packet
@@ -147,28 +143,6 @@ tests:
     - chain: baremetalds-assisted-operator-lso
     - ref: baremetalds-assisted-operator-setup
     - ref: baremetalds-assisted-operator-ztp
-- as: e2e-metal-assisted-ipv6
-  steps:
-    cluster_profile: packet
-    env:
-      ASSISTED_CONFIG: |
-        IPv6=yes
-        IPv4=no
-        VIP_DHCP_ALLOCATION=no
-        PROXY=yes
-        OPENSHIFT_VERSION=4.8
-    workflow: baremetalds-assisted-install
-- as: e2e-metal-assisted-single-node
-  steps:
-    cluster_profile: packet
-    env:
-      ASSISTED_CONFIG: |
-        NUM_MASTERS=1
-        NUM_WORKERS=0
-        ISO_IMAGE_TYPE=minimal-iso
-        OPENSHIFT_INSTALL_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}
-        OPENSHIFT_VERSION=4.8
-    workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-kube-api
   steps:
     cluster_profile: packet
@@ -182,26 +156,8 @@ tests:
         ADDITIONAL_PARAMS="--with-static-network-config"
         ISO_IMAGE_TYPE=minimal-iso
         KUBE_API=yes
-        OPENSHIFT_INSTALL_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}
         OPENSHIFT_VERSION=4.8
         ENABLE_KUBE_API=true
-    workflow: baremetalds-assisted-install
-- as: system-test
-  steps:
-    cluster_profile: packet
-    env:
-      ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=""
-        TEST_FUNC=test_install
-        MAKEFILE_TARGET="create_full_environment run test_parallel"
-    workflow: baremetalds-assisted-install
-- as: system-test-olm
-  steps:
-    cluster_profile: packet
-    env:
-      ASSISTED_CONFIG: |
-        TEST_FUNC=test_olm_operator
-        MAKEFILE_TARGET="create_full_environment run test_parallel"
     workflow: baremetalds-assisted-install
 zz_generated_metadata:
   branch: ocm-2.3
