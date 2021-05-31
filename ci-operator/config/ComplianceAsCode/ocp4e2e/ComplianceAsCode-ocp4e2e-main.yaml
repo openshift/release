@@ -1,0 +1,52 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.15
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 400Mi
+tag_specification:
+  name: "4.8"
+  namespace: ocp
+tests:
+- as: e2e-aws-ocp4-moderate
+  steps:
+    cluster_profile: aws
+    env:
+      FIPS_ENABLED: "true"
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export SKIP_CONTAINER_PUSH=true
+        export PROFILE=moderate
+        export PRODUCT=ocp4
+        make e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-ocp4-cis
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export SKIP_CONTAINER_PUSH=true
+        export PROFILE=cis
+        export PRODUCT=ocp4
+        make e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: ComplianceAsCode
+  repo: ocp4e2e

@@ -55,7 +55,7 @@ release-controllers:
 .PHONY: release-controllers
 
 checkconfig:
-	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR):/release:z" gcr.io/k8s-prow/checkconfig:v20210408-1d94238fac --config-path /release/core-services/prow/02_config/_config.yaml --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
+	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR):/release:z" gcr.io/k8s-prow/checkconfig:v20210408-1d94238fac --config-path /release/core-services/prow/02_config/_config.yaml --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
 
 jobs:
 	$(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/ci-operator-prowgen:latest
@@ -77,7 +77,7 @@ boskos-config:
 
 prow-config:
 	$(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/determinize-prow-config:latest
-	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR)/core-services/prow/02_config:/config:z" registry.ci.openshift.org/ci/determinize-prow-config:latest --prow-config-dir /config --sharded-prow-config-base-dir /config
+	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR)/core-services/prow/02_config:/config:z" registry.ci.openshift.org/ci/determinize-prow-config:latest --prow-config-dir /config --sharded-prow-config-base-dir /config --sharded-plugin-config-base-dir /config
 
 branch-cut:
 	$(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/config-brancher:latest
