@@ -55,7 +55,7 @@ for agentclusterinstall in "${agentclusterinstall_objects[@]}"; do
   oc get agentclusterinstall -n ${agentclusterinstall_namespace} ${agentclusterinstall_name} -o yaml > "${cluster_dir}/agentclusterinstall.yaml"
 
   debug_info_url=$(echo ${agentclusterinstall} | jq -r .status.debugInfo.eventsURL)
-  if [ "${debug_info_url}" != null ]; then
+  if [ -n "${debug_info_url}" ] && [ "${debug_info_url}" != null ]; then
     curl -ks "${debug_info_url}" | jq '.' > "${cluster_dir}/cluster_events.json"
   fi
 done
