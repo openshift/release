@@ -40,12 +40,23 @@ tests:
     test:
     - as: test
       commands: |
-        export SELF="make -f Makefile.prow"
-        export GITHUB_PRIVATE_URL=$(cat "/etc/github-private-url/token")
-        make -f Makefile.prow e2e-tests
+        export GITHUB_PRIVATE_URL=$(cat "/etc/e2e-secrets/github-private-url") \
+        export GITHUB_USER=$(cat "/etc/e2e-secrets/github-user") \
+        export GITHUB_TOKEN=$(cat "/etc/e2e-secrets/github-token") \
+        export OBJECTSTORE_PRIVATE_URL=$(cat "/etc/e2e-secrets/objectstore-private-url") \
+        export OBJECTSTORE_ACCESS_KEY=$(cat "/etc/e2e-secrets/objectstore-access-key") \
+        export OBJECTSTORE_SECRET_KEY=$(cat "/etc/e2e-secrets/objectstore-secret-key") \
+        export HELM_PRIVATE_URL=$(cat "/etc/e2e-secrets/helm-private-url") \
+        export HELM_USERNAME=$(cat "/etc/e2e-secrets/github-user") \
+        export HELM_PASSWORD=$(cat "/etc/e2e-secrets/github-token") \
+        export HELM_CHART_NAME=$(cat "/etc/e2e-secrets/helm-chart-name") \
+        export ANSIBLE_URL=$(cat "/etc/e2e-secrets/ansible-url") \
+        export ANSIBLE_TOKEN=$(cat "/etc/e2e-secrets/ansible-token") \
+        export SELF="make -f Makefile.prow" \
+        make -f Makefile.prow test-e2e
       credentials:
-      - mount_path: /etc/github-private-url
-        name: github-private-url
+      - mount_path: /etc/e2e-secrets
+        name: e2e-secrets
         namespace: test-credentials
       from: src
       resources:
