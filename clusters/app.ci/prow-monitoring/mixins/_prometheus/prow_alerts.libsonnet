@@ -16,6 +16,17 @@
             },
           },
           {
+            alert: 'prow-job-backlog-growing',
+            expr: 'sum(rate(prowjob_state_transitions{state="triggered"}[5m]))>0',
+            'for': '60m',
+            labels: {
+              severity: 'critical',
+            },
+            annotations: {
+              message: 'The number of Prow jobs with the triggered state has been increasing for the past hour.'
+            },
+          },
+          {
             # We need this for a grafana variable, because grafana itself can only do extremely simplistic queries there
             record: 'github:identity_names',
             expr: 'count(label_replace(count(github_token_usage{token_hash =~ "openshift.*"}) by (token_hash), "login", "$1", "token_hash", "(.*)") or github_user_info{login=~"openshift-.*"}) by (login)'
