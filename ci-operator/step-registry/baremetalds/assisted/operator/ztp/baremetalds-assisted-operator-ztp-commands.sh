@@ -21,6 +21,7 @@ then
 fi
 
 # Copy job variables to the packet server
+echo "export OPENSHIFT_INSTALL_RELEASE_IMAGE=${OPENSHIFT_INSTALL_RELEASE_IMAGE}" >> /tmp/assisted-vars.conf
 echo "export ASSISTED_NAMESPACE=${ASSISTED_NAMESPACE}" >> /tmp/assisted-vars.conf
 echo "export ASSISTED_CLUSTER_NAME=${ASSISTED_CLUSTER_NAME}" >> /tmp/assisted-vars.conf
 echo "export ASSISTED_CLUSTER_DEPLOYMENT_NAME=${ASSISTED_CLUSTER_DEPLOYMENT_NAME}" >> /tmp/assisted-vars.conf
