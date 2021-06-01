@@ -812,6 +812,46 @@ periodics:
   interval: 6h
   labels:
     ci.openshift.io/role: infra
+  name: periodic-branch-protector-openshift-org
+  spec:
+    containers:
+    - args:
+      - --config-path=./core-services/prow/02_config/_config.yaml
+      - --supplemental-prow-config-dir=./core-services/prow/02_config
+      - --job-config-path=./ci-operator/jobs
+      - --confirm=true
+      - --github-token-path=/etc/github/oauth
+      - --github-endpoint=http://ghproxy
+      - --github-endpoint=https://api.github.com
+      - --github-hourly-tokens=3000
+      - --github-enabled-org=openshift
+      command:
+      - /app/prow/cmd/branchprotector/app.binary
+      image: gcr.io/k8s-prow/branchprotector:v20210601-df2711fc5c
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: token
+        readOnly: true
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-merge-robot
+- agent: kubernetes
+  cluster: app.ci
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+    workdir: true
+  interval: 6h
+  labels:
+    ci.openshift.io/role: infra
   name: periodic-branch-protector
   spec:
     containers:
@@ -825,8 +865,8 @@ periodics:
       - --github-endpoint=http://ghproxy
       - --github-endpoint=https://api.github.com
       - --github-graphql-endpoint=http://ghproxy/graphql
-      - --github-throttle-org=openshift:1000:1000
       - --github-hourly-tokens=10000
+      - --github-disabled-org=openshift
       command:
       - /app/prow/cmd/branchprotector/app.binary
       env:
