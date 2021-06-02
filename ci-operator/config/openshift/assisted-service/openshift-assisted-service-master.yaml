@@ -114,13 +114,6 @@ tests:
   steps:
     cluster_profile: packet
     workflow: baremetalds-assisted-install
-- as: e2e-metal-assisted-operator
-  steps:
-    cluster_profile: packet
-    env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4
-    workflow: baremetalds-assisted-operator
 - as: e2e-metal-assisted-operator-disconnected
   steps:
     cluster_profile: packet
@@ -128,14 +121,6 @@ tests:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4
       DISCONNECTED: "true"
-    workflow: baremetalds-assisted-operator
-- as: e2e-metal-assisted-operator-periodic
-  cron: '@daily'
-  steps:
-    cluster_profile: packet
-    env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4
     workflow: baremetalds-assisted-operator
 - as: e2e-metal-assisted-operator-disconnected-periodic
   cron: '@daily'
@@ -149,23 +134,12 @@ tests:
 - as: e2e-metal-assisted-operator-ztp
   steps:
     cluster_profile: packet
-    env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4
-        NUM_WORKERS=2
-        NUM_EXTRA_WORKERS=1
-        PROVISIONING_NETWORK_PROFILE=Disabled
-    post:
-    - ref: baremetalds-assisted-operator-gather
-    - ref: baremetalds-devscripts-gather
-    - ref: baremetalds-packet-teardown
-    pre:
-    - ref: baremetalds-packet-setup
-    - ref: ipi-install-rbac
-    - ref: baremetalds-devscripts-setup
-    - chain: baremetalds-assisted-operator-lso
-    - ref: baremetalds-assisted-operator-setup
-    - ref: baremetalds-assisted-operator-ztp
+    workflow: baremetalds-assisted-operator-ztp
+- as: e2e-metal-assisted-operator-ztp-periodic
+  cron: '@daily'
+  steps:
+    cluster_profile: packet
+    workflow: baremetalds-assisted-operator-ztp
 - as: e2e-metal-assisted-ipv6
   steps:
     cluster_profile: packet
@@ -185,7 +159,6 @@ tests:
         NUM_MASTERS=1
         NUM_WORKERS=0
         ISO_IMAGE_TYPE=minimal-iso
-        OPENSHIFT_INSTALL_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}
         OPENSHIFT_VERSION=4.8
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-kube-api
@@ -201,28 +174,9 @@ tests:
         ADDITIONAL_PARAMS="--with-static-network-config"
         ISO_IMAGE_TYPE=minimal-iso
         KUBE_API=yes
-        OPENSHIFT_INSTALL_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}
         OPENSHIFT_VERSION=4.8
         ENABLE_KUBE_API=true
     workflow: baremetalds-assisted-install
-- as: assisted-operator-install-aws
-  steps:
-    cluster_profile: aws
-    env:
-      OO_CHANNEL: alpha
-      OO_INSTALL_NAMESPACE: assisted-installer
-      OO_PACKAGE: assisted-service-operator
-      OO_TARGET_NAMESPACES: '!install'
-    test:
-    - as: tests
-      commands: |
-        echo "operator installed"
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: optional-operators-ci-aws
 - as: system-test
   steps:
     cluster_profile: packet

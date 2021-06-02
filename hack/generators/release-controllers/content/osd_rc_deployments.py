@@ -195,6 +195,7 @@ def _add_osd_rc_deployment(gendoc):
                                         '--bugzilla-endpoint=https://bugzilla.redhat.com',
                                         '--bugzilla-api-key-path=/etc/bugzilla/api',
                                         '--plugin-config=/etc/plugins/plugins.yaml',
+                                        '--supplemental-plugin-config-dir=/etc/plugins',
                                         '--verify-bugzilla',
                                         '--authentication-message="Pulling these images requires <a href=\"https://docs.ci.openshift.org/docs/how-tos/use-registries-in-build-farm/\">authenticating to the app.ci cluster</a>."'],
                             'image': 'release-controller:latest',

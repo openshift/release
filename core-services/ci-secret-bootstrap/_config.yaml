@@ -1,4 +1,7 @@
 cluster_groups:
+  bastion:
+  - build01
+  - build02
   build_farm:
   - app.ci
   - arm01
@@ -59,7 +62,8 @@ secret_configs:
       attachment: authorized_keys
       bw_item: sshd-bastion-z
   to:
-  - cluster: build01
+  - cluster_groups:
+    - bastion
     name: sshd-authorized-keys
     namespace: bastion-z
 - from:
@@ -76,7 +80,8 @@ secret_configs:
       attachment: ssh_host_rsa_key
       bw_item: sshd-bastion-z
   to:
-  - cluster: build01
+  - cluster_groups:
+    - bastion
     name: sshd-host-keys
     namespace: bastion-z
 - from:
@@ -84,7 +89,8 @@ secret_configs:
       attachment: authorized_keys
       bw_item: sshd-bastion-ppc64le
   to:
-  - cluster: build01
+  - cluster_groups:
+    - bastion
     name: sshd-authorized-keys
     namespace: bastion-ppc64le
 - from:
@@ -101,7 +107,8 @@ secret_configs:
       attachment: ssh_host_rsa_key
       bw_item: sshd-bastion-ppc64le
   to:
-  - cluster: build01
+  - cluster_groups:
+    - bastion
     name: sshd-host-keys
     namespace: bastion-ppc64le
 - from:
@@ -109,7 +116,8 @@ secret_configs:
       attachment: authorized_keys
       bw_item: sshd-bastion-ppc64le-libvirt
   to:
-  - cluster: build01
+  - cluster_groups:
+    - bastion
     name: sshd-authorized-keys
     namespace: bastion-ppc64le-libvirt
 - from:
@@ -126,7 +134,8 @@ secret_configs:
       attachment: ssh_host_rsa_key
       bw_item: sshd-bastion-ppc64le-libvirt
   to:
-  - cluster: build01
+  - cluster_groups:
+    - bastion
     name: sshd-host-keys
     namespace: bastion-ppc64le-libvirt
 - from:
@@ -134,7 +143,8 @@ secret_configs:
       attachment: authorized_keys
       bw_item: sshd-bastion-telco
   to:
-  - cluster: build01
+  - cluster_groups:
+    - bastion
     name: sshd-authorized-keys
     namespace: bastion-telco
 - from:
@@ -151,7 +161,8 @@ secret_configs:
       attachment: ssh_host_rsa_key
       bw_item: sshd-bastion-telco
   to:
-  - cluster: build01
+  - cluster_groups:
+    - bastion
     name: sshd-host-keys
     namespace: bastion-telco
 - from:
@@ -491,6 +502,12 @@ secret_configs:
     name: files-pull-secret
     namespace: ci-release-s390x-priv
   - cluster: app.ci
+    name: files-pull-secret
+    namespace: ci-release-arm64
+  - cluster: app.ci
+    name: files-pull-secret
+    namespace: ci-release-arm64-priv
+  - cluster: app.ci
     name: source
     namespace: ci-release
   - cluster: app.ci
@@ -508,6 +525,12 @@ secret_configs:
   - cluster: app.ci
     name: source
     namespace: ci-release-s390x-priv
+  - cluster: app.ci
+    name: source
+    namespace: ci-release-arm64
+  - cluster: app.ci
+    name: source
+    namespace: ci-release-arm64-priv
 - from:
     .dockerconfigjson:
       dockerconfigJSON:
@@ -567,6 +590,14 @@ secret_configs:
   - cluster: app.ci
     name: ci-pull-credentials
     namespace: ci-release-s390x-priv
+    type: kubernetes.io/dockerconfigjson
+  - cluster: app.ci
+    name: ci-pull-credentials
+    namespace: ci-release-arm64
+    type: kubernetes.io/dockerconfigjson
+  - cluster: app.ci
+    name: ci-pull-credentials
+    namespace: ci-release-arm64-priv
     type: kubernetes.io/dockerconfigjson
 - from:
     .dockerconfigjson:
@@ -1339,6 +1370,9 @@ secret_configs:
     sa.config-updater.build02.config:
       attachment: sa.config-updater.build02.config
       bw_item: build_farm
+    sa.config-updater.hive.config:
+      attachment: sa.config-updater.hive.config
+      bw_item: build_farm
     sa.config-updater.vsphere.config:
       attachment: sa.config-updater.vsphere.config
       bw_item: build_farm
@@ -1459,16 +1493,16 @@ secret_configs:
     namespace: ci
 - from:
     kubeconfig:
-      attachment: sa.hive.app.ci.config
+      attachment: sa.hive.hive.config
       bw_item: build_farm
   to:
   - cluster_groups:
     - non_app_ci
-    name: app.ci-hive-credentials
+    name: hive-hive-credentials
     namespace: ci
   - cluster_groups:
     - non_app_ci
-    name: app.ci-hive-credentials
+    name: hive-hive-credentials
     namespace: test-credentials
 - from:
     ci.htpasswd:
@@ -1536,6 +1570,12 @@ secret_configs:
   - cluster: app.ci
     name: git-credentials
     namespace: ci-release-s390x-priv
+  - cluster: app.ci
+    name: git-credentials
+    namespace: ci-release-arm64
+  - cluster: app.ci
+    name: git-credentials
+    namespace: ci-release-arm64-priv
 - from:
     sa.release-controller-ocp-arm64-priv.app.ci.config:
       attachment: sa.release-controller-ocp-arm64-priv.app.ci.config
@@ -1979,6 +2019,14 @@ secret_configs:
   - cluster: app.ci
     name: registry-pull-credentials
     namespace: ocp-s390x-priv
+    type: kubernetes.io/dockerconfigjson
+  - cluster: app.ci
+    name: registry-pull-credentials
+    namespace: ocp-arm64
+    type: kubernetes.io/dockerconfigjson
+  - cluster: app.ci
+    name: registry-pull-credentials
+    namespace: ocp-arm64-priv
     type: kubernetes.io/dockerconfigjson
 - from:
     .dockerconfigjson:
@@ -2470,6 +2518,28 @@ secret_configs:
     name: dpcr-secret
     namespace: dex
 - from:
+    hive-id:
+      bw_item: dex
+      field: hive-id
+    hive-secret:
+      bw_item: dex
+      field: hive-secret
+  to:
+  - cluster: app.ci
+    name: hive-secret
+    namespace: dex
+- from:
+    art-id:
+      bw_item: dex
+      field: art-id
+    art-secret:
+      bw_item: dex
+      field: art-secret
+  to:
+  - cluster: app.ci
+    name: art-secret
+    namespace: dex
+- from:
     clientSecret:
       bw_item: dex
       field: build02-secret
@@ -2579,7 +2649,7 @@ secret_configs:
         email_bw_field: email
         registry_url: registry.redhat.io
   to:
-  - cluster: app.ci
+  - cluster: hive
     name: pull-secret
     namespace: ci-cluster-pool
     type: kubernetes.io/dockerconfigjson
@@ -2591,10 +2661,10 @@ secret_configs:
       bw_item: openshift-ci-pools-hive
       field: aws_secret_access_key
   to:
-  - cluster: app.ci
+  - cluster: hive
     name: hive-aws-credentials
     namespace: ci-cluster-pool
-  - cluster: app.ci
+  - cluster: hive
     name: hive-aws-credentials
     namespace: fake-cluster-pool
 - from:
@@ -2675,6 +2745,15 @@ secret_configs:
   - cluster: app.ci
     name: github-deploymentconfig-trigger
     namespace: ci
+- from:
+    app.ci.config:
+      attachment: sa.endurance.app.ci.config
+      bw_item: endurance_cluster
+  to:
+  - cluster_groups:
+    - build_farm
+    name: endurance-sa
+    namespace: test-credentials
 user_secrets_target_clusters:
 - app.ci
 - arm01

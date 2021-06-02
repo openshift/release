@@ -1,0 +1,109 @@
+base_images:
+  upi-installer:
+    name: "4.9"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  initial:
+    release:
+      channel: candidate
+      version: 4.8.0-fc.5
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.9"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws-upgrade
+  interval: 24h
+  steps:
+    cluster_profile: aws
+    workflow: openshift-upgrade-aws
+- as: e2e-aws-compact-upgrade
+  interval: 48h
+  steps:
+    cluster_profile: aws
+    env:
+      SIZE_VARIANT: compact
+    workflow: openshift-upgrade-aws
+- as: e2e-gcp-upgrade
+  interval: 24h
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    workflow: openshift-upgrade-gcp
+- as: e2e-azure-upgrade
+  interval: 24h
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-upgrade-azure
+- as: e2e-ovirt-upgrade
+  cron: '@yearly'
+  steps:
+    cluster_profile: ovirt
+    workflow: openshift-upgrade-ovirt
+- as: e2e-vsphere-upgrade
+  interval: 24h
+  steps:
+    cluster_profile: vsphere
+    workflow: openshift-upgrade-vsphere
+- as: e2e-aws-ovn-upgrade
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws
+    env:
+      TEST_TYPE: upgrade-conformance
+    workflow: openshift-upgrade-aws-ovn
+- as: e2e-aws-ovn-upgrade-rollback
+  interval: 24h
+  steps:
+    cluster_profile: aws
+    env:
+      TEST_TYPE: upgrade-conformance
+      TEST_UPGRADE_OPTIONS: abort-at=99
+    workflow: openshift-upgrade-aws-ovn
+- as: e2e-gcp-ovn-upgrade
+  cron: '@yearly'
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    env:
+      TEST_TYPE: upgrade-conformance
+    workflow: openshift-upgrade-gcp-ovn
+- as: e2e-azure-ovn-upgrade
+  interval: 24h
+  steps:
+    cluster_profile: azure4
+    env:
+      TEST_TYPE: upgrade-conformance
+    workflow: openshift-upgrade-azure-ovn
+- as: e2e-openstack-upgrade
+  interval: 48h
+  steps:
+    cluster_profile: openstack
+    env:
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_API_VERSION: v1beta4
+      CONFIG_TYPE: minimal
+      OPENSTACK_COMPUTE_FLAVOR: m1.s2.xlarge
+      OPENSTACK_EXTERNAL_NETWORK: external
+      OS_CLOUD: openstack-cloud
+      TEST_TYPE: upgrade-conformance
+    workflow: openshift-upgrade-openstack-loki
+- as: e2e-aws-upgrade-rollback
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws
+    env:
+      DELETE_MC: "false"
+      TEST_TYPE: upgrade
+      TEST_UPGRADE_OPTIONS: abort-at=99
+    workflow: openshift-upgrade-aws
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: release
+  variant: ci-4.9-upgrade-from-stable-4.8

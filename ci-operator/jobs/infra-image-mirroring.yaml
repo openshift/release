@@ -800,6 +800,10 @@ periodics:
     ci.openshift.io/area: openshift-logging
     ci.openshift.io/role: image-mirroring
   name: periodic-image-mirroring-openshift-logging
+  reporter_config:
+    slack:
+      channel: '#announce-logging'
+      report_template: Job {{.Spec.Job}} failed
   spec:
     containers:
     - args:
@@ -836,7 +840,7 @@ periodics:
     volumes:
     - name: push
       secret:
-        secretName: registry-push-credentials-quay.io-openshift-logging
+        secretName: openshiftlogging-ci-to-quay
     - configMap:
         name: image-mirror-mappings
       name: config
@@ -856,6 +860,54 @@ periodics:
         set -o errexit
         failures=0
         for mapping in /etc/imagemirror/mapping_addon_operator*; do
+          echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
+          if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
+            echo "ERROR: Failed to mirror images from $mapping"
+            failures=$((failures+1))
+          fi
+        done
+        exit $failures
+      command:
+      - /bin/bash
+      env:
+      - name: HOME
+        value: /home/mirror
+      image: registry.ci.openshift.org/ocp/4.8:cli
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /home/mirror/.docker/config.json
+        name: push
+        readOnly: true
+        subPath: config.json
+      - mountPath: /etc/imagemirror
+        name: config
+    volumes:
+    - name: push
+      secret:
+        secretName: app-sre-push-pull-secret
+    - configMap:
+        name: image-mirror-mappings
+      name: config
+- agent: kubernetes
+  cluster: app.ci
+  cron: '@hourly'
+  decorate: true
+  labels:
+    ci.openshift.io/area: reference-addon-dev
+    ci.openshift.io/role: image-mirroring
+  name: periodic-image-mirroring-reference-addon
+  spec:
+    containers:
+    - args:
+      - -c
+      - |
+        set -o errexit
+        failures=0
+        for mapping in /etc/imagemirror/mapping_reference_addon*; do
           echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
           if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
             echo "ERROR: Failed to mirror images from $mapping"

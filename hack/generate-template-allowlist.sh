@@ -17,5 +17,5 @@ ${CONTAINER_ENGINE} run --rm -v "$PWD:/release:z" registry.ci.openshift.org/ci/t
     ${ARGS:-} \
     --prow-jobs-dir /release/ci-operator/jobs \
     --prow-config-path /release/core-services/prow/02_config/_config.yaml \
-    --prow-plugin-config-path /release/core-services/prow/02_config/_plugins.yaml \
+    --plugin-config /release/core-services/prow/02_config/_plugins.yaml \
     --allowlist-path /release/core-services/template-deprecation/_allowlist.yaml

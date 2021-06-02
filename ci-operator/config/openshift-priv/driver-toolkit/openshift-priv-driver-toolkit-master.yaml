@@ -10,7 +10,10 @@ build_root:
     tag: golang-1.13
 canonical_go_repository: github.com/openshift/driver-toolkit
 images:
-- dockerfile_path: Dockerfile
+- build_args:
+  - name: RHEL_VERSION
+    value: "8.4"
+  dockerfile_path: Dockerfile
   from: base
   to: driver-toolkit
 promotion:
@@ -31,6 +34,10 @@ tests:
   commands: make verify
   container:
     from: src
+- as: image-contents
+  commands: cat /etc/driver-toolkit-release.json
+  container:
+    from: driver-toolkit
 zz_generated_metadata:
   branch: master
   org: openshift-priv

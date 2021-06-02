@@ -50,11 +50,11 @@ controlPlane:
 platform:
   ovirt:
     ovirt_cluster_id: ${OVIRT_ENGINE_CLUSTER_ID}
-    ovirt_storage_domain_id: ${OVIRT_ENGINE_STORAGE_DOMAIN_ID}
+    ovirt_storage_domain_id: ${OVIRT_STORAGE_DOMAIN_ID}
     api_vip: ${OVIRT_APIVIP}
     ingress_vip: ${OVIRT_INGRESSVIP}
-    dns_vip: ${OVIRT_DNSVIP}
     ovirt_network_name: ${OVIRT_ENGINE_NETWORK}
+    affinityGroups: []
 pullSecret: >
   ${PULL_SECRET}
 sshKey: |

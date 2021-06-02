@@ -121,7 +121,7 @@ spec:
       serviceAccountName: vector-log-shipper
       containers:
       - name: vector
-        image: docker.io/timberio/vector:0.11.1-alpine
+        image: vector:0.11.1-alpine
         args:
         - --watch-config=/etc/vector/vector.toml
         env:
@@ -222,3 +222,20 @@ users:
 - system:serviceaccount:prow-logging:vector-log-shipper
 volumes:
 - '*'
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: vector
+  namespace: prow-logging
+spec:
+  lookupPolicy:
+    local: true
+  tags:
+  - name: 0.11.1-alpine
+    from:
+      kind: DockerImage
+      # Mirror of docker.io/timberio/vector:0.11.1-alpine because the cluster hit the ratelimit for that
+      name: quay.io/droslean/vector:0.11.1-alpine
+    referencePolicy:
+      type: Local

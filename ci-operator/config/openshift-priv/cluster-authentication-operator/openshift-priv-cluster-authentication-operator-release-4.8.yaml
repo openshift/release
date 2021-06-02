@@ -129,9 +129,23 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-gcp
-- as: e2e-aws-operator-encryption-perf
+- as: e2e-gcp-operator-encryption-rotation
   steps:
-    cluster_profile: aws
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e-encryption-rotation JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: ipi-gcp
+- as: e2e-gcp-operator-encryption-perf
+  steps:
+    cluster_profile: gcp
     test:
     - as: test
       cli: latest
@@ -141,7 +155,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    workflow: ipi-gcp
 - as: e2e-aws-single-node
   steps:
     cluster_profile: aws

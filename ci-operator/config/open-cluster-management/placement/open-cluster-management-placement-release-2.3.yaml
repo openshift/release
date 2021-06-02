@@ -53,6 +53,22 @@ tests:
   commands: make test-integration
   container:
     from: test-bin
+- as: e2e
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        KUBECTL=oc
+        IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:placement}
+        export KUBECTL IMAGE_NAME
+        make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: release-2.3
   org: open-cluster-management

@@ -1,0 +1,145 @@
+base_images:
+  assisted-installer:
+    name: assisted
+    namespace: ocp-kni
+    tag: assisted-installer
+  assisted-installer-agent:
+    name: assisted
+    namespace: ocp-kni
+    tag: assisted-installer-agent
+  assisted-installer-controller:
+    name: assisted
+    namespace: ocp-kni
+    tag: assisted-installer-controller
+  assisted-test-infra:
+    name: assisted-test
+    namespace: ocp-kni
+    tag: assisted-test-infra
+  coreos_centos:
+    name: coreos-centos8-buildroot
+    namespace: coreos
+    tag: latest
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  openshift_release_golang-1.15:
+    name: release
+    namespace: openshift
+    tag: golang-1.15
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.15
+images:
+- dockerfile_path: Dockerfile.assisted-service
+  from: coreos_centos
+  inputs:
+    openshift_release_golang-1.15:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.15
+  to: assisted-service
+operator:
+  bundles:
+  - dockerfile_path: Dockerfile.bundle
+  substitutions:
+  - pullspec: quay.io/ocpmetal/assisted-service:latest
+    with: assisted-service
+promotion:
+  disabled: true
+  name: ocm-2.3
+  namespace: openshift
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.8"
+  namespace: ocp
+test_binary_build_commands: |
+  make build-openshift-ci-test-bin
+  curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.36.0
+  go mod vendor
+  mkdir /.cache && chmod 775 -R /.cache && chmod 775 -R $GOPATH
+tests:
+- as: lint
+  commands: export GOLANGCI_LINT_CACHE=/tmp/.cache && export GOPROXY=https://proxy.golang.org
+    && make lint
+  container:
+    from: test-bin
+- as: subsystem-aws
+  steps:
+    cluster_profile: aws
+    test:
+    - as: subsystem-deploy-and-run
+      cli: latest
+      commands: |
+        export BUILD_TYPE=CI
+        export REPORTS=${ARTIFACT_DIR}
+        export SERVICE=$(echo "${IMAGE_FORMAT}" | component=assisted-service envsubst)
+        export TARGET=oc
+
+        make deploy-on-openshift-ci
+        make test
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+- as: subsystem-kubeapi-aws
+  steps:
+    cluster_profile: aws
+    test:
+    - as: subsystem-deploy-and-run
+      cli: latest
+      commands: |
+        export BUILD_TYPE=CI
+        export REPORTS=${ARTIFACT_DIR}
+        export SERVICE=$(echo "${IMAGE_FORMAT}" | component=assisted-service envsubst)
+        export TARGET=oc
+        export GENERATE_CRD=false
+
+        make deploy-on-openshift-ci
+        make enable-kube-api-for-subsystem
+        make test-kube-api
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+- as: e2e-metal-assisted-operator-disconnected
+  steps:
+    cluster_profile: packet
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+      DISCONNECTED: "true"
+    workflow: baremetalds-assisted-operator
+- as: e2e-metal-assisted-operator-ztp
+  steps:
+    cluster_profile: packet
+    workflow: baremetalds-assisted-operator-ztp
+- as: e2e-metal-assisted-kube-api
+  steps:
+    cluster_profile: packet
+    env:
+      ASSISTED_CONFIG: |
+        NUM_MASTERS=1
+        NUM_WORKERS=0
+        IPv6=yes
+        IPv4=no
+        PROXY=yes
+        ADDITIONAL_PARAMS="--with-static-network-config"
+        ISO_IMAGE_TYPE=minimal-iso
+        KUBE_API=yes
+        OPENSHIFT_VERSION=4.8
+        ENABLE_KUBE_API=true
+    workflow: baremetalds-assisted-install
+zz_generated_metadata:
+  branch: ocm-2.3
+  org: openshift
+  repo: assisted-service
