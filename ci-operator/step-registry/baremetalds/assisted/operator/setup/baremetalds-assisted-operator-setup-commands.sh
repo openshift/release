@@ -10,7 +10,7 @@ echo "************ baremetalds assisted operator setup command ************"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
 
-git clone https://github.com/openshift/assisted-service
+git clone https://github.com/osherdp/assisted-service --branch feature/disconnected-mode-for-assisted-service
 cd assisted-service/
 tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/assisted-service.tar.gz"
 
