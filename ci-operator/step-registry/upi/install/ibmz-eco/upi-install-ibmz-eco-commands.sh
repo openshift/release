@@ -43,6 +43,7 @@ if [ $ret -ne 0 ]; then
   set +e
   # Attempt to gather tfstate file and logs.
   echo "$(date -u --rfc-3339=seconds) - Install failed, gathering cluster directory with tfstate file..."
+  gzip "${cluster_dir}/terraform.tfstate"
   tar -cv -f cluster_dir.tgz -C ${cluster_dir} .
   cp -t "${SHARED_DIR}" \
       cluster_dir.tgz
@@ -56,7 +57,8 @@ touch /tmp/install-complete
 
 sed 's/password: .*/password: REDACTED/' "${cluster_dir}/.openshift_install.log" >>"${ARTIFACT_DIR}/.openshift_install.log"
 
-tar -cv -f cluster_dir.tgz -C ${cluster_dir} .
+gzip "${cluster_dir}/terraform.tfstate"
+tar -cv -f cluster_dir.tgz -C ${cluster_dir} . --exclude="${cluster_dir}/ocp_install/bootstrap.ign"
 
 cp -t "${SHARED_DIR}" \
     "${cluster_dir}/ocp_install/auth/kubeconfig" \

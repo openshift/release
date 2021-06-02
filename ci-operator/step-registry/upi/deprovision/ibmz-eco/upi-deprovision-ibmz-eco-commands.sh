@@ -27,6 +27,7 @@ cp -t "${cluster_dir}" \
     "${SHARED_DIR}/cluster_dir.tgz"
 
 cd ${cluster_dir} && tar -xv -f cluster_dir.tgz
+gzip -d "${cluster_dir}/terraform.tfstate.gz"
 
 ocp_version=$(cat ${installer_dir}/terraform.tfvars | grep openshift_version | cut -d= -f2 | sed -e 's/"//' -e 's/"$//')
 
