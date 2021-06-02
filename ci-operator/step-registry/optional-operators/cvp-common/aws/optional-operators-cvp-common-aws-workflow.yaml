@@ -4,6 +4,12 @@ workflow:
     cluster_profile: aws-cpaas
     env:
       BASE_DOMAIN: cpaas-ci.devcluster.openshift.com
+      CHANNEL: "4.3"
+      INDEX_IMAGE: brew.registry.redhat.io/rh-osbs-stage/iib:23576
+      INSTALL_NAMESPACE: '!create'
+      PACKAGE: e2e-test-operator
+      TARGET_NAMESPACES: '!install'
+      BUNDLE_IMAGE: brew.registry.redhat.io/rh-osbs-stage/e2e-e2e-test-operator-bundle-container:8.0-3
     pre:
     - chain: ipi-aws-pre
     - ref: optional-operators-configure-proxy-registry
@@ -17,3 +23,7 @@ workflow:
     Installs a cluster with a default configuration on AWS, install an optional
     operator using the input index image, package and channel, and execute a
     common suite of CVP tests to validate the optional operator.
+
+    Important: Parameter values in `env` are supposed to be used only in rehearsals
+    and serve as "testing defaults". Production jobs should always override them
+    via `cvp-trigger`.
