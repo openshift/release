@@ -53,6 +53,9 @@ fi
 
 echo "### Setup assisted installer..."
 export INDEX_IMAGE=${INDEX_IMAGE}
+
+images=(${ASSISTED_AGENT_IMAGE} ${ASSISTED_CONTROLLER_IMAGE} ${ASSISTED_INSTALLER_IMAGE})
+export PUBLIC_CONTAINER_REGISTRIES=\$(for image in \${images}; do echo \${image} | cut -d'/' -f1; done | sort -u | paste -sd "," -)
 deploy/operator/setup_assisted_operator.sh
 
 EOF
