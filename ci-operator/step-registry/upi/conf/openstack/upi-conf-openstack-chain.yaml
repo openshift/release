@@ -1,0 +1,37 @@
+chain:
+  as: upi-conf-openstack
+  steps:
+  - ref: openstack-conf-clouds
+  - ref: openstack-conf-resourcenames
+  - ref: opesntack-conf-upi
+  - ref: openstack-conf-createfips #openstack command
+  - ref: openstack-conf-createbootstrapfip #openstack command
+
+  - ref: openstack-conf-creatednsrecord #aws commands, python command
+  - ref: ipi-conf-openstack-precheck #does this go here or after create dnsrecords
+  - ref: openstack-conf-upi-generateconfig # could use regular version? Command: echo, cat
+
+
+  ###############################installer container#############
+  - ref: openstack-conf-upi-createresourcefiles
+  ###############################################################
+
+  - ref: openstack-conf-uploadrhcosimage #Commands: wget, openstck, gunzip
+  - ref: openstack-conf-upi-deploycontrolplane
+
+  ####################installer container##################
+  - ref: openstack-install-waitforbootstrapcomplete #openshift-install
+  #########################################################
+
+
+  - ref: openstack-conf-upi-deleteboostrapresources #Commands: ansible-playbook
+  - ref: openstack-conf-upi-deployworkers #Commands: ansible-playbook
+
+  ####################installer container##################
+  - ref: openstack-install-waitforinstallcomplete #Command: openshift-install
+  #########################################################
+  documentation: |-
+    The upi-conf-openstack chain contains all the
+    refs and chains necessary to configure the system
+    before deploying an UPI installation of OpenShift
+    onto OpenStack

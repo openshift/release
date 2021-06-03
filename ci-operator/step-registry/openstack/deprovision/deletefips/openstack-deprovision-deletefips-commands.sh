@@ -4,7 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-echo using ${OS_CLOUD}
 export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
 
 if [[ -f "${SHARED_DIR}/DELETE_FIPS" ]]; then
