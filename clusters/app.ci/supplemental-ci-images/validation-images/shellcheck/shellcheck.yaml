@@ -23,12 +23,15 @@ items:
         name: shellcheck:latest
     runPolicy: Serial
     source:
-      git:
-        ref: master
-        uri: https://github.com/openshift/release.git
-      type: Git
+      dockerfile: |-
+        FROM quay.io/fedora/fedora:34-x86_64
+        RUN dnf update -y \
+          && dnf install -y \
+            git \
+            findutils \
+            ShellCheck \
+          && dnf clean all
     strategy:
       dockerStrategy:
         imageOptimizationPolicy: SkipLayers
-        dockerfilePath: clusters/app.ci/supplemental-ci-images/validation-images/shellcheck/Dockerfile
       type: Docker
