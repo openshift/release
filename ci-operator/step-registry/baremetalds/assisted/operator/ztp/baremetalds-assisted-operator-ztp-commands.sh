@@ -41,16 +41,6 @@ source /root/assisted-vars.conf
 cd /root/dev-scripts
 source common.sh
 
-echo "### Ignoring boot device on sushy-tools, to allow booting from out disk..."
-sushy_conf_file="${WORKING_DIR}/virtualbmc/sushy-tools/conf.py"
-sed -ir 's/SUSHY_EMULATOR_IGNORE_BOOT_DEVICE[[:blank:]]*=[[:blank:]]*False/SUSHY_EMULATOR_IGNORE_BOOT_DEVICE = True/g' \
-    "${sushy_conf_file}"
-
-echo "Sushy configuration file:"
-cat "${sushy_conf_file}"
-
-podman restart sushy-tools
-
 REPO_DIR="/home/assisted-service"
 if [ ! -d "${REPO_DIR}" ]; then
   mkdir -p "${REPO_DIR}"

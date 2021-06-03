@@ -40,14 +40,6 @@ spec:
       for: 5m
       labels:
         severity: critical
-    - alert: hookDown
-      annotations:
-        message: The service hook has been down for 5 minutes.
-      expr: |
-        absent(up{job="hook"} == 1)
-      for: 5m
-      labels:
-        severity: critical
     - alert: hook-appsDown
       annotations:
         message: The service hook-apps has been down for 5 minutes.
@@ -492,6 +484,14 @@ spec:
       expr: rate(kube_pod_container_status_restarts_total{namespace=~"ci|prow-monitoring",job="kube-state-metrics"}[15m])
         * 60 * 5 > 0
       for: 1m
+      labels:
+        severity: critical
+    - alert: prow-job-backlog-growing
+      annotations:
+        message: The number of Prow jobs with the triggered state has been increasing
+          for the past hour.
+      expr: sum(rate(prowjob_state_transitions{state="triggered"}[5m]))>0
+      for: 60m
       labels:
         severity: critical
     - expr: count(label_replace(count(github_token_usage{token_hash =~ "openshift.*"})
