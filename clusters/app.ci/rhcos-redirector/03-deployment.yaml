@@ -16,8 +16,6 @@ metadata:
   name: rhcos-redirector
   labels:
     app: rhcos-redirector
-  annotations:
-    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"rhcos-redirector:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"rhcos-redirector\")].image"}]'
 spec:
   replicas: 2
   revisionHistoryLimit: 2
@@ -29,10 +27,41 @@ spec:
       labels:
         app: rhcos-redirector
     spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - rhcos-redirector
+            topologyKey: kubernetes.io/hostname
       containers:
       - name: rhcos-redirector
-        image: rhcos-redirector
+        image: registry.ci.openshift.org/ci/nginx-unprivileged:1.18-alpine
         resources:
           requests:
             memory: "250Mi"
             cpu: "100m"
+        volumeMounts:
+        - mountPath: /etc/nginx/conf.d
+          name: config
+      volumes:
+      - name: config
+        configMap:
+          name: rhcos-redirector-config
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rhcos-redirector-config
+  namespace: coreos
+data:
+  "default.conf": |
+    server {
+      listen 8080;
+      location / {
+        proxy_pass https://rhcos-redirector.apps.art.xq1c.p1.openshiftapps.com/;
+      }
+    }
