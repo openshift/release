@@ -38,7 +38,7 @@ echo "Configuring deployment of OpenShift ${OCP_VERSION} under the name ${cluste
 dns_key=$(</var/run/secrets/ibmz-eco/dns-key)
 
 export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${RELEASE_IMAGE_LATEST}
-image_override_version=oc adm release info "${RELEASE_IMAGE_LATEST}" --output=jsonpath={.metadata.version}
+image_override_version=$(oc adm release info "${RELEASE_IMAGE_LATEST}" --output=jsonpath={.metadata.version})
 # Ensure ignition assets are configured with the correct invoker to track CI jobs.
 export OPENSHIFT_INSTALL_INVOKER=openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD_ID}
 
