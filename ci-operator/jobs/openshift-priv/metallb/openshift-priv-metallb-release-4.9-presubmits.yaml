@@ -1,28 +1,31 @@
 presubmits:
-  ComplianceAsCode/ocp4e2e:
+  openshift-priv/metallb:
   - agent: kubernetes
     always_run: true
     branches:
-    - main
+    - release-4.9
     cluster: build01
-    context: ci/prow/e2e-aws-ocp4-cis
+    context: ci/prow/e2e-aws
     decorate: true
     decoration_config:
       skip_cloning: true
+    hidden: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-ComplianceAsCode-ocp4e2e-main-e2e-aws-ocp4-cis
-    rerun_command: /test e2e-aws-ocp4-cis
+    name: pull-ci-openshift-priv-metallb-release-4.9-e2e-aws
+    path_alias: github.com/openshift/metallb
+    rerun_command: /test e2e-aws
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/usr/local/e2e-aws-ocp4-cis-cluster-profile
-        - --target=e2e-aws-ocp4-cis
+        - --secret-dir=/usr/local/e2e-aws-cluster-profile
+        - --target=e2e-aws
         command:
         - ci-operator
         image: ci-operator:latest
@@ -35,10 +38,13 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/e2e-aws-ocp4-cis-cluster-profile
+        - mountPath: /usr/local/e2e-aws-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -59,36 +65,42 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-aws
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-ocp4-cis,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - main
+    - release-4.9
     cluster: build01
-    context: ci/prow/e2e-aws-ocp4-moderate
+    context: ci/prow/e2e-operator
     decorate: true
     decoration_config:
       skip_cloning: true
+    hidden: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-ComplianceAsCode-ocp4e2e-main-e2e-aws-ocp4-moderate
-    rerun_command: /test e2e-aws-ocp4-moderate
+    name: pull-ci-openshift-priv-metallb-release-4.9-e2e-operator
+    path_alias: github.com/openshift/metallb
+    rerun_command: /test e2e-operator
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/usr/local/e2e-aws-ocp4-moderate-cluster-profile
-        - --target=e2e-aws-ocp4-moderate
+        - --secret-dir=/usr/local/e2e-operator-cluster-profile
+        - --target=e2e-operator
         command:
         - ci-operator
         image: ci-operator:latest
@@ -101,10 +113,13 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/e2e-aws-ocp4-moderate-cluster-profile
+        - mountPath: /usr/local/e2e-operator-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -125,36 +140,40 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-aws
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-ocp4-moderate,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-operator,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - main
+    - release-4.9
     cluster: build01
-    context: ci/prow/e2e-aws-rhcos4-moderate
+    context: ci/prow/unit
     decorate: true
     decoration_config:
       skip_cloning: true
+    hidden: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-ComplianceAsCode-ocp4e2e-main-e2e-aws-rhcos4-moderate
-    rerun_command: /test e2e-aws-rhcos4-moderate
+    name: pull-ci-openshift-priv-metallb-release-4.9-unit
+    path_alias: github.com/openshift/metallb
+    rerun_command: /test unit
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/usr/local/e2e-aws-rhcos4-moderate-cluster-profile
-        - --target=e2e-aws-rhcos4-moderate
+        - --target=unit
         command:
         - ci-operator
         image: ci-operator:latest
@@ -164,13 +183,11 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/e2e-aws-rhcos4-moderate-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -180,21 +197,13 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
         secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-rhcos4-moderate,?($|\s.*)
+    trigger: (?m)^/test( | .* )unit,?($|\s.*)
