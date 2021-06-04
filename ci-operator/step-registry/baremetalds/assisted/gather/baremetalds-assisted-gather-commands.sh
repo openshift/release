@@ -33,7 +33,7 @@ cd /home/assisted
 source /root/config
 
 # Get sosreport including sar data
-sosreport --ticket-number "\${HOSTNAME}" --batch -o container_log,filesys,kvm,libvirt,logs,networkmanager,podman,processor,rpm,sar,virsh,yum --tmp-dir /tmp/artifacts
+sos report --case-id "\${HOSTNAME}" --batch -o container_log,filesys,kvm,libvirt,logs,networkmanager,podman,processor,rpm,sar,virsh,yum --tmp-dir /tmp/artifacts
 
 cp -R ./reports /tmp/artifacts || true
 
