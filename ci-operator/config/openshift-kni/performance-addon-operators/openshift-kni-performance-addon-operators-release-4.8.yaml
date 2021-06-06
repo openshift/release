@@ -27,16 +27,9 @@ images:
       paths:
       - destination_dir: .
         source_path: /go/src/github.com/openshift-kni/performance-addon-operators/build/_output/bin/performance-addon-operators
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift-kni/performance-addon-operators/build/_output/bin/performance-profile-creator
   to: performance-addon-operator
 - dockerfile_path: openshift-ci/Dockerfile.must-gather
   from: os-min8
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift-kni/performance-addon-operators/build/_output/bin/gather-sysinfo
   to: performance-addon-operator-must-gather
 - dockerfile_path: openshift-ci/Dockerfile.index-gen.ci
   from: opm-builder
@@ -67,7 +60,7 @@ images:
 operator:
   bundles:
   - dockerfile_path: openshift-ci/Dockerfile.bundle.ci
-  - dockerfile_path: openshift-ci/Dockerfile.bundle-4.8.ci
+  - dockerfile_path: openshift-ci/Dockerfile.bundle-4.7.ci
   substitutions:
   - pullspec: REPLACE_IMAGE
     with: performance-addon-operator
@@ -75,7 +68,7 @@ promotion:
   excluded_images:
   - performance-addon-operator-index-gen
   - pao-src-oc
-  name: performance-addon-operator
+  name: performance-addon-operator-4.8
   namespace: ocp-kni
 resources:
   '*':
@@ -90,23 +83,11 @@ tests:
   commands: make ci-job
   container:
     from: src
-- as: ci-tools
-  commands: make ci-tools-job
-  container:
-    from: src
-- as: ci-ppc
-  commands: make perf-profile-creator-tests
-  container:
-    from: src
-- as: e2e-render-cmd
-  commands: make render-command-tests
-  container:
-    from: src
 - as: e2e-gcp
   steps:
     cluster_profile: gcp
     env:
-      OO_CHANNEL: "4.9"
+      OO_CHANNEL: "4.8"
       OO_INSTALL_NAMESPACE: openshift-performance-addon-operator
       OO_PACKAGE: performance-addon-operator
       OO_TARGET_NAMESPACES: '!all'
@@ -123,7 +104,7 @@ tests:
   steps:
     cluster_profile: gcp
     env:
-      OO_CHANNEL: "4.8"
+      OO_CHANNEL: "4.7"
       OO_INSTALL_NAMESPACE: openshift-performance-addon-operator
       OO_PACKAGE: performance-addon-operator
       OO_TARGET_NAMESPACES: '!all'
@@ -136,20 +117,7 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: optional-operators-ci-gcp
-- as: e2e-bastion
-  cron: 0 0 * * *
-  steps:
-    test:
-    - as: e2e-test
-      commands: KUBECONFIG=$SHARED_DIR/kubeconfig make cluster-deploy && KUBECONFIG=$SHARED_DIR/kubeconfig
-        make functests
-      from: pao-src-oc
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: telco-bastion
 zz_generated_metadata:
-  branch: master
+  branch: release-4.8
   org: openshift-kni
   repo: performance-addon-operators
