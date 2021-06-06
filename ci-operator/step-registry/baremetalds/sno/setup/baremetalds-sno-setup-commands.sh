@@ -37,7 +37,7 @@ fi
 # TODO: Figure out way to get these parameters (used by deploy_ibip) without hardcoding them here
 # preferrably by making deploy_ibip / makefile perform these configurations itself in the assisted_test_infra
 # repo.
-export SINGLE_NODE_IP_ADDRESS="192.168.126.10"
+export SINGLE_NODE_IP_ADDRESS="192.168.127.10"
 export CLUSTER_NAME="test-infra-cluster"
 export CLUSTER_API_DOMAIN="api.${CLUSTER_NAME}.redhat.com"
 
