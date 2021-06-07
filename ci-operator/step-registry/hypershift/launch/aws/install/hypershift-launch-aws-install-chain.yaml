@@ -1,0 +1,34 @@
+chain:
+  as: hypershift-launch-aws-create
+  steps:
+  - ref: openshift-cluster-bot-rbac
+  - ref: ipi-install-rbac
+  - as: create
+    cli: latest
+    env:
+    commands: |-
+      set -exuo pipefail
+      export KUBECONFIG=/var/run/hypershift/kubeconfig
+
+      echo "$(date) Installing HyperShift cluster"
+      /usr/bin/hypershift install --hypershift-image "${HYPERSHIFT_RELEASE_LATEST}"
+    from_image:
+      namespace: hypershift
+      name: hypershift
+      tag: latest
+    grace_period: 5m0s
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    timeout: 15m0s
+    credentials:
+    - namespace: test-credentials
+      name: hypershift-clusterbot-credentials
+      mount_path: /var/run/hypershift
+    dependencies:
+    - name: "release:latest"
+      env: RELEASE_IMAGE_LATEST
+    - env: HYPERSHIFT_RELEASE_LATEST
+      name: hypershift
+  
