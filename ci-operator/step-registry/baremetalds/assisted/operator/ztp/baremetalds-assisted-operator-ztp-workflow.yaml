@@ -2,25 +2,14 @@ workflow:
   as: baremetalds-assisted-operator-ztp
   steps:
     pre:
-    - ref: baremetalds-packet-setup
-    - ref: ipi-install-rbac
-    - ref: baremetalds-devscripts-setup
+    - ref: baremetalds-assisted-operator-conf
+    - chain: baremetalds-ipi-pre
     - chain: baremetalds-assisted-operator-lso
     - ref: baremetalds-assisted-operator-setup
     - ref: baremetalds-assisted-operator-ztp
     post:
     - ref: baremetalds-assisted-operator-gather
-    - ref: baremetalds-devscripts-gather
-    - ref: baremetalds-packet-teardown
-    env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4
-        NUM_EXTRA_WORKERS=1
-        EXTRA_WORKER_VCPU=8
-        EXTRA_WORKER_MEMORY=32768
-        EXTRA_WORKER_DISK=120
-        PROVISIONING_NETWORK_PROFILE=Disabled
-        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+    - chain: baremetalds-ipi-post
   documentation: |-
     Using hub-cluster with Assisted Service operator to deploy extra workers as spoke clusters.
     Installation will be following ZTP flow (Zero Touch Provisioning), meaning no explicit

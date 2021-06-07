@@ -12,11 +12,8 @@ build_root:
   project_image:
     dockerfile_path: build/build-image/Dockerfile
 images:
-- dockerfile_path: Dockerfile.hivebase
-  from: base
-  to: hivebase
 - dockerfile_path: Dockerfile
-  from: hivebase
+  from: base
   inputs:
     openshift_release_golang-1.15:
       as:
@@ -46,18 +43,78 @@ tests:
   commands: make verify
   container:
     from: src
+- as: coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  secret:
+    mount_path: /tmp/secret
+    name: hive-codecov-token
+- as: publish-coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  postsubmit: true
+  secret:
+    mount_path: /tmp/secret
+    name: hive-codecov-token
 - as: e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: dpp
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.7"
   steps:
-    cluster_profile: aws
     test:
     - as: test
       cli: latest
-      commands: CLOUD=aws make test-e2e
+      commands: |
+        export AWS_ACCESS_KEY_ID=$(cat /tmp/secret/hive-aws-creds/AWS_ACCESS_KEY_ID)
+        export AWS_SECRET_ACCESS_KEY=$(cat /tmp/secret/hive-aws-creds/AWS_SECRET_ACCESS_KEY)
+        # TODO: Refactor the test to accept the creds from the env.
+        # Meanwhile, create the file the test is expecting.
+        mkdir -p /tmp/cluster
+        chmod 700 /tmp/cluster
+        touch /tmp/cluster/.awscred
+        chmod 600 /tmp/cluster/.awscred
+        printf '[default]\naws_access_key_id=%s\naws_secret_access_key=%s\n' "$AWS_ACCESS_KEY_ID" "$AWS_SECRET_ACCESS_KEY"  > /tmp/cluster/.awscred
+        chmod 400 /tmp/cluster/.awscred
+        # Override default location for pull secret
+        export PULL_SECRET_FILE=/tmp/secret/pull-secret/.dockerconfigjson
+        # Set up a keypair for this test.
+        # TODO: Do this in the test itself.
+        # This env var is known to installmanager
+        export SSH_PRIV_KEY_PATH=/tmp/cluster/id_rsa
+        ssh-keygen -q -t rsa -N '' -f ${SSH_PRIV_KEY_PATH}
+        # This is where ssh-keygen will put the public key. This env var
+        # is used by the test to pass into hiveutil create-cluster.
+        export SSH_PUBLIC_KEY_FILE=${SSH_PRIV_KEY_PATH}.pub
+        # Our AWS account is set up with this domain:
+        export BASE_DOMAIN=new-installer.openshift.com
+        CLOUD=aws make test-e2e
+      credentials:
+      - mount_path: /tmp/secret/hive-aws-creds
+        name: hive-aws-creds
+        namespace: test-credentials
+      - mount_path: /tmp/secret/pull-secret
+        name: ci-pull-credentials
+        namespace: test-credentials
+      dependencies:
+      - env: HIVE_IMAGE
+        name: hive
+      - env: RELEASE_IMAGE
+        name: release:latest
       from: src
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    workflow: generic-claim
 - as: e2e-gcp
   steps:
     cluster_profile: gcp
@@ -65,6 +122,11 @@ tests:
     - as: test
       cli: latest
       commands: CLOUD=gcp make test-e2e
+      dependencies:
+      - env: HIVE_IMAGE
+        name: hive
+      - env: RELEASE_IMAGE
+        name: release:latest
       from: src
       resources:
         requests:
@@ -77,6 +139,11 @@ tests:
     - as: test
       cli: latest
       commands: CLOUD=azure make test-e2e
+      dependencies:
+      - env: HIVE_IMAGE
+        name: hive
+      - env: RELEASE_IMAGE
+        name: release:latest
       from: src
       resources:
         requests:

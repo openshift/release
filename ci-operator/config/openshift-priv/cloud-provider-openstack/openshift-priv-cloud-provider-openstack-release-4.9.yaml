@@ -19,15 +19,16 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.16-openshift-4.8
+  ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.16-openshift-4.9
   ocp_builder_rhel-8-golang-openshift-4.6:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-openshift-4.6
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.13
+  from_repository: true
 canonical_go_repository: k8s.io/cloud-provider-openstack
 images:
 - dockerfile_path: images/manila-csi-plugin/Dockerfile
@@ -36,16 +37,16 @@ images:
     ocp_builder_rhel-8-golang-1.15-openshift-4.6:
       as:
       - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
-    ocp_builder_rhel-8-golang-1.16-openshift-4.8:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
   to: csi-driver-manila
 - dockerfile_path: images/cinder-csi-plugin/Dockerfile
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.8:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
   to: openstack-cinder-csi-driver
 - dockerfile_path: images/cloud-controller-manager/Dockerfile
   from: base
@@ -55,6 +56,7 @@ images:
       - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
   to: openstack-cloud-controller-manager
 promotion:
+  disabled: true
   name: 4.9-priv
   namespace: ocp-private
 resources:
@@ -66,18 +68,26 @@ tag_specification:
   name: 4.9-priv
   namespace: ocp-private
 tests:
-- as: e2e-openstack-ipi
-  steps:
-    cluster_profile: openstack-vexxhost
-    workflow: openshift-e2e-openstack-ipi
-- as: e2e-openstack
-  steps:
-    cluster_profile: openstack
-    workflow: openshift-e2e-openstack-minimal
 - as: unit
   commands: make test
   container:
     from: src
+- as: e2e-openstack
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      TEST_SUITE: experimental/reliability/minimal
+    workflow: openshift-e2e-openstack-ipi
+- as: e2e-openstack-parallel
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      TEST_SUITE: openshift/conformance/parallel
+    workflow: openshift-e2e-openstack-ipi
+- as: e2e-openstack-csi-cinder
+  steps:
+    cluster_profile: openstack
+    workflow: openshift-e2e-openstack-csi-cinder
 zz_generated_metadata:
   branch: release-4.9
   org: openshift-priv

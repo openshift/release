@@ -3,6 +3,10 @@ base_images:
     name: "4.9"
     namespace: ocp
     tag: base
+  ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.16-openshift-4.9
   openshift_release_golang-1.15:
     name: release
     namespace: openshift
@@ -20,17 +24,18 @@ build_root:
 images:
 - from: base
   inputs:
-    openshift_release_golang-1.16:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.16
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
   to: cluster-cloud-controller-manager-operator
 - from: src
   inputs:
-    openshift_release_golang-1.16:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.16
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
   to: cluster-cloud-controller-manager-operator-src
 promotion:
+  disabled: true
   name: "4.9"
   namespace: ocp
 resources:
@@ -64,6 +69,12 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-ccm
+- as: e2e-openstack
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      TEST_SUITE: experimental/reliability/minimal
+    workflow: openshift-e2e-openstack-ipi
 zz_generated_metadata:
   branch: release-4.9
   org: openshift

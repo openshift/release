@@ -24,7 +24,7 @@ logdir="${ARTIFACTS}/deprovision"
 mkdir -p "${logdir}"
 
 
-gce_cluster_age_cutoff="$(TZ=":America/Los_Angeles" date --date="${CLUSTER_TTL}-4 hours" '+%Y-%m-%dT%H:%M%z')"
+gce_cluster_age_cutoff="$(TZ=":America/Los_Angeles" date --date="${CLUSTER_TTL}-8 hours" '+%Y-%m-%dT%H:%M%z')"
 echo "deprovisioning clusters with a creationTimestamp before ${gce_cluster_age_cutoff} in GCE ..."
 export CLOUDSDK_CONFIG=/tmp/gcloudconfig
 mkdir -p "${CLOUDSDK_CONFIG}"
@@ -60,7 +60,7 @@ done
 
 wait
 
-gcs_bucket_age_cutoff="$(TZ="GMT" date --date="${CLUSTER_TTL}-4 hours" '+%a, %d %b %Y %H:%M:%S GMT')"
+gcs_bucket_age_cutoff="$(TZ="GMT" date --date="${CLUSTER_TTL}-8 hours" '+%a, %d %b %Y %H:%M:%S GMT')"
 gcs_bucket_age_cutoff_seconds="$(date --date="${gcs_bucket_age_cutoff}" '+%s')"
 echo "deleting GCS buckets with a creationTimestamp before ${gcs_bucket_age_cutoff} in GCE ..."
 buckets=()

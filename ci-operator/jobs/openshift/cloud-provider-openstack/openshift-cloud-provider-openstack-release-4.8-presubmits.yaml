@@ -4,7 +4,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.8
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-openstack
     decorate: true
     decoration_config:
@@ -59,7 +59,7 @@ presubmits:
         projected:
           sources:
           - secret:
-              name: cluster-secrets-openstack
+              name: cluster-secrets-openstack-vexxhost
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -68,21 +68,21 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-openstack,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - release-4.8
-    cluster: build01
-    context: ci/prow/e2e-openstack-ipi
+    cluster: build02
+    context: ci/prow/e2e-openstack-parallel
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cloud-provider-openstack-release-4.8-e2e-openstack-ipi
+    name: pull-ci-openshift-cloud-provider-openstack-release-4.8-e2e-openstack-parallel
     optional: true
     path_alias: k8s.io/cloud-provider-openstack
-    rerun_command: /test e2e-openstack-ipi
+    rerun_command: /test e2e-openstack-parallel
     spec:
       containers:
       - args:
@@ -90,8 +90,8 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/usr/local/e2e-openstack-ipi-cluster-profile
-        - --target=e2e-openstack-ipi
+        - --secret-dir=/usr/local/e2e-openstack-parallel-cluster-profile
+        - --target=e2e-openstack-parallel
         command:
         - ci-operator
         image: ci-operator:latest
@@ -104,7 +104,7 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/e2e-openstack-ipi-cluster-profile
+        - mountPath: /usr/local/e2e-openstack-parallel-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -134,12 +134,12 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-openstack-ipi,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-openstack-parallel,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - release-4.8
-    cluster: build01
+    cluster: build02
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -157,6 +157,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
+        - --target=[release:latest]
         command:
         - ci-operator
         image: ci-operator:latest
@@ -188,7 +189,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.8
-    cluster: build01
+    cluster: build02
     context: ci/prow/unit
     decorate: true
     decoration_config:

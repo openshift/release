@@ -39,7 +39,6 @@ images:
       - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
   to: machine-api-operator
 promotion:
-  disabled: true
   name: 4.8-priv
   namespace: ocp-private
 resources:
@@ -138,7 +137,40 @@ tests:
 - as: e2e-metal-ipi
   steps:
     cluster_profile: packet
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OpenShiftSDN
     workflow: baremetalds-e2e
+- as: e2e-metal-ipi-upgrade
+  steps:
+    cluster_profile: packet
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OpenShiftSDN
+      RUN_UPGRADE_TEST: "true"
+    workflow: baremetalds-e2e-upgrade
+- as: e2e-metal-ipi-ovn-ipv6
+  steps:
+    cluster_profile: packet
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        NETWORK_TYPE=OVNKubernetes
+    workflow: baremetalds-e2e
+- as: e2e-metal-ipi-ovn-dualstack
+  steps:
+    cluster_profile: packet
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NETWORK_TYPE=OVNKubernetes
+    workflow: baremetalds-e2e
+- as: e2e-metal-ipi-virtualmedia
+  steps:
+    cluster_profile: packet
+    workflow: baremetalds-e2e-virtualmedia
 - as: e2e-vsphere-serial
   steps:
     cluster_profile: vsphere
@@ -171,6 +203,10 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-disruption
+- as: e2e-openstack
+  steps:
+    cluster_profile: openstack-vexxhost
+    workflow: openshift-e2e-openstack-ipi
 zz_generated_metadata:
   branch: release-4.8
   org: openshift-priv

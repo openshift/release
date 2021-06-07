@@ -110,7 +110,9 @@ tests:
 - as: e2e-aws-single-node
   cron: 0 0 * * *
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-e2e-aws-single-node
 - as: e2e-metal-single-node-live-iso
   cron: 0 0 * * *
@@ -163,12 +165,10 @@ tests:
   cron: 0 0 * * 1
   steps:
     cluster_profile: packet
-    pre:
-    - ref: baremetalds-packet-setup
-    - ref: ipi-install-rbac
-    - ref: baremetalds-devscripts-conf-compact
-    - ref: baremetalds-devscripts-proxy
-    - ref: baremetalds-devscripts-setup
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        NUM_WORKERS=0
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-virtualmedia
   cron: 0 0 * * 1
@@ -188,8 +188,9 @@ tests:
 - as: e2e-aws-ovn-local-gateway
   interval: 48h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
       GATEWAY_MODE: local
     workflow: openshift-e2e-aws-ovn
 - as: e2e-vsphere-ovn
@@ -255,8 +256,9 @@ tests:
 - as: e2e-aws-fips
   interval: 48h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
       FIPS_ENABLED: "true"
     pre:
     - chain: ipi-aws-pre
@@ -296,8 +298,9 @@ tests:
 - as: e2e-aws-fips-serial
   interval: 48h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
       FIPS_ENABLED: "true"
       TEST_SUITE: openshift/conformance/serial
     pre:
@@ -318,7 +321,9 @@ tests:
 - as: console-aws
   interval: 48h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
     test:
     - as: e2e-test
       cli: latest
@@ -342,47 +347,58 @@ tests:
 - as: e2e-aws-upgrade
   interval: 24h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-aws
 - as: e2e-aws-upgrade-rollback-oldest-supported
   interval: 48h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:oldest-supported-z-rollback
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
     env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
       TEST_TYPE: upgrade-conformance
       TEST_UPGRADE_OPTIONS: abort-at=random
     workflow: openshift-upgrade-aws
 - as: e2e-aws
   interval: 48h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-e2e-aws
 - as: e2e-aws-serial
   interval: 48h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-e2e-aws-serial
 - as: e2e-aws-canary
   interval: 12h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
       TEST_SUITE: experimental/reliability/minimal
     workflow: openshift-e2e-aws
 - as: e2e-aws-csi
   interval: 12h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-e2e-aws-csi
 - as: e2e-aws-csi-migration
   interval: 12h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-e2e-aws-csi-migration
 - as: e2e-azure
   interval: 48h
@@ -394,6 +410,112 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-csi
+- as: e2e-remote-libvirt-s390x
+  cluster: build02
+  cron: 0 8,20 * * *
+  steps:
+    cluster_profile: libvirt-s390x
+    env:
+      ARCH: s390x
+      BRANCH: "4.8"
+      TEST_TYPE: conformance-parallel
+    workflow: openshift-e2e-libvirt
+- as: image-ecosystem-remote-libvirt-s390x
+  cluster: build02
+  cron: 0 9,21 * * *
+  steps:
+    cluster_profile: libvirt-s390x
+    env:
+      ARCH: s390x
+      BRANCH: "4.8"
+      TEST_TYPE: image-ecosystem
+    workflow: openshift-e2e-libvirt
+- as: jenkins-e2e-remote-libvirt-s390x
+  cluster: build02
+  cron: 0 9,21 * * *
+  steps:
+    cluster_profile: libvirt-s390x
+    env:
+      ARCH: s390x
+      BRANCH: "4.8"
+      TEST_TYPE: jenkins-e2e-rhel-only
+    workflow: openshift-e2e-libvirt
+- as: e2e-serial-remote-libvirt-s390x
+  cluster: build02
+  cron: 0 3 * * 3
+  steps:
+    cluster_profile: libvirt-s390x
+    env:
+      ARCH: s390x
+      BRANCH: "4.8"
+      TEST_TYPE: conformance-serial
+    workflow: openshift-e2e-libvirt
+- as: e2e-compact-remote-libvirt-s390x
+  cluster: build02
+  cron: 0 10,22 * * *
+  steps:
+    cluster_profile: libvirt-s390x
+    env:
+      ARCH: s390x
+      BRANCH: "4.8"
+      MASTER_DISK: "53687063712"
+      MASTER_MEMORY: "32768"
+      TEST_TYPE: conformance-parallel
+      WORKER_REPLICAS: "0"
+    workflow: openshift-e2e-libvirt
+- as: e2e-remote-libvirt-ppc64le
+  cluster: build02
+  cron: 0 4,16 * * *
+  steps:
+    cluster_profile: libvirt-ppc64le
+    env:
+      ARCH: ppc64le
+      BRANCH: "4.8"
+      TEST_TYPE: conformance-parallel
+    workflow: openshift-e2e-libvirt
+- as: image-ecosystem-remote-libvirt-ppc64le
+  cluster: build02
+  cron: 0 8,20 * * *
+  steps:
+    cluster_profile: libvirt-ppc64le
+    env:
+      ARCH: ppc64le
+      BRANCH: "4.8"
+      TEST_TYPE: image-ecosystem
+    workflow: openshift-e2e-libvirt
+- as: jenkins-e2e-remote-libvirt-ppc64le
+  cluster: build02
+  cron: 0 8,20 * * *
+  steps:
+    cluster_profile: libvirt-ppc64le
+    env:
+      ARCH: ppc64le
+      BRANCH: "4.8"
+      TEST_TYPE: jenkins-e2e-rhel-only
+    workflow: openshift-e2e-libvirt
+- as: e2e-serial-remote-libvirt-ppc64le
+  cluster: build02
+  cron: 0 2 * * 3
+  steps:
+    cluster_profile: libvirt-ppc64le
+    env:
+      ARCH: ppc64le
+      BRANCH: "4.8"
+      TEST_TYPE: conformance-serial
+    workflow: openshift-e2e-libvirt
+- as: e2e-compact-remote-libvirt-ppc64le
+  cluster: build02
+  cron: 0 5,17 * * *
+  steps:
+    cluster_profile: libvirt-ppc64le
+    env:
+      ARCH: ppc64le
+      BRANCH: "4.8"
+      MASTER_DISK: "53687063712"
+      MASTER_MEMORY: "32768"
+      TEST_TYPE: conformance-parallel
+      WORKER_REPLICAS: "0"
+    workflow: openshift-e2e-libvirt
 zz_generated_metadata:
   branch: master
   org: openshift

@@ -11,6 +11,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-base-openshift-4.8
+  ocp_builder_rhel-8-base-openshift-4.9:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-base-openshift-4.9
   ocp_builder_rhel-8-golang-1.15-openshift-4.7:
     name: builder
     namespace: ocp
@@ -24,18 +28,15 @@ base_images:
     namespace: ocp
     tag: rhel-8-golang-1.16-openshift-4.8
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.13
+  from_repository: true
 canonical_go_repository: github.com/openshift/images
 images:
 - context_dir: base
   dockerfile_path: Dockerfile.rhel
   inputs:
-    ocp_builder_rhel-8-base-openshift-4.8:
+    ocp_builder_rhel-8-base-openshift-4.9:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-base-openshift-4.8
+      - registry.ci.openshift.org/ocp/builder:rhel-8-base-openshift-4.9
   to: base
 - context_dir: egress/router
   from: base
@@ -50,6 +51,7 @@ images:
   from: base
   to: keepalived-ipfailover
 promotion:
+  disabled: true
   name: 4.9-priv
   namespace: ocp-private
 resources:

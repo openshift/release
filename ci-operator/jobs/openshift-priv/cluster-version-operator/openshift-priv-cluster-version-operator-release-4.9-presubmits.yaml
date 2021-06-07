@@ -7,8 +7,6 @@ presubmits:
     cluster: build01
     context: ci/prow/e2e-agnostic
     decorate: true
-    decoration_config:
-      skip_cloning: true
     hidden: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
@@ -82,8 +80,6 @@ presubmits:
     cluster: build01
     context: ci/prow/e2e-agnostic-operator
     decorate: true
-    decoration_config:
-      skip_cloning: true
     hidden: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
@@ -157,8 +153,6 @@ presubmits:
     cluster: build01
     context: ci/prow/e2e-agnostic-upgrade
     decorate: true
-    decoration_config:
-      skip_cloning: true
     hidden: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
@@ -232,8 +226,6 @@ presubmits:
     cluster: build01
     context: ci/prow/e2e-metal-assisted
     decorate: true
-    decoration_config:
-      skip_cloning: true
     hidden: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
@@ -309,8 +301,6 @@ presubmits:
     cluster: build01
     context: ci/prow/gofmt
     decorate: true
-    decoration_config:
-      skip_cloning: true
     hidden: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
@@ -364,10 +354,63 @@ presubmits:
     branches:
     - release-4.9
     cluster: build01
+    context: ci/prow/golangci-lint
+    decorate: true
+    hidden: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-cluster-version-operator-release-4.9-golangci-lint
+    path_alias: github.com/openshift/cluster-version-operator
+    rerun_command: /test golangci-lint
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --target=golangci-lint
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )golangci-lint,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-4.9
+    cluster: build01
     context: ci/prow/images
     decorate: true
-    decoration_config:
-      skip_cloning: true
     hidden: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
@@ -423,8 +466,6 @@ presubmits:
     cluster: build01
     context: ci/prow/unit
     decorate: true
-    decoration_config:
-      skip_cloning: true
     hidden: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"

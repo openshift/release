@@ -177,7 +177,7 @@ for field in state reason; do
     fi
 done
 
-if [[ -n "$CSV" ]]; then
+if [[ -n "${CSV:-}" ]]; then
     CSV_ART="$ARTIFACT_DIR/csv-$CSV.yaml"
     echo "ClusterServiceVersion $CSV was created but never became ready"
     echo "Dumping ClusterServiceVersion $CSV as $CSV_ART"

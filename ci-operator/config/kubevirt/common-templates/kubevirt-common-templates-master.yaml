@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: "4.6"
+    name: "4.7"
     namespace: ocp
     tag: base
 build_root:
@@ -14,7 +14,7 @@ resources:
       cpu: 200m
       memory: 400Mi
 tag_specification:
-  name: "4.6"
+  name: "4.7"
   namespace: ocp
 tests:
 - as: e2e-azure-common-templates-unit-tests
@@ -91,6 +91,29 @@ tests:
         cp -L $KUBECONFIG /tmp/kubeconfig && export KUBECONFIG=/tmp/kubeconfig
         echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
         export TARGET=rhel8 && make e2e-tests
+      credentials:
+      - mount_path: /tmp/secrets
+        name: common-templates-container-disk-puller
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 200m
+          memory: 400Mi
+    workflow: ipi-azure
+- as: e2e-azure-common-templates-rhel9
+  steps:
+    cluster_profile: azure4
+    env:
+      COMPUTE_NODE_TYPE: Standard_D8s_v3
+    test:
+    - as: e2e-tests-rhel9
+      commands: |
+        set -o pipefail
+        #kubeconfig is mounted from a secret, so its immutable. We have to copy it to some writable location.
+        cp -L $KUBECONFIG /tmp/kubeconfig && export KUBECONFIG=/tmp/kubeconfig
+        echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
+        export TARGET=rhel9 && make e2e-tests
       credentials:
       - mount_path: /tmp/secrets
         name: common-templates-container-disk-puller

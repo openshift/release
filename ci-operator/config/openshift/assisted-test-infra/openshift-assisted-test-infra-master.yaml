@@ -44,7 +44,7 @@ tag_specification:
   name: "4.8"
   namespace: ocp
 tests:
-- as: system-test
+- as: e2e-metal-assisted
   steps:
     cluster_profile: packet
     env:
@@ -53,7 +53,7 @@ tests:
         TEST_FUNC=test_install
         MAKEFILE_TARGET="create_full_environment run test_parallel"
     workflow: baremetalds-assisted-install
-- as: system-test-periodic
+- as: e2e-metal-assisted-periodic
   cron: '@daily'
   steps:
     cluster_profile: packet
@@ -85,7 +85,9 @@ tests:
     cluster_profile: packet
     env:
       ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.8
         TEST=./discovery-infra/tests/test_kube_api.py
+        TEST_FUNC=test_kube_api_ipv4
         POST_INSTALL_COMMAND="make deploy_assisted_operator test_parallel"
     workflow: baremetalds-assisted-install
 - as: system-test-operator-periodic
@@ -94,7 +96,9 @@ tests:
     cluster_profile: packet
     env:
       ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.8
         TEST=./discovery-infra/tests/test_kube_api.py
+        TEST_FUNC=test_kube_api_ipv4
         POST_INSTALL_COMMAND="make deploy_assisted_operator test_parallel"
     workflow: baremetalds-assisted
 - as: e2e-metal-assisted-ipv6
@@ -119,12 +123,24 @@ tests:
         VIP_DHCP_ALLOCATION=no
         PROXY=yes
     workflow: baremetalds-assisted
+- as: system-test-ipv6
+  steps:
+    cluster_profile: packet
+    env:
+      ASSISTED_CONFIG: |
+        IPv6=true
+        TEST_FUNC=test_install
+        OPENSHIFT_VERSION=4.8
+        MAKEFILE_TARGET="create_full_environment run test_parallel"
+    workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-none
   steps:
     cluster_profile: packet
     env:
       ASSISTED_CONFIG: |
         PLATFORM=none
+        TEST_FUNC=test_install
+        MAKEFILE_TARGET="create_full_environment run test_parallel"
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-none-periodic
   cron: '@daily'
@@ -133,6 +149,8 @@ tests:
     env:
       ASSISTED_CONFIG: |
         PLATFORM=none
+        TEST_FUNC=test_install
+        MAKEFILE_TARGET="create_full_environment run test_parallel"
     workflow: baremetalds-assisted
 - as: e2e-metal-assisted-none-ipv6
   steps:
@@ -145,6 +163,8 @@ tests:
         PROXY=yes
         OPENSHIFT_VERSION=4.8
         PLATFORM=none
+        TEST_FUNC=test_install
+        MAKEFILE_TARGET="create_full_environment run test_parallel"
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-none-ipv6-periodic
   cron: '@daily'
@@ -157,11 +177,9 @@ tests:
         VIP_DHCP_ALLOCATION=no
         PROXY=yes
         PLATFORM=none
+        TEST_FUNC=test_install
+        MAKEFILE_TARGET="create_full_environment run test_parallel"
     workflow: baremetalds-assisted
-- as: e2e-metal-assisted
-  steps:
-    cluster_profile: packet
-    workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-single-node
   steps:
     cluster_profile: packet
@@ -172,11 +190,6 @@ tests:
         ISO_IMAGE_TYPE=minimal-iso
         OPENSHIFT_VERSION=4.8
     workflow: baremetalds-assisted-install
-- as: e2e-metal-assisted-periodic
-  cron: '@daily'
-  steps:
-    cluster_profile: packet
-    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-single-node-periodic
   cron: '@daily'
   steps:
@@ -220,35 +233,6 @@ tests:
         KUBE_API=yes
         OPENSHIFT_VERSION=4.8
         ENABLE_KUBE_API=true
-    workflow: baremetalds-assisted
-- as: e2e-metal-assisted-edge-ready
-  steps:
-    cluster_profile: packet
-    env:
-      ASSISTED_CONFIG: |
-        NUM_MASTERS=1
-        NUM_WORKERS=0
-        IPv6=yes
-        IPv4=no
-        PROXY=yes
-        ADDITIONAL_PARAMS="--with-static-network-config"
-        ISO_IMAGE_TYPE=minimal-iso
-        OPENSHIFT_VERSION=4.8
-    workflow: baremetalds-assisted-install
-- as: e2e-metal-assisted-edge-ready-periodic
-  cron: '@daily'
-  steps:
-    cluster_profile: packet
-    env:
-      ASSISTED_CONFIG: |
-        NUM_MASTERS=1
-        NUM_WORKERS=0
-        IPv6=yes
-        IPv4=no
-        PROXY=yes
-        ADDITIONAL_PARAMS="--with-static-network-config"
-        ISO_IMAGE_TYPE=minimal-iso
-        OPENSHIFT_VERSION=4.8
     workflow: baremetalds-assisted
 - as: e2e-metal-single-node-live-iso
   steps:

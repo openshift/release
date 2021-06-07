@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: 4.8-priv
+    name: 4.9-priv
     namespace: ocp-private
     tag: base
   ocp_builder_rhel-8-golang-1.15-openshift-4.7:
@@ -15,23 +15,24 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.16-openshift-4.8
+  ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.16-openshift-4.9
 binary_build_commands: make build --warn-undefined-variables
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.15
+  from_repository: true
 canonical_go_repository: github.com/openshift/openshift-controller-manager
 images:
 - dockerfile_path: Dockerfile.rhel
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.8:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
   to: openshift-controller-manager
 promotion:
-  name: 4.8-priv
+  name: 4.9-priv
   namespace: ocp-private
 resources:
   '*':
@@ -39,7 +40,7 @@ resources:
       cpu: "3"
       memory: 6Gi
 tag_specification:
-  name: 4.8-priv
+  name: 4.9-priv
   namespace: ocp-private
 test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
 tests:

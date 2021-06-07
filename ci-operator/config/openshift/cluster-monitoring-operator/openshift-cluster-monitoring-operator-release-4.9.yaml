@@ -19,6 +19,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.16-openshift-4.8
+  ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.16-openshift-4.9
   ocp_builder_rhel-8-golang-openshift-4.6:
     name: builder
     namespace: ocp
@@ -32,19 +36,21 @@ base_images:
     namespace: openshift
     tag: golang-1.14
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.14
+  from_repository: true
 images:
 - dockerfile_path: Dockerfile
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.8:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
   to: cluster-monitoring-operator
+- dockerfile_literal: |
+    FROM src
+  from: src
+  to: cluster-monitoring-operator-src
 promotion:
+  disabled: true
   name: "4.9"
   namespace: ocp
 resources:
@@ -70,6 +76,10 @@ tests:
     from: src
 - as: vendor
   commands: make vendor && git diff --exit-code
+  container:
+    from: src
+- as: shellcheck
+  commands: make shellcheck
   container:
     from: src
 - as: unit

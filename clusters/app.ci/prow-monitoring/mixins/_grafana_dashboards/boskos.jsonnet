@@ -62,6 +62,7 @@ dashboard.new(
     y: 0,
   })
 .addPanel(statePanel(iaas="aws", displayName="AWS"), gridPos={h: 9, w: 24, x: 0, y: 0})
+.addPanel(statePanel(iaas="aws-2", displayName="AWS-2"), gridPos={h: 9, w: 24, x: 0, y: 0})
 .addPanel(statePanel(iaas="gcp", displayName="GCP"), gridPos={h: 9, w: 24, x: 0, y: 0})
 .addPanel(statePanel(iaas="gcp-openshift-gce-devel-ci-2", displayName="GCP-2"), gridPos={h: 9, w: 24, x: 0, y: 0})
 .addPanel(statePanel(iaas="azure4", displayName="Azure"), gridPos={h: 9, w: 24, x: 0, y: 0})
@@ -70,4 +71,5 @@ dashboard.new(
 .addPanel(statePanel(iaas="openstack", displayName="OpenStack"), gridPos={h: 9, w: 24, x: 0, y: 0})
 .addPanel(statePanel(iaas="openstack-kuryr", displayName="OpenStack Kuryr"), gridPos={h: 9, w: 24, x: 0, y: 0})
 .addPanel(statePanel(iaas="openstack-vexxhost", displayName="OpenStack Vexxhost"), gridPos={h: 9, w: 24, x: 0, y: 0})
+.addPanel(statePanel(iaas="openstack-vh-mecha", displayName="OpenStack VH Mecha"), gridPos={h: 9, w: 24, x: 0, y: 0})
 + dashboardConfig

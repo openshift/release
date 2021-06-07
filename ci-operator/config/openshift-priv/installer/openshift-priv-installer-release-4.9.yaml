@@ -47,6 +47,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.16-openshift-4.8
+  ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.16-openshift-4.9
   ocp_builder_rhel-8-golang-openshift-4.6:
     name: builder
     namespace: ocp
@@ -80,10 +84,7 @@ base_images:
     namespace: ocp-private
     tag: base-7
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.14
+  from_repository: true
 canonical_go_repository: github.com/openshift/installer
 images:
 - dockerfile_path: images/installer/Dockerfile.ci
@@ -99,6 +100,9 @@ images:
     ocp_builder_rhel-8-golang-1.15-openshift-4.8:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
+    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
   to: installer-artifacts
 - dockerfile_path: images/libvirt/Dockerfile.ci
   from: base
@@ -133,9 +137,9 @@ images:
     ocp_builder_rhel-8-golang-1.15-openshift-4.8:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
-    ocp_builder_rhel-8-golang-1.16-openshift-4.8:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
   to: baremetal-installer
 - dockerfile_path: images/installer/Dockerfile.ci
   from: base
@@ -145,6 +149,7 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
   to: ovirt-installer
 promotion:
+  disabled: true
   name: 4.9-priv
   namespace: ocp-private
 resources:
@@ -309,9 +314,17 @@ tests:
   steps:
     cluster_profile: packet
     workflow: baremetalds-e2e-virtualmedia
-- as: e2e-openstack-ipi
+- as: e2e-openstack
   steps:
     cluster_profile: openstack-vexxhost
+    env:
+      TEST_SUITE: experimental/reliability/minimal
+    workflow: openshift-e2e-openstack-ipi
+- as: e2e-openstack-parallel
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
 - as: openstack-manifests
   steps:

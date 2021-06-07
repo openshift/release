@@ -11,6 +11,11 @@
         "required": true
       },
       {
+        "name": "PAGERDUTY_INTEGRATION_KEY",
+        "description": "The PagerDuty integration key",
+        "required": true
+      },
+      {
         "description": "prow monitoring namespace",
         "name": "PROW_MONITORING_NAMESPACE",
         "value": "prow-monitoring"

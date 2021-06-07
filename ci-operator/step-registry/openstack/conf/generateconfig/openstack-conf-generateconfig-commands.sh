@@ -4,8 +4,10 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-#Read necessary variables
-CLUSTER_NAME=$(<"${SHARED_DIR}"/CLUSTER_NAME)
+CLUSTER_NAME=$(<"${SHARED_DIR}/CLUSTER_NAME")
+OPENSTACK_EXTERNAL_NETWORK="${OPENSTACK_EXTERNAL_NETWORK:-$(<"${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK")}"
+OPENSTACK_COMPUTE_FLAVOR="${OPENSTACK_COMPUTE_FLAVOR:-$(<"${SHARED_DIR}/OPENSTACK_COMPUTE_FLAVOR")}"
+
 LB_FIP_IP=$(<"${SHARED_DIR}"/LB_FIP_IP)
 INGRESS_FIP_IP=$(<"${SHARED_DIR}"/INGRESS_FIP_IP)
 
@@ -37,11 +39,11 @@ sshKey: |
   ${SSH_PUB_KEY}
 EOF
 else
-    echo "NO valid install config type specified. Please check  CONFIG_TYPE"
+    echo "No valid install config type specified. Please check CONFIG_TYPE"
     exit 1
 fi
 
 # Lets  check the syntax of yaml file by reading it.
 python -c 'import yaml;
 import sys;
-data = yaml.safe_load(open(sys.argv[1]))' ${SHARED_DIR}/install-config.yaml
+data = yaml.safe_load(open(sys.argv[1]))' "${SHARED_DIR}/install-config.yaml"

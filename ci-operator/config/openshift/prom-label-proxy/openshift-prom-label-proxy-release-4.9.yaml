@@ -24,10 +24,7 @@ base_images:
     namespace: ocp
     tag: rhel-8-golang-openshift-4.6
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.14
+  from_repository: true
 images:
 - dockerfile_path: Dockerfile.ocp
   from: base
@@ -37,6 +34,7 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
   to: prom-label-proxy
 promotion:
+  disabled: true
   name: "4.9"
   namespace: ocp
 resources:
@@ -60,6 +58,18 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
+- as: e2e-agnostic-cmo
+  steps:
+    cluster_profile: azure4
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: stable:cluster-monitoring-operator-src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-azure
 zz_generated_metadata:
   branch: release-4.9
   org: openshift

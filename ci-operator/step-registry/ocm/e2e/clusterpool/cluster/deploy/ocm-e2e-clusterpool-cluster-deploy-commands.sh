@@ -39,10 +39,19 @@ case "${PIPELINE_STAGE}" in
         ;;
 esac
 
+if [[ -z "$COMPONENT_IMAGE_REF" ]]; then
+    log "ERROR COMPONENT_IMAGE_REF is empty"
+    exit 1
+fi
+
+log "Using COMPONENT_IMAGE_REF: $COMPONENT_IMAGE_REF"
+
 cp "$MAKEFILE" ./Makefile || {
     log "ERROR Could not find make file: $MAKEFILE"
     exit 1
 }
+
+log "Using MAKEFILE: $MAKEFILE"
 
 # The actual clusters to deploy to.
 clusters=()
@@ -205,17 +214,6 @@ log "Using version: $version"
 snapshot="${version}-SNAPSHOT-${timestamp}"
 log "Using snapshot: $snapshot"
 
-# Get image name from manifest file
-git_repository="${REPO_OWNER}/${REPO_NAME}"
-image_name_query=".[] | select(.[\"git-repository\"]==\"${git_repository}\") | .[\"image-name\"]"
-IMAGE_NAME=$(jq -r "$image_name_query" "$manifest_file" 2> >(tee -a "$log_file"))
-if [[ -z "$IMAGE_NAME" ]]; then
-    log "ERROR Could not find image-name for $REPO_NAME in manifest $manifest_file"
-    log "Contents of manifest $manifest_file"
-    cat "$manifest_file" > >(tee -a "$log_file")
-    exit 1
-fi
-
 # Return to work directory.
 cd "$ocm_dir" || exit 1
 
@@ -247,7 +245,21 @@ if [[ -z "$COMPONENT_NAME" ]]; then
     fi
 fi
 
-log "Using COMPONENT_NAME $COMPONENT_NAME"
+log "Using COMPONENT_NAME: $COMPONENT_NAME"
+
+# Verify COMPONENT_NAME is in the manifest file
+image_name_query=".[] | select(.[\"image-name\"]==\"${COMPONENT_NAME}\")"
+IMAGE_NAME=$(jq -r "$image_name_query" "$snapshot_dir/$manifest_file" 2> >(tee -a "$log_file"))
+if [[ -z "$IMAGE_NAME" ]]; then
+    log "ERROR Could not find image $COMPONENT_NAME in manifest $manifest_file"
+    log "Contents of manifest $manifest_file"
+    cat "$manifest_file" > >(tee -a "$log_file")
+    exit 1
+fi
+IMAGE_NAME="$COMPONENT_NAME"
+log "Using IMAGE_NAME: $IMAGE_NAME"
+IMAGE_QUERY="quay.io/open-cluster-management/${IMAGE_NAME}@sha256:[[:alnum:]]+"
+log "Using IMAGE_QUERY: $IMAGE_QUERY"
 
 # Set up Quay credentials.
 log "Setting up Quay credentials."
@@ -260,7 +272,6 @@ QUAY_TOKEN=$(cat "$QUAY_TOKEN_FILE")
 # Set up additional deploy variables
 NAMESPACE=open-cluster-management
 OPERATOR_DIR=acm-operator
-IMAGE_QUERY="quay.io/open-cluster-management/${IMAGE_NAME}@sha256:[[:alnum:]]+"
 
 # Function to deploy ACM to a cluster.
 # The first parameter is the cluster name without the suffix.
@@ -522,7 +533,7 @@ deploy() {
 
     # Wait for ClusterServiceVersion
     logf "$_log" "Deploy $_cluster: Waiting up to 5 minutes for CSV"
-    echo "WAIT_CSV" > "${_status}"
+    echo "WAIT_CSV_1" > "${_status}"
     local _timeout=300 _elapsed='' _step=15
     local _csv_name='' _csv_status=''
     while true; do
@@ -564,7 +575,7 @@ deploy() {
                 logf "$_log" "ERROR Deploy $_cluster: Error message: $_msg"
                 logf "$_log" "ERROR Deploy $_cluster: Full CSV"
                 jq . csv.json > >(tee -a "$_log") 2>&1
-                echo "ERROR_WAIT_CSV" > "$_status"
+                echo "ERROR WAIT_CSV_1" > "$_status"
                 return 1
                 ;;
             Succeeded)
@@ -576,20 +587,20 @@ deploy() {
         # Check timeout
         if (( _elapsed > _timeout )); then
                 logf "$_log" "ERROR Deploy $_cluster: Timeout (${_timeout}s) waiting for CSV"
-                echo "ERROR WAIT_CSV" > "${_status}"
+                echo "ERROR WAIT_CSV_1" > "${_status}"
                 return 1
         fi
 
         logf "$_log" "WARN Deploy $_cluster: Current CSV status is $_csv_status. Will retry (${_elapsed}/${_timeout}s)"
     done
 
-    # Rewrite CSV. CSV contents are in csv.json
-    sed -E "s,$IMAGE_QUERY,$COMPONENT_IMAGE_REF," csv.json > csv_update.json 2> >(tee -a "$_log")
-    jq 'del(.metadata.uid) | del(.metadata.resourceVersion)' csv_update.json > csv_clean.json 2> >(tee -a "$_log")
-
     # Update CSV
     logf "$_log" "Deploy $_cluster: Updating CSV"
     echo "UPDATE_CSV" > "${_status}"
+    # Rewrite CSV. CSV contents are in csv.json
+    sed -E "s,$IMAGE_QUERY,$COMPONENT_IMAGE_REF," csv.json > csv_update.json 2> >(tee -a "$_log")
+    jq 'del(.metadata.uid) | del(.metadata.resourceVersion)' csv_update.json > csv_clean.json 2> >(tee -a "$_log")
+    # Replace CSV on cluster
     KUBECONFIG="$_kc" oc -n $NAMESPACE replace -f csv_clean.json > >(tee -a "$_log") 2>&1 || {
         logf "$_log" "ERROR Deploy $_cluster: Failed to update CSV."
         logf "$_log" "ERROR Deploy $_cluster: New CSV contents"
@@ -600,17 +611,13 @@ deploy() {
 
     # Wait for ClusterServiceVersion
     logf "$_log" "Deploy $_cluster: Waiting up to 5 minutes for CSV"
-    echo "WAIT_CSV" > "${_status}"
-    local _timeout=300 _elapsed='' _step=15
+    echo "WAIT_CSV_2" > "${_status}"
+    local _timeout=300 _elapsed=0 _step=15
     local _csv_name='' _csv_status=''
     while true; do
-        # Wait for _step seconds, except for first iteration.
-        if [[ -z "$_elapsed" ]]; then
-            _elapsed=0
-        else
-            sleep $_step
-            _elapsed=$(( _elapsed + _step ))
-        fi
+        # Wait for _step seconds, including first iteration
+        sleep $_step
+        _elapsed=$(( _elapsed + _step ))
 
         # Get CSV name
         KUBECONFIG="$_kc" oc -n $NAMESPACE get csv -o name > csv_name 2> >(tee -a "$_log") || {
@@ -642,7 +649,7 @@ deploy() {
                 logf "$_log" "ERROR Deploy $_cluster: Error message: $_msg"
                 logf "$_log" "ERROR Deploy $_cluster: Full CSV"
                 jq . csv.json > >(tee -a "$_log") 2>&1
-                echo "ERROR_WAIT_CSV" > "$_status"
+                echo "ERROR WAIT_CSV_2" > "$_status"
                 return 1
                 ;;
             Succeeded)
@@ -654,7 +661,7 @@ deploy() {
         # Check timeout
         if (( _elapsed > _timeout )); then
                 logf "$_log" "ERROR Deploy $_cluster: Timeout (${_timeout}s) waiting for CSV"
-                echo "ERROR WAIT_CSV" > "${_status}"
+                echo "ERROR WAIT_CSV_2" > "${_status}"
                 return 1
         fi
 
@@ -675,7 +682,7 @@ deploy() {
             _elapsed=$(( _elapsed + _step ))
         fi
 
-        KUBECONFIG="$_kc" oc -n $NAMESPACE apply -k multiclusterhub/ \
+        KUBECONFIG="$_kc" oc -n $NAMESPACE apply -k applied-mch/ \
             > >(tee -a "$_log") 2>&1 && {
             logf "$_log" "Deploy $_cluster: MCH YAML files applied after ${_elapsed}s"
             break
@@ -684,7 +691,7 @@ deploy() {
         # Check timeout
         if (( _elapsed > _timeout )); then
                 logf "$_log" "ERROR Deploy $_cluster: Timeout (${_timeout}s) waiting to apply MCH YAML files"
-                echo "ERROR APPLY_MCH" > "${_status}"
+                echo "ERROR WAIT_APPLY_MCH" > "${_status}"
                 return 1
         fi
 
@@ -822,14 +829,16 @@ err=0
 for cluster in "${clusters[@]}"; do
     status="${ARTIFACT_DIR}/deploy-$cluster.status"
     if [[ ! -r "$status" ]]; then
-        log "Cluster $cluster: No status file: $status"
+        log "Cluster $cluster: ERROR No status file: $status"
+        log "Cluster $cluster: See cluster deploy log file (deploy-$cluster.log) for more details."
         err=$(( err + 1 ))
         continue
     fi
     
     status=$(cat "$status")
     if [[ "$status" != OK ]]; then
-        log "Cluster $cluster: Failed: $status"
+        log "Cluster $cluster: ERROR Failed with status: $status"
+        log "Cluster $cluster: See cluster deploy log file (deploy-$cluster.log) for more details."
         err=$(( err + 1 ))
     fi
 done

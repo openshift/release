@@ -10,8 +10,6 @@ echo "************ baremetalds assisted operator ztp command ************"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
 
-git clone https://github.com/openshift/assisted-service
-cd assisted-service/
 tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/assisted-service.tar.gz"
 
 # Copy additional dev-script variables, if present
@@ -40,6 +38,8 @@ source /root/assisted-vars.conf
 
 cd /root/dev-scripts
 source common.sh
+source utils.sh
+source network.sh
 
 REPO_DIR="/home/assisted-service"
 if [ ! -d "${REPO_DIR}" ]; then

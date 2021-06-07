@@ -1,3 +1,8 @@
+base_images:
+  openstack-installer:
+    name: "4.8"
+    namespace: ocp
+    tag: openstack-installer
 releases:
   initial:
     candidate:
@@ -19,51 +24,63 @@ tests:
 - as: e2e-aws
   interval: 24h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-e2e-aws
 - as: e2e-aws-compact
   interval: 48h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
       SIZE_VARIANT: compact
     workflow: openshift-e2e-aws
 - as: e2e-aws-serial
   interval: 24h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-e2e-aws-serial
 - as: e2e-aws-compact-serial
   interval: 48h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
       SIZE_VARIANT: compact
     workflow: openshift-e2e-aws
 - as: e2e-aws-sdn-multitenant
   interval: 48h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-e2e-aws-sdn-multi
 - as: e2e-aws-upgrade
   interval: 24h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-aws
 - as: e2e-aws-compact-upgrade
   interval: 72h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
       SIZE_VARIANT: compact
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-aws
 - as: e2e-aws-calico
   interval: 72h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-e2e-aws-calico
 - as: e2e-azure
   interval: 24h
@@ -151,15 +168,18 @@ tests:
 - as: e2e-aws-upgrade-rollback
   cron: '@yearly'
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
       TEST_TYPE: upgrade-conformance
       TEST_UPGRADE_OPTIONS: abort-at=random
     workflow: openshift-upgrade-aws
 - as: e2e-aws-upgrade-single-node
   interval: 24h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-upgrade-aws-single-node
 - as: e2e-azure-upgrade-single-node
   interval: 24h
@@ -174,6 +194,20 @@ tests:
     - ref: hypershift-launch-wait-for-nodes
     - ref: openshift-e2e-test
     workflow: hypershift-launch-aws
+- as: e2e-openstack-parallel
+  cron: 0 2,10,18 * * *
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      TEST_SUITE: openshift/conformance/parallel
+    workflow: openshift-e2e-openstack-ipi
+- as: e2e-openstack-serial
+  cron: 0 6,14,22 * * *
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      TEST_SUITE: openshift/conformance/serial
+    workflow: openshift-e2e-openstack-ipi
 zz_generated_metadata:
   branch: master
   org: openshift

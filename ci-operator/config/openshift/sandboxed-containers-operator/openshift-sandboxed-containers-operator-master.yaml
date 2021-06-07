@@ -1,0 +1,48 @@
+base_images:
+  base:
+    name: "4.8"
+    namespace: ocp
+    tag: base
+  ocp_builder_golang-1.13:
+    name: builder
+    namespace: ocp
+    tag: golang-1.13
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- from: ocp_builder_golang-1.13
+  to: sandboxed-containers-operator
+operator:
+  bundles:
+  - as: sandboxed-containers-operator-bundle
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: registry-proxy.engineering.redhat.com/rh-osbs/openshift-sandboxed-containers-operator:1.0.0-5
+    with: pipeline:sandboxed-containers-operator
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.8"
+  namespace: ocp
+tests:
+- as: sandboxed-containers-operator-e2e
+  steps:
+    cluster_profile: azure4
+    dependencies:
+      OO_INDEX: ci-index-sandboxed-containers-operator-bundle
+    env:
+      OO_CHANNEL: "1.0"
+      OO_INSTALL_NAMESPACE: openshift-sandboxed-containers-operator
+      OO_PACKAGE: kata-operator
+      OO_TARGET_NAMESPACES: openshift-sandboxed-containers-operator
+    workflow: optional-operators-ci-azure
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: sandboxed-containers-operator

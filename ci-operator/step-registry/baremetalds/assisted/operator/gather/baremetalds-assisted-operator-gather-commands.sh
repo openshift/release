@@ -15,8 +15,6 @@ fi
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
 
-git clone https://github.com/openshift/assisted-service
-cd assisted-service/
 tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/assisted-service.tar.gz"
 
 function getlogs() {
@@ -33,7 +31,13 @@ timeout -s 9 30m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << "EOF"
 set -xeo pipefail
 
 # Get sosreport including sar data
-sos report --case-id "${HOSTNAME}" --batch -o container_log,filesys,kvm,libvirt,logs,networkmanager,podman,processor,rpm,sar,virsh,yum --tmp-dir /tmp/artifacts
+sos report --batch --tmp-dir /tmp/artifacts \
+  -o container_log,filesys,kvm,libvirt,logs,networkmanager,networking,podman,processor,rpm,sar,virsh,yum \
+  -k podman.all -k podman.logs
+
+# TODO: remove when https://github.com/sosreport/sos/pull/2594 is available
+cp -r /var/lib/libvirt/dnsmasq /tmp/artifacts/libvirt-dnsmasq
+
 cp -R ./reports /tmp/artifacts || true
 
 REPO_DIR="/home/assisted-service"

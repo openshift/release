@@ -1,32 +1,8 @@
 base_images:
-  base:
-    name: ubi
-    namespace: ocp
-    tag: "8"
-  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.15-openshift-4.6
-  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.15-openshift-4.7
-  ocp_builder_rhel-8-golang-1.15-openshift-4.8:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.15-openshift-4.8
   ocp_builder_rhel-8-golang-1.16-openshift-4.8:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.16-openshift-4.8
-  ocp_builder_rhel-8-golang-openshift-4.6:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-openshift-4.6
-  ocp_builder_rhel-8-golang-openshift-4.7:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-openshift-4.7
 base_rpm_images:
   rpm:
     name: ubi
@@ -54,7 +30,6 @@ images:
   from: rpm-os
   to: kuryr-controller
 promotion:
-  disabled: true
   name: 4.8-priv
   namespace: ocp-private
 raw_steps:
@@ -83,6 +58,12 @@ tests:
   commands: HOME=`dirname .` tox -e pep8
   container:
     from: kuryr-tester
+- as: e2e-openstack-kuryr
+  steps:
+    cluster_profile: openstack-kuryr
+    env:
+      NETWORK_TYPE: Kuryr
+    workflow: openshift-e2e-openstack-minimal
 zz_generated_metadata:
   branch: release-4.8
   org: openshift-priv

@@ -32,10 +32,7 @@ base_images:
     namespace: openshift
     tag: golang-1.12
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.12
+  from_repository: true
 canonical_go_repository: github.com/openshift/mdns-publisher
 images:
 - dockerfile_path: Dockerfile
@@ -46,6 +43,7 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
   to: mdns-publisher
 promotion:
+  disabled: true
   name: 4.9-priv
   namespace: ocp-private
 resources:
@@ -69,14 +67,6 @@ tests:
   commands: make test
   container:
     from: src
-- as: e2e-metal-ipi
-  steps:
-    cluster_profile: packet
-    workflow: baremetalds-e2e
-- as: e2e-openstack-ipi
-  steps:
-    cluster_profile: openstack
-    workflow: openshift-e2e-openstack-ipi
 zz_generated_metadata:
   branch: release-4.9
   org: openshift-priv

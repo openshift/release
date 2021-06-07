@@ -43,6 +43,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.15-openshift-4.8
+  ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.16-openshift-4.9
   ocp_builder_rhel-8-golang-openshift-4.6:
     name: builder
     namespace: ocp
@@ -52,20 +56,18 @@ base_images:
     namespace: openshift
     tag: golang-1.15
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.15
+  from_repository: true
 canonical_go_repository: github.com/openshift/machine-config-operator
 images:
 - dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.15-openshift-4.8:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
   to: machine-config-operator
 promotion:
+  disabled: true
   name: 4.9-priv
   namespace: ocp-private
 resources:
@@ -222,6 +224,18 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-gcp-single-node
+- as: e2e-openstack
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      TEST_SUITE: experimental/reliability/minimal
+    workflow: openshift-e2e-openstack-ipi
+- as: e2e-openstack-parallel
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      TEST_SUITE: openshift/conformance/parallel
+    workflow: openshift-e2e-openstack-ipi
 zz_generated_metadata:
   branch: release-4.9
   org: openshift-priv

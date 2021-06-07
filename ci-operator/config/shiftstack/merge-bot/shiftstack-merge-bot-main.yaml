@@ -1,0 +1,91 @@
+build_root:
+  project_image:
+    dockerfile_literal: |-
+      FROM registry.access.redhat.com/ubi8/python-39
+
+      # Prow expects to be able to check out a repo under /go
+      USER 0:0
+      WORKDIR /go
+      RUN chown 1001:1001 .
+
+      USER 1001:1001
+images:
+- dockerfile_path: Containerfile
+  to: merge-bot
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: make install-all-deps
+tests:
+- as: lint
+  commands: make lint
+  container:
+    from: test-bin
+- as: unittests
+  commands: make unittests
+  container:
+    from: test-bin
+- as: cloud-provider-openstack
+  cron: 0 12 * * Mon,Thu
+  steps:
+    test:
+    - as: cloud-provider-openstack
+      commands: |
+        merge-bot --source https://github.com/kubernetes/cloud-provider-openstack:master \
+                  --dest openshift/cloud-provider-openstack:master \
+                  --merge shiftstack/cloud-provider-openstack:merge-bot-master \
+                  --update-go-modules \
+                  --bot-name shiftstack-merge-bot --bot-email shiftstack-merge-bot@redhat.com \
+                  --github-app-key /secrets/merge-bot/github_private_key \
+                  --github-cloner-key /secrets/merge-bot/github_cloner_private_key \
+                  --slack-webhook /secrets/slack/hook_forum-shiftstack
+      credentials:
+      - mount_path: /secrets/merge-bot
+        name: shiftstack-merge-bot
+        namespace: test-credentials
+      - mount_path: /secrets/slack
+        name: slack-hook-forum-shiftstack
+        namespace: test-credentials
+      from: merge-bot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: csi-driver-nfs
+  cron: 0 12 * * Mon,Thu
+  steps:
+    test:
+    - as: csi-driver-nfs
+      commands: |
+        merge-bot --source https://github.com/kubernetes-csi/csi-driver-nfs:master \
+                  --dest openshift/csi-driver-nfs:master \
+                  --merge shiftstack/csi-driver-nfs:merge-bot-master \
+                  --update-go-modules \
+                  --bot-name shiftstack-merge-bot --bot-email shiftstack-merge-bot@redhat.com \
+                  --github-app-key /secrets/merge-bot/github_private_key \
+                  --github-cloner-key /secrets/merge-bot/github_cloner_private_key \
+                  --slack-webhook /secrets/slack/hook_forum-shiftstack
+      credentials:
+      - mount_path: /secrets/merge-bot
+        name: shiftstack-merge-bot
+        namespace: test-credentials
+      - mount_path: /secrets/slack
+        name: slack-hook-forum-shiftstack
+        namespace: test-credentials
+      from: merge-bot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+zz_generated_metadata:
+  branch: main
+  org: shiftstack
+  repo: merge-bot

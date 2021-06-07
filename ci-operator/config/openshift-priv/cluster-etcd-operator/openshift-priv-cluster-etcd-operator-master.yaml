@@ -4,7 +4,7 @@ base_images:
     namespace: ocp-kni
     tag: assisted-test-infra
   base:
-    name: 4.8-priv
+    name: 4.9-priv
     namespace: ocp-private
     tag: base
   dev-scripts:
@@ -31,6 +31,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.16-openshift-4.8
+  ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.16-openshift-4.9
   ocp_builder_rhel-8-golang-openshift-4.6:
     name: builder
     namespace: ocp
@@ -47,12 +51,12 @@ images:
 - dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.8:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
   to: cluster-etcd-operator
 promotion:
-  name: 4.8-priv
+  name: 4.9-priv
   namespace: ocp-private
 resources:
   '*':
@@ -60,7 +64,7 @@ resources:
       cpu: "3"
       memory: 1Gi
 tag_specification:
-  name: 4.8-priv
+  name: 4.9-priv
   namespace: ocp-private
 test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
 tests:
@@ -85,8 +89,8 @@ tests:
     workflow: openshift-e2e-aws-loki
 - as: e2e-agnostic-upgrade
   steps:
-    cluster_profile: aws
-    workflow: openshift-upgrade-aws
+    cluster_profile: gcp
+    workflow: openshift-upgrade-gcp
 - as: e2e-aws-disruptive
   steps:
     cluster_profile: aws

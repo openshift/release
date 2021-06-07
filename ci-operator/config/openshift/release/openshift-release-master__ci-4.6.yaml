@@ -1,3 +1,8 @@
+base_images:
+  openstack-installer:
+    name: "4.6"
+    namespace: ocp
+    tag: openstack-installer
 releases:
   initial:
     candidate:
@@ -59,6 +64,20 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
+- as: e2e-openstack-parallel
+  cron: 0 0,8,16 * * *
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      TEST_SUITE: openshift/conformance/parallel
+    workflow: openshift-e2e-openstack-ipi
+- as: e2e-openstack-serial
+  cron: 0 4,12,20 * * *
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      TEST_SUITE: openshift/conformance/serial
+    workflow: openshift-e2e-openstack-ipi
 zz_generated_metadata:
   branch: master
   org: openshift

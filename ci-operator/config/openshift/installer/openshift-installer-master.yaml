@@ -4,7 +4,7 @@ base_images:
     namespace: ocp-kni
     tag: assisted-test-infra
   base:
-    name: "4.8"
+    name: "4.9"
     namespace: ocp
     tag: base
   dev-scripts:
@@ -16,11 +16,11 @@ base_images:
     namespace: ocp
     tag: cli
   ocp_4.6_cli:
-    name: "4.8"
+    name: "4.9"
     namespace: ocp
     tag: cli
   ocp_4.8_cli:
-    name: "4.8"
+    name: "4.9"
     namespace: ocp
     tag: cli
   ocp_builder_golang-1.13:
@@ -47,6 +47,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.16-openshift-4.8
+  ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.16-openshift-4.9
   ocp_builder_rhel-8-golang-openshift-4.6:
     name: builder
     namespace: ocp
@@ -76,14 +80,11 @@ base_images:
     namespace: origin
     tag: cli
   rhel-7:
-    name: "4.8"
+    name: "4.9"
     namespace: ocp
     tag: base-7
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.14
+  from_repository: true
 images:
 - dockerfile_path: images/installer/Dockerfile.ci
   from: base
@@ -98,6 +99,9 @@ images:
     ocp_builder_rhel-8-golang-1.15-openshift-4.8:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
+    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
   to: installer-artifacts
 - dockerfile_path: images/libvirt/Dockerfile.ci
   from: base
@@ -132,9 +136,9 @@ images:
     ocp_builder_rhel-8-golang-1.15-openshift-4.8:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
-    ocp_builder_rhel-8-golang-1.16-openshift-4.8:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
   to: baremetal-installer
 - dockerfile_path: images/installer/Dockerfile.ci
   from: base
@@ -144,7 +148,7 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
   to: ovirt-installer
 promotion:
-  name: "4.8"
+  name: "4.9"
   namespace: ocp
 resources:
   '*':
@@ -188,7 +192,7 @@ resources:
       cpu: "3"
       memory: 5Gi
 tag_specification:
-  name: "4.8"
+  name: "4.9"
   namespace: ocp
 tests:
 - as: unit
@@ -308,9 +312,17 @@ tests:
   steps:
     cluster_profile: packet
     workflow: baremetalds-e2e-virtualmedia
-- as: e2e-openstack-ipi
+- as: e2e-openstack
   steps:
     cluster_profile: openstack-vexxhost
+    env:
+      TEST_SUITE: experimental/reliability/minimal
+    workflow: openshift-e2e-openstack-ipi
+- as: e2e-openstack-parallel
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
 - as: openstack-manifests
   steps:

@@ -7,17 +7,20 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.15
+    tag: golang-1.16
 images:
 - dockerfile_path: build/Dockerfile
   from: os
   to: ci-artifacts
+promotion:
+  name: master
+  namespace: openshift-psap
 releases:
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.7"
+      version: "4.8"
 resources:
   '*':
     limits:
@@ -57,6 +60,23 @@ tests:
     - as: presubmit-master
       cli: latest
       commands: run gpu-operator test_master_branch
+      credentials:
+      - mount_path: /var/run/psap-entitlement-secret
+        name: psap-entitlement-secret
+        namespace: test-credentials
+      from: ci-artifacts
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+    workflow: ipi-aws
+- as: gpu-operator-commit
+  steps:
+    cluster_profile: aws
+    test:
+    - as: presubmit-commit
+      cli: latest
+      commands: run gpu-operator test_commit
       credentials:
       - mount_path: /var/run/psap-entitlement-secret
         name: psap-entitlement-secret

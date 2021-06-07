@@ -7,13 +7,12 @@ base_images:
     name: release
     namespace: openshift
     tag: golang-1.16
-binary_build_commands: make
+binary_build_commands: make build
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: golang-1.16
-canonical_go_repository: openshift.io/hypershift
 images:
 - from: base
   inputs:
@@ -26,11 +25,10 @@ promotion:
   tag: latest
 releases:
   latest:
-    prerelease:
+    candidate:
       product: ocp
-      version_bounds:
-        lower: 4.8.0-fc.0
-        upper: 4.8.0-fc.2
+      stream: nightly
+      version: "4.8"
 resources:
   '*':
     limits:
@@ -38,6 +36,7 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+test_binary_build_commands: make e2e
 tests:
 - as: verify
   commands: make verify
@@ -53,11 +52,11 @@ tests:
     test:
     - as: install-hypershift
       cli: latest
-      commands: go run . install --hypershift-image "${HYPERSHIFT_RELEASE_LATEST}"
+      commands: bin/hypershift install --hypershift-image "${HYPERSHIFT_RELEASE_LATEST}"
       dependencies:
       - env: HYPERSHIFT_RELEASE_LATEST
         name: hypershift
-      from: src
+      from: bin
       grace_period: 1m0s
       resources:
         requests:
@@ -66,18 +65,18 @@ tests:
     - as: test-e2e
       cli: latest
       commands: |-
-        make e2e && \
         bin/test-e2e \
           -test.v \
           -test.timeout 0 \
           --e2e.aws-credentials-file ${CLUSTER_PROFILE_DIR}/.awscred \
-          --e2e.pull-secret-file ${CLUSTER_PROFILE_DIR}/pull-secret
-      from: src
+          --e2e.pull-secret-file ${CLUSTER_PROFILE_DIR}/pull-secret \
+          --e2e.latest-release-image ${RELEASE_IMAGE_LATEST}
+      from: test-bin
       grace_period: 15m0s
       resources:
         requests:
           cpu: 100m
-      timeout: 40m0s
+      timeout: 2h0m0s
     workflow: ipi-aws
 zz_generated_metadata:
   branch: main

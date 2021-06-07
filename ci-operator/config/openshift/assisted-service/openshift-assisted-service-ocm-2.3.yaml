@@ -11,6 +11,10 @@ base_images:
     name: assisted
     namespace: ocp-kni
     tag: assisted-installer-controller
+  assisted-service-scripts:
+    name: assisted
+    namespace: ocp-kni
+    tag: assisted-service-scripts
   assisted-test-infra:
     name: assisted-test
     namespace: ocp-kni
@@ -82,47 +86,63 @@ tests:
   container:
     from: test-bin
 - as: subsystem-aws
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: dpp
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.8"
   steps:
-    cluster_profile: aws
     test:
     - as: subsystem-deploy-and-run
       cli: latest
       commands: |
         export BUILD_TYPE=CI
         export REPORTS=${ARTIFACT_DIR}
-        export SERVICE=$(echo "${IMAGE_FORMAT}" | component=assisted-service envsubst)
         export TARGET=oc
 
         make deploy-on-openshift-ci
         make test
+      dependencies:
+      - env: SERVICE
+        name: assisted-service
       from: test-bin
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: ipi-aws
+    workflow: generic-claim
 - as: subsystem-kubeapi-aws
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: dpp
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.8"
   steps:
-    cluster_profile: aws
     test:
     - as: subsystem-deploy-and-run
       cli: latest
       commands: |
         export BUILD_TYPE=CI
         export REPORTS=${ARTIFACT_DIR}
-        export SERVICE=$(echo "${IMAGE_FORMAT}" | component=assisted-service envsubst)
         export TARGET=oc
         export GENERATE_CRD=false
 
         make deploy-on-openshift-ci
         make enable-kube-api-for-subsystem
         make test-kube-api
+      dependencies:
+      - env: SERVICE
+        name: assisted-service
       from: test-bin
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: ipi-aws
+    workflow: generic-claim
 - as: e2e-metal-assisted-operator-disconnected
   steps:
     cluster_profile: packet

@@ -1,10 +1,10 @@
 base_images:
   base:
-    name: "4.8"
+    name: "4.9"
     namespace: ocp
     tag: base
   operator-registry:
-    name: "4.8"
+    name: "4.9"
     namespace: ocp
     tag: operator-registry
   os:
@@ -25,7 +25,7 @@ images:
   from: base
   to: dpdk
 promotion:
-  name: "4.8"
+  name: "4.9"
   namespace: ocp-kni
 resources:
   '*':
@@ -33,7 +33,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: "4.8"
+  name: "4.9"
   namespace: ocp
 tests:
 - as: ci
@@ -103,6 +103,21 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: openshift-e2e-gcp
+- as: e2e-bastion-periodic
+  cluster: build01
+  cron: 0 0 * * *
+  steps:
+    test:
+    - as: e2e-bastion-periodic
+      commands: KUBECONFIG=$SHARED_DIR/kubeconfig FEATURES_ENVIRONMENT="typical-baremetal"
+        FEATURES="performance xt_u32 vrf sctp ovn" make functests-on-ci
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 4h0m0s
+    workflow: telco-bastion
 zz_generated_metadata:
   branch: master
   org: openshift-kni

@@ -145,7 +145,6 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
   to: ovirt-installer
 promotion:
-  disabled: true
   name: 4.8-priv
   namespace: ocp-private
 resources:
@@ -310,9 +309,17 @@ tests:
   steps:
     cluster_profile: packet
     workflow: baremetalds-e2e-virtualmedia
-- as: e2e-openstack-ipi
+- as: e2e-openstack
   steps:
     cluster_profile: openstack-vexxhost
+    env:
+      TEST_SUITE: experimental/reliability/minimal
+    workflow: openshift-e2e-openstack-ipi
+- as: e2e-openstack-parallel
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
 - as: openstack-manifests
   steps:

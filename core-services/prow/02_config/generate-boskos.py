@@ -14,7 +14,7 @@ CONFIG = {
     'aws-2-quota-slice': {
         'us-east-1': 10,
         'us-east-2': 10,
-        'us-west-1': 10,
+        'us-west-1': 35,
         'us-west-2': 10,
     },
     'azure4-quota-slice': {
@@ -24,10 +24,10 @@ CONFIG = {
         'westus': 8
     },
     'gcp-quota-slice': {
-        'us-east1': 70,
+        'us-central1': 70,
     },
     'gcp-openshift-gce-devel-ci-2-quota-slice': {
-        'us-east1': 70,
+        'us-central1': 70,
     },
     'libvirt-s390x-quota-slice': {},
     'libvirt-ppc64le-quota-slice': {},
@@ -44,6 +44,9 @@ CONFIG = {
     },
     'openstack-kuryr-quota-slice': {
         'default': 3,
+    },
+    'openstack-vh-mecha-quota-slice': {
+        'default': 6,
     },
     'openstack-ppc64le-quota-slice': {},
     'ovirt-quota-slice': {},

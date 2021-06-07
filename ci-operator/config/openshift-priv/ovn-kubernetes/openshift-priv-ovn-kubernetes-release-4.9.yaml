@@ -19,6 +19,10 @@ base_images:
     name: 4.9-priv
     namespace: ocp-private
     tag: cli
+  ocp_4.9_cli:
+    name: 4.9-priv
+    namespace: ocp-private
+    tag: cli
   ocp_builder_rhel-8-golang-1.15-openshift-4.6:
     name: builder
     namespace: ocp
@@ -31,27 +35,29 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.15-openshift-4.8
+  ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.16-openshift-4.9
   ocp_builder_rhel-8-golang-openshift-4.6:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-openshift-4.6
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.13
+  from_repository: true
 canonical_go_repository: github.com/openshift/ovn-kubernetes
 images:
 - from: base
   inputs:
-    ocp_4.8_cli:
+    ocp_4.9_cli:
       as:
-      - registry.ci.openshift.org/ocp/4.8:cli
-    ocp_builder_rhel-8-golang-1.15-openshift-4.8:
+      - registry.ci.openshift.org/ocp/4.9:cli
+    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
   to: ovn-kubernetes
 promotion:
+  disabled: true
   name: 4.9-priv
   namespace: ocp-private
 resources:
@@ -112,11 +118,11 @@ tests:
     workflow: openshift-e2e-azure-ovn
 - as: e2e-gcp-ovn
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-openshift-gce-devel-ci-2
     workflow: openshift-e2e-gcp-ovn
 - as: e2e-gcp-ovn-upgrade
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-openshift-gce-devel-ci-2
     workflow: openshift-upgrade-gcp-ovn
 - as: e2e-vsphere-windows
   steps:

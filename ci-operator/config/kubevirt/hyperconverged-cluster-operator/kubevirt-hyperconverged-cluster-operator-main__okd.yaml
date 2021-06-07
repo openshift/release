@@ -42,6 +42,8 @@ images:
       - destination_dir: .
         source_path: /go/bin/hyperconverged-cluster-webhook
   to: hyperconverged-cluster-webhook
+- dockerfile_path: build/Dockerfile.functest
+  to: hyperconverged-cluster-functest
 - dockerfile_path: deploy/Dockerfile.registry.intermediate
   from: operator-registry
   to: operator-registry-base
@@ -100,9 +102,9 @@ tag_specification:
   name: "4.8"
   namespace: origin
 tests:
-- as: hco-e2e-image-index-azure
+- as: hco-e2e-image-index-gcp
   steps:
-    cluster_profile: azure4
+    cluster_profile: gcp
     env:
       OO_CHANNEL: 1.5.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
@@ -118,7 +120,7 @@ tests:
         requests:
           cpu: 500m
           memory: 1Gi
-    workflow: optional-operators-ci-azure
+    workflow: optional-operators-ci-gcp
 - as: hco-e2e-image-index-aws
   steps:
     cluster_profile: aws
@@ -157,9 +159,9 @@ tests:
           cpu: 500m
           memory: 1Gi
     workflow: optional-operators-ci-aws
-- as: hco-e2e-upgrade-index-azure
+- as: hco-e2e-upgrade-index-gcp
   steps:
-    cluster_profile: azure4
+    cluster_profile: gcp
     dependencies:
       OO_INDEX: ci-index-hco-upgrade-bundle
     env:
@@ -168,14 +170,14 @@ tests:
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
     test:
-    - as: e2e-index-image-upgrade-azure
+    - as: e2e-index-image-upgrade-gcp
       commands: RELEASE_DELTA=1 make upgrade-test-index-image
       from: hco-oc-bin-image
       resources:
         requests:
           cpu: 500m
           memory: 1Gi
-    workflow: optional-operators-ci-azure
+    workflow: optional-operators-ci-gcp
 zz_generated_metadata:
   branch: main
   org: kubevirt

@@ -33,9 +33,15 @@ cd /home/assisted
 source /root/config
 
 # Get sosreport including sar data
-sos report --case-id "\${HOSTNAME}" --batch -o container_log,filesys,kvm,libvirt,logs,networkmanager,podman,processor,rpm,sar,virsh,yum --tmp-dir /tmp/artifacts
+sos report --batch --tmp-dir /tmp/artifacts \
+  -o container_log,filesys,kvm,libvirt,logs,networkmanager,networking,podman,processor,rpm,sar,virsh,yum \
+  -k podman.all -k podman.logs
+
+# TODO: remove when https://github.com/sosreport/sos/pull/2594 is available
+cp -r /var/lib/libvirt/dnsmasq /tmp/artifacts/libvirt-dnsmasq
 
 cp -R ./reports /tmp/artifacts || true
+find -name '*.log' -exec cp -v {} /tmp/artifacts \; || true
 
 # Get assisted logs
 export LOGS_DEST=/tmp/artifacts
@@ -55,6 +61,11 @@ if [ "${GATHER_ALL_CLUSTERS}" == "true" ]; then
 fi
 make download_cluster_logs
 
-KUBECTL="kubectl --kubeconfig=\${KUBECONFIG}" LOGS_DEST=/tmp/artifacts/new_cluster make download_service_logs
+for kubeconfig in \$(find \${KUBECONFIG} -type f); do
+  export KUBECTL="kubectl --kubeconfig=\${kubeconfig}"
+  name=\$(basename \${kubeconfig})
+  export LOGS_DEST=/tmp/artifacts/new_cluster_\${name}
+  make download_service_logs
+done
 
 EOF

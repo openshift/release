@@ -346,6 +346,7 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-machine-config-operator-release-4.8-e2e-aws-serial
+    optional: true
     rerun_command: /test e2e-aws-serial
     spec:
       containers:
@@ -802,7 +803,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-gcp-op,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - release-4.8
     cluster: build01
@@ -814,7 +815,9 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-machine-config-operator-release-4.8-e2e-gcp-op-single-node
+    optional: true
     rerun_command: /test e2e-gcp-op-single-node
+    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
     spec:
       containers:
       - args:
@@ -870,7 +873,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-gcp-op-single-node,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - release-4.8
     cluster: build01
@@ -882,6 +885,7 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-machine-config-operator-release-4.8-e2e-gcp-single-node
+    optional: true
     rerun_command: /test e2e-gcp-single-node
     spec:
       containers:
@@ -1290,6 +1294,7 @@ presubmits:
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-machine-config-operator-release-4.8-e2e-openstack
     optional: true
@@ -1298,22 +1303,13 @@ presubmits:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
-        - --repo=machine-config-operator
+        - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/usr/local/e2e-openstack-cluster-profile
         - --target=e2e-openstack
-        - --template=/usr/local/e2e-openstack
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: openstack
-        - name: JOB_NAME_SAFE
-          value: e2e-openstack
-        - name: TEST_COMMAND
-          value: run-minimal-tests
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -1329,11 +1325,11 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-openstack
-          name: job-definition
-          subPath: cluster-launch-installer-openstack-e2e.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
@@ -1347,14 +1343,81 @@ presubmits:
         projected:
           sources:
           - secret:
-              name: cluster-secrets-openstack
-      - configMap:
-          name: prow-job-cluster-launch-installer-openstack-e2e
-        name: job-definition
+              name: cluster-secrets-openstack-vexxhost
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-openstack,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - release-4.8
+    cluster: build01
+    context: ci/prow/e2e-openstack-parallel
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-machine-config-operator-release-4.8-e2e-openstack-parallel
+    optional: true
+    rerun_command: /test e2e-openstack-parallel
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-openstack-parallel-cluster-profile
+        - --target=e2e-openstack-parallel
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-openstack-parallel-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-openstack-vexxhost
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-openstack-parallel,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -1781,6 +1844,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
+        - --target=[release:latest]
         command:
         - ci-operator
         image: ci-operator:latest

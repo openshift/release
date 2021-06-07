@@ -323,6 +323,15 @@ spec:
       for: 5m
       labels:
         severity: critical
+    - alert: ghproxy-90-inode-percent
+      annotations:
+        message: '{{ $labels.token_hash }} uses 90% of the available inodes. Check
+          <ghcache_disk_inode_used / ghcache_disk_inode_total * 100 |prometheus>'
+      expr: |
+        ghcache_disk_inode_used / ghcache_disk_inode_total * 100 > 90
+      for: 5m
+      labels:
+        severity: critical
   - name: sinker-missing
     rules:
     - alert: SinkerNotRemovingPods
@@ -488,9 +497,10 @@ spec:
         severity: critical
     - alert: prow-job-backlog-growing
       annotations:
-        message: The number of Prow jobs with the triggered state has been increasing
-          for the past hour.
-      expr: sum(rate(prowjob_state_transitions{state="triggered"}[5m]))>0
+        message: The number of the triggered Prow jobs that have not yet been running
+          has been increasing for the past hour.
+      expr: sum(rate(prowjob_state_transitions{state="triggered"}[5m])) - sum(rate(prowjob_state_transitions{state!="triggered"}[5m]))
+        > 0
       for: 60m
       labels:
         severity: critical
@@ -505,6 +515,25 @@ spec:
         message: '{{ $labels.deployment }} has been down for 5 minutes.'
       expr: kube_deployment_status_replicas_unavailable{namespace="ci", deployment=~"release-controller.*"}
         >= 1
+      for: 5m
+      labels:
+        severity: critical
+  - name: abnormal Tide sync durations
+    rules:
+    - alert: abnormal Tide controler sync duration
+      annotations:
+        message: The Tide sync duration is abnormal high (>45 seconds). Check <https://prometheus-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/graph?g0.range_input=1h&g0.expr=max(syncdur%20and%20(changes(syncdur%5B1h%5D)%20%3E%200))%20%3E%2045&g0.tab=0|Prometheus>
+      expr: |
+        max(syncdur and (changes(syncdur[1h]) > 0)) > 45
+      for: 5m
+      labels:
+        severity: critical
+    - alert: abnormal Tide status controler sync duration
+      annotations:
+        message: The Tide status sync duration is abnormal high (>30 seconds). Check
+          <https://prometheus-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/graph?g0.range_input=1h&g0.expr=max(statusupdatedur%20and%20(changes(statusupdatedur%5B1h%5D)%20%3E%200))%20%3E%2030&g0.tab=1|Prometheus>
+      expr: |
+        max(statusupdatedur and (changes(statusupdatedur[1h]) > 0)) > 30
       for: 5m
       labels:
         severity: critical

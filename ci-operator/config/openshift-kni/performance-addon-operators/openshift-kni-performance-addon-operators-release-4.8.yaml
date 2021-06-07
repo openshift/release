@@ -27,9 +27,16 @@ images:
       paths:
       - destination_dir: .
         source_path: /go/src/github.com/openshift-kni/performance-addon-operators/build/_output/bin/performance-addon-operators
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift-kni/performance-addon-operators/build/_output/bin/performance-profile-creator
   to: performance-addon-operator
 - dockerfile_path: openshift-ci/Dockerfile.must-gather
   from: os-min8
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift-kni/performance-addon-operators/build/_output/bin/gather-sysinfo
   to: performance-addon-operator-must-gather
 - dockerfile_path: openshift-ci/Dockerfile.index-gen.ci
   from: opm-builder
@@ -81,6 +88,14 @@ tag_specification:
 tests:
 - as: ci
   commands: make ci-job
+  container:
+    from: src
+- as: ci-tools
+  commands: make ci-tools-job
+  container:
+    from: src
+- as: ci-ppc
+  commands: make perf-profile-creator-tests
   container:
     from: src
 - as: e2e-gcp

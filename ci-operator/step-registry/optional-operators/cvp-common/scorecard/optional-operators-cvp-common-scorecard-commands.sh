@@ -5,10 +5,6 @@ set -o errexit
 set -o pipefail
 set -x
 
-# This value serves as a default when the parameters are not set, which should
-# only happen in rehearsals. Production jobs should always set the OO_* variable.
-REHEARSAL_BUNDLE="brew.registry.redhat.io/rh-osbs-stage/e2e-e2e-test-operator-bundle-container:8.0-3"
-OO_BUNDLE="${OO_BUNDLE:-$REHEARSAL_BUNDLE}"
 OPENSHIFT_AUTH="${OPENSHIFT_AUTH:-/var/run/brew-pullsecret/.dockerconfigjson}"
 SCORECARD_CONFIG="${SCORECARD_CONFIG:-/tmp/config/scorecard-basic-config.yml}"
 
@@ -21,12 +17,12 @@ NAMESPACE=$(grep "install_namespace:" "${SHARED_DIR}"/oo_deployment_details.yaml
 pushd "${ARTIFACT_DIR}"
 OPERATOR_DIR="test-operator-basic"
 
-echo "Starting the basic operator-sdk scorecard test for ${OO_BUNDLE}"
+echo "Starting the basic operator-sdk scorecard test for ${BUNDLE_IMAGE}"
 
 echo "Extracting the operator bundle image into the operator directory"
 mkdir -p "${OPERATOR_DIR}"
 pushd "${OPERATOR_DIR}"
-oc image extract "${OO_BUNDLE}" --confirm -a "${OPENSHIFT_AUTH}"
+oc image extract "${BUNDLE_IMAGE}" --confirm -a "${OPENSHIFT_AUTH}"
 chmod -R go+r ./
 popd
 echo "Extracted the following bundle data:"
