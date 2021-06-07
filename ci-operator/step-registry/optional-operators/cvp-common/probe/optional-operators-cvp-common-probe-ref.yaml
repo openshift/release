@@ -10,6 +10,23 @@ ref:
   - namespace: test-credentials
     name: brew-registry-pullsecret
     mount_path: /var/run/brew-pullsecret
+  env:
+  - name: BUNDLE_IMAGE
+    documentation: The pullspec of the bundle image.
+  - name: INDEX_IMAGE
+    documentation: The pullspec of an index image. Must contain bundle referenced by `BUNDLE_IMAGE`.
+  - name: PACKAGE
+    documentation: The name of the operator package to be installed. Must be present in the index image referenced by `INDEX_IMAGE`.
+  - name: CHANNEL
+    documentation: The name of the operator channel to track.
+  - name: INSTALL_NAMESPACE
+    documentation: The namespace into which the operator and catalog shall be installed. Special value `!create` means that a new namespace would be created.
+  - name: TARGET_NAMESPACES
+    documentation: A comma-separated list of namespaces the operator will target. Special, value `!all` means that all namespaces would be targeted. The special value `!install` would set the target namespace to the operator's installation namespace.
   documentation: |-
     This steps serves as an frequently-executed probe that verifies OpenShift CI
-    generally works and certain externally observed behavior does not change.
+    generally works and certain externally observed behavior does not change. The
+    probe will attempt to access bundle and index images (testing that OpenShift CI
+    can access internal images via authenticated proxy) and then save values of
+    all parameters to a well-known artifact (so it can be verified that parameter
+    passing works and artifact placement did not change).
