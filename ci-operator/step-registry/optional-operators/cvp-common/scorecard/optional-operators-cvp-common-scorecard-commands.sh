@@ -18,7 +18,8 @@ SCORECARD_CONFIG="${SCORECARD_CONFIG:-/tmp/config/scorecard-basic-config.yml}"
 
 NAMESPACE=$(grep "install_namespace:" "${SHARED_DIR}"/oo_deployment_details.yaml | cut -d ':' -f2 | xargs)
 
-OPERATOR_DIR="${ARTIFACT_DIR}/test-operator-basic"
+pushd "${ARTIFACT_DIR}"
+OPERATOR_DIR="test-operator-basic"
 
 echo "Starting the basic operator-sdk scorecard test for ${OO_BUNDLE}"
 
@@ -26,6 +27,7 @@ echo "Extracting the operator bundle image into the operator directory"
 mkdir -p "${OPERATOR_DIR}"
 pushd "${OPERATOR_DIR}"
 oc image extract "${OO_BUNDLE}" --confirm -a "${OPENSHIFT_AUTH}"
+chmod -R go+r ./
 popd
 echo "Extracted the following bundle data:"
 tree "${OPERATOR_DIR}"
