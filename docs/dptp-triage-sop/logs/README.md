@@ -19,6 +19,5 @@ $ docs/dptp-triage-sop/logs/fetch.sh warnings
 You'll need the AWS CLI, Python 3 and the `tabulate` Python module. On Fedora:
 
 ```
-$ sudo dnf install awscli python3 pip
-$ pip install tabulate
+$ sudo dnf install awscli python3 python3-tabulate
 ```
