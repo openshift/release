@@ -5,6 +5,7 @@ set -o errexit
 set -o pipefail
 
 
+CLUSTER_TYPE="${CLUSTER_TYPE_OVERRIDE:-$CLUSTER_TYPE}"
 
 # We have to truncate cluster name to 14 chars, because there is a limitation in the install-config
 # Now it looks like "ci-op-rl6z646h-65230".
