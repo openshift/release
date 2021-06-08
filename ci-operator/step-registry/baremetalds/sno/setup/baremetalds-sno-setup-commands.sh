@@ -6,7 +6,7 @@ set -o pipefail
 
 echo "************ baremetalds single-node setup command ************"
 
-# Fetch packet basic configuration
+#  Fetch packet basic configuration
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
 
