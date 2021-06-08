@@ -42,24 +42,17 @@ tests:
       CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-app-ui-clusterpool
       CLUSTERPOOL_LIST_INCLUSION_FILTER: prow
     test:
-    - as: test
+    - as: import
       commands: |
-        KUBECONFIG=${SHARED_DIR}/hub-1.kc oc cm attach cluster --name managed --cluster-kubeconfig ${SHARED_DIR}/managed-1.kc \
-        export GITHUB_PRIVATE_URL=$(cat "/etc/e2e-secrets/github-private-url") \
-        export GITHUB_USER=$(cat "/etc/e2e-secrets/github-user") \
-        export GITHUB_TOKEN=$(cat "/etc/e2e-secrets/github-token") \
-        export OBJECTSTORE_PRIVATE_URL=$(cat "/etc/e2e-secrets/objectstore-private-url") \
-        export OBJECTSTORE_ACCESS_KEY=$(cat "/etc/e2e-secrets/objectstore-access-key") \
-        export OBJECTSTORE_SECRET_KEY=$(cat "/etc/e2e-secrets/objectstore-secret-key") \
-        export HELM_PRIVATE_URL=$(cat "/etc/e2e-secrets/helm-private-url") \
-        export HELM_USERNAME=$(cat "/etc/e2e-secrets/github-user") \
-        export HELM_PASSWORD=$(cat "/etc/e2e-secrets/github-token") \
-        export HELM_CHART_NAME=$(cat "/etc/e2e-secrets/helm-chart-name") \
-        export ANSIBLE_URL=$(cat "/etc/e2e-secrets/ansible-url") \
-        export ANSIBLE_TOKEN=$(cat "/etc/e2e-secrets/ansible-token") \
-        export SLACK_TOKEN=$(cat "/etc/e2e-secrets/slack-token") \
-        export SELF="make -f Makefile.prow" \
-        ./opt/app-root/src/application-ui/tests/run-prow-e2e.sh
+        KUBECONFIG=${SHARED_DIR}/hub-1.kc oc cm attach cluster --name managed --cluster-kubeconfig ${SHARED_DIR}/managed-1.kc
+      from: root
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: e2e-test
+      commands: |
+        ./run-prow-e2e.sh
       credentials:
       - mount_path: /etc/e2e-secrets
         name: e2e-secrets
