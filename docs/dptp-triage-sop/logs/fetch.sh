@@ -9,7 +9,13 @@ target="${1:-"errors"}"
 query="$( cat docs/dptp-triage-sop/logs/${target}.txt )"
 echo "[INFO] Running query: ${query}"
 echo "[INFO] Starting log query..."
-query_id="$( aws --profile openshift-ci-infra --region us-east-1 logs start-query --log-group-name app-ci-pod-logs --start-time "$( date --date '1 day ago' '+%s' )" --end-time "$( date '+%s' )" --query-string "${query}" --query queryId --output text )"
+
+DATE_CMD=date
+if [[ "${OSTYPE}" == "darwin"* ]]; then
+  DATE_CMD=gdate
+fi
+
+query_id="$( aws --profile openshift-ci-infra --region us-east-1 logs start-query --log-group-name app-ci-pod-logs --start-time "$( ${DATE_CMD} --date '1 day ago' '+%s' )" --end-time "$( ${DATE_CMD} '+%s' )" --query-string "${query}" --query queryId --output text )"
 echo "[INFO] Log query id: ${query_id}"
 echo "[INFO] Fetching log query results..."
 out="$( mktemp /tmp/aws-logs-XXXXXXXXXX )"
