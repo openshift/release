@@ -3,33 +3,48 @@ ref:
   from: tests
   commands: ipi-libvirt-test-commands.sh
   env:
-  - name: ARCH
-  - name: MASTER_REPLICAS
-    default: "3"
-  - name: NSS_GROUPNAME
-    default: "test"
-  - name: NSS_USERNAME
-    default: "test"
-  - name: NSS_WRAPPER_GROUP
-    default: "/tmp/test-group"
-  - name: NSS_WRAPPER_PASSWD
-    default: "/tmp/test-passwd"
-  - name: WORKER_REPLICAS
-    default: "2"
-  - name: USER
-    default: "test"
-  - name: REMOTE_LIBVIRT_HOSTNAME
-  - name: REMOTE_LIBVIRT_HOSTNAME_1
-  - name: REMOTE_LIBVIRT_HOSTNAME_2
-  - name: REMOTE_LIBVIRT_URI
-    default: "qemu+tcp://${REMOTE_LIBVIRT_HOSTNAME}/system"
-  - name: CLUSTER_NAME
+  - name: TEST_TYPE
+    default: "suite"
+    documentation: |
+      The type of test to perform.
+      * 'suite' - Run the test suite defined by TEST_SUITE. By default this executes the
+                  OpenShift parallel conformance suite. All product components must run the
+                  default suite on pull requests prior to merge.
+      * 'conformance-parallel' - Runs the test suite defined by TEST_SUITE, then runs the product conformance/parallel
+                  suite to verify the cluster is still functional. This is typically used for testing
+                  disruption from one suite, then confirming that the disruption did not degrade the
+                  product.
+      * 'conformance-serial' - Runs the test suite defined by TEST_SUITE, then runs the product conformance/serial
+                  suite to verify the cluster is still functional. This is typically used for testing
+                  disruption from one suite, then confirming that the disruption did not degrade the
+                  product.
+      * 'upgrade' - Perform an upgrade to the image defined by OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE.
+                  The TEST_UPGRADE_OPTIONS flag may be optionally set. All product components
+                  must run the default upgrade test (verify an upgrade completes) on pull requests
+                  prior to merge.
+      * 'jenkins-e2e' - Runs the test suite defined by TEST_SUITE, then runs the product jenkins-e2e
+                  suite to verify the cluster is still functional. This is typically used for testing
+                  disruption from one suite, then confirming that the disruption did not degrade the
+                  product.
+      * 'image-ecosystem' - Runs the test suite defined by TEST_SUITE, then runs the product image-ecosystem
+                  suite to verify the cluster is still functional. This is typically used for testing
+                  disruption from one suite, then confirming that the disruption did not degrade the
+                  product.
+  - name: TEST_SUITE
+    default: openshift/conformance/parallel
+    documentation: The test suite to run.  Use 'openshift-test run --help' to list available suites.
+  - name: TEST_UPGRADE_OPTIONS
+    default: ""
+    documentation: Options controlling how an upgrade is performed. See `openshift-test run-upgrade --help` for more details.
+  dependencies:
+  - name: "release:latest"
+    env: OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE
   resources:
     requests:
-      cpu: "3"
-      memory: 1Gi
+      cpu: "4"
+      memory: 600Mi
     limits:
-      memory: 4Gi
+      memory: 6Gi
   dnsConfig:
     nameservers:
     - 172.30.38.188

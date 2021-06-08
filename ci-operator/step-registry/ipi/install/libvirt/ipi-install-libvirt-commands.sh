@@ -38,26 +38,21 @@ cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/
 export TF_LOG=DEBUG
 export TF_LOG_PATH=${ARTIFACT_DIR}/terraform.log
 
-# Mocknss
-NSS_GROUPNAME=${NSS_GROUPNAME}
-NSS_USERNAME=${NSS_USERNAME}
-NSS_WRAPPER_GROUP=${NSS_WRAPPER_GROUP}
-NSS_WRAPPER_PASSWD=${NSS_WRAPPER_PASSWD}
-
 echo "Creating manifest"
 mock-nss.sh openshift-install create manifests --dir=${dir}
 sed -i '/^  channel:/d' ${dir}/manifests/cvo-overrides.yaml
 # Bump the libvirt masters memory to 16GB
-export TF_VAR_libvirt_master_memory=16384
+export TF_VAR_libvirt_master_memory=${MASTER_MEMORY}
 ls ${dir}/openshift
 for ((i=0; i<${MASTER_REPLICAS}; i++))
 do
-  yq write --inplace ${dir}/openshift/99_openshift-cluster-api_master-machines-${i}.yaml spec.providerSpec.value[domainMemory] 16384
+  yq write --inplace ${dir}/openshift/99_openshift-cluster-api_master-machines-${i}.yaml spec.providerSpec.value[domainMemory] ${MASTER_MEMORY}
+  yq write --inplace ${dir}/openshift/99_openshift-cluster-api_master-machines-${i}.yaml spec.providerSpec.value.volume[volumeSize] ${MASTER_DISK}
 done
 # Bump the libvirt workers memory to 16GB
-yq write --inplace ${dir}/openshift/99_openshift-cluster-api_worker-machineset-0.yaml spec.template.spec.providerSpec.value[domainMemory] 16384
+yq write --inplace ${dir}/openshift/99_openshift-cluster-api_worker-machineset-0.yaml spec.template.spec.providerSpec.value[domainMemory] ${WORKER_MEMORY}
 # Bump the libvirt workers disk to to 30GB
-yq write --inplace ${dir}/openshift/99_openshift-cluster-api_worker-machineset-0.yaml spec.template.spec.providerSpec.value.volume[volumeSize] 32212254720
+yq write --inplace ${dir}/openshift/99_openshift-cluster-api_worker-machineset-0.yaml spec.template.spec.providerSpec.value.volume[volumeSize] ${WORKER_DISK}
 
 while IFS= read -r -d '' item
 do
@@ -77,13 +72,9 @@ sed -i 's/password: .*/password: REDACTED"/g' ${dir}/.openshift_install.log
 REMOTE_LIBVIRT_URI=$(yq r "${SHARED_DIR}/cluster-config.yaml" 'REMOTE_LIBVIRT_URI')
 CLUSTER_NAME=$(yq r "${SHARED_DIR}/cluster-config.yaml" 'CLUSTER_NAME')
 CLUSTER_SUBNET=$(yq r "${SHARED_DIR}/cluster-config.yaml" 'CLUSTER_SUBNET')
-echo "************"
-echo "REMOTE_LIBVIRT_URI=${REMOTE_LIBVIRT_URI}"
-echo "CLUSTER_NAME=${CLUSTER_NAME}"
-echo "NAMESPACE=${NAMESPACE}"
-echo "JOB_NAME_HASH=${JOB_NAME_HASH}"
-echo "************"
 i=0
+# Block for injecting DNS below release 4.8 
+if [ "${BRANCH}" == "4.7" ] || [ "${BRANCH}" == "4.6" ]; then
 while kill -0 $openshift_install 2> /dev/null; do
   sleep 60
   echo "Polling libvirt for network, attempt #$((++i))"
@@ -104,12 +95,11 @@ EOF
       break
   fi
 done
+fi
 wait "${openshift_install}"
 # Add a step to wait for installation to complete, in case the cluster takes longer to create than the default time of 30 minutes.
 mock-nss.sh openshift-install --dir=${dir} --log-level=debug wait-for install-complete 2>&1 &
 wait "$!"
-
-#TF_LOG=debug openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v password &
 
 set +e
 wait "$!"

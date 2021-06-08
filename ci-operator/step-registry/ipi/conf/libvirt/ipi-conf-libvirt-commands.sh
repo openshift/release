@@ -8,7 +8,7 @@ echo "Conf-libvirt"
 echo "${SHARED_DIR}"
 touch ${SHARED_DIR}/cluster-config.yaml
 #registry.ci.openshift.org/ocp-s390x/release-s390x:$(BRANCH)
-MULTIARCH_RELEASE_IMAGE_INITIAL=registry.ci.openshift.org/ocp-${ARCH}/release-${ARCH}:4.7
+MULTIARCH_RELEASE_IMAGE_INITIAL=registry.ci.openshift.org/ocp-${ARCH}/release-${ARCH}:${BRANCH}
 if [[ -n "${MULTIARCH_RELEASE_IMAGE_INITIAL}" ]]; then
   echo "Installing from initial release ${MULTIARCH_RELEASE_IMAGE_INITIAL}"
   OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${MULTIARCH_RELEASE_IMAGE_INITIAL}"
@@ -54,6 +54,17 @@ if [[ -z "${CLUSTER_SUBNET}" ]]; then
   CLUSTER_SUBNET=126
 fi
 
+# Setting Hostnames
+if [[ "${ARCH}" == "s390x" ]]; then
+  REMOTE_LIBVIRT_HOSTNAME=lnxocp01
+  REMOTE_LIBVIRT_HOSTNAME_1=lnxocp02
+  REMOTE_LIBVIRT_HOSTNAME_2=""
+elif [[ "${ARCH}" == "ppc64le" ]]; then
+  REMOTE_LIBVIRT_HOSTNAME=C155F2U33
+  REMOTE_LIBVIRT_HOSTNAME_1=C155F2U31
+  REMOTE_LIBVIRT_HOSTNAME_2=C155F2U35
+fi
+
 declare -A LIBVIRT_HOSTS
   LIBVIRT_HOSTS["${CLUSTER_TYPE}-0-0"]="${REMOTE_LIBVIRT_HOSTNAME}"
   LIBVIRT_HOSTS["${CLUSTER_TYPE}-0-1"]="${REMOTE_LIBVIRT_HOSTNAME}"
@@ -80,8 +91,7 @@ echo "Remote Libvirt=${REMOTE_LIBVIRT_URI}"
 yq write --inplace ${SHARED_DIR}/cluster-config.yaml REMOTE_LIBVIRT_URI ${REMOTE_LIBVIRT_URI}
 yq write --inplace ${SHARED_DIR}/cluster-config.yaml CLUSTER_NAME ${LEASED_RESOURCE}-${JOB_NAME_HASH}
 yq write --inplace ${SHARED_DIR}/cluster-config.yaml CLUSTER_SUBNET ${CLUSTER_SUBNET}
-yq r "${SHARED_DIR}/cluster-config.yaml" 'OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE'
-cat ${SHARED_DIR}/cluster-config.yaml
+
 # Test the remote connection
 mock-nss.sh virsh -c ${REMOTE_LIBVIRT_URI} list
 
@@ -123,8 +133,6 @@ NETWORK_NAME="br$(printf ${LEASED_RESOURCE} | tail -c 3)"
 CLUSTER_NAME="${LEASED_RESOURCE}-${JOB_NAME_HASH}"
 ssh_pub_key=$(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")
 pull_secret=$(<"${CLUSTER_PROFILE_DIR}/pull-secret")
-echo "Network name=$NETWORK_NAME"
-echo "Cluster name=$CLUSTER_NAME"
 cat >> "${CONFIG}" << EOF
 apiVersion: v1
 baseDomain: ${LEASED_RESOURCE}
