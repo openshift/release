@@ -55,7 +55,7 @@ echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_END"
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 touch /tmp/install-complete
 
-sed 's/password: .*/password: REDACTED/' "${cluster_dir}/.openshift_install.log" >>"${ARTIFACT_DIR}/.openshift_install.log"
+sed 's/password: .*/password: REDACTED/' "${cluster_dir}/ocp_install/.openshift_install.log" >>"${ARTIFACT_DIR}/.openshift_install.log"
 
 gzip "${cluster_dir}/terraform.tfstate"
 tar -cv -f cluster_dir.tgz -C ${cluster_dir} . --exclude="${cluster_dir}/ocp_install/bootstrap.ign"
