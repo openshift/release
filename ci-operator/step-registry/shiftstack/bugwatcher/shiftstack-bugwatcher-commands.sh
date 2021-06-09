@@ -10,4 +10,4 @@ export BUGZILLA_API_KEY
 export SLACK_HOOK
 export TEAM_MEMBERS
 
-python ./main.py &> "${ARTIFACT_DIR}/bugwatcher.log"
+python ./main.py
