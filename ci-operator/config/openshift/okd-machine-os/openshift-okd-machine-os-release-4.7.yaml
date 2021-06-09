@@ -3,29 +3,25 @@ base_images:
     name: "4.7"
     namespace: origin
     tag: base
-  ocp_4.7_artifacts:
-    name: "4.7"
-    namespace: origin
-    tag: artifacts
-  ocp_4.7_mcd:
-    name: "4.7"
-    namespace: origin
-    tag: machine-config-operator
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: golang-1.15
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  inputs:
-    ocp_4.7_artifacts:
-      as:
-      - quay.io/openshift/origin-artifacts:4.7
-    ocp_4.7_mcd:
-      as:
-      - quay.io/openshift/origin-machine-config-operator:4.7
+- dockerfile_path: Dockerfile.ci
+  to: cosa-build
+- inputs:
+    cosa-build:
+      paths:
+      - destination_dir: .
+        source_path: /tmp/Dockerfile
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/okd-machine-os/manifests/
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/okd-machine-os/bootstrap/
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/okd-machine-os/extensions/
   to: machine-os-content
 promotion:
   name: "4.7"
