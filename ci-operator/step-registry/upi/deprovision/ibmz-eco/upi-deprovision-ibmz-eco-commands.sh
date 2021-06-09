@@ -28,6 +28,7 @@ cp -t "${cluster_dir}" \
 
 cd ${cluster_dir} && tar -xv -f cluster_dir.tgz
 gzip -d "${cluster_dir}/terraform.tfstate.gz"
+touch "${cluster_dir}/ocp_install/bootstrap.ign"
 cd ${installer_dir}
 
 ocp_version=$(cat ${installer_dir}/terraform.tfvars | grep openshift_version | cut -d= -f2 | sed -e 's/"//' -e 's/"$//')
@@ -46,8 +47,9 @@ if [ $ret -ne 0 ]; then
   set +e
   # Attempt to gather tfstate file and logs.
   echo "$(date -u --rfc-3339=seconds) - Destroy failed, gathering tfstate file and logs..."
+  gzip "${cluster_dir}/terraform.tfstate"
   cp -t "${SHARED_DIR}" \
-      "${cluster_dir}/terraform.tfstate"
+      "${cluster_dir}/terraform.tfstate.gz"
   set -e
   exit "$ret"
 fi
