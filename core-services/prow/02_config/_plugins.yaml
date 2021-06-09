@@ -499,6 +499,10 @@ approve:
   repos:
   - shiftstack/bugwatcher
   require_self_approval: false
+- commandHelpLink: ""
+  repos:
+  - ViaQ/log-file-metric-exporter
+  require_self_approval: false
 blunderbuss:
   max_request_count: 2
   request_count: 2
@@ -712,6 +716,34 @@ bugzilla:
       target_release: 4.8.0
       validate_by_default: true
   orgs:
+    ViaQ:
+      repos:
+        log-file-metric-exporter:
+          branches:
+            '*':
+              add_external_link: true
+              allowed_groups:
+              - redhat
+              - qe_staff
+              dependent_bug_states:
+              - status: VERIFIED
+              - status: RELEASE_PENDING
+              - resolution: ERRATA
+                status: CLOSED
+              - resolution: CURRENTRELEASE
+                status: CLOSED
+              is_open: true
+              state_after_close:
+                status: NEW
+              state_after_merge:
+                status: MODIFIED
+              state_after_validation:
+                status: POST
+              valid_states:
+              - status: NEW
+              - status: ASSIGNED
+              - status: ON_DEV
+              - status: POST
     openshift:
       repos:
         ceph-csi:
@@ -1913,6 +1945,12 @@ config_updater:
         - ci
       gzip: true
       name: ci-operator-misc-configs
+    ci-operator/config/**/log-file-metric-exporter/ViaQ-log-file-metric-exporter-release-5.*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
     ci-operator/config/**/oauth-proxy/openshift*-samples-operator-*.yaml:
       clusters:
         app.ci:
@@ -3031,6 +3069,26 @@ external_plugins:
     events:
     - pull_request
     name: needs-rebase
+  ViaQ/log-file-metric-exporter:
+  - endpoint: http://refresh
+    events:
+    - issue_comment
+    name: refresh
+  - endpoint: http://cherrypick
+    events:
+    - issue_comment
+    - pull_request
+    name: cherrypick
+  - endpoint: http://needs-rebase
+    events:
+    - issue_comment
+    - pull_request
+    name: needs-rebase
+  - endpoint: http://backport-verifier
+    events:
+    - issue_comment
+    - pull_request
+    name: backport-verifier
   app-sre/deployment-validation-operator:
   - endpoint: http://refresh
     events:
