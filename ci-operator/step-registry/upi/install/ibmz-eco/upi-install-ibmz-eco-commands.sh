@@ -60,6 +60,8 @@ sed 's/password: .*/password: REDACTED/' "${cluster_dir}/ocp_install/.openshift_
 gzip "${cluster_dir}/terraform.tfstate"
 tar --exclude="./ocp_install/bootstrap.ign" -cv -f cluster_dir.tgz -C ${cluster_dir} .
 
+oc --kubeconfig="${cluster_dir}/ocp_install/auth/kubeconfig" config set clusters.demo.proxy-url ${http_proxy}
+
 cp -t "${SHARED_DIR}" \
     "${cluster_dir}/ocp_install/auth/kubeconfig" \
     "${cluster_dir}/ocp_install/metadata.json" \
