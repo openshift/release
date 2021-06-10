@@ -4,6 +4,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
 expiration_date=$(date -d '4 hours' --iso=minutes --utc)
@@ -11,7 +13,18 @@ expiration_date=$(date -d '4 hours' --iso=minutes --utc)
 function join_by { local IFS="$1"; shift; echo "$*"; }
 
 REGION="${LEASED_RESOURCE}"
-ZONES=("${REGION}a" "${REGION}b")
+
+# Generate working availability zones from the region
+mapfile -t AVAILABILITY_ZONES < <(aws --region "${REGION}" ec2 describe-availability-zones | jq -r '.AvailabilityZones[] | select(.State == "available") | .ZoneName' | sort -u)
+# Generate availability zones with the biggest instance type required
+mapfile -t XLARGE_ZONES < <(aws --region "${REGION}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values=m5.8xlarge | jq -r '.InstanceTypeOfferings[].Location' | sort -u)
+# Generate availability zones based on these 2 criterias
+mapfile -t ZONES < <(echo "${AVAILABILITY_ZONES[@]}" "${XLARGE_ZONES[@]}" | sed 's/ /\n/g' | sort -R | uniq -d)
+# Calculate the maximum number of availability zones from the region
+MAX_ZONES_COUNT="${#ZONES[@]}"
+# Save max zones count information to ${SHARED_DIR} for use in other scenarios
+echo "${MAX_ZONES_COUNT}" >> "${SHARED_DIR}/maxzonescount"
+
 
 ZONES_COUNT=${ZONES_COUNT:-2}
 ZONES=("${ZONES[@]:0:${ZONES_COUNT}}")
