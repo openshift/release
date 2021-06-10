@@ -477,11 +477,13 @@ objects:
         cp -r /var/lib/openshift-install/upi/metal/* ${TMP_SHARED}/terraform/
         cp /bin/terraform-provider-matchbox ${TMP_SHARED}/terraform/
 
-        PXE_INITRD_URL="$(jq -r '.baseURI + (.images["live-initramfs"].path // .images["initramfs"].path)' /var/lib/openshift-install/rhcos.json)"
-        PXE_KERNEL_URL="$(jq -r '.baseURI + (.images["live-kernel"].path // .images["kernel"].path)' /var/lib/openshift-install/rhcos.json)"
+        BASE_URI="$(jq -r '.baseURI' /var/lib/openshift-install/rhcos.json | sed 's|https://|http://|' | sed 's|rhcos-redirector.apps.art.xq1c.p1.openshiftapps.com|releases-art-rhcos.svc.ci.openshift.org|')"
+
+        PXE_INITRD_URL="${BASE_URI}$(jq -r '.images["live-initramfs"].path // .images["initramfs"].path' /var/lib/openshift-install/rhcos.json)"
+        PXE_KERNEL_URL="${BASE_URI}$(jq -r '.images["live-kernel"].path // .images["kernel"].path' /var/lib/openshift-install/rhcos.json)"
         # 4.3 unified 'metal-bios' and 'metal-uefi' into just 'metal'
-        PXE_OS_IMAGE_URL="$(jq -r '.baseURI + (.images["metal-bios"].path // .images["metal"].path)' /var/lib/openshift-install/rhcos.json)"
-        PXE_ROOTFS_URL="$(jq -r '.baseURI + (.images["live-rootfs"].path)' /var/lib/openshift-install/rhcos.json)"
+        PXE_OS_IMAGE_URL="${BASE_URI}$(jq -r '.images["metal-bios"].path // .images["metal"].path' /var/lib/openshift-install/rhcos.json)"
+        PXE_ROOTFS_URL="${BASE_URI}$(jq -r '.images["live-rootfs"].path' /var/lib/openshift-install/rhcos.json)"
         if [[ $PXE_KERNEL_URL =~ "live" ]]; then
           PXE_KERNEL_ARGS="coreos.live.rootfs_url=${PXE_ROOTFS_URL}"
         else
