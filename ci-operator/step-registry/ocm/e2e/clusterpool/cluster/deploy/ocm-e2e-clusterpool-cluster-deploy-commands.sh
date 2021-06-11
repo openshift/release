@@ -39,10 +39,19 @@ case "${PIPELINE_STAGE}" in
         ;;
 esac
 
+if [[ -z "$COMPONENT_IMAGE_REF" ]]; then
+    log "ERROR COMPONENT_IMAGE_REF is empty"
+    exit 1
+fi
+
+log "Using COMPONENT_IMAGE_REF: $COMPONENT_IMAGE_REF"
+
 cp "$MAKEFILE" ./Makefile || {
     log "ERROR Could not find make file: $MAKEFILE"
     exit 1
 }
+
+log "Using MAKEFILE: $MAKEFILE"
 
 # The actual clusters to deploy to.
 clusters=()
@@ -205,17 +214,6 @@ log "Using version: $version"
 snapshot="${version}-SNAPSHOT-${timestamp}"
 log "Using snapshot: $snapshot"
 
-# Get image name from manifest file
-git_repository="${REPO_OWNER}/${REPO_NAME}"
-image_name_query=".[] | select(.[\"git-repository\"]==\"${git_repository}\") | .[\"image-name\"]"
-IMAGE_NAME=$(jq -r "$image_name_query" "$manifest_file" 2> >(tee -a "$log_file"))
-if [[ -z "$IMAGE_NAME" ]]; then
-    log "ERROR Could not find image-name for $REPO_NAME in manifest $manifest_file"
-    log "Contents of manifest $manifest_file"
-    cat "$manifest_file" > >(tee -a "$log_file")
-    exit 1
-fi
-
 # Return to work directory.
 cd "$ocm_dir" || exit 1
 
@@ -247,7 +245,21 @@ if [[ -z "$COMPONENT_NAME" ]]; then
     fi
 fi
 
-log "Using COMPONENT_NAME $COMPONENT_NAME"
+log "Using COMPONENT_NAME: $COMPONENT_NAME"
+
+# Verify COMPONENT_NAME is in the manifest file
+image_name_query=".[] | select(.[\"image-name\"]==\"${COMPONENT_NAME}\")"
+IMAGE_NAME=$(jq -r "$image_name_query" "$snapshot_dir/$manifest_file" 2> >(tee -a "$log_file"))
+if [[ -z "$IMAGE_NAME" ]]; then
+    log "ERROR Could not find image $COMPONENT_NAME in manifest $manifest_file"
+    log "Contents of manifest $manifest_file"
+    cat "$manifest_file" > >(tee -a "$log_file")
+    exit 1
+fi
+IMAGE_NAME="$COMPONENT_NAME"
+log "Using IMAGE_NAME: $IMAGE_NAME"
+IMAGE_QUERY="quay.io/open-cluster-management/${IMAGE_NAME}@sha256:[[:alnum:]]+"
+log "Using IMAGE_QUERY: $IMAGE_QUERY"
 
 # Set up Quay credentials.
 log "Setting up Quay credentials."
@@ -260,7 +272,6 @@ QUAY_TOKEN=$(cat "$QUAY_TOKEN_FILE")
 # Set up additional deploy variables
 NAMESPACE=open-cluster-management
 OPERATOR_DIR=acm-operator
-IMAGE_QUERY="quay.io/open-cluster-management/${IMAGE_NAME}@sha256:[[:alnum:]]+"
 
 # Function to deploy ACM to a cluster.
 # The first parameter is the cluster name without the suffix.
@@ -586,13 +597,10 @@ deploy() {
     # Update CSV
     logf "$_log" "Deploy $_cluster: Updating CSV"
     echo "UPDATE_CSV" > "${_status}"
-
     # Rewrite CSV. CSV contents are in csv.json
-    logf "$_log" "Deploy $_cluster: >>> IMAGE_QUERY: $IMAGE_QUERY"
-    logf "$_log" "Deploy $_cluster: >>> COMPONENT_IMAGE_REF: $COMPONENT_IMAGE_REF"
     sed -E "s,$IMAGE_QUERY,$COMPONENT_IMAGE_REF," csv.json > csv_update.json 2> >(tee -a "$_log")
     jq 'del(.metadata.uid) | del(.metadata.resourceVersion)' csv_update.json > csv_clean.json 2> >(tee -a "$_log")
-
+    # Replace CSV on cluster
     KUBECONFIG="$_kc" oc -n $NAMESPACE replace -f csv_clean.json > >(tee -a "$_log") 2>&1 || {
         logf "$_log" "ERROR Deploy $_cluster: Failed to update CSV."
         logf "$_log" "ERROR Deploy $_cluster: New CSV contents"
