@@ -13,6 +13,8 @@ export AWS_REGION
 export SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 export PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
 
+echo "PLATFORM_VERSION: '${PLATFORM_VERSION}'"
+
 # Ensure our UID, which is randomly generated, is in /etc/passwd. This is required
 # to be able to SSH.
 if ! whoami &> /dev/null; then
@@ -34,7 +36,7 @@ cat > create-machines.yaml <<-'EOF'
     aws_region: "{{ lookup('env', 'AWS_REGION') }}"
     cluster_dir: "{{ lookup('env', 'SHARED_DIR') }}"
     platform_type: "rhel"
-    platform_version: "7.9"
+    platform_version: "{{ lookup('env', 'PLATFORM_VERSION') }}"
     platform_type_dict:
       rhel:
         username: "ec2-user"
