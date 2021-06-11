@@ -1,12 +1,9 @@
-base_images:
-  os:
-    name: ubi
-    namespace: ocp
-    tag: "8"
-binary_build_commands: make build
 build_root:
   project_image:
-    dockerfile_path: openshift-ci/Dockerfile.tools
+    dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi8/ubi
+      RUN yum install -y --nodocs jq python3-virtualenv make git
+      RUN ln -s /cli/oc /usr/bin/kubectl
 resources:
   '*':
     requests:
@@ -22,7 +19,9 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: VERBOSE=2 make -k test-acceptance test-acceptance-artifacts
+      commands: make -k VERBOSE=2 OPERATOR_INDEX_IMAGE_REF=quay.io/redhat-developer/servicebinding-operator:pr-${PULL_NUMBER}-${PULL_PULL_SHA:0:8}-index
+        CATSRC_NAME=sbo-pr-checks SKIP_REGISTRY_LOGIN=true -o registry-login test-acceptance-with-bundle
+        test-acceptance-artifacts
       from: src
       resources:
         requests:
