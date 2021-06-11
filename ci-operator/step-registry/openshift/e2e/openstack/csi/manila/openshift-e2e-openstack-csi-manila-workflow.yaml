@@ -1,0 +1,19 @@
+workflow:
+  as: openshift-e2e-openstack-csi-manila
+  steps:
+    pre:
+    - chain: ipi-openstack-pre
+    - ref: storage-pv-save
+    - ref: storage-conf-csi-openstack-manila
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - ref: storage-pv-check
+    - chain: ipi-openstack-post
+    env:
+      CONFIG_TYPE: "minimal"
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      TEST_CSI_DRIVER_MANIFEST: manifest-openstack-manila.yaml
+      TEST_SUITE: openshift/csi
+  documentation: |-
+    The Openshift E2E OpenStack `csi manila` workflow installs OpenStack Manila CSI driver and executes the `openshift/csi` end-to-end test suite on OpenStack with a default cluster configuration and a manifest to test Manila resources.
