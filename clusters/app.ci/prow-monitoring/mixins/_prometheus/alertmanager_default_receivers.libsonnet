@@ -10,6 +10,11 @@
           text: '{{ template "custom_slack_text" . }}',
         },
       ],
+      pagerduty_configs: [
+        {
+          service_key: '${PAGERDUTY_INTEGRATION_KEY}',
+        },
+      ],
     },
     {
       name: 'slack-warnings',
