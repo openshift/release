@@ -11,6 +11,7 @@ build_root:
 images:
 - dockerfile_literal: |-
     FROM src
+    RUN dnf -y install python3-openstackclient jq && dnf clean all
     ADD openshift-install /usr/bin/openshift-install
   from: src
   inputs:
@@ -18,7 +19,7 @@ images:
       paths:
       - destination_dir: .
         source_path: /bin/openshift-install
-  to: installer-cleanup
+  to: openstack-installer
 resources:
   '*':
     limits:
@@ -31,6 +32,12 @@ tests:
   commands: shellcheck ./clean-ci-resources.sh
   container:
     from: src
+- as: cleanup-moc
+  cron: '@hourly'
+  steps:
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack
+    workflow: shiftstack-cleanup
 - as: cleanup-vexxhost
   cron: '@hourly'
   steps:
