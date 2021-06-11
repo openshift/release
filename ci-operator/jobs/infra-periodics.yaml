@@ -27,6 +27,46 @@ periodics:
   decorate: true
   labels:
     ci.openshift.io/role: infra
+  name: periodic-bugzilla-refresh-after-code-freeze
+  spec:
+    containers:
+    - args:
+      - |-
+        --query=is:pr
+        state:open
+        label:bugzilla/invalid-bug
+        label:bugzilla/valid-bug
+        base:main
+        base:master
+      - --token=/etc/oauth/oauth
+      - --updated=0
+      - |-
+        --comment=/bugzilla refresh
+
+        The main branch will open for development of next OCP version. Recalculating validity of PRs linked to this PR.
+      - --ceiling=0
+      - --confirm
+      command:
+      - /app/robots/commenter/app.binary
+      image: gcr.io/k8s-prow/commenter:v20210609-402d3ba6b7
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/oauth
+        name: token
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-bot
+- agent: kubernetes
+  cluster: app.ci
+  cron: '@yearly'
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
   name: periodic-bugzilla-refresh
   spec:
     containers:
