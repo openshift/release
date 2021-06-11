@@ -7,10 +7,9 @@ presubmits:
     cluster: build01
     context: ci/prow/generate
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      job-release: "4.8"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-route-monitor-operator-master-generate
     rerun_command: /test generate
@@ -55,10 +54,9 @@ presubmits:
     cluster: build01
     context: ci/prow/images
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      job-release: "4.8"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-route-monitor-operator-master-images
     rerun_command: /test images
@@ -103,10 +101,9 @@ presubmits:
     cluster: build01
     context: ci/prow/integration-aws
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      job-release: "4.8"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-route-monitor-operator-master-integration-aws
     rerun_command: /test integration-aws
@@ -117,6 +114,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --secret-dir=/usr/local/integration-aws-cluster-profile
         - --target=integration-aws
         command:
@@ -130,6 +128,9 @@ presubmits:
         volumeMounts:
         - mountPath: /etc/boskos
           name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
           readOnly: true
         - mountPath: /usr/local/integration-aws-cluster-profile
           name: cluster-profile
@@ -150,6 +151,9 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -169,10 +173,9 @@ presubmits:
     cluster: build01
     context: ci/prow/unit
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
+      job-release: "4.8"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-route-monitor-operator-master-unit
     rerun_command: /test unit
