@@ -1,25 +1,14 @@
-base_images:
-  base:
-    name: ubi
-    namespace: ocp
-    tag: "8"
-  openshift_release_golang-1.13:
-    name: release
-    namespace: openshift
-    tag: golang-1.13
-  openshift_release_golang-1.14:
-    name: release
-    namespace: openshift
-    tag: golang-1.14
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.14
+  from_repository: true
 images:
 - dockerfile_path: Dockerfile
-  from: base
-  to: route-monitor-operator
+  to: unused
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.8"
 resources:
   '*':
     limits:
@@ -27,9 +16,6 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: "4.7"
-  namespace: ocp
 tests:
 - as: generate
   commands: make generate --always-make && git diff --exit-code
