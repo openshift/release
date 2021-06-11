@@ -45,6 +45,9 @@ CONFIG = {
     'openstack-kuryr-quota-slice': {
         'default': 3,
     },
+    'openstack-vh-mecha-quota-slice': {
+        'default': 6,
+    },
     'openstack-ppc64le-quota-slice': {},
     'ovirt-quota-slice': {},
     'packet-quota-slice': {
