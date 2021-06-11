@@ -583,13 +583,16 @@ deploy() {
         logf "$_log" "WARN Deploy $_cluster: Current CSV status is $_csv_status. Will retry (${_elapsed}/${_timeout}s)"
     done
 
-    # Rewrite CSV. CSV contents are in csv.json
-    sed -E "s,$IMAGE_QUERY,$COMPONENT_IMAGE_REF," csv.json > csv_update.json 2> >(tee -a "$_log")
-    jq 'del(.metadata.uid) | del(.metadata.resourceVersion)' csv_update.json > csv_clean.json 2> >(tee -a "$_log")
-
     # Update CSV
     logf "$_log" "Deploy $_cluster: Updating CSV"
     echo "UPDATE_CSV" > "${_status}"
+
+    # Rewrite CSV. CSV contents are in csv.json
+    logf "$_log" "Deploy $_cluster: >>> IMAGE_QUERY: $IMAGE_QUERY"
+    logf "$_log" "Deploy $_cluster: >>> COMPONENT_IMAGE_REF: $COMPONENT_IMAGE_REF"
+    sed -E "s,$IMAGE_QUERY,$COMPONENT_IMAGE_REF," csv.json > csv_update.json 2> >(tee -a "$_log")
+    jq 'del(.metadata.uid) | del(.metadata.resourceVersion)' csv_update.json > csv_clean.json 2> >(tee -a "$_log")
+
     KUBECONFIG="$_kc" oc -n $NAMESPACE replace -f csv_clean.json > >(tee -a "$_log") 2>&1 || {
         logf "$_log" "ERROR Deploy $_cluster: Failed to update CSV."
         logf "$_log" "ERROR Deploy $_cluster: New CSV contents"
