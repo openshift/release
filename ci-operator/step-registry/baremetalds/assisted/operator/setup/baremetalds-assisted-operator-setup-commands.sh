@@ -53,6 +53,15 @@ fi
 
 echo "### Setup assisted installer..."
 export INDEX_IMAGE=${INDEX_IMAGE}
+export OPENSHIFT_VERSIONS=\$(cat data/default_ocp_versions.json |
+    jq -rc 'with_entries(.key = "4.8") | with_entries(
+      {
+        key: .key,
+        value: {rhcos_image:   .value.rhcos_image,
+                rhcos_version: .value.rhcos_version,
+                rhcos_rootfs:  .value.rhcos_rootfs}
+      }
+    )')
 
 images=(${ASSISTED_AGENT_IMAGE} ${ASSISTED_CONTROLLER_IMAGE} ${ASSISTED_INSTALLER_IMAGE})
 export PUBLIC_CONTAINER_REGISTRIES=\$(for image in \${images}; do echo \${image} | cut -d'/' -f1; done | sort -u | paste -sd "," -)
