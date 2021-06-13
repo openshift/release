@@ -1,0 +1,33 @@
+base_images:
+  os-min8:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+binary_build_commands: make all
+build_root:
+  project_image:
+    dockerfile_path: images/Dockerfile.tools
+images:
+- dockerfile_path: images/Dockerfile
+  from: os-min8
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift-kni/resource-topology-exporter/_out
+  to: resource-topology-exporter
+promotion:
+  name: resource-topology-exporter
+  namespace: ocp-kni
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.7"
+  namespace: ocp
+zz_generated_metadata:
+  branch: master
+  org: openshift-kni
+  repo: resource-topology-exporter
