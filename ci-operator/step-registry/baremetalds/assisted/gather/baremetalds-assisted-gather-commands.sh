@@ -33,7 +33,9 @@ cd /home/assisted
 source /root/config
 
 # Get sosreport including sar data
-sos report --case-id "\${HOSTNAME}" --batch -o container_log,filesys,kvm,libvirt,logs,networkmanager,podman,processor,rpm,sar,virsh,yum --tmp-dir /tmp/artifacts
+sos report --batch --tmp-dir /tmp/artifacts \
+  -o container_log,filesys,kvm,libvirt,logs,networkmanager,podman,processor,rpm,sar,virsh,yum \
+  -k podman.all -k podman.logs
 
 cp -R ./reports /tmp/artifacts || true
 
