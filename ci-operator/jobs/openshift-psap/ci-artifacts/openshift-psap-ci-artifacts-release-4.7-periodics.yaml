@@ -9,6 +9,10 @@ periodics:
   - base_ref: release-4.7
     org: openshift-psap
     repo: ci-artifacts
+  - base_ref: release-next
+    org: stevekuznetsov
+    repo: ci-artifacts
+    workdir: true
   labels:
     ci-operator.openshift.io/prowgen-controlled: "true"
     job-release: "4.7"
@@ -30,10 +34,8 @@ periodics:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/gpu-operator-e2e-162-cluster-profile
       - --target=gpu-operator-e2e-162
       command:
       - ci-operator
@@ -44,14 +46,9 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/gpu-operator-e2e-162-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -63,20 +60,9 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-aws
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
