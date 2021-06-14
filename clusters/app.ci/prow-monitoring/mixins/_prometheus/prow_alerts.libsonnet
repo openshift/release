@@ -17,13 +17,13 @@
           },
           {
             alert: 'prow-job-backlog-growing',
-            expr: 'sum(rate(prowjob_state_transitions{state="triggered"}[5m]))>0',
+            expr: 'sum(rate(prowjob_state_transitions{state="triggered"}[5m])) - sum(rate(prowjob_state_transitions{state!="triggered"}[5m])) > 0',
             'for': '60m',
             labels: {
               severity: 'critical',
             },
             annotations: {
-              message: 'The number of Prow jobs with the triggered state has been increasing for the past hour.'
+              message: 'The number of the triggered Prow jobs that have not yet been running has been increasing for the past hour.'
             },
           },
           {
