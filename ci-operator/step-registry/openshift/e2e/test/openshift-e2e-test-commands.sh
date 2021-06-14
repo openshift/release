@@ -137,7 +137,7 @@ fi
 
 function upgrade() {
     set -x
-    TARGET_RELEASES="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"
+    TARGET_RELEASES="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:-}"
     if [[ -f "${SHARED_DIR}/override-upgrade" ]]; then
         TARGET_RELEASES="$(< "${SHARED_DIR}/override-upgrade")"
         echo "Overriding upgrade target to ${TARGET_RELEASES}"
@@ -149,6 +149,53 @@ function upgrade() {
         -o "${ARTIFACT_DIR}/e2e.log" \
         --junit-dir "${ARTIFACT_DIR}/junit" &
     wait "$!"
+    set +x
+}
+
+function upgrade_paused() {
+    set -x
+    unset TEST_SUITE
+    TARGET_RELEASES="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:-}"
+    if [[ -f "${SHARED_DIR}/override-upgrade" ]]; then
+        TARGET_RELEASES="$(< "${SHARED_DIR}/override-upgrade")"
+        echo "Overriding upgrade target to ${TARGET_RELEASES}"
+    fi
+    # Split TARGET_RELEASES by commas, producing two releases
+    OPENSHIFT_UPGRADE0_RELEASE_IMAGE_OVERRIDE="$(echo $TARGET_RELEASES | cut -f1 -d,)"
+    OPENSHIFT_UPGRADE1_RELEASE_IMAGE_OVERRIDE="$(echo $TARGET_RELEASES | cut -f2 -d,)"
+
+    oc patch mcp/worker --type merge --patch '{"spec":{"paused":true}}'
+
+    echo "Starting control-plane upgrade to ${OPENSHIFT_UPGRADE0_RELEASE_IMAGE_OVERRIDE}"
+    openshift-tests run-upgrade "${TEST_UPGRADE_SUITE}" \
+        --to-image "${OPENSHIFT_UPGRADE0_RELEASE_IMAGE_OVERRIDE}" \
+        --options "${TEST_UPGRADE_OPTIONS-}" \
+        --provider "${TEST_PROVIDER}" \
+        -o "${ARTIFACT_DIR}/e2e.log" \
+        --junit-dir "${ARTIFACT_DIR}/junit" &
+    wait "$!"
+    echo "Upgraded control-plane to ${OPENSHIFT_UPGRADE0_RELEASE_IMAGE_OVERRIDE}"
+
+    echo "Starting control-plane upgrade to ${OPENSHIFT_UPGRADE1_RELEASE_IMAGE_OVERRIDE}"
+    openshift-tests run-upgrade "${TEST_UPGRADE_SUITE}" \
+        --to-image "${OPENSHIFT_UPGRADE1_RELEASE_IMAGE_OVERRIDE}" \
+        --options "${TEST_UPGRADE_OPTIONS-}" \
+        --provider "${TEST_PROVIDER}" \
+        -o "${ARTIFACT_DIR}/e2e.log" \
+        --junit-dir "${ARTIFACT_DIR}/junit" &
+    wait "$!"
+    echo "Upgraded control-plane to ${OPENSHIFT_UPGRADE1_RELEASE_IMAGE_OVERRIDE}"
+
+    echo "Starting worker upgrade to ${OPENSHIFT_UPGRADE1_RELEASE_IMAGE_OVERRIDE}"
+    oc patch mcp/worker --type merge --patch '{"spec":{"paused":false}}'
+    openshift-tests run-upgrade all \
+        --to-image "${OPENSHIFT_UPGRADE1_RELEASE_IMAGE_OVERRIDE}" \
+        --options "${TEST_UPGRADE_OPTIONS-}" \
+        --provider "${TEST_PROVIDER}" \
+        -o "${ARTIFACT_DIR}/e2e.log" \
+        --junit-dir "${ARTIFACT_DIR}/junit" &
+    wait "$!"
+    echo "Upgraded workers to ${OPENSHIFT_UPGRADE1_RELEASE_IMAGE_OVERRIDE}"
     set +x
 }
 
@@ -180,6 +227,9 @@ upgrade-conformance)
     ;;
 upgrade)
     upgrade
+    ;;
+upgrade-paused)
+    upgrade_paused
     ;;
 suite-conformance)
     suite
