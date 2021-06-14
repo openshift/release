@@ -1,5 +1,7 @@
 #!/bin/bash
 
+SECONDS=0
+
 set -o nounset
 set -o errexit
 set -o pipefail
@@ -20,3 +22,6 @@ echo "$(date -u --rfc-3339=seconds) - Deploying cluster on PowerVS"
 /usr/local/bin/python3.9 /cluster/powervs.py
 
 cp -rp --target-directory "${SHARED_DIR}" /tmp/output/*
+
+TOTAL_EXEC_TIME=$SECONDS
+echo "INFO: Execution time took $(($TOTAL_EXEC_TIME / 60)) minutes and $(($TOTAL_EXEC_TIME % 60)) seconds."
