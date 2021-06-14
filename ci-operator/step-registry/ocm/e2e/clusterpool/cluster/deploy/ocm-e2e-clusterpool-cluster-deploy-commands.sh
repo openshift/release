@@ -533,7 +533,7 @@ deploy() {
 
     # Wait for ClusterServiceVersion
     logf "$_log" "Deploy $_cluster: Waiting up to 5 minutes for CSV"
-    echo "WAIT_CSV" > "${_status}"
+    echo "WAIT_CSV_1" > "${_status}"
     local _timeout=300 _elapsed='' _step=15
     local _csv_name='' _csv_status=''
     while true; do
@@ -575,7 +575,7 @@ deploy() {
                 logf "$_log" "ERROR Deploy $_cluster: Error message: $_msg"
                 logf "$_log" "ERROR Deploy $_cluster: Full CSV"
                 jq . csv.json > >(tee -a "$_log") 2>&1
-                echo "ERROR_WAIT_CSV" > "$_status"
+                echo "ERROR WAIT_CSV_1" > "$_status"
                 return 1
                 ;;
             Succeeded)
@@ -587,7 +587,7 @@ deploy() {
         # Check timeout
         if (( _elapsed > _timeout )); then
                 logf "$_log" "ERROR Deploy $_cluster: Timeout (${_timeout}s) waiting for CSV"
-                echo "ERROR WAIT_CSV" > "${_status}"
+                echo "ERROR WAIT_CSV_1" > "${_status}"
                 return 1
         fi
 
@@ -611,17 +611,13 @@ deploy() {
 
     # Wait for ClusterServiceVersion
     logf "$_log" "Deploy $_cluster: Waiting up to 5 minutes for CSV"
-    echo "WAIT_CSV" > "${_status}"
-    local _timeout=300 _elapsed='' _step=15
+    echo "WAIT_CSV_2" > "${_status}"
+    local _timeout=300 _elapsed=0 _step=15
     local _csv_name='' _csv_status=''
     while true; do
-        # Wait for _step seconds, except for first iteration.
-        if [[ -z "$_elapsed" ]]; then
-            _elapsed=0
-        else
-            sleep $_step
-            _elapsed=$(( _elapsed + _step ))
-        fi
+        # Wait for _step seconds, including first iteration
+        sleep $_step
+        _elapsed=$(( _elapsed + _step ))
 
         # Get CSV name
         KUBECONFIG="$_kc" oc -n $NAMESPACE get csv -o name > csv_name 2> >(tee -a "$_log") || {
@@ -653,7 +649,7 @@ deploy() {
                 logf "$_log" "ERROR Deploy $_cluster: Error message: $_msg"
                 logf "$_log" "ERROR Deploy $_cluster: Full CSV"
                 jq . csv.json > >(tee -a "$_log") 2>&1
-                echo "ERROR_WAIT_CSV" > "$_status"
+                echo "ERROR WAIT_CSV_2" > "$_status"
                 return 1
                 ;;
             Succeeded)
@@ -665,7 +661,7 @@ deploy() {
         # Check timeout
         if (( _elapsed > _timeout )); then
                 logf "$_log" "ERROR Deploy $_cluster: Timeout (${_timeout}s) waiting for CSV"
-                echo "ERROR WAIT_CSV" > "${_status}"
+                echo "ERROR WAIT_CSV_2" > "${_status}"
                 return 1
         fi
 
@@ -675,6 +671,8 @@ deploy() {
     # Apply YAML files in multicluster hub directory
     logf "$_log" "Deploy $_cluster: Wait up to 5 minutes to apply YAML files from MCH directory"
     echo "WAIT_APPLY_MCH" > "${_status}"
+    logf "$_log" "Deploy $_cluster: Copying MCH YAML files to artifacts directory"
+    cp multiclusterhub/* "${ARTIFACT_DIR}"
     local _timeout=300 _elapsed='' _step=15
     local _mch_name='' _mch_status=''
     while true; do
@@ -695,7 +693,7 @@ deploy() {
         # Check timeout
         if (( _elapsed > _timeout )); then
                 logf "$_log" "ERROR Deploy $_cluster: Timeout (${_timeout}s) waiting to apply MCH YAML files"
-                echo "ERROR APPLY_MCH" > "${_status}"
+                echo "ERROR WAIT_APPLY_MCH" > "${_status}"
                 return 1
         fi
 
@@ -833,14 +831,16 @@ err=0
 for cluster in "${clusters[@]}"; do
     status="${ARTIFACT_DIR}/deploy-$cluster.status"
     if [[ ! -r "$status" ]]; then
-        log "Cluster $cluster: No status file: $status"
+        log "Cluster $cluster: ERROR No status file: $status"
+        log "Cluster $cluster: See cluster deploy log file (deploy-$cluster.log) for more details."
         err=$(( err + 1 ))
         continue
     fi
     
     status=$(cat "$status")
     if [[ "$status" != OK ]]; then
-        log "Cluster $cluster: Failed: $status"
+        log "Cluster $cluster: ERROR Failed with status: $status"
+        log "Cluster $cluster: See cluster deploy log file (deploy-$cluster.log) for more details."
         err=$(( err + 1 ))
     fi
 done
