@@ -671,8 +671,6 @@ deploy() {
     # Apply YAML files in multicluster hub directory
     logf "$_log" "Deploy $_cluster: Wait up to 5 minutes to apply YAML files from MCH directory"
     echo "WAIT_APPLY_MCH" > "${_status}"
-    logf "$_log" "Deploy $_cluster: Copying MCH YAML files to artifacts directory"
-    cp multiclusterhub/* "${ARTIFACT_DIR}"
     local _timeout=300 _elapsed='' _step=15
     local _mch_name='' _mch_status=''
     while true; do
@@ -684,7 +682,7 @@ deploy() {
             _elapsed=$(( _elapsed + _step ))
         fi
 
-        KUBECONFIG="$_kc" oc -n $NAMESPACE apply -k multiclusterhub/ \
+        KUBECONFIG="$_kc" oc -n $NAMESPACE apply -k applied-mch/ \
             > >(tee -a "$_log") 2>&1 && {
             logf "$_log" "Deploy $_cluster: MCH YAML files applied after ${_elapsed}s"
             break
