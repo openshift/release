@@ -42,7 +42,9 @@ echo "OO_CHANNEL:           $OO_CHANNEL"
 echo "OO_INSTALL_NAMESPACE: $OO_INSTALL_NAMESPACE"
 echo "OO_TARGET_NAMESPACES: $OO_TARGET_NAMESPACES"
 
-if [[ "$OO_INSTALL_NAMESPACE" == "!create" ]]; then
+if [[ -f "${SHARED_DIR}/operator-install-namespace.txt" ]]; then
+    OO_INSTALL_NAMESPACE=$(cat $SHARED_DIR/operator-install-namespace.txt)
+elif [[ "$OO_INSTALL_NAMESPACE" == "!create" ]]; then
     echo "OO_INSTALL_NAMESPACE is '!create': creating new namespace"
     NS_NAMESTANZA="generateName: oo-"
 elif ! oc get namespace "$OO_INSTALL_NAMESPACE"; then
