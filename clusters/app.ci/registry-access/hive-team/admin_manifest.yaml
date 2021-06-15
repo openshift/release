@@ -1,0 +1,77 @@
+# this is the Namespace in which your ServiceAccount will live
+apiVersion: v1
+kind: Namespace
+metadata:
+  annotations:
+    openshift.io/description: ServiceAccounts for Hive team cluster to provision clusters from nightly release images
+    openshift.io/display-name: Hive Team Cluster Registry Access
+  name: hive-team
+---
+# this is the ServiceAccount whose credentials you will use
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: image-puller
+  namespace: hive-team
+---
+# this grants your ServiceAccount rights to pull images
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: hive-team-image-puller-binding
+  # the namespace from which you will pull images
+  namespace: ocp
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: system:image-puller
+subjects:
+  - kind: ServiceAccount
+    namespace: hive-team
+    name: image-puller
+---
+# the Group of people who should be able to manage this ServiceAccount
+kind: Group
+apiVersion: v1
+metadata:
+  name: hive-team-admins
+users:
+  # these names are GitHub usernames
+  - dgoodwin
+  - gregsheremeta
+  - 2uasimojo
+  - abutcher
+  - joelddiaz
+---
+# this adds the admins to the project.
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: hive-team-viewer-binding
+  namespace: hive-team
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: view
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: hive-team-admins
+    namespace: hive-team
+---
+# this grants the right to read the ServiceAccount's credentials and pull
+# images to the admins.
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: hive-team-admins-binding
+  namespace: hive-team
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: pull-secret-namespace-manager
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: hive-team-admins
+    namespace: hive-team
