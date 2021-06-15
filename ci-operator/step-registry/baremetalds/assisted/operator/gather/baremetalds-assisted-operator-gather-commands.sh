@@ -15,7 +15,7 @@ fi
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
 
-git clone https://github.com/openshift/assisted-service
+git clone https://github.com/osherdp/assisted-service --branch feature/gather-hive-logs
 cd assisted-service/
 tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/assisted-service.tar.gz"
 
@@ -39,7 +39,7 @@ sos report --batch --tmp-dir /tmp/artifacts \
 
 cp -R ./reports /tmp/artifacts || true
 
-REPO_DIR="/home/assisted-service"
+REPO_DIR="/home/assisted-service-patched"
 if [ ! -d "\${REPO_DIR}" ]; then
   mkdir -p "\${REPO_DIR}"
 
