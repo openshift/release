@@ -4,13 +4,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-echo "origin-ci-int-aws.dev.rhcloud.com" > "${SHARED_DIR}"/basedomain.txt
+echo "vmc-ci.devcluster.openshift.com" > "${SHARED_DIR}"/basedomain.txt
 
 cluster_name=${NAMESPACE}-${JOB_NAME_HASH}
 base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
 cluster_domain="${cluster_name}.${base_domain}"
 
-export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
+export AWS_SHARED_CREDENTIALS_FILE=/var/run/vault/vsphere/.awscred
 export AWS_MAX_ATTEMPTS=50
 export AWS_RETRY_MODE=adaptive
 export HOME=/tmp

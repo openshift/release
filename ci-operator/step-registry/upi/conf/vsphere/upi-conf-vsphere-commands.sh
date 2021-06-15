@@ -25,7 +25,7 @@ export OPENSHIFT_INSTALL_INVOKER=openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD_
 
 echo "$(date -u --rfc-3339=seconds) - Creating reusable variable files..."
 # Create basedomain.txt
-echo "origin-ci-int-aws.dev.rhcloud.com" > "${SHARED_DIR}"/basedomain.txt
+echo "vmc-ci.devcluster.openshift.com" > "${SHARED_DIR}"/basedomain.txt
 base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
 
 # Create clustername.txt
