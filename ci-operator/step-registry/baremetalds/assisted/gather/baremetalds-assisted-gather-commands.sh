@@ -57,6 +57,11 @@ if [ "${GATHER_ALL_CLUSTERS}" == "true" ]; then
 fi
 make download_cluster_logs
 
-KUBECTL="kubectl --kubeconfig=\${KUBECONFIG}" LOGS_DEST=/tmp/artifacts/new_cluster make download_service_logs
+for kubeconfig in \$(ls \${KUBECONFIG}); do
+  export KUBECTL="kubectl --kubeconfig=\${kubeconfig}"
+  name=\$(basename \${kubeconfig})
+  export LOGS_DEST=/tmp/artifacts/new_cluster_\${name}
+  make download_service_logs
+done
 
 EOF
