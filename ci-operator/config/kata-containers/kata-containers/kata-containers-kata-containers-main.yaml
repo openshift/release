@@ -119,6 +119,48 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: openshift-e2e-azure
+- as: e2e-fips-tests
+  cron: 2 7 * * *
+  steps:
+    cluster_profile: aws
+    env:
+      FIPS_ENABLED: "true"
+      TEST_SUITE: openshift/conformance/parallel
+    pre:
+    - chain: ipi-aws-pre
+    - ref: fips-check
+    - as: kata-containers-e2e-fips-pre
+      cli: latest
+      commands: |
+        # oc is made available to this script via cli configuration, but
+        # kubectl is not. Since kubectl is used by kata-webhook scripts,
+        # thus it is created a symlink to oc.
+        pushd "$CLI_DIR"
+        if [ ! -f kubectl ]; then
+            ln -s oc kubectl
+        fi
+        popd
+
+        # TODO: The ipi-azure test step does not export AZURE_AUTH_LOCATION
+        # which causes openshift-tests to fail.
+        export AZURE_AUTH_LOCATION=${SHARED_DIR}/metadata.json
+
+        KATA_WORKDIR=/go/src/github.com/kata-containers/tests
+        cd $KATA_WORKDIR
+        # Install Kata Containers and run a smoke test.
+        .ci/openshift-ci/test.sh
+
+        # Deploy the kata-webhook so that the tests ran on next step of the
+        # workflow will use the kata runtime.
+        .ci/openshift-ci/cluster/deploy_webhook.sh
+      from: pipeline:bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    test:
+    - ref: openshift-e2e-test
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: kata-containers
