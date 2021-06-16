@@ -100,7 +100,51 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-aws
+- as: subsystem-aws-periodic
+  cron: '@daily'
+  steps:
+    cluster_profile: aws
+    test:
+    - as: subsystem-deploy-and-run
+      cli: latest
+      commands: |
+        export BUILD_TYPE=CI
+        export REPORTS=${ARTIFACT_DIR}
+        export SERVICE=$(echo "${IMAGE_FORMAT}" | component=assisted-service envsubst)
+        export TARGET=oc
+
+        make deploy-on-openshift-ci
+        make test
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
 - as: subsystem-kubeapi-aws
+  steps:
+    cluster_profile: aws
+    test:
+    - as: subsystem-deploy-and-run
+      cli: latest
+      commands: |
+        export BUILD_TYPE=CI
+        export REPORTS=${ARTIFACT_DIR}
+        export SERVICE=$(echo "${IMAGE_FORMAT}" | component=assisted-service envsubst)
+        export TARGET=oc
+        export GENERATE_CRD=false
+
+        make deploy-on-openshift-ci
+        make enable-kube-api-for-subsystem
+        make test-kube-api
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+- as: subsystem-kubeapi-aws-periodic
+  cron: '@daily'
   steps:
     cluster_profile: aws
     test:
