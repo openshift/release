@@ -29,7 +29,7 @@ scp "${SSHOPTS[@]}" "${SHARED_DIR}/test-list" "root@${IP}:/tmp/test-list"
 
 echo "### Running tests"
 timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
-    for kubeconfig in \$(ls \${KUBECONFIG}); do
+    for kubeconfig in \$(find \${KUBECONFIG} -type f); do
         export KUBECONFIG=\${kubeconfig}
         name=\$(basename \${kubeconfig})
         openshift-tests run "openshift/conformance/parallel" --dry-run | \
