@@ -10,8 +10,7 @@ echo "************ baremetalds assisted operator ztp command ************"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
 
-git clone https://github.com/openshift/assisted-service
-cd assisted-service/
+# Copy assisted-service source from current directory to the remote server
 tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/assisted-service.tar.gz"
 
 # Copy additional dev-script variables, if present
