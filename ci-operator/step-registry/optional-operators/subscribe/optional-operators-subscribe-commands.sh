@@ -20,15 +20,15 @@ echo "INSTALL_NAMESPACE: $INSTALL_NAMESPACE"
 echo "TARGET_NAMESPACES: $TARGET_NAMESPACES"
 
 if [[ -f "${SHARED_DIR}/operator-install-namespace.txt" ]]; then
-    OO_INSTALL_NAMESPACE=$(cat $SHARED_DIR/operator-install-namespace.txt)
-elif [[ "$OO_INSTALL_NAMESPACE" == "!create" ]]; then
-    echo "OO_INSTALL_NAMESPACE is '!create': creating new namespace"
+    INSTALL_NAMESPACE=$(cat "$SHARED_DIR"/operator-install-namespace.txt)
+elif [[ "$INSTALL_NAMESPACE" == "!create" ]]; then
+    echo "INSTALL_NAMESPACE is '!create': creating new namespace"
     NS_NAMESTANZA="generateName: oo-"
-elif ! oc get namespace "$OO_INSTALL_NAMESPACE"; then
-    echo "OO_INSTALL_NAMESPACE is '$OO_INSTALL_NAMESPACE' which does not exist: creating"
-    NS_NAMESTANZA="name: $OO_INSTALL_NAMESPACE"
+elif ! oc get namespace "$INSTALL_NAMESPACE"; then
+    echo "INSTALL_NAMESPACE is '$INSTALL_NAMESPACE' which does not exist: creating"
+    NS_NAMESTANZA="name: $INSTALL_NAMESPACE"
 else
-    echo "OO_INSTALL_NAMESPACE is '$OO_INSTALL_NAMESPACE'"
+    echo "INSTALL_NAMESPACE is '$INSTALL_NAMESPACE'"
 fi
 
 if [[ -n "${NS_NAMESTANZA:-}" ]]; then
