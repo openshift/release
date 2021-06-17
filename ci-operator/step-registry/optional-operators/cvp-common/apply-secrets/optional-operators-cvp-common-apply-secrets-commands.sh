@@ -5,17 +5,17 @@
 
 REHEARSAL_INSTALL_NAMESPACE="!create"
 
-OO_PYXIS_URL="${OO_PYXIS_URL:-""}"
+PYXIS_URL="${PYXIS_URL:-""}"
 # The namespace into which the operator and catalog will be
 # installed. Special value `!create` means that a new namespace will be created.
 OO_INSTALL_NAMESPACE="${OO_INSTALL_NAMESPACE:-$REHEARSAL_INSTALL_NAMESPACE}"
 
-# Check if OO_PYXIS_URL exists, skip the whole step if not.
-if [[ -z "$OO_PYXIS_URL" ]]; then
-    echo "OO_PYXIS_URL is not defined, skipping step cvp-common-apply-secrets!"
+# Check if PYXIS_URL exists, skip the whole step if not.
+if [[ -z "$PYXIS_URL" ]]; then
+    echo "PYXIS_URL is not defined, skipping step cvp-common-apply-secrets!"
     exit 0
 else
-    echo "OO_PYXIS_URL is defined, proceeding with cvp-common-apply-secrets step."
+    echo "PYXIS_URL is defined, proceeding with cvp-common-apply-secrets step."
 fi
 
 echo "Creating a new NAMESPACE"
@@ -48,9 +48,9 @@ GPG_PASS='/var/run/cvp-pyxis-gpg-secret/cvp-gpg.pass' # Secret file which will b
 PKCS12_CERT='/var/run/cvp-pyxis-gpg-secret/cvp-dptp.cert' # Secret file which will be mounted by DPTP
 PKCS12_KEY='/var/run/cvp-pyxis-gpg-secret/cvp-dptp.key' # Secret file which will be mounted by DPTP
 
-echo "Fetching the kube_objects from Pyxis for ISV pid ${OO_PYXIS_URL}"
+echo "Fetching the kube_objects from Pyxis for ISV pid ${PYXIS_URL}"
 touch /tmp/get_kubeObjects.txt
-curl --key "${PKCS12_KEY}" --cert "${PKCS12_CERT}" "${OO_PYXIS_URL}" | jq -r ".container.kube_objects" > /tmp/get_kubeObjects.txt
+curl --key "${PKCS12_KEY}" --cert "${PKCS12_CERT}" "${PYXIS_URL}" | jq -r ".container.kube_objects" > /tmp/get_kubeObjects.txt
 
 echo "Decrypting the kube_objects fetched from Pyxis"
 gpg --batch --yes --quiet --pinentry-mode loopback --import --passphrase-file "${GPG_PASS}" "${GPG_KEY}"
