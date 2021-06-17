@@ -62,6 +62,7 @@ dashboard.new(
     y: 0,
   })
 .addPanel(statePanel(iaas="aws", displayName="AWS"), gridPos={h: 9, w: 24, x: 0, y: 0})
+.addPanel(statePanel(iaas="aws-2", displayName="AWS-2"), gridPos={h: 9, w: 24, x: 0, y: 0})
 .addPanel(statePanel(iaas="gcp", displayName="GCP"), gridPos={h: 9, w: 24, x: 0, y: 0})
 .addPanel(statePanel(iaas="gcp-openshift-gce-devel-ci-2", displayName="GCP-2"), gridPos={h: 9, w: 24, x: 0, y: 0})
 .addPanel(statePanel(iaas="azure4", displayName="Azure"), gridPos={h: 9, w: 24, x: 0, y: 0})
