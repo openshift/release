@@ -100,11 +100,18 @@ in 3.11).''')
                     'name': 'art-publish-modify-release',
                     'namespace': f'ocp{config.get_suffix(arch, private)}'
                 },
-                'rules': [{
-                    'apiGroups': ['image.openshift.io'],
-                    'resources': ['imagestreams', 'imagestreamtags'],
-                    'verbs': ['get', 'list', 'watch', 'update', 'patch']
-                }]
+                'rules': [
+                    {
+                        'apiGroups': ['image.openshift.io'],
+                        'resources': ['imagestreams'],
+                        'verbs': ['get', 'list', 'watch', 'update', 'patch']
+                    },
+                    {
+                        'apiGroups': ['image.openshift.io'],
+                        'resources': ['imagestreamtags'],
+                        'verbs': ['get', 'list', 'watch', 'update', 'patch', 'delete']
+                    }
+                ]
             })
 
             gendoc.append({
