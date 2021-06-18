@@ -16,13 +16,7 @@ export SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 export PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
 export OPENSHIFT_INSTALL_INVOKER=openshift-internal-ci/${JOB_NAME}/${BUILD_ID}
 export HOME=/tmp
-
-# Debug echo "Cluster_type=${CLUSTER_TYPE}"
-case "${CLUSTER_TYPE}" in
-libvirt-s390x) export KUBECONFIG=${HOME}/.kube/config ;;
-libvirt-ppc64le) export KUBECONFIG=${HOME}/.kube/config ;;
-*) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"
-esac
+export KUBECONFIG=${HOME}/.kube/config
 
 dir=/tmp/installer
 mkdir "${dir}/"
