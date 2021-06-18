@@ -152,6 +152,25 @@ in 3.11).''')
                 'apiVersion': 'rbac.authorization.k8s.io/v1',
                 'kind': 'RoleBinding',
                 'metadata': {
+                    'name': 'art-backup-upgrade-graph',
+                    'namespace': f'ocp{config.get_suffix(arch, private)}'
+                },
+                'roleRef': {
+                    'apiGroup': 'rbac.authorization.k8s.io',
+                    'kind': 'Role',
+                    'name': 'art-backup-upgrade-graph'
+                },
+                'subjects': [{
+                    'kind': 'ServiceAccount',
+                    'name': 'art-publish',
+                    'namespace': 'ocp'
+                }]
+            })
+
+            gendoc.append({
+                'apiVersion': 'rbac.authorization.k8s.io/v1',
+                'kind': 'RoleBinding',
+                'metadata': {
                     'name': 'art-publish',
                     'namespace': f'ocp{config.get_suffix(arch, private)}'
                 },
