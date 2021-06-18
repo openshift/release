@@ -4,8 +4,10 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# List of exclude tests for 4.7 & 4.6
-
+# List of exclude tests from conformance/parallel suite for 4.7 & 4.6
+if [ "${TEST_TYPE}" != "conformance-parallel" ]; then 
+    exit 0 
+fi
 if [ "${BRANCH}" == "4.7" ] && [ "${ARCH}" == "ppc64le" ]; then
 
     read -d '#' INCL << EOF
@@ -67,8 +69,6 @@ if [ "${BRANCH}" == "4.7" ] && [ "${ARCH}" == "ppc64le" ]; then
 #
 EOF
     cat <(echo "$INCL") > "${SHARED_DIR}/excluded_tests"
-echo "Skipping following tests..."
-cat ${SHARED_DIR}/excluded_tests
 elif [ "${BRANCH}" == "4.7" ] && [ "${ARCH}" == "s390x" ]; then
 
     read -d '#' INCL << EOF
@@ -115,8 +115,6 @@ elif [ "${BRANCH}" == "4.7" ] && [ "${ARCH}" == "s390x" ]; then
 #
 EOF
     cat <(echo "$INCL") > "${SHARED_DIR}/excluded_tests"
-echo "Skipping following tests..."
-cat ${SHARED_DIR}/excluded_tests
 elif [ "${BRANCH}" == "4.6" ] && [ "${ARCH}" == "ppc64le" ]; then
 
     read -d '#' INCL << EOF
@@ -187,8 +185,6 @@ elif [ "${BRANCH}" == "4.6" ] && [ "${ARCH}" == "ppc64le" ]; then
 #
 EOF
     cat <(echo "$INCL") > "${SHARED_DIR}/excluded_tests"
-echo "Skipping following tests..."
-cat ${SHARED_DIR}/excluded_tests
 elif [ "${BRANCH}" == "4.6" ] && [ "${ARCH}" == "s390x" ]; then
 
     read -d '#' INCL << EOF
@@ -256,8 +252,6 @@ elif [ "${BRANCH}" == "4.6" ] && [ "${ARCH}" == "s390x" ]; then
 #
 EOF
     cat <(echo "$INCL") > "${SHARED_DIR}/excluded_tests"
-echo "Skipping following tests..."
-cat ${SHARED_DIR}/excluded_tests
 else
     echo "Executing all tests"
 fi

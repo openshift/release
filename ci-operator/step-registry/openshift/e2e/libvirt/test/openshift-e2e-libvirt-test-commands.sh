@@ -5,17 +5,6 @@ set -o errexit
 set -o pipefail
 
 export PATH=/usr/libexec/origin:$PATH
-# Ensure our UID, which is randomly generated, is in /etc/passwd. This is required
-# to be able to SSH.
-if ! whoami &> /dev/null; then
-    if [[ -w /etc/passwd ]]; then
-        echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
-    else
-        echo "/etc/passwd is not writeable, and user matching this uid is not found."
-        exit 1
-    fi
-fi
-
 # Initial check
 if [[ "${CLUSTER_TYPE}" != "libvirt-ppc64le" ]] && [[ "${CLUSTER_TYPE}" != "libvirt-s390x" ]] ; then
     echo "Unsupported cluster type '${CLUSTER_TYPE}'"
@@ -34,14 +23,14 @@ function upgrade() {
 }
 
 function suite() {
-    if [[ -f "${SHARED_DIR}/excluded_tests" ]]; then
+    if [ -f "${SHARED_DIR}/excluded_tests" ] && [ "${TEST_TYPE}" == "conformance-parallel" ]; then
 
         cat > ${SHARED_DIR}/invert_excluded.py <<EOSCRIPT
 #!/usr/libexec/platform-python
 import sys
 all_tests = set()
 excluded_tests = set()
-for l in sys.stdin.readlines():
+for l in sys.stdin.readlines():"${TEST_TYPE}" != "conformance-parallel"
   all_tests.add(l.strip())
 with open(sys.argv[1], "r") as f:
   for l in f.readlines():
@@ -91,11 +80,4 @@ suite)
     exit 1
     ;;
 esac
-wait "$!"
-rv=$?
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"
-echo "### Fetching results"
-tar -czf - ${ARTIFACT_DIR}/artifacts | tar -C "${ARTIFACT_DIR}" -xzf -
-set -e
-echo "### Done! (${rv})"
-exit $rv
