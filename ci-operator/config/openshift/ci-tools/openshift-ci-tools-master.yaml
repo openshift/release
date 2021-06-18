@@ -509,6 +509,33 @@ tests:
   commands: make validate-vendor
   container:
     from: src
+- as: repro
+  steps:
+    test:
+    - as: producer
+      commands: |
+        cp /secret/entitlement.pem "${SHARED_DIR}/content"
+        curl -s https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/origin-ci-test/pr-logs/pull/openshift_release/19420/rehearse-19420-periodic-ci-openshift-psap-ci-artifacts-release-4.6-gpu-operator-e2e-170/1405813243384958976/artifacts/gpu-operator-e2e-170/gather-extra/artifacts/machineconfigs.json > "${SHARED_DIR}/raw"
+      from: os
+      credentials:
+      - mount_path: /secret
+        name: psap-entitlement-secret
+        namespace: test-credentials
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+    - as: consumer
+      commands: |
+        echo "some preamble" >> "${ARTIFACT_DIR}/output"
+        cat "${SHARED_DIR}/content" | base64 --wrap 0 >> "${ARTIFACT_DIR}/output"
+        echo "some suffix" >> "${ARTIFACT_DIR}/output"
+        cp "${SHARED_DIR}/raw" "${ARTIFACT_DIR}/raw"
+      from: os
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
 zz_generated_metadata:
   branch: master
   org: openshift
