@@ -27,7 +27,7 @@ if [[ "${DELETE_MC}" == "true" ]]; then
 fi
 
 # create a fedora pod and get the capabilities enabled in the pod
-oc run fedora-pod --image fedora --restart Never --command -- sleep 1000
+oc run fedora-pod --image quay.io/fedora/fedora:34 --restart Never --command -- sleep 1000
 oc wait --for=condition=Ready pod/fedora-pod --timeout=300s
 capabilities=$(oc rsh fedora-pod capsh --print)
 
