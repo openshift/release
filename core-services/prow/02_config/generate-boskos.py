@@ -24,10 +24,10 @@ CONFIG = {
         'westus': 8
     },
     'gcp-quota-slice': {
-        'us-east1': 70,
+        'us-east4': 70,
     },
     'gcp-openshift-gce-devel-ci-2-quota-slice': {
-        'us-east1': 70,
+        'us-east4': 70,
     },
     'libvirt-s390x-quota-slice': {},
     'libvirt-ppc64le-quota-slice': {},
