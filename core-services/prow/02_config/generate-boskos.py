@@ -13,9 +13,9 @@ CONFIG = {
     },
     'aws-2-quota-slice': {
         'us-east-1': 5,
-        'us-east-2': 5,
+        'us-east-2': 10,
         'us-west-1': 5,
-        'us-west-2': 5,
+        'us-west-2': 10,
     },
     'azure4-quota-slice': {
         'centralus': 33,
