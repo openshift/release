@@ -67,6 +67,35 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+- as: osde2e-aro-e2e
+  cron: '@daily'
+  steps:
+    post:
+    - as: cluster-destroy
+      commands: |
+        source ./ci/destroy-aro-cluster.sh
+      credentials:
+      - mount_path: /usr/local/osde2e-credentials
+        name: osde2e-credentials
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    pre:
+    - as: cluster-create
+      commands: |
+        source ./ci/create-aro-cluster.sh
+      credentials:
+      - mount_path: /usr/local/osde2e-credentials
+        name: osde2e-credentials
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 zz_generated_metadata:
   branch: main
   org: openshift
