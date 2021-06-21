@@ -8,7 +8,7 @@ CONFIG="${SHARED_DIR}/install-config.yaml"
 
 GCP_BASE_DOMAIN="$(< ${CLUSTER_PROFILE_DIR}/public_hosted_zone)"
 GCP_PROJECT="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
-GCP_REGION="${LEASED_RESOURCE}"
+GCP_REGION="us-east4"
 
 masters="${CONTROL_PLANE_REPLICAS}"
 
