@@ -175,10 +175,34 @@ dashboard.new(
     .addTarget(prometheus.target(
         'avg(ghcache_disk_free) without (instance,pod)',
         legendFormat='GB Free',
+    )), gridPos = {
+    h: 6,
+    w: 8,
+    x: 0,
+    y: 0,
+  })
+.addPanel(
+    (graphPanel.new(
+        'Disk Inode Usage',
+        description='',
+        datasource='prometheus',
+        legend_alignAsTable=true,
+        legend_rightSide=true,
+        legend_values=true,
+        legend_current=true,
+        stack=true,
+    ) + legendConfig)
+    .addTarget(prometheus.target(
+        'avg(ghcache_disk_inode_used) without (instance,pod)',
+        legendFormat='Inodes used',
+    ))
+    .addTarget(prometheus.target(
+        'avg(ghcache_disk_inode_free) without (instance,pod)',
+        legendFormat='Inodes Free',
     )), gridPos={
     h: 6,
-    w: 16,
-    x: 0,
+    w: 8,
+    x: 8,
     y: 0,
   })
 .addPanel(
