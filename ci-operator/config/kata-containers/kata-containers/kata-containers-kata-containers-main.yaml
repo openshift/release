@@ -113,6 +113,12 @@ tests:
         # Deploy the kata-webhook so that the tests ran on next step of the
         # workflow will use the kata runtime.
         .ci/openshift-ci/cluster/deploy_webhook.sh
+
+        worker_nodes=$(oc get nodes |  awk '{if ($3 == "worker") { print $1 } }')
+        for node in ${worker_nodes}; do
+          echo "Change config in $node"
+          oc debug node/${node} -- sed -i "s/disable_guest_seccomp=true/disable_guest_seccomp=false/" /opt/kata/share/defaults/kata-containers/configuration.toml
+        done
       from: pipeline:bin
       resources:
         requests:
