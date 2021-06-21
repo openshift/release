@@ -12,7 +12,7 @@ expiration_date=$(date -d '4 hours' --iso=minutes --utc)
 
 function join_by { local IFS="$1"; shift; echo "$*"; }
 
-REGION="${LEASED_RESOURCE}"
+REGION=us-central1
 # BootstrapInstanceType gets its value from pkg/types/aws/defaults/platform.go
 BOOTSTRAP_NODE_TYPE=m5.large
 
