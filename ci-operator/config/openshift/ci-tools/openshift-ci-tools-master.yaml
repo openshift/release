@@ -422,6 +422,17 @@ images:
   to: vault-subpath-proxy
 - dockerfile_literal: |-
     FROM centos:8
+    ADD cluster-display /usr/bin/cluster-display
+    ENTRYPOINT ["/usr/bin/cluster-display"]
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/cluster-display
+  to: cluster-display
+- dockerfile_literal: |-
+    FROM centos:8
     ADD vault-secret-collection-manager /usr/bin/vault-secret-collection-manager
     ENTRYPOINT ["/usr/bin/vault-secret-collection-manager"]
   from: os
@@ -433,6 +444,7 @@ images:
   to: vault-secret-collection-manager
 - dockerfile_literal: |-
     FROM centos:8
+    RUN  dnf install -y git && dnf clean all && rm -rf /var/cache/dnf
     ADD ci-operator-yaml-creator /usr/bin/ci-operator-yaml-creator
     ENTRYPOINT ["ci-operator-yaml-creator"]
   from: os

@@ -29,7 +29,9 @@ timeout -s 9 20m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << "EOF" |& sed -e 's/.
 set -xeo pipefail
 
 # Get sosreport including sar data
-sos report --case-id "$HOSTNAME" --batch -o container_log,filesys,kvm,libvirt,logs,networkmanager,podman,processor,rpm,sar,virsh,yum --tmp-dir /tmp/artifacts
+sos report --batch --tmp-dir /tmp/artifacts \
+  -o container_log,filesys,kvm,libvirt,logs,networkmanager,podman,processor,rpm,sar,virsh,yum \
+  -k podman.all -k podman.logs
 
 echo "Copy content from setup step to artifacts dir..."
 cp -r /home/sno/build/ /tmp/artifacts/

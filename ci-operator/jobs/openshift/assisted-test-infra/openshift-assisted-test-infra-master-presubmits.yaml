@@ -289,6 +289,7 @@ presubmits:
     name: pull-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-none
     optional: true
     rerun_command: /test e2e-metal-assisted-none
+    run_if_changed: ^(terraform_files/.*|.*/controllers/.*)$
     spec:
       containers:
       - args:
@@ -599,19 +600,20 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - master
     cluster: build01
-    context: ci/prow/system-test
+    context: ci/prow/system-test-ipv6
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-test-infra-master-system-test
-    rerun_command: /test system-test
+    name: pull-ci-openshift-assisted-test-infra-master-system-test-ipv6
+    optional: true
+    rerun_command: /test system-test-ipv6
     spec:
       containers:
       - args:
@@ -619,8 +621,8 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/usr/local/system-test-cluster-profile
-        - --target=system-test
+        - --secret-dir=/usr/local/system-test-ipv6-cluster-profile
+        - --target=system-test-ipv6
         command:
         - ci-operator
         image: ci-operator:latest
@@ -633,7 +635,7 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/system-test-cluster-profile
+        - mountPath: /usr/local/system-test-ipv6-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -665,7 +667,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )system-test,?($|\s.*)
+    trigger: (?m)^/test( | .* )system-test-ipv6,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -681,6 +683,7 @@ presubmits:
     name: pull-ci-openshift-assisted-test-infra-master-system-test-olm
     optional: true
     rerun_command: /test system-test-olm
+    run_if_changed: .*operator.*
     spec:
       containers:
       - args:

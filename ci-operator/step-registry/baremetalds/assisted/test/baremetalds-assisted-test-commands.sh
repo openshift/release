@@ -24,52 +24,20 @@ scp "${SSHOPTS[@]}" /usr/bin/openshift-tests /usr/bin/kubectl "root@${IP}:/usr/l
 # Tests execution
 set +e
 
-# Test upgrade for workflows that requested it
-if [[ "$RUN_UPGRADE_TEST" == true ]]; then
-    echo "### Running Upgrade tests"
-    timeout \
-    --kill-after 10m \
-    120m \
-        ssh \
-            "${SSHOPTS[@]}" \
-            "root@${IP}" \
-            openshift-tests \
-            run-upgrade \
-            --to-image "$OPENSHIFT_UPGRADE_RELEASE_IMAGE" \
-            -o /tmp/artifacts/e2e-upgrade.log \
-            --junit-dir /tmp/artifacts/junit-upgrade \
-            platform
-else
-    if [[ -s "${SHARED_DIR}/test-list" ]]; then
-        echo "### Copying test-list file"
-        scp \
-            "${SSHOPTS[@]}" \
-            "${SHARED_DIR}/test-list" \
-            "root@${IP}:/tmp/test-list"
-        echo "### Running tests"
-        timeout \
-        --kill-after 10m \
-        120m \
-        ssh \
-            "${SSHOPTS[@]}" \
-            "root@${IP}" \
-            openshift-tests \
-            run \
-            "openshift/conformance/parallel" \
-            --dry-run \
-            \| grep -Ff /tmp/test-list \|openshift-tests run -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit -f -
-    else
-        echo "### Running tests"
-        ssh \
-            "${SSHOPTS[@]}" \
-            "root@${IP}" \
-            openshift-tests \
-            run \
-            "openshift/conformance/parallel" \
-            --dry-run \
-            \| grep 'Feature:ProjectAPI' \| openshift-tests run -o /tmp/artifacts/e2e.log --junit-dir /tmp/artifacts/junit -f -
-    fi
-fi
+echo "### Copying test-list file"
+scp "${SSHOPTS[@]}" "${SHARED_DIR}/test-list" "root@${IP}:/tmp/test-list"
+
+echo "### Running tests"
+timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
+    for kubeconfig in \$(find \${KUBECONFIG} -type f); do
+        export KUBECONFIG=\${kubeconfig}
+        name=\$(basename \${kubeconfig})
+        openshift-tests run "openshift/conformance/parallel" --dry-run | \
+            grep -Ff /tmp/test-list | \
+            openshift-tests run -o /tmp/artifacts/e2e_\${name}.log --junit-dir /tmp/artifacts/junit_\${name} -f -
+    done
+EOF
+
 
 rv=$?
 

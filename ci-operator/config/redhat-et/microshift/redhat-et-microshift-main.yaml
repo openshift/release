@@ -1,0 +1,64 @@
+base_images:
+  base:
+    name: "4.8"
+    namespace: ocp
+    tag: base
+  build:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.16-openshift-4.8
+binary_build_commands: make cross-build-linux-amd64 cross-build-linux-arm64
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
+      USER root
+
+      ENV GOPATH=/go GO111MODULE=on
+
+      WORKDIR $GOPATH/src/github.com/redhat-et/microshift
+
+      RUN yum install gpgme-devel glibc-static libassuan-devel -y
+    inputs:
+      build:
+        as:
+        - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
+images:
+- dockerfile_literal: |
+    FROM registry.access.redhat.com/ubi8/ubi
+    COPY --from=builder /go/src/github.com/redhat-et/microshift/_output/bin/linux_amd64/microshift /usr/bin
+  from: base
+  to: microshift-linux-amd64
+- dockerfile_literal: |
+    FROM registry.access.redhat.com/ubi8/ubi
+    COPY --from=builder /go/src/github.com/redhat-et/microshift/_output/bin/linux_arm64/microshift /usr/bin
+  from: base
+  to: microshift-linux-arm64
+promotion:
+  additional_images:
+    microshift: microshift-linux-amd64
+  namespace: redhat-et
+  tag: microshift
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.8"
+  namespace: ocp
+tests:
+- as: verify
+  commands: make verify
+  container:
+    from: src
+- as: test-unit
+  commands: make test-unit
+  container:
+    from: src
+zz_generated_metadata:
+  branch: main
+  org: redhat-et
+  repo: microshift

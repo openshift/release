@@ -101,6 +101,64 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-aws
+- as: subsystem-aws-pools
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: dpp
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.8"
+  steps:
+    test:
+    - as: subsystem-deploy-and-run
+      cli: latest
+      commands: |
+        export BUILD_TYPE=CI
+        export REPORTS=${ARTIFACT_DIR}
+        export TARGET=oc
+
+        make deploy-on-openshift-ci
+        make test
+      dependencies:
+      - env: SERVICE
+        name: assisted-service
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
+- as: subsystem-kubeapi-aws-pools
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: dpp
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.8"
+  steps:
+    test:
+    - as: subsystem-deploy-and-run
+      cli: latest
+      commands: |
+        export BUILD_TYPE=CI
+        export REPORTS=${ARTIFACT_DIR}
+        export TARGET=oc
+        export GENERATE_CRD=false
+
+        make deploy-on-openshift-ci
+        make enable-kube-api-for-subsystem
+        make test-kube-api
+      dependencies:
+      - env: SERVICE
+        name: assisted-service
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
 - as: subsystem-kubeapi-aws
   steps:
     cluster_profile: aws

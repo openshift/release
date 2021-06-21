@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: "4.8"
+    name: "4.9"
     namespace: ocp
     tag: base
   ocp_builder_golang-1.13:
@@ -11,6 +11,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.16-openshift-4.9
   ocp_builder_rhel-8-golang-openshift-4.6:
     name: builder
     namespace: ocp
@@ -21,20 +25,17 @@ base_images:
     tag: golang-1.13
 binary_build_commands: make build
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.15
+  from_repository: true
 images:
 - dockerfile_path: Dockerfile.rhel
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
       as:
-      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
   to: cluster-autoscaler-operator
 promotion:
-  name: "4.8"
+  name: "4.9"
   namespace: ocp
 resources:
   '*':
@@ -42,7 +43,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: "4.8"
+  name: "4.9"
   namespace: ocp
 tests:
 - as: unit

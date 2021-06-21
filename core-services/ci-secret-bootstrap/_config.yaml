@@ -256,8 +256,16 @@ secret_configs:
     name: ci-slack-api-url
     namespace: ci
 - from:
+    integration_key:
+      bw_item: pagerduty
+      field: integration_key
+  to:
+  - cluster: app.ci
+    name: pagerduty
+    namespace: ci
+- from:
     config.json:
-      bw_item: prow.svc.ci.openshift.org
+      bw_item: prow.ci.openshift.org
       field: client-configuration
   to:
   - cluster: app.ci
@@ -265,7 +273,7 @@ secret_configs:
     namespace: ci
 - from:
     config.json:
-      bw_item: deck-internal-ci.svc.ci.openshift.org
+      bw_item: deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com
       field: client-configuration
   to:
   - cluster: app.ci
@@ -273,7 +281,7 @@ secret_configs:
     namespace: ci
 - from:
     cookie:
-      bw_item: prow.svc.ci.openshift.org
+      bw_item: prow.ci.openshift.org
       field: cookie32
   to:
   - cluster: app.ci
@@ -988,6 +996,45 @@ secret_configs:
     name: cluster-secrets-openstack-kuryr
     namespace: ci
 - from:
+    .awscred:
+      attachment: .awscred
+      bw_item: openstack
+    insights-live.yaml:
+      attachment: insights-live.yaml
+      bw_item: insights-ci-account
+    pull-secret:
+      dockerconfigJSON:
+      - auth_bw_attachment: token_image-puller_app.ci_reg_auth_value.txt
+        bw_item: build_farm
+        registry_url: registry.ci.openshift.org
+      - auth_bw_attachment: auth
+        bw_item: cloud.openshift.com-pull-secret
+        email_bw_field: email
+        registry_url: cloud.openshift.com
+      - auth_bw_attachment: auth
+        bw_item: quay.io-pull-secret
+        email_bw_field: email
+        registry_url: quay.io
+      - auth_bw_attachment: auth
+        bw_item: registry.connect.redhat.com-pull-secret
+        email_bw_field: email
+        registry_url: registry.connect.redhat.com
+      - auth_bw_attachment: auth
+        bw_item: registry.redhat.io-pull-secret
+        email_bw_field: email
+        registry_url: registry.redhat.io
+    ssh-privatekey:
+      attachment: ssh-privatekey
+      bw_item: jenkins-ci-provisioner
+    ssh-publickey:
+      attachment: ssh-publickey
+      bw_item: jenkins-ci-provisioner
+  to:
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-openstack-vh-mecha
+    namespace: ci
+- from:
     ca-cert.pem:
       attachment: ca-cert.pem
       bw_item: openstack-ppc64le
@@ -1458,6 +1505,9 @@ secret_configs:
   - cluster: app.ci
     name: build-farm-credentials
     namespace: ci
+  - cluster: app.ci
+    name: build-farm-credentials
+    namespace: vault
 - from:
     kubeconfig:
       attachment: sa.ci-operator.arm01.config
@@ -2764,6 +2814,14 @@ secret_configs:
     - build_farm
     name: endurance-sa
     namespace: test-credentials
+- from:
+    sa.cluster-display.hive.config:
+      attachment: sa.cluster-display.hive.config
+      bw_item: build_farm
+  to:
+  - cluster: app.ci
+    name: cluster-display
+    namespace: ci
 user_secrets_target_clusters:
 - app.ci
 - arm01

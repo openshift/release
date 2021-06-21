@@ -12,9 +12,9 @@ CONFIG = {
         'us-west-2': 35,
     },
     'aws-2-quota-slice': {
-        'us-east-1': 10,
+        'us-east-1': 5,
         'us-east-2': 10,
-        'us-west-1': 10,
+        'us-west-1': 5,
         'us-west-2': 10,
     },
     'azure4-quota-slice': {
@@ -44,6 +44,9 @@ CONFIG = {
     },
     'openstack-kuryr-quota-slice': {
         'default': 3,
+    },
+    'openstack-vh-mecha-quota-slice': {
+        'default': 6,
     },
     'openstack-ppc64le-quota-slice': {},
     'ovirt-quota-slice': {},

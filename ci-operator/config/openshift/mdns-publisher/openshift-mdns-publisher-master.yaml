@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: "4.8"
+    name: "4.9"
     namespace: ocp
     tag: base
   dev-scripts:
@@ -32,10 +32,7 @@ base_images:
     namespace: openshift
     tag: golang-1.12
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.12
+  from_repository: true
 images:
 - dockerfile_path: Dockerfile
   from: base
@@ -45,7 +42,7 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
   to: mdns-publisher
 promotion:
-  name: "4.8"
+  name: "4.9"
   namespace: ocp
 resources:
   '*':
@@ -53,7 +50,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: "4.8"
+  name: "4.9"
   namespace: ocp
 tests:
 - as: gofmt
@@ -68,14 +65,6 @@ tests:
   commands: make test
   container:
     from: src
-- as: e2e-metal-ipi
-  steps:
-    cluster_profile: packet
-    workflow: baremetalds-e2e
-- as: e2e-openstack-ipi
-  steps:
-    cluster_profile: openstack
-    workflow: openshift-e2e-openstack-ipi
 zz_generated_metadata:
   branch: master
   org: openshift

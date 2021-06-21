@@ -15,10 +15,10 @@ base_images:
     name: assisted-test
     namespace: ocp-kni
     tag: assisted-test-infra
-  coreos_centos:
-    name: coreos-centos8-buildroot
+  coreos_centos_stream8:
+    name: stream8
     namespace: coreos
-    tag: latest
+    tag: "8"
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -38,7 +38,7 @@ build_root:
     tag: golang-1.15
 images:
 - dockerfile_path: Dockerfile.assisted-service
-  from: coreos_centos
+  from: coreos_centos_stream8
   inputs:
     openshift_release_golang-1.15:
       as:
@@ -100,6 +100,85 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-aws
+- as: subsystem-aws-periodic
+  cron: '@daily'
+  steps:
+    cluster_profile: aws
+    test:
+    - as: subsystem-deploy-and-run
+      cli: latest
+      commands: |
+        export BUILD_TYPE=CI
+        export REPORTS=${ARTIFACT_DIR}
+        export SERVICE=$(echo "${IMAGE_FORMAT}" | component=assisted-service envsubst)
+        export TARGET=oc
+
+        make deploy-on-openshift-ci
+        make test
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+- as: subsystem-aws-pools
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: dpp
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.8"
+  steps:
+    test:
+    - as: subsystem-deploy-and-run
+      cli: latest
+      commands: |
+        export BUILD_TYPE=CI
+        export REPORTS=${ARTIFACT_DIR}
+        export TARGET=oc
+
+        make deploy-on-openshift-ci
+        make test
+      dependencies:
+      - env: SERVICE
+        name: assisted-service
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
+- as: subsystem-kubeapi-aws-pools
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: dpp
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.8"
+  steps:
+    test:
+    - as: subsystem-deploy-and-run
+      cli: latest
+      commands: |
+        export BUILD_TYPE=CI
+        export REPORTS=${ARTIFACT_DIR}
+        export TARGET=oc
+        export GENERATE_CRD=false
+
+        make deploy-on-openshift-ci
+        make enable-kube-api-for-subsystem
+        make test-kube-api
+      dependencies:
+      - env: SERVICE
+        name: assisted-service
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
 - as: subsystem-kubeapi-aws
   steps:
     cluster_profile: aws
@@ -122,10 +201,29 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-aws
-- as: e2e-metal-assisted
+- as: subsystem-kubeapi-aws-periodic
+  cron: '@daily'
   steps:
-    cluster_profile: packet
-    workflow: baremetalds-assisted-install
+    cluster_profile: aws
+    test:
+    - as: subsystem-deploy-and-run
+      cli: latest
+      commands: |
+        export BUILD_TYPE=CI
+        export REPORTS=${ARTIFACT_DIR}
+        export SERVICE=$(echo "${IMAGE_FORMAT}" | component=assisted-service envsubst)
+        export TARGET=oc
+        export GENERATE_CRD=false
+
+        make deploy-on-openshift-ci
+        make enable-kube-api-for-subsystem
+        make test-kube-api
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
 - as: e2e-metal-assisted-operator-disconnected
   steps:
     cluster_profile: packet
@@ -189,7 +287,7 @@ tests:
         OPENSHIFT_VERSION=4.8
         ENABLE_KUBE_API=true
     workflow: baremetalds-assisted-install
-- as: system-test
+- as: e2e-metal-assisted
   steps:
     cluster_profile: packet
     env:

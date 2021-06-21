@@ -1,0 +1,45 @@
+base_images:
+  base:
+    name: ubi
+    namespace: ocp
+    tag: "8"
+  repo-brancher:
+    name: repo-brancher
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: open-cluster-management
+    tag: go1.16-linux
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  to: bailer
+promotion:
+  name: "2.3"
+  namespace: open-cluster-management
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: fast-forward
+  commands: |
+    git clone -b master https://github.com/openshift/release.git /tmp/release
+    repo-brancher --fast-forward --confirm \
+        --config-dir=/tmp/release/ci-operator/config/open-cluster-management/bailer/ \
+        --username=acm-cicd --token-path=/etc/github/token \
+        --current-promotion-namespace=open-cluster-management \
+        --current-release=2.3 --future-release=2.3
+  container:
+    from: repo-brancher
+  postsubmit: true
+  secrets:
+  - mount_path: /etc/github
+    name: acm-cicd-github
+zz_generated_metadata:
+  branch: main
+  org: open-cluster-management
+  repo: bailer
