@@ -168,6 +168,34 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: operator-e2e-aws-ocp-47
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: dpp
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.7"
+  steps:
+    allow_skip_on_success: true
+    test:
+    - as: operator-e2e
+      commands: make test-e2e-with-kafka
+      dependencies:
+      - env: KNATIVE_OPENSHIFT_INGRESS
+        name: knative-openshift-ingress
+      - env: KNATIVE_OPERATOR
+        name: knative-operator
+      - env: OPENSHIFT_KNATIVE_OPERATOR
+        name: openshift-knative-operator
+      from: serverless-operator-src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
 - as: upstream-e2e-aws-ocp-47
   cluster_claim:
     architecture: amd64
@@ -195,6 +223,34 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+    workflow: generic-claim
+- as: upgrade-tests-aws-ocp-47
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: dpp
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.7"
+  steps:
+    allow_skip_on_success: true
+    test:
+    - as: serverless-e2e
+      commands: make test-upgrade
+      dependencies:
+      - env: KNATIVE_OPENSHIFT_INGRESS
+        name: knative-openshift-ingress
+      - env: KNATIVE_OPERATOR
+        name: knative-operator
+      - env: OPENSHIFT_KNATIVE_OPERATOR
+        name: openshift-knative-operator
+      from: serverless-operator-src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: "2"
+          memory: 4Gi
     workflow: generic-claim
 zz_generated_metadata:
   branch: hive
