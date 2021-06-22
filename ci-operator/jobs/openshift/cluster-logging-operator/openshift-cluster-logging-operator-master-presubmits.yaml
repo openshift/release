@@ -5,15 +5,15 @@ presubmits:
     branches:
     - master
     cluster: build02
-    context: ci/prow/e2e-operator
+    context: ci/prow/e2e-gcp
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cluster-logging-operator-master-e2e-operator
-    rerun_command: /test e2e-operator
+    name: pull-ci-openshift-cluster-logging-operator-master-e2e-gcp
+    rerun_command: /test e2e-gcp
     spec:
       containers:
       - args:
@@ -22,8 +22,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-operator-cluster-profile
-        - --target=e2e-operator
+        - --secret-dir=/usr/local/e2e-gcp-cluster-profile
+        - --target=e2e-gcp
         command:
         - ci-operator
         image: ci-operator:latest
@@ -39,7 +39,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-operator-cluster-profile
+        - mountPath: /usr/local/e2e-gcp-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -65,14 +65,16 @@ presubmits:
         projected:
           sources:
           - secret:
-              name: cluster-secrets-aws
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-operator,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-gcp,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -138,7 +140,9 @@ presubmits:
         projected:
           sources:
           - secret:
-              name: cluster-secrets-aws
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
