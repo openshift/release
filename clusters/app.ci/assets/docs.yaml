@@ -7,7 +7,10 @@ spec:
   selector:
     app: ci-docs
   ports:
-  - port: 8080
+  - name: ci-docs
+    port: 8080
+  - name: cluster-display
+    port: 8090
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -17,7 +20,7 @@ metadata:
   labels:
     app: ci-docs
   annotations:
-    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"ci-docs:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"ci-docs\")].image"}]'
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"ci-docs:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"ci-docs\")].image"},{"from":{"kind":"ImageStreamTag","name":"cluster-display:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"cluster-display\")].image"}]'
 spec:
   replicas: 2
   revisionHistoryLimit: 2
@@ -36,3 +39,32 @@ spec:
           requests:
             memory: "250Mi"
             cpu: "100m"
+      - args:
+        - --hive-kubeconfig=/etc/kubeconfig/sa.cluster-display.hive.config
+        name: cluster-display
+        image: cluster-display
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 8090
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 8090
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 600
+        resources:
+          requests:
+            memory: "250Mi"
+            cpu: "100m"
+        volumeMounts:
+        - name: kubeconfig
+          mountPath: "/etc/kubeconfig"
+          readOnly: true
+      volumes:
+      - name: kubeconfig
+        secret:
+          secretName: cluster-display
