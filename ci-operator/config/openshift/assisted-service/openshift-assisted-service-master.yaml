@@ -15,6 +15,10 @@ base_images:
     name: assisted-test
     namespace: ocp-kni
     tag: assisted-test-infra
+  coreos_centos:
+    name: coreos-centos8-buildroot
+    namespace: coreos
+    tag: latest
   coreos_centos_stream8:
     name: stream8
     namespace: coreos
@@ -44,6 +48,15 @@ images:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.15
   to: assisted-service
+- dockerfile_literal: |
+    FROM coreos/centos
+    COPY . .
+  from: src
+  inputs:
+    coreos_centos:
+      as:
+      - coreos/centos
+  to: assisted-service-scripts
 operator:
   bundles:
   - dockerfile_path: deploy/olm-catalog/bundle.Dockerfile
