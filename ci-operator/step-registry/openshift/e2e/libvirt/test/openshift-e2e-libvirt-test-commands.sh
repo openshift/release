@@ -30,14 +30,14 @@ function suite() {
 import sys
 all_tests = set()
 excluded_tests = set()
-for l in sys.stdin.readlines():"${TEST_TYPE}" != "conformance-parallel"
-  all_tests.add(l.strip())
+for l in sys.stdin.readlines():
+    all_tests.add(l.strip())
 with open(sys.argv[1], "r") as f:
-  for l in f.readlines():
-    excluded_tests.add(l.strip())
+    for l in f.readlines():
+        excluded_tests.add(l.strip())
 test_suite = all_tests - excluded_tests
 for t in test_suite:
-  print(t)
+    print(t)
 EOSCRIPT
       chmod +x ${SHARED_DIR}/invert_excluded.py
       openshift-tests run "${TEST_SUITE}" --dry-run | ${SHARED_DIR}/invert_excluded.py ${SHARED_DIR}/excluded_tests > ${SHARED_DIR}/tests
