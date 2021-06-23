@@ -532,8 +532,26 @@ tests:
     env:
       ARCH: ppc64le
       BRANCH: "4.8"
-      TEST_TYPE: conformance-parallel
-    workflow: openshift-e2e-libvirt
+    test:
+    - as: e2e-test
+      cli: latest
+      commands: |
+        echo "\"[sig-api-machinery] Servers with support for Table transformation should return chunks of table results for list calls [Suite:openshift/conformance/parallel] [Suite:k8s]\"" > ${SHARED_DIR}/tests
+        openshift-tests run --from-repository quay.io/multi-arch/community-e2e-images --file=${SHARED_DIR}/tests
+      dnsConfig:
+        nameservers:
+        - 172.30.38.188
+        searches:
+        - bastion-z.svc.cluster.local
+        - bastion-ppc64le-libvirt.svc.cluster.local
+      from: tests
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-libvirt
 - as: image-ecosystem-remote-libvirt-ppc64le
   cluster: build01
   cron: 0 8,20 * * *
