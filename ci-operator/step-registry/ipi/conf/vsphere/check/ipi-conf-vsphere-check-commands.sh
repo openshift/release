@@ -47,6 +47,7 @@ govc ls -json -t OpaqueNetwork "/SDDC-Datacenter/network/${LEASED_RESOURCE}" |\
 # does not help the situation. For periodics create a slight random delay
 # before continuing job progression.
 
-if [[ "${JOB_TYPE}" = "periodic" ]]; then
-    sleep "$(( RANDOM % 240 + 60 ))"s
-fi
+# In addition the DHCP lease scope timeout is causing additional issues.
+# By increasing the initial delay we might be able to work around this.
+
+sleep "$(( RANDOM % 120 + 180 ))"s
