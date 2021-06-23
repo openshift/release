@@ -20,8 +20,8 @@ EOF
 set -x
 
 KCLI_PARAM=""
-if [ ! -z $OO_CHANNEL ] ; then
-    KCLI_PARAM="-P openshift_image=registry.ci.openshift.org/ocp/release:$OO_CHANNEL"
+if [ ! -z $CHANNEL ] ; then
+    KCLI_PARAM="-P openshift_image=registry.ci.openshift.org/ocp/release:$CHANNEL"
 fi
 
 cat << EOF > ~/ocp-install.yml

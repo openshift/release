@@ -4,6 +4,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# In upgrade tests, the subscribe step installs the initial version of the operator, so
+# it needs to install from the INITIAL_CHANNEL
+if [ -n "${INITIAL_CHANNEL}" ]; then
+    CHANNEL="${INITIAL_CHANNEL}"
+fi
+
 if [[ $JOB_NAME != rehearse-* ]]; then
     if [[ -z ${INDEX_IMAGE:-} ]] || [[ -z ${PACKAGE:-} ]] || [[ -z ${CHANNEL:-} ]]; then
         echo "At least of required variables INDEX_IMAGE=${INDEX_IMAGE:-} PACKAGE=${PACKAGE:-} CHANNEL=${CHANNEL:-} is unset"
@@ -104,8 +110,7 @@ echo "Set the deployment start time: ${DEPLOYMENT_START_TIME}"
 
 echo "Creating Subscription"
 
-SUB=$(
-    oc create -f - -o jsonpath='{.metadata.name}' <<EOF
+SUB_MANIFEST=$(cat <<EOF
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
@@ -116,21 +121,62 @@ spec:
   channel: "$CHANNEL"
   source: $CATSRC
   sourceNamespace: $INSTALL_NAMESPACE
+  installPlanApproval: Manual
 EOF
 )
 
+# Add startingCSV is one is provided
+if [ -n "${INITIAL_CSV}" ]; then
+    SUB_MANIFEST="${SUB_MANIFEST}"$'\n'"  startingCSV: ${INITIAL_CSV}"
+fi
+
+SUB=$(oc create -f - -o jsonpath='{.metadata.name}' <<< "${SUB_MANIFEST}" )
+
 echo "Subscription name is \"$SUB\""
-echo "Waiting for ClusterServiceVersion to become ready..."
+echo "Waiting for installPlan to be created"
 
+# store subscription name and install namespace to shared directory for upgrade step
+echo "${INSTALL_NAMESPACE}" > "${SHARED_DIR}"/oo-install-namespace
+echo "${SUB}" > "${SHARED_DIR}"/oo-subscription
+
+FOUND_INSTALLPLAN=false
+# wait up to 5 minutes for CSV installPlan to appear
 for _ in $(seq 1 60); do
-    CSV=$(oc -n "$INSTALL_NAMESPACE" get subscription "$SUB" -o jsonpath='{.status.installedCSV}' || true)
-    if [[ -n "$CSV" ]]; then
-        if [[ "$(oc -n "$INSTALL_NAMESPACE" get csv "$CSV" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
-            echo "ClusterServiceVersion \"$CSV\" ready"
+    INSTALL_PLAN=$(oc -n "$INSTALL_NAMESPACE" get subscription "$SUB" -o jsonpath='{.status.installplan.name}' || true)
+    if [[ -n "$INSTALL_PLAN" ]]; then
+      oc -n "$INSTALL_NAMESPACE" patch installPlan "${INSTALL_PLAN}" --type merge --patch '{"spec":{"approved":true}}'
+      FOUND_INSTALLPLAN=true
+      break
+    fi
+    sleep 5
+done
 
-            DEPLOYMENT_ART="oo_deployment_details.yaml"
-            echo "Saving deployment details in ${DEPLOYMENT_ART} as a shared artifact"
-            cat > "${ARTIFACT_DIR}/${DEPLOYMENT_ART}" <<EOF
+
+if [ "$FOUND_INSTALLPLAN" = true ] ; then
+    echo "Install Plan approved"
+    echo "Waiting for ClusterServiceVersion to become ready..."
+
+    # wait 10 minutes for operator installation to complete
+    for _ in $(seq 1 60); do
+        CSV=$(oc -n "$INSTALL_NAMESPACE" get subscription "$SUB" -o jsonpath='{.status.installedCSV}' || true)
+        if [[ -n "$CSV" ]]; then
+            if [[ "$(oc -n "$INSTALL_NAMESPACE" get csv "$CSV" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
+                echo "ClusterServiceVersion \"$CSV\" ready"
+                exit 0
+            fi
+        fi
+        sleep 10
+    done
+
+    for _ in $(seq 1 60); do
+      CSV=$(oc -n "$INSTALL_NAMESPACE" get subscription "$SUB" -o jsonpath='{.status.installedCSV}' || true)
+      if [[ -n "$CSV" ]]; then
+          if [[ "$(oc -n "$INSTALL_NAMESPACE" get csv "$CSV" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
+              echo "ClusterServiceVersion \"$CSV\" ready"
+
+              DEPLOYMENT_ART="oo_deployment_details.yaml"
+              echo "Saving deployment details in ${DEPLOYMENT_ART} as a shared artifact"
+              cat > "${ARTIFACT_DIR}/${DEPLOYMENT_ART}" <<EOF
 ---
 csv: "${CSV}"
 operatorgroup: "${OPERATORGROUP}"
@@ -140,14 +186,16 @@ install_namespace: "${INSTALL_NAMESPACE}"
 target_namespaces: "${TARGET_NAMESPACES}"
 deployment_start_time: "${DEPLOYMENT_START_TIME}"
 EOF
-            cp "${ARTIFACT_DIR}/${DEPLOYMENT_ART}" "${SHARED_DIR}/${DEPLOYMENT_ART}"
-            exit 0
-        fi
-    fi
-    sleep 10
-done
-
-echo "Timed out waiting for csv to become ready"
+              cp "${ARTIFACT_DIR}/${DEPLOYMENT_ART}" "${SHARED_DIR}/${DEPLOYMENT_ART}"
+              exit 0
+          fi
+      fi
+      sleep 10
+    done
+    echo "Timed out waiting for csv to become ready"
+else
+    echo "Failed to find installPlan for subscription"
+fi
 
 NS_ART="$ARTIFACT_DIR/ns-$INSTALL_NAMESPACE.yaml"
 echo "Dumping Namespace $INSTALL_NAMESPACE as $NS_ART"
@@ -190,8 +238,13 @@ if [[ -n "$CSV" ]]; then
     done
 else
     CSV_ART="$ARTIFACT_DIR/$INSTALL_NAMESPACE-all-csvs.yaml"
-    echo "ClusterServiceVersion was never created"
+    echo "ClusterServiceVersion $CSV was never created"
     echo "Dumping all ClusterServiceVersions in namespace $INSTALL_NAMESPACE to $CSV_ART"
     oc get -n "$INSTALL_NAMESPACE" csv -o yaml >"$CSV_ART"
 fi
+
+INSTALLPLANS_ART="$ARTIFACT_DIR/installPlans.yaml"
+echo "Dumping all installPlans in namespace $INSTALL_NAMESPACE as $INSTALLPLANS_ART"
+oc get -n "$INSTALL_NAMESPACE" installplans -o yaml >"$INSTALLPLANS_ART"
+
 exit 1
