@@ -141,8 +141,8 @@ function wait_for_stable_cluster() {
         oc get node -o yaml &> $ARTIFACT_DIR/stability-node-$COUNT.yaml || :
         oc get clusteroperator -o yaml > $ARTIFACT_DIR/stability-clusteroperator-$COUNT.yaml || :
 
-        # Wait until 6 checks pass in a row (at least 1 minute, probably much more)
-        if [ "$STABLE_COUNT" -ge "6" ]; then
+        # Wait until 15 checks pass in a row (at least 2 minutes, probably much more)
+        if [ "$STABLE_COUNT" -ge "15" ]; then
             echo "Cluster is stable"
             break
         fi
