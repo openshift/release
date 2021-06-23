@@ -8,7 +8,7 @@ export PATH=/usr/libexec/origin:$PATH
 # Initial check
 if [[ "${CLUSTER_TYPE}" != "libvirt-ppc64le" ]] && [[ "${CLUSTER_TYPE}" != "libvirt-s390x" ]] ; then
     echo "Unsupported cluster type '${CLUSTER_TYPE}'"
-    exit 0
+    exit 1
 fi
 
 function upgrade() {
@@ -18,44 +18,47 @@ function upgrade() {
         --options "${TEST_UPGRADE_OPTIONS-}" \
         --provider "${TEST_PROVIDER}" \
         -o "${ARTIFACT_DIR}/e2e.log" \
-        --junit-dir "${ARTIFACT_DIR}/junit"
+        --junit-dir "${ARTIFACT_DIR}/junit" &
+    wait "$!"
     set +x
 }
 
 function suite() {
-    if [ -f "${SHARED_DIR}/excluded_tests" ] && [ "${TEST_TYPE}" == "conformance-parallel" ]; then
-
+    if [ -f "${SHARED_DIR}/excluded_tests" ]; then
         cat > ${SHARED_DIR}/invert_excluded.py <<EOSCRIPT
 #!/usr/libexec/platform-python
 import sys
 all_tests = set()
 excluded_tests = set()
-for l in sys.stdin.readlines():"${TEST_TYPE}" != "conformance-parallel"
-  all_tests.add(l.strip())
+for l in sys.stdin.readlines():
+    all_tests.add(l.strip())
 with open(sys.argv[1], "r") as f:
-  for l in f.readlines():
-    excluded_tests.add(l.strip())
+    for l in f.readlines():
+        excluded_tests.add(l.strip())
 test_suite = all_tests - excluded_tests
 for t in test_suite:
-  print(t)
+    print(t)
 EOSCRIPT
-chmod +x ${SHARED_DIR}/invert_excluded.py
-
-
-openshift-tests run openshift/conformance/parallel --dry-run | ${SHARED_DIR}/invert_excluded.py ${SHARED_DIR}/excluded_tests > ${SHARED_DIR}/tests
-
-        TEST_ARGS="${TEST_ARGS:-} --file ${SHARED_DIR}/tests"
+      chmod +x ${SHARED_DIR}/invert_excluded.py
+      openshift-tests run "${TEST_SUITE}" --dry-run | ${SHARED_DIR}/invert_excluded.py ${SHARED_DIR}/excluded_tests > ${SHARED_DIR}/tests
+      TEST_ARGS="${TEST_ARGS:-} --file ${SHARED_DIR}/tests"
     fi
 
     VERBOSITY="" # "--v 9"
+    set -x
     openshift-tests run --from-repository quay.io/multi-arch/community-e2e-images \
-	${VERBOSITY} \
-	"${TEST_SUITE}" \
-	${TEST_ARGS:-} \
+        ${VERBOSITY} \
+        "${TEST_SUITE}" \
+        ${TEST_ARGS:-} \
         -o "${ARTIFACT_DIR}/e2e.log" \
         --junit-dir "${ARTIFACT_DIR}/junit" &
+    wait "$!"
+    set +x
 }
+
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_START"
+trap 'echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"' EXIT
+
 case "${TEST_TYPE}" in
 conformance-parallel)
     TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/conformance/parallel suite
@@ -80,4 +83,3 @@ suite)
     exit 1
     ;;
 esac
-echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"

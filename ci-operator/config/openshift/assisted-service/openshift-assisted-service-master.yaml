@@ -15,6 +15,10 @@ base_images:
     name: assisted-test
     namespace: ocp-kni
     tag: assisted-test-infra
+  coreos_centos:
+    name: coreos-centos8-buildroot
+    namespace: coreos
+    tag: latest
   coreos_centos_stream8:
     name: stream8
     namespace: coreos
@@ -44,6 +48,11 @@ images:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.15
   to: assisted-service
+- dockerfile_literal: |
+    FROM coreos/centos
+    COPY . .
+  from: src
+  to: assisted-service-scripts
 operator:
   bundles:
   - dockerfile_path: deploy/olm-catalog/bundle.Dockerfile
@@ -81,47 +90,6 @@ tests:
   container:
     from: test-bin
 - as: subsystem-aws
-  steps:
-    cluster_profile: aws
-    test:
-    - as: subsystem-deploy-and-run
-      cli: latest
-      commands: |
-        export BUILD_TYPE=CI
-        export REPORTS=${ARTIFACT_DIR}
-        export SERVICE=$(echo "${IMAGE_FORMAT}" | component=assisted-service envsubst)
-        export TARGET=oc
-
-        make deploy-on-openshift-ci
-        make test
-      from: test-bin
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: ipi-aws
-- as: subsystem-aws-periodic
-  cron: '@daily'
-  steps:
-    cluster_profile: aws
-    test:
-    - as: subsystem-deploy-and-run
-      cli: latest
-      commands: |
-        export BUILD_TYPE=CI
-        export REPORTS=${ARTIFACT_DIR}
-        export SERVICE=$(echo "${IMAGE_FORMAT}" | component=assisted-service envsubst)
-        export TARGET=oc
-
-        make deploy-on-openshift-ci
-        make test
-      from: test-bin
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: ipi-aws
-- as: subsystem-aws-pools
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -149,7 +117,7 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
-- as: subsystem-kubeapi-aws-pools
+- as: subsystem-aws-periodic
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -157,6 +125,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.8"
+  cron: '@daily'
   steps:
     test:
     - as: subsystem-deploy-and-run
@@ -165,11 +134,9 @@ tests:
         export BUILD_TYPE=CI
         export REPORTS=${ARTIFACT_DIR}
         export TARGET=oc
-        export GENERATE_CRD=false
 
         make deploy-on-openshift-ci
-        make enable-kube-api-for-subsystem
-        make test-kube-api
+        make test
       dependencies:
       - env: SERVICE
         name: assisted-service
@@ -180,50 +147,66 @@ tests:
           memory: 200Mi
     workflow: generic-claim
 - as: subsystem-kubeapi-aws
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: dpp
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.8"
   steps:
-    cluster_profile: aws
     test:
     - as: subsystem-deploy-and-run
       cli: latest
       commands: |
         export BUILD_TYPE=CI
         export REPORTS=${ARTIFACT_DIR}
-        export SERVICE=$(echo "${IMAGE_FORMAT}" | component=assisted-service envsubst)
         export TARGET=oc
         export GENERATE_CRD=false
 
         make deploy-on-openshift-ci
         make enable-kube-api-for-subsystem
         make test-kube-api
+      dependencies:
+      - env: SERVICE
+        name: assisted-service
       from: test-bin
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: ipi-aws
+    workflow: generic-claim
 - as: subsystem-kubeapi-aws-periodic
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: dpp
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.8"
   cron: '@daily'
   steps:
-    cluster_profile: aws
     test:
     - as: subsystem-deploy-and-run
       cli: latest
       commands: |
         export BUILD_TYPE=CI
         export REPORTS=${ARTIFACT_DIR}
-        export SERVICE=$(echo "${IMAGE_FORMAT}" | component=assisted-service envsubst)
         export TARGET=oc
         export GENERATE_CRD=false
 
         make deploy-on-openshift-ci
         make enable-kube-api-for-subsystem
         make test-kube-api
+      dependencies:
+      - env: SERVICE
+        name: assisted-service
       from: test-bin
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: ipi-aws
+    workflow: generic-claim
 - as: e2e-metal-assisted-operator-disconnected
   steps:
     cluster_profile: packet

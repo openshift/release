@@ -46,6 +46,10 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
   to: cluster-monitoring-operator
+- dockerfile_literal: |
+    FROM src
+  from: src
+  to: cluster-monitoring-operator-src
 promotion:
   disabled: true
   name: 4.9-priv
@@ -73,6 +77,10 @@ tests:
     from: src
 - as: vendor
   commands: make vendor && git diff --exit-code
+  container:
+    from: src
+- as: shellcheck
+  commands: make shellcheck
   container:
     from: src
 - as: unit
