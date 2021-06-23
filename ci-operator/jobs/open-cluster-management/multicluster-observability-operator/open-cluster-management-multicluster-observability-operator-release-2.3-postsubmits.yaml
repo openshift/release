@@ -93,3 +93,44 @@ postsubmits:
       - name: acm-cicd-github
         secret:
           secretName: acm-cicd-github
+  - agent: kubernetes
+    branches:
+    - ^release-2\.3$
+    cluster: build02
+    decorate: true
+    name: branch-ci-open-cluster-management-rbac-query-proxy-release-2.3-publish
+    run_if_changed: ^(proxy/.*)$
+    spec:
+      containers:
+      - args:
+        - -f
+        - /opt/build-harness/Makefile.build-harness-openshift-ci
+        - osci/publish
+        command:
+        - make
+        env:
+        - name: COMPONENT_NAME
+          value: obs-rbac-query-proxy
+        - name: COMPONENT_VERSION
+          value: "2.3"
+        - name: OSCI_IMAGE_REMOTE_REPO_SRC
+          value: registry.ci.openshift.org/open-cluster-management
+        - name: OSCI_PUBLISH_DELAY
+          value: "20"
+        - name: SELF
+          value: make -f /opt/build-harness/Makefile.build-harness-openshift-ci
+        image: registry.ci.openshift.org/open-cluster-management/builder:go1.14-linux-amd64
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/github
+          name: acm-cicd-github
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: acm-cicd-github
+        secret:
+          secretName: acm-cicd-github
