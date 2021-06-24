@@ -498,6 +498,61 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+- as: e2e-oo
+  steps:
+    test:
+    - as: e2e-oo
+      commands: |
+        GCS_CREDENTIALS_FILE=/tmp/gcs/service-account.json REMOTE_REGISTRY_SECRET_DIR=/tmp/import-secret LOCAL_REGISTRY_SECRET_DIR=/tmp/pull-secret KUBECONFIG=/auth/kubeconfig make e2e TAGS=optional_operators
+      credentials:
+      - mount_path: /auth
+        name: ci-operator
+        namespace: test-credentials
+      - mount_path: /tmp/pull-secret
+        name: registry-pull-credentials
+        namespace: test-credentials
+      - mount_path: /etc/push-secret
+        name: registry-push-credentials-ci-central
+        namespace: test-credentials
+      - mount_path: /tmp/import-secret
+        name: ci-pull-credentials
+        namespace: test-credentials
+      - mount_path: /tmp/gcs
+        name: gce-sa-credentials-gcs-publisher
+        namespace: test-credentials
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: e2e-oo-post
+  postsubmit: true
+  steps:
+    test:
+    - as: e2e-oo-post
+      commands: |
+        GCS_CREDENTIALS_FILE=/tmp/gcs/service-account.json REMOTE_REGISTRY_SECRET_DIR=/tmp/import-secret LOCAL_REGISTRY_SECRET_DIR=/tmp/pull-secret KUBECONFIG=/auth/kubeconfig make e2e TAGS=optional_operators
+      credentials:
+      - mount_path: /auth
+        name: ci-operator
+        namespace: test-credentials
+      - mount_path: /tmp/pull-secret
+        name: registry-pull-credentials
+        namespace: test-credentials
+      - mount_path: /etc/push-secret
+        name: registry-push-credentials-ci-central
+        namespace: test-credentials
+      - mount_path: /tmp/import-secret
+        name: ci-pull-credentials
+        namespace: test-credentials
+      - mount_path: /tmp/gcs
+        name: gce-sa-credentials-gcs-publisher
+        namespace: test-credentials
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: breaking-changes
   commands: make check-breaking-changes
   container:
