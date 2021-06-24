@@ -41,6 +41,7 @@ sos report --batch --tmp-dir /tmp/artifacts \
 cp -r /var/lib/libvirt/dnsmasq /tmp/artifacts/libvirt-dnsmasq
 
 cp -R ./reports /tmp/artifacts || true
+find -name '*.log' -exec cp -v {} /tmp/artifacts \; || true
 
 # Get assisted logs
 export LOGS_DEST=/tmp/artifacts
