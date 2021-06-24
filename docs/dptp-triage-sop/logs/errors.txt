@@ -11,7 +11,7 @@
 	or (error=~"Something went wrong while executing your query. This may be the result of a timeout, or it could be a GitHub bug." or msg=~"Something went wrong while executing your query. This may be the result of a timeout, or it could be a GitHub bug.") # nothing to do post-hoc
 	or (msg="Error dispatching event to external plugin." and (error=~"i/o timeout" or error=~"connection refused")) # this happens on redeploy and nothing we can do post-hoc
 	or msg="Query returned 1k PRs" # nothing to do
-	or (msg=~"http://ghproxy/graphql" and msg=~"i/o timeout") or (error=~"http://ghproxy/graphql" and error=~"i/o timeout") # ghproxy outage
+	or (msg=~"http://ghproxy/graphql" and (msg=~"i/o timeout" or msg=~"connect: connection refused")) or (error=~"http://ghproxy/graphql" and (error=~"i/o timeout" or error=~"connect: connection refused")) # ghproxy outage
 	or (component="deck" and msg=~"Updating" and (error=~"connect: connection refused" or error=~"i/o timeout") ) # deck trying to talk to Tide, this fails when we bump. We have probes in Tide so we get alerted when it's down for longer time.
 	or ((component="crier" or component="dptp-controller-manager" or component="prow-controller-manager" or logger=~"controller-runtime") and (error=~"context deadline exceeded" or error=~"context canceled")) # why???
 	or error=~"leader election lost" # why is this even an error?
