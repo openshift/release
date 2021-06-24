@@ -1,8 +1,4 @@
 base_images:
-  boskos:
-    name: boskos
-    namespace: ci
-    tag: latest
   cli:
     name: "4.8"
     namespace: ocp
@@ -401,14 +397,6 @@ images:
       - destination_dir: .
         source_path: /go/bin/ocp-build-data-enforcer
   to: ocp-build-data-enforcer
-- context_dir: test/images/e2e-bin/
-  from: test-bin
-  inputs:
-    boskos:
-      paths:
-      - destination_dir: boskos/
-        source_path: /app
-  to: e2e-bin
 - dockerfile_literal: |-
     FROM centos:8
     ADD vault-subpath-proxy /usr/bin/vault-subpath-proxy
@@ -455,8 +443,6 @@ images:
         source_path: /go/bin/ci-operator-yaml-creator
   to: ci-operator-yaml-creator
 promotion:
-  excluded_images:
-  - e2e-bin
   namespace: ci
   tag: latest
 resources:
@@ -507,7 +493,7 @@ tests:
       - mount_path: /tmp/hive
         name: hive-hive-credentials
         namespace: test-credentials
-      from: e2e-bin
+      from: test-bin
       resources:
         requests:
           cpu: 100m
