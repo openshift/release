@@ -6,6 +6,29 @@ set -o pipefail
 
 base="$( dirname "${BASH_SOURCE[0]}" )/.."
 
+
+# Stolen from https://github.com/kubermatic/kubermatic/blob/00c0da788d618a4fbf3ddf1e9655c8a3a06d0a28/hack/lib.sh#L41 https://github.com/kubermatic/kubermatic/blob/00c0da788d618a4fbf3ddf1e9655c8a3a06d0a28/hack/lib.sh#L41
+retry() {
+  retries=$1
+  shift
+
+  count=0
+  delay=2
+  until "$@"; do
+    rc=$?
+    count=$((count + 1))
+    if [ $count -lt "$retries" ]; then
+      echo "Retry $count/$retries exited $rc, retrying in $delay seconds..." > /dev/stderr
+      sleep $delay
+    else
+      echo "Retry $count/$retries exited $rc, no more retries left." > /dev/stderr
+      return $rc
+    fi
+    delay=$((delay * 2))
+  done
+  return 0
+}
+
 function annotate() {
 	local namespace="$1"
 	local name="$2"
@@ -31,7 +54,7 @@ function annotate() {
 			fi
 		fi
 
-		oc annotate -n "${namespace}" "is/${name}" "release.openshift.io/config=$( cat "${conf}" | jq -c . )" --overwrite
+		retry 3 oc annotate -n "${namespace}" "is/${name}" "release.openshift.io/config=$( cat "${conf}" | jq -c . )" --overwrite
 	fi
 }
 
