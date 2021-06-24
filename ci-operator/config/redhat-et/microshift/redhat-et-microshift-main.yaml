@@ -28,26 +28,30 @@ build_root:
         - registry.access.redhat.com/ubi8/go-toolset
 images:
 - dockerfile_literal: |
-    FROM registry.access.redhat.com/ubi8/ubi
-    COPY --from=builder /go/src/github.com/redhat-et/microshift/_output/bin/linux_amd64/microshift /usr/bin
+    FROM base
+    ADD microshift /usr/bin/
+    ENTRYPOINT ["/usr/bin/microshift", "run"]
   from: base
   inputs:
     bin:
-      as:
-      - builder
-  to: linux-amd64
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/redhat-et/microshift/_output/bin/linux_amd64/microshift
+  to: linux-amd64-4.7.0-0.microshift
 - dockerfile_literal: |
-    FROM registry.access.redhat.com/ubi8/ubi
-    COPY --from=builder /go/src/github.com/redhat-et/microshift/_output/bin/linux_arm64/microshift /usr/bin
+    FROM base
+    ADD microshift /usr/bin/
+    ENTRYPOINT ["/usr/bin/microshift", "run"]
   from: base
   inputs:
     bin:
-      as:
-      - builder
-  to: linux-arm64
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/redhat-et/microshift/_output/bin/linux_arm64/microshift
+  to: linux-arm64-4.7.0-0.microshift
 promotion:
+  name: microshift
   namespace: microshift
-  tag: 4.7.0-0.okd
 resources:
   '*':
     limits:
