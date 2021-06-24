@@ -38,6 +38,8 @@ source /root/assisted-vars.conf
 
 cd /root/dev-scripts
 source common.sh
+source utils.sh
+source network.sh
 
 REPO_DIR="/home/assisted-service"
 if [ ! -d "${REPO_DIR}" ]; then
