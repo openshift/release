@@ -1032,7 +1032,7 @@ presubmits:
     branches:
     - main
     cluster: build01
-    context: ci/prow/okd-hco-e2e-image-index-azure
+    context: ci/prow/okd-hco-e2e-image-index-gcp
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -1040,8 +1040,8 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       ci-operator.openshift.io/variant: okd
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-kubevirt-hyperconverged-cluster-operator-main-okd-hco-e2e-image-index-azure
-    rerun_command: /test okd-hco-e2e-image-index-azure
+    name: pull-ci-kubevirt-hyperconverged-cluster-operator-main-okd-hco-e2e-image-index-gcp
+    rerun_command: /test okd-hco-e2e-image-index-gcp
     run_if_changed: ^(build/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
     spec:
       containers:
@@ -1050,8 +1050,8 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/usr/local/hco-e2e-image-index-azure-cluster-profile
-        - --target=hco-e2e-image-index-azure
+        - --secret-dir=/usr/local/hco-e2e-image-index-gcp-cluster-profile
+        - --target=hco-e2e-image-index-gcp
         - --variant=okd
         command:
         - ci-operator
@@ -1065,7 +1065,7 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/hco-e2e-image-index-azure-cluster-profile
+        - mountPath: /usr/local/hco-e2e-image-index-gcp-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -1088,14 +1088,16 @@ presubmits:
         projected:
           sources:
           - secret:
-              name: cluster-secrets-azure4
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )okd-hco-e2e-image-index-azure,?($|\s.*)
+    trigger: (?m)^/test( | .* )okd-hco-e2e-image-index-gcp,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -1170,7 +1172,7 @@ presubmits:
     branches:
     - main
     cluster: build01
-    context: ci/prow/okd-hco-e2e-upgrade-index-azure
+    context: ci/prow/okd-hco-e2e-upgrade-index-gcp
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -1178,8 +1180,8 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       ci-operator.openshift.io/variant: okd
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-kubevirt-hyperconverged-cluster-operator-main-okd-hco-e2e-upgrade-index-azure
-    rerun_command: /test okd-hco-e2e-upgrade-index-azure
+    name: pull-ci-kubevirt-hyperconverged-cluster-operator-main-okd-hco-e2e-upgrade-index-gcp
+    rerun_command: /test okd-hco-e2e-upgrade-index-gcp
     run_if_changed: ^(build/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|Makefile|go\.mod|go\.sum)$
     spec:
       containers:
@@ -1188,8 +1190,8 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/usr/local/hco-e2e-upgrade-index-azure-cluster-profile
-        - --target=hco-e2e-upgrade-index-azure
+        - --secret-dir=/usr/local/hco-e2e-upgrade-index-gcp-cluster-profile
+        - --target=hco-e2e-upgrade-index-gcp
         - --variant=okd
         command:
         - ci-operator
@@ -1203,7 +1205,7 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/hco-e2e-upgrade-index-azure-cluster-profile
+        - mountPath: /usr/local/hco-e2e-upgrade-index-gcp-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -1226,14 +1228,16 @@ presubmits:
         projected:
           sources:
           - secret:
-              name: cluster-secrets-azure4
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )okd-hco-e2e-upgrade-index-azure,?($|\s.*)
+    trigger: (?m)^/test( | .* )okd-hco-e2e-upgrade-index-gcp,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
