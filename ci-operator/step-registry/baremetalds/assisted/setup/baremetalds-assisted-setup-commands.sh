@@ -117,9 +117,8 @@ set -xeuo pipefail
 cd /home/assisted
 source /root/config
 
+echo "export KUBECONFIG=/home/assisted/build/kubeconfig" >> /root/.bashrc
 export KUBECONFIG=/home/assisted/build/kubeconfig
-KUBECONFIG=\$(find \${KUBECONFIG} -type f)
-echo "export KUBECONFIG=\${KUBECONFIG}" >> /root/.bashrc
 
 \${POST_INSTALL_COMMAND:-}
 
