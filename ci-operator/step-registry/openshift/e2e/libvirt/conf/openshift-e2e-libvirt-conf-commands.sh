@@ -9,8 +9,7 @@ if [ "${TEST_TYPE}" != "conformance-parallel" ]; then
     exit 0 
 fi
 if [ "${BRANCH}" == "4.7" ] && [ "${ARCH}" == "ppc64le" ]; then
-
-    read -d '#' INCL << EOF
+    cat > "${SHARED_DIR}/excluded_tests" << EOF
 "[sig-api-machinery] Servers with support for Table transformation should return chunks of table results for list calls [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-api-machinery] Servers with support for Table transformation should return generic metadata details across all namespaces for nodes [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-apps][Feature:DeploymentConfig] deploymentconfigs when tagging images should successfully tag the deployed image [Suite:openshift/conformance/parallel]"
@@ -66,12 +65,9 @@ if [ "${BRANCH}" == "4.7" ] && [ "${ARCH}" == "ppc64le" ]; then
 "[sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should support a 'default-deny-all' policy [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should work with Ingress,Egress specified together [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-#
 EOF
-    cat <(echo "$INCL") > "${SHARED_DIR}/excluded_tests"
 elif [ "${BRANCH}" == "4.7" ] && [ "${ARCH}" == "s390x" ]; then
-
-    read -d '#' INCL << EOF
+     cat > "${SHARED_DIR}/excluded_tests" << EOF
 "[sig-auth][Feature:HTPasswdAuth] HTPasswd IDP should successfully configure htpasswd and be responsive [Suite:openshift/conformance/parallel]"
 "[sig-auth][Feature:LDAP] LDAP IDP should authenticate against an ldap server [Suite:openshift/conformance/parallel]"
 "[sig-auth][Feature:OAuthServer] [Headers] expected headers returned from the authorize URL [Suite:openshift/conformance/parallel]"
@@ -112,12 +108,9 @@ elif [ "${BRANCH}" == "4.7" ] && [ "${ARCH}" == "s390x" ]; then
 "[sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should support a 'default-deny-all' policy [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should work with Ingress,Egress specified together [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-#
 EOF
-    cat <(echo "$INCL") > "${SHARED_DIR}/excluded_tests"
 elif [ "${BRANCH}" == "4.6" ] && [ "${ARCH}" == "ppc64le" ]; then
-
-    read -d '#' INCL << EOF
+     cat > "${SHARED_DIR}/excluded_tests" << EOF
 "[sig-apps][Feature:DeploymentConfig] deploymentconfigs when tagging images should successfully tag the deployed image [Suite:openshift/conformance/parallel]"
 "[sig-arch] Managed cluster should have no crashlooping pods in core namespaces over four minutes [Suite:openshift/conformance/parallel]"
 "[sig-auth][Feature:HTPasswdAuth] HTPasswd IDP should successfully configure htpasswd and be responsive [Suite:openshift/conformance/parallel]"
@@ -182,12 +175,9 @@ elif [ "${BRANCH}" == "4.6" ] && [ "${ARCH}" == "ppc64le" ]; then
 "[sig-imageregistry][Feature:Image] oc tag should preserve image reference for external images [Suite:openshift/conformance/parallel]"
 "[sig-imageregistry][Feature:Image] oc tag should work when only imagestreams api is available [Suite:openshift/conformance/parallel]"
 "[sig-network][Feature:Router] The HAProxy router should support reencrypt to services backed by a serving certificate automatically [Suite:openshift/conformance/parallel]"
-#
 EOF
-    cat <(echo "$INCL") > "${SHARED_DIR}/excluded_tests"
 elif [ "${BRANCH}" == "4.6" ] && [ "${ARCH}" == "s390x" ]; then
-
-    read -d '#' INCL << EOF
+     cat > "${SHARED_DIR}/excluded_tests" << EOF
 "[sig-imageregistry][Feature:ImageLookup] Image policy should perform lookup when the Deployment gets the resolve-names annotation later [Suite:openshift/conformance/parallel]"
 "[sig-cli] Kubectl client Kubectl copy should copy a file from a running Pod [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-cluster-lifecycle] Pods cannot access the /config/master API endpoint [Suite:openshift/conformance/parallel]"
@@ -249,9 +239,11 @@ elif [ "${BRANCH}" == "4.6" ] && [ "${ARCH}" == "s390x" ]; then
 "[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-storage] PersistentVolumes GCEPD should test that deleting a PVC before the pod does not cause pod deletion to fail on PD detach [Suite:openshift/conformance/parallel] [Suite:k8s]"
-#
 EOF
-    cat <(echo "$INCL") > "${SHARED_DIR}/excluded_tests"
 else
     echo "Executing all tests"
+fi
+if [ -f "${SHARED_DIR}/excluded_tests" ]; then
+    echo "Skipping following tests from conformance/parallel suite..."
+    cat ${SHARED_DIR}/excluded_tests
 fi
