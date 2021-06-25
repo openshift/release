@@ -5,10 +5,10 @@ set -o errexit
 set -o pipefail
 
 echo "Accessing the bundle image: $BUNDLE_IMAGE"
-oc image info --filter-by-os linux/amd64  -a /var/run/brew-pullsecret/.dockerconfigjson "$BUNDLE_IMAGE"
+oc image info --filter-by-os linux/amd64 -a /var/run/brew-pullsecret/.dockerconfigjson "$BUNDLE_IMAGE"
 
 echo "Accessing the index image: $INDEX_IMAGE"
-oc image info -a /var/run/brew-pullsecret/.dockerconfigjson "$INDEX_IMAGE"
+oc image info --filter-by-os linux/amd64 -a /var/run/brew-pullsecret/.dockerconfigjson "$INDEX_IMAGE"
 
 echo "Creating an artifact in $ARTIFACT_DIR"
 cat > "$ARTIFACT_DIR/well-known-artifact" << EOF
