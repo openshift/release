@@ -120,6 +120,6 @@ source /root/config
 echo "export KUBECONFIG=/home/assisted/build/kubeconfig" >> /root/.bashrc
 export KUBECONFIG=/home/assisted/build/kubeconfig
 
-\${POST_INSTALL_COMMAND:-}
+eval \${POST_INSTALL_COMMAND:-}
 
 EOF
