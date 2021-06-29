@@ -1,3 +1,8 @@
+base_images:
+  azure:
+    name: ci-base
+    namespace: azure
+    tag: latest
 build_root:
   image_stream_tag:
     name: release
@@ -72,26 +77,47 @@ tests:
   steps:
     post:
     - as: cluster-destroy
-      from: src
       commands: |
-        ci/destroy-aro-cluster.sh
+        cd /tmp/
+        git clone https://github.com/openshift/osde2e.git
+        cd
+        source /tmp/osde2e/ci/destroy-aro-cluster.sh
       credentials:
       - mount_path: /usr/local/osde2e-credentials
         name: osde2e-credentials
         namespace: test-credentials
+      from: azure
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
     pre:
     - as: cluster-create
-      from: src
       commands: |
-        ci/create-aro-cluster.sh
+        cd /tmp/
+        git clone https://github.com/openshift/osde2e.git
+        cd
+        source /tmp/osde2e/ci/create-aro-cluster.sh
       credentials:
       - mount_path: /usr/local/osde2e-credentials
         name: osde2e-credentials
         namespace: test-credentials
+      from: azure
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    test:
+    - as: conformance-tests
+      commands: |
+        export GOFLAGS=""
+
+        make build
+
+        TEST_KUBECONFIG=${SHARED_DIR}/kubeconfig \
+        PROVIDER=mock \
+        ./out/osde2e test --configs=conformance-suite
+      from: src
       resources:
         requests:
           cpu: 100m
