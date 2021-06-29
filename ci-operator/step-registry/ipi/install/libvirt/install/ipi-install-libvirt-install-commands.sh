@@ -110,11 +110,13 @@ if [ "${BRANCH}" == "4.7" ] || [ "${BRANCH}" == "4.6" ]; then
       cat > ${dir}/worker-hostrecords.xml << EOF
 <host ip='192.168.${CLUSTER_SUBNET}.1'>
   <hostname>alertmanager-main-openshift-monitoring.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
+  <hostname>canary-openshift-ingress-canary.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
   <hostname>console-openshift-console.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
   <hostname>downloads-openshift-console.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
   <hostname>grafana-openshift-monitoring.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
   <hostname>oauth-openshift.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
   <hostname>prometheus-k8s-openshift-monitoring.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
+  <hostname>test-disruption-openshift-image-registry.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
 </host>
 EOF
       echo "Libvirt network found. Injecting worker DNS records."
