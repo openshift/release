@@ -85,6 +85,8 @@ for i in range(2):
 for i in range(3):
     for j in range(4):
         CONFIG['libvirt-ppc64le-quota-slice']['libvirt-ppc64le-{}-{}'.format(i, j)] = 1
+# Reserve one for internal debugging use
+del CONFIG['libvirt-ppc64le-quota-slice']['libvirt-ppc64le-1-3']
 
 for i in range(2):
     CONFIG['openstack-osuosl-quota-slice']['openstack-osuosl-{0:0>2}'.format(i)] = 1
