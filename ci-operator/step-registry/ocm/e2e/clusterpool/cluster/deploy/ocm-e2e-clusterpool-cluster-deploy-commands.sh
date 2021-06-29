@@ -426,7 +426,7 @@ deploy() {
     done
 
     # Apply YAML files in multicluster hub operator directory
-    logf "$_log" "Deploy $_cluster: Waitint up to 5 minutes to apply YAML files from MCH operator directory"
+    logf "$_log" "Deploy $_cluster: Waiting up to 5 minutes to apply YAML files from MCH operator directory"
     echo "WAIT_APPLY_MCHO" > "${_status}"
     local _timeout=300 _elapsed='' _step=15
     local _mch_name='' _mch_status=''
@@ -532,9 +532,9 @@ deploy() {
     done
 
     # Wait for ClusterServiceVersion
-    logf "$_log" "Deploy $_cluster: Waiting up to 5 minutes for CSV"
+    logf "$_log" "Deploy $_cluster: Waiting up to 10 minutes for CSV"
     echo "WAIT_CSV_1" > "${_status}"
-    local _timeout=300 _elapsed='' _step=15
+    local _timeout=600 _elapsed='' _step=15
     local _csv_name='' _csv_status=''
     while true; do
         # Wait for _step seconds, except for first iteration.
@@ -610,9 +610,9 @@ deploy() {
     }
 
     # Wait for ClusterServiceVersion
-    logf "$_log" "Deploy $_cluster: Waiting up to 5 minutes for CSV"
+    logf "$_log" "Deploy $_cluster: Waiting up to 10 minutes for CSV"
     echo "WAIT_CSV_2" > "${_status}"
-    local _timeout=300 _elapsed=0 _step=15
+    local _timeout=600 _elapsed=0 _step=15
     local _csv_name='' _csv_status=''
     while true; do
         # Wait for _step seconds, including first iteration
