@@ -79,7 +79,7 @@ echo "export OPENSHIFT_RELEASE_IMAGE=${OPENSHIFT_INSTALL_RELEASE_IMAGE}" >> /roo
 echo "export ADDN_DNS=\$(awk '/nameserver/ { print \$2;exit; }' /etc/resolv.conf)" >> /root/dev-scripts/config_root.sh
 echo "export OPENSHIFT_CI=true" >> /root/dev-scripts/config_root.sh
 echo "export WORKER_MEMORY=16384" >> /root/dev-scripts/config_root.sh
-# echo "export ENABLE_LOCAL_REGISTRY=true" >> /root/dev-scripts/config_root.sh
+echo "export ENABLE_LOCAL_REGISTRY=true" >> /root/dev-scripts/config_root.sh
 
 # Inject PR additional configuration, if available
 if [[ -e /root/dev-scripts/dev-scripts-additional-config ]]

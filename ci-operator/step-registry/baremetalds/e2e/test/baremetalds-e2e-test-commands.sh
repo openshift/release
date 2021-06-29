@@ -77,6 +77,7 @@ esac
 
 function upgrade() {
     set -x
+    sleep 600
     ssh "${SSHOPTS[@]}" "root@${IP}" \
         openshift-tests run-upgrade all \
         --to-image "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}" \
