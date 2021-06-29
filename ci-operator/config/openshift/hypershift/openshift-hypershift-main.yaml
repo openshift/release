@@ -24,7 +24,7 @@ promotion:
   namespace: hypershift
   tag: latest
 releases:
-  latest:
+  hosted-ocp-latest:
     candidate:
       product: ocp
       stream: nightly
@@ -47,8 +47,14 @@ tests:
   container:
     from: src
 - as: e2e-aws
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: hypershift
+    product: ocp
+    timeout: 1h30m0s
+    version: "4.8"
   steps:
-    cluster_profile: aws
     test:
     - as: install-hypershift
       cli: latest
@@ -68,16 +74,27 @@ tests:
         bin/test-e2e \
           -test.v \
           -test.timeout 0 \
-          --e2e.aws-credentials-file ${CLUSTER_PROFILE_DIR}/.awscred \
-          --e2e.pull-secret-file ${CLUSTER_PROFILE_DIR}/pull-secret \
-          --e2e.latest-release-image ${RELEASE_IMAGE_LATEST}
+          --e2e.aws-credentials-file /etc/hypershift-pool-aws-credentials/credentials \
+          --e2e.pull-secret-file /etc/ci-pull-credentials/.dockerconfigjson \
+          --e2e.base-domain ci.hypershift.devcluster.openshift.com \
+          --e2e.latest-release-image ${RELEASE_IMAGE}
+      credentials:
+      - mount_path: /etc/hypershift-pool-aws-credentials
+        name: hypershift-pool-aws-credentials
+        namespace: test-credentials
+      - mount_path: /etc/ci-pull-credentials
+        name: ci-pull-credentials
+        namespace: test-credentials
+      dependencies:
+      - env: RELEASE_IMAGE
+        name: release:hosted-ocp-latest
       from: test-bin
       grace_period: 15m0s
       resources:
         requests:
           cpu: 100m
-      timeout: 2h0m0s
-    workflow: ipi-aws
+      timeout: 1h0m0s
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: openshift
