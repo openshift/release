@@ -4,6 +4,14 @@ import yaml
 
 
 CONFIG = {
+
+    'aws-arm64-quota-slice': {
+        # Wild guesses.  We'll see when we hit quota issues
+        'us-east-1': 10,
+        'us-east-2': 8,
+        'us-west-1': 8,
+        'us-west-2': 8,
+    },
     'aws-quota-slice': {
         # Wild guesses.  We'll see when we hit quota issues
         'us-east-1': 50,
