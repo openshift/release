@@ -23,7 +23,6 @@ base_images:
     name: release
     namespace: openshift
     tag: golang-1.15
-binary_build_commands: go mod vendor
 build_root:
   project_image:
     dockerfile_path: Dockerfile.assisted-installer-build
@@ -54,40 +53,25 @@ resources:
 tag_specification:
   name: "4.8"
   namespace: ocp
+test_binary_build_commands: |
+  go mod vendor
+  mkdir /.cache && chmod 775 -R /.cache && chmod 775 -R $GOPATH
 tests:
 - as: lint
-  commands: export GOLANGCI_LINT_CACHE=/tmp/golangci-cache make lint
+  commands: |
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    make lint
   container:
-    from: bin
+    from: test-bin
 - as: format-check
   commands: make format-check
   container:
-    from: bin
+    from: test-bin
 - as: unit-test
   commands: make REPORTS=${ARTIFACT_DIR} unit-test
   container:
-    from: bin
-- as: e2e-metal-assisted
-  steps:
-    cluster_profile: packet
-    dependencies:
-      ASSISTED_CONTROLLER_IMAGE: pipeline:assisted-installer-controller
-      ASSISTED_INSTALLER_IMAGE: pipeline:assisted-installer
-    workflow: baremetalds-assisted-install
-- as: e2e-metal-assisted-ipv6
-  steps:
-    cluster_profile: packet
-    dependencies:
-      ASSISTED_CONTROLLER_IMAGE: pipeline:assisted-installer-controller
-      ASSISTED_INSTALLER_IMAGE: pipeline:assisted-installer
-    env:
-      ASSISTED_CONFIG: |
-        IPv6=yes
-        IPv4=no
-        VIP_DHCP_ALLOCATION=no
-        PROXY=yes
-        OPENSHIFT_VERSION=4.8
-    workflow: baremetalds-assisted-install
+    from: test-bin
 zz_generated_metadata:
   branch: ocm-2.3
   org: openshift
