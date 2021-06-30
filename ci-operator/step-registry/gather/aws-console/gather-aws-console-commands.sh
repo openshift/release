@@ -31,6 +31,8 @@ then
 	cat "${SHARED_DIR}/aws-instance-ids.txt" >> "${TMPDIR}/node-provider-IDs.txt"
 fi
 
+aws --version
+
 REGION="$(jq -r .aws.region "${SHARED_DIR}/metadata.json")"
 cat "${TMPDIR}/node-provider-IDs.txt" | sort | uniq | while read -r INSTANCE_ID
 do
