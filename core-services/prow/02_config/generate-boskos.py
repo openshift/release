@@ -4,6 +4,14 @@ import yaml
 
 
 CONFIG = {
+
+    'aws-arm64-quota-slice': {
+        # Wild guesses.  We'll see when we hit quota issues
+        'us-east-1': 10,
+        'us-east-2': 8,
+        'us-west-1': 8,
+        'us-west-2': 8,
+    },
     'aws-quota-slice': {
         # Wild guesses.  We'll see when we hit quota issues
         'us-east-1': 50,
@@ -12,9 +20,9 @@ CONFIG = {
         'us-west-2': 35,
     },
     'aws-2-quota-slice': {
-        'us-east-1': 5,
+        'us-east-1': 10,
         'us-east-2': 10,
-        'us-west-1': 5,
+        'us-west-1': 35,
         'us-west-2': 10,
     },
     'azure4-quota-slice': {
@@ -77,6 +85,8 @@ for i in range(2):
 for i in range(3):
     for j in range(4):
         CONFIG['libvirt-ppc64le-quota-slice']['libvirt-ppc64le-{}-{}'.format(i, j)] = 1
+# Reserve one for internal debugging use
+del CONFIG['libvirt-ppc64le-quota-slice']['libvirt-ppc64le-1-3']
 
 for i in range(2):
     CONFIG['openstack-osuosl-quota-slice']['openstack-osuosl-{0:0>2}'.format(i)] = 1

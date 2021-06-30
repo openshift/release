@@ -11,7 +11,7 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 # Use govc to remove virtual machines if terraform fails
 
 export HOME=/tmp
-export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
+export AWS_SHARED_CREDENTIALS_FILE=/var/run/vault/vsphere/.awscred
 export AWS_DEFAULT_REGION=us-east-1
 
 installer_dir=/tmp/installer

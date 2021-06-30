@@ -20,6 +20,7 @@ fi
 
 # Copy job variables to the packet server
 echo "export OPENSHIFT_INSTALL_RELEASE_IMAGE=${OPENSHIFT_INSTALL_RELEASE_IMAGE}" >> /tmp/assisted-vars.conf
+echo "export ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE=${ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE}" >> /tmp/assisted-vars.conf
 echo "export ASSISTED_NAMESPACE=${ASSISTED_NAMESPACE}" >> /tmp/assisted-vars.conf
 echo "export ASSISTED_CLUSTER_NAME=${ASSISTED_CLUSTER_NAME}" >> /tmp/assisted-vars.conf
 echo "export ASSISTED_CLUSTER_DEPLOYMENT_NAME=${ASSISTED_CLUSTER_DEPLOYMENT_NAME}" >> /tmp/assisted-vars.conf
@@ -38,6 +39,8 @@ source /root/assisted-vars.conf
 
 cd /root/dev-scripts
 source common.sh
+source utils.sh
+source network.sh
 
 REPO_DIR="/home/assisted-service"
 if [ ! -d "${REPO_DIR}" ]; then

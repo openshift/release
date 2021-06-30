@@ -39,6 +39,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-openshift-4.6
+  log-file-metric-exporter:
+    name: "5.2"
+    namespace: logging
+    tag: log-file-metric-exporter
   logging-eventrouter:
     name: "5.2"
     namespace: logging
@@ -125,9 +129,7 @@ tests:
     from: logging-test-unit
 - as: smoke
   steps:
-    cluster_profile: aws
-    env:
-      COMPUTE_NODE_TYPE: m5.4xlarge
+    cluster_profile: gcp
     test:
     - as: test
       cli: latest
@@ -155,16 +157,16 @@ tests:
         name: pipeline:logging-kibana6
       - env: IMAGE_LOGGING_EVENTROUTER
         name: pipeline:logging-eventrouter
+      - env: IMAGE_LOG_FILE_METRIC_EXPORTER
+        name: pipeline:log-file-metric-exporter
       from: pipeline:origin-aggregated-logging-tests
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    workflow: ipi-gcp
 - as: elastic-operator-e2e
   steps:
-    cluster_profile: aws
-    env:
-      COMPUTE_NODE_TYPE: m5.4xlarge
+    cluster_profile: gcp
     test:
     - as: test
       cli: latest
@@ -186,12 +188,10 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    workflow: ipi-gcp
 - as: cluster-logging-operator-e2e
   steps:
-    cluster_profile: aws
-    env:
-      COMPUTE_NODE_TYPE: m5.4xlarge
+    cluster_profile: gcp
     test:
     - as: test
       cli: latest
@@ -218,16 +218,16 @@ tests:
         name: pipeline:logging-kibana6
       - env: IMAGE_LOGGING_EVENTROUTER
         name: pipeline:logging-eventrouter
+      - env: IMAGE_LOG_FILE_METRIC_EXPORTER
+        name: pipeline:log-file-metric-exporter
       from: pipeline:cluster-logging-operator-e2e
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    workflow: ipi-gcp
 - as: clo-functional
   steps:
-    cluster_profile: aws
-    env:
-      COMPUTE_NODE_TYPE: m5.4xlarge
+    cluster_profile: gcp
     test:
     - as: test
       cli: latest
@@ -254,11 +254,13 @@ tests:
         name: pipeline:logging-kibana6
       - env: IMAGE_LOGGING_EVENTROUTER
         name: pipeline:logging-eventrouter
+      - env: IMAGE_LOG_FILE_METRIC_EXPORTER
+        name: pipeline:log-file-metric-exporter
       from: pipeline:cluster-logging-operator-e2e
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    workflow: ipi-gcp
 zz_generated_metadata:
   branch: master
   org: openshift

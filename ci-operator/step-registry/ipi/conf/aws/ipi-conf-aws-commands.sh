@@ -8,7 +8,7 @@ export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
-expiration_date=$(date -d '4 hours' --iso=minutes --utc)
+expiration_date=$(date -d '8 hours' --iso=minutes --utc)
 
 function join_by { local IFS="$1"; shift; echo "$*"; }
 

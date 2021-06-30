@@ -31,9 +31,12 @@ then
 	cat "${SHARED_DIR}/aws-instance-ids.txt" >> "${TMPDIR}/node-provider-IDs.txt"
 fi
 
+aws --version
+
 REGION="$(jq -r .aws.region "${SHARED_DIR}/metadata.json")"
-cat "${TMPDIR}/node-provider-IDs.txt" | sort | uniq | while read -r INSTANCE_ID
+cat "${TMPDIR}/node-provider-IDs.txt" | sort | grep . | uniq | while read -r INSTANCE_ID
 do
 	echo "Gathering console logs for ${INSTANCE_ID}"
-	aws --region "${REGION}" ec2 get-console-output --instance-id "${INSTANCE_ID}" --output text > "${ARTIFACT_DIR}/${INSTANCE_ID}" || echo "Failed to gather console logs"
+	LC_ALL=en_US.UTF-8 aws --region "${REGION}" ec2 get-console-output --instance-id "${INSTANCE_ID}" --output text > "${ARTIFACT_DIR}/${INSTANCE_ID}" &
+	wait "$!"
 done

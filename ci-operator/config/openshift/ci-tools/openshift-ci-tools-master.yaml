@@ -1,8 +1,4 @@
 base_images:
-  boskos:
-    name: boskos
-    namespace: ci
-    tag: latest
   cli:
     name: "4.8"
     namespace: ocp
@@ -14,6 +10,7 @@ base_images:
 binary_build_commands: make production-install
 build_root:
   from_repository: true
+  use_build_cache: true
 images:
 - context_dir: images/pod-scaler/
   from: os
@@ -401,14 +398,6 @@ images:
       - destination_dir: .
         source_path: /go/bin/ocp-build-data-enforcer
   to: ocp-build-data-enforcer
-- context_dir: test/images/e2e-bin/
-  from: test-bin
-  inputs:
-    boskos:
-      paths:
-      - destination_dir: boskos/
-        source_path: /app
-  to: e2e-bin
 - dockerfile_literal: |-
     FROM centos:8
     ADD vault-subpath-proxy /usr/bin/vault-subpath-proxy
@@ -455,8 +444,6 @@ images:
         source_path: /go/bin/ci-operator-yaml-creator
   to: ci-operator-yaml-creator
 promotion:
-  excluded_images:
-  - e2e-bin
   namespace: ci
   tag: latest
 resources:
@@ -507,7 +494,62 @@ tests:
       - mount_path: /tmp/hive
         name: hive-hive-credentials
         namespace: test-credentials
-      from: e2e-bin
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: e2e-oo
+  steps:
+    test:
+    - as: e2e-oo
+      commands: |
+        GCS_CREDENTIALS_FILE=/tmp/gcs/service-account.json REMOTE_REGISTRY_SECRET_DIR=/tmp/import-secret LOCAL_REGISTRY_SECRET_DIR=/tmp/pull-secret KUBECONFIG=/auth/kubeconfig make e2e TAGS=e2e_framework,optional_operators
+      credentials:
+      - mount_path: /auth
+        name: ci-operator
+        namespace: test-credentials
+      - mount_path: /tmp/pull-secret
+        name: registry-pull-credentials
+        namespace: test-credentials
+      - mount_path: /etc/push-secret
+        name: registry-push-credentials-ci-central
+        namespace: test-credentials
+      - mount_path: /tmp/import-secret
+        name: ci-pull-credentials
+        namespace: test-credentials
+      - mount_path: /tmp/gcs
+        name: gce-sa-credentials-gcs-publisher
+        namespace: test-credentials
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: e2e-oo-post
+  postsubmit: true
+  steps:
+    test:
+    - as: e2e-oo-post
+      commands: |
+        GCS_CREDENTIALS_FILE=/tmp/gcs/service-account.json REMOTE_REGISTRY_SECRET_DIR=/tmp/import-secret LOCAL_REGISTRY_SECRET_DIR=/tmp/pull-secret KUBECONFIG=/auth/kubeconfig make e2e TAGS=e2e_framework,optional_operators
+      credentials:
+      - mount_path: /auth
+        name: ci-operator
+        namespace: test-credentials
+      - mount_path: /tmp/pull-secret
+        name: registry-pull-credentials
+        namespace: test-credentials
+      - mount_path: /etc/push-secret
+        name: registry-push-credentials-ci-central
+        namespace: test-credentials
+      - mount_path: /tmp/import-secret
+        name: ci-pull-credentials
+        namespace: test-credentials
+      - mount_path: /tmp/gcs
+        name: gce-sa-credentials-gcs-publisher
+        namespace: test-credentials
+      from: test-bin
       resources:
         requests:
           cpu: 100m

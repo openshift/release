@@ -1,5 +1,5 @@
 - item_name: build_farm
-  attachments:
+  fields:
   - cmd: |-
       oc --context $(cluster) sa create-kubeconfig --namespace ci $(service_account) | sed "s/$(service_account)/$(cluster)/g"
     name: sa.$(service_account).$(cluster).config
@@ -19,7 +19,7 @@
     - dptp-controller-manager
     - ci-operator
 - item_name: build_farm
-  attachments:
+  fields:
   - cmd: |-
       oc --context $(cluster) sa create-kubeconfig --namespace ci $(service_account) | sed "s/$(service_account)/$(cluster)/g"
     name: sa.$(service_account).$(cluster).config
@@ -36,7 +36,7 @@
     - pj-rehearse
     - ci-operator
 - item_name: release-controller
-  attachments:
+  fields:
   - cmd: oc --context $(cluster) sa create-kubeconfig --namespace ci $(service_account) | sed "s/$(service_account)/$(cluster)/g"
     name: sa.$(service_account).$(cluster).config
   params:
@@ -53,7 +53,7 @@
     - release-controller-ocp-arm64
     - release-controller-ocp-arm64-priv
 - item_name: build_farm
-  attachments:
+  fields:
   - cmd: |-
       oc --context $(cluster) get secrets --sort-by=.metadata.creationTimestamp --namespace ci -o json | jq '.items[] | select(.type=="kubernetes.io/dockercfg") | select(.metadata.annotations["kubernetes.io/service-account.name"]=="image-puller")'| jq --slurp '.[-1] | .data[".dockercfg"]' --raw-output | base64 --decode | jq '.["image-registry.openshift-image-registry.svc:5000"].auth' --raw-output | tr -d '\n'
     name: token_image-puller_$(cluster)_reg_auth_value.txt
@@ -66,16 +66,16 @@
     - vsphere
 # This is not idempotent, so we can not run it by default
 #- item_name: jenkins-ci-iam
-#  attachments:
+#  fields:
 #  - cmd: aws iam create-access-key --user-name origin-ci-robot-provision | jq -r '.AccessKey | "[default]\naws_access_key_id = " + .AccessKeyId + "\naws_secret_access_key = " + .SecretAccessKey'
 #    name: .awscred
 # This is not idempotent, so we can not run it by default
 #- item_name: jenkins-ci-provisioner
-#  attachments:
+#  fields:
 #  - cmd: gcloud iam service-accounts keys create /dev/stdout --iam-account do-not-delete-ci-provisioner@openshift-gce-devel-ci.iam.gserviceaccount.com
 #    name: credentials.json
 - item_name: build_farm
-  attachments:
+  fields:
   - cmd: |-
       oc --context $(cluster) get secrets --sort-by=.metadata.creationTimestamp --namespace ci -o json | jq '.items[] | select(.type=="kubernetes.io/dockercfg") | select(.metadata.annotations["kubernetes.io/service-account.name"]=="image-pusher")' | jq --slurp '.[-1] | .data[".dockercfg"]' --raw-output | base64 --decode | jq '.["image-registry.openshift-image-registry.svc.cluster.local:5000"].auth' --raw-output | tr -d '\n'
     name: token_image-pusher_$(cluster)_reg_auth_value.txt
@@ -83,7 +83,7 @@
     cluster:
     - app.ci
 - item_name: ci-chat-bot
-  attachments:
+  fields:
   - cmd: oc --context $(cluster) sa create-kubeconfig --namespace ci $(service_account) | sed "s/$(service_account)/$(cluster)/g"
     name: sa.$(service_account).$(cluster).config
   params:
@@ -95,7 +95,7 @@
     service_account:
     - ci-chat-bot
 - item_name: pod-scaler
-  attachments:
+  fields:
   - cmd: |-
       oc --context $(cluster) sa create-kubeconfig --namespace ci $(service_account) | sed "s/$(service_account)/$(cluster)/g"
     name: sa.$(service_account).$(cluster).config
@@ -107,7 +107,7 @@
     service_account:
     - pod-scaler
 - item_name: endurance_cluster
-  attachments:
+  fields:
   - cmd: |-
       oc --context $(cluster) sa create-kubeconfig --namespace bparees $(service_account) | sed "s/$(service_account)/$(cluster)/g"
     name: sa.$(service_account).$(cluster).config
@@ -116,3 +116,15 @@
     - app.ci
     service_account:
     - endurance
+- item_name: build_farm
+  fields:
+  - cmd: |-
+      oc --context $(cluster) sa create-kubeconfig --namespace ci $(service_account) | sed "s/$(service_account)/$(cluster)/g"
+    name: sa.$(service_account).$(cluster).config
+  params:
+    cluster:
+    - hive
+    service_account:
+    - cluster-display
+    - config-updater
+    - hive
