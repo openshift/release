@@ -1,0 +1,34 @@
+# Besides hive-cluster-pool-admin role defined in https://github.com/openshift/hive/blob/master/docs/clusterpools.md#managing-admins-for-cluster-pools
+# the owners of the cluster pools need to list the namespaces and filter out the namespaces with the name of the pools
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cluster-namespace-view
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - get
+  - list
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cluster-namespace-view
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-namespace-view
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: Group
+  name: cluster-namespace-viewer
+---
+apiVersion: user.openshift.io/v1
+kind: Group
+metadata:
+  name: cluster-namespace-viewer
+users:
+- dmace

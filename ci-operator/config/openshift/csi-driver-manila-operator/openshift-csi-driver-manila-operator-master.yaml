@@ -18,6 +18,9 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
   to: csi-driver-manila-operator
+- dockerfile_path: Dockerfile.test
+  from: src
+  to: manila-csi-driver-operator-test
 promotion:
   name: "4.9"
   namespace: ocp
@@ -42,6 +45,14 @@ tests:
     make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml
   container:
     from: src
+- as: e2e-openstack-csi
+  steps:
+    cluster_profile: openstack-vh-mecha
+    workflow: openshift-e2e-openstack-csi-manila
+- as: e2e-openstack
+  steps:
+    cluster_profile: openstack-vexxhost
+    workflow: openshift-e2e-openstack-ipi
 zz_generated_metadata:
   branch: master
   org: openshift

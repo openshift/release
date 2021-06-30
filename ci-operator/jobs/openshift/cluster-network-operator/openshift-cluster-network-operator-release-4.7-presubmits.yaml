@@ -4,7 +4,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.7
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-agnostic-upgrade
     decorate: true
     decoration_config:
@@ -70,7 +70,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.7
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-aws-ovn-windows
     decorate: true
     decoration_config:
@@ -136,7 +136,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.7
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-aws-sdn-multi
     decorate: true
     decoration_config:
@@ -202,7 +202,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.7
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-azure-ovn
     decorate: true
     decoration_config:
@@ -268,7 +268,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.7
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-gcp
     decorate: true
     decoration_config:
@@ -336,7 +336,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.7
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-gcp-ovn
     decorate: true
     decoration_config:
@@ -404,7 +404,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.7
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-gcp-ovn-upgrade
     decorate: true
     decoration_config:
@@ -473,7 +473,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.7
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-metal-ipi-ovn-ipv6
     decorate: true
     decoration_config:
@@ -541,7 +541,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.7
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-ovn-hybrid-step-registry
     decorate: true
     decoration_config:
@@ -607,7 +607,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.7
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-ovn-ipsec-step-registry
     decorate: true
     decoration_config:
@@ -673,7 +673,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.7
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-ovn-step-registry
     decorate: true
     decoration_config:
@@ -805,7 +805,73 @@ presubmits:
     always_run: true
     branches:
     - release-4.7
-    cluster: build01
+    cluster: vsphere
+    context: ci/prow/e2e-vsphere-windows
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-network-operator-release-4.7-e2e-vsphere-windows
+    rerun_command: /test e2e-vsphere-windows
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-vsphere-windows-cluster-profile
+        - --target=e2e-vsphere-windows
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-vsphere-windows-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-vsphere
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-vsphere-windows,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-4.7
+    cluster: build02
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -854,7 +920,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.7
-    cluster: build01
+    cluster: build02
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -902,7 +968,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.7
-    cluster: build01
+    cluster: build02
     context: ci/prow/verify
     decorate: true
     decoration_config:

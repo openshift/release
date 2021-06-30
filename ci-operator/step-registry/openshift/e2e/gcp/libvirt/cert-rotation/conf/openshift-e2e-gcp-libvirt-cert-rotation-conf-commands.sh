@@ -429,7 +429,7 @@ run-on "${control_nodes} ${compute_nodes}" "systemctl disable chronyd --now"
 run-on "${control_nodes} ${compute_nodes}" "
 timedatectl status
 timedatectl set-ntp false
-timedatectl set-time '${SKEW}'
+timedatectl set-time ${SKEW}
 timedatectl status
 "
 run-on "${control_nodes} ${compute_nodes}" "sleep 10 && systemctl start kubelet"

@@ -1,0 +1,17 @@
+workflow:
+  as: openshift-e2e-aws-ccm-install
+  steps:
+    pre:
+    - chain: ipi-conf-aws
+    - ref: ccm-conf-pre-create-feature-gate
+    - chain: ipi-install
+    - ref: storage-conf-csi-aws-ebs
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - chain: gather-core-dump
+    - chain: ipi-aws-post
+    env:
+      TEST_CSI_DRIVER_MANIFEST: manifest-aws-ebs.yaml
+  documentation: |-
+    The Openshift E2E AWS CCM install workflow executes the common end-to-end test suite on AWS with a cluster configuration including CCM pods

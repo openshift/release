@@ -4,7 +4,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.7
-    cluster: build02
+    cluster: build01
     context: ci/prow/cluster-bootimages
     decorate: true
     decoration_config:
@@ -70,7 +70,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.7
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-agnostic-upgrade
     decorate: true
     decoration_config:
@@ -136,7 +136,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.7
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-aws
     decorate: true
     decoration_config:
@@ -203,7 +203,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.7
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-aws-disruptive
     decorate: true
     decoration_config:
@@ -270,7 +270,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.7
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-aws-proxy
     decorate: true
     decoration_config:
@@ -337,7 +337,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.7
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-aws-serial
     decorate: true
     decoration_config:
@@ -404,7 +404,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.7
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-aws-single-node
     decorate: true
     decoration_config:
@@ -471,7 +471,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.7
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-aws-workers-rhel7
     decorate: true
     decoration_config:
@@ -538,7 +538,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.7
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-azure
     decorate: true
     decoration_config:
@@ -605,7 +605,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.7
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-gcp-op
     decorate: true
     decoration_config:
@@ -674,7 +674,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.7
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-metal-assisted
     decorate: true
     decoration_config:
@@ -743,7 +743,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.7
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-metal-ipi
     decorate: true
     decoration_config:
@@ -812,7 +812,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.7
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-metal-ipi-ovn-dualstack
     decorate: true
     decoration_config:
@@ -881,12 +881,13 @@ presubmits:
     always_run: false
     branches:
     - release-4.7
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-openstack
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-machine-config-operator-release-4.7-e2e-openstack
     optional: true
@@ -895,22 +896,13 @@ presubmits:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
-        - --repo=machine-config-operator
+        - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/usr/local/e2e-openstack-cluster-profile
         - --target=e2e-openstack
-        - --template=/usr/local/e2e-openstack
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: openstack
-        - name: JOB_NAME_SAFE
-          value: e2e-openstack
-        - name: TEST_COMMAND
-          value: run-minimal-tests
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -926,11 +918,11 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-openstack
-          name: job-definition
-          subPath: cluster-launch-installer-openstack-e2e.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
@@ -944,19 +936,19 @@ presubmits:
         projected:
           sources:
           - secret:
-              name: cluster-secrets-openstack
-      - configMap:
-          name: prow-job-cluster-launch-installer-openstack-e2e
-        name: job-definition
+              name: cluster-secrets-openstack-vexxhost
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-openstack,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - release-4.7
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-ovirt
     decorate: true
     decoration_config:
@@ -1025,7 +1017,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.7
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-ovn-step-registry
     decorate: true
     decoration_config:
@@ -1293,7 +1285,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.7
-    cluster: build02
+    cluster: build01
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -1342,7 +1334,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.7
-    cluster: build02
+    cluster: build01
     context: ci/prow/okd-e2e-aws
     decorate: true
     decoration_config:
@@ -1411,7 +1403,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.7
-    cluster: build02
+    cluster: build01
     context: ci/prow/okd-e2e-gcp-op
     decorate: true
     decoration_config:
@@ -1482,7 +1474,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.7
-    cluster: build02
+    cluster: build01
     context: ci/prow/okd-e2e-upgrade
     decorate: true
     decoration_config:
@@ -1622,7 +1614,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.7
-    cluster: build02
+    cluster: build01
     context: ci/prow/okd-images
     decorate: true
     decoration_config:
@@ -1672,7 +1664,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.7
-    cluster: build02
+    cluster: build01
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -1720,7 +1712,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.7
-    cluster: build02
+    cluster: build01
     context: ci/prow/verify
     decorate: true
     decoration_config:

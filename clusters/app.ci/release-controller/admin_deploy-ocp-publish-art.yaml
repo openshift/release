@@ -88,6 +88,48 @@ subjects:
 # art_publish_permissions.py added the following resource
 #---------------------------------------------------------------------------------
 
+# Allow ART to create prowjobs in the ci namespace for running upgrade tests
+apiVersion: authorization.openshift.io/v1
+kind: Role
+metadata:
+  name: art-prowjob
+  namespace: ci
+rules:
+- apiGroups:
+  - prow.k8s.io
+  resources:
+  - prowjobs
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+  - update
+  - patch
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+# Allow ART to create prowjobs in the ci namespace for running upgrade tests
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: art-create-prowjobs
+  namespace: ci
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: art-prowjob
+subjects:
+- kind: ServiceAccount
+  name: art-publish
+  namespace: ocp
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
 apiVersion: v1
 kind: Namespace
 metadata:

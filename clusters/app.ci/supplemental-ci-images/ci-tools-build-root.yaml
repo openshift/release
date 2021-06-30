@@ -1,0 +1,70 @@
+apiVersion: v1
+kind: List
+items:
+- kind: ImageStream
+  apiVersion: image.openshift.io/v1
+  metadata:
+    namespace: ci
+    name: ci-tools-build-root
+- kind: BuildConfig
+  apiVersion: build.openshift.io/v1
+  metadata:
+    namespace: ci
+    name: ci-tools-build-root
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: ci-tools-build-root:latest
+    source:
+      images:
+      - from:
+          kind: ImageStreamTag
+          name: boskos:latest
+          namespace: ci
+        paths:
+        - destinationDir: .
+          sourcePath: /app
+      - from:
+          kind: ImageStreamTag
+          name: prometheus:latest
+          namespace: ci
+        paths:
+        - destinationDir: .
+          sourcePath: /bin/prometheus
+        - destinationDir: .
+          sourcePath: /bin/promtool
+      # NOTE: We cannot use a ConfigChange trigger on this build as it triggers on every push to
+      # openshift/release, causing this image to build ~100x a day. If you change the following
+      # Dockerfile, please ensure you run `oc start-build` yourself once the new version is applied.
+      dockerfile: |
+        FROM openshift/release:golang-1.16
+
+        ENV VAULT_DISABLE_MLOCK true
+        RUN yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo && \
+            yum install -y vault-1.7.0-1 && \
+            setcap cap_ipc_lock= /usr/bin/vault
+
+        RUN yum install -y nodejs && npm install -g typescript
+
+        COPY ./app /go/bin/boskos
+
+        COPY ./prometheus /go/bin/prometheus
+        COPY ./promtool /go/bin/promtool
+      type: Dockerfile
+    strategy:
+      dockerStrategy:
+        from:
+          kind: ImageStreamTag
+          name: release:golang-1.16
+          namespace: openshift
+        imageOptimizationPolicy: SkipLayers
+      type: Docker
+    triggers:
+    - imageChange:
+        from:
+          kind: ImageStreamTag
+          name: release:golang-1.16
+      type: ImageChange

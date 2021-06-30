@@ -64,6 +64,37 @@ in 3.11).''')
         }]
     }, comment='Allow ART to mirror images to the openshift namespace so ci-build-root "release" images can be pushed')
 
+    gendoc.append_all([{
+        'apiVersion': 'authorization.openshift.io/v1',
+        'kind': 'Role',
+        'metadata': {
+            'name': 'art-prowjob',
+            'namespace': 'ci'
+        },
+        'rules': [{
+            'apiGroups': ['prow.k8s.io'],
+            'resources': ['prowjobs'],
+            'verbs': ['create', 'get', 'list', 'watch', 'update', 'patch']
+        }]
+    }, {
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
+        'kind': 'RoleBinding',
+        'metadata': {
+            'name': 'art-create-prowjobs',
+            'namespace': 'ci'
+        },
+        'roleRef': {
+            'apiGroup': 'rbac.authorization.k8s.io',
+            'kind': 'Role',
+            'name': 'art-prowjob'
+        },
+        'subjects': [{
+            'kind': 'ServiceAccount',
+            'name': 'art-publish',
+            'namespace': 'ocp'
+        }]
+    }], comment='Allow ART to create prowjobs in the ci namespace for running upgrade tests')
+
     for private in (False, True):
         for arch in config.arches:
 

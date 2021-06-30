@@ -16,9 +16,9 @@ def internal_auths_for_cluster(cluster):
     auths = []
     for hostname in internal_hostnames_for_cluster():
         auths.append({
-            "bw_item": "build_farm",
+            "item": "build_farm",
             "registry_url": hostname,
-            "auth_bw_attachment": "token_image-puller_{}_reg_auth_value.txt".format(cluster),
+            "auth_field": "token_image-puller_{}_reg_auth_value.txt".format(cluster),
         })
     return auths
 
@@ -29,58 +29,58 @@ def config_for_cluster(cluster):
             ".dockerconfigjson": {
                 "dockerconfigJSON": internal_auths_for_cluster(cluster) + [
                 {
-                    "bw_item": "cloud.openshift.com-pull-secret",
+                    "item": "cloud.openshift.com-pull-secret",
                     "registry_url": "cloud.openshift.com",
-                    "auth_bw_attachment": "auth",
-                    "email_bw_field": "email",
+                    "auth_field": "auth",
+                    "email_field": "email",
                 },
                 {
-                    "bw_item": "quay.io-pull-secret",
+                    "item": "quay.io-pull-secret",
                     "registry_url": "quay.io",
-                    "auth_bw_attachment": "auth",
-                    "email_bw_field": "email",
+                    "auth_field": "auth",
+                    "email_field": "email",
                 },
                 {
-                    "bw_item": "registry.connect.redhat.com-pull-secret",
+                    "item": "registry.connect.redhat.com-pull-secret",
                     "registry_url": "registry.connect.redhat.com",
-                    "auth_bw_attachment": "auth",
-                    "email_bw_field": "email",
+                    "auth_field": "auth",
+                    "email_field": "email",
                 },
                 {
-                    "bw_item": "registry.redhat.io-pull-secret",
+                    "item": "registry.redhat.io-pull-secret",
                     "registry_url": "registry.redhat.io",
-                    "auth_bw_attachment": "auth",
-                    "email_bw_field": "email",
+                    "auth_field": "auth",
+                    "email_field": "email",
                 },
                 {
-                    "bw_item": "build_farm",
+                    "item": "build_farm",
                     "registry_url": "registry.svc.ci.openshift.org",
-                    "auth_bw_attachment": "token_image-puller_ci_reg_auth_value.txt",
+                    "auth_field": "token_image-puller_ci_reg_auth_value.txt",
                 },
                 {
-                    "bw_item": "build_farm",
+                    "item": "build_farm",
                     "registry_url": "registry.ci.openshift.org",
-                    "auth_bw_attachment": "token_image-puller_app.ci_reg_auth_value.txt",
+                    "auth_field": "token_image-puller_app.ci_reg_auth_value.txt",
                 },
                 {
-                    "bw_item": "build_farm",
+                    "item": "build_farm",
                     "registry_url": "registry.arm-build01.arm-build.devcluster.openshift.com",
-                    "auth_bw_attachment": "token_image-puller_arm01_reg_auth_value.txt",
+                    "auth_field": "token_image-puller_arm01_reg_auth_value.txt",
                 },
                 {
-                    "bw_item": "build_farm",
+                    "item": "build_farm",
                     "registry_url": "registry.build01.ci.openshift.org",
-                    "auth_bw_attachment": "token_image-puller_build01_reg_auth_value.txt",
+                    "auth_field": "token_image-puller_build01_reg_auth_value.txt",
                 },
                 {
-                    "bw_item": "build_farm",
+                    "item": "build_farm",
                     "registry_url": "registry.build02.ci.openshift.org",
-                    "auth_bw_attachment": "token_image-puller_build02_reg_auth_value.txt",
+                    "auth_field": "token_image-puller_build02_reg_auth_value.txt",
                 },
                 {
-                    "bw_item": "build_farm",
+                    "item": "build_farm",
                     "registry_url": "registry.apps.build01-us-west-2.vmc.ci.openshift.org",
-                    "auth_bw_attachment": "token_image-puller_vsphere_reg_auth_value.txt",
+                    "auth_field": "token_image-puller_vsphere_reg_auth_value.txt",
                 }],
             },
         },

@@ -120,22 +120,22 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws-proxy
 - as: e2e-vsphere
-  cron: 0 2,8,14,20 * * *
+  cron: 0 2,10,18 * * *
   steps:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere
 - as: e2e-vsphere-serial
-  cron: 30 2,8,14,20 */6 * * *
+  cron: 30 2,10,18 * * *
   steps:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere-serial
 - as: e2e-vsphere-upi
-  cron: 15 2,8,14,20 * * *
+  cron: 15 2,10,18 * * *
   steps:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere-upi
 - as: e2e-vsphere-upi-serial
-  cron: 45 2,8,14,20 * * *
+  cron: 45 2,10,18 * * *
   steps:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere-upi-serial
@@ -152,7 +152,9 @@ tests:
 - as: e2e-aws
   interval: 12h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-e2e-aws
 - as: e2e-ovirt
   cron: 3 */6 * * *
@@ -172,7 +174,9 @@ tests:
 - as: console-aws
   interval: 48h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
     test:
     - as: e2e-test
       cli: latest
@@ -188,7 +192,9 @@ tests:
 - as: cluster-logging-operator-e2e
   interval: 24h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
     test:
     - as: e2e-test
       cli: latest
@@ -215,8 +221,9 @@ tests:
 - as: e2e-aws-fips
   interval: 48h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
       FIPS_ENABLED: "true"
     pre:
     - chain: ipi-aws-pre
@@ -246,8 +253,9 @@ tests:
 - as: e2e-aws-fips-serial
   cron: '@yearly'
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
       FIPS_ENABLED: "true"
       TEST_SUITE: openshift/conformance/serial
     pre:
@@ -276,13 +284,75 @@ tests:
 - as: e2e-aws-serial
   interval: 24h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-e2e-aws-serial
 - as: e2e-azure
   interval: 12h
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
+- as: e2e-remote-libvirt-s390x
+  cluster: build02
+  cron: 0 2,14 * * *
+  steps:
+    cluster_profile: libvirt-s390x
+    env:
+      ARCH: s390x
+      BRANCH: "4.6"
+      TEST_TYPE: conformance-parallel
+    workflow: openshift-e2e-libvirt
+- as: image-ecosystem-remote-libvirt-s390x
+  cluster: build02
+  cron: 0 2,14 * * *
+  steps:
+    cluster_profile: libvirt-s390x
+    env:
+      ARCH: s390x
+      BRANCH: "4.6"
+      TEST_TYPE: image-ecosystem
+    workflow: openshift-e2e-libvirt
+- as: jenkins-e2e-remote-libvirt-s390x
+  cluster: build02
+  cron: 0 2,14 * * *
+  steps:
+    cluster_profile: libvirt-s390x
+    env:
+      ARCH: s390x
+      BRANCH: "4.6"
+      TEST_TYPE: jenkins-e2e-rhel-only
+    workflow: openshift-e2e-libvirt
+- as: e2e-remote-libvirt-ppc64le
+  cluster: build02
+  cron: 0 3,15 * * *
+  steps:
+    cluster_profile: libvirt-ppc64le
+    env:
+      ARCH: ppc64le
+      BRANCH: "4.6"
+      TEST_TYPE: conformance-parallel
+    workflow: openshift-e2e-libvirt
+- as: image-ecosystem-remote-libvirt-ppc64le
+  cluster: build02
+  cron: 0 11,23 * * *
+  steps:
+    cluster_profile: libvirt-ppc64le
+    env:
+      ARCH: ppc64le
+      BRANCH: "4.6"
+      TEST_TYPE: image-ecosystem
+    workflow: openshift-e2e-libvirt
+- as: jenkins-e2e-remote-libvirt-ppc64le
+  cluster: build02
+  cron: 0 11,23 * * *
+  steps:
+    cluster_profile: libvirt-ppc64le
+    env:
+      ARCH: ppc64le
+      BRANCH: "4.6"
+      TEST_TYPE: jenkins-e2e-rhel-only
+    workflow: openshift-e2e-libvirt
 zz_generated_metadata:
   branch: master
   org: openshift
