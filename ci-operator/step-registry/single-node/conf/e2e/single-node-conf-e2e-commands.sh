@@ -16,6 +16,7 @@ spec:
     matchLabels:
       pools.operator.machineconfiguration.openshift.io/master: ""
   kubeletConfig: 
+    maxPods: 500
     systemReserved:
       memory: 3Gi
 EOF
