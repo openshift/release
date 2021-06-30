@@ -37,6 +37,16 @@ function prepare_next_steps() {
 trap 'prepare_next_steps' EXIT TERM
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+if [[ "${CLUSTER_TYPE}" == "aws-arm64" ]]; then
+  # Hack to avoid importing arm64 release image by using an image override
+  if [[ -z "${ARM64_RELEASE_OVERRIDE}" ]]; then
+    echo "ARM64_RELEASE_OVERRIDE is an empty string, exiting"
+    exit 1
+  fi
+  OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${ARM64_RELEASE_OVERRIDE}
+  export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+fi
+
 if [[ -z "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" ]]; then
   echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE is an empty string, exiting"
   exit 1
@@ -49,7 +59,7 @@ export OPENSHIFT_INSTALL_INVOKER=openshift-internal-ci/${JOB_NAME}/${BUILD_ID}
 export HOME=/tmp
 
 case "${CLUSTER_TYPE}" in
-aws) export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred;;
+aws|aws-arm64) export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred;;
 azure4) export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json;;
 gcp) export GOOGLE_CLOUD_KEYFILE_JSON=${CLUSTER_PROFILE_DIR}/gce.json;;
 kubevirt) export KUBEVIRT_KUBECONFIG=${HOME}/.kube/config;;
