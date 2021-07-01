@@ -207,6 +207,7 @@ if __name__ == '__main__':
         'openshift/cluster-api-provider-azure',
         'openshift/cluster-api-provider-baremetal',
         'openshift/cluster-api-provider-gcp',
+        'openshift/cluster-api-provider-ibmcloud',
         'openshift/cluster-api-provider-kubemark',
         'openshift/cluster-api-provider-libvirt',
         'openshift/cluster-api-provider-openstack',
