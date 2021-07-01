@@ -35,4 +35,7 @@ while true; do
 	break
 done
 echo "[INFO] Found $( jq .statistics.recordsMatched <"${out}" ) matching logs, stored in ${out}"
-docs/dptp-triage-sop/logs/table.py "${out}"
+filtered="$( mktemp /tmp/aws-logs-XXXXXXXXXX )"
+docs/dptp-triage-sop/logs/filter.py "${target}" "${out}" > "${filtered}"
+echo "[INFO] Filtered to $( jq length <"${filtered}" ) matching logs, stored in ${filtered}"
+docs/dptp-triage-sop/logs/table.py "${filtered}"
