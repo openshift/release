@@ -1,9 +1,26 @@
+base_images:
+  base:
+    name: ubi
+    namespace: ocp
+    tag: "8"
+  ocp_builder_golang-1.15:
+    name: builder
+    namespace: ocp
+    tag: golang-1.15
 binary_build_commands: make manager
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: golang-1.15
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  inputs:
+    bin:
+      as:
+      - registry.ci.openshift.org/ocp/builder:golang-1.15
+  to: node-healthcheck-operator
 releases:
   latest:
     candidate:
@@ -30,7 +47,10 @@ tests:
     test:
     - as: e2e
       cli: latest
-      commands: make test-e2e
+      commands: make test-e2e IMG=${NHC_IMAGE}
+      dependencies:
+      - env: NHC_IMAGE
+        name: node-healthcheck-operator
       from: src
       resources:
         requests:
