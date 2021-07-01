@@ -29,6 +29,11 @@ releases:
       product: ocp
       stream: nightly
       version: "4.8"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.8"
 resources:
   '*':
     limits:
@@ -47,6 +52,41 @@ tests:
   container:
     from: src
 - as: e2e-aws
+  steps:
+    cluster_profile: aws
+    test:
+    - as: install-hypershift
+      cli: latest
+      commands: bin/hypershift install --hypershift-image "${HYPERSHIFT_RELEASE_LATEST}"
+      dependencies:
+      - env: HYPERSHIFT_RELEASE_LATEST
+        name: hypershift
+      from: bin
+      grace_period: 1m0s
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 5m0s
+    - as: test-e2e
+      cli: latest
+      commands: |-
+        bin/test-e2e \
+          -test.v \
+          -test.timeout 0 \
+          --e2e.aws-credentials-file ${CLUSTER_PROFILE_DIR}/.awscred \
+          --e2e.pull-secret-file ${CLUSTER_PROFILE_DIR}/pull-secret \
+          --e2e.latest-release-image ${RELEASE_IMAGE}
+      dependencies:
+      - env: RELEASE_IMAGE
+        name: release:hosted-ocp-latest
+      from: test-bin
+      grace_period: 15m0s
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 2h0m0s
+    workflow: ipi-aws
+- as: e2e-aws-pooled
   cluster_claim:
     architecture: amd64
     cloud: aws
