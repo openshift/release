@@ -203,6 +203,7 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-network-operator-release-4.9-e2e-azure-ovn
+    optional: true
     rerun_command: /test e2e-azure-ovn
     spec:
       containers:
@@ -257,7 +258,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-azure-ovn,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - release-4.9
     cluster: build02
@@ -267,6 +268,7 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-network-operator-release-4.9-e2e-azure-ovn-dualstack
+    optional: true
     rerun_command: /test e2e-azure-ovn-dualstack
     spec:
       containers:
@@ -596,6 +598,7 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-network-operator-release-4.9-e2e-metal-ipi-ovn-ipv6-ipsec
+    optional: true
     rerun_command: /test e2e-metal-ipi-ovn-ipv6-ipsec
     spec:
       containers:
@@ -656,12 +659,90 @@ presubmits:
     branches:
     - release-4.9
     cluster: build02
+    context: ci/prow/e2e-openstack-ovn
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-network-operator-release-4.9-e2e-openstack-ovn
+    optional: true
+    rerun_command: /test e2e-openstack-ovn
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --repo=cluster-network-operator
+        - --secret-dir=/usr/local/e2e-openstack-ovn-cluster-profile
+        - --target=e2e-openstack-ovn
+        - --template=/usr/local/e2e-openstack-ovn
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: openstack
+        - name: CLUSTER_VARIANT
+          value: ovn
+        - name: JOB_NAME_SAFE
+          value: e2e-openstack-ovn
+        - name: KURYR_ENABLED
+          value: "false"
+        - name: TEST_COMMAND
+          value: TEST_SUITE=openshift/conformance/parallel run-tests
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-openstack-ovn-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-openstack-ovn
+          name: job-definition
+          subPath: cluster-launch-installer-openstack-e2e.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-openstack
+      - configMap:
+          name: prow-job-cluster-launch-installer-openstack-e2e
+        name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+    trigger: (?m)^/test( | .* )e2e-openstack-ovn,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-4.9
+    cluster: build02
     context: ci/prow/e2e-ovn-hybrid-step-registry
     decorate: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-network-operator-release-4.9-e2e-ovn-hybrid-step-registry
+    optional: true
     rerun_command: /test e2e-ovn-hybrid-step-registry
     spec:
       containers:
@@ -726,6 +807,7 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-network-operator-release-4.9-e2e-ovn-ipsec-step-registry
+    optional: true
     rerun_command: /test e2e-ovn-ipsec-step-registry
     spec:
       containers:
@@ -790,6 +872,7 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-network-operator-release-4.9-e2e-ovn-step-registry
+    optional: true
     rerun_command: /test e2e-ovn-step-registry
     spec:
       containers:
@@ -854,6 +937,7 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-network-operator-release-4.9-e2e-vsphere-ovn
+    optional: true
     rerun_command: /test e2e-vsphere-ovn
     spec:
       containers:
@@ -918,6 +1002,7 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-network-operator-release-4.9-e2e-vsphere-windows
+    optional: true
     rerun_command: /test e2e-vsphere-windows
     spec:
       containers:
