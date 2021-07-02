@@ -23,7 +23,9 @@ tag_specification:
   namespace: ocp
 tests:
 - as: unit
-  commands: USE_EXISTING_CLUSTER=true GOFLAGS='-mod=readonly' make test
+  commands: |
+    GOFLAGS='-mod=readonly' make generate fmt vet
+    go mod vendor && go test -covermode=atomic $(go list ./... | grep -v internal/operator)
   container:
     from: src
 zz_generated_metadata:
