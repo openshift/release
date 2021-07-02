@@ -94,7 +94,7 @@ EOF
 
 echo "$(date -u --rfc-3339=seconds) - Create terraform.tfvars ..."
 cat > "${SHARED_DIR}/terraform.tfvars" <<-EOF
-machine_cidr = "192.168.${third_octet}.0/27"
+machine_cidr = "192.168.${third_octet}.0/25"
 vm_template = "${vm_template}"
 vsphere_cluster = "Cluster-1"
 vsphere_datacenter = "SDDC-Datacenter"
