@@ -1,47 +1,6 @@
 presubmits:
   openshift/origin:
   - agent: kubernetes
-    always_run: false
-    branches:
-    - release-4.7
-    cluster: build01
-    context: ci/prow/artifacts
-    decorate: true
-    labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-origin-release-4.7-artifacts
-    rerun_command: /test artifacts
-    run_if_changed: ^(hack/)|(Makefile)|(.*_(windows|linux|darwin|unsupported)(_test)?\.go)$
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --give-pr-author-access-to-namespace=true
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --repo=origin
-        - --target=artifacts
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-    trigger: (?m)^/test( | .* )artifacts,?($|\s.*)
-  - agent: kubernetes
     always_run: true
     branches:
     - release-4.7
