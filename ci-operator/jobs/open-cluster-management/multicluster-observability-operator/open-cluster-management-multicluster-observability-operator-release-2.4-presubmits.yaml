@@ -1,9 +1,9 @@
 presubmits:
-  open-cluster-management/observability-e2e-test:
+  open-cluster-management/multicluster-observability-operator:
   - agent: kubernetes
     always_run: true
     branches:
-    - main
+    - release-2.4
     cluster: build01
     context: ci/prow/images
     decorate: true
@@ -12,7 +12,7 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-open-cluster-management-observability-e2e-test-main-images
+    name: pull-ci-open-cluster-management-multicluster-observability-operator-release-2.4-images
     rerun_command: /test images
     spec:
       containers:
@@ -49,9 +49,64 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
-    - main
+    - release-2.4
+    cluster: build01
+    context: ci/prow/sonarcloud
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-open-cluster-management-multicluster-observability-operator-release-2.4-sonarcloud
+    rerun_command: /test sonarcloud
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/acm-sonarcloud-token
+        - --target=sonarcloud
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/acm-sonarcloud-token
+          name: acm-sonarcloud-token
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: acm-sonarcloud-token
+        secret:
+          secretName: acm-sonarcloud-token
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )sonarcloud,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-2.4
     cluster: build01
     context: ci/prow/test-e2e
     decorate: true
@@ -60,9 +115,8 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-open-cluster-management-observability-e2e-test-main-test-e2e
+    name: pull-ci-open-cluster-management-multicluster-observability-operator-release-2.4-test-e2e
     rerun_command: /test test-e2e
-    run_if_changed: ^(pkg/.*|Makefile|Dockerfile|go\.mod|go\.sum)$
     spec:
       containers:
       - args:
@@ -118,7 +172,7 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - main
+    - release-2.4
     cluster: build01
     context: ci/prow/test-unit
     decorate: true
@@ -127,7 +181,7 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-open-cluster-management-observability-e2e-test-main-test-unit
+    name: pull-ci-open-cluster-management-multicluster-observability-operator-release-2.4-test-unit
     rerun_command: /test test-unit
     spec:
       containers:
