@@ -1,0 +1,35 @@
+base_images:
+  base:
+    name: 4.9-priv
+    namespace: ocp-private
+    tag: base
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.16
+canonical_go_repository: github.com/openshift/contour-operator
+promotion:
+  name: 4.9-priv
+  namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: 4.9-priv
+  namespace: ocp-private
+tests:
+- as: unit
+  commands: |
+    GOFLAGS='-mod=readonly' make generate fmt vet
+    go mod vendor && go test -covermode=atomic $(go list ./... | grep -v internal/operator)
+  container:
+    from: src
+zz_generated_metadata:
+  branch: main
+  org: openshift-priv
+  repo: contour-operator
