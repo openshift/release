@@ -1,0 +1,47 @@
+ref:
+  as: openstack-provision-machinesubnet
+  from: openstack-installer
+  commands: openstack-provision-machinesubnet-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+    - name: OS_CLOUD
+      default: "openstack"
+      documentation: Name of cloud to use from ${SHARED_DIR}/clouds.yaml file
+    - name: SUBNET_RANGE
+      default: "172.16.0.0/24"
+    - name: DNS_IP
+      default: "1.1.1.1"
+    - name: API_VIP
+      default: "172.16.0.5"
+    - name: INGRESS_VIP
+      default: "172.16.0.7"
+    - name: ALLOCATION_POOL_START
+      default: "172.16.0.10"
+    - name: ALLOCATION_POOL_END
+      default: "172.16.0.254"
+    - name: OPENSTACK_EXTERNAL_NETWORK
+      default: ''
+      documentation: |-
+        Name of the OpenStack public-facing network. Defaults to the value in
+        "${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK"
+    - name: CONFIG_TYPE
+      documentation: |
+        The type of config for the environment to deploy.
+
+        * 'minimal' - Configure the install-config with the minimal options to make it work on
+                      our tests, which requires the usage of floating IPs. This config type doesn't
+                      require a proxy server to be deployed.
+        * 'byon' - Configure the install-config to use a pre-created network (BYON) so it wouln't
+                   require the usage of floating IPs. This config type will require a proxy server
+                   to be deployed.
+  documentation: |-
+    This step creates the necessary resources for user-provided custom subnet
+    when $CONFIG_TYPE is byon.
+    It creates a network named "${CLUSTER_NAME}-network".
+    Then it adds to it a subnet named "${CLUSTER_NAME}-subnet"
+    and creates a router named "${CLUSTER_NAME}-router".
+    It attaches the router to the subnet of the $OPENSTACK_EXTERNAL_NETWORK.
+    Finally, it writes their UIDS to ${SHARED_DIR}.
