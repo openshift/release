@@ -52,6 +52,7 @@ fi
 
 cd "${REPO_DIR}/deploy/operator/ztp/"
 echo "### Deploying SNO spoke cluster..."
+export DISCONNECTED="${DISCONNECTED:-}"
 export EXTRA_BAREMETALHOSTS_FILE="/root/dev-scripts/${EXTRA_BAREMETALHOSTS_FILE}"
 ./deploy_spoke_cluster.sh
 
