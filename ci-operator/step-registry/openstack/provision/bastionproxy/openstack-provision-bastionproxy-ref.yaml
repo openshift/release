@@ -1,15 +1,29 @@
 ref:
-  as: openstack-conf-createfips
+  as: openstack-provision-bastionproxy
   from: openstack-installer
-  commands: openstack-conf-createfips-commands.sh
+  commands: openstack-provision-bastionproxy-commands.sh
   resources:
     requests:
       cpu: 10m
       memory: 100Mi
   env:
     - name: OS_CLOUD
-      default: "openstack"
+      default: 'openstack'
       documentation: Name of cloud to use from ${SHARED_DIR}/clouds.yaml file
+    - name: BASTION_IMAGE
+      default: 'centos8-stream'
+      documentation: The image of the bastion machine
+    - name: BASTION_FLAVOR
+      default: 'm1.small'
+      documentation: The flavor of the bastion machine
+    - name: BASTION_USER
+      default: 'centos'
+      documentation: The user of the bastion machine
+    - name: OPENSTACK_EXTERNAL_NETWORK
+      default: ''
+      documentation: |-
+        Name of the OpenStack public-facing network. Defaults to the value in
+        "${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK"
     - name: CONFIG_TYPE
       documentation: |
         The type of config for the environment to deploy.
@@ -20,13 +34,5 @@ ref:
         * 'byon' - Configure the install-config to use a pre-created network (BYON) so it wouln't
                    require the usage of floating IPs. This config type will require a proxy server
                    to be deployed.
-    - name: OPENSTACK_EXTERNAL_NETWORK
-      default: ''
-      documentation: |-
-        Name of the OpenStack public-facing network. Defaults to the value in
-        "${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK"
   documentation: |-
-    Creates two floating IPs in OPENSTACK_EXTERNAL_NETWORK with the description
-    set to "${SHARED_DIR/CLUSTER_NAME".api-fip and
-    "${SHARED_DIR/CLUSTER_NAME".ingress-fip. Writes IP and UID of created FIPs to
-    $SHARED_DIR for later reference.
+    This step creates the bastion proxy when $CONFIG_TYPE is byon.
