@@ -96,6 +96,8 @@ queue ${ARTIFACT_DIR}/services.json oc --insecure-skip-tls-verify --request-time
 queue ${ARTIFACT_DIR}/oc_cmds/services oc --insecure-skip-tls-verify --request-timeout=5s get services --all-namespaces
 FILTER=gzip queue ${ARTIFACT_DIR}/statefulsets.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get statefulsets --all-namespaces -o json
 queue ${ARTIFACT_DIR}/statefulsets oc --insecure-skip-tls-verify --request-timeout=5s get statefulsets --all-namespaces
+queue ${ARTIFACT_DIR}/routes.json oc --insecure-skip-tls-verify --request-timeout=5s get routes --all-namespaces -o json
+queue ${ARTIFACT_DIR}/oc_cmds/routes oc --insecure-skip-tls-verify --request-timeout=5s get routes --all-namespaces
 
 FILTER=gzip queue ${ARTIFACT_DIR}/openapi.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get --raw /openapi/v2
 
