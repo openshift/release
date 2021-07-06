@@ -4,7 +4,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.9
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-agnostic-cmd
     decorate: true
     decoration_config:
@@ -71,7 +71,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.9
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-aws
     decorate: true
     decoration_config:
@@ -126,7 +126,7 @@ presubmits:
         projected:
           sources:
           - secret:
-              name: cluster-secrets-aws
+              name: cluster-secrets-aws-2
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -138,7 +138,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.9
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-aws-csi
     decorate: true
     decoration_config:
@@ -193,7 +193,7 @@ presubmits:
         projected:
           sources:
           - secret:
-              name: cluster-secrets-aws
+              name: cluster-secrets-aws-2
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -205,7 +205,74 @@ presubmits:
     always_run: false
     branches:
     - release-4.9
-    cluster: build01
+    cluster: build02
+    context: ci/prow/e2e-aws-csi-migration
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-origin-release-4.9-e2e-aws-csi-migration
+    optional: true
+    rerun_command: /test e2e-aws-csi-migration
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-aws-csi-migration-cluster-profile
+        - --target=e2e-aws-csi-migration
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-aws-csi-migration-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-csi-migration,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - release-4.9
+    cluster: build02
     context: ci/prow/e2e-aws-disruptive
     decorate: true
     decoration_config:
@@ -260,7 +327,7 @@ presubmits:
         projected:
           sources:
           - secret:
-              name: cluster-secrets-aws
+              name: cluster-secrets-aws-2
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -272,7 +339,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.9
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-aws-fips
     decorate: true
     decoration_config:
@@ -326,7 +393,7 @@ presubmits:
         projected:
           sources:
           - secret:
-              name: cluster-secrets-aws
+              name: cluster-secrets-aws-2
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -338,7 +405,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.9
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-aws-image-registry
     decorate: true
     decoration_config:
@@ -393,7 +460,7 @@ presubmits:
         projected:
           sources:
           - secret:
-              name: cluster-secrets-aws
+              name: cluster-secrets-aws-2
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -405,7 +472,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.9
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-aws-jenkins
     decorate: true
     decoration_config:
@@ -460,7 +527,7 @@ presubmits:
         projected:
           sources:
           - secret:
-              name: cluster-secrets-aws
+              name: cluster-secrets-aws-2
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -472,7 +539,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.9
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-aws-multitenant
     decorate: true
     decoration_config:
@@ -527,7 +594,7 @@ presubmits:
         projected:
           sources:
           - secret:
-              name: cluster-secrets-aws
+              name: cluster-secrets-aws-2
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -539,7 +606,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.9
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-aws-ovn
     decorate: true
     decoration_config:
@@ -594,7 +661,7 @@ presubmits:
         projected:
           sources:
           - secret:
-              name: cluster-secrets-aws
+              name: cluster-secrets-aws-2
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -606,7 +673,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.9
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-aws-proxy
     decorate: true
     decoration_config:
@@ -673,7 +740,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.9
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-aws-serial
     decorate: true
     decoration_config:
@@ -727,7 +794,7 @@ presubmits:
         projected:
           sources:
           - secret:
-              name: cluster-secrets-aws
+              name: cluster-secrets-aws-2
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -739,7 +806,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.9
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-aws-single-node
     decorate: true
     decoration_config:
@@ -794,7 +861,7 @@ presubmits:
         projected:
           sources:
           - secret:
-              name: cluster-secrets-aws
+              name: cluster-secrets-aws-2
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -806,7 +873,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.9
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-aws-upgrade
     decorate: true
     decoration_config:
@@ -861,7 +928,7 @@ presubmits:
         projected:
           sources:
           - secret:
-              name: cluster-secrets-aws
+              name: cluster-secrets-aws-2
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -873,7 +940,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.9
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-azure
     decorate: true
     decoration_config:
@@ -940,7 +1007,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.9
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-gcp
     decorate: true
     decoration_config:
@@ -1008,7 +1075,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.9
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-gcp-builds
     decorate: true
     decoration_config:
@@ -1077,7 +1144,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.9
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-gcp-csi
     decorate: true
     decoration_config:
@@ -1146,7 +1213,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.9
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-gcp-disruptive
     decorate: true
     decoration_config:
@@ -1215,7 +1282,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.9
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-gcp-image-ecosystem
     decorate: true
     decoration_config:
@@ -1284,7 +1351,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.9
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-gcp-upgrade
     decorate: true
     decoration_config:
@@ -1352,7 +1419,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.9
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-metal-ipi
     decorate: true
     decoration_config:
@@ -1421,7 +1488,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.9
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-metal-ipi-ovn-dualstack
     decorate: true
     decoration_config:
@@ -1490,7 +1557,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.9
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-metal-ipi-ovn-ipv6
     decorate: true
     decoration_config:
@@ -1558,7 +1625,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.9
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-metal-ipi-virtualmedia
     decorate: true
     decoration_config:
@@ -1627,7 +1694,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.9
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-openstack
     decorate: true
     decoration_config:
@@ -1694,7 +1761,7 @@ presubmits:
     always_run: false
     branches:
     - release-4.9
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-openstack-serial
     decorate: true
     decoration_config:
@@ -1828,7 +1895,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.9
-    cluster: build01
+    cluster: build02
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -1876,7 +1943,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.9
-    cluster: build01
+    cluster: build02
     context: ci/prow/verify
     decorate: true
     decoration_config:
@@ -1924,7 +1991,7 @@ presubmits:
     always_run: true
     branches:
     - release-4.9
-    cluster: build01
+    cluster: build02
     context: ci/prow/verify-deps
     decorate: true
     decoration_config:

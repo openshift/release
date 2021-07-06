@@ -21,9 +21,9 @@ CONFIG = {
     },
     'aws-2-quota-slice': {
         'us-east-1': 10,
-        'us-east-2': 10,
+        'us-east-2': 40,
         'us-west-1': 35,
-        'us-west-2': 10,
+        'us-west-2': 40,
     },
     'azure4-quota-slice': {
         'centralus': 33,
@@ -100,7 +100,7 @@ for i in range(10, 20):
 for i in range(1, 3):
     CONFIG['kubevirt-quota-slice']['tenant-cluster-{}'.format(i)] = 1
 
-for i in range(40,53):
+for i in range(0,13):
     CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 config = {

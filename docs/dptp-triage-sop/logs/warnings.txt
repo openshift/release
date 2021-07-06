@@ -2,16 +2,6 @@
 | sort @timestamp desc 
 | filter(level = "warning")
 | filter(not(
-# exclusions we expect to keep forever
 	component="entrypoint" or component="sidecar" or component="clonerefs" or component="initupload" # these are logs from jobs, which we don't care about
 	or `kubernetes.pod_labels.prow.k8s.io/type`="presubmit" or `kubernetes.pod_labels.prow.k8s.io/type`="batch" # these are logs from jobs, which we don't care about
-	or msg="Throttled clientside for more than 15 minutes" # this is just token contention
-	or (component="deck" and (msg=~"object doesn't exist" or error=~"object doesn't exist" or error=~"failed to read started.json" or msg=~"failed to read started.json" or msg=~"Error getting ProwJob name for source ")) # deck spews a lot of useless warnings
-	or msg="empty -github-token-path, will use anonymous github client" # this is expected and OK
-	or msg=~"Unable to add nonexistent labels" # if the users cared they'd do something
-	or (component="needs-rebase" and msg="Query returned 1k PRs, which is the max number of results per query allowed by GitHub. This indicates that we were not able to process all PRs.") # nothing we can do
-	or (component="cherrypicker" and msg~="failed to apply PR on top") # this is expected and ok
-# ephemeral exclusions we are working to remove
-	or (msg=~"unrecognized file name (expected <int64>.txt)") # https://github.com/kubernetes/test-infra/issues/22256
-	or (component="slack-bot" and msg~="could not search Jira for requester") # https://issues.redhat.com/browse/DPTP-2220
 ))

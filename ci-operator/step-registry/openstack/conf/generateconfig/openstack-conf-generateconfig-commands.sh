@@ -17,7 +17,7 @@ SSH_PUB_KEY=$(<"${CLUSTER_PROFILE_DIR}"/ssh-publickey)
 CONFIG="${SHARED_DIR}/install-config.yaml"
 if [[ "${CONFIG_TYPE}" == "minimal" ]]; then
 cat > "${CONFIG}" << EOF
-apiVersion: ${CONFIG_API_VERSION}
+apiVersion: v1
 baseDomain: ${BASE_DOMAIN}
 metadata:
   name: ${CLUSTER_NAME}
