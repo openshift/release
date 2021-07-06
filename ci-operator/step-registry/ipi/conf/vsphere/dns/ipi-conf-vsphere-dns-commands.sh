@@ -10,6 +10,7 @@ cluster_name=${NAMESPACE}-${JOB_NAME_HASH}
 base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
 cluster_domain="${cluster_name}.${base_domain}"
 
+export AWS_DEFAULT_REGION=us-west-2  # TODO: Derive this?
 export AWS_SHARED_CREDENTIALS_FILE=/var/run/vault/vsphere/.awscred
 export AWS_MAX_ATTEMPTS=50
 export AWS_RETRY_MODE=adaptive
@@ -46,6 +47,22 @@ hosted_zone_id="$(aws route53 list-hosted-zones-by-name \
             --output text)"
 echo "${hosted_zone_id}" > "${SHARED_DIR}/hosted-zone.txt"
 
+if [ "${JOB_NAME_SAFE}" = "launch" ]; then
+  # Configure DNS target as previously configured NLB
+  nlb_arn=$(<"${SHARED_DIR}"/nlb_arn.txt)
+  nlb_dnsname="$(aws elbv2 describe-load-balancers \
+            --load-balancer-arns ${nlb_arn} \
+            --query 'LoadBalancers[0].DNSName' \
+            --output text)"
+  dns_target='"AliasTarget": { \
+        "DNSName": "'${nlb_dnsname}'", \
+        "EvaluateTargetHealth": false \
+        }'
+else
+  # Configure DNS direct to VIP
+  dns_target='"ResourceRecords": [{"Value": "'${vips[0]}'"}]'
+fi
+
 # api-int record is needed just for Windows nodes
 # TODO: Remove the api-int entry in future
 echo "Creating DNS records..."
@@ -58,7 +75,7 @@ cat > "${SHARED_DIR}"/dns-create.json <<EOF
       "Name": "api.$cluster_domain.",
       "Type": "A",
       "TTL": 60,
-      "ResourceRecords": [{"Value": "${vips[0]}"}]
+      $dns_target
       }
     },{
     "Action": "UPSERT",
@@ -74,7 +91,7 @@ cat > "${SHARED_DIR}"/dns-create.json <<EOF
       "Name": "*.apps.$cluster_domain.",
       "Type": "A",
       "TTL": 60,
-      "ResourceRecords": [{"Value": "${vips[1]}"}]
+      $dns_target
       }
 }]}
 EOF
@@ -92,7 +109,7 @@ cat > "${SHARED_DIR}"/dns-delete.json <<EOF
       "Name": "api.$cluster_domain.",
       "Type": "A",
       "TTL": 60,
-      "ResourceRecords": [{"Value": "${vips[0]}"}]
+      $dns_target
       }
     },{
     "Action": "DELETE",
@@ -108,7 +125,7 @@ cat > "${SHARED_DIR}"/dns-delete.json <<EOF
       "Name": "*.apps.$cluster_domain.",
       "Type": "A",
       "TTL": 60,
-      "ResourceRecords": [{"Value": "${vips[1]}"}]
+      $dns_target
       }
 }]}
 EOF
