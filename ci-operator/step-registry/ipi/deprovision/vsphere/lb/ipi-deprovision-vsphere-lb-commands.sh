@@ -35,21 +35,21 @@ then
     fi
 fi
 
+
+if [ -f "${SHARED_DIR}"/nlb_arn.txt ]; then
+  # Initiate delete of NLB and wait for it
+  nlb_arn=$(<"${SHARED_DIR}"/nlb_arn.txt)
+  aws elbv2 delete-load-balancer --load-balancer-arn "${nlb_arn}"
+  echo "Waiting for Network Load Balancer to delete..."
+  aws elbv2 wait load-balancers-deleted --load-balancer-arns "${nlb_arn}"
+  echo "Network Load Balancer deleted."
+fi
+
 # Load array of ARNs created in vsphere-lb step:
 declare -a tg_arns
-mapfile -t tg_arns < "${SHARED_DIR}"/tg_arn.txt
-
-nlb_arn=$(<"${SHARED_DIR}"/nlb_arn.txt)
-
-# Initiate delete of NLB and wait for it
-aws elbv2 delete-load-balancer --load-balancer-arn "${nlb_arn}"
-
-echo "Waiting for Network Load Balancer to delete..."
-
-aws elbv2 wait load-balancers-deleted --load-balancer-arns "${nlb_arn}"
-
-echo "Network Load Balancer deleted."
-
+if [ -f "${SHARED_DIR}"/tg_arn.txt ]; then
+  mapfile -t tg_arns < "${SHARED_DIR}"/tg_arn.txt
+fi
 
 for arn in "${tg_arns[@]}"; do
   aws elbv2 delete-target-group --target-group-arn $arn
