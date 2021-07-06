@@ -13,7 +13,7 @@ with open(sys.argv[1]) as raw:
 headers = ["time", "level", "component", "message", "file", "func", "fields"]
 entries = []
 
-for item in data["results"]:
+for item in data:
 	for field in item:
 		if field["field"] == "@message":
 			raw_entry = json.loads(field["value"])
