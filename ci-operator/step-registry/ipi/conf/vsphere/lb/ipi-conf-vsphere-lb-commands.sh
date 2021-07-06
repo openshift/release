@@ -81,15 +81,15 @@ echo "Registering VIPs with Target Groups..."
 
 aws elbv2 register-targets \
     --target-group-arn ${http_tg_arn} \
-    --targets Id="${vips[1]}"
+    --targets Id="${vips[1]}",Port=80,AvailabilityZone=all
 
 aws elbv2 register-targets \
     --target-group-arn ${https_tg_arn} \
-    --targets Id="${vips[1]}"
+    --targets Id="${vips[1]}",Port=443,AvailabilityZone=all
 
 aws elbv2 register-targets \
     --target-group-arn ${api_tg_arn} \
-    --targets Id="${vips[0]}"
+    --targets Id="${vips[0]}",Port=6443,AvailabilityZone=all
 
 echo "VIPs registered."
 
