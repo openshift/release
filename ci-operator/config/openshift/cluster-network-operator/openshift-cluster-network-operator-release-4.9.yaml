@@ -146,6 +146,29 @@ tests:
       NETWORK_TYPE: OVNKubernetes
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
+- as: e2e-network-migration
+  steps:
+    cluster_profile: aws
+    env:
+      TEST_SKIPS: Alerts shouldn't report any alerts in firing or pending state\|
+        Prometheus when installed on the cluster shouldn't report any alerts in firing
+        state apart from Watchdog and AlertmanagerReceiversNotConfigured
+    test:
+    - ref: ovn-sdn-migration
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws
+- as: e2e-network-migration-rollback
+  steps:
+    cluster_profile: aws
+    env:
+      TEST_SKIPS: Alerts shouldn't report any alerts in firing or pending state\|
+        Prometheus when installed on the cluster shouldn't report any alerts in firing
+        state apart from Watchdog and AlertmanagerReceiversNotConfigured
+    test:
+    - ref: ovn-sdn-migration
+    - ref: ovn-sdn-migration-rollback
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: release-4.9
   org: openshift
