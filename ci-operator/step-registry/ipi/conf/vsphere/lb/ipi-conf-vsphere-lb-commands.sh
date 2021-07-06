@@ -61,15 +61,16 @@ aws elbv2 wait load-balancer-available --load-balancer-arns "${nlb_arn}"
 echo "Network Load Balancer created."
 
 
-# Create the Target Groups
+# Create the Target Groups and save to tg_arn.txt for later during deprovision
 echo "Creating Target Groups for 80/tcp, 443/tcp, and 6443/tcp..."
 
 http_tg_arn=$(aws elbv2 create-target-group --name ${cluster_name}-http --protocol TCP --port 80 --vpc-id ${vpc_id} --target-type ip --query 'TargetGroups[0].TargetGroupArn' --output text)
-https_tg_arn=$(aws elbv2 create-target-group --name ${cluster_name}-https --protocol TCP --port 443 --vpc-id ${vpc_id} --target-type ip --query 'TargetGroups[0].TargetGroupArn' --output text)
-api_tg_arn=$(aws elbv2 create-target-group --name ${cluster_name}-api --protocol TCP --port 6443 --vpc-id ${vpc_id} --target-type ip --query 'TargetGroups[0].TargetGroupArn' --output tex)
-
 echo ${http_tg_arn} > ${SHARED_DIR}/tg_arn.txt
+
+https_tg_arn=$(aws elbv2 create-target-group --name ${cluster_name}-https --protocol TCP --port 443 --vpc-id ${vpc_id} --target-type ip --query 'TargetGroups[0].TargetGroupArn' --output text)
 echo ${https_tg_arn} >> ${SHARED_DIR}/tg_arn.txt
+
+api_tg_arn=$(aws elbv2 create-target-group --name ${cluster_name}-api --protocol TCP --port 6443 --vpc-id ${vpc_id} --target-type ip --query 'TargetGroups[0].TargetGroupArn' --output text)
 echo ${api_tg_arn} >> ${SHARED_DIR}/tg_arn.txt
 
 echo "Target Groups created."
