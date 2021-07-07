@@ -54,13 +54,19 @@ if [ "${JOB_NAME_SAFE}" = "launch" ]; then
             --load-balancer-arns ${nlb_arn} \
             --query 'LoadBalancers[0].DNSName' \
             --output text)"
-  dns_target='"AliasTarget": { \
-        "DNSName": "'${nlb_dnsname}'", \
-        "EvaluateTargetHealth": false \
+  nlb_hosted_zone_id="$(aws elbv2 describe-load-balancers \
+            --load-balancer-arns ${nlb_arn} \
+            --query 'LoadBalancers[0].CanonicalHostedZoneId' \
+            --output text)"
+  dns_target='"AliasTarget": {
+        "HostedZoneId": "'${nlb_hosted_zone_id}'",
+        "DNSName": "'${nlb_dnsname}'",
+        "EvaluateTargetHealth": false
         }'
 else
   # Configure DNS direct to VIP
-  dns_target='"ResourceRecords": [{"Value": "'${vips[0]}'"}]'
+  dns_target='"TTL": 60,
+        "ResourceRecords": [{"Value": "'${vips[0]}'"}]'
 fi
 
 # api-int record is needed just for Windows nodes
@@ -74,7 +80,6 @@ cat > "${SHARED_DIR}"/dns-create.json <<EOF
     "ResourceRecordSet": {
       "Name": "api.$cluster_domain.",
       "Type": "A",
-      "TTL": 60,
       $dns_target
       }
     },{
@@ -90,7 +95,6 @@ cat > "${SHARED_DIR}"/dns-create.json <<EOF
     "ResourceRecordSet": {
       "Name": "*.apps.$cluster_domain.",
       "Type": "A",
-      "TTL": 60,
       $dns_target
       }
 }]}
@@ -108,7 +112,6 @@ cat > "${SHARED_DIR}"/dns-delete.json <<EOF
     "ResourceRecordSet": {
       "Name": "api.$cluster_domain.",
       "Type": "A",
-      "TTL": 60,
       $dns_target
       }
     },{
@@ -124,7 +127,6 @@ cat > "${SHARED_DIR}"/dns-delete.json <<EOF
     "ResourceRecordSet": {
       "Name": "*.apps.$cluster_domain.",
       "Type": "A",
-      "TTL": 60,
       $dns_target
       }
 }]}
