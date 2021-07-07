@@ -185,3 +185,7 @@ pullSecret: >
 sshKey: |
   $(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")
 EOF
+
+echo "BEGIN: ${CONFIG}"
+awk 'BEGIN{f=1;} /^pullSecret/{f=0; next;} /^sshKey/{f=1;} f' ${CONFIG}
+echo "END: ${CONFIG}"
