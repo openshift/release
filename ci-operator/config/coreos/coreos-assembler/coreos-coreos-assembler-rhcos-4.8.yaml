@@ -1,19 +1,38 @@
-binary_build_commands: make && make check
-build_root:
-  image_stream_tag:
-    name: cosa-buildroot
+base_images:
+  fedora:
+    name: fedora
     namespace: coreos
-    tag: latest
+    tag: "33"
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile
+  inputs:
+    fedora:
+      as:
+      - registry.svc.ci.openshift.org/coreos/fedora:33
+  to: cosa48
+promotion:
+  excluded_images:
+  - '*'
+  name: "4.8"
+  namespace: coreos
 resources:
   '*':
+    limits:
+      devices.kubevirt.io/kvm: "1"
     requests:
       cpu: 1000m
-      memory: 1Gi
+      devices.kubevirt.io/kvm: "1"
+      memory: 2Gi
+tag_specification:
+  name: "4.8"
+  namespace: coreos
 tests:
 - as: sanity
   commands: coreos-assembler shell true
   container:
-    from: bin
+    from: cosa48
 zz_generated_metadata:
   branch: rhcos-4.8
   org: coreos
