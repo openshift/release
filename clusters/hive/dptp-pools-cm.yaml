@@ -1,0 +1,80 @@
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: dptp-pools-cm
+  namespace: ci
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: dptp-pools-cm
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: dptp-pools-cm
+subjects:
+- kind: ServiceAccount
+  name: dptp-pools-cm
+  namespace: ci
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: dptp-pools-cm
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - patch
+  - update
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"dptp-pools-cm:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"dptp-pools-cm\")].image"}]'
+  labels:
+    app: dptp-pools-cm
+  name: dptp-pools-cm
+  namespace: ci
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dptp-pools-cm
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: dptp-pools-cm
+    spec:
+      containers:
+      - image: dptp-pools-cm
+        name: dptp-pools-cm
+        args:
+        - --leader-election-namespace=ci
+        - --dry-run=false
+        env:
+        - name: KUBECONFIG
+          value: /var/kubeconfigs/hive-kubeconfig
+        ports:
+        - name: metrics
+          containerPort: 8080
+        volumeMounts:
+        - name: kubeconfigs
+          mountPath: /var/kubeconfigs
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "250m"
+      serviceAccountName: dptp-pools-cm
+      volumes:
+      - name: kubeconfigs
+        secret:
+          secretName: dptp-pools-cm
