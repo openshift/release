@@ -3,10 +3,10 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  open-cluster-management_builder_go1.15-linux:
+  open-cluster-management_builder_go1.15-linux-amd64:
     name: builder
     namespace: open-cluster-management
-    tag: go1.15-linux
+    tag: go1.15-linux-amd64
   open-cluster-management_builder_go1.16-linux:
     name: builder
     namespace: open-cluster-management
@@ -17,15 +17,30 @@ build_root:
     namespace: open-cluster-management
     tag: go1.15-linux
 images:
-- dockerfile_path: Dockerfile.prow
+- dockerfile_path: operators/multiclusterobservability/Dockerfile
+  from: base
+  to: multicluster-observability-operator
+- dockerfile_path: proxy/Dockerfile
   from: base
   inputs:
-    open-cluster-management_builder_go1.16-linux:
+    open-cluster-management_builder_go1.15-linux-amd64:
       as:
-      - registry.ci.openshift.org/open-cluster-management/builder:go1.16-linux
-  to: multicluster-observability-operator
+      - registry.ci.openshift.org/open-cluster-management/builder:go1.15-linux-amd64
+  to: rbac-query-proxy
+- dockerfile_path: operators/endpointmetrics/Dockerfile
+  from: base
+  to: endpoint-monitoring-operator
+- dockerfile_path: tests/Dockerfile
+  from: base
+  to: observability-e2e-test
+- dockerfile_path: collectors/metrics/Dockerfile
+  from: base
+  to: metrics-collector
+- dockerfile_path: loaders/dashboards/Dockerfile
+  from: base
+  to: grafana-dashboard-loader
 promotion:
-  name: "2.3"
+  name: "2.4"
   namespace: open-cluster-management
 resources:
   '*':
@@ -41,8 +56,8 @@ test_binary_build_commands: "true"
 tests:
 - as: test-unit
   commands: |
-    export SELF="make -f Makefile.prow"
-    make -f Makefile.prow unit-tests
+    export SELF="make -f Makefile"
+    make -f Makefile unit-tests
   container:
     from: src
 - as: test-e2e
@@ -53,9 +68,9 @@ tests:
       cli: latest
       commands: |
         export COMPONENT_IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:multicluster-observability-operator}
-        export SELF="make -f Makefile.prow"
+        export SELF="make -f Makefile"
         set -o pipefail
-        make -f Makefile.prow e2e-tests 2>&1 | tee ${ARTIFACT_DIR}/e2e_tests_out.log
+        make -f Makefile e2e-tests 2>&1 | tee ${ARTIFACT_DIR}/e2e_tests_out.log
         set +o pipefail
       env:
       - default: oc
