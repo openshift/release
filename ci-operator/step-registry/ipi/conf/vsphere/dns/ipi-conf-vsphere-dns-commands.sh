@@ -58,15 +58,20 @@ if [ "${JOB_NAME_SAFE}" = "launch" ]; then
             --load-balancer-arns ${nlb_arn} \
             --query 'LoadBalancers[0].CanonicalHostedZoneId' \
             --output text)"
-  dns_target='"AliasTarget": {
+
+  # Both API and *.apps pipe through same NLB
+  api_dns_target='"AliasTarget": {
         "HostedZoneId": "'${nlb_hosted_zone_id}'",
         "DNSName": "'${nlb_dnsname}'",
         "EvaluateTargetHealth": false
         }'
+  apps_dns_target=$api_dns_target
 else
-  # Configure DNS direct to VIP
-  dns_target='"TTL": 60,
+  # Configure DNS direct to respective VIP
+  api_dns_target='"TTL": 60,
         "ResourceRecords": [{"Value": "'${vips[0]}'"}]'
+  apps_dns_target='"TTL": 60,
+        "ResourceRecords": [{"Value": "'${vips[1]}'"}]'
 fi
 
 # api-int record is needed just for Windows nodes
@@ -80,7 +85,7 @@ cat > "${SHARED_DIR}"/dns-create.json <<EOF
     "ResourceRecordSet": {
       "Name": "api.$cluster_domain.",
       "Type": "A",
-      $dns_target
+      $api_dns_target
       }
     },{
     "Action": "UPSERT",
@@ -95,7 +100,7 @@ cat > "${SHARED_DIR}"/dns-create.json <<EOF
     "ResourceRecordSet": {
       "Name": "*.apps.$cluster_domain.",
       "Type": "A",
-      $dns_target
+      $apps_dns_target
       }
 }]}
 EOF
@@ -112,7 +117,7 @@ cat > "${SHARED_DIR}"/dns-delete.json <<EOF
     "ResourceRecordSet": {
       "Name": "api.$cluster_domain.",
       "Type": "A",
-      $dns_target
+      $api_dns_target
       }
     },{
     "Action": "DELETE",
@@ -127,7 +132,7 @@ cat > "${SHARED_DIR}"/dns-delete.json <<EOF
     "ResourceRecordSet": {
       "Name": "*.apps.$cluster_domain.",
       "Type": "A",
-      $dns_target
+      $apps_dns_target
       }
 }]}
 EOF
