@@ -23,6 +23,43 @@ periodics:
     serviceAccountName: clonerefs-manager
 - agent: kubernetes
   cluster: app.ci
+  cron: 0 1 * * *
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-sprint-automation
+  spec:
+    containers:
+    - args:
+      - --jira-endpoint=https://issues.redhat.com
+      - --jira-username=dptp-bot
+      - --jira-password-file=/etc/jira/password
+      - --slack-token-path=/etc/slack/oauth_token
+      command:
+      - /usr/bin/sprint-automation
+      image: registry.ci.openshift.org/ci/sprint-automation:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/slack
+        name: slack
+        readOnly: true
+      - mountPath: /etc/jira
+        name: jira
+        readOnly: true
+    serviceAccountName: clonerefs-manager
+    volumes:
+    - name: slack
+      secret:
+        secretName: slack-credentials-dptp-bot
+    - name: jira
+      secret:
+        secretName: jira-credentials-dptp-bot
+- agent: kubernetes
+  cluster: app.ci
   cron: '@yearly'
   decorate: true
   labels:
