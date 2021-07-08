@@ -72,15 +72,21 @@ sed -i '/^  channel:/d' ${dir}/manifests/cvo-overrides.yaml
 # Bump the libvirt masters memory to 16GB
 export TF_VAR_libvirt_master_memory=${MASTER_MEMORY}
 ls ${dir}/openshift
+echo "Bumping master memory to ${MASTER_MEMORY} and disk size to ${MASTER_DISK}"
 for ((i=0; i<${MASTER_REPLICAS}; i++))
 do
   yq write --inplace ${dir}/openshift/99_openshift-cluster-api_master-machines-${i}.yaml spec.providerSpec.value[domainMemory] ${MASTER_MEMORY}
   yq write --inplace ${dir}/openshift/99_openshift-cluster-api_master-machines-${i}.yaml spec.providerSpec.value.volume[volumeSize] ${MASTER_DISK}
+  echo "${dir}/openshift/99_openshift-cluster-api_master-machines-${i}.yaml"
+  cat ${dir}/openshift/99_openshift-cluster-api_master-machines-${i}.yaml
 done
+echo "Bumping worker memory to ${WORKER_MEMORY} and disk size to ${WORKER_DISK}"
 # Bump the libvirt workers memory to 16GB
 yq write --inplace ${dir}/openshift/99_openshift-cluster-api_worker-machineset-0.yaml spec.template.spec.providerSpec.value[domainMemory] ${WORKER_MEMORY}
 # Bump the libvirt workers disk to to 30GB
 yq write --inplace ${dir}/openshift/99_openshift-cluster-api_worker-machineset-0.yaml spec.template.spec.providerSpec.value.volume[volumeSize] ${WORKER_DISK}
+echo "${dir}/openshift/99_openshift-cluster-api_worker-machineset-0.yaml"
+cat ${dir}/openshift/99_openshift-cluster-api_worker-machineset-0.yaml
 
 while IFS= read -r -d '' item
 do
