@@ -11,6 +11,10 @@ base_images:
     name: builder
     namespace: open-cluster-management
     tag: go1.16-linux
+  open-cluster-management_builder_go1.16-linux-amd64:
+    name: builder
+    namespace: open-cluster-management
+    tag: go1.16-linux-amd64
 build_root:
   image_stream_tag:
     name: builder
@@ -19,25 +23,45 @@ build_root:
 images:
 - dockerfile_path: operators/multiclusterobservability/Dockerfile
   from: base
+  inputs:
+    open-cluster-management_builder_go1.16-linux:
+      as:
+      - registry.ci.openshift.org/open-cluster-management/builder:go1.16-linux
   to: multicluster-observability-operator
 - dockerfile_path: proxy/Dockerfile
   from: base
   inputs:
-    open-cluster-management_builder_go1.15-linux-amd64:
+    open-cluster-management_builder_go1.16-linux-amd64:
       as:
-      - registry.ci.openshift.org/open-cluster-management/builder:go1.15-linux-amd64
+      - registry.ci.openshift.org/open-cluster-management/builder:go1.16-linux-amd64
   to: rbac-query-proxy
 - dockerfile_path: operators/endpointmetrics/Dockerfile
   from: base
+  inputs:
+    open-cluster-management_builder_go1.16-linux:
+      as:
+      - registry.ci.openshift.org/open-cluster-management/builder:go1.16-linux
   to: endpoint-monitoring-operator
 - dockerfile_path: tests/Dockerfile
   from: base
+  inputs:
+    open-cluster-management_builder_go1.16-linux:
+      as:
+      - registry.ci.openshift.org/open-cluster-management/builder:go1.16-linux
   to: observability-e2e-test
 - dockerfile_path: collectors/metrics/Dockerfile
   from: base
+  inputs:
+    open-cluster-management_builder_go1.16-linux:
+      as:
+      - registry.ci.openshift.org/open-cluster-management/builder:go1.16-linux
   to: metrics-collector
 - dockerfile_path: loaders/dashboards/Dockerfile
   from: base
+  inputs:
+    open-cluster-management_builder_go1.16-linux:
+      as:
+      - registry.ci.openshift.org/open-cluster-management/builder:go1.16-linux
   to: grafana-dashboard-loader
 promotion:
   name: "2.4"
