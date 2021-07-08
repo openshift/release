@@ -3,7 +3,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/breaking-changes
     decorate: true
@@ -50,7 +51,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/checkconfig
     decorate: true
@@ -96,7 +98,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/codegen
     decorate: true
@@ -142,7 +145,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/e2e
     decorate: true
@@ -188,7 +192,8 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/e2e-oo
     decorate: true
@@ -235,7 +240,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/format
     decorate: true
@@ -281,7 +287,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/images
     decorate: true
@@ -327,7 +334,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/integration
     decorate: true
@@ -373,30 +381,49 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/lint
     decorate: true
     labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-ci-tools-master-lint
     rerun_command: /test lint
     spec:
       containers:
       - args:
-        - lint
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=lint
         command:
-        - make
-        env:
-        - name: GOCACHE
-          value: /tmp/gocache
-        image: golangci-lint:v1.37.1
+        - ci-operator
+        image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
         resources:
           requests:
-            cpu: "2"
-            memory: 10Gi
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
     trigger: (?m)^/test( | .* )lint,?($|\s.*)
   - agent: kubernetes
     always_run: true
@@ -466,7 +493,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/unit
     decorate: true
@@ -544,7 +572,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/validate-vendor
     decorate: true

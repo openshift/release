@@ -3,7 +3,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/e2e-agnostic-cmd
     decorate: true
@@ -78,7 +79,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/e2e-aws
     decorate: true
@@ -153,7 +155,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/e2e-aws-csi
     decorate: true
@@ -228,7 +231,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/e2e-aws-csi-migration
     decorate: true
@@ -303,7 +307,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/e2e-aws-disruptive
     decorate: true
@@ -378,7 +383,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/e2e-aws-fips
     decorate: true
@@ -453,7 +459,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/e2e-aws-image-registry
     decorate: true
@@ -528,7 +535,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/e2e-aws-jenkins
     decorate: true
@@ -603,7 +611,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/e2e-aws-multitenant
     decorate: true
@@ -678,7 +687,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/e2e-aws-ovn
     decorate: true
@@ -753,7 +763,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/e2e-aws-proxy
     decorate: true
@@ -828,7 +839,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/e2e-aws-serial
     decorate: true
@@ -903,7 +915,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/e2e-aws-single-node
     decorate: true
@@ -978,7 +991,84 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
+    cluster: build01
+    context: ci/prow/e2e-aws-single-node-serial
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    hidden: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-origin-master-e2e-aws-single-node-serial
+    path_alias: github.com/openshift/origin
+    rerun_command: /test e2e-aws-single-node-serial
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-aws-single-node-serial-cluster-profile
+        - --target=e2e-aws-single-node-serial
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-aws-single-node-serial-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws-2
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-single-node-serial,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/e2e-aws-upgrade
     decorate: true
@@ -1053,7 +1143,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/e2e-azure
     decorate: true
@@ -1128,7 +1219,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/e2e-gcp
     decorate: true
@@ -1205,7 +1297,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/e2e-gcp-builds
     decorate: true
@@ -1282,7 +1375,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/e2e-gcp-csi
     decorate: true
@@ -1359,7 +1453,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/e2e-gcp-disruptive
     decorate: true
@@ -1436,7 +1531,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/e2e-gcp-image-ecosystem
     decorate: true
@@ -1513,7 +1609,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/e2e-gcp-upgrade
     decorate: true
@@ -1590,7 +1687,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/e2e-metal-ipi
     decorate: true
@@ -1667,7 +1765,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/e2e-metal-ipi-ovn-dualstack
     decorate: true
@@ -1744,7 +1843,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/e2e-metal-ipi-ovn-ipv6
     decorate: true
@@ -1821,7 +1921,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/e2e-metal-ipi-virtualmedia
     decorate: true
@@ -1898,7 +1999,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/e2e-openstack
     decorate: true
@@ -1973,7 +2075,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/e2e-openstack-serial
     decorate: true
@@ -2048,7 +2151,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: vsphere
     context: ci/prow/e2e-vsphere
     decorate: true
@@ -2123,7 +2227,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/images
     decorate: true
@@ -2180,7 +2285,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/verify
     decorate: true
@@ -2237,7 +2343,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/verify-deps
     decorate: true
