@@ -15,7 +15,7 @@ spec:
   machineConfigPoolSelector:
     matchLabels:
       pools.operator.machineconfiguration.openshift.io/master: ""
-  kubeletConfig: 
+  kubeletConfig:
     systemReserved:
       memory: 3Gi
 EOF

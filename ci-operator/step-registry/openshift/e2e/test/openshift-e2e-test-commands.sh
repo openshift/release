@@ -86,6 +86,9 @@ if [[ -n "${TEST_REQUIRES_SSH-}" ]]; then
     export KUBE_SSH_BASTION="${BASTION_HOST}:22"
 fi
 
+# calculate multimaster value for TEST_PROVIDER data
+num_masters="$(oc get nodes --selector='node-role.kubernetes.io/master' --no-headers | wc -l)"
+MULTI_MASTER="$([ "${num_masters}" -gt 1 ] && echo "true" || echo "false")"
 
 # set up cloud-provider-specific env vars
 case "${CLUSTER_TYPE}" in
@@ -97,7 +100,7 @@ gcp)
     # TODO: make openshift-tests auto-discover this from cluster config
     PROJECT="$(oc get -o jsonpath='{.status.platformStatus.gcp.projectID}' infrastructure cluster)"
     REGION="$(oc get -o jsonpath='{.status.platformStatus.gcp.region}' infrastructure cluster)"
-    export TEST_PROVIDER="{\"type\":\"gce\",\"region\":\"${REGION}\",\"multizone\": true,\"multimaster\":true,\"projectid\":\"${PROJECT}\"}"
+    export TEST_PROVIDER="{\"type\":\"gce\",\"region\":\"${REGION}\",\"multizone\": true,\"multimaster\":${MULTI_MASTER},\"projectid\":\"${PROJECT}\"}"
     ;;
 aws|aws-arm64)
     mkdir -p ~/.ssh
@@ -106,7 +109,7 @@ aws|aws-arm64)
     # TODO: make openshift-tests auto-discover this from cluster config
     REGION="$(oc get -o jsonpath='{.status.platformStatus.aws.region}' infrastructure cluster)"
     ZONE="$(oc get -o jsonpath='{.items[0].metadata.labels.failure-domain\.beta\.kubernetes\.io/zone}' nodes)"
-    export TEST_PROVIDER="{\"type\":\"aws\",\"region\":\"${REGION}\",\"zone\":\"${ZONE}\",\"multizone\":true,\"multimaster\":true}"
+    export TEST_PROVIDER="{\"type\":\"aws\",\"region\":\"${REGION}\",\"zone\":\"${ZONE}\",\"multizone\":true,\"multimaster\":${MULTI_MASTER}}"
     export KUBE_SSH_USER=core
     ;;
 azure4) export TEST_PROVIDER=azure;;
