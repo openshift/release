@@ -1,0 +1,87 @@
+base_images:
+  base:
+    name: "4.9"
+    namespace: origin
+    tag: base
+  ocp_builder_golang-1.13:
+    name: builder
+    namespace: ocp
+    tag: golang-1.13
+  ocp_builder_golang-1.14:
+    name: builder
+    namespace: ocp
+    tag: golang-1.14
+  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.7
+  ocp_builder_rhel-8-golang-1.15-openshift-4.8:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.8
+  ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.16-openshift-4.9
+  ocp_builder_rhel-8-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
+  tools:
+    name: "4.9"
+    namespace: origin
+    tag: tools
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.14
+images:
+- dockerfile_path: images/tests/Dockerfile.rhel
+  from: tools
+  inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.8:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
+    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
+  to: tests
+- dockerfile_path: images/hello-openshift/Dockerfile.rhel
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.8:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
+  to: hello-openshift
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 4Gi
+  bin:
+    requests:
+      cpu: "3"
+      memory: 7Gi
+  tests:
+    requests:
+      cpu: "3"
+      memory: 7Gi
+  verify:
+    requests:
+      cpu: "3"
+      memory: 8Gi
+tag_specification:
+  name: "4.9"
+  namespace: origin
+tests:
+- as: e2e-gcp
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-loki
+zz_generated_metadata:
+  branch: release-4.9
+  org: openshift
+  repo: origin
+  variant: okd

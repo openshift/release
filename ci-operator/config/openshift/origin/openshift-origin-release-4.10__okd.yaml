@@ -1,0 +1,92 @@
+base_images:
+  base:
+    name: "4.10"
+    namespace: origin
+    tag: base
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp_builder_rhel-8-golang-1.15-openshift-4.8:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.8
+  ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.16-openshift-4.9
+  tools:
+    name: "4.10"
+    namespace: origin
+    tag: tools
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.16-openshift-4.8
+images:
+- dockerfile_path: images/tests/Dockerfile.rhel
+  from: tools
+  inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.8:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
+    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
+  to: tests
+- dockerfile_path: images/hello-openshift/Dockerfile.rhel
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.8:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
+  to: hello-openshift
+promotion:
+  disabled: true
+  name: "4.10"
+  namespace: origin
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 4Gi
+  bin:
+    requests:
+      cpu: "3"
+      memory: 7Gi
+  tests:
+    requests:
+      cpu: "3"
+      memory: 7Gi
+  verify:
+    requests:
+      cpu: "3"
+      memory: 8Gi
+tag_specification:
+  name: "4.10"
+  namespace: ocp
+tests:
+- as: verify
+  commands: |
+    make verify -k --warn-undefined-variables
+  container:
+    from: bin
+- as: verify-deps
+  commands: |
+    make verify-deps -k --warn-undefined-variables
+  container:
+    from: src
+- as: e2e-aws
+  optional: true
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+    workflow: openshift-e2e-aws-loki
+zz_generated_metadata:
+  branch: release-4.10
+  org: openshift
+  repo: origin
+  variant: okd
