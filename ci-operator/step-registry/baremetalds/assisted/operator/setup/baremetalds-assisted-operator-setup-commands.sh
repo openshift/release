@@ -44,6 +44,9 @@ export INDEX_IMAGE="\$(dirname ${INDEX_IMAGE})/pipeline:ci-index"
 images=(${ASSISTED_AGENT_IMAGE} ${ASSISTED_CONTROLLER_IMAGE} ${ASSISTED_INSTALLER_IMAGE})
 export PUBLIC_CONTAINER_REGISTRIES=\$(for image in \${images}; do echo \${image} | cut -d'/' -f1; done | sort -u | paste -sd "," -)
 
+# Fix for disconnected Hive
+export GO_REQUIRED_MIN_VERSION="1.14.4"
+
 deploy/operator/deploy.sh
 
 EOF

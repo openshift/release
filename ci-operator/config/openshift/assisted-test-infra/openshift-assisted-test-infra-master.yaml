@@ -63,7 +63,7 @@ tests:
         TEST_FUNC=test_install
         MAKEFILE_TARGET="create_full_environment run test_parallel"
     workflow: baremetalds-assisted
-- as: system-test-olm
+- as: e2e-metal-assisted-olm
   steps:
     cluster_profile: packet
     env:
@@ -71,7 +71,7 @@ tests:
         TEST_FUNC=test_olm_operator
         MAKEFILE_TARGET="create_full_environment run test_parallel"
     workflow: baremetalds-assisted-install
-- as: system-test-olm-periodic
+- as: e2e-metal-assisted-olm-periodic
   cron: '@daily'
   steps:
     cluster_profile: packet
@@ -88,7 +88,7 @@ tests:
         OPENSHIFT_VERSION=4.8
         TEST=./discovery-infra/tests/test_kube_api.py
         TEST_FUNC=test_kube_api_ipv4
-        POST_INSTALL_COMMAND="make deploy_assisted_operator test_parallel"
+        POST_INSTALL_COMMAND="export KUBECONFIG=\$(find \${KUBECONFIG} -type f); make deploy_assisted_operator test_parallel"
     workflow: baremetalds-assisted-install
 - as: system-test-operator-periodic
   cron: '@daily'
@@ -99,13 +99,14 @@ tests:
         OPENSHIFT_VERSION=4.8
         TEST=./discovery-infra/tests/test_kube_api.py
         TEST_FUNC=test_kube_api_ipv4
-        POST_INSTALL_COMMAND="make deploy_assisted_operator test_parallel"
+        POST_INSTALL_COMMAND="export KUBECONFIG=\$(find \${KUBECONFIG} -type f); make deploy_assisted_operator test_parallel"
     workflow: baremetalds-assisted
 - as: e2e-metal-assisted-ipv6
   steps:
     cluster_profile: packet
     env:
       ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.8
         IPv6=true
         TEST_FUNC=test_install
         MAKEFILE_TARGET="create_full_environment run test_parallel"
@@ -172,6 +173,7 @@ tests:
     cluster_profile: packet
     env:
       ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.8
         NUM_MASTERS=1
         TEST_FUNC=test_install
         MAKEFILE_TARGET="create_full_environment run test_parallel"

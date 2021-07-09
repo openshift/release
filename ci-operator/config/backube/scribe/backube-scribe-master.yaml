@@ -1,0 +1,38 @@
+binary_build_commands: make all
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM registry.fedoraproject.org/fedora:33
+      USER root
+      RUN dnf install -y ShellCheck yamllint asciidoctor && \
+          dnf install -y make go diffutils && \
+          dnf clean all && rm -rf /var/cache/dnf/*
+      ENV GOPATH=/go GOCACHE=/go/src/.cache GO111MODULE=on
+      RUN mkdir -p $GOCACHE /.cache $GOPATH/src/github.com/backube/testbin
+      RUN chmod -R 777 /go /.cache
+      RUN curl -sSLo envtest-bins.tar.gz "https://storage.googleapis.com/kubebuilder-tools/kubebuilder-tools-1.19.2-$(go env GOOS)-$(go env GOARCH).tar.gz"
+      RUN tar -C $GOPATH/src/github.com/backube/testbin --strip-components=1 -zvxf envtest-bins.tar.gz
+      WORKDIR $GOPATH/src/github.com/backube/scribe
+resources:
+  '*':
+    limits:
+      memory: 5Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+tests:
+- as: unit
+  commands: |
+    cp -R ../testbin .
+    export TEST_ARGS='-progress -randomizeAllSpecs -nodes 1 -randomizeSuites -slowSpecThreshold 30 -cover -coverprofile cover.out -outputdir .'
+    make test
+  container:
+    from: src
+- as: pre-commit
+  commands: ./.ci-scripts/pre-commit.sh
+  container:
+    from: src
+zz_generated_metadata:
+  branch: master
+  org: backube
+  repo: scribe

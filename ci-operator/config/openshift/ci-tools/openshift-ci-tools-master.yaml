@@ -3,6 +3,10 @@ base_images:
     name: "4.8"
     namespace: ocp
     tag: cli
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.37.1
   os:
     name: centos
     namespace: origin
@@ -12,6 +16,14 @@ build_root:
   from_repository: true
   use_build_cache: true
 images:
+- context_dir: images/sprint-automation/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/sprint-automation
+  to: sprint-automation
 - context_dir: images/pod-scaler/
   from: os
   inputs:
@@ -132,6 +144,17 @@ images:
       - destination_dir: .
         source_path: /go/bin/dptp-controller-manager
   to: dptp-controller-manager
+- dockerfile_literal: |-
+    FROM centos:8
+    ADD dptp-pools-cm /usr/bin/dptp-pools-cm
+    ENTRYPOINT ["dptp-pools-cm"]
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/dptp-pools-cm
+  to: dptp-pools-cm
 - context_dir: images/autoconfigbrancher/
   from: os
   inputs:
@@ -558,10 +581,18 @@ tests:
   commands: make check-breaking-changes
   container:
     from: test-bin
+- as: checkconfig
+  commands: make validate-checkconfig
+  container:
+    from: test-bin
 - as: validate-vendor
   commands: make validate-vendor
   container:
     from: src
+- as: lint
+  commands: make lint
+  container:
+    from: golangci-lint
 zz_generated_metadata:
   branch: master
   org: openshift

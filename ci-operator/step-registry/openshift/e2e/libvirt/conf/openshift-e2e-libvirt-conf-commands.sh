@@ -4,10 +4,16 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# List of exclude tests from conformance/parallel suite for 4.7 & 4.6
+# List of exclude tests from conformance/serial suite
+if [ "${TEST_TYPE}" == "conformance-serial" ]; then 
+    cat > "${SHARED_DIR}/excluded_tests" << EOF
+"[sig-imageregistry][Serial][Suite:openshift/registry/serial] Image signature workflow can push a signed image to openshift registry and verify it [Suite:openshift/conformance/serial]"
+EOF
+fi
 if [ "${TEST_TYPE}" != "conformance-parallel" ]; then 
     exit 0 
 fi
+# List of exclude tests from conformance/parallel suite for 4.7 & 4.6
 if [ "${BRANCH}" == "4.7" ] && [ "${ARCH}" == "ppc64le" ]; then
     cat > "${SHARED_DIR}/excluded_tests" << EOF
 "[sig-api-machinery] Servers with support for Table transformation should return chunks of table results for list calls [Suite:openshift/conformance/parallel] [Suite:k8s]"

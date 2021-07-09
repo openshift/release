@@ -1,0 +1,56 @@
+base_images:
+  base:
+    name: "4.8"
+    namespace: ocp
+    tag: base
+  openshift_release_golang-1.16:
+    name: release
+    namespace: openshift
+    tag: golang-1.16
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.16
+images:
+- dockerfile_path: Dockerfile.openshift
+  from: base
+  inputs:
+    openshift_release_golang-1.16:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.16
+  to: apiserver-network-proxy
+promotion:
+  namespace: hypershift
+  tag: latest
+releases:
+  hosted-ocp-latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.8"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.8"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: verify
+  commands: go mod vendor && git diff --exit-code
+  container:
+    from: src
+- as: unit
+  commands: make test
+  container:
+    from: src
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: apiserver-network-proxy

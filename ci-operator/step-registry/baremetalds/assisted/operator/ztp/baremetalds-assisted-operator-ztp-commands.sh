@@ -30,7 +30,8 @@ echo "export ASSISTED_PULLSECRET_NAME=${ASSISTED_PULLSECRET_NAME}" >> /tmp/assis
 echo "export ASSISTED_PULLSECRET_JSON=${ASSISTED_PULLSECRET_JSON}" >> /tmp/assisted-vars.conf
 scp "${SSHOPTS[@]}" "/tmp/assisted-vars.conf" "root@${IP}:assisted-vars.conf"
 
-ssh "${SSHOPTS[@]}" "root@${IP}" bash - <<"EOF" |& sed -e 's/.*auths\{0,1\}".*/*** PULL_SECRET ***/g'
+# shellcheck disable=SC2087
+ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths\{0,1\}".*/*** PULL_SECRET ***/g'
 
 set -xeo pipefail
 
@@ -43,16 +44,17 @@ source utils.sh
 source network.sh
 
 REPO_DIR="/home/assisted-service"
-if [ ! -d "${REPO_DIR}" ]; then
-  mkdir -p "${REPO_DIR}"
+if [ ! -d "\${REPO_DIR}" ]; then
+  mkdir -p "\${REPO_DIR}"
 
   echo "### Untar assisted-service code..."
-  tar -xzvf /root/assisted-service.tar.gz -C "${REPO_DIR}"
+  tar -xzvf /root/assisted-service.tar.gz -C "\${REPO_DIR}"
 fi
 
-cd "${REPO_DIR}/deploy/operator/ztp/"
+cd "\${REPO_DIR}/deploy/operator/ztp/"
 echo "### Deploying SNO spoke cluster..."
-export EXTRA_BAREMETALHOSTS_FILE="/root/dev-scripts/${EXTRA_BAREMETALHOSTS_FILE}"
+export DISCONNECTED="${DISCONNECTED:-}"
+export EXTRA_BAREMETALHOSTS_FILE="/root/dev-scripts/\${EXTRA_BAREMETALHOSTS_FILE}"
 ./deploy_spoke_cluster.sh
 
 EOF
