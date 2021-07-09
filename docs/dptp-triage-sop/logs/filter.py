@@ -64,14 +64,17 @@ elif mode == "errors":
         lambda message: any(
             s in message.get("error", "") for s in [
                 "sleep time for token reset exceeds max sleep time",  # this is emitted when we run out of tokens, nothing to do post-hoc for this
+                "leader election lost",  # why is this even an error?
                 "not accessible",  # https://github.com/kubernetes/test-infra/issues/22251
-                "leader election lost"  # why is this even an error?
+                "no client for cluster  available",  # https://issues.redhat.com/browse/DPTP-2380
+                "found duplicate series for the match group",  # https://issues.redhat.com/browse/DPTP-2381
             ]
         ),
         lambda message: any(
             any(s in message.get(m, "") for m in ["msg", "error"]) for s in [
                 "You have triggered an abuse detection mechanism.",  # nothing to do post-hoc for this
-                "Something went wrong while executing your query. This may be the result of a timeout, or it could be a GitHub bug."  # nothing to do post-hoc
+                "Something went wrong while executing your query. This may be the result of a timeout, or it could be a GitHub bug.",  # nothing to do post-hoc
+                "no new finalizers can be added if the object is being deleted",  # https://github.com/kubernetes/test-infra/issues/22846
             ]
         ),
         # this happens on redeploy and nothing we can do post-hoc
@@ -92,6 +95,9 @@ elif mode == "errors":
                 "no workflow named"  # user error? should not be an error?
             ]
         ),
+        # deck is spamming us for no good reason
+        lambda message: "deck" in message.get("component", "") and
+        "error executing template pr-history.html" in message.get("msg", ""),
         # deck trying to talk to Tide, this fails when we bump. We have probes in Tide so we get alerted when it's down for longer time.
         lambda message: "deck" in message.get("component", "") and
         "Updating" in message.get("msg", "") and
@@ -116,5 +122,6 @@ def aggregate_filter(entry):
             for f in filters:
                 keep = keep and not f(raw_entry)
     return keep
+
 
 print(json.dumps(list(filter(aggregate_filter, data["results"]))))
