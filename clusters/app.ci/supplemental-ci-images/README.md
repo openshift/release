@@ -2,6 +2,7 @@
 
 These resources provide some supplemental images to be used in CI builds.
 
+- `assisted-ci-tools`: Used by [openshift/assisted-test-infra](../../../ci-operator/config/openshift/assisted-test-infra) and other openshift/assisted-* projects
 - `azure`: Used by [openshift/openshift-azure](../../../ci-operator/config/openshift/openshift-azure)
 - `boilerplate`: Used by [openshift/boilerplate](../../../ci-operator/config/openshift/boilerplate)
 - `cincinnati-ci`: Used by [openshift/cincinnati](../../../ci-operator/config/openshift/cincinnati)
