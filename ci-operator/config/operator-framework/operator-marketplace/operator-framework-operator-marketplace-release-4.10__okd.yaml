@@ -3,19 +3,19 @@ base_images:
     name: "4.10"
     namespace: origin
     tag: base
-  openshift_release_golang-1.16:
-    name: release
-    namespace: openshift
-    tag: golang-1.16
+  ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.16-openshift-4.9
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.okd
+- dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
-    openshift_release_golang-1.16:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.16
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
   to: operator-marketplace
 promotion:
   disabled: true
@@ -30,12 +30,16 @@ tag_specification:
   name: "4.10"
   namespace: origin
 tests:
+- as: unit
+  commands: make unit
+  container:
+    from: src
 - as: e2e-aws
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
 zz_generated_metadata:
-  branch: master
+  branch: release-4.10
   org: operator-framework
   repo: operator-marketplace
   variant: okd
