@@ -1,5 +1,4 @@
-# See https://github.com/coreos/coreos-assembler/pull/730
-# This creates a "buildroot" container used by e.g. rpm-ostree CI.
+# See https://github.com/coreos/coreos-assembler/pull/2290
 apiVersion: v1
 kind: List
 items:
@@ -8,10 +7,12 @@ items:
   metadata:
     name: cosa-buildroot
     namespace: coreos
+
+# Current 'main' branch based on Fedora 34
 - apiVersion: v1
   kind: BuildConfig
   metadata:
-    name: cosa-buildroot
+    name: cosa-buildroot-main
     namespace: coreos
     labels:
       ci.openshift.io/source-repo: coreos-assembler
@@ -30,13 +31,48 @@ items:
       dockerStrategy:
         from:
           kind: "ImageStreamTag"
-          name: "coreos-assembler:latest"
-        dockerfilePath: Dockerfile.buildroot
+          name: "fedora:34"
+        dockerfilePath: ci/Dockerfile
       type: Docker
     triggers:
     - type: ConfigChange
     - imageChange:
         from:
           kind: ImageStreamTag
-          name: coreos-assembler:latest
+          name: coreos-assembler:imported-latest
+      type: ImageChange
+
+# Main branch based on 'rawhide'
+# Future branch
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    name: cosa-buildroot-rawhide
+    namespace: coreos
+    labels:
+      ci.openshift.io/source-repo: coreos-assembler
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: cosa-buildroot:rawhide
+    source:
+      git:
+        uri: https://github.com/coreos/coreos-assembler
+      type: Git
+    strategy:
+      dockerStrategy:
+        from:
+          kind: "ImageStreamTag"
+          name: "fedora:35"
+        dockerfilePath: ci/Dockerfile
+      type: Docker
+    triggers:
+    - type: ConfigChange
+    - imageChange:
+        from:
+          kind: ImageStreamTag
+          name: coreos-assembler:imported-latest
       type: ImageChange

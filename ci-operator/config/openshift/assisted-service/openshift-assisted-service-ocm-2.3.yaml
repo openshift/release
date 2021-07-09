@@ -1,15 +1,15 @@
 base_images:
   assisted-installer:
-    name: assisted
-    namespace: ocp-kni
+    name: ocm-2.3
+    namespace: openshift
     tag: assisted-installer
   assisted-installer-agent:
-    name: assisted
-    namespace: ocp-kni
+    name: ocm-2.3
+    namespace: openshift
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: assisted
-    namespace: ocp-kni
+    name: ocm-2.3
+    namespace: openshift
     tag: assisted-installer-controller
   assisted-service-scripts:
     name: assisted
@@ -52,18 +52,17 @@ operator:
   bundles:
   - dockerfile_path: deploy/olm-catalog/bundle.Dockerfile
   substitutions:
-  - pullspec: quay.io/ocpmetal/assisted-service:latest
+  - pullspec: quay.io/ocpmetal/assisted-service:ocm-2.3
     with: assisted-service
-  - pullspec: quay.io/ocpmetal/assisted-installer:latest
+  - pullspec: quay.io/ocpmetal/assisted-installer:ocm-2.3
     with: assisted-installer
-  - pullspec: quay.io/ocpmetal/assisted-installer-agent:latest
+  - pullspec: quay.io/ocpmetal/assisted-installer-agent:ocm-2.3
     with: assisted-installer-agent
-  - pullspec: quay.io/ocpmetal/assisted-installer-controller:latest
+  - pullspec: quay.io/ocpmetal/assisted-installer-controller:ocm-2.3
     with: assisted-installer-controller
   - pullspec: quay.io/ocpmetal/postgresql-12-centos7:latest
     with: postgresql-12-centos7
 promotion:
-  disabled: true
   name: ocm-2.3
   namespace: openshift
 resources:
@@ -89,7 +88,7 @@ tests:
   cluster_claim:
     architecture: amd64
     cloud: aws
-    owner: dpp
+    owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
     version: "4.8"
@@ -117,7 +116,7 @@ tests:
   cluster_claim:
     architecture: amd64
     cloud: aws
-    owner: dpp
+    owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
     version: "4.8"
@@ -161,6 +160,8 @@ tests:
     cluster_profile: packet
     env:
       ASSISTED_CONFIG: |
+        SERVICE_BRANCH=ocm-2.3
+        INSTALLER_BRANCH=ocm-2.3
         NUM_MASTERS=1
         NUM_WORKERS=0
         IPv6=yes

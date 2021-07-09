@@ -29,6 +29,12 @@ releases:
       product: ocp
       stream: nightly
       version: "4.8"
+  hosted-ocp-previous:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: nightly
+      version: "4.8"
   latest:
     candidate:
       product: ocp
@@ -72,13 +78,17 @@ tests:
       commands: |-
         bin/test-e2e \
           -test.v \
-          -test.timeout 0 \
-          --e2e.aws-credentials-file ${CLUSTER_PROFILE_DIR}/.awscred \
-          --e2e.pull-secret-file ${CLUSTER_PROFILE_DIR}/pull-secret \
-          --e2e.latest-release-image ${RELEASE_IMAGE}
+          -test.timeout=0 \
+          --e2e.aws-credentials-file=${CLUSTER_PROFILE_DIR}/.awscred \
+          --e2e.pull-secret-file=${CLUSTER_PROFILE_DIR}/pull-secret \
+          --e2e.latest-release-image=${OCP_IMAGE_LATEST} \
+          --e2e.previous-release-image=${OCP_IMAGE_PREVIOUS} \
+          --e2e.upgrade-tests-enabled=true
       dependencies:
-      - env: RELEASE_IMAGE
+      - env: OCP_IMAGE_LATEST
         name: release:hosted-ocp-latest
+      - env: OCP_IMAGE_PREVIOUS
+        name: release:hosted-ocp-previous
       from: test-bin
       grace_period: 15m0s
       resources:
@@ -113,11 +123,13 @@ tests:
       commands: |-
         bin/test-e2e \
           -test.v \
-          -test.timeout 0 \
-          --e2e.aws-credentials-file /etc/hypershift-pool-aws-credentials/credentials \
-          --e2e.pull-secret-file /etc/ci-pull-credentials/.dockerconfigjson \
-          --e2e.base-domain ci.hypershift.devcluster.openshift.com \
-          --e2e.latest-release-image ${RELEASE_IMAGE}
+          -test.timeout=0 \
+          --e2e.aws-credentials-file=/etc/hypershift-pool-aws-credentials/credentials \
+          --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson \
+          --e2e.base-domain=ci.hypershift.devcluster.openshift.com \
+          --e2e.latest-release-image=${OCP_IMAGE_LATEST} \
+          --e2e.previous-release-image=${OCP_IMAGE_PREVIOUS} \
+          --e2e.upgrade-tests-enabled=true
       credentials:
       - mount_path: /etc/hypershift-pool-aws-credentials
         name: hypershift-pool-aws-credentials
@@ -126,8 +138,10 @@ tests:
         name: ci-pull-credentials
         namespace: test-credentials
       dependencies:
-      - env: RELEASE_IMAGE
+      - env: OCP_IMAGE_LATEST
         name: release:hosted-ocp-latest
+      - env: OCP_IMAGE_PREVIOUS
+        name: release:hosted-ocp-previous
       from: test-bin
       grace_period: 15m0s
       resources:

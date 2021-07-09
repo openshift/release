@@ -10,6 +10,7 @@ cluster_name=${NAMESPACE}-${JOB_NAME_HASH}
 base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
 cluster_domain="${cluster_name}.${base_domain}"
 
+export AWS_DEFAULT_REGION=us-west-2  # TODO: Derive this?
 export AWS_SHARED_CREDENTIALS_FILE=/var/run/vault/vsphere/.awscred
 export AWS_MAX_ATTEMPTS=50
 export AWS_RETRY_MODE=adaptive
@@ -46,6 +47,33 @@ hosted_zone_id="$(aws route53 list-hosted-zones-by-name \
             --output text)"
 echo "${hosted_zone_id}" > "${SHARED_DIR}/hosted-zone.txt"
 
+if [ "${JOB_NAME_SAFE}" = "launch" ]; then
+  # Configure DNS target as previously configured NLB
+  nlb_arn=$(<"${SHARED_DIR}"/nlb_arn.txt)
+  nlb_dnsname="$(aws elbv2 describe-load-balancers \
+            --load-balancer-arns ${nlb_arn} \
+            --query 'LoadBalancers[0].DNSName' \
+            --output text)"
+  nlb_hosted_zone_id="$(aws elbv2 describe-load-balancers \
+            --load-balancer-arns ${nlb_arn} \
+            --query 'LoadBalancers[0].CanonicalHostedZoneId' \
+            --output text)"
+
+  # Both API and *.apps pipe through same NLB
+  api_dns_target='"AliasTarget": {
+        "HostedZoneId": "'${nlb_hosted_zone_id}'",
+        "DNSName": "'${nlb_dnsname}'",
+        "EvaluateTargetHealth": false
+        }'
+  apps_dns_target=$api_dns_target
+else
+  # Configure DNS direct to respective VIP
+  api_dns_target='"TTL": 60,
+        "ResourceRecords": [{"Value": "'${vips[0]}'"}]'
+  apps_dns_target='"TTL": 60,
+        "ResourceRecords": [{"Value": "'${vips[1]}'"}]'
+fi
+
 # api-int record is needed just for Windows nodes
 # TODO: Remove the api-int entry in future
 echo "Creating DNS records..."
@@ -57,8 +85,7 @@ cat > "${SHARED_DIR}"/dns-create.json <<EOF
     "ResourceRecordSet": {
       "Name": "api.$cluster_domain.",
       "Type": "A",
-      "TTL": 60,
-      "ResourceRecords": [{"Value": "${vips[0]}"}]
+      $api_dns_target
       }
     },{
     "Action": "UPSERT",
@@ -73,8 +100,7 @@ cat > "${SHARED_DIR}"/dns-create.json <<EOF
     "ResourceRecordSet": {
       "Name": "*.apps.$cluster_domain.",
       "Type": "A",
-      "TTL": 60,
-      "ResourceRecords": [{"Value": "${vips[1]}"}]
+      $apps_dns_target
       }
 }]}
 EOF
@@ -91,8 +117,7 @@ cat > "${SHARED_DIR}"/dns-delete.json <<EOF
     "ResourceRecordSet": {
       "Name": "api.$cluster_domain.",
       "Type": "A",
-      "TTL": 60,
-      "ResourceRecords": [{"Value": "${vips[0]}"}]
+      $api_dns_target
       }
     },{
     "Action": "DELETE",
@@ -107,8 +132,7 @@ cat > "${SHARED_DIR}"/dns-delete.json <<EOF
     "ResourceRecordSet": {
       "Name": "*.apps.$cluster_domain.",
       "Type": "A",
-      "TTL": 60,
-      "ResourceRecords": [{"Value": "${vips[1]}"}]
+      $apps_dns_target
       }
 }]}
 EOF

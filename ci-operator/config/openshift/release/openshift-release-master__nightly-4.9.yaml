@@ -110,6 +110,14 @@ tests:
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-e2e-aws-single-node
+- as: e2e-aws-single-node-serial
+  interval: 24h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      TEST_SUITE: openshift/conformance/serial
+    workflow: openshift-e2e-aws-single-node
 - as: e2e-metal-single-node-live-iso
   interval: 24h
   steps:
@@ -123,6 +131,16 @@ tests:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4
         NETWORK_TYPE=OpenShiftSDN
+    workflow: baremetalds-e2e
+- as: e2e-metal-ipi-ovn-dualstack-local-gateway
+  interval: 48h
+  steps:
+    cluster_profile: packet
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NETWORK_TYPE=OVNKubernetes
+        OVN_LOCAL_GATEWAY_MODE=true
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-serial-ipv4
   cron: 0 0 1 1 *
@@ -340,6 +358,16 @@ tests:
       COMPUTE_NODE_TYPE: n1-standard-8
       RT_ENABLED: "true"
     workflow: openshift-e2e-gcp-realtime
+- as: e2e-aws-arm64
+  interval: 24h
+  steps:
+    cluster_profile: aws-arm64
+    env:
+      ARM64_RELEASE_OVERRIDE: registry.ci.openshift.org/ocp-arm64/release-arm64:4.9
+      BASE_DOMAIN: arm-ci.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      TEST_ARGS: --from-repository quay.io/multi-arch/community-e2e-images
+    workflow: openshift-e2e-aws
 - as: e2e-aws-upgrade
   interval: 24h
   steps:
