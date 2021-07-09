@@ -58,6 +58,7 @@ elif mode == "errors":
                 "Throttled clientside for more than 15 minutes",  # this is just token contention
                 "Query returned 1k PRs",  # nothing to do
                 "unrecognized file name (expected <int64>.txt)",  # https://github.com/kubernetes/test-infra/issues/22256
+                "unrecognized file name (expected int64)",  # https://github.com/kubernetes/test-infra/issues/22256
                 "Getting plugin help from hook."  # https://github.com/kubernetes/test-infra/issues/21426
             ]
         ),
