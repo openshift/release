@@ -33,6 +33,44 @@ rules:
   - create
   - patch
   - update
+  - delete
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: dptp-pools-cm
+  namespace: ci
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - create
+  - get
+  - update
+- apiGroups:
+  - "coordination.k8s.io"
+  resources:
+  - leases
+  verbs:
+  - create
+  - get
+  - update
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: dptp-pools-cm
+  namespace: ci
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: dptp-pools-cm
+subjects:
+- kind: ServiceAccount
+  name: dptp-pools-cm
+  namespace: ci
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -78,3 +116,19 @@ spec:
       - name: kubeconfigs
         secret:
           secretName: dptp-pools-cm
+---
+kind: ImageStream
+apiVersion: image.openshift.io/v1
+metadata:
+  namespace: ci
+  name: dptp-pools-cm
+spec:
+  tags:
+  - name: "latest"
+    from:
+      kind: DockerImage
+      name: registry.ci.openshift.org/ci/dptp-pools-cm:latest
+    importPolicy:
+      scheduled: true
+    referencePolicy:
+      type: Local
