@@ -1,19 +1,47 @@
-binary_build_commands: make && make check
+base_images:
+  base:
+    name: "4.9"
+    namespace: origin
+    tag: base
+  cosa-buildroot:
+    name: cosa-buildroot
+    namespace: coreos
+    tag: latest
 build_root:
   image_stream_tag:
     name: cosa-buildroot
     namespace: coreos
     tag: latest
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  inputs:
+    cosa-buildroot:
+      as:
+      - registry.svc.ci.openshift.org/coreos/cosa-buildroot:latest
+  to: cosa
+promotion:
+  excluded_images:
+  - '*'
+  name: "4.9"
+  namespace: ocp
 resources:
   '*':
+    limits:
+      devices.kubevirt.io/kvm: "1"
     requests:
       cpu: 1000m
-      memory: 1Gi
+      devices.kubevirt.io/kvm: "1"
+      memory: 2Gi
 tests:
+- as: check
+  commands: make check
+  container:
+    from: src
 - as: sanity
   commands: coreos-assembler shell true
   container:
-    from: bin
+    from: cosa
 zz_generated_metadata:
   branch: main
   org: coreos
