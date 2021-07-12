@@ -1537,3 +1537,127 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+- agent: kubernetes
+  cluster: build01
+  cron: '@yearly'
+  decorate: true
+  labels:
+    job-env: ovirt
+    job-type: launch
+  name: release-openshift-origin-installer-launch-ovirt
+  spec:
+    containers:
+    - args:
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --namespace=$(NAMESPACE)
+      - --secret-dir=/usr/local/launch-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=launch
+      - --template=/usr/local/launch
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_INITIAL
+      - name: RELEASE_IMAGE_LATEST
+      - name: CLUSTER_VARIANT
+      - name: CLUSTER_DURATION
+        value: "9000"
+      - name: BRANCH
+        value: "4.2"
+      - name: CLUSTER_TYPE
+        value: ovirt
+      - name: UNRESOLVED_CONFIG
+        value: |
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tag_specification:
+            name: "$(BRANCH)"
+            namespace: ocp
+          tests:
+          - as: launch
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              test:
+              - as: e2e-test
+                commands: sleep $(CLUSTER_DURATION) & wait
+                from_image:
+                  namespace: origin
+                  name: centos
+                  tag: '8'
+                env:
+                  - name: TEST_TYPE
+                  - name: TEST_SKIPS
+                resources:
+                  requests:
+                    cpu: 100m
+                    memory: 200Mi
+              workflow: openshift-e2e-ovirt-minimal
+      - name: JOB_NAME_SAFE
+        value: launch
+      - name: TEST_COMMAND
+        value: sleep $(CLUSTER_DURATION) & wait
+      - name: NAMESPACE
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/launch-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /usr/local/launch
+        name: job-definition
+        subPath: cluster-launch-installer-upi-e2e.yaml
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/push-secret
+        name: push-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-ovirt
+        - configMap:
+            name: cluster-profile-ovirt
+    - configMap:
+        name: prow-job-cluster-launch-installer-upi-e2e
+      name: job-definition
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: push-secret
+      secret:
+        secretName: registry-push-credentials-ci-central
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
