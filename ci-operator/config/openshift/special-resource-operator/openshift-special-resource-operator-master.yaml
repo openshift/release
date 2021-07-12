@@ -3,11 +3,30 @@ base_images:
     name: "4.9"
     namespace: ocp
     tag: base
+  ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.16-openshift-4.9
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.16
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.16-openshift-4.9
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
+  to: special-resource-rhel8-operator
+- dockerfile_literal: |-
+    FROM src
+    RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" \
+        && chmod +x kubectl \
+        && mv kubectl /usr/local/bin/kubectl
+  from: src
+  to: sro-e2e-runner
 promotion:
   name: "4.9"
   namespace: ocp
@@ -30,10 +49,32 @@ tests:
   commands: make verify
   container:
     from: src
-- as: e2e-aws
+- as: e2e-aws-operator
   steps:
     cluster_profile: aws
-    workflow: openshift-e2e-aws
+    test:
+    - as: deploy-sro
+      cli: latest
+      commands: make deploy NAMESPACE="openshift-special-resource-operator"
+      from: sro-e2e-runner
+      resources:
+        requests:
+          cpu: 100m
+    - as: e2e-test-sro
+      cli: latest
+      commands: make test-e2e NAMESPACE="openshift-special-resource-operator"
+      from: sro-e2e-runner
+      resources:
+        requests:
+          cpu: 100m
+    - as: undeploy-sro
+      cli: latest
+      commands: make undeploy NAMESPACE="openshift-special-resource-operator"
+      from: sro-e2e-runner
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: openshift
