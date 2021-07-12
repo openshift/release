@@ -55,7 +55,13 @@ tests:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
 - as: unit-olm
-  commands: make unit/olm
+  commands: |
+    # Note(tflannag): Hacks for https://github.com/kubernetes-sigs/controller-runtime/commit/58c17f696263fc4a35ef5de198f99aa1717e7b87
+    # as we run into permission denied errors when attempting to create the ${HOME}/.cache directory in the unit test.
+    echo "Overriding the \$XDG_CACHE_HOME directory"
+    export XDG_CACHE_HOME=/tmp/.cache
+
+    make unit/olm
   container:
     from: src
 - as: unit-registry
