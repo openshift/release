@@ -45,7 +45,7 @@ cluster_domain=$(<"${SHARED_DIR}"/clusterdomain.txt)
 
 ssh_pub_key_path="${CLUSTER_PROFILE_DIR}/ssh-publickey"
 install_config="${SHARED_DIR}/install-config.yaml"
-tfvars_path=/var/run/secrets/ci.openshift.io/cluster-profile/vmc.secret.auto.tfvars
+tfvars_path=/var/run/vault/vsphere/secret.auto.tfvars
 vsphere_user=$(grep -oP 'vsphere_user\s*=\s*"\K[^"]+' ${tfvars_path})
 vsphere_password=$(grep -oP 'vsphere_password\s*=\s*"\K[^"]+' ${tfvars_path})
 

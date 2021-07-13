@@ -15,7 +15,7 @@ export AWS_SHARED_CREDENTIALS_FILE=/var/run/vault/vsphere-aws/.awscred
 export AWS_DEFAULT_REGION=us-east-1
 
 installer_dir=/tmp/installer
-tfvars_path=/var/run/secrets/ci.openshift.io/cluster-profile/vmc.secret.auto.tfvars
+tfvars_path=/var/run/vault/vsphere/secret.auto.tfvars
 cluster_name=$(<"${SHARED_DIR}"/clustername.txt)
 
 echo Deprovisioning $cluster_name
