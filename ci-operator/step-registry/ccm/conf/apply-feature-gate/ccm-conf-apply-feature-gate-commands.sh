@@ -129,7 +129,7 @@ function waitFor() {
   local CMD="${*:2}"
 
   ret=0
-  timeout --foreground "${TIMEOUT}" bash -c "execute ${CMD}" || ret="$?"
+  timeout "${TIMEOUT}" bash -c "execute ${CMD}" || ret="$?"
 
   # Command timed out
   if [[ ret -eq 124 ]]; then
@@ -144,7 +144,7 @@ function execute() {
   # API server occasionally becomes unavailable, so we repeat command in case of error
   while true; do
     ret=0
-    bash -c "${CMD}"|| ret="$?"
+    ${CMD} || ret="$?"
 
     if [[ ret -eq 0 ]]; then
       return
