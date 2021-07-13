@@ -1900,6 +1900,38 @@ periodics:
   labels:
     ci.openshift.io/role: infra
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-openshift-release-master-accept-invitations-cherrypick-robot
+  spec:
+    containers:
+    - args:
+      - --github-token-path=/etc/github/oauth
+      - --github-endpoint=http://ghproxy
+      - --github-endpoint=https://api.github.com
+      - --github-graphql-endpoint=http://ghproxy/graphql
+      - --dry-run=false
+      command:
+      - /app/prow/cmd/invitations-accepter/app.binary
+      image: gcr.io/k8s-prow/invitations-accepter:v20210713-49f933a3ed
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: token
+        readOnly: true
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-cherrypick-robot
+- agent: kubernetes
+  cluster: app.ci
+  decorate: true
+  interval: 12h
+  labels:
+    ci.openshift.io/role: infra
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-openshift-release-master-accept-invitations-merge-robot
   spec:
     containers:
