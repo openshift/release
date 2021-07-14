@@ -54,6 +54,22 @@ tests:
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
+- as: fast-forward
+  commands: |
+    git clone -b master https://github.com/openshift/release.git /tmp/release
+    repo-brancher --fast-forward --confirm \
+      --config-dir=/tmp/release/ci-operator/config/open-cluster-management/search-operator/ \
+      --username=acm-cicd \
+      --token-path=/etc/github/token \
+      --current-promotion-namespace=open-cluster-management \
+      --current-release=2.4 \
+      --future-release=2.4
+  container:
+    from: repo-brancher
+  postsubmit: true
+  secrets:
+  - mount_path: /etc/github
+    name: acm-cicd-github
 zz_generated_metadata:
   branch: main
   org: open-cluster-management
