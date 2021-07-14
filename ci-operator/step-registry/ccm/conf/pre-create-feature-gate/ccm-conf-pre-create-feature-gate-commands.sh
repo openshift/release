@@ -17,5 +17,7 @@ spec:
     - ExternalCloudProvider
     - CSIMigrationAWS
     - CSIMigrationOpenStack
+    - CSIMigrationAzureDisk
+    - CSIDriverAzureDisk
   featureSet: CustomNoUpgrade
 EOF
