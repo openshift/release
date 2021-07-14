@@ -6,13 +6,6 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-# remove this section after testing
-
-ls -alh /var/run/vault/vsphere/*
-cat /var/run/vault/vsphere/*
-
-
-
 if [[ -z "$RELEASE_IMAGE_LATEST" ]]; then
   echo "RELEASE_IMAGE_LATEST is an empty string, exiting"
   exit 1
