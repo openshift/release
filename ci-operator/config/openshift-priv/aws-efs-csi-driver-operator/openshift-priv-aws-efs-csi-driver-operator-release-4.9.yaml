@@ -1,0 +1,51 @@
+base_images:
+  base:
+    name: 4.9-priv
+    namespace: ocp-private
+    tag: base
+  ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.16-openshift-4.9
+binary_build_commands: make
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.16
+canonical_go_repository: github.com/openshift/aws-efs-csi-driver-operator
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
+  to: aws-efs-csi-driver-operator
+promotion:
+  disabled: true
+  name: 4.9-priv
+  namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: 4.9-priv
+  namespace: ocp-private
+tests:
+- as: unit
+  commands: make test
+  container:
+    from: src
+- as: verify
+  commands: make verify
+  container:
+    from: src
+zz_generated_metadata:
+  branch: release-4.9
+  org: openshift-priv
+  repo: aws-efs-csi-driver-operator
