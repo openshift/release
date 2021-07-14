@@ -37,7 +37,6 @@ function prepare_next_steps() {
 trap 'prepare_next_steps' EXIT TERM
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=$(read_shared_dir 'OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE')
 if [[ -z "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" ]]; then
   echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE is an empty string, exiting"
   exit 1
