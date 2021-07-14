@@ -20,7 +20,174 @@ function upgrade() {
         -o "${ARTIFACT_DIR}/e2e.log" \
         --junit-dir "${ARTIFACT_DIR}/junit" &
     wait "$!"
-    set +x
+}
+
+function log_to_file() {
+	local LOG_FILE=$1
+
+	# Close STDOUT file descriptor
+	exec 1<&-
+	# Close STDERR FD
+	exec 2<&-
+	# Open STDOUT as $LOG_FILE file for read and write.
+	exec 1<>${LOG_FILE}
+	# Redirect STDERR to STDOUT
+	exec 2>&1
+}
+
+function urlencode() {
+	local DATA=$1
+
+	echo "${DATA}" | jq -sRr @uri
+}
+
+function prometheus_var_init() {
+	HOSTNAME=$(oc get routes/prometheus-k8s -n openshift-monitoring -o json | jq -r '.spec.host')
+	TOKEN=$(oc -n openshift-monitoring sa get-token prometheus-k8s)
+	export HOSTNAME
+	export TOKEN
+}
+
+function prometheus_query() {
+	local DATA=$1
+	local EDATA
+	local URL
+
+	EDATA=$(urlencode "${DATA}")
+	URL="https://${HOSTNAME}/api/v1/query?query=${EDATA}"
+	RESPONSE=$(curl --silent --insecure --header "Authorization: Bearer ${TOKEN}" "${URL}")
+	RC=$?
+	if [[ ${RC} -gt 0 ]]
+	then
+		echo "Error: ${URL} returned ${RC}"
+		exit 1
+	fi
+	STATUS=$(echo "${RESPONSE}" | jq -r '.status')
+	if [[ "${STATUS}" != "success" ]]
+	then
+		echo "Error: Status is not success (${STATUS})"
+		exit 1
+	fi
+	RETURNED=$(echo "${RESPONSE}" | jq -r '.data.result[0].value[1]')
+	echo "${RETURNED}"
+}
+
+function prometheus_all_alerts() {
+	local URL="https://${HOSTNAME}/api/v1/alerts"
+
+	RESPONSE=$(curl --silent --insecure --header "Authorization: Bearer ${TOKEN}" "${URL}")
+	RC=$?
+	if [[ ${RC} -gt 0 ]]
+	then
+		echo "Error: ${URL} returned ${RC}"
+		exit 1
+	fi
+	jq -r '.data.alerts[]' <<< "${RESPONSE}"
+}
+
+function prometheus_alert() {
+	local ALERT=$1
+	local RESPONSE
+
+	RESPONSE=$(prometheus_all_alerts)
+
+	jq -r 'select(.labels.alertname=="'${ALERT}'")' <<< "${RESPONSE}"
+	RC=$?
+	if [ ${RC} -gt 0 ]
+	then
+		echo "ERROR: \'${RESPONSE}\'"
+	fi
+}
+
+function prometheus_kaebb_loop() {
+	local BR1h
+	local BR5m
+	local BR6h
+	local BR30m
+	local BR1d
+	local BR2h
+	local BR3d
+	local BR6h
+
+	log_to_file "${ARTIFACT_DIR}/prometheus-kaebb.log"
+
+	while true
+	do
+		echo "8<----------8<---------- $(date +%s) 8<----------8<----------"
+
+		BR1h=$(prometheus_query 'sum(apiserver_request:burnrate1h)')
+		BR5m=$(prometheus_query 'sum(apiserver_request:burnrate5m)')
+		BR6h=$(prometheus_query 'sum(apiserver_request:burnrate6h)')
+		BR30m=$(prometheus_query 'sum(apiserver_request:burnrate30m)')
+		BR1d=$(prometheus_query 'sum(apiserver_request:burnrate1d)')
+		BR2h=$(prometheus_query 'sum(apiserver_request:burnrate2h)')
+		BR3d=$(prometheus_query 'sum(apiserver_request:burnrate3d)')
+		BR6h=$(prometheus_query 'sum(apiserver_request:burnrate6h)')
+
+		echo "BR1h=${BR1h}"
+		echo "BR5m=${BR5m}"
+		echo "BR6h=${BR6h}"
+		echo "BR30m=${BR30m}"
+		echo "BR1d=${BR1d}"
+		echo "BR2h=${BR2h}"
+		echo "BR3d=${BR3d}"
+		echo "BR6h=${BR6h}"
+
+		prometheus_alert "KubeAPIErrorBudgetBurn"
+
+		sleep 5m
+	done
+}
+
+function prometheus_cmrss_loop() {
+	local CMRSS_DATA
+	local CMRSS_EDATA
+	local URL
+
+	CMRSS_DATA='( container_memory_rss{id="/system.slice"} and container_memory_rss{node=~".*worker.*"} )'
+	CMRSS_EDATA=$(urlencode "${CMRSS_DATA}")
+	URL="https://${HOSTNAME}/api/v1/query?query=${CMRSS_EDATA}"
+
+	log_to_file "${ARTIFACT_DIR}/prometheus-cmrss.log"
+
+	while true
+	do
+		echo "8<----------8<---------- $(date +%s) 8<----------8<----------"
+
+		RESPONSE=$(curl --silent --insecure --header "Authorization: Bearer ${TOKEN}" "${URL}")
+		RC=$?
+		if [[ ${RC} -gt 0 ]]
+		then
+			echo "Error: ${URL} returned ${RC}"
+			exit 1
+		fi
+		STATUS=$(echo "${RESPONSE}" | jq -r '.status')
+		if [[ "${STATUS}" != "success" ]]
+		then
+			echo "Error: Status is not success (${STATUS})"
+			exit 1
+		fi
+		RETURNED1=$(echo "${RESPONSE}" | jq -r '.data.result[0].value[1]')
+		RETURNED2=$(echo "${RESPONSE}" | jq -r '.data.result[1].value[1]')
+		echo "${RETURNED1} ${RETURNED2}"
+
+		prometheus_alert "SystemMemoryExceedsReservation"
+
+		sleep 5m
+	done
+}
+
+function oc_adm_top_nodes_loop() {
+	log_to_file "${ARTIFACT_DIR}/oc-adm-top-nodes.log"
+
+	while true
+	do
+		echo "8<----------8<---------- $(date +%s) 8<----------8<----------"
+
+		oc adm top nodes --use-protocol-buffers
+
+		sleep 5m
+	done
 }
 
 function suite() {
@@ -72,11 +239,25 @@ export KUBE_TEST_REPO_LIST=${SHARED_DIR}/kube-test-repo-list
         -o "${ARTIFACT_DIR}/e2e.log" \
         --junit-dir "${ARTIFACT_DIR}/junit" &
     wait "$!"
-    set +x
 }
 
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_START"
 trap 'echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"' EXIT
+
+declare -a WATCHERS
+
+trap 'echo "Killing WATCHERS"; for PID in ${WATCHERS[@]}; do kill -9 ${PID} >/dev/null 2>&1 || true; done' TERM
+
+prometheus_var_init
+
+prometheus_cmrss_loop &
+WATCHERS+=( "$!" )
+
+prometheus_kaebb_loop &
+WATCHERS+=( "$!" )
+
+oc_adm_top_nodes_loop &
+WATCHERS+=( "$!" )
 
 case "${TEST_TYPE}" in
 conformance-parallel)
