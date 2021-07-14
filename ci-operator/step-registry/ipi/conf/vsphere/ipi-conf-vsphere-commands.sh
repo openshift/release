@@ -10,11 +10,6 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   exit 1
 fi
 
-
-# remove this section after testing
-ls -alh /var/run/vault/vsphere/*
-cat /var/run/vault/vsphere/*
-
 CONFIG="${SHARED_DIR}/install-config.yaml"
 TFVARS_PATH=/var/run/vault/vsphere/secret.auto.tfvars
 vsphere_user=$(grep -oP 'vsphere_user\s*=\s*"\K[^"]+' ${TFVARS_PATH})
