@@ -144,7 +144,5 @@ cat << EOF > ~/fetch-kubeconfig.yml
     delegate_to: localhost
 EOF
 
-sleep 600
-
 ansible-playbook -i ~/inventory ~/ocp-install.yml -vvvv
 ansible-playbook -i ~/inventory ~/fetch-kubeconfig.yml -vvvv
