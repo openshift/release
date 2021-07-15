@@ -10,10 +10,10 @@ export HOME=/tmp
 export SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 export SSH_PUB_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-publickey
 export OPENSHIFT_INSTALL_INVOKER=openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD_ID}
-export AWS_SHARED_CREDENTIALS_FILE=/var/run/vault/vsphere/.awscred
+export AWS_SHARED_CREDENTIALS_FILE=/var/run/vault/vsphere-aws/.awscred
 export AWS_DEFAULT_REGION=us-east-1
 
-tfvars_path=/var/run/secrets/ci.openshift.io/cluster-profile/vmc.secret.auto.tfvars
+tfvars_path=/var/run/vault/vsphere/secret.auto.tfvars
 cluster_name=$(<"${SHARED_DIR}"/clustername.txt)
 installer_dir=/tmp/installer
 
