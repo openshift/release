@@ -33,19 +33,25 @@ fi
 
 cd "\${REPO_DIR}"
 
-export DISCONNECTED="${DISCONNECTED:-}"
-
 echo "### Setup assisted installer..."
+
+images=(${ASSISTED_AGENT_IMAGE} ${ASSISTED_CONTROLLER_IMAGE} ${ASSISTED_INSTALLER_IMAGE})
+
+cat << VARS >> /root/config
+export DISCONNECTED="${DISCONNECTED:-}"
 
 # TODO: remove this and support mirroring an index referenced by digest value
 # https://issues.redhat.com/browse/MGMT-6858
 export INDEX_IMAGE="\$(dirname ${INDEX_IMAGE})/pipeline:ci-index"
 
-images=(${ASSISTED_AGENT_IMAGE} ${ASSISTED_CONTROLLER_IMAGE} ${ASSISTED_INSTALLER_IMAGE})
-export PUBLIC_CONTAINER_REGISTRIES=\$(for image in \${images}; do echo \${image} | cut -d'/' -f1; done | sort -u | paste -sd "," -)
+export PUBLIC_CONTAINER_REGISTRIES="\$(for image in \${images}; do echo \${image} | cut -d'/' -f1; done | sort -u | paste -sd ',' -)"
+export ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE="${ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE}"
 
 # Fix for disconnected Hive
 export GO_REQUIRED_MIN_VERSION="1.14.4"
+VARS
+
+source /root/config
 
 deploy/operator/deploy.sh
 
