@@ -11,7 +11,7 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
 fi
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
-TFVARS_PATH=/var/run/secrets/ci.openshift.io/cluster-profile/vmc.secret.auto.tfvars
+TFVARS_PATH=/var/run/vault/vsphere/secret.auto.tfvars
 vsphere_user=$(grep -oP 'vsphere_user\s*=\s*"\K[^"]+' ${TFVARS_PATH})
 vsphere_password=$(grep -oP 'vsphere_password\s*=\s*"\K[^"]+' ${TFVARS_PATH})
 base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
