@@ -118,7 +118,7 @@ metadata:
   namespace: $OO_INSTALL_NAMESPACE
 spec:
   name: $OO_PACKAGE
-  OO_CHANNEL: "$OO_CHANNEL"
+  channel: "$OO_CHANNEL"
   source: $CATSRC
   sourceNamespace: $OO_INSTALL_NAMESPACE
   installPlanApproval: Manual
