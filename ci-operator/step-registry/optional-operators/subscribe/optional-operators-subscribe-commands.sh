@@ -213,7 +213,7 @@ for field in state reason; do
     fi
 done
 
-if [[ -n "$CSV" ]]; then
+if [[ -n "${CSV:-}" ]]; then
     CSV_ART="$ARTIFACT_DIR/csv-$CSV.yaml"
     echo "ClusterServiceVersion $CSV was created but never became ready"
     echo "Dumping ClusterServiceVersion $CSV as $CSV_ART"
@@ -226,7 +226,7 @@ if [[ -n "$CSV" ]]; then
     done
 else
     CSV_ART="$ARTIFACT_DIR/$OO_INSTALL_NAMESPACE-all-csvs.yaml"
-    echo "ClusterServiceVersion $CSV was never created"
+    echo "ClusterServiceVersion was never created"
     echo "Dumping all ClusterServiceVersions in namespace $OO_INSTALL_NAMESPACE to $CSV_ART"
     oc get -n "$OO_INSTALL_NAMESPACE" csv -o yaml >"$CSV_ART"
 fi
