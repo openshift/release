@@ -1,45 +1,6 @@
-base_images:
-  os:
-    name: centos
-    namespace: openshift
-    tag: "7"
-binary_build_commands: make build-with-operators
 build_root:
   project_image:
     dockerfile_path: openshift-ci/Dockerfile.tools
-images:
-- dockerfile_path: openshift-ci/Dockerfile.host.deploy
-  from: os
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/codeready-toolchain/toolchain-e2e/build/_output/bin/host-operator
-  to: host-operator
-- dockerfile_path: openshift-ci/Dockerfile.member.deploy
-  from: os
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/codeready-toolchain/toolchain-e2e/build/_output/bin/member-operator
-  to: member-operator
-- dockerfile_path: openshift-ci/Dockerfile.member.webhook.deploy
-  from: os
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/codeready-toolchain/toolchain-e2e/build/_output/bin/member-operator-webhook
-  to: member-operator-webhook
-- dockerfile_path: openshift-ci/Dockerfile.registration.deploy
-  from: os
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/codeready-toolchain/toolchain-e2e/build/_output/bin/registration-service
-  to: registration-service
 resources:
   '*':
     requests:
@@ -49,10 +10,6 @@ tag_specification:
   name: "4.6"
   namespace: ocp
 tests:
-- as: build
-  commands: make build
-  container:
-    from: src
 - as: e2e
   steps:
     cluster_profile: aws
