@@ -69,6 +69,23 @@ echo "Creating manifest"
 mock-nss.sh openshift-install create manifests --dir=${dir}
 sed -i '/^  channel:/d' ${dir}/manifests/cvo-overrides.yaml
 
+# Bumping up reserve memory for worker for ppc64le
+if [ "${ARCH}" == "ppc64le" ]; then
+  cat > "${dir}/manifests/manifest-reserve-sys-mem-kubeletconfig.yml" << EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: KubeletConfig
+metadata:
+  name: reserve-sys-mem
+spec:
+  machineConfigPoolSelector:
+    matchLabels:
+      pools.operator.machineconfiguration.openshift.io/worker: ""
+  kubeletConfig: 
+    systemReserved:
+      memory: 2Gi
+EOF
+fi
+
 # Bump the libvirt masters memory to 16GB
 export TF_VAR_libvirt_master_memory=${MASTER_MEMORY}
 ls ${dir}/openshift
