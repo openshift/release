@@ -34,8 +34,8 @@ function prepare_next_steps() {
   fi
 }
 
-trap 'prepare_next_steps' EXIT TERM
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+trap 'prepare_next_steps' EXIT TERM
 
 if [[ "${CLUSTER_TYPE}" == "aws-arm64" ]]; then
   # Hack to avoid importing arm64 release image by using an image override
