@@ -99,7 +99,6 @@ openshift_install="$!"
 if [ "${BRANCH}" == "4.7" ] || [ "${BRANCH}" == "4.6" ]; then
   REMOTE_LIBVIRT_URI=$(read_shared_dir 'REMOTE_LIBVIRT_URI')
   CLUSTER_NAME=$(read_shared_dir 'CLUSTER_NAME')
-  CLUSTER_SUBNET=$(read_shared_dir 'CLUSTER_SUBNET')
 
   i=0
   while kill -0 $openshift_install 2> /dev/null; do
@@ -107,20 +106,8 @@ if [ "${BRANCH}" == "4.7" ] || [ "${BRANCH}" == "4.6" ]; then
     echo "Polling libvirt for network, attempt #$((++i))"
     LIBVIRT_NETWORK=$(mock-nss.sh virsh --connect "${REMOTE_LIBVIRT_URI}" net-list --name | grep "${CLUSTER_NAME::21}" || true)
     if [[ -n "${LIBVIRT_NETWORK}" ]]; then
-      cat > ${dir}/worker-hostrecords.xml << EOF
-<host ip='192.168.${CLUSTER_SUBNET}.1'>
-  <hostname>alertmanager-main-openshift-monitoring.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
-  <hostname>canary-openshift-ingress-canary.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
-  <hostname>console-openshift-console.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
-  <hostname>downloads-openshift-console.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
-  <hostname>grafana-openshift-monitoring.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
-  <hostname>oauth-openshift.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
-  <hostname>prometheus-k8s-openshift-monitoring.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
-  <hostname>test-disruption-openshift-image-registry.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
-</host>
-EOF
       echo "Libvirt network found. Injecting worker DNS records."
-      mock-nss.sh virsh --connect "${REMOTE_LIBVIRT_URI}" net-update --network "${LIBVIRT_NETWORK}" --command add-last --section dns-host --xml "$(< ${dir}/worker-hostrecords.xml)"
+      mock-nss.sh virsh --connect "${REMOTE_LIBVIRT_URI}" net-update --network "${LIBVIRT_NETWORK}" --command add-last --section dns-host --xml "$(< ${SHARED_DIR}/worker-hostrecords.xml)"
       break
     fi
   done
