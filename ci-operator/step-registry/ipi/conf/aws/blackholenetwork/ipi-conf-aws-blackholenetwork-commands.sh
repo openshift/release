@@ -305,11 +305,10 @@ EOF
 
 MAX_ZONES_COUNT="$(cat "${SHARED_DIR}/maxzonescount")"
 
-ZONE_COUNT=${ZONES_COUNT:-2}
+ZONES_COUNT=${ZONES_COUNT:-2}
 if [[ "${MAX_ZONES_COUNT}" -lt 3 ]]
-	
 then
-  ZONE_COUNT="${MAX_ZONES_COUNT}"
+  ZONES_COUNT="${MAX_ZONES_COUNT}"
 fi
 
 STACK_NAME="${CLUSTER_NAME}-shared-vpc-blackhole"
@@ -317,7 +316,7 @@ aws --region "${REGION}" cloudformation create-stack \
   --stack-name "${STACK_NAME}" \
   --template-body "$(cat /tmp/blackhole_vpc.yaml)" \
   --tags "${TAGS}" \
-  --parameters "ParameterKey=AvailabilityZoneCount,ParameterValue=${ZONE_COUNT}" &
+  --parameters "ParameterKey=AvailabilityZoneCount,ParameterValue=${ZONES_COUNT}" &
 
 wait "$!"
 echo "Created stack"
