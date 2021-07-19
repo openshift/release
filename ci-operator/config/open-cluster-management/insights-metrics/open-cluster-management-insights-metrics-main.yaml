@@ -20,3 +20,29 @@ images:
 promotion:
   name: "2.3"
   namespace: open-cluster-management
+tests:
+- as: sonar-pre-submit
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow sonar/go/prow
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+- as: unit
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow unit-tests
+  container:
+    from: src
+- as: sonar-post-submit
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow sonar/go/prow
+  container:
+    from: src
+  postsubmit: true
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
