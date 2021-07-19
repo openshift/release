@@ -54,12 +54,9 @@ images:
 
     WORKDIR /opt/
 
-    ENV HOME=/root/
+    RUN mkdir -p /root/.ssh ./microshift/linux_amd64 ./microshift/linux_arm64
 
     RUN dnf install openssh-clients jq python3 -y && python3 -m pip install awscli
-
-    RUN mkdir -p /root/.ssh ./microshift/linux_amd64 ./microshift/linux_arm64 /root/.subsciption-manager && \
-        printf "Host *.compute.amazon.com\n\tIdentityFile ~/.ssh/aws.pem\n\tUser ec2-user\n" > ~/.ssh/config
   from: base
   inputs:
     bin:
@@ -115,7 +112,7 @@ tests:
                           {Key=NAMESPACE,Value=${NAMESPACE:-' '}},
                           {Key=PROW_JOB_ID,Value=${PROW_JOB_ID:-' '}}]")" || exit 1
         INSTANCE_ID="$(jq -r ".Instances[0].InstanceId" <<< $INSTANCE)"
-        printf "instance created, waiting for state==Running, id: %s\n" $INSTANCE_ID
+        printf ":: instance created, waiting for state==Running, id: %s\n" $INSTANCE_ID
 
         aws ec2 wait instance-running --instance-ids "$INSTANCE_ID"
 
@@ -123,7 +120,15 @@ tests:
         PUB_DNS="$(jq -r '.Reservations[0].Instances[0].NetworkInterfaces[0].Association.PublicDnsName' <<< "$INSTANCE")"
 
         printf "shelling into instance [%s]\n" $INSTANCE_ID
-        ssh -vv "$PUB_DNS" "echo Hello, AWS!"
+        start=$(date +%s)
+        timeout=120
+        printf ":: attempting ssh connection for %s seconds" $timeout
+        until ssh -vv -i /root/.ssh/aws.pem "ec2-user@$PUB_DNS" "echo Hello, AWS!"; do
+          sleep 3
+          passed=$(( $(date +%s) - start ))
+          [ $passed -ge $timeout ] && printf ":: ssh connection attempts timed out (%s seconds)\n" $passed >&2 && exit 1
+        done
+        printf ":: SSH succeeded!\n"
       credentials:
       - mount_path: /root/.ssh/
         name: microshift-aws-ssh-access-pem
