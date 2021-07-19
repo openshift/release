@@ -4,10 +4,11 @@ presubmits:
     always_run: true
     branches:
     - release-4.9
+    cluster: build01
     context: ci/prow/e2e-aws
     decorate: true
     labels:
-      ci-operator.openshift.io/prowgen-controlled: newly-generated
+      ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-api-provider-aws-release-4.9-e2e-aws
     path_alias: sigs.k8s.io/cluster-api-provider-aws
@@ -69,13 +70,76 @@ presubmits:
     branches:
     - release-4.9
     cluster: build01
+    context: ci/prow/e2e-aws
+    decorate: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-api-provider-ibmcloud-release-4.9-e2e-aws
+    rerun_command: /test e2e-aws
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-aws-cluster-profile
+        - --target=e2e-aws
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-aws-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-4.9
+    cluster: build01
     context: ci/prow/generate
     decorate: true
     labels:
-      ci-operator.openshift.io/prowgen-controlled: newly-generated
+      ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-api-provider-ibmcloud-release-4.9-generate
-    path_alias: sigs.k8s.io/cluster-api-provider-ibmcloud
     rerun_command: /test generate
     spec:
       containers:
@@ -119,10 +183,9 @@ presubmits:
     context: ci/prow/goimports
     decorate: true
     labels:
-      ci-operator.openshift.io/prowgen-controlled: newly-generated
+      ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-api-provider-ibmcloud-release-4.9-goimports
-    path_alias: sigs.k8s.io/cluster-api-provider-ibmcloud
     rerun_command: /test goimports
     spec:
       containers:
@@ -166,10 +229,9 @@ presubmits:
     context: ci/prow/golint
     decorate: true
     labels:
-      ci-operator.openshift.io/prowgen-controlled: newly-generated
+      ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-api-provider-ibmcloud-release-4.9-golint
-    path_alias: sigs.k8s.io/cluster-api-provider-ibmcloud
     rerun_command: /test golint
     spec:
       containers:
@@ -213,10 +275,9 @@ presubmits:
     context: ci/prow/govet
     decorate: true
     labels:
-      ci-operator.openshift.io/prowgen-controlled: newly-generated
+      ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-api-provider-ibmcloud-release-4.9-govet
-    path_alias: sigs.k8s.io/cluster-api-provider-ibmcloud
     rerun_command: /test govet
     spec:
       containers:
@@ -260,10 +321,9 @@ presubmits:
     context: ci/prow/images
     decorate: true
     labels:
-      ci-operator.openshift.io/prowgen-controlled: newly-generated
+      ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-api-provider-ibmcloud-release-4.9-images
-    path_alias: sigs.k8s.io/cluster-api-provider-ibmcloud
     rerun_command: /test images
     spec:
       containers:
@@ -307,10 +367,9 @@ presubmits:
     context: ci/prow/unit
     decorate: true
     labels:
-      ci-operator.openshift.io/prowgen-controlled: newly-generated
+      ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-api-provider-ibmcloud-release-4.9-unit
-    path_alias: sigs.k8s.io/cluster-api-provider-ibmcloud
     rerun_command: /test unit
     spec:
       containers:
