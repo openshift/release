@@ -4,6 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if [ "$ETCD_ON_RAMFS" == "false" ]; then
+    echo "Not enabling etcd-on-ramfs because ETCD_ON_RAMFS=false"
+    exit 0
+fi
+
 cat >> "${SHARED_DIR}/manifest_etcd-on-ramfs-mc.yml" << EOF
 kind: MachineConfig
 apiVersion: machineconfiguration.openshift.io/v1
