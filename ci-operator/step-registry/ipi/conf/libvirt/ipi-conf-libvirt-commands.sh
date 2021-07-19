@@ -137,10 +137,10 @@ if [[ -z "${REMOTE_LIBVIRT_URI}" ]]; then
   REMOTE_LIBVIRT_URI="qemu+tcp://${REMOTE_LIBVIRT_HOSTNAME}/system"
 fi
 # Debug echo "Remote Libvirt=${REMOTE_LIBVIRT_URI}"
-
 write_shared_dir REMOTE_LIBVIRT_URI ${REMOTE_LIBVIRT_URI}
-write_shared_dir CLUSTER_NAME ${LEASED_RESOURCE}-${JOB_NAME_HASH}
-write_shared_dir CLUSTER_SUBNET ${CLUSTER_SUBNET}
+
+CLUSTER_NAME="${LEASED_RESOURCE}-${JOB_NAME_HASH}"
+write_shared_dir CLUSTER_NAME ${CLUSTER_NAME}
 
 # Test the remote connection
 mock-nss.sh virsh -c ${REMOTE_LIBVIRT_URI} list
@@ -148,10 +148,10 @@ mock-nss.sh virsh -c ${REMOTE_LIBVIRT_URI} list
 # in case the cluster deprovision failed in a previous run
 cleanup_leftover_resources
 
-CLUSTER_NAME="${LEASED_RESOURCE}-${JOB_NAME_HASH}"
+BASE_DOMAIN="${LEASED_RESOURCE}.ci"
 cat >> "${CONFIG}" << EOF
 apiVersion: v1
-baseDomain: ${LEASED_RESOURCE}
+baseDomain: ${BASE_DOMAIN}
 metadata:
   name: ${CLUSTER_NAME}
 controlPlane:
@@ -178,10 +178,24 @@ platform:
     network:
       dnsmasqOptions:
       - name: "address"
-        value: "/.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}/192.168.${CLUSTER_SUBNET}.1"
+        value: "/.apps.${CLUSTER_NAME}.${BASE_DOMAIN}/192.168.${CLUSTER_SUBNET}.1"
       if: "br$(printf ${LEASED_RESOURCE} | tail -c 3)"
 pullSecret: >
   $(<"${CLUSTER_PROFILE_DIR}/pull-secret")
 sshKey: |
   $(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")
+EOF
+
+# DNS records for libvirt versions that don't support dnsmasq options
+cat >> ${SHARED_DIR}/worker-hostrecords.xml << EOF
+<host ip='192.168.${CLUSTER_SUBNET}.1'>
+  <hostname>alertmanager-main-openshift-monitoring.apps.${CLUSTER_NAME}.${BASE_DOMAIN}</hostname>
+  <hostname>canary-openshift-ingress-canary.apps.${CLUSTER_NAME}.${BASE_DOMAIN}</hostname>
+  <hostname>console-openshift-console.apps.${CLUSTER_NAME}.${BASE_DOMAIN}</hostname>
+  <hostname>downloads-openshift-console.apps.${CLUSTER_NAME}.${BASE_DOMAIN}</hostname>
+  <hostname>grafana-openshift-monitoring.apps.${CLUSTER_NAME}.${BASE_DOMAIN}</hostname>
+  <hostname>oauth-openshift.apps.${CLUSTER_NAME}.${BASE_DOMAIN}</hostname>
+  <hostname>prometheus-k8s-openshift-monitoring.apps.${CLUSTER_NAME}.${BASE_DOMAIN}</hostname>
+  <hostname>test-disruption-openshift-image-registry.apps.${CLUSTER_NAME}.${BASE_DOMAIN}</hostname>
+</host>
 EOF
