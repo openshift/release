@@ -250,21 +250,6 @@ REGION="$(/tmp/yq r "${CONFIG}" 'platform.aws.region')"
 echo Using region: ${REGION}
 test -n "${REGION}"
 
-# Generate working availability zones from the region
-mapfile -t AVAILABILITY_ZONES < <(aws --region "${REGION}" ec2 describe-availability-zones | jq -r '.AvailabilityZones[] | select(.State == "available") | .ZoneName' | sort -u)
-# Generate availability zones with the biggest instance type required
-mapfile -t XLARGE_ZONES < <(aws --region "${REGION}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort -u)
-mapfile -t ZONES < <(echo "${AVAILABILITY_ZONES[@]}" "${XLARGE_ZONES[@]}" | sed 's/ /\n/g' | sort -R | uniq -d)
-
-function join_by { local IFS="$1"; shift; echo "$*"; }
-
-ZONES_COUNT=${ZONES_COUNT:-2}
-ZONES=("${ZONES[@]:0:${ZONES_COUNT}}")
-ZONES_STR="[ "
-ZONES_STR+=$(join_by , "${ZONES[@]}")
-ZONES_STR+=" ]"
-echo "Using zones: ${ZONES_STR})"
-
 curl -L -o /tmp/fcos-stable.json https://builds.coreos.fedoraproject.org/streams/stable.json
 AMI=$(jq -r .architectures.x86_64.images.aws.regions[\"${REGION}\"].image < /tmp/fcos-stable.json)
 if [ -z "${AMI}" ]; then
@@ -403,14 +388,4 @@ cat >> "${CONFIG}" << EOF
 proxy:
   httpsProxy: ${PROXY_URL}
   httpProxy: ${PROXY_URL}
-controlPlane:
-  name: master
-  platform:
-    aws:
-      zones: ${ZONES_STR}
-compute:
-- name: worker
-  platform:
-    aws:
-      zones: ${ZONES_STR}
 EOF
