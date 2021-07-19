@@ -21,7 +21,7 @@ images:
       - registry.ci.openshift.org/open-cluster-management/builder:nodejs14-linux
   to: console-api
 promotion:
-  name: "2.3"
+  name: "2.4"
   namespace: open-cluster-management
 resources:
   '*':
@@ -65,6 +65,22 @@ tests:
       IMAGE_TAG: latest
       REGISTRY_ORG: open-cluster-management
     workflow: ocm-ci-image-mirror
+- as: fast-forward
+  commands: |
+    git clone -b master https://github.com/openshift/release.git /tmp/release
+    repo-brancher --fast-forward --confirm \
+        --config-dir=/tmp/release/ci-operator/config/open-cluster-management/console-api/ \
+        --username=acm-cicd \
+        --token-path=/etc/github/token \
+        --current-promotion-namespace=open-cluster-management \
+        --current-release=2.4 \
+        --future-release=2.4
+  container:
+    from: repo-brancher
+  postsubmit: true
+  secrets:
+  - mount_path: /etc/github
+    name: acm-cicd-github
 zz_generated_metadata:
   branch: main
   org: open-cluster-management
