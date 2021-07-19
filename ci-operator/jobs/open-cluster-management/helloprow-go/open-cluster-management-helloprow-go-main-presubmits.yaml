@@ -197,22 +197,23 @@ presubmits:
     branches:
     - main
     cluster: build01
-    context: ci/prow/sleep-test
+    context: ci/prow/sonar-pre-submit
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-open-cluster-management-helloprow-go-main-sleep-test
-    rerun_command: /test sleep-test
+    name: pull-ci-open-cluster-management-helloprow-go-main-sonar-pre-submit
+    rerun_command: /test sonar-pre-submit
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=sleep-test
+        - --secret-dir=/secrets/acm-sonarcloud-token
+        - --target=sonar-pre-submit
         command:
         - ci-operator
         image: ci-operator:latest
@@ -222,6 +223,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/acm-sonarcloud-token
+          name: acm-sonarcloud-token
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -233,10 +237,13 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: acm-sonarcloud-token
+        secret:
+          secretName: acm-sonarcloud-token
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )sleep-test,?($|\s.*)
+    trigger: (?m)^/test( | .* )sonar-pre-submit,?($|\s.*)
