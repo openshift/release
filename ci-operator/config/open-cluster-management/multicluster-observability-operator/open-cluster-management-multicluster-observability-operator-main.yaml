@@ -97,7 +97,10 @@ tests:
     test:
     - as: e2e
       commands: |
-        export COMPONENT_IMAGE_PIPELINE=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline}
+        echo "ENDPOINT_MONITORING_OPERATOR_IMAGE_REF=$ENDPOINT_MONITORING_OPERATOR_IMAGE_REF"
+        echo "GRAFANA_DASHBOARD_LOADER_IMAGE_REF=$GRAFANA_DASHBOARD_LOADER_IMAGE_REF"
+        echo "METRICS_COLLECTOR_IMAGE_REF=$METRICS_COLLECTOR_IMAGE_REF"
+        echo "RBAC_QUERY_PROXY_IMAGE_REF=$RBAC_QUERY_PROXY_IMAGE_REF"
         export SELF="make"
         set -o pipefail
         make e2e-tests 2>&1 | tee ${ARTIFACT_DIR}/e2e_tests_out.log
@@ -119,8 +122,8 @@ tests:
     workflow: ocm-e2e-clusterpool
 - as: sonarcloud
   commands: |
-    export SELF="make -f /opt/build-harness/Makefile.prow"
-    make -f /opt/build-harness/Makefile.prow sonar/go/prow
+    export SELF="make"
+    make sonar/go/prow
   container:
     from: src
   secrets:
