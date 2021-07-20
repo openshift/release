@@ -15,6 +15,7 @@ images:
 - dockerfile_path: Dockerfile.e2etest
   to: grc-ui-tests
 promotion:
+  disabled: true
   name: "2.4"
   namespace: open-cluster-management
 resources:
@@ -46,7 +47,7 @@ tests:
     make lint
     make -f Makefile.prow sonar/js/jest-init
     make unit-test
-    # make -f Makefile.prow sonar/js/prow
+    make -f Makefile.prow sonar/js/prow
   container:
     from: src
   secrets:
@@ -59,7 +60,7 @@ tests:
       SOURCE_IMAGE_REF: grc-ui
     env:
       IMAGE_REPO: grc-ui
-      IMAGE_TAG: latest
+      IMAGE_TAG: latest-2.4
       REGISTRY_ORG: open-cluster-management
     workflow: ocm-ci-image-mirror
 - as: latest-test-image-mirror
@@ -69,10 +70,47 @@ tests:
       SOURCE_IMAGE_REF: grc-ui-tests
     env:
       IMAGE_REPO: grc-ui-tests
-      IMAGE_TAG: latest
+      IMAGE_TAG: latest-2.3
       REGISTRY_ORG: open-cluster-management
     workflow: ocm-ci-image-mirror
+- as: sonar-post-submit
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow sonar/js/jest-init
+    make -f Makefile.prow unit-tests
+    make -f Makefile.prow sonar/js/prow
+  container:
+    from: src
+  postsubmit: true
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+- as: publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: grc-ui
+    env:
+      IMAGE_REPO: grc-ui
+      REGISTRY_ORG: open-cluster-management
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/open-cluster-management"
+        export OSCI_PUBLISH_DELAY="0"
+        export SELF="make -f Makefile.prow"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: main
+  branch: release-2.4
   org: open-cluster-management
   repo: grc-ui
