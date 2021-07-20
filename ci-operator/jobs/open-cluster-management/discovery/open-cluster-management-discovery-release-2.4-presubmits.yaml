@@ -1,74 +1,24 @@
-postsubmits:
+presubmits:
   open-cluster-management/discovery:
   - agent: kubernetes
+    always_run: true
     branches:
-    - ^main$
-    cluster: build02
+    - release-2.4
+    cluster: build01
+    context: ci/prow/images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-    name: branch-ci-open-cluster-management-discovery-main-fast-forward
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-open-cluster-management-discovery-release-2.4-images
+    rerun_command: /test images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/acm-cicd-github
-        - --target=fast-forward
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/acm-cicd-github
-          name: acm-cicd-github
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: acm-cicd-github
-        secret:
-          secretName: acm-cicd-github
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-  - agent: kubernetes
-    branches:
-    - ^main$
-    cluster: build02
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/is-promotion: "true"
-      ci-operator.openshift.io/prowgen-controlled: "true"
-    max_concurrency: 1
-    name: branch-ci-open-cluster-management-discovery-main-images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
-        - --promote
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
         command:
@@ -86,8 +36,108 @@ postsubmits:
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
-        - mountPath: /etc/push-secret
-          name: push-secret
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-2.4
+    cluster: build01
+    context: ci/prow/sonar-post-submit
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-open-cluster-management-discovery-release-2.4-sonar-post-submit
+    rerun_command: /test sonar-post-submit
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/acm-sonarcloud-token
+        - --target=sonar-post-submit
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/acm-sonarcloud-token
+          name: acm-sonarcloud-token
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: acm-sonarcloud-token
+        secret:
+          secretName: acm-sonarcloud-token
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )sonar-post-submit,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - release-2.4
+    cluster: build01
+    context: ci/prow/test-unit
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-open-cluster-management-discovery-release-2.4-test-unit
+    rerun_command: /test test-unit
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=test-unit
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
           readOnly: true
         - mountPath: /etc/report
           name: result-aggregator
@@ -97,46 +147,7 @@ postsubmits:
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
-      - name: push-secret
-        secret:
-          secretName: registry-push-credentials-ci-central
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-  - agent: kubernetes
-    branches:
-    - ^main$
-    cluster: build02
-    decorate: true
-    labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: branch-ci-open-cluster-management-discovery-main-sonarcloud
-    spec:
-      containers:
-      - args:
-        - -f
-        - Makefile.prow
-        - sonar/go/prow
-        command:
-        - make
-        env:
-        - name: ARTIFACT_DIR
-          value: $(ARTIFACTS)
-        - name: SELF
-          value: make -f Makefile.prow
-        image: registry.ci.openshift.org/open-cluster-management/builder:go1.16-linux
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 100m
-            memory: 200Mi
-        volumeMounts:
-        - mountPath: /etc/sonarcloud
-          name: acm-sonarcloud-token
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: acm-sonarcloud-token
-        secret:
-          secretName: acm-sonarcloud-token
+    trigger: (?m)^/test( | .* )test-unit,?($|\s.*)
