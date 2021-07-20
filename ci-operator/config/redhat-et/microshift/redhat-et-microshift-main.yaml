@@ -54,9 +54,7 @@ images:
 
     USER root
 
-    RUN echo "HOME=$HOME, i_am $(whoami)"
-
-    RUN mkdir -p $HOME/ ./microshift/linux_amd64 ./microshift/linux_arm64
+    RUN mkdir -p ./microshift/linux_amd64 ./microshift/linux_arm64
 
     RUN dnf install openssh-clients jq python3 -y && python3 -m pip install awscli
   from: base
@@ -98,8 +96,6 @@ tests:
       commands: |
         #! /usr/bin/env bash
         
-        echo "HOME=$HOME, i_am $(whoami)"
-
         set -euo pipefail
         INSTANCE_ID=''
         clean_up(){
@@ -107,6 +103,9 @@ tests:
           aws ec2 terminate-instances --instance-ids $INSTANCE_ID
         }
         trap clean_up EXIT
+
+        chmod 600 $HOME/.ssh
+        chmod 400 $HOME/.ssh/aws.pem
 
         printf ":: creating instance"
         INSTANCE="$(aws ec2 run-instances --launch-template LaunchTemplateId=$AWS_LAUNCH_TEMPLATE_ID \
@@ -135,13 +134,13 @@ tests:
         done
         printf ":: SSH succeeded!\n"
       credentials:
-      - mount_path: /root/.ssh/
+      - mount_path: /alabama/.ssh/
         name: microshift-aws-ssh-access-pem
         namespace: test-credentials
-      - mount_path: /root/.aws/
+      - mount_path: /alabama/.aws/
         name: microshift-aws-access-credentials
         namespace: test-credentials
-      - mount_path: /root/.subscription-manager/
+      - mount_path: /alabama/.subscription-manager/
         name: microshift-dependency-access-credentials
         namespace: test-credentials
       dependencies:
@@ -150,7 +149,6 @@ tests:
       env:
       - name: AWS_DEFAULT_REGION
       - name: AWS_LAUNCH_TEMPLATE_ID
-      - name: AWS_SHARED_CREDENTIALS_FILE
       from: test-smoke-base
       grace_period: 2m0s
       resources:
