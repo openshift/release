@@ -52,11 +52,14 @@ images:
 - dockerfile_literal: |
     FROM registry.access.redhat.com/ubi8/ubi
 
-    USER root
+    WORKDIR /alabama
 
     RUN mkdir -p ./microshift/linux_amd64 ./microshift/linux_arm64
+    
+    USER root
 
     RUN dnf install openssh-clients jq python3 -y && python3 -m pip install awscli
+
   from: base
   inputs:
     bin:
@@ -90,12 +93,11 @@ tests:
     env:
       AWS_DEFAULT_REGION: us-east-2
       AWS_LAUNCH_TEMPLATE_ID: lt-0c7afc666d88ec6be
-      AWS_SHARED_CREDENTIALS_FILE: /root/.aws/credentials
     test:
     - as: test-smoke-deploy-infra
       commands: |
         #! /usr/bin/env bash
-        
+
         set -euo pipefail
         INSTANCE_ID=''
         clean_up(){
