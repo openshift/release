@@ -1,30 +1,30 @@
 base_images:
   base:
-    name: "4.10"
+    name: "4.8"
     namespace: origin
     tag: base
   cli:
-    name: "4.10"
+    name: "4.8"
     namespace: origin
     tag: cli
   hco-index:
     name: hyperconverged-cluster-index
     namespace: ci
-    tag: 1.6.0-unstable
+    tag: 1.5.0-unstable
   hco-index-prev:
     name: hyperconverged-cluster-index
     namespace: ci
-    tag: 1.5.0-unstable
-  open-cluster-management_builder_go1.17-linux:
-    name: builder
-    namespace: open-cluster-management
-    tag: go1.17-linux
+    tag: 1.4.0-unstable
+  operator-registry:
+    name: "4.8"
+    namespace: origin
+    tag: operator-registry
 binary_build_commands: make install
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.16
+    tag: golang-1.15
 images:
 - dockerfile_path: build/Dockerfile.okd
   from: base
@@ -42,15 +42,14 @@ images:
       - destination_dir: .
         source_path: /go/bin/hyperconverged-cluster-webhook
   to: hyperconverged-cluster-webhook
-- dockerfile_path: build/Dockerfile.artifacts
-  optional: true
-  to: virt-artifacts-server
-- dockerfile_path: build/Dockerfile.functest.ci
-  inputs:
-    open-cluster-management_builder_go1.17-linux:
-      as:
-      - registry.ci.openshift.org/open-cluster-management/builder:go1.17-linux
+- dockerfile_path: build/Dockerfile.functest
   to: hyperconverged-cluster-functest
+- dockerfile_path: deploy/Dockerfile.registry.intermediate
+  from: operator-registry
+  to: operator-registry-base
+- dockerfile_path: deploy/Dockerfile.registry.ci
+  from: operator-registry-base
+  to: hco-registry
 - dockerfile_path: deploy/Dockerfile.src.ci
   from: src
   inputs:
@@ -78,17 +77,15 @@ operator:
     with: hyperconverged-cluster-operator
   - pullspec: +WEBHOOK_IMAGE_TO_REPLACE+
     with: hyperconverged-cluster-webhook
-  - pullspec: +ARTIFACTS_SERVER_IMAGE_TO_REPLACE+
-    with: virt-artifacts-server
 releases:
   initial:
     integration:
-      name: "4.10"
+      name: "4.8"
       namespace: origin
   latest:
     integration:
       include_built_images: true
-      name: "4.10"
+      name: "4.8"
       namespace: origin
 resources:
   '*':
@@ -100,27 +97,15 @@ tests:
   steps:
     cluster_profile: gcp
     env:
-      OO_CHANNEL: 1.6.0
+      OO_CHANNEL: 1.5.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
     test:
-    - as: deploy-cr
-      commands: |
-        make deploy_cr
-      from: hco-oc-bin-image
-      resources:
-        requests:
-          cpu: 500m
-          memory: 1Gi
     - as: e2e-test
       commands: |
+        make deploy_cr
         make functest
-      dependencies:
-      - env: FUNCTEST_IMAGE
-        name: hyperconverged-cluster-functest
-      - env: IMAGE_FORMAT
-        name: hyperconverged-cluster-functest
       from: hco-oc-bin-image
       resources:
         requests:
@@ -131,27 +116,15 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      OO_CHANNEL: 1.6.0
+      OO_CHANNEL: 1.5.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
     test:
-    - as: deploy-cr
-      commands: |
-        KVM_EMULATION=true make deploy_cr
-      from: hco-oc-bin-image
-      resources:
-        requests:
-          cpu: 500m
-          memory: 1Gi
     - as: e2e-test
       commands: |
+        KVM_EMULATION=true make deploy_cr
         make functest
-      dependencies:
-      - env: FUNCTEST_IMAGE
-        name: hyperconverged-cluster-functest
-      - env: IMAGE_FORMAT
-        name: hyperconverged-cluster-functest
       from: hco-oc-bin-image
       resources:
         requests:
@@ -164,7 +137,7 @@ tests:
     dependencies:
       OO_INDEX: ci-index-hco-upgrade-bundle
     env:
-      OO_CHANNEL: 1.6.0
+      OO_CHANNEL: 1.5.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
@@ -183,7 +156,7 @@ tests:
     dependencies:
       OO_INDEX: ci-index-hco-upgrade-bundle
     env:
-      OO_CHANNEL: 1.6.0
+      OO_CHANNEL: 1.5.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
@@ -197,7 +170,7 @@ tests:
           memory: 1Gi
     workflow: optional-operators-ci-gcp
 zz_generated_metadata:
-  branch: main
+  branch: release-4.8
   org: kubevirt
   repo: hyperconverged-cluster-operator
   variant: okd
