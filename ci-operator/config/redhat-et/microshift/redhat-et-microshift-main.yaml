@@ -52,9 +52,11 @@ images:
 - dockerfile_literal: |
     FROM registry.access.redhat.com/ubi8/ubi
 
-    WORKDIR /opt/
+    USER root
 
-    RUN mkdir -p /root/.ssh ./microshift/linux_amd64 ./microshift/linux_arm64
+    RUN echo "HOME=$HOME, i_am $(whoami)"
+
+    RUN mkdir -p $HOME/ ./microshift/linux_amd64 ./microshift/linux_arm64
 
     RUN dnf install openssh-clients jq python3 -y && python3 -m pip install awscli
   from: base
@@ -95,6 +97,9 @@ tests:
     - as: test-smoke-deploy-infra
       commands: |
         #! /usr/bin/env bash
+        
+        echo "HOME=$HOME, i_am $(whoami)"
+
         set -euo pipefail
         INSTANCE_ID=''
         clean_up(){
@@ -118,12 +123,12 @@ tests:
 
         INSTANCE="$(aws ec2 describe-instances --instance-ids "$INSTANCE_ID")"
         PUB_DNS="$(jq -r '.Reservations[0].Instances[0].NetworkInterfaces[0].Association.PublicDnsName' <<< "$INSTANCE")"
-        sleep 36000
+
         printf "shelling into instance [%s]\n" $INSTANCE_ID
         start=$(date +%s)
         timeout=120
         printf ":: attempting ssh connection for %s seconds" $timeout
-        until ssh -t -vv -i /root/.ssh/aws.pem "ec2-user@$PUB_DNS" "echo Hello, AWS!"; do
+        until ssh -o "StrictHostKeyChecking no" -t -vv -i $HOME/.ssh/aws.pem "ec2-user@$PUB_DNS" "echo Hello, AWS!"; do
           sleep 3
           passed=$(( $(date +%s) - start ))
           [ $passed -ge $timeout ] && printf ":: ssh connection attempts timed out (%s seconds)\n" $passed >&2 && exit 1
