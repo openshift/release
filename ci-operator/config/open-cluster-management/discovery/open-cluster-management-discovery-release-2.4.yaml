@@ -7,10 +7,6 @@ base_images:
     name: builder
     namespace: open-cluster-management
     tag: go1.16-linux
-  repo-brancher:
-    name: repo-brancher
-    namespace: ci
-    tag: latest
 binary_build_commands: make build
 build_root:
   image_stream_tag:
@@ -40,6 +36,7 @@ images:
       - registry.ci.openshift.org/open-cluster-management/builder:go1.16-linux
   to: discovery-testserver
 promotion:
+  disabled: true
   name: "2.4"
   namespace: open-cluster-management
 resources:
@@ -54,7 +51,7 @@ tests:
     make -f Makefile.prow unit-tests
   container:
     from: src
-- as: sonarcloud
+- as: sonar-post-submit
   commands: |
     export SELF="make -f Makefile.prow"
     make -f Makefile.prow sonar/go/prow
@@ -63,25 +60,57 @@ tests:
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
-- as: fast-forward
-  commands: |
-    git clone -b master https://github.com/openshift/release.git /tmp/release
-    repo-brancher \
-        --fast-forward \
-        --confirm \
-        --config-dir=/tmp/release/ci-operator/config/open-cluster-management/discovery/ \
-        --username=acm-cicd \
-        --token-path=/etc/github/token \
-        --current-promotion-namespace=open-cluster-management \
-        --current-release=2.4 \
-        --future-release=2.4
-  container:
-    from: repo-brancher
+- as: publish
   postsubmit: true
-  secrets:
-  - mount_path: /etc/github
-    name: acm-cicd-github
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: discovery-operator
+    env:
+      IMAGE_REPO: discovery-operator
+      REGISTRY_ORG: open-cluster-management
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/open-cluster-management"
+        export OSCI_PUBLISH_DELAY="0"
+        export SELF="make -f Makefile.prow"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+- as: publish-test
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: discovery-testserver
+    env:
+      IMAGE_REPO: discovery-testserver
+      REGISTRY_ORG: open-cluster-management
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/open-cluster-management"
+        export OSCI_PUBLISH_DELAY="0"
+        export SELF="make -f Makefile.prow"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: main
+  branch: release-2.4
   org: open-cluster-management
   repo: discovery
