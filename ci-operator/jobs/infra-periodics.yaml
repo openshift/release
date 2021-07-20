@@ -1976,3 +1976,30 @@ periodics:
     - name: token
       secret:
         secretName: github-credentials-openshift-ci-robot
+- agent: kubernetes
+  cluster: app.ci
+  cron: 30 7 * * *
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-promoted-image-governor
+  spec:
+    containers:
+    - command:
+      - /usr/bin/promoted-image-governor
+      - --ci-operator-config-path=ci-operator/config
+      - --release-controller-mirror-config-dir=core-services/release-controller/_releases
+      - --ignored-image-stream-tags='^ocp\S*/\S+:machine-os-content$'
+      - --ignored-image-stream-tags='^openshift/origin-v3.11:'
+      - --dry-run=true
+      image: registry.ci.openshift.org/ci/promoted-image-governor:latest
+      imagePullPolicy: Always
+      name: promoted-image-governor
+      resources:
+        requests:
+          cpu: 500m
+    serviceAccountName: promoted-image-governor
