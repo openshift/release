@@ -1,0 +1,37 @@
+binary_build_commands: make commands
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.16
+canonical_go_repository: cloud.ibm.com/cloud-provider-ibm
+promotion:
+  name: "4.9"
+  namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.9"
+  namespace: ocp
+tests:
+- as: e2e-aws
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- as: unit
+  commands: make test
+  container:
+    from: src
+- as: fvt
+  commands: make fvttest
+  container:
+    from: src
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: cloud-provider-ibm
