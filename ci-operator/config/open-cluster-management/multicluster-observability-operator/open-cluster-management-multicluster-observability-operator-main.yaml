@@ -86,27 +86,37 @@ tests:
     from: src
 - as: test-e2e
   steps:
-    cluster_profile: aws
+    dependencies:
+      COMPONENT_IMAGE_REF: multicluster-observability-operator
+    env:
+      CLUSTERPOOL_GROUP_NAME: Core-Services
+      CLUSTERPOOL_HOST_NAMESPACE: acm-observability-china
+      CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-obs-china-clusterpool
+      CLUSTERPOOL_LIST_INCLUSION_FILTER: prow
+      COMPONENT_NAME: multicluster-observability-operator
     test:
-    - as: run-e2e
-      cli: latest
+    - as: e2e
       commands: |
         export COMPONENT_IMAGE_PIPELINE=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline}
         export SELF="make"
         set -o pipefail
         make e2e-tests 2>&1 | tee ${ARTIFACT_DIR}/e2e_tests_out.log
         set +o pipefail
-      env:
-      - default: oc
-        name: KUBECTL
-      - default: /tmp
-        name: HOME
+      dependencies:
+      - env: ENDPOINT_MONITORING_OPERATOR_IMAGE_REF
+        name: endpoint-monitoring-operator
+      - env: GRAFANA_DASHBOARD_LOADER_IMAGE_REF
+        name: grafana-dashboard-loader
+      - env: METRICS_COLLECTOR_IMAGE_REF
+        name: metrics-collector
+      - env: RBAC_QUERY_PROXY_IMAGE_REF
+        name: rbac-query-proxy
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: openshift-e2e-aws
+    workflow: ocm-e2e-clusterpool
 - as: sonarcloud
   commands: |
     export SELF="make -f /opt/build-harness/Makefile.prow"
