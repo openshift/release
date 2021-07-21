@@ -34,3 +34,13 @@ operator-sdk scorecard --config "${SCORECARD_CONFIG}" \
                        --kubeconfig "${KUBECONFIG}" \
                        --output json \
                        "${OPERATOR_DIR}" > "${ARTIFACT_DIR}"/scorecard-output-basic.json || true
+
+if [ -f "${OPERATOR_DIR}/tests/scorecard/config.yaml" ]; then
+  echo "CUSTOM SCORECARD TESTS DETECTED"
+  echo "Running the operator-sdk scorecard test using the custom, bundle-provided configuration, json output and storing it in the artifacts directory"
+  operator-sdk scorecard \
+    --namespace=${NAMESPACE} \
+    --kubeconfig ${KUBECONFIG} \
+    --output json \
+    "${OPERATOR_DIR}" > "${ARTIFACTS_DIR}"/scorecard-output-custom.json || true
+fi
