@@ -39,6 +39,10 @@ base_images:
     name: postgresql-12-centos7
     namespace: ocp-kni
     tag: latest
+  spectral:
+    name: stoplight-spectral
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: release
@@ -93,6 +97,10 @@ tests:
     && make lint
   container:
     from: test-bin
+- as: swagger-lint
+  commands: spectral lint swagger.yaml
+  container:
+    from: spectral
 - as: subsystem-aws
   cluster_claim:
     architecture: amd64
