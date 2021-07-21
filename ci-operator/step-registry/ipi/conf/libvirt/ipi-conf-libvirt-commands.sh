@@ -65,9 +65,7 @@ fi
 # create a file for storing shared information between steps
 touch ${SHARED_DIR}/cluster-config.yaml
 
-OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="registry.ci.openshift.org/ocp-${ARCH}/release-${ARCH}:${BRANCH}"
-echo "Installing from initial release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
-write_shared_dir OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}
+echo "Installing from initial release ${RELEASE_IMAGE_LATEST}"
 
 openshift-install version
 
