@@ -4,7 +4,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-SINGLE_NODE_AWS_INSTANCE_TYPE="m5d.2xlarge"
+SINGLE_NODE_AWS_INSTANCE_TYPE="t2.small"
 
 echo "Updating install-config.yaml to a single ${SINGLE_NODE_AWS_INSTANCE_TYPE} control plane node and 0 workers"
 
