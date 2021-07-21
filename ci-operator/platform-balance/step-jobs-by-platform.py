@@ -200,7 +200,7 @@ if __name__ == '__main__':
         for _workflow in sorted(fixed_workflows):
             print('  {}'.format(list(_stripped_workflows[_workflow].values())[0]))
     _interesting_jobs = set(yield_interesting_jobs(job_steps=_job_steps, balanceable_workflows=_balanceable_workflows))
-    _counts = get_prow_job_counts(uri='https://prow.svc.ci.openshift.org/prowjobs.js', interesting_jobs=_interesting_jobs)
+    _counts = get_prow_job_counts(uri='https://prow.ci.openshift.org/prowjobs.js', interesting_jobs=_interesting_jobs)
     _platform_specific_repositories = {
         'openshift/cloud-credential-operator',
         'openshift/cluster-api-provider-aws',
