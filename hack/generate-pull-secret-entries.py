@@ -79,6 +79,11 @@ def config_for_cluster(cluster):
                 },
                 {
                     "item": "build_farm",
+                    "registry_url": "registry.build03.ci.openshift.org",
+                    "auth_field": "token_image-puller_build03_reg_auth_value.txt",
+                },
+                {
+                    "item": "build_farm",
                     "registry_url": "registry.apps.build01-us-west-2.vmc.ci.openshift.org",
                     "auth_field": "token_image-puller_vsphere_reg_auth_value.txt",
                 }],
@@ -98,7 +103,7 @@ def config_for_cluster(cluster):
         }],
     }
 
-clusters = ["app.ci", "build01", "build02", "vsphere"]
+clusters = ["app.ci", "build01", "build02", "build03", "vsphere"]
 configs = dict(zip(clusters, [config_for_cluster(cluster) for cluster in clusters]))
 found = dict(zip(clusters, [False for cluster in clusters]))
 

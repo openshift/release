@@ -141,7 +141,7 @@ periodics:
       - /usr/bin/serviceaccount-secret-rotation-trigger
       env:
       - name: KUBECONFIG
-        value: /etc/build-farm-credentials/sa.config-updater.app.ci.config:/etc/build-farm-credentials/sa.config-updater.build01.config:/etc/build-farm-credentials/sa.config-updater.build02.config:/etc/build-farm-credentials/sa.config-updater.vsphere.config
+        value: /etc/build-farm-credentials/sa.config-updater.app.ci.config:/etc/build-farm-credentials/sa.config-updater.build01.config:/etc/build-farm-credentials/sa.config-updater.build02.config:/etc/build-farm-credentials/sa.config-updater.build03.config:/etc/build-farm-credentials/sa.config-updater.vsphere.config
       image: serviceaccount-secret-rotation-trigger:latest
       imagePullPolicy: Always
       name: ""
@@ -162,6 +162,8 @@ periodics:
           path: sa.config-updater.build01.config
         - key: sa.config-updater.build02.config
           path: sa.config-updater.build02.config
+        - key: sa.config-updater.build03.config
+          path: sa.config-updater.build03.config
         - key: sa.config-updater.vsphere.config
           path: sa.config-updater.vsphere.config
         secretName: build-farm-credentials
@@ -1191,6 +1193,44 @@ periodics:
   interval: 12h
   labels:
     ci.openshift.io/role: infra
+  name: periodic-openshift-release-master-build03-apply
+  spec:
+    containers:
+    - args:
+      - --config-dir=clusters/build-clusters/03_cluster
+      - --confirm=true
+      - --as=
+      - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+      command:
+      - applyconfig
+      image: applyconfig:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/build-farm-credentials
+        name: build-farm-credentials
+        readOnly: true
+    serviceAccountName: config-updater
+    volumes:
+    - name: build-farm-credentials
+      secret:
+        items:
+        - key: sa.config-updater.build03.config
+          path: kubeconfig
+        secretName: build-farm-credentials
+- agent: kubernetes
+  cluster: app.ci
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  interval: 12h
+  labels:
+    ci.openshift.io/role: infra
   name: periodic-openshift-release-master-vsphere-apply
   spec:
     containers:
@@ -1575,7 +1615,7 @@ periodics:
       - --dry-run=false
       env:
       - name: KUBECONFIG
-        value: /etc/build-farm-credentials/sa.config-updater.app.ci.config:/etc/build-farm-credentials/sa.config-updater.build01.config:/etc/build-farm-credentials/sa.config-updater.build02.config:/etc/build-farm-credentials/sa.config-updater.vsphere.config:/etc/build-farm-credentials/sa.config-updater.arm01.config:/etc/build-farm-credentials/sa.config-updater.hive.config
+        value: /etc/build-farm-credentials/sa.config-updater.app.ci.config:/etc/build-farm-credentials/sa.config-updater.build01.config:/etc/build-farm-credentials/sa.config-updater.build02.config:/etc/build-farm-credentials/sa.config-updater.build03.config:/etc/build-farm-credentials/sa.config-updater.vsphere.config:/etc/build-farm-credentials/sa.config-updater.arm01.config:/etc/build-farm-credentials/sa.config-updater.hive.config
       - name: HOME
         value: /tmp
       image: registry.ci.openshift.org/ci/ci-secret-generator:latest
@@ -1609,6 +1649,8 @@ periodics:
           path: sa.config-updater.build01.config
         - key: sa.config-updater.build02.config
           path: sa.config-updater.build02.config
+        - key: sa.config-updater.build03.config
+          path: sa.config-updater.build03.config
         - key: sa.config-updater.vsphere.config
           path: sa.config-updater.vsphere.config
         - key: sa.config-updater.arm01.config
@@ -1666,7 +1708,7 @@ periodics:
       - /usr/bin/ci-secret-bootstrap
       env:
       - name: KUBECONFIG
-        value: /etc/build-farm-credentials/sa.config-updater.app.ci.config:/etc/build-farm-credentials/sa.config-updater.build01.config:/etc/build-farm-credentials/sa.config-updater.build02.config:/etc/build-farm-credentials/sa.config-updater.vsphere.config:/etc/build-farm-credentials/sa.config-updater.arm01.config:/etc/build-farm-credentials/sa.config-updater.hive.config
+        value: /etc/build-farm-credentials/sa.config-updater.app.ci.config:/etc/build-farm-credentials/sa.config-updater.build01.config:/etc/build-farm-credentials/sa.config-updater.build02.config:/etc/build-farm-credentials/sa.config-updater.build03.config:/etc/build-farm-credentials/sa.config-updater.vsphere.config:/etc/build-farm-credentials/sa.config-updater.arm01.config:/etc/build-farm-credentials/sa.config-updater.hive.config
       image: registry.ci.openshift.org/ci/ci-secret-bootstrap:latest
       imagePullPolicy: Always
       name: ci-secret-bootstrap
@@ -1701,6 +1743,8 @@ periodics:
           path: sa.config-updater.build01.config
         - key: sa.config-updater.build02.config
           path: sa.config-updater.build02.config
+        - key: sa.config-updater.build03.config
+          path: sa.config-updater.build03.config
         - key: sa.config-updater.vsphere.config
           path: sa.config-updater.vsphere.config
         - key: sa.config-updater.arm01.config
