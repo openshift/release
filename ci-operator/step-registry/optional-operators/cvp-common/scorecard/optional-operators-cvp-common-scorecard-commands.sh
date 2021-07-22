@@ -42,5 +42,5 @@ if [ -f "${OPERATOR_DIR}/tests/scorecard/config.yaml" ]; then
     --namespace=${NAMESPACE} \
     --kubeconfig ${KUBECONFIG} \
     --output json \
-    "${OPERATOR_DIR}" > "${ARTIFACTS_DIR}"/scorecard-output-custom.json || true
+    "${OPERATOR_DIR}" > "${ARTIFACT_DIR}"/scorecard-output-custom.json || true
 fi
