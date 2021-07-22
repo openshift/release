@@ -111,6 +111,21 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: openshift-e2e-gcp
+- as: e2e-bastion-periodic
+  cluster: build01
+  cron: 0 6 * * *
+  steps:
+    test:
+    - as: e2e-bastion-periodic
+      commands: KUBECONFIG=$SHARED_DIR/kubeconfig FEATURES_ENVIRONMENT="typical-baremetal"
+        FEATURES="performance xt_u32 vrf sctp ovn" make functests-on-ci
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 4h0m0s
+    workflow: telco-bastion
 zz_generated_metadata:
   branch: master
   org: openshift-kni
