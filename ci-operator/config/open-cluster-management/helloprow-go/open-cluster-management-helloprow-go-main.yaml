@@ -3,6 +3,10 @@ base_images:
     name: builder
     namespace: open-cluster-management
     tag: go1.16-linux
+  open-cluster-management_builder_go1.15-linux-amd64:
+    name: builder
+    namespace: open-cluster-management
+    tag: go1.15-linux-amd64
   repo-brancher:
     name: repo-brancher
     namespace: ci
@@ -16,12 +20,12 @@ build_root:
 images:
 - dockerfile_path: Dockerfile.prow
   inputs:
-    builder-go1.16-linux:
+    open-cluster-management_builder_go1.15-linux-amd64:
       as:
       - registry.ci.openshift.org/open-cluster-management/builder:go1.15-linux-amd64
   to: helloprow-go
 promotion:
-  name: "2.3"
+  name: "2.4"
   namespace: open-cluster-management
 resources:
   '*':
@@ -29,35 +33,25 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: sleep-test
-  steps:
-    test:
-    - as: sleep
-      commands: |
-        sleep 86400
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-- as: fast-forward
+- as: sonar-pre-submit
   commands: |
-    git clone -b master https://github.com/openshift/release.git /tmp/release
-    repo-brancher \
-        --config-dir=/tmp/release/ci-operator/config/open-cluster-management/helloprow-go/ \
-        --username=acm-cicd \
-        --token-path=/etc/github/token \
-        --current-promotion-namespace=open-cluster-management \
-        --fast-forward \
-        --confirm \
-        --current-release=2.3 \
-        --future-release=2.4
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow sonar/go/prow
   container:
-    from: repo-brancher
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+- as: sonar-post-submit
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow sonar/go/prow
+  container:
+    from: src
   postsubmit: true
   secrets:
-  - mount_path: /etc/github
-    name: acm-cicd-github
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
 - as: e2e-cluster
   steps:
     dependencies:
@@ -115,6 +109,24 @@ tests:
       IMAGE_TAG: latest
       REGISTRY_ORG: open-cluster-management
     workflow: ocm-ci-image-mirror
+- as: fast-forward
+  commands: |
+    git clone -b master https://github.com/openshift/release.git /tmp/release
+    repo-brancher \
+        --fast-forward \
+        --confirm \
+        --config-dir=/tmp/release/ci-operator/config/open-cluster-management/helloprow-go/ \
+        --username=acm-cicd \
+        --token-path=/etc/github/token \
+        --current-promotion-namespace=open-cluster-management \
+        --current-release=2.4 \
+        --future-release=2.4
+  container:
+    from: repo-brancher
+  postsubmit: true
+  secrets:
+  - mount_path: /etc/github
+    name: acm-cicd-github
 zz_generated_metadata:
   branch: main
   org: open-cluster-management

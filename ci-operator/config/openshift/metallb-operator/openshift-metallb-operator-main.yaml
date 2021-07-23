@@ -3,11 +3,43 @@ base_images:
     name: "4.9"
     namespace: ocp
     tag: base
+  metallb:
+    name: "4.9"
+    namespace: ocp
+    tag: metallb
+  ocp_builder_rhel-8-golang-1.16-openshift-4.8:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.16-openshift-4.8
+  ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.16-openshift-4.9
+  operator-index:
+    name: redhat-operator-index
+    namespace: ci
+    tag: v4.8
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: golang-1.16
+images:
+- dockerfile_path: Dockerfile.openshift
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
+  to: metallb-operator
+operator:
+  bundles:
+  - dockerfile_path: bundleci.Dockerfile
+  substitutions:
+  - pullspec: quay.io/openshift/origin-metallb:4.9
+    with: pipeline:metallb
+  - pullspec: quay.io/openshift/origin-metallb-operator:4.9
+    with: pipeline:metallb-operator
 promotion:
   name: "4.9"
   namespace: ocp
@@ -22,10 +54,24 @@ tag_specification:
   name: "4.9"
   namespace: ocp
 tests:
-- as: e2e-aws
+- as: operator-e2e
   steps:
     cluster_profile: aws
-    workflow: openshift-e2e-aws
+    env:
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: openshift-metallb-operator
+      OO_PACKAGE: metallb-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: e2e
+      commands: |
+        OO_INSTALL_NAMESPACE=openshift-metallb-operator IS_OPENSHIFT=1 make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-aws
 zz_generated_metadata:
   branch: main
   org: openshift

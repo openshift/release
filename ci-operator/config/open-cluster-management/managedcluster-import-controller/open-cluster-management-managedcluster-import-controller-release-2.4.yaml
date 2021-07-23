@@ -1,0 +1,80 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+  open-cluster-management_builder_go1.15-linux:
+    name: builder
+    namespace: open-cluster-management
+    tag: go1.15-linux
+  open-cluster-management_builder_go1.16-linux:
+    name: builder
+    namespace: open-cluster-management
+    tag: go1.16-linux
+binary_build_commands: go build ./cmd/manager
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: open-cluster-management
+    tag: go1.16-linux
+images:
+- dockerfile_path: build/Dockerfile
+  from: base
+  inputs:
+    open-cluster-management_builder_go1.16-linux:
+      as:
+      - registry.ci.openshift.org/open-cluster-management/builder:go1.16-linux
+  to: managedcluster-import-controller
+promotion:
+  disabled: true
+  name: "2.4"
+  namespace: open-cluster-management
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 80m
+      memory: 200Mi
+tag_specification:
+  name: "4.8"
+  namespace: ocp
+tests:
+- as: sonarcloud
+  commands: |
+    export SELF="make -f /opt/build-harness/Makefile.prow"
+    make -f /opt/build-harness/Makefile.prow sonar/go/prow
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+- as: check
+  commands: make check
+  container:
+    from: src
+- as: unit
+  commands: make test
+  container:
+    from: src
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: managedcluster-import-controller
+    env:
+      IMAGE_REPO: managedcluster-import-controller
+      REGISTRY_ORG: open-cluster-management
+    workflow: ocm-ci-image-mirror
+- as: pr-merge-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: managedcluster-import-controller
+    env:
+      IMAGE_REPO: managedcluster-import-controller
+      REGISTRY_ORG: open-cluster-management
+    workflow: ocm-ci-image-mirror
+zz_generated_metadata:
+  branch: release-2.4
+  org: open-cluster-management
+  repo: managedcluster-import-controller

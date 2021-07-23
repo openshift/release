@@ -1,0 +1,44 @@
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: open-cluster-management
+    tag: go1.16-linux
+images:
+- dockerfile_path: build/Dockerfile
+  to: klusterlet-addon-operator
+promotion:
+  disabled: true
+  name: "2.4"
+  namespace: open-cluster-management
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 80m
+      memory: 200Mi
+tag_specification:
+  name: "4.8"
+  namespace: ocp
+tests:
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: klusterlet-addon-operator
+    env:
+      IMAGE_REPO: klusterlet-addon-operator
+      REGISTRY_ORG: open-cluster-management
+    workflow: ocm-ci-image-mirror
+- as: pr-merge-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: klusterlet-addon-operator
+    env:
+      IMAGE_REPO: klusterlet-addon-operator
+      REGISTRY_ORG: open-cluster-management
+    workflow: ocm-ci-image-mirror
+zz_generated_metadata:
+  branch: release-2.4
+  org: open-cluster-management
+  repo: klusterlet-addon-operator

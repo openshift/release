@@ -271,6 +271,21 @@ vault write auth/kubernetes/role/vault-secret-collection-manager \
   policies=vault-secret-collection-manager \
   ttl=1h
 
+vault policy write vault-subpath-proxy -<<EOH
+path "kv/data/*" {
+  capabilities = ["read"]
+}
+
+path "kv/metadata/*" {
+  capabilities = ["list"]
+}
+EOH
+vault write auth/kubernetes/role/vault-subpath-proxy \
+  bound_service_account_names=vault \
+  bound_service_account_namespaces=vault \
+  policies=vault-subpath-proxy \
+  ttl=1h
+
 # Make dptp members admins
 echo "Setting up admin policy"
 vault policy write admin -<<EOF
