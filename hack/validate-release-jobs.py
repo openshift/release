@@ -12,7 +12,7 @@ logger = logging.getLogger('validate-release-jobs')
 logger.setLevel(logging.INFO)
 
 release_definition_path = 'core-services/release-controller/_releases'
-job_definitions_path = 'ci-operator/jobs/openshift/release'
+job_definitions_paths = ['ci-operator/jobs/openshift/release','ci-operator/jobs/openshift/multiarch']
 
 
 def raise_on_duplicates(ordered_pairs):
@@ -61,17 +61,18 @@ def validate_jobs(data, definitions):
     for source, verification, name in data:
         logger.debug('Searching for job: %s', name)
         found = False
-        for key in definitions:
-            jobs = definitions[key]
-            if 'periodics' in jobs:
-                logger.debug('\tChecking: %s', key)
-                for job in jobs['periodics']:
-                    if job['name'] == name:
-                        logger.debug('\t\tFound')
-                        found = True
-                        break
-            if found:
-                break
+        for definition in definitions:
+            for key in definition:
+                jobs = definition[key]
+                if 'periodics' in jobs:
+                    logger.debug('\tChecking: %s', key)
+                    for job in jobs['periodics']:
+                        if job['name'] == name:
+                            logger.debug('\t\tFound')
+                            found = True
+                            break
+        if found:
+            break
         if not found:
             missing.append((source, verification, name))
     return missing
@@ -80,7 +81,10 @@ def validate_jobs(data, definitions):
 def main(git_repo_path):
     releases = read_release_definitions(os.path.join(git_repo_path, release_definition_path))
     job_data = get_job_data(releases)
-    job_definitions = read_job_definitions(os.path.join(git_repo_path, job_definitions_path))
+    job_definitions = []
+    for job_definitions_path in job_definitions_paths:
+        job_definition = read_job_definitions(os.path.join(git_repo_path, job_definitions_path))
+        job_definitions.append(job_definition)
     missing_jobs = validate_jobs(job_data, job_definitions)
 
     for source, verification, name in missing_jobs:
