@@ -2,45 +2,7 @@ postsubmits:
   open-cluster-management/submariner-addon:
   - agent: kubernetes
     branches:
-    - ^main$
-    cluster: build02
-    decorate: true
-    extra_refs:
-    - base_ref: master
-      org: openshift
-      repo: release
-    name: branch-ci-open-cluster-management-submariner-addon-main-fast-forward
-    spec:
-      containers:
-      - args:
-        - --config-dir=../../openshift/release/ci-operator/config/open-cluster-management/submariner-addon/
-        - --current-release=2.4
-        - --current-promotion-namespace=open-cluster-management
-        - --future-release=2.4
-        - --fast-forward
-        - --confirm
-        - --username=acm-cicd
-        - --token-path=/etc/github/token
-        command:
-        - repo-brancher
-        image: repo-brancher:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/github
-          name: acm-cicd-github
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: acm-cicd-github
-        secret:
-          secretName: acm-cicd-github
-  - agent: kubernetes
-    branches:
-    - ^main$
+    - ^release-2\.4$
     cluster: build02
     decorate: true
     decoration_config:
@@ -49,7 +11,7 @@ postsubmits:
       ci-operator.openshift.io/is-promotion: "true"
       ci-operator.openshift.io/prowgen-controlled: "true"
     max_concurrency: 1
-    name: branch-ci-open-cluster-management-submariner-addon-main-images
+    name: branch-ci-open-cluster-management-submariner-addon-release-2.4-images
     spec:
       containers:
       - args:
@@ -93,55 +55,50 @@ postsubmits:
           secretName: result-aggregator
   - agent: kubernetes
     branches:
-    - ^main$
+    - ^release-2\.4$
     cluster: build02
     decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-    name: branch-ci-open-cluster-management-submariner-addon-main-pr-merge-image-mirror
+    name: branch-ci-open-cluster-management-submariner-addon-release-2.4-publish
     spec:
       containers:
       - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=pr-merge-image-mirror
+        - -f
+        - /opt/build-harness/Makefile.prow
+        - osci/publish
         command:
-        - ci-operator
-        image: ci-operator:latest
+        - make
+        env:
+        - name: OSCI_COMPONENT_NAME
+          value: submariner-addon
+        - name: OSCI_COMPONENT_VERSION
+          value: 0.5.0
+        - name: OSCI_IMAGE_REMOTE_REPO_SRC
+          value: registry.ci.openshift.org/open-cluster-management
+        - name: SELF
+          value: make -f /opt/build-harness/Makefile.prow
+        image: registry.ci.openshift.org/open-cluster-management/builder:go1.16-linux
         imagePullPolicy: Always
         name: ""
         resources:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
+        - mountPath: /etc/github
+          name: acm-cicd-github
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: pull-secret
+      - name: acm-cicd-github
         secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
+          secretName: acm-cicd-github
   - agent: kubernetes
     branches:
-    - ^main$
+    - ^release-2\.4$
     cluster: build02
     decorate: true
     labels:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: branch-ci-open-cluster-management-submariner-addon-main-sonarcloud
+    name: branch-ci-open-cluster-management-submariner-addon-release-2.4-sonarcloud
     spec:
       containers:
       - args:
