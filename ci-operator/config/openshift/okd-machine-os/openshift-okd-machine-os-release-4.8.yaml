@@ -17,15 +17,19 @@ build_root:
     namespace: openshift
     tag: golang-1.15
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  inputs:
-    ocp_4.8_artifacts:
-      as:
-      - quay.io/openshift/origin-artifacts:4.8
-    ocp_4.8_mcd:
-      as:
-      - quay.io/openshift/origin-machine-config-operator:4.8
+- dockerfile_path: Dockerfile.ci
+  to: cosa-build
+- inputs:
+    cosa-build:
+      paths:
+      - destination_dir: .
+        source_path: /tmp/Dockerfile
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/okd-machine-os/manifests/
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/okd-machine-os/bootstrap/
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/okd-machine-os/extensions/
   to: machine-os-content
 promotion:
   name: "4.8"
