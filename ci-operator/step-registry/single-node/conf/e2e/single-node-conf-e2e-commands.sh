@@ -16,6 +16,8 @@ spec:
     matchLabels:
       pools.operator.machineconfiguration.openshift.io/master: ""
   kubeletConfig: 
+    shutdownGracePeriod: 600s
+    shutdownGracePeriodCriticalPods: 300s
     systemReserved:
       memory: 3Gi
 EOF
