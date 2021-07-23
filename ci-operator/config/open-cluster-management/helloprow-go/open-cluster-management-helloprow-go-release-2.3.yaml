@@ -3,6 +3,10 @@ base_images:
     name: builder
     namespace: open-cluster-management
     tag: go1.16-linux
+  open-cluster-management_builder_go1.15-linux-amd64:
+    name: builder
+    namespace: open-cluster-management
+    tag: go1.15-linux-amd64
 binary_build_commands: make build
 build_root:
   image_stream_tag:
@@ -12,12 +16,11 @@ build_root:
 images:
 - dockerfile_path: Dockerfile.prow
   inputs:
-    builder-go1.16-linux:
+    open-cluster-management_builder_go1.15-linux-amd64:
       as:
       - registry.ci.openshift.org/open-cluster-management/builder:go1.15-linux-amd64
   to: helloprow-go
 promotion:
-  disabled: true
   name: "2.3"
   namespace: open-cluster-management
 resources:
@@ -26,6 +29,25 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: sonar-pre-submit
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow sonar/go/prow
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+- as: sonar-post-submit
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow sonar/go/prow
+  container:
+    from: src
+  postsubmit: true
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
 - as: e2e-cluster
   steps:
     dependencies:

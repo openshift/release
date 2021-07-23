@@ -1,0 +1,112 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+  open-cluster-management_builder_go1.16-linux:
+    name: builder
+    namespace: open-cluster-management
+    tag: go1.16-linux
+binary_build_commands: make build --warn-undefined-variables
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: open-cluster-management
+    tag: go1.16-linux
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  inputs:
+    open-cluster-management_builder_go1.16-linux:
+      as:
+      - registry.ci.openshift.org/open-cluster-management/builder:go1.16-linux
+  to: multicloud-manager
+promotion:
+  disabled: true
+  name: "2.4"
+  namespace: open-cluster-management
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 100m
+      memory: 1Gi
+tag_specification:
+  name: "4.6"
+  namespace: ocp
+test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
+tests:
+- as: build
+  commands: |
+    true
+  container:
+    from: bin
+- as: verify
+  commands: |
+    make verify -k --warn-undefined-variables
+  container:
+    from: bin
+- as: verify-deps
+  commands: |
+    make verify-deps -k --warn-undefined-variables
+  container:
+    from: bin
+- as: unit
+  commands: |
+    make test --warn-undefined-variables
+  container:
+    from: test-bin
+- as: e2e
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        KUBECTL=oc
+        FOUNDATION_IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:multicloud-manager}
+        export KUBECTL FOUNDATION_IMAGE_NAME
+        make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: sonarcloud
+  steps:
+    test:
+    - as: test
+      commands: |
+        export SELF="make -f /opt/build-harness/Makefile.prow"
+        make -f /opt/build-harness/Makefile.prow sonar/go/prow
+      credentials:
+      - mount_path: /etc/sonarcloud/
+        name: acm-sonarcloud-token
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: multicloud-manager
+    env:
+      IMAGE_REPO: multicloud-manager
+      REGISTRY_ORG: open-cluster-management
+    workflow: ocm-ci-image-mirror
+- as: pr-merge-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: multicloud-manager
+    env:
+      IMAGE_REPO: multicloud-manager
+      IMAGE_TAG: 0.5.0
+      REGISTRY_ORG: open-cluster-management
+    workflow: ocm-ci-image-mirror
+zz_generated_metadata:
+  branch: release-2.4
+  org: open-cluster-management
+  repo: multicloud-operators-foundation

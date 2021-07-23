@@ -3,6 +3,10 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
+  open-cluster-management_builder_go1.16-linux:
+    name: builder
+    namespace: open-cluster-management
+    tag: go1.16-linux
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
@@ -12,9 +16,13 @@ build_root:
 images:
 - dockerfile_path: Dockerfile
   from: base
+  inputs:
+    open-cluster-management_builder_go1.16-linux:
+      as:
+      - registry.ci.openshift.org/open-cluster-management/builder:go1.16-linux
   to: multicloud-manager
 promotion:
-  name: "2.3"
+  name: "2.4"
   namespace: open-cluster-management
 resources:
   '*':
@@ -79,6 +87,24 @@ tests:
       resources:
         requests:
           cpu: 100m
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: multicloud-manager
+    env:
+      IMAGE_REPO: multicloud-manager
+      REGISTRY_ORG: open-cluster-management
+    workflow: ocm-ci-image-mirror
+- as: pr-merge-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: multicloud-manager
+    env:
+      IMAGE_REPO: multicloud-manager
+      IMAGE_TAG: latest
+      REGISTRY_ORG: open-cluster-management
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
   branch: main
   org: open-cluster-management
