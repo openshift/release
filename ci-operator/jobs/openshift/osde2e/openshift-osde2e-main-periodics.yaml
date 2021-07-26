@@ -3585,7 +3585,7 @@ periodics:
         secretName: osde2e-rosa-staging
 - agent: kubernetes
   cluster: build01
-  cron: '@daily'
+  cron: 0 0 12 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -3638,7 +3638,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
-  cron: '@daily'
+  cron: 0 0 12 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -3663,6 +3663,53 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --report-credentials-file=/etc/report/credentials
       - --target=osde2e-aro-e2e-latest-z
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
+  cron: '@midnight'
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: osde2e
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-osde2e-main-osde2e-aro-nightly-cleanup
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --target=osde2e-aro-nightly-cleanup
       command:
       - ci-operator
       image: ci-operator:latest
