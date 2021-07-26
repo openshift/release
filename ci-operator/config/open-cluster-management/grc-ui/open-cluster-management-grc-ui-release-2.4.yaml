@@ -3,6 +3,10 @@ base_images:
     name: builder
     namespace: open-cluster-management
     tag: nodejs14-linux
+  open-cluster-management_common-nodejs-parent_nodejs-14:
+    name: common-nodejs-parent
+    namespace: open-cluster-management
+    tag: nodejs-14
 binary_build_commands: make build
 build_root:
   image_stream_tag:
@@ -11,6 +15,10 @@ build_root:
     tag: nodejs14-linux
 images:
 - dockerfile_path: Dockerfile
+  inputs:
+    open-cluster-management_common-nodejs-parent_nodejs-14:
+      as:
+      - registry.ci.openshift.org/open-cluster-management/common-nodejs-parent:nodejs-14
   to: grc-ui
 - dockerfile_path: Dockerfile.e2etest
   to: grc-ui-tests
@@ -56,8 +64,10 @@ tests:
 - as: sonar-post-submit
   commands: |
     export SELF="make -f Makefile.prow"
+    make install
+    make lint
     make -f Makefile.prow sonar/js/jest-init
-    make -f Makefile.prow unit-tests
+    make unit-test
     make -f Makefile.prow sonar/js/prow
   container:
     from: src
@@ -97,7 +107,7 @@ tests:
     - as: publish
       commands: |-
         export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/open-cluster-management"
-        export OSCI_PUBLISH_DELAY="15"
+        export OSCI_PUBLISH_DELAY="0"
         export SELF="make -f Makefile.prow"
         make -f Makefile.prow osci/publish
       credentials:
@@ -116,13 +126,14 @@ tests:
     dependencies:
       SOURCE_IMAGE_REF: grc-ui-tests
     env:
-      IMAGE_REPO: grc-ui
+      IMAGE_REPO: grc-ui-tests
       REGISTRY_ORG: open-cluster-management
     test:
     - as: publish
       commands: |-
+        export OSCI_COMPONENT_NAME="grc-ui-tests"
         export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/open-cluster-management"
-        export OSCI_PUBLISH_DELAY="20"
+        export OSCI_PUBLISH_DELAY="5"
         export SELF="make -f Makefile.prow"
         make -f Makefile.prow osci/publish
       credentials:

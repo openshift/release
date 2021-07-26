@@ -17,7 +17,7 @@ fi
 # that libcurl doesn't recognize the uppercase variables).
 if test -f "${SHARED_DIR}/proxy-conf.sh"
 then
-	# shellcheck source=/dev/null
+	# shellcheck disable=SC1090
 	source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
@@ -25,7 +25,7 @@ fi
 # disconnected environments prior to 4.8.
 if test -f "${SHARED_DIR}/must-gather-image.sh"
 then
-	# shellcheck source=/dev/null
+	# shellcheck disable=SC1090
 	source "${SHARED_DIR}/must-gather-image.sh"
 else
 	MUST_GATHER_IMAGE=${MUST_GATHER_IMAGE:-""}

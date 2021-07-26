@@ -1,0 +1,22 @@
+workflow:
+  as: openshift-e2e-azure-ccm
+  steps:
+    pre:
+      - chain: ipi-azure-pre
+      - ref: ccm-conf-apply-feature-gate
+      - ref: storage-conf-csi-azure-disk
+      - ref: storage-conf-wait-for-csi-driver
+      - ref: storage-conf-wait-for-csi-migration
+    test:
+      - ref: openshift-e2e-test
+    post:
+      - chain: gather-core-dump
+      - chain: ipi-azure-post
+    env:
+      # for storage-conf-wait-for-csi-driver
+      CLUSTERCSIDRIVER: disk.csi.azure.com
+      TRUECONDITIONS: AzureDiskDriverControllerServiceControllerAvailable AzureDiskDriverNodeServiceControllerAvailable
+      TEST_CSI_DRIVER_MANIFEST: manifest-azure-disk.yaml
+  documentation: |-
+    The Openshift E2E Azure workflow using CCM as a primary mean to initialize nodes.
+    Executes the common end-to-end test suite on Azure to test updated cluster configuration.
