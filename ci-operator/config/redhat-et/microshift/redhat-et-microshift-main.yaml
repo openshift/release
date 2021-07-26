@@ -55,11 +55,10 @@ images:
     WORKDIR /alabama
 
     RUN mkdir -p ./microshift/linux_amd64 ./microshift/linux_arm64
-    
+
     USER root
 
     RUN dnf install openssh-clients jq python3 -y && python3 -m pip install awscli
-
   from: base
   inputs:
     bin:
@@ -97,6 +96,21 @@ tests:
     - as: test-smoke-deploy-infra
       commands: |
         #! /usr/bin/env bash
+        export HOME=/alabama/
+        mkdir -p $HOME/.ssh
+        # mock passwd and group files
+        (
+          exec 2>/dev/null
+          username="${NSS_USERNAME:-$(id -un)}"
+          uid="${NSS_UID:-$(id -u)}"
+
+          groupname="${NSS_GROUPNAME:-$(id -gn)}"
+          gid="${NSS_GID:-$(id -g)}"
+
+          echo "${username}:x:${uid}:${uid}:gecos:${HOME}:/bin/bash" > "${NSS_WRAPPER_PASSWD}"
+          echo "${groupname}:x:${gid}:" > "${NSS_WRAPPER_GROUP}"
+        )
+        export LD_PRELOAD=/usr/lib64/libnss_wrapper.so
 
         set -euo pipefail
         INSTANCE_ID=''
