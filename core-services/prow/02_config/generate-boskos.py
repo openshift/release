@@ -75,6 +75,9 @@ CONFIG = {
     },
     'hypershift-quota-slice': {
         'default': 15,
+    },
+    'ibmcloud-quota-slice': {
+        'default': 15,
     }
 }
 
