@@ -1,0 +1,82 @@
+base_images:
+  base:
+    name: "4.9"
+    namespace: ocp
+    tag: base
+  builder:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.16-openshift-4.9
+  operator-registry:
+    name: "4.8"
+    namespace: ocp
+    tag: operator-registry
+  os:
+    name: ubi
+    namespace: ocp
+    tag: "8"
+binary_build_commands: make build GOFLAGS=''
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.16-openshift-4.9
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  inputs:
+    builder:
+      as:
+      - builder
+  to: odf-operator
+operator:
+  bundles:
+  - as: fixed-dependencies
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/ocs-dev/odf-operator:latest
+    with: odf-operator
+promotion:
+  name: odf-4.9
+  namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.8"
+  namespace: ocp
+tests:
+- as: unit-tests
+  commands: |
+    export GOFLAGS=''; make test
+  container:
+    from: src
+- as: odf-operator-bundle-e2e-aws
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-fixed-dependencies
+    env:
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: openshift-storage
+      OO_PACKAGE: odf-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: tests
+      commands: |
+        export GOFLAGS=''; make test
+      dependencies:
+      - env: OO_INDEX
+        name: ci-index
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-aws
+zz_generated_metadata:
+  branch: main
+  org: red-hat-storage
+  repo: odf-operator
