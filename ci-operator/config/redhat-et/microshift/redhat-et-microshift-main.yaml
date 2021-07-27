@@ -50,23 +50,32 @@ images:
         source_path: /go/src/github.com/redhat-et/microshift/_output/bin/linux_arm64/microshift
   to: linux-arm64-4.7.0-0.microshift
 - dockerfile_literal: |
-    FROM registry.access.redhat.com/ubi8/ubi
+    FROM centos:7
+    RUN curl -sSL https://raw.githubusercontent.com/openshift/installer/master/images/libvirt/mock-nss.sh -o /usr/bin/mock-nss.sh && \
+              chmod +x /usr/bin/mock-nss.sh
+    RUN curl -sSL https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /usr/bin/yq && \
+        chmod +x /usr/bin/yq
+    RUN curl -sSL https://raw.githubusercontent.com/openshift/installer/master/images/libvirt/google-cloud-sdk.repo -o /etc/yum.repos.d/google-cloud-sdk.repo
+    RUN yum update -y && \
+        yum install --setopt=tsflags=nodocs -y \
+        genisoimage \
+        gettext \
+        google-cloud-sdk \
+        libvirt-client \
+        libvirt-libs \
+        nss_wrapper \
+        openssh-clients && \
+        yum clean all && rm -rf /var/cache/yum/*
 
-    RUN mkdir -p ./microshift/linux_amd64 ./microshift/linux_arm64
-
-    USER root
-
-    RUN dnf install openssh-clients jq python3 nss_wrapper -y
-    RUN python3 -m pip install awscli
+    RUN mkdir /output && chown 1000:1000 /output
+    RUN mkdir /output/.ssh && chmod 700 /output/.ssh && chown 1000:1000 /output/.ssh
+    RUN mkdir /output/.gcp && chmod 700 /output/.gcp && chown 1000:1000 /output/.gcp
+    USER 1000:1000
+    ENV PATH /bin
+    ENV HOME /output
+    WORKDIR /output
   from: base
-  inputs:
-    bin:
-      paths:
-      - destination_dir: ./microshift/linux_amd64/
-        source_path: /go/src/github.com/redhat-et/microshift/_output/bin/linux_amd64/microshift
-      - destination_dir: ./microshift/linux_arm64/
-        source_path: /go/src/github.com/redhat-et/microshift/_output/bin/linux_arm64/microshift
-  to: test-smoke-base
+  to: setup
 promotion:
   name: microshift
   namespace: microshift
@@ -89,101 +98,11 @@ tests:
 - as: run-smoke-tests
   steps:
     env:
-      AWS_DEFAULT_REGION: us-east-2
-      AWS_LAUNCH_TEMPLATE_ID: lt-0c7afc666d88ec6be
+      GOOGLE_COMPUTE_REGION: us-east1
+      GOOGLE_COMPUTE_ZONE: us-east1-a
+      GOOGLE_PROJECT_ID: openshift-gce-devel
     test:
-    - as: test-smoke-deploy-infra
-      commands: |
-        #! /usr/bin/env bash
-        set -xeuo pipefail
-
-        export NSS_WRAPPER_GROUP=/tmp/group \
-          NSS_WRAPPER_PASSWD=/tmp/passwd \
-          NSS_UID=1000 \
-          NSS_GID=1000 \
-          NSS_USERNAME=testuser \
-          NSS_GROUPNAME=testuser
-
-        cat <<EOF > /usr/bin/nss_wrapper.sh
-        #!/bin/bash
-        # mock passwd and group files
-        (
-          exec 2>/dev/null
-          username="${NSS_USERNAME:-$(id -un)}"
-          uid="${NSS_UID:-$(id -u)}"
-
-          groupname="${NSS_GROUPNAME:-$(id -gn)}"
-          gid="${NSS_GID:-$(id -g)}"
-
-          echo "${username}:x:${uid}:${uid}:gecos:${HOME}:/bin/bash" > "${NSS_WRAPPER_PASSWD}"
-          echo "${groupname}:x:${gid}:" > "${NSS_WRAPPER_GROUP}"
-        )
-
-        # wrap command
-        export LD_PRELOAD=/usr/lib64/libnss_wrapper.so
-        exec "$@"
-        EOF
-        chmod +x /usr/bin/nss_wrapper.sh
-
-        nss_wrapper.sh mkdir -p $HOME/.ssh
-        INSTANCE_ID=''
-        clean_up(){
-          printf ":: tearing down instance %s\n" $INSTANCE_ID
-          aws ec2 terminate-instances --instance-ids $INSTANCE_ID
-        }
-        trap clean_up EXIT
-
-        nss_wrapper.sh chmod 600 $HOME/.ssh
-        nss_wrapper.sh chmod 400 $HOME/.ssh/aws.pem
-
-        printf ":: creating instance"
-        INSTANCE="$(aws ec2 run-instances --launch-template LaunchTemplateId=$AWS_LAUNCH_TEMPLATE_ID \
-                    --tag-specifications="ResourceType=instance,
-                        Tags=[
-                          {Key=Name,Value=${JOB_NAME:=openshift-release-ci}},
-                          {Key=PULL_SHA,Value=${PULL_PULL_SHA:-' '}},
-                          {Key=NAMESPACE,Value=${NAMESPACE:-' '}},
-                          {Key=PROW_JOB_ID,Value=${PROW_JOB_ID:-' '}}]")" || exit 1
-        INSTANCE_ID="$(jq -r ".Instances[0].InstanceId" <<< $INSTANCE)"
-        printf ":: instance created, waiting for state==Running, id: %s\n" $INSTANCE_ID
-
-        aws ec2 wait instance-running --instance-ids "$INSTANCE_ID"
-
-        INSTANCE="$(aws ec2 describe-instances --instance-ids "$INSTANCE_ID")"
-        PUB_DNS="$(jq -r '.Reservations[0].Instances[0].NetworkInterfaces[0].Association.PublicDnsName' <<< "$INSTANCE")"
-
-        printf "shelling into instance [%s]\n" $INSTANCE_ID
-        start=$(date +%s)
-        timeout=120
-        printf ":: attempting ssh connection for %s seconds" $timeout
-        until nss_wrapper.sh ssh -o "StrictHostKeyChecking no" -t -vv -i $HOME/.ssh/aws.pem "ec2-user@$PUB_DNS" "echo Hello, AWS!"; do
-          sleep 3
-          passed=$(( $(date +%s) - start ))
-          [ $passed -ge $timeout ] && printf ":: ssh connection attempts timed out (%s seconds)\n" $passed >&2 && exit 1
-        done
-        printf ":: SSH succeeded!\n"
-      credentials:
-      - mount_path: /alabama/.ssh/
-        name: microshift-aws-ssh-access-pem
-        namespace: test-credentials
-      - mount_path: /alabama/.aws/
-        name: microshift-aws-access-credentials
-        namespace: test-credentials
-      - mount_path: /alabama/.subscription-manager/
-        name: microshift-dependency-access-credentials
-        namespace: test-credentials
-      dependencies:
-      - env: TEST_SMOKE_BASE
-        name: pipeline:test-smoke-base
-      env:
-      - name: AWS_DEFAULT_REGION
-      - name: AWS_LAUNCH_TEMPLATE_ID
-      from: test-smoke-base
-      grace_period: 2m0s
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
+    - ref: redhat-et-microshift-gcp
 zz_generated_metadata:
   branch: main
   org: redhat-et
