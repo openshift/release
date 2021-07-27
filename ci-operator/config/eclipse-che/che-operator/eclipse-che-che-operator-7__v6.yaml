@@ -10,6 +10,10 @@ base_images:
 build_root:
   project_image:
     dockerfile_path: .ci/openshift-ci/Dockerfile
+operator:
+  bundles:
+  - context_dir: bundle/stable-all-namespaces/eclipse-che-preview-openshift
+    dockerfile_path: bundle.Dockerfile
 resources:
   '*':
     limits:
@@ -39,6 +43,36 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- as: che-all-namespaces-installation
+  steps:
+    cluster_profile: gcp
+    env:
+      OO_CHANNEL: stable-all-namespaces
+      OO_INSTALL_NAMESPACE: openshift-operators
+      OO_PACKAGE: eclipse-che-preview-openshift
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: che-all-namespaces-installation
+      cli: latest
+      commands: |
+        echo -e "[INFO] Test script content"
+        cat .ci/oci-stable-all-namespaces.sh
+
+        /bin/bash .ci/oci-stable-all-namespaces.sh
+      dependencies:
+      - env: CI_CHE_OPERATOR_IMAGE
+        name: che-operator-image
+      env:
+      - name: OO_CHANNEL
+      - name: OO_INSTALL_NAMESPACE
+      - name: OO_PACKAGE
+      - name: OO_TARGET_NAMESPACES
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-gcp
 zz_generated_metadata:
   branch: "7"
   org: eclipse-che
