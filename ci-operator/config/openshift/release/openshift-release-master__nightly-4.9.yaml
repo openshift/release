@@ -51,6 +51,10 @@ base_images:
     name: "4.9"
     namespace: ocp
     tag: libvirt-installer
+  openstack-installer:
+    name: "4.9"
+    namespace: ocp
+    tag: openstack-installer
   upi-installer:
     name: "4.9"
     namespace: ocp
@@ -339,6 +343,17 @@ tests:
     - chain: ipi-gcp-pre
     - ref: fips-check
     workflow: openshift-e2e-gcp
+- as: e2e-openstack-fips
+  interval: 48h
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      FIPS_ENABLED: "true"
+      TEST_SUITE: experimental/reliability/minimal
+    pre:
+    - chain: ipi-openstack-pre
+    - ref: fips-check
+    workflow: openshift-e2e-openstack-ipi
 - as: console-aws
   interval: 48h
   steps:
