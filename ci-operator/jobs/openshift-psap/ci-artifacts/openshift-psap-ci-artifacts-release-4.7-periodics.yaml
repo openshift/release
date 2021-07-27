@@ -1,7 +1,7 @@
 periodics:
 - agent: kubernetes
   cluster: build01
-  cron: 0 */23 * * *
+  cron: 0 1 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -11,7 +11,6 @@ periodics:
     repo: ci-artifacts
   labels:
     ci-operator.openshift.io/prowgen-controlled: "true"
-    job-release: "4.7"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-psap-ci-artifacts-release-4.7-gpu-operator-e2e-162
   reporter_config:
@@ -29,11 +28,10 @@ periodics:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/gpu-operator-e2e-162-cluster-profile
       - --target=gpu-operator-e2e-162
       command:
       - ci-operator
@@ -44,16 +42,14 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/gpu-operator-e2e-162-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/hive-hive-credentials
+        name: hive-hive-credentials
         readOnly: true
       - mountPath: /etc/pull-secret
         name: pull-secret
@@ -63,20 +59,12 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-aws
+    - name: hive-hive-credentials
+      secret:
+        secretName: hive-hive-credentials
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -85,7 +73,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
-  cron: 0 */23 * * *
+  cron: 0 2 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -95,7 +83,6 @@ periodics:
     repo: ci-artifacts
   labels:
     ci-operator.openshift.io/prowgen-controlled: "true"
-    job-release: "4.7"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-psap-ci-artifacts-release-4.7-gpu-operator-e2e-170
   reporter_config:
@@ -113,11 +100,10 @@ periodics:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/gpu-operator-e2e-170-cluster-profile
       - --target=gpu-operator-e2e-170
       command:
       - ci-operator
@@ -128,16 +114,14 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/gpu-operator-e2e-170-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/hive-hive-credentials
+        name: hive-hive-credentials
         readOnly: true
       - mountPath: /etc/pull-secret
         name: pull-secret
@@ -147,20 +131,12 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-aws
+    - name: hive-hive-credentials
+      secret:
+        secretName: hive-hive-credentials
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -169,7 +145,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
-  cron: 0 */23 * * *
+  cron: 0 0 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -179,7 +155,6 @@ periodics:
     repo: ci-artifacts
   labels:
     ci-operator.openshift.io/prowgen-controlled: "true"
-    job-release: "4.7"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-psap-ci-artifacts-release-4.7-gpu-operator-e2e-master
   reporter_config:
@@ -197,11 +172,10 @@ periodics:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/gpu-operator-e2e-master-cluster-profile
       - --target=gpu-operator-e2e-master
       command:
       - ci-operator
@@ -212,16 +186,14 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/gpu-operator-e2e-master-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/hive-hive-credentials
+        name: hive-hive-credentials
         readOnly: true
       - mountPath: /etc/pull-secret
         name: pull-secret
@@ -231,20 +203,12 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-aws
+    - name: hive-hive-credentials
+      secret:
+        secretName: hive-hive-credentials
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -264,7 +228,6 @@ periodics:
   labels:
     ci-operator.openshift.io/prowgen-controlled: "true"
     ci-operator.openshift.io/variant: sro
-    job-release: "4.7"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-psap-ci-artifacts-release-4.7-sro-e2e-master
   reporter_config:
@@ -282,11 +245,10 @@ periodics:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-master-cluster-profile
       - --target=e2e-master
       - --variant=sro
       command:
@@ -298,16 +260,14 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-master-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/hive-hive-credentials
+        name: hive-hive-credentials
         readOnly: true
       - mountPath: /etc/pull-secret
         name: pull-secret
@@ -317,20 +277,12 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-aws
+    - name: hive-hive-credentials
+      secret:
+        secretName: hive-hive-credentials
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
