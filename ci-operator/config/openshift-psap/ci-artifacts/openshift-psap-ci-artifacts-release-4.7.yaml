@@ -12,12 +12,6 @@ images:
 - dockerfile_path: build/Dockerfile
   from: os
   to: ci-artifacts
-releases:
-  latest:
-    candidate:
-      product: ocp
-      stream: nightly
-      version: "4.7"
 resources:
   '*':
     limits:
@@ -27,12 +21,17 @@ resources:
       memory: 2Gi
 tests:
 - as: gpu-operator-e2e-170
-  cron: 0 */23 * * *
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h30m0s
+    version: "4.7"
+  cron: 0 2 * * *
   steps:
-    cluster_profile: aws
     test:
     - as: nightly
-      cli: latest
       commands: run gpu-operator test_operatorhub 1.7.1 v1.7
       credentials:
       - mount_path: /var/run/psap-entitlement-secret
@@ -43,14 +42,19 @@ tests:
         requests:
           cpu: 2000m
           memory: 2Gi
-    workflow: ipi-aws
+    workflow: generic-claim
 - as: gpu-operator-e2e-162
-  cron: 0 */23 * * *
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h30m0s
+    version: "4.7"
+  cron: 0 1 * * *
   steps:
-    cluster_profile: aws
     test:
     - as: nightly
-      cli: latest
       commands: run gpu-operator test_operatorhub 1.6.2 stable
       credentials:
       - mount_path: /var/run/psap-entitlement-secret
@@ -61,14 +65,19 @@ tests:
         requests:
           cpu: 2000m
           memory: 2Gi
-    workflow: ipi-aws
+    workflow: generic-claim
 - as: gpu-operator-e2e-master
-  cron: 0 */23 * * *
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h30m0s
+    version: "4.7"
+  cron: 0 0 * * *
   steps:
-    cluster_profile: aws
     test:
     - as: nightly
-      cli: latest
       commands: run gpu-operator test_master_branch
       credentials:
       - mount_path: /var/run/psap-entitlement-secret
@@ -79,7 +88,7 @@ tests:
         requests:
           cpu: 2000m
           memory: 2Gi
-    workflow: ipi-aws
+    workflow: generic-claim
 zz_generated_metadata:
   branch: release-4.7
   org: openshift-psap

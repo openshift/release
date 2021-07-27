@@ -12,12 +12,6 @@ images:
 - dockerfile_path: build/Dockerfile
   from: os
   to: ci-artifacts
-releases:
-  latest:
-    candidate:
-      product: ocp
-      stream: nightly
-      version: "4.8"
 resources:
   '*':
     limits:
@@ -27,12 +21,17 @@ resources:
       memory: 2Gi
 tests:
 - as: gpu-operator-e2e-master
-  cron: 0 */23 * * *
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h30m0s
+    version: "4.8"
+  cron: 0 23 * * *
   steps:
-    cluster_profile: aws
     test:
     - as: nightly
-      cli: latest
       commands: run gpu-operator test_master_branch
       credentials:
       - mount_path: /var/run/psap-entitlement-secret
@@ -43,7 +42,7 @@ tests:
         requests:
           cpu: 2000m
           memory: 2Gi
-    workflow: ipi-aws
+    workflow: generic-claim
 zz_generated_metadata:
   branch: release-4.8
   org: openshift-psap
