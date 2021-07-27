@@ -4,10 +4,14 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-if [[ "${CONFIG_TYPE}" != "byon" ]]; then
-    echo "Skipping step due to CONFIG_TYPE not being byon."
+case "$CONFIG_TYPE" in
+  byon|proxy)
+    ;;
+  *)
+    echo "Skipping step due to CONFIG_TYPE not being byon or proxy."
     exit 0
-fi
+    ;;
+esac
 
 export OS_CLIENT_CONFIG_FILE=${SHARED_DIR}/clouds.yaml
 CLUSTER_NAME=$(<"${SHARED_DIR}"/CLUSTER_NAME)
@@ -34,8 +38,9 @@ tar -czC "/tmp" -f "/tmp/squid-logs.tar.gz" squid-logs/
 EOF
 $SCP_CMD ${BASTION_USER}@${BASTION_FIP}:/tmp/squid-logs.tar.gz ${ARTIFACT_DIR}
 
->&2 echo "Starting the server cleanup for cluster name '$CLUSTER_NAME'"
-openstack server delete "bastionproxy-$CLUSTER_NAME" || >&2 echo "Failed to delete server bastionproxy-$CLUSTER_NAME"
-openstack security group delete "$CLUSTER_NAME" || >&2 echo "Failed to delete security group $CLUSTER_NAME"
-openstack keypair delete "$CLUSTER_NAME" || >&2 echo "Failed to delete keypair $CLUSTER_NAME"
+>&2 echo "Starting the server cleanup for cluster '$CLUSTER_NAME'"
+openstack server delete --wait "bastionproxy-${CLUSTER_NAME}-${CONFIG_TYPE}" || >&2 echo "Failed to delete server bastionproxy-${CLUSTER_NAME}-${CONFIG_TYPE}"
+openstack security group delete "bastionproxy-${CLUSTER_NAME}-${CONFIG_TYPE}" || >&2 echo "Failed to delete security group bastionproxy-${CLUSTER_NAME}-${CONFIG_TYPE}"
+openstack keypair delete "bastionproxy-${CLUSTER_NAME}-${CONFIG_TYPE}" || >&2 echo "Failed to delete keypair bastionproxy-${CLUSTER_NAME}-${CONFIG_TYPE}"
+openstack floating ip delete ${BASTION_FIP} || >&2 echo "Failed to delete floating IP ${BASTION_FIP}"
 >&2 echo 'Cleanup done.'
