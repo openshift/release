@@ -14,6 +14,7 @@ images:
   from: base
   to: work
 promotion:
+  disabled: true
   name: "2.4"
   namespace: open-cluster-management
 resources:
@@ -23,11 +24,33 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: "4.6"
-  namespace: ocp
 test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
+tests:
+- as: build
+  commands: |
+    true
+  container:
+    from: bin
+- as: verify
+  commands: |
+    make verify -k --warn-undefined-variables
+  container:
+    from: bin
+- as: verify-deps
+  commands: |
+    make verify-deps -k --warn-undefined-variables
+  container:
+    from: bin
+- as: unit
+  commands: |
+    make test-unit --warn-undefined-variables
+  container:
+    from: test-bin
+- as: integration
+  commands: make test-integration
+  container:
+    from: test-bin
 zz_generated_metadata:
-  branch: main
+  branch: release-2.4
   org: open-cluster-management
   repo: work
