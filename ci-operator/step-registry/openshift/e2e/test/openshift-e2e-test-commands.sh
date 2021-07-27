@@ -215,7 +215,7 @@ function suite() {
         TESTS="$(openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")"
         echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests
         echo "Skipping tests:"
-        echo "${TESTS}" | grep "${TEST_SKIPS}"
+        echo "${TESTS}" | grep "${TEST_SKIPS}" || { exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS regex:'; echo "$TEST_SKIPS"; return $exit_code; }
         TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
     fi
 
