@@ -7,6 +7,30 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.16-openshift-4.9
+  driver-operand:
+    namespace: "ocp"
+    name: "aws-efs-csi-driver"
+    tag: "4.9"
+  provisioner-operand:
+    tag: "4.9"
+    namespace: ocp
+    name: "csi-external-provisioner"
+  registrar-operand:
+    tag: "4.9"
+    namespace: ocp
+    name: "csi-node-driver-registrar"
+  livenessprobe-operand:
+    tag: "4.9"
+    namespace: ocp
+    name: "csi-livenessprobe"
+  proxy-operand:
+    tag: "4.9"
+    namespace: ocp
+    name: "kube-rbac-proxy"
+  operator-index:
+    namespace: "ci"
+    name: "redhat-operator-index"
+    tag: "v4.9"
 binary_build_commands: make
 build_root:
   image_stream_tag:
@@ -34,6 +58,26 @@ resources:
 tag_specification:
   name: "4.9"
   namespace: ocp
+operator:
+  bundles:
+  - as: aws-efs-csi-driver-operator-bundle
+    dockerfile_path: "config/bundle.Dockerfile"
+    context_dir: "config"
+    base_index: "operator-index"
+    update_graph: "replaces"
+  substitutions:
+  - pullspec: "quay.io/openshift/origin-aws-efs-csi-driver:latest"
+    with: "pipeline:driver-operand"
+  - pullspec: "quay.io/openshift/origin-csi-external-provisioner:latest"
+    with: "pipeline:provisioner-operand"
+  - pullspec: "quay.io/openshift/origin-csi-node-driver-registrar:latest"
+    with: "pipeline:registrar-operand"
+  - pullspec: "quay.io/openshift/origin-csi-livenessprobe:latest"
+    with: "pipeline:livenessprobe-operand"
+  - pullspec: "quay.io/openshift/origin-kube-rbac-proxy:latest"
+    with: "pipeline:proxy-operand"
+  - pullspec: "quay.io/openshift/origin-aws-efs-csi-driver-operator:latest"
+    with: "pipeline:aws-efs-csi-driver-operator"
 tests:
 - as: unit
   commands: make test
@@ -43,6 +87,25 @@ tests:
   commands: make verify
   container:
     from: src
+- as: "operator-e2e"
+  steps:
+    workflow: "optional-operators-ci-aws"
+    cluster_profile: "aws"
+    env:
+      OO_CHANNEL: "4.9"
+      OO_INSTALL_NAMESPACE: "openshift-cluster-csi-drivers"
+      OO_PACKAGE: "aws-efs-csi-driver-operator"
+      OO_TARGET_NAMESPACES: '!install'
+    dependencies:
+      OO_INDEX: "aws-efs-csi-driver-operator-bundle" # if the bundle being tested is named, update the dependency to match
+    test:
+    - as: "e2e"
+      from: "src"               # the end-to-end tests run in the source repository
+      commands: "make test-e2e" # the commands to run end-to-end tests
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 zz_generated_metadata:
   branch: master
   org: openshift
