@@ -3,10 +3,6 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  open-cluster-management_builder_go1.15-linux:
-    name: builder
-    namespace: open-cluster-management
-    tag: go1.15-linux
   open-cluster-management_builder_go1.16-linux:
     name: builder
     namespace: open-cluster-management
@@ -40,15 +36,15 @@ tag_specification:
   name: "4.8"
   namespace: ocp
 tests:
-- as: sonarcloud
-  commands: |
-    export SELF="make -f /opt/build-harness/Makefile.prow"
-    make -f /opt/build-harness/Makefile.prow sonar/go/prow
-  container:
-    from: src
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
+#- as: sonarcloud
+#  commands: |
+#    export SELF="make -f /opt/build-harness/Makefile.prow"
+#    make -f /opt/build-harness/Makefile.prow sonar/go/prow
+#  container:
+#    from: src
+#  secrets:
+#  - mount_path: /etc/sonarcloud/
+#    name: acm-sonarcloud-token
 - as: check
   commands: make check
   container:
@@ -57,23 +53,23 @@ tests:
   commands: make test
   container:
     from: src
-- as: pr-image-mirror
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: idp-mgmt-operator
-    env:
-      IMAGE_REPO: idp-mgmt-operator
-      REGISTRY_ORG: identitatem
-    workflow: ocm-ci-image-mirror
-- as: pr-merge-image-mirror
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: idp-mgmt-operator
-    env:
-      IMAGE_REPO: idp-mgmt-operator
-      REGISTRY_ORG: identitatem
-    workflow: ocm-ci-image-mirror
+#- as: pr-image-mirror
+#  steps:
+#    dependencies:
+#      SOURCE_IMAGE_REF: idp-mgmt-operator
+#    env:
+#      IMAGE_REPO: idp-mgmt-operator
+#      REGISTRY_ORG: identitatem
+#    workflow: ocm-ci-image-mirror
+#- as: pr-merge-image-mirror
+#  postsubmit: true
+#  steps:
+#    dependencies:
+#      SOURCE_IMAGE_REF: idp-mgmt-operator
+#    env:
+#      IMAGE_REPO: idp-mgmt-operator
+#      REGISTRY_ORG: identitatem
+#    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
   branch: release-0.1
   org: identitatem
