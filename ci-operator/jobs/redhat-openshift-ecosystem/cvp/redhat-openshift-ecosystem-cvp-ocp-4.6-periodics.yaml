@@ -6,14 +6,13 @@ periodics:
   decoration_config:
     skip_cloning: true
   extra_refs:
-  - base_ref: ocp-4.8
-    org: redhat-operator-ecosystem
+  - base_ref: ocp-4.6
+    org: redhat-openshift-ecosystem
     repo: cvp
   labels:
     ci-operator.openshift.io/prowgen-controlled: "true"
-    job-release: "4.8"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-redhat-operator-ecosystem-cvp-ocp-4.8-cvp-common-aws
+  name: periodic-ci-redhat-openshift-ecosystem-cvp-ocp-4.6-cvp-common-aws
   spec:
     containers:
     - args:
@@ -66,61 +65,6 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws-cpaas
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build01
-  cron: '@yearly'
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: ocp-4.8
-    org: redhat-operator-ecosystem
-    repo: cvp
-  labels:
-    ci-operator.openshift.io/prowgen-controlled: "true"
-    job-release: "4.8"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-redhat-operator-ecosystem-cvp-ocp-4.8-probe
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=probe
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
