@@ -3,8 +3,6 @@ set -euo pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-mock-nss.sh 'id'
-
 GOOGLE_PROJECT_ID="us-east1"
 GOOGLE_COMPUTE_REGION="us-east1-a"
 GOOGLE_COMPUTE_ZONE="openshift-gce-devel"
@@ -13,6 +11,7 @@ INSTANCE_PREFIX="microshift-release-ci-${NAMESPACE}-${JOB_NAME_HASH}"
 
 mkdir -p "${HOME}"/.ssh
 chmod 0700 "${HOME}"/.ssh
+
 mock-nss.sh
 
 # gcloud compute will use this key rather than create a new one
