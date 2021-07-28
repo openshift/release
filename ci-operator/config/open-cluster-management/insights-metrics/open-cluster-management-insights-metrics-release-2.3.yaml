@@ -13,32 +13,40 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  repo-brancher:
-    name: repo-brancher
-    namespace: ci
-    tag: latest
 images:
 - dockerfile_path: Dockerfile
   from: base
   to: insights-metrics
 promotion:
+  disabled: "true"
   name: "2.3"
   namespace: open-cluster-management
 tests:
-- as: fast-forward
-  commands: |
-    git clone -b master https://github.com/openshift/release.git /tmp/release
-    repo-brancher --fast-forward --confirm \
-        --config-dir=/tmp/release/ci-operator/config/open-cluster-management/insights-metrics/ \
-        --username=acm-cicd --token-path=/etc/github/token \
-        --current-promotion-namespace=open-cluster-management \
-        --current-release=2.3 --future-release=2.3
-  container:
-    from: repo-brancher
+- as: publish
   postsubmit: true
-  secrets:
-  - mount_path: /etc/github
-    name: acm-cicd-github
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: insights-metrics
+    env:
+      IMAGE_REPO: insights-metrics
+      REGISTRY_ORG: open-cluster-management
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/open-cluster-management"
+        export SELF="make -f Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 - as: sonar-pre-submit
   commands: |
     export SELF="make -f Makefile.prow"
