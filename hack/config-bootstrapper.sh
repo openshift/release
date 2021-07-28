@@ -2,10 +2,10 @@
 set -euo pipefail
 
 dir=$(realpath "$(dirname "${BASH_SOURCE}")/..")
-roe_release_dir="${dir}/../../redhat-operator-ecosystem/release"
+roe_release_dir="${dir}/../../redhat-openshift-ecosystem/release"
 
 if ! [[ -d "${roe_release_dir}" ]]; then
-  echo "You need to also have a clone of redhat-operator-ecosystem/release in ${roe_release_dir}"
+  echo "You need to also have a clone of redhat-openshift-ecosystem/release in ${roe_release_dir}"
   exit 1
 fi
 
