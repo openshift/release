@@ -14,8 +14,7 @@ images:
   from: base
   to: registration
 promotion:
-  disabled: true
-  name: "2.3"
+  name: "2.4"
   namespace: open-cluster-management
 resources:
   '*':
@@ -28,66 +27,6 @@ tag_specification:
   name: "4.6"
   namespace: ocp
 test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
-tests:
-- as: build
-  commands: |
-    true
-  container:
-    from: bin
-- as: verify
-  commands: |
-    make verify -k --warn-undefined-variables
-  container:
-    from: bin
-- as: verify-deps
-  commands: |
-    make verify-deps -k --warn-undefined-variables
-  container:
-    from: bin
-- as: unit
-  commands: |
-    make test-unit --warn-undefined-variables
-  container:
-    from: test-bin
-- as: integration
-  commands: make test-integration
-  container:
-    from: test-bin
-- as: e2e
-  steps:
-    cluster_profile: aws
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        KUBECTL=oc
-        IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:registration}
-        export KUBECTL IMAGE_NAME
-        make test-e2e
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
-- as: sonar-pre-submit
-  commands: |
-    export SELF="make -f /opt/build-harness/Makefile.prow"
-    make -f /opt/build-harness/Makefile.prow sonar/go/prow
-  container:
-    from: src
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
-- as: sonar-post-submit
-  commands: |
-    export SELF="make -f /opt/build-harness/Makefile.prow"
-    make -f /opt/build-harness/Makefile.prow sonar/go/prow
-  container:
-    from: src
-  postsubmit: true
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
 zz_generated_metadata:
   branch: main
   org: open-cluster-management

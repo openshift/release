@@ -12,12 +12,6 @@ images:
 - dockerfile_path: build/Dockerfile
   from: os
   to: ci-artifacts
-releases:
-  latest:
-    candidate:
-      product: ocp
-      stream: nightly
-      version: "4.8"
 resources:
   '*':
     limits:
@@ -27,18 +21,23 @@ resources:
       memory: 2Gi
 tests:
 - as: operator-e2e-master
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h30m0s
+    version: "4.8"
   steps:
-    cluster_profile: aws
     test:
     - as: presubmit
-      cli: latest
       commands: run nfd-operator test_master_branch
       from: ci-artifacts
       resources:
         requests:
           cpu: 2000m
           memory: 2Gi
-    workflow: ipi-aws
+    workflow: generic-claim
 zz_generated_metadata:
   branch: master
   org: openshift-psap
