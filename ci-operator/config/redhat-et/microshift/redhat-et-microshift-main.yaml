@@ -66,14 +66,13 @@ images:
         nss_wrapper \
         openssh-clients && \
         yum clean all && rm -rf /var/cache/yum/*
-
-    RUN mkdir /output && chown 1000:1000 /output
-    RUN mkdir /output/.ssh && chmod 700 /output/.ssh && chown 1000:1000 /output/.ssh
-    RUN mkdir /output/.gcp && chmod 700 /output/.gcp && chown 1000:1000 /output/.gcp
-    USER 1000:1000
+    WORKDIR /tmp/
+    ENV HOME /tmp
     ENV PATH /bin
-    ENV HOME /output
-    WORKDIR /output
+    RUN mkdir ./secret && chown 1000:1000 ./secret
+    RUN mkdir ./secret/.gcp && chmod 700 ./secret/.gcp && chown 1000:1000 ./secret/.gcp
+    RUN mkdir ./secret/.ssh && chmod 700 ./secret/.ssh && chown 1000:1000 ./secret/.ssh
+    USER 1000:1000
   from: base
   to: setup
 promotion:
@@ -101,6 +100,13 @@ tests:
       GOOGLE_COMPUTE_REGION: us-east1
       GOOGLE_COMPUTE_ZONE: us-east1-a
       GOOGLE_PROJECT_ID: openshift-gce-devel
+    credentials:
+    - name: microshift-gcp-ssh-credentials
+      namespace: test-credentials
+      mount_path: /alabama/secret/.ssh/
+    - name: microshift-e2e-gcp-credentials
+      namespace: test-credentials
+      mount_path: /alabama/secret/.gcp/
     test:
     - ref: redhat-et-microshift-gcp
 zz_generated_metadata:

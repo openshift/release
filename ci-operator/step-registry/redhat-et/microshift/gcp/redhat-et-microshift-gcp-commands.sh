@@ -20,7 +20,7 @@ echo 'ServerAliveInterval 30' | tee -a "${HOME}"/.ssh/config
 echo 'ServerAliveCountMax 1200' | tee -a "${HOME}"/.ssh/config
 chmod 0600 "${HOME}"/.ssh/config
 
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud auth activate-service-account --quiet --key-file ""
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud auth activate-service-account --quiet --key-file "$HOME/.ssh/google_compute_engine"
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
