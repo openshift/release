@@ -2,7 +2,7 @@
 set -exuo pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-
+sleep 10000000000
 GOOGLE_PROJECT_ID="us-east1"
 GOOGLE_COMPUTE_REGION="us-east1-a"
 GOOGLE_COMPUTE_ZONE="openshift-gce-devel"
