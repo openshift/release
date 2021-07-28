@@ -3,7 +3,7 @@ set -euo pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-echo "`id`"
+mock-nss.sh 'id'
 
 GOOGLE_PROJECT_ID="us-east1"
 GOOGLE_COMPUTE_REGION="us-east1-a"
