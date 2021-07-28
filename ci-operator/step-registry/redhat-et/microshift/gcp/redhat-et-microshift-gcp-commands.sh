@@ -1,5 +1,5 @@
 #!/bin/bash
-set -euo pipefail
+set -exuo pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
@@ -8,9 +8,6 @@ GOOGLE_COMPUTE_REGION="us-east1-a"
 GOOGLE_COMPUTE_ZONE="openshift-gce-devel"
 
 INSTANCE_PREFIX="microshift-release-ci-${NAMESPACE}-${JOB_NAME_HASH}"
-
-mkdir -p "${HOME}"/.ssh
-chmod 0700 "${HOME}"/.ssh
 
 mock-nss.sh
 
