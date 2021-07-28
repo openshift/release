@@ -15,7 +15,7 @@ SCORECARD_CONFIG="${SCORECARD_CONFIG:-/tmp/config/scorecard-basic-config.yml}"
 NAMESPACE=$(grep "install_namespace:" "${SHARED_DIR}"/oo_deployment_details.yaml | cut -d ':' -f2 | xargs)
 
 pushd "${ARTIFACT_DIR}"
-OPERATOR_DIR="test-operator-basic"
+OPERATOR_DIR="test-operator"
 
 echo "Starting the basic operator-sdk scorecard test for ${BUNDLE_IMAGE}"
 

@@ -1,0 +1,20 @@
+workflow:
+  as: openshift-e2e-ovirt-csi-release-4.8
+  steps:
+    pre:
+    - chain: ipi-ovirt-pre
+    - ref: ipi-conf-ovirt-generate-csi-test-manifest-release-4.6-4.8
+    - ref: storage-pv-save
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - ref: storage-pv-check
+    - chain: ipi-ovirt-post
+    env:
+      TEST_TYPE:  "suite"
+      TEST_SUITE: "openshift/csi"
+      TEST_CSI_DRIVER_MANIFEST: csi-test-manifest.yaml
+  documentation: |-
+    The Openshift E2E oVirt `csi` workflow installs OpenShift cluster on top of oVirt
+    Executes the `openshift/csi` end-to-end test suite.
+    Volume resizing tests are disabled, release 4.8 doesn't support volume resizing
