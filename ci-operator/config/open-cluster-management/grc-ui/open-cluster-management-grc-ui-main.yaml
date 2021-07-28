@@ -47,19 +47,48 @@ tests:
       IMAGE_REPO: grc-ui-tests
       REGISTRY_ORG: open-cluster-management
     workflow: ocm-ci-image-mirror
-- as: lint-unittest-sonarcloud
+- as: lint
   commands: |
-    export SELF="make -f Makefile.prow"
-    make install
     make lint
-    make -f Makefile.prow sonar/js/jest-init
-    make unit-test
-    # make -f Makefile.prow sonar/js/prow
   container:
     from: src
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
+- as: unit-tests
+  commands: |
+    make unit-test
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+- as: e2e-tests
+  steps:
+    dependencies:
+      COMPONENT_IMAGE_REF: grc-ui
+    env:
+      CLUSTERPOOL_GROUP_NAME: policy-grc
+      CLUSTERPOOL_HOST_NAMESPACE: acm-grc-security
+      CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-grc-clusterpool
+      CLUSTERPOOL_LIFETIME: 4h
+      CLUSTERPOOL_LIST_INCLUSION_FILTER: prow
+      CLUSTERPOOL_LIST_EXCLUSION_FILTER: dev\|autoclaims
+    test:
+    - as: e2e
+      commands: |
+        export SELF="make -f Makefile.prow"
+        make -f Makefile.prow sonar/js/jest-init
+        make unit-test
+        make -f Makefile.prow component/test/e2e
+        npm run merge:coverage
+        make -f Makefile.prow sonar/js/prow
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-e2e-clusterpool
 - as: latest-image-mirror
   postsubmit: true
   steps:
