@@ -1,6 +1,7 @@
 #!/bin/bash
 set -exuo pipefail
 id
+ls -alR
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 GOOGLE_PROJECT_ID="us-east1"
