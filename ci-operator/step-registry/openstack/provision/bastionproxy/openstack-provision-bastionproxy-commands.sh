@@ -118,6 +118,7 @@ bastion_fip="$(openstack floating ip create -f value -c floating_ip_address \
 >&2 echo "Created floating IP ${bastion_fip}"
 >&2 openstack server add floating ip "$server_id" "$bastion_fip"
 echo ${bastion_fip} >> ${SHARED_DIR}/DELETE_FIPS
+echo ${bastion_fip} > ${SHARED_DIR}/BASTION_FIP
 cp ${SHARED_DIR}/DELETE_FIPS ${ARTIFACT_DIR}
 
 # configure the local container environment to have the correct SSH configuration
