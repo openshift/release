@@ -66,12 +66,13 @@ images:
         nss_wrapper \
         openssh-clients && \
         yum clean all && rm -rf /var/cache/yum/*
-    WORKDIR /tmp/secret
-    ENV HOME /tmp/secret
-    ENV PATH /bin
-    RUN mkdir -p /tmp/secret/.gcp && chmod 700 /tmp/secret/.gcp && chown 1000:1000 /tmp/secret/.gcp
-    RUN mkdir -p /tmp/secret/.ssh && chmod 700 /tmp/secret/.ssh && chown 1000:1000 /tmp/secret/.ssh
+    RUN mkdir -p /home/microshift && chown 1000:1000 /home/microshift && \
+        chgrp -R 0 /home/microshift && \
+        chmod -R g=u /home/microshift
     USER 1000:1000
+    ENV PATH /bin
+    ENV HOME /home/microshift
+    WORKDIR /home/microshift
   from: base
   to: setup
 promotion:
