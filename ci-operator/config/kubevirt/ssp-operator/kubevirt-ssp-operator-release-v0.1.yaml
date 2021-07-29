@@ -2,10 +2,12 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: golang-1.15
 images:
 - dockerfile_path: Dockerfile
   to: ssp-operator-container
+- dockerfile_path: validator.Dockerfile
+  to: template-validator-container
 resources:
   '*':
     limits:
@@ -14,7 +16,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: "4.7"
+  name: "4.8"
   namespace: ocp
 tests:
 - as: unittests
@@ -34,12 +36,13 @@ tests:
     - as: e2e-functests
       cli: latest
       commands: |
-        ./hack/deploy-kubevirt-and-cdi.sh
+        ./automation/e2e-functests/setup.sh
         export component=ssp-operator-container
-        export IMG=$(echo $IMAGE_FORMAT | envsubst)
+        export CI_OPERATOR_IMG=$(echo $IMAGE_FORMAT | envsubst)
+        export component=template-validator-container
+        export CI_VALIDATOR_IMG=$(echo $IMAGE_FORMAT | envsubst)
         export GOFLAGS=
-        export SKIP_CLEANUP_AFTER_TESTS=true
-        make deploy functest
+        ./automation/e2e-functests/run.sh
       from: src
       resources:
         requests:
@@ -53,13 +56,13 @@ tests:
     - as: e2e-upgrade-from-old-operator-functests
       cli: latest
       commands: |
-        ./hack/deploy-kubevirt-and-cdi.sh
-        ./hack/deploy-old-ssp-operator.sh
+        ./automation/e2e-upgrade-from-old-operator-functests/setup.sh
         export component=ssp-operator-container
-        export IMG=$(echo $IMAGE_FORMAT | envsubst)
+        export CI_OPERATOR_IMG=$(echo $IMAGE_FORMAT | envsubst)
+        export component=template-validator-container
+        export CI_VALIDATOR_IMG=$(echo $IMAGE_FORMAT | envsubst)
         export GOFLAGS=
-        export SKIP_CLEANUP_AFTER_TESTS=true
-        make deploy functest
+        ./automation/e2e-upgrade-from-old-operator-functests/run.sh
       from: src
       resources:
         requests:
