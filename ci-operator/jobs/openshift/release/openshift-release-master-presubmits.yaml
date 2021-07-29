@@ -434,7 +434,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: app.ci
     context: ci/prow/config
     decorate: true
     labels:
@@ -444,6 +444,11 @@ presubmits:
     spec:
       containers:
       - args:
+        - --github-app-id=$(GITHUB_APP_ID)
+        - --github-app-private-key-path=/etc/github/cert
+        - --github-endpoint=http://ghproxy
+        - --github-endpoint=https://api.github.com
+        - --github-graphql-endpoint=http://ghproxy/graphql
         - --config-path
         - ./core-services/prow/02_config/_config.yaml
         - --supplemental-prow-config-dir
@@ -461,12 +466,26 @@ presubmits:
         - mismatched-tide-lenient
         command:
         - /checkconfig
+        env:
+        - name: GITHUB_APP_ID
+          valueFrom:
+            secretKeyRef:
+              key: appid
+              name: openshift-prow-github-app
         image: gcr.io/k8s-prow/checkconfig:v20210729-79c386fdf5
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         name: ""
         resources:
           requests:
             cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/github
+          name: github-app-credentials
+          readOnly: true
+      volumes:
+      - name: github-app-credentials
+        secret:
+          secretName: openshift-prow-github-app
     trigger: (?m)^/test( | .* )config,?($|\s.*)
   - agent: kubernetes
     always_run: true
