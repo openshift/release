@@ -1,6 +1,6 @@
 #!/bin/bash
 set -exuo pipefail
-
+id
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 GOOGLE_PROJECT_ID="us-east1"
@@ -10,6 +10,7 @@ GOOGLE_COMPUTE_ZONE="openshift-gce-devel"
 INSTANCE_PREFIX="microshift-release-ci-${NAMESPACE}-${JOB_NAME_HASH}"
 
 # gcloud compute will use this key rather than create a new one
+ls -laR "$HOME"
 chmod 0600 "${HOME}"/.ssh/google_compute_engine
 echo 'ServerAliveInterval 30' | tee -a "${HOME}"/.ssh/config
 echo 'ServerAliveCountMax 1200' | tee -a "${HOME}"/.ssh/config
