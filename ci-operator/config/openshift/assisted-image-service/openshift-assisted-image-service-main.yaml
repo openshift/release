@@ -1,0 +1,59 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.37.1
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.16
+images:
+- dockerfile_path: Dockerfile.image-service
+  from: root
+  inputs:
+    base:
+      as:
+      - registry.access.redhat.com/ubi8/ubi-minimal
+  to: assisted-image-service
+promotion:
+  name: assisted
+  namespace: ocp-kni
+releases:
+  candidate:
+    release:
+      channel: candidate
+      version: "4.8"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.8"
+  namespace: ocp
+test_binary_build_commands: go mod vendor
+tests:
+- as: lint
+  commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    make lint
+  container:
+    clone: true
+    from: golangci-lint
+- as: test
+  commands: |
+    go mod vendor
+    make test
+  container:
+    from: src
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: assisted-image-service
