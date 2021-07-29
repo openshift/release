@@ -10,8 +10,6 @@ GOOGLE_COMPUTE_ZONE="openshift-gce-devel"
 INSTANCE_PREFIX="microshift-release-ci-${NAMESPACE}-${JOB_NAME_HASH}"
 
 # gcloud compute will use this key rather than create a new one
-ls -laR "$HOME"
-chmod 0600 "${HOME}"/.ssh/google_compute_engine
 echo 'ServerAliveInterval 30' | tee -a "${HOME}"/.ssh/config
 echo 'ServerAliveCountMax 1200' | tee -a "${HOME}"/.ssh/config
 chmod 0600 "${HOME}"/.ssh/config
