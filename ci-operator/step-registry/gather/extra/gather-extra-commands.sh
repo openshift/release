@@ -138,6 +138,7 @@ cat >> ${SHARED_DIR}/custom-links.txt << EOF
 let a = document.createElement('a');
 a.href="https://promecieus.dptools.openshift.org/?search="+document.referrer;
 a.innerHTML="PromeCIeus";
+a.target="_blank";
 document.getElementById("wrapper").append(a);
 </script>
 EOF
