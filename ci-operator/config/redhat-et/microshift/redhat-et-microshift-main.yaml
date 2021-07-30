@@ -1,26 +1,29 @@
 base_images:
   base:
-    name: "4.7"
+    name: "4.8"
     namespace: ocp
     tag: base
+  libvirt-installer:
+    name: "4.8"
+    namespace: ocp
+    tag: libvirt-installer
   ocp_builder_rhel-8-golang-1.15-openshift-4.7:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.15-openshift-4.7
+  os:
+    name: centos
+    namespace: origin
+    tag: "8"
 binary_build_commands: make cross-build-linux-amd64 cross-build-linux-arm64
 build_root:
   project_image:
     dockerfile_literal: |
       FROM registry.access.redhat.com/ubi8/go-toolset
-
       USER root
-
       ENV GOPATH=/go GOCACHE=/go/src/.cache GO111MODULE=on
-
-      RUN mkdir -p $GOCACHE
-
+      RUN mkdir -p $GOCACHE && mkdir -p /root/.aws
       WORKDIR $GOPATH/src/github.com/redhat-et/microshift
-
       RUN yum install gpgme-devel glibc-static libassuan-devel -y
     inputs:
       ocp_builder_rhel-8-golang-1.15-openshift-4.7:
@@ -49,9 +52,36 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/redhat-et/microshift/_output/bin/linux_arm64/microshift
   to: linux-arm64-4.7.0-0.microshift
+- dockerfile_literal: |
+    FROM os
+    COPY mock-nss.sh /bin/mock-nss.sh
+    COPY google-cloud-sdk.repo /etc/yum.repos.d/google-cloud-sdk.repo
+    COPY microshift /usr/bin/microshift
+    RUN dnf update -y && \
+        dnf --enablerepo=powertools install --setopt=tsflags=nodocs -y \
+        glib2-devel glibc-devel glibc-static gpgme-devel libassuan-devel \
+        google-cloud-sdk nss_wrapper openssh-clients && \
+        dnf clean all && rm -rf /var/cache/dnf/*
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/redhat-et/microshift/_output/bin/linux_amd64/microshift
+    libvirt-installer:
+      paths:
+      - destination_dir: .
+        source_path: /bin/mock-nss.sh
+      - destination_dir: .
+        source_path: /etc/yum.repos.d/google-cloud-sdk.repo
+  to: microshift-setup
 promotion:
-  name: microshift
+  additional_images:
+    linux-amd64-4.7.0-0.microshift: linux-amd64-4.7.0-0.microshift
+    linux-arm64-4.7.0-0.microshift: linux-arm64-4.7.0-0.microshift
+    microshift-setup: microshift-setup
   namespace: microshift
+  tag: latest
 resources:
   '*':
     limits:
@@ -59,6 +89,9 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tag_specification:
+  name: "4.8"
+  namespace: ocp
 tests:
 - as: verify
   commands: make verify
@@ -68,6 +101,10 @@ tests:
   commands: make test-unit
   container:
     from: src
+- as: e2e-microshift
+  steps:
+    cluster_profile: gcp
+    workflow: redhat-et-microshift-e2e
 zz_generated_metadata:
   branch: main
   org: redhat-et
