@@ -51,18 +51,25 @@ images:
   to: linux-arm64-4.7.0-0.microshift
 - dockerfile_literal: |
     FROM centos:7
+
     RUN curl -sSL https://raw.githubusercontent.com/openshift/installer/master/images/libvirt/google-cloud-sdk.repo -o /etc/yum.repos.d/google-cloud-sdk.repo
+
     RUN yum update -y && \
         yum install --setopt=tsflags=nodocs -y \
         google-cloud-sdk \
         openssh-clients && \
         yum clean all && rm -rf /var/cache/yum/*
-    RUN mkdir -p /home/microshift/.ssh /home/microshift/.gcp && \
-        chgrp -R 0 /home/microshift && \
-        chmod -R g=u /home/microshift
+
+    RUN mkdir -p /tmp/microshift/.ssh /tmp/microshift/.gcp && \
+        chgrp -R 0 /tmp/microshift && \
+        chmod -R g=u /tmp/microshift
+
     ENV PATH /bin
-    ENV HOME /home/microshift
-    WORKDIR /home/microshift
+
+    ENV HOME /tmp/microshift
+
+    WORKDIR /tmp/microshift
+
     USER 1000:1000
   from: base
   inputs:
