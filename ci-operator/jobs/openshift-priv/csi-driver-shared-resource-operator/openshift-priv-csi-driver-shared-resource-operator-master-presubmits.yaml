@@ -1,7 +1,7 @@
 presubmits:
-  openshift/shared-resources-operator:
+  openshift-priv/csi-driver-shared-resource-operator:
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
     cluster: build01
@@ -9,18 +9,20 @@ presubmits:
     decorate: true
     decoration_config:
       skip_cloning: true
+    hidden: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-shared-resources-operator-master-e2e-aws
+    name: pull-ci-openshift-priv-csi-driver-shared-resource-operator-master-e2e-aws
+    path_alias: github.com/openshift/csi-driver-shared-resource-operator
     rerun_command: /test e2e-aws
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/usr/local/e2e-aws-cluster-profile
         - --target=e2e-aws
@@ -41,6 +43,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -60,6 +65,9 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-aws
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -68,7 +76,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
     cluster: build01
@@ -76,17 +84,19 @@ presubmits:
     decorate: true
     decoration_config:
       skip_cloning: true
+    hidden: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-shared-resources-operator-master-test
+    name: pull-ci-openshift-priv-csi-driver-shared-resource-operator-master-test
+    path_alias: github.com/openshift/csi-driver-shared-resource-operator
     rerun_command: /test test
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --target=test
         command:
@@ -101,6 +111,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -109,6 +122,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -117,7 +133,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )test,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - master
     cluster: build01
@@ -125,17 +141,19 @@ presubmits:
     decorate: true
     decoration_config:
       skip_cloning: true
+    hidden: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-shared-resources-operator-master-verify
+    name: pull-ci-openshift-priv-csi-driver-shared-resource-operator-master-verify
+    path_alias: github.com/openshift/csi-driver-shared-resource-operator
     rerun_command: /test verify
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --target=verify
         command:
@@ -150,6 +168,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -158,6 +179,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
