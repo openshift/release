@@ -6,13 +6,19 @@ set -o pipefail
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
+curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
 CONFIG="${SHARED_DIR}/install-config.yaml"
-
+PATCH="${SHARED_DIR}/install-config-china.yaml.patch"
 expiration_date=$(date -d '8 hours' --iso=minutes --utc)
 
 function join_by { local IFS="$1"; shift; echo "$*"; }
 
-REGION="${LEASED_RESOURCE}"
+
+# If no REGION was not provided by user, will get region from Boskos lease
+if [ -z ${REGION} ]; then
+  REGION="${LEASED_RESOURCE}"
+fi
+
 # BootstrapInstanceType gets its value from pkg/types/aws/defaults/platform.go
 architecture="amd64"
 arch_instance_type=m5
@@ -78,3 +84,12 @@ compute:
       type: ${COMPUTE_NODE_TYPE}
       zones: ${ZONES_STR}
 EOF
+
+
+cat >> "${PATCH}" << EOF
+platform:
+  aws:
+    amiID: ${AWS_RHCOS_AMI_OVERRIDE}
+EOF
+
+/tmp/yq m -x -i "${CONFIG}" "${PATCH}"

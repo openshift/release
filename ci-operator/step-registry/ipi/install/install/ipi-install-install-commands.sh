@@ -75,7 +75,15 @@ then
 fi
 
 case "${CLUSTER_TYPE}" in
-aws|aws-arm64) export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred;;
+aws|aws-arm64) 
+  # if on AWS China
+  if [ "${REGION}" == "cn-north-1" ] || [ "${REGION}" == "cn-northwest-1" ]; then
+    # use inject credential
+    export AWS_SHARED_CREDENTIALS_FILE=/var/run/aws-china-credential/.awscred
+  else
+    export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
+  fi
+  ;;
 azure4) export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json;;
 gcp) export GOOGLE_CLOUD_KEYFILE_JSON=${CLUSTER_PROFILE_DIR}/gce.json;;
 kubevirt) export KUBEVIRT_KUBECONFIG=${HOME}/.kube/config;;
