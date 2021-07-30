@@ -52,18 +52,10 @@ if [[ -z "$DESTINATION_BRANCH" ]]; then
     exit 1
 fi
 
-
-log "INFO Setting up GitHub credentials"
+log "INFO Cloning DESTINATION_BRANCH"
 token=$(cat "$GITHUB_TOKEN_FILE")
 repo="github.com/$REPO_OWNER/$REPO_NAME"
-echo "https://${GITHUB_USER}:${token}@${repo}.git" > ghcreds
-if ! git config --global credential.helper 'store --file=ghcreds' ; then
-    log "ERROR Could not configure git credential helper"
-    exit 1
-fi
-
-log "INFO Cloning DESTINATION_BRANCH"
-repo_url="https://${repo}.git"
+repo_url="https://${GITHUB_USER}:${token}@${repo}.git"
 
 if ! git clone -b "$DESTINATION_BRANCH" "$repo_url" ; then
     log "INFO DESTINATION_BRANCH does not exist. Will create it"
