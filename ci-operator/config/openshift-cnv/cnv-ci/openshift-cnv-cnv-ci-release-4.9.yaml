@@ -3,11 +3,24 @@ base_images:
     name: "4.9"
     namespace: ocp
     tag: base
+  cli:
+    name: "4.9"
+    namespace: ocp
+    tag: cli
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: golang-1.13
+images:
+- dockerfile_path: hack/Dockerfile.upgrade.src.ci
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: src-upgrade-ci
 resources:
   '*':
     limits:
@@ -56,7 +69,6 @@ tests:
     cluster_profile: azure4
     test:
     - as: test
-      cli: latest
       commands: make upgrade_test
       credentials:
       - mount_path: /var/run/cnv-ci-brew-pull-secret
@@ -75,7 +87,7 @@ tests:
         name: ARTIFACTS_DIR
       - default: openshift-cnv
         name: TARGET_NAMESPACE
-      from: src
+      from: src-upgrade-ci
       resources:
         requests:
           cpu: 100m

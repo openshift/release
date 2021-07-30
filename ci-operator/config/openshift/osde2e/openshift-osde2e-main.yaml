@@ -73,7 +73,7 @@ tests:
           cpu: 100m
           memory: 200Mi
 - as: osde2e-aro-e2e-latest-y
-  cron: '@daily'
+  cron: 0 0 12 * * *
   steps:
     post:
     - as: cluster-destroy
@@ -141,7 +141,7 @@ tests:
           cpu: 100m
           memory: 200Mi
 - as: osde2e-aro-e2e-latest-z
-  cron: '@daily'
+  cron: 0 0 12 * * *
   steps:
     post:
     - as: cluster-destroy
@@ -204,6 +204,25 @@ tests:
         name: osde2e-credentials
         namespace: test-credentials
       from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: osde2e-aro-nightly-cleanup
+  cron: '@midnight'
+  steps:
+    test:
+    - as: aro-cleanup
+      commands: |
+        cd /tmp/
+        git clone https://github.com/openshift/osde2e.git
+        cd osde2e
+        source ./ci/cleanup-aro-clusters.sh
+      credentials:
+      - mount_path: /usr/local/osde2e-credentials
+        name: osde2e-credentials
+        namespace: test-credentials
+      from: azure
       resources:
         requests:
           cpu: 100m

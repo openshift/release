@@ -20,7 +20,7 @@ cluster_name=$(<"${SHARED_DIR}"/clustername.txt)
 
 echo Deprovisioning $cluster_name
 
-echo "$(date -u --rfc-3339=seconds) - Collecting vCenter performance data, events, and alerts"
+echo "$(date -u --rfc-3339=seconds) - Collecting vCenter performance data and alerts"
 
 set +e
 # shellcheck source=/dev/null
@@ -30,16 +30,13 @@ vcenter_state=${ARTIFACT_DIR}/vcenter_state
 mkdir ${vcenter_state}
 
 govc object.collect "/${GOVC_DATACENTER}/host" triggeredAlarmState &> ${vcenter_state}/host_alarms.log
-govc events "/${GOVC_DATACENTER}/host" &> ${vcenter_state}/host_events.log
 govc metric.ls $vm_path/* | xargs govc metric.sample -json -n 60 $vm_path/* &> ${vcenter_state}/vm_metrics.json
 
 clustervms=$(govc ls "${vm_path}")
 for vm in $clustervms; do
-echo Collecting alarms and events from $vm
+echo Collecting alarms from $vm
 echo " >>>> Alarms for: $vm" >> ${vcenter_state}/vm_alarms.log
-echo " >>>> Events for: $vm" >> ${vcenter_state}/vm_events.log
 govc object.collect $vm triggeredAlarmState &>> ${vcenter_state}/vm_alarms.log
-govc events $vm &>> ${vcenter_state}/vm_events.log
 done
 set -e
 

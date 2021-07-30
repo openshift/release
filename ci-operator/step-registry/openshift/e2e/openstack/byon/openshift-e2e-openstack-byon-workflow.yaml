@@ -4,15 +4,21 @@ workflow:
     pre:
       - chain: ipi-openstack-pre
     test:
-      # The current test suites don't work fine when going through a proxy, so for now
-      # we just want to deploy a cluster and consider it tested. This will be improved 
-      # in the future.
-      - ref: openstack-noop
+      - ref: openshift-e2e-test
     post:
       - chain: ipi-openstack-post
     env:
       CONFIG_TYPE: "byon"
       BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      TEST_SUITE: experimental/reliability/minimal
+      # These tests fail when we use HTTP_PROXY / HTTPS_PROXY to reach the OCP cluster and run tests against it.
+      # This will be investigated later, but in the meantime we skip them to be able to test the rest and
+      # provide good coverage.
+      TEST_SKIPS: >-
+        Kubectl Port forwarding With a server listening on 0.0.0.0 should support forwarding over websockets \|
+        Kubectl client Simple pod should support exec through kubectl proxy \|
+        Kubectl client Simple pod should support exec through an HTTP proxy \|
+        Kubectl Port forwarding With a server listening on localhost should support forwarding over websockets
   documentation: |-
     The openshift-e2e-openstack-byon workflow executes the common
     end-to-end test suite on OpenShift BYON installation on OpenStack.

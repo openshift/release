@@ -68,6 +68,13 @@ sshKey: |
   ${SSH_PUB_KEY}
 EOF
 
+if [ ${FIPS_ENABLED} = "true" ]; then
+  echo "Adding 'fips: true' to install-config.yaml"
+  cat >> "${CONFIG}" << EOF
+fips: true
+EOF
+fi
+
 # Lets  check the syntax of yaml file by reading it.
 python -c 'import yaml;
 import sys;
