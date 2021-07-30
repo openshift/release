@@ -56,7 +56,7 @@ fi
 log "INFO Setting up GitHub credentials"
 token=$(cat "$GITHUB_TOKEN_FILE")
 repo="github.com/$REPO_OWNER/$REPO_NAME"
-echo "https://${GITHUB_USER}:${token}@${repo}.git" | ghcreds
+echo "https://${GITHUB_USER}:${token}@${repo}.git" > ghcreds
 if ! git config --global credential.helper 'store --file=ghcreds' ; then
     log "ERROR Could not configure git credential helper"
     exit 1
