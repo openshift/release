@@ -77,7 +77,8 @@ fi
 case "${CLUSTER_TYPE}" in
 aws|aws-arm64) 
   # if on AWS China
-  if [ "${REGION}" == "cn-north-1" ] || [ "${REGION}" == "cn-northwest-1" ]; then
+  if [ "${AWS_REGION_OVERRIDE}" == "cn-north-1" ] || [ "${AWS_REGION_OVERRIDE}" == "cn-northwest-1" ]; then
+    export AWS_REGION="${AWS_REGION_OVERRIDE}"
     # use inject credential
     export AWS_SHARED_CREDENTIALS_FILE=/var/run/aws-china-credential/.awscred
   else

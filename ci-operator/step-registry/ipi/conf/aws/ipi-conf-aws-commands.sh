@@ -15,8 +15,10 @@ function join_by { local IFS="$1"; shift; echo "$*"; }
 
 
 # If no REGION was not provided by user, will get region from Boskos lease
-if [ -z ${REGION} ]; then
+if [ -z ${AWS_REGION_OVERRIDE} ]; then
   REGION="${LEASED_RESOURCE}"
+else
+  REGION="${AWS_REGION_OVERRIDE}"
 fi
 
 # BootstrapInstanceType gets its value from pkg/types/aws/defaults/platform.go
