@@ -41,6 +41,25 @@ tests:
     make -f Makefile test-local
   container:
     from: src
+- as: e2e-kind
+  steps:
+    env:
+      AWS_CREDENTIALS_SECRET: ocm-obs-china-aws-kind
+      AWS_INSTANCE_TYPE: t3.small
+    post:
+    - ref: ocm-e2e-kind-destroy
+    pre:
+    - ref: ocm-ci-rbac
+    - ref: ocm-e2e-kind-create
+    test:
+    - as: test
+      commands: "export SELF=\"make\"\ntest-kind-prow.sh \n"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-e2e-kind
 zz_generated_metadata:
   branch: release-2.4
   org: open-cluster-management
