@@ -12,7 +12,7 @@ logger = logging.getLogger('validate-release-jobs')
 logger.setLevel(logging.INFO)
 
 release_definition_path = 'core-services/release-controller/_releases'
-job_definitions_paths = ['ci-operator/jobs/openshift/release','ci-operator/jobs/openshift/multiarch']
+job_definitions_paths = ['ci-operator/jobs/openshift/release', 'ci-operator/jobs/openshift/multiarch']
 
 
 def raise_on_duplicates(ordered_pairs):
@@ -71,8 +71,8 @@ def validate_jobs(data, definitions):
                             logger.debug('\t\tFound')
                             found = True
                             break
-        if found:
-            break
+            if found:
+                break
         if not found:
             missing.append((source, verification, name))
     return missing
