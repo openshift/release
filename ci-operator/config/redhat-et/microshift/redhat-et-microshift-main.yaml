@@ -56,12 +56,13 @@ images:
     FROM os
     COPY mock-nss.sh /bin/mock-nss.sh
     COPY google-cloud-sdk.repo /etc/yum.repos.d/google-cloud-sdk.repo
-    COPY microshift /usr/bin/microshift
-    RUN dnf update -y && \
-        dnf --enablerepo=powertools install --setopt=tsflags=nodocs -y \
-        glib2-devel glibc-devel glibc-static gpgme-devel libassuan-devel \
-        google-cloud-sdk nss_wrapper openssh-clients && \
-        dnf clean all && rm -rf /var/cache/dnf/*
+    COPY microshift /bin/microshift
+    RUN  dnf update -y && \
+         dnf --enablerepo=powertools install --setopt=tsflags=nodocs -y \
+         glib2-devel glibc-devel glibc-static gpgme-devel libassuan-devel \
+         google-cloud-sdk nss_wrapper openssh-clients && \
+         dnf clean all && rm -rf /var/cache/dnf/*
+    RUN  chgrp -R 0 /bin/microshift && chmod -R g=u /bin/microshift
   from: os
   inputs:
     bin:
