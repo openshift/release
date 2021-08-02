@@ -32,18 +32,40 @@ gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
 gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
 gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
+# Setup Test Env
+# TODO (copejon) hacky workaround to setup the env.  Once merged, drop the systemctl and rm commands and add
+#   curl -sfL https://raw.githubusercontent.com/redhat-et/microshift/main/scripts/setup-env.sh | sh -
+cat > "${HOME}"/configure-e2e-host.sh <<EOF
+#! /bin/bash
+set -euxo pipefail
+
+curl -sfL https://raw.githubusercontent.com/redhat-et/microshift/main/install.sh | sh -
+systemctl disable --now microshift.service
+rm -rf /var/lib/microshift
+rm -f /usr/local/bin/microshift
+EOF
+chmod +x "${HOME}"/configure-e2e-host.sh
+
 # smoke-tests script to scp to gcp instance
 # TODO: edit this file to launch microshift and run tests
 cat  > "${HOME}"/run-smoke-tests.sh << 'EOF'
 #!/bin/bash
 set -euxo pipefail
+
 # Tests execution
 echo ### Running microshift smoke-tests
 echo ### Start /usr/bin/microshift run and run commands to perform smoke-tests
-set -x
-ls -al /usr/bin/microshift
+
+microshift version
+microshift run
 EOF
 chmod +x "${HOME}"/run-smoke-tests.sh
+
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+  --quiet \
+  --project "${GOOGLE_PROJECT_ID}" \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  --recurse "${HOME}"/configure-e2e-host.sh rhel8user@"${INSTANCE_PREFIX}":~/configure-e2e-host.sh
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \
@@ -63,6 +85,11 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   --recurse /usr/bin/microshift rhel8user@"${INSTANCE_PREFIX}":/home/rhel8user/microshift
+
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  rhel8user@"${INSTANCE_PREFIX}" \
+  --command '/home/rhel8user/configure-e2e-host.sh'
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
