@@ -50,7 +50,7 @@ EOF
 
 # Export those parameters before running
 export BUSHSLICER_DEFAULT_ENVIRONMENT=ocp4
-export BUSHSLICER_REPORT_DIR=/tmp/cucushift
+export BUSHSLICER_REPORT_DIR=${ARTIFACT_DIR}
 
 export OPENSHIFT_ENV_OCP4_ADMIN_CREDS_SPEC=${KUBECONFIG}
 
