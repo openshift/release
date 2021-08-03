@@ -6,6 +6,8 @@ set -o pipefail
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
+function join_by { local IFS="$1"; shift; echo "$*"; }
+
 # TODO: move to image
 curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
 
