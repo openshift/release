@@ -12,7 +12,7 @@ PATCH="${SHARED_DIR}/install-config-sharednetwork.yaml.patch"
 
 azure_region=$(/tmp/yq r "${CONFIG}" 'platform.azure.region')
 
-cat >> "${PATCH}" << EOF
+cat > "${PATCH}" << EOF
 platform:
   azure:
     networkResourceGroupName: os4-common
