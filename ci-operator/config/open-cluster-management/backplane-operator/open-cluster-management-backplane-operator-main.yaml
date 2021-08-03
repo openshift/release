@@ -3,10 +3,10 @@ base_images:
     name: builder
     namespace: open-cluster-management
     tag: go1.16-linux
-  open-cluster-management_builder_go1.15-linux-amd64:
+  open-cluster-management_builder_go1.16-linux-amd64:
     name: builder
     namespace: open-cluster-management
-    tag: go1.15-linux-amd64
+    tag: go1.16-linux-amd64
 binary_build_commands: make build
 build_root:
   image_stream_tag:
@@ -16,9 +16,9 @@ build_root:
 images:
 - dockerfile_path: Dockerfile.prow
   inputs:
-    open-cluster-management_builder_go1.15-linux-amd64:
+    open-cluster-management_builder_go1.16-linux-amd64:
       as:
-      - registry.ci.openshift.org/open-cluster-management/builder:go1.15-linux-amd64
+      - registry.ci.openshift.org/open-cluster-management/builder:go1.16-linux-amd64
   to: backplane-operator
 promotion:
   name: "1.0"
@@ -38,6 +38,15 @@ tests:
     env:
       DESTINATION_BRANCH: backplane-1.0
     workflow: ocm-ci-fastforward
+- as: sonarcloud
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow sonar/go/prow
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
 zz_generated_metadata:
   branch: main
   org: open-cluster-management
