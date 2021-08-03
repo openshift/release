@@ -11,7 +11,6 @@ periodics:
     repo: cvp
   labels:
     ci-operator.openshift.io/prowgen-controlled: "true"
-    job-release: "4.8"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-redhat-openshift-ecosystem-cvp-ocp-4.8-cvp-common-aws
   spec:
@@ -84,17 +83,17 @@ periodics:
     repo: cvp
   labels:
     ci-operator.openshift.io/prowgen-controlled: "true"
-    job-release: "4.8"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-redhat-openshift-ecosystem-cvp-ocp-4.8-probe
+  name: periodic-ci-redhat-openshift-ecosystem-cvp-ocp-4.8-cvp-common-claim
   spec:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=probe
+      - --target=cvp-common-claim
       command:
       - ci-operator
       image: ci-operator:latest
@@ -110,6 +109,9 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /secrets/hive-hive-credentials
+        name: hive-hive-credentials
+        readOnly: true
       - mountPath: /etc/pull-secret
         name: pull-secret
         readOnly: true
@@ -121,6 +123,9 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - name: hive-hive-credentials
+      secret:
+        secretName: hive-hive-credentials
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
