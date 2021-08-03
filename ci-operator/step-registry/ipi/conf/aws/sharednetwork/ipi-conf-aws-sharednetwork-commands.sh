@@ -32,7 +32,7 @@ aws --region "${REGION}" cloudformation create-stack \
   --stack-name "${STACK_NAME}" \
   --template-body "$(cat /tmp/01_vpc.yaml)" \
   --tags "${TAGS}" \
-  --parameters "ParameterKey=AvailabilityZoneCount,ParameterValue=${ZONE_COUNT}" &
+  --parameters "ParameterKey=AvailabilityZoneCount,ParameterValue=${ZONES_COUNT}" &
 
 wait "$!"
 echo "Created stack"
