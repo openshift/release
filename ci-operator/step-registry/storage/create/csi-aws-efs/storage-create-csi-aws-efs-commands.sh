@@ -6,7 +6,7 @@ set -o pipefail
 export STORAGEClASS_LOCATION=${SHARED_DIR}/efs-sc.yaml
 export MANIFEST_LOCATION=${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
 
-/usr/bin/create-efs-volume
+/usr/bin/create-efs-volume start
 
 echo "Using storageclass ${STORAGEClASS_LOCATION}"
 cat ${STORAGEClASS_LOCATION}
