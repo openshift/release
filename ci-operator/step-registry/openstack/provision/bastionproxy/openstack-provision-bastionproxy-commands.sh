@@ -36,13 +36,19 @@ retry() {
 export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
 WORK_DIR=${WORK_DIR:-$(mktemp -d -t shiftstack-ci-XXXXXXXXXX)}
 CLUSTER_NAME=$(<"${SHARED_DIR}"/CLUSTER_NAME)
-NET_ID=$(<"${SHARED_DIR}"/MACHINESSUBNET_NET_ID)
 OPENSTACK_EXTERNAL_NETWORK="${OPENSTACK_EXTERNAL_NETWORK:-$(<"${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK")}"
 BASTION_FLAVOR="${BASTION_FLAVOR:-$(<"${SHARED_DIR}/BASTION_FLAVOR")}"
+BASTION_USER=${BASTION_USER:-centos}
 ZONES=$(<"${SHARED_DIR}"/ZONES)
 
-mapfile -t ZONES < <(printf ${ZONES})
+mapfile -t ZONES < <(printf ${ZONES}) >/dev/null
 MAX_ZONES_COUNT=${#ZONES[@]}
+
+if [[ ! -f ${SHARED_DIR}"/BASTIONSUBNET_NET_ID" ]]; then
+    echo "Failed to find ${SHARED_DIR}/BASTIONSUBNET_NET_ID, bastion network was probably not created"
+    exit 1
+fi
+NET_ID=$(<"${SHARED_DIR}"/BASTIONSUBNET_NET_ID)
 
 if [[ ${ZONES_COUNT} -gt ${MAX_ZONES_COUNT} ]]; then
   echo "Too many zones were requested: ${ZONES_COUNT}; only ${MAX_ZONES_COUNT} are available: ${ZONES[*]}"
@@ -72,6 +78,19 @@ if ! openstack flavor show $BASTION_FLAVOR >/dev/null; then
 		exit 1
 fi
 
+if [[ ${OPENSTACK_PROVIDER_NETWORK} != "" ]]; then
+    echo "Provider network detected: ${OPENSTACK_PROVIDER_NETWORK}"
+    if ! openstack network show ${OPENSTACK_PROVIDER_NETWORK} >/dev/null; then
+        echo "ERROR: Provider network not found: ${OPENSTACK_PROVIDER_NETWORK}"
+        exit 1
+    fi
+    PROV_NET_ID=$(openstack network show -c id -f value "${OPENSTACK_PROVIDER_NETWORK}")
+    echo "Provider network ID: ${PROV_NET_ID}"
+    PROV_NET_ARGS="--network ${PROV_NET_ID} "
+else
+  PROV_NET_ARGS=""
+fi
+
 openstack keypair create --public-key ${CLUSTER_PROFILE_DIR}/ssh-publickey ${CLUSTER_NAME} >/dev/null
 >&2 echo "Created keypair: ${CLUSTER_NAME}"
 
@@ -81,14 +100,15 @@ openstack security group rule create --ingress --protocol tcp --dst-port 22 --de
 openstack security group rule create --ingress --protocol tcp --dst-port 8213 --description "${CLUSTER_NAME} squid" "$sg_id" >/dev/null
 >&2 echo "Security group rules created in ${sg_id} to allow SSH and squid access"
 
-server_id="$(openstack server create -f value -c id $ZONES_ARGS \
+openstack server create --wait $ZONES_ARGS \
 		--image "$BASTION_IMAGE" \
 		--flavor "$BASTION_FLAVOR" \
-		--network "$NET_ID" \
+		--network "$NET_ID" $PROV_NET_ARGS \
 		--security-group "$sg_id" \
 		--key-name "$CLUSTER_NAME" \
-		"bastionproxy-$CLUSTER_NAME")"
->&2 echo "Created nova server ${CLUSTER_NAME}: ${server_id}"
+		"bastionproxy-$CLUSTER_NAME" >/dev/null
+server_id="$(openstack server show bastionproxy-${CLUSTER_NAME} -f value -c id)"
+>&2 echo "Created nova server bastionproxy-${CLUSTER_NAME}: ${server_id}"
 
 bastion_fip="$(openstack floating ip create -f value -c floating_ip_address \
 		--description "bastionproxy $CLUSTER_NAME FIP" \
@@ -102,7 +122,7 @@ cp ${SHARED_DIR}/DELETE_FIPS ${ARTIFACT_DIR}
 # configure the local container environment to have the correct SSH configuration
 if ! whoami &> /dev/null; then
     if [[ -w /etc/passwd ]]; then
-        echo "${BASTION_USER:-centos}:x:$(id -u):0:${BASTION_USER:-centos} user:${HOME}:/sbin/nologin" >> /etc/passwd
+        echo "${BASTION_USER}:x:$(id -u):0:${BASTION_USER} user:${HOME}:/sbin/nologin" >> /etc/passwd
     fi
 fi
 
@@ -113,7 +133,8 @@ SCP_CMD="scp $SSH_ARGS"
 
 #if ! retry 60 5 $SSH_CMD uname -a >/dev/null; then
 if ! retry 60 5 $SSH_CMD uname -a; then
-		echo "ERROR: Bastion proxy is not reachable via its floating-IP: $bastion_fip"
+		echo "ERROR: Bastion proxy is not reachable via $bastion_fip - check logs:"
+    openstack console log show ${server_id}
 		exit 1
 fi
 
