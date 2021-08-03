@@ -45,6 +45,13 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
   to: aws-efs-csi-driver-operator
+- dockerfile_path: Dockerfile.create_efs
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
+  to: aws-efs-csi-operator-create-efs
 operator:
   bundles:
   - as: aws-efs-csi-driver-operator-bundle
@@ -66,7 +73,6 @@ operator:
   - pullspec: quay.io/openshift/origin-aws-efs-csi-driver-operator:latest
     with: pipeline:aws-efs-csi-driver-operator
 promotion:
-  disabled: true
   name: "4.9"
   namespace: ocp
 resources:
@@ -98,15 +104,7 @@ tests:
       OO_INSTALL_NAMESPACE: openshift-cluster-csi-drivers
       OO_PACKAGE: aws-efs-csi-driver-operator
       OO_TARGET_NAMESPACES: '!install'
-    test:
-    - as: e2e
-      commands: make test-e2e
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: optional-operators-ci-aws
+    workflow: openshift-e2e-aws-efs-csi
 zz_generated_metadata:
   branch: release-4.9
   org: openshift
