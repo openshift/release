@@ -15,10 +15,10 @@ if [[ "${CLUSTER_TYPE}" == "aws-arm64" ]]; then
   fi
   OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${ARM64_RELEASE_OVERRIDE}
   echo "Installing from initial release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
-  openshift-install version
   # end of hack
 fi
 
+echo "Instalelr version: $(openshift-install version)"
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
 expiration_date=$(date -d '8 hours' --iso=minutes --utc)
@@ -60,14 +60,30 @@ MAX_ZONES_COUNT="${#ZONES[@]}"
 # Save max zones count information to ${SHARED_DIR} for use in other scenarios
 echo "${MAX_ZONES_COUNT}" >> "${SHARED_DIR}/maxzonescount"
 
+existing_zones_setting=$(yq r zone.yaml 'controlPlane.platform.aws.zones')
 
-ZONES_COUNT=${ZONES_COUNT:-2}
-ZONES=("${ZONES[@]:0:${ZONES_COUNT}}")
-ZONES_STR="[ "
-ZONES_STR+=$(join_by , "${ZONES[@]}")
-ZONES_STR+=" ]"
-echo "AWS region: ${REGION} (zones: ${ZONES_STR})"
+if [[ ${existing_zones_setting} == "" ]]; then
+  ZONES_COUNT=${ZONES_COUNT:-2}
+  ZONES=("${ZONES[@]:0:${ZONES_COUNT}}")
+  ZONES_STR="[ $(join_by , "${ZONES[@]}") ]"
+  echo "AWS region: ${REGION} (zones: ${ZONES_STR})"
+  PATCH="${SHARED_DIR}/install-config-zones.yaml.patch"
+  cat >> "${PATCH}" << EOF
+controlPlane:
+  platform:
+    aws:
+      zones: ${ZONES_STR}
+compute:
+- platform:
+    aws:
+      zones: ${ZONES_STR}
+EOF
+  /tmp/yq m -x -i "${CONFIG}" "${PATCH}"
+else
+  echo "zones already set in install-config.yaml, skipped"
+fi
 
+PATCH="${SHARED_DIR}/install-config-common.yaml.patch"
 cat >> "${CONFIG}" << EOF
 baseDomain: ${BASE_DOMAIN}
 platform:
@@ -81,7 +97,6 @@ controlPlane:
   platform:
     aws:
       type: ${master_type}
-      zones: ${ZONES_STR}
 compute:
 - architecture: ${architecture}
   name: worker
@@ -89,5 +104,4 @@ compute:
   platform:
     aws:
       type: ${COMPUTE_NODE_TYPE}
-      zones: ${ZONES_STR}
 EOF

@@ -303,12 +303,43 @@ Outputs:
       ]
 EOF
 
-MAX_ZONES_COUNT="$(cat "${SHARED_DIR}/maxzonescount")"
+# BootstrapInstanceType gets its value from pkg/types/aws/defaults/platform.go
+architecture="amd64"
+arch_instance_type=m5
+if [[ "${CLUSTER_TYPE}" == "aws-arm64" ]]; then
+  architecture="arm64"
+  arch_instance_type=m6g
+fi
+BOOTSTRAP_NODE_TYPE=${arch_instance_type}.large
+master_type=null
+if [[ "${SIZE_VARIANT}" == "xlarge" ]]; then
+  master_type=${arch_instance_type}.8xlarge
+elif [[ "${SIZE_VARIANT}" == "large" ]]; then
+  master_type=${arch_instance_type}.4xlarge
+elif [[ "${SIZE_VARIANT}" == "compact" ]]; then
+  master_type=${arch_instance_type}.2xlarge
+fi
 
-ZONES_COUNT=${ZONES_COUNT:-2}
-if [[ "${MAX_ZONES_COUNT}" -lt 3 ]]
+# Generate working availability zones from the region
+mapfile -t AVAILABILITY_ZONES < <(aws --region "${REGION}" ec2 describe-availability-zones | jq -r '.AvailabilityZones[] | select(.State == "available") | .ZoneName' | sort -u)
+# Generate availability zones with OpenShift Installer required instance types
+mapfile -t INSTANCE_ZONES < <(aws --region "${REGION}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${master_type}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort -u)
+# Generate availability zones based on these 2 criterias
+mapfile -t ZONES < <(echo "${AVAILABILITY_ZONES[@]}" "${INSTANCE_ZONES[@]}" | sed 's/ /\n/g' | sort | uniq -d)
+# Calculate the maximum number of availability zones from the region
+MAX_ZONES_COUNT="${#ZONES[@]}"
+# Save max zones count information to ${SHARED_DIR} for use in other scenarios
+echo "${MAX_ZONES_COUNT}" >> "${SHARED_DIR}/maxzonescount"
+
+# The above cloudformation template's max zones account is 3
+if [[ "${ZONES_COUNT}" -gt 3 ]]
 then
-  ZONES_COUNT="${MAX_ZONES_COUNT}"
+  ZONES_COUNT=3
+fi
+
+if [[ "${ZONES_COUNT}" -gt "${MAX_ZONES_COUNT}" ]]
+then
+  ZONES_COUNT=${MAX_ZONES_COUNT}
 fi
 
 STACK_NAME="${CLUSTER_NAME}-shared-vpc-blackhole"
@@ -334,9 +365,7 @@ echo "${STACK_NAME}" >> "${SHARED_DIR}/blackholenetworkstackname"
 # Generate working availability zones from the region
 mapfile -t AVAILABILITY_ZONES < <(aws --region "${REGION}" ec2 describe-availability-zones | jq -r '.AvailabilityZones[] | select(.State == "available") | .ZoneName' | sort -u)
 ZONES=("${AVAILABILITY_ZONES[@]:0:${ZONES_COUNT}}")
-ZONES_STR="[ "
-ZONES_STR+=$(join_by , "${ZONES[@]}")
-ZONES_STR+=" ]"
+ZONES_STR="[ $(join_by , "${ZONES[@]}") ]"
 echo "AWS region: ${REGION} (zones: ${ZONES_STR})"
 
 cat >> "${PATCH}" << EOF
