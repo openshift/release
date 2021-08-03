@@ -10,7 +10,7 @@ curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -
 CONFIG="${SHARED_DIR}/install-config.yaml"
 PATCH="${SHARED_DIR}/install-config-manual-creds.yaml.patch"
 
-cat >> "${PATCH}" << EOF
+cat > "${PATCH}" << EOF
 credentialsMode: Manual
 EOF
 

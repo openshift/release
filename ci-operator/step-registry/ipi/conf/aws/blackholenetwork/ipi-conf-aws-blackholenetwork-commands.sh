@@ -330,7 +330,7 @@ echo "Subnets : ${subnets}"
 # save stack information to ${SHARED_DIR} for deprovision step
 echo "${STACK_NAME}" >> "${SHARED_DIR}/blackholenetworkstackname"
 
-cat >> "${PATCH}" << EOF
+cat > "${PATCH}" << EOF
 platform:
   aws:
     subnets: ${subnets}
