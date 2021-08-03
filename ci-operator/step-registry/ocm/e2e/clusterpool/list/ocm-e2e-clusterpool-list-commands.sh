@@ -1,54 +1,114 @@
 #!/bin/bash
 
 temp=$(mktemp -d -t ocm-XXXXX)
-cd $temp || exit 1
+cd "$temp" || exit 1
 
-OUTPUT="$SHARED_DIR/$CLUSTERPOOL_LIST_FILE"
+echo "INFO Setting clusterpool list file"
+LIST_FILE="$SHARED_DIR/$CLUSTERPOOL_LIST_FILE"
+echo "     LIST_FILE: $LIST_FILE"
 
+echo "INFO Copying make file"
+echo "     MAKEFILE: $MAKEFILE"
 cp "$MAKEFILE" ./Makefile
 
-make clusterpool/list-clusterpools CLUSTERPOOL_LIST_ARGUMENTS=" -o json" > >(tee list.json ${ARTIFACT_DIR}/list.json)
+echo "INFO Getting list of all clusterpools in json format"
+make clusterpool/list-clusterpools CLUSTERPOOL_LIST_ARGUMENTS=" -o json" > >(tee list.json "${ARTIFACT_DIR}/list.json")
+echo "     --- end ---"
 
-jq -r '.items[] | select(.status.ready > 0) | .metadata.name' list.json > >(tee "$OUTPUT" "${ARTIFACT_DIR}/$CLUSTERPOOL_LIST_FILE")
+echo "Info Getting the names of all clusterpools in a ready state"
+jq -r '.items[] | select(.status.ready > 0) | .metadata.name' list.json > >(tee "$LIST_FILE" "${ARTIFACT_DIR}/$CLUSTERPOOL_LIST_FILE")
+echo "     --- end ---"
 
+echo "INFO Checking inclusion filter..."
 if [[ -n "$CLUSTERPOOL_LIST_INCLUSION_FILTER" ]]; then
-    grep -e "$CLUSTERPOOL_LIST_INCLUSION_FILTER" "$OUTPUT" > "$OUTPUT.tmp"
-    if [[ $(cat "$OUTPUT.tmp" | wc -l) == 0 ]]; then
+    echo "     CLUSTERPOOL_LIST_INCLUSION_FILTER: $CLUSTERPOOL_LIST_INCLUSION_FILTER"
+
+    echo "INFO Applying inclusion filter"
+    grep -e "$CLUSTERPOOL_LIST_INCLUSION_FILTER" "$LIST_FILE" > "$LIST_FILE.tmp"
+
+    echo "INFO Cluster list after filtering:"
+    cat "$LIST_FILE"
+    echo "     --- end ---"
+
+    echo "INFO Number of clusterpools after inclusion filter:"
+    echo "     ---$(wc -l < "$LIST_FILE.tmp")---"
+
+    echo "INFO Checking if any clusters are left..."
+    if [[ $(wc -l < "$LIST_FILE.tmp") == 0 ]]; then
         echo "ERROR No clusters left after applying inclusion filter."
-        echo "Inclusion filter: $CLUSTERPOOL_LIST_INCLUSION_FILTER"
-        echo "Original clusters:"
-        cat "$OUTPUT"
         exit 1
     fi
-    mv "$OUTPUT.tmp" "$OUTPUT"
+
+    echo "INFO Updating list of available clusters"
+    mv "$LIST_FILE.tmp" "$LIST_FILE"
+else
+    echo "     inclusion filter not provided"
 fi
 
+echo "INFO Checking exclusion filter"
 if [[ -n "$CLUSTERPOOL_LIST_EXCLUSION_FILTER" ]]; then
-    grep -v -e "$CLUSTERPOOL_LIST_EXCLUSION_FILTER" "$OUTPUT" > "$OUTPUT.tmp"
-    if [[ $(cat "$OUTPUT.tmp" | wc -l) == 0 ]]; then
+    echo "     CLUSTERPOOL_LIST_EXCLUSION_FILTER: $CLUSTERPOOL_LIST_EXCLUSION_FILTER"
+
+    echo "INFO Applying exclusion filter"
+    grep -e "$CLUSTERPOOL_LIST_EXCLUSION_FILTER" "$LIST_FILE" > "$LIST_FILE.tmp"
+
+    echo "INFO Cluster list after filtering:"
+    cat "$LIST_FILE.tmp"
+    echo "     --- end ---"
+
+    echo "INFO Number of clusterpools after exclusion filter:"
+    echo "     ---$(wc -l < "$LIST_FILE.tmp")---"
+
+    echo "INFO Checking if any clusters are left..."
+    if [[ $(wc -l < "$LIST_FILE.tmp") == 0 ]]; then
         echo "ERROR No clusters left after applying exclusion filter."
-        echo "Exclusion filter: $CLUSTERPOOL_LIST_EXCLUSION_FILTER"
-        echo "Original clusters:"
-        cat "$OUTPUT"
         exit 1
     fi
-    mv "$OUTPUT.tmp" "$OUTPUT"
+    echo "INFO Updating list of available clusterpools"
+    mv "$LIST_FILE.tmp" "$LIST_FILE"
+else
+    echo "     exclusion filter not provided"
 fi
 
-echo "$OUTPUT after filtering:"
-cat "$OUTPUT"
-echo "---"
+echo "INFO Available clusterpool list:"
+cat "$LIST_FILE"
+echo "     --- end ---"
 
+echo "INFO Checking if list needs to be reordered"
+echo "     CLUSTERPOOL_LIST_ORDER: $CLUSTERPOOL_LIST_ORDER"
 case "$CLUSTERPOOL_LIST_ORDER" in
+    "")
+        echo "     CLUSTERPOOL_LIST_ORDER is empty"
+        echo "     Will not change list order"
+        ;;
     sort)
-        sort "$OUTPUT" > "$OUTPUT.tmp"
-        mv "$OUTPUT.tmp" "$OUTPUT"
+        echo "INFO Sorting clusterpool list"
+        sort "$LIST_FILE" > "$LIST_FILE.tmp"
+        
+        echo "INFO Sorted clusterpool list:"
+        cat "$LIST_FILE.tmp"
+        echo "     --- end ---"
+
+        echo "INFO Updating list of available clusterpools"
+        mv "$LIST_FILE.tmp" "$LIST_FILE"
         ;;
     shuffle)
-        shuf "$OUTPUT" > "$OUTPUT.tmp"
-        mv "$OUTPUT.tmp" "$OUTPUT"
+        echo "INFO Shuffling clusterpool list"
+        shuf "$LIST_FILE" > "$LIST_FILE.tmp"
+        
+        echo "INFO Shuffled clusterpool list:"
+        cat "$LIST_FILE.tmp"
+        echo "     --- end ---"
+
+        echo "INFO Updating list of available clusterpools"
+        mv "$LIST_FILE.tmp" "$LIST_FILE"
+        ;;
+    *)
+        echo "     Invalid CLUSTERPOOL_LIST_ORDER"
+        echo "     Ignoring"
         ;;
 esac
 
-echo "Cluster pools"
-cat "$OUTPUT"
+echo "INFO Final clusterpool list:"
+cat "$LIST_FILE"
+echo "     --- end ---"
