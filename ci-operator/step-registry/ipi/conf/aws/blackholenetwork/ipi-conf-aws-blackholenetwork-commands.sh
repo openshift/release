@@ -304,10 +304,8 @@ Outputs:
 EOF
 
 # BootstrapInstanceType gets its value from pkg/types/aws/defaults/platform.go
-architecture="amd64"
 arch_instance_type=m5
 if [[ "${CLUSTER_TYPE}" == "aws-arm64" ]]; then
-  architecture="arm64"
   arch_instance_type=m6g
 fi
 BOOTSTRAP_NODE_TYPE=${arch_instance_type}.large
