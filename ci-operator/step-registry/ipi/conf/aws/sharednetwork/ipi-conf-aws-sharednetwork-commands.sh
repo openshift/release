@@ -21,13 +21,10 @@ CLUSTER_NAME="$(/tmp/yq r "${CONFIG}" 'metadata.name')"
 
 curl -L https://raw.githubusercontent.com/openshift/installer/master/upi/aws/cloudformation/01_vpc.yaml -o /tmp/01_vpc.yaml
 
-MAX_ZONES_COUNT="$(cat "${SHARED_DIR}/maxzonescount")"
-
-ZONE_COUNT=3
-if [[ "${MAX_ZONES_COUNT}" -lt 3 ]]
-	
+# The above cloudformation template's max zones account is 3
+if [[ "${ZONES_COUNT}" -gt 3 ]]
 then
-  ZONE_COUNT="${MAX_ZONES_COUNT}"
+  ZONES_COUNT=3
 fi
 
 STACK_NAME="${CLUSTER_NAME}-shared-vpc"
@@ -50,7 +47,21 @@ echo "Subnets : ${subnets}"
 # save stack information to ${SHARED_DIR} for deprovision step
 echo "${STACK_NAME}" >> "${SHARED_DIR}/sharednetworkstackname"
 
+# Generate working availability zones from the region
+mapfile -t AVAILABILITY_ZONES < <(aws --region "${REGION}" ec2 describe-availability-zones | jq -r '.AvailabilityZones[] | select(.State == "available") | .ZoneName' | sort -u)
+ZONES=("${AVAILABILITY_ZONES[@]:0:${ZONES_COUNT}}")
+ZONES_STR="[ $(join_by , "${ZONES[@]}") ]"
+echo "AWS region: ${REGION} (zones: ${ZONES_STR})"
+
 cat >> "${PATCH}" << EOF
+controlPlane:
+  platform:
+    aws:
+      zones: ${ZONES_STR}
+compute:
+- platform:
+    aws:
+      zones: ${ZONES_STR}
 platform:
   aws:
     subnets: ${subnets}
