@@ -32,7 +32,7 @@ if [[ -n "$CLUSTERPOOL_LIST_INCLUSION_FILTER" ]]; then
     echo "     CLUSTERPOOL_LIST_INCLUSION_FILTER: $CLUSTERPOOL_LIST_INCLUSION_FILTER"
 
     echo "INFO Applying inclusion filter"
-    grep -e "$CLUSTERPOOL_LIST_INCLUSION_FILTER" "$LIST_FILE" > "$LIST_FILE.tmp"
+    grep -e "$CLUSTERPOOL_LIST_INCLUSION_FILTER" "$LIST_FILE" > "$LIST_FILE.tmp" || true
 
     echo "INFO Cluster list after filtering:"
     cat "$LIST_FILE"
@@ -58,7 +58,7 @@ if [[ -n "$CLUSTERPOOL_LIST_EXCLUSION_FILTER" ]]; then
     echo "     CLUSTERPOOL_LIST_EXCLUSION_FILTER: $CLUSTERPOOL_LIST_EXCLUSION_FILTER"
 
     echo "INFO Applying exclusion filter"
-    grep -e "$CLUSTERPOOL_LIST_EXCLUSION_FILTER" "$LIST_FILE" > "$LIST_FILE.tmp"
+    grep -e "$CLUSTERPOOL_LIST_EXCLUSION_FILTER" "$LIST_FILE" > "$LIST_FILE.tmp" || true
 
     echo "INFO Cluster list after filtering:"
     cat "$LIST_FILE.tmp"
