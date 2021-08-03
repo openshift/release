@@ -30,7 +30,7 @@ az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIEN
 az group create -l "${azure_region}" -n "${existing_rg}"
 
 # create a patch with existing resource group configuration
-cat >> "${PATCH}" << EOF
+cat > "${PATCH}" << EOF
 platform:
   azure:
     resourceGroupName: ${existing_rg}
