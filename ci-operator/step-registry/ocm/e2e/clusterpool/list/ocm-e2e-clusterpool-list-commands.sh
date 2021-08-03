@@ -58,7 +58,7 @@ if [[ -n "$CLUSTERPOOL_LIST_EXCLUSION_FILTER" ]]; then
     echo "     CLUSTERPOOL_LIST_EXCLUSION_FILTER: $CLUSTERPOOL_LIST_EXCLUSION_FILTER"
 
     echo "INFO Applying exclusion filter"
-    grep -e "$CLUSTERPOOL_LIST_EXCLUSION_FILTER" "$LIST_FILE" > "$LIST_FILE.tmp" || true
+    grep -v -e "$CLUSTERPOOL_LIST_EXCLUSION_FILTER" "$LIST_FILE" > "$LIST_FILE.tmp" || true
 
     echo "INFO Cluster list after filtering:"
     cat "$LIST_FILE.tmp"
