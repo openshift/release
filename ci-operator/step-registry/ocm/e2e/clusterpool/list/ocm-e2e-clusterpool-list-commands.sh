@@ -12,11 +12,19 @@ echo "     MAKEFILE: $MAKEFILE"
 cp "$MAKEFILE" ./Makefile
 
 echo "INFO Getting list of all clusterpools in json format"
-make clusterpool/list-clusterpools CLUSTERPOOL_LIST_ARGUMENTS=" -o json" > >(tee list.json "${ARTIFACT_DIR}/list.json")
+make clusterpool/list-clusterpools CLUSTERPOOL_LIST_ARGUMENTS=" -o json" > list.json
+echo "INFO Saving clusterpool json file to artifact directory"
+cp list.json "${ARTIFACT_DIR}/list.json"
+echo "INFO Clusterpool list json file"
+cat list.json
 echo "     --- end ---"
 
 echo "Info Getting the names of all clusterpools in a ready state"
-jq -r '.items[] | select(.status.ready > 0) | .metadata.name' list.json > >(tee "$LIST_FILE" "${ARTIFACT_DIR}/$CLUSTERPOOL_LIST_FILE")
+jq -r '.items[] | select(.status.ready > 0) | .metadata.name' list.json > "$LIST_FILE"
+echo "INFO Saving clusterpool ready list to artifact directory"
+cp "$LIST_FILE" "${ARTIFACT_DIR}/$CLUSTERPOOL_LIST_FILE"
+echo "INFO All ready clusterpools:"
+cat "$LIST_FILE"
 echo "     --- end ---"
 
 echo "INFO Checking inclusion filter..."
