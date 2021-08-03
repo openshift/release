@@ -63,7 +63,7 @@ MAX_ZONES_COUNT="${#ZONES[@]}"
 # Save max zones count information to ${SHARED_DIR} for use in other scenarios
 echo "${MAX_ZONES_COUNT}" >> "${SHARED_DIR}/maxzonescount"
 
-existing_zones_setting=$(yq r zone.yaml 'controlPlane.platform.aws.zones')
+existing_zones_setting=$(/tmp/yq r "${CONFIG}" 'controlPlane.platform.aws.zones')
 
 if [[ ${existing_zones_setting} == "" ]]; then
   ZONES_COUNT=${ZONES_COUNT:-2}
@@ -87,7 +87,7 @@ else
 fi
 
 PATCH="${SHARED_DIR}/install-config-common.yaml.patch"
-cat >> "${CONFIG}" << EOF
+cat >> "${PATCH}" << EOF
 baseDomain: ${BASE_DOMAIN}
 platform:
   aws:
@@ -108,3 +108,4 @@ compute:
     aws:
       type: ${COMPUTE_NODE_TYPE}
 EOF
+/tmp/yq m -x -i "${CONFIG}" "${PATCH}"
