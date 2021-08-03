@@ -32,9 +32,6 @@ gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
 gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
 gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
-# Setup Test Env
-# TODO (copejon) hacky workaround to setup the env.  Once merged, drop the systemctl and rm commands and add
-#   curl -sfL https://raw.githubusercontent.com/redhat-et/microshift/main/scripts/setup-env.sh | sh -
 cat > "${HOME}"/microshift-service <<EOF
 [Unit]
 Description=Microshift
@@ -47,212 +44,92 @@ User=root
 WantedBy=multi-user.target
 EOF
 
-cat > "${HOME}"/configure-e2e-host.sh <<'EOF'
-#! /bin/bash
-set -euxo pipefail
-
-VERSION=$(curl -s https://api.github.com/repos/redhat-et/microshift/releases | grep tag_name | head -n 1 | cut -d '"' -f 4)
-
-# Function to get Linux distribution
-get_distro() {
-    DISTRO=$(egrep '^(ID)=' /etc/os-release| sed 's/"//g' | cut -f2 -d"=")
-    if [[ $DISTRO != @(rhel|fedora|centos) ]]
-    then
-      echo "This Linux distro is not supported by the install script"
-      exit 1
-    fi
-
-}
-
-# Function to get system architecture
-get_arch() {
-    ARCH=$(uname -m)
-}
-
-# If RHEL, use subscription-manager to register
-register_subs() {
-    set +e +o pipefail
-    REPO="rhocp-4.7-for-rhel-8-x86_64-rpms"
-    # Check subscription status and register if not
-    STATUS=$(sudo subscription-manager status | awk '/Overall Status/ { print $3 }')
-    if [[ $STATUS != "Current" ]]
-    then
-        sudo subscription-manager register --auto-attach < /dev/tty
-        POOL=$(sudo subscription-manager list --available --matches '*OpenShift' | grep Pool | head -n1 | awk -F: '{print $2}' | tr -d ' ')
-	sudo subscription-manager attach --pool $POOL
-        sudo subscription-manager config --rhsm.manage_repos=1
-    fi
-    set -e -o pipefail
-    # Check if already subscribed to the proper repository
-    if ! sudo subscription-manager repos --list-enabled | grep -q ${REPO}
-    then
-        sudo subscription-manager repos --enable=${REPO}
-    fi
-}
-
-# Apply SElinux policies
-apply_selinux_policy() {
-    # sudo semanage fcontext -a -t container_runtime_exec_t /usr/local/bin/microshift ||
-    #   sudo semanage fcontext -m -t container_runtime_exec_t /usr/local/bin/microshift
-    # sudo mkdir -p /var/lib/kubelet/
-    # sudo chcon -R -t container_file_t /var/lib/kubelet/
-    # sudo chcon -R system_u:object_r:bin_t:s0 /usr/local/bin/microshift
-    sudo setenforce 0
-    sudo sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/selinux/config
-}
-# Install dependencies
-install_dependencies() {
-    sudo dnf install -y \
-    policycoreutils-python-utils \
-    conntrack \
-    firewalld 
-}
-
-# Establish Iptables rules
-establish_firewall () {
-sudo systemctl enable firewalld --now
-sudo firewall-cmd --zone=public --permanent --add-port=6443/tcp
-sudo firewall-cmd --zone=public --permanent --add-port=30000-32767/tcp
-sudo firewall-cmd --zone=public --permanent --add-port=2379-2380/tcp
-sudo firewall-cmd --zone=public --add-masquerade --permanent
-sudo firewall-cmd --zone=public --add-port=10250/tcp --permanent
-sudo firewall-cmd --zone=public --add-port=10251/tcp --permanent
-sudo firewall-cmd --permanent --zone=trusted --add-source=10.42.0.0/16
-sudo firewall-cmd --reload
-}
-
-
-# Install CRI-O depending on the distro
-install_crio() {
-    case $DISTRO in
-      "fedora")
-        sudo dnf module -y enable cri-o:1.20
-        sudo dnf install -y cri-o cri-tools
-      ;;
-      "rhel")
-        sudo dnf install cri-o cri-tools -y
-      ;;
-      "centos")
-        CRIOVERSION=1.20
-        OS=CentOS_8_Stream
-        sudo curl -L -o /etc/yum.repos.d/devel:kubic:libcontainers:stable.repo https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/$OS/devel:kubic:libcontainers:stable.repo
-        sudo curl -L -o /etc/yum.repos.d/devel:kubic:libcontainers:stable:cri-o:$CRIOVERSION.repo https://download.opensuse.org/repositories/devel:kubic:libcontainers:stable:cri-o:$CRIOVERSION/$OS/devel:kubic:libcontainers:stable:cri-o:$CRIOVERSION.repo
-        sudo dnf install -y cri-o cri-tools
-      ;;
-    esac
-}
-
-
-# CRI-O config to match Microshift networking values
-crio_conf() {
-    sudo sed -i 's/10.85.0.0\/16/10.42.0.0\/24/' /etc/cni/net.d/100-crio-bridge.conf
-    sudo sed -i 's/0.3.1/0.4.0/' /etc/cni/net.d/100-crio-bridge.conf
-
-     if [ "$DISTRO" == "rhel" ]; then
-        sudo sed -i 's|/usr/libexec/crio/conmon|/usr/bin/conmon|' /etc/crio/crio.conf 
-     fi
-}
-
-# Start CRI-O
-verify_crio() {
-    sudo systemctl enable crio
-    sudo systemctl restart crio
-
-}
-
-# Download and install kubectl
-get_kubectl() {
-    curl -LO "https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl"
-    sudo chmod +x ./kubectl
-    sudo mv ./kubectl /usr/local/bin/kubectl
-
-}
-
-# Download and install microshift
-get_microshift() {
-    if [ $ARCH = "x86_64" ]; then
-        curl -L https://github.com/redhat-et/microshift/releases/download/$VERSION/microshift-linux-amd64 -o microshift
-        curl -L https://github.com/redhat-et/microshift/releases/download/$VERSION/release.sha256 -o release.sha256
-    fi
-
-    SHA=$(sha256sum microshift | awk '{print $1}')
-    if [[ $SHA != $(cat release.sha256 | awk '{print $1}') ]]; then echo "SHA256 checksum failed" && exit 1; fi
-
-    sudo chmod +x microshift
-    sudo mv microshift /usr/local/bin/
-
-    apply_selinux_policy
-
-    sudo systemctl enable microshift.service --now
-
-}
-
-# Locate kubeadmin configuration to default kubeconfig location
-prepare_kubeconfig() {
-    mkdir -p $HOME/.kube
-    if [ -f $HOME/.kube/config ]; then
-        mv $HOME/.kube/config $HOME/.kube/config.orig
-    fi
-    sudo KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig:$HOME/.kube/config.orig  /usr/local/bin/kubectl config view --flatten > $HOME/.kube/config
-}
-
-# validation checks for deployment 
-validation_check(){
-    echo $HOSTNAME | grep -P '(?=^.{1,254}$)(^(?>(?!\d+\.)[a-zA-Z0-9_\-]{1,63}\.?)+(?:[a-zA-Z]{2,})$)' && echo "Correct"
-    if [ $? != 0 ];
-    then
-        echo "The hostname $HOSTNAME is incompatible with this installation please update your hostname and try again. "
-        echo "Example: 'sudo hostnamectl set-hostname $HOSTNAME.example.com'"
-        exit 1
-    else
-        echo "$HOSTNAME is a valid machine name continuing installation"
-    fi
-}
-
-# Script execution
-get_distro
-get_arch
-if [ $DISTRO = "rhel" ]; then
-    register_subs
-fi
-# let's see what happens if disable validation check
-#validation_check
-install_dependencies
-establish_firewall
-install_crio
-crio_conf
-verify_crio
-get_kubectl
-get_microshift
-
-until sudo test -f /var/lib/microshift/resources/kubeadmin/kubeconfig
-do
-     sleep 2
-done
-prepare_kubeconfig
-
-sudo systemctl disable --now microshift.service
-sudo rm -rf /var/lib/microshift
-sudo rm -f /usr/local/bin/microshift
-EOF
-chmod +x "${HOME}"/configure-e2e-host.sh
-
 # smoke-tests script to scp to gcp instance
 # TODO: edit this file to launch microshift and run tests
 cat  > "${HOME}"/run-smoke-tests.sh << 'EOF'
 #!/bin/bash
-set -euxo pipefail
+set -euo pipefail
+
+systemctl disable --now firewalld
+
+export KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig
 
 # Tests execution
-echo ### Running microshift smoke-tests
-echo ### Start /usr/bin/microshift run and run commands to perform smoke-tests
+echo '### Running microshift smoke-tests'
 
-microshift version
-microshift run
+echo '### Start /usr/bin/microshift run and run commands to perform smoke-tests'
+systemctl enable --now microshift.service
+start=$(date '+%s')
+to=120
+until oc get nodes; do
+  echo "waiting for node response"
+  sleep 10
+  if [ $(( $(date '+%s') - start )) -ge $to ]; then
+    exit 1
+  fi
+done
+
+LABELS=(
+'dns.operator.openshift.io/daemonset-dns=default'
+'app=flannel'
+'ingresscontroller.operator.openshift.io/deployment-ingresscontroller=default'
+'app=service-ca'
+'k8s-app=kubevirt-hostpath-provisioner'
+)
+
+to=300
+for l in "${LABELS[@]}"; do
+  echo "waiting on pods with label $l"
+  start=$(date '+%s')
+  while :; do
+    containersReady="$(oc get pods -A -l $l -o jsonpath='{.items[*].status.conditions}' | \
+        jq -r '.[] | select(.type == "ContainersReady") | .status')"
+    if [ "$containersReady" = "True" ]; then
+    echo "Pod (label: $l), all containers running"
+      break
+    elif [ $(( $(date '+%s') - start )) -ge $to ]; then
+      echo "timed out waiting for pod, label: $l"
+      podNamespaceName="$(oc get pod -A -l $l --no-headers -o custom-columns="NS:.metadata.namespace,NAME:.metadata.name")"
+      if [ "$l" = "dns" ]; then
+        container="-c dns"
+      fi
+      oc logs -f -n $podNamespaceName  "$l" || true
+      journalctl -u microshift
+      exit 1
+    fi
+    echo "retrying pod, label $l"
+    sleep 3
+  done
+done
+echo "All pod containers are Ready"
 EOF
 chmod +x "${HOME}"/run-smoke-tests.sh
 
 set -x
+
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  rhel8user@"${INSTANCE_PREFIX}" \
+  --command 'sudo dnf install subscription-manager -y'
+  
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  rhel8user@"${INSTANCE_PREFIX}" \
+  --command "sudo subscription-manager register \
+  --password=$(cat /var/run/rhsm/subscription-manager-passwd ) \
+  --username=$(cat /var/run/rhsm/subscription-manager-user)"
+
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  rhel8user@"${INSTANCE_PREFIX}" \
+  --command 'sudo dnf install jq -y'
+
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  rhel8user@"${INSTANCE_PREFIX}" \
+  --command 'sudo setenforce 0'
+
+# scp and install microshift.service
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \
   --project "${GOOGLE_PROJECT_ID}" \
@@ -264,19 +141,43 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJE
   rhel8user@"${INSTANCE_PREFIX}" \
   --command 'sudo mv microshift-service /usr/lib/systemd/system/microshift.service'
 
-# scp and install microshift binary and smoke-tests script
+# scp and install microshift binary
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \
   --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
-  --recurse /bin/microshift rhel8user@"${INSTANCE_PREFIX}":~/microshift
+  --recurse /usr/bin/microshift rhel8user@"${INSTANCE_PREFIX}":~/microshift
 
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  rhel8user@"${INSTANCE_PREFIX}" \
+  --command 'sudo mv microshift /usr/local/bin/microshift'
+
+# scp and install oc binary
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \
   --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
-  --recurse "${HOME}"/configure-e2e-host.sh rhel8user@"${INSTANCE_PREFIX}":~/configure-e2e-host.sh
+  --recurse /usr/bin/oc rhel8user@"${INSTANCE_PREFIX}":~/oc
 
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  rhel8user@"${INSTANCE_PREFIX}" \
+  --command 'sudo mv oc /usr/bin/oc'
+
+# scp and run install.sh
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+  --quiet \
+  --project "${GOOGLE_PROJECT_ID}" \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  --recurse /usr/bin/install.sh rhel8user@"${INSTANCE_PREFIX}":~/install.sh
+
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  rhel8user@"${INSTANCE_PREFIX}" \
+  --command 'sudo HOSTNAME=$(hostname -A) CONFIG_ENV_ONLY=true ./install.sh'
+
+# scp smoke test script and pull secret
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \
   --project "${GOOGLE_PROJECT_ID}" \
@@ -289,17 +190,8 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   --recurse "${HOME}"/pull-secret rhel8user@"${INSTANCE_PREFIX}":~/pull-secret
 
+# start the test
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
-  --command './configure-e2e-host.sh'
-
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  rhel8user@"${INSTANCE_PREFIX}" \
-  --command 'sudo mv microshift /usr/bin/microshift'
-
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  rhel8user@"${INSTANCE_PREFIX}" \
-  --command './run-smoke-tests.sh'
+  --command 'sudo ./run-smoke-tests.sh'

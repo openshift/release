@@ -3,6 +3,10 @@ base_images:
     name: "4.8"
     namespace: ocp
     tag: base
+  cli:
+    name: "4.7"
+    namespace: ocp
+    tag: cli
   libvirt-installer:
     name: "4.8"
     namespace: ocp
@@ -54,21 +58,28 @@ images:
   to: linux-arm64-4.7.0-0.microshift
 - dockerfile_literal: |
     FROM os
-    COPY mock-nss.sh /bin/mock-nss.sh
+    COPY mock-nss.sh /usr/bin/mock-nss.sh
     COPY google-cloud-sdk.repo /etc/yum.repos.d/google-cloud-sdk.repo
-    COPY microshift /bin/microshift
+    COPY microshift /usr/bin/microshift
+    COPY oc /usr/bin/oc
+    COPY install.sh /usr/bin/install.sh
     RUN  dnf update -y && \
          dnf --enablerepo=powertools install --setopt=tsflags=nodocs -y \
          glib2-devel glibc-devel glibc-static gpgme-devel libassuan-devel \
          google-cloud-sdk nss_wrapper openssh-clients && \
          dnf clean all && rm -rf /var/cache/dnf/*
-    RUN  chgrp -R 0 /bin/microshift && chmod -R g=u /bin/microshift
   from: os
   inputs:
     bin:
       paths:
       - destination_dir: .
         source_path: /go/src/github.com/redhat-et/microshift/_output/bin/linux_amd64/microshift
+      - destination_dir: .
+        source_path: /go/src/github.com/redhat-et/microshift/install.sh
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
     libvirt-installer:
       paths:
       - destination_dir: .

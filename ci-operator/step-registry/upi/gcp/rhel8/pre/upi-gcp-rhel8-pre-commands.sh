@@ -45,4 +45,5 @@ gcloud compute instances create "${INSTANCE_PREFIX}" \
   --machine-type e2-standard-8 \
   --boot-disk-type pd-ssd \
   --subnet "${INSTANCE_PREFIX}" \
-  --network "${INSTANCE_PREFIX}"
+  --network "${INSTANCE_PREFIX}" \
+  --hostname "release-ci-${INSTANCE_PREFIX}.microshift-ci.com"
