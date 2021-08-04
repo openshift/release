@@ -134,6 +134,7 @@ monitoring_pod="$( oc --insecure-skip-tls-verify get pods -n openshift-monitorin
 queue ${ARTIFACT_DIR}/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${monitoring_pod}" -- tar cvzf - -C /prometheus .
 
 cat >> ${SHARED_DIR}/custom-links.txt << EOF
+<p>
 <script>
 let a = document.createElement('a');
 a.href="https://promecieus.dptools.openshift.org/?search="+document.referrer;
@@ -141,6 +142,8 @@ a.innerHTML="PromeCIeus";
 a.target="_blank";
 document.getElementById("wrapper").append(a);
 </script>
+  - PromeCIeus runs a monitoring stack based on the metrics dump from a CI run.  Commonly used for inspecting alert failures.
+</p>
 EOF
 
 FILTER=gzip queue ${ARTIFACT_DIR}/metrics/prometheus-target-metadata.json.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${monitoring_pod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/targets/metadata --data-urlencode 'match_target={instance!=\"\"}'"
