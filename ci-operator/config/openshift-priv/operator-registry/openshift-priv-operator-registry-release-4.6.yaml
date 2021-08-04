@@ -1,0 +1,54 @@
+base_images:
+  base:
+    name: 4.6-priv
+    namespace: ocp-private
+    tag: base
+  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.6
+  ocp_builder_rhel-8-golang-openshift-4.6:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6
+  ocp_builder_rhel-8-golang-openshift-4.6-clang:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-openshift-4.6-clang
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+canonical_go_repository: github.com/operator-framework/operator-registry
+images:
+- from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
+  to: operator-registry
+promotion:
+  name: 4.6-priv
+  namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: 4.6-priv
+  namespace: ocp-private
+tests:
+- as: unit
+  commands: make unit
+  container:
+    from: src
+- as: e2e-aws
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+zz_generated_metadata:
+  branch: release-4.6
+  org: openshift-priv
+  repo: operator-registry

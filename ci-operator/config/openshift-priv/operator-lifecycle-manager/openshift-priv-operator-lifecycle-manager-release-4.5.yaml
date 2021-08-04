@@ -1,0 +1,68 @@
+base_images:
+  base:
+    name: 4.5-priv
+    namespace: ocp-private
+    tag: base
+build_root:
+  project_image:
+    dockerfile_path: base.Dockerfile
+canonical_go_repository: github.com/operator-framework/operator-lifecycle-manager
+images:
+- from: base
+  to: operator-lifecycle-manager
+promotion:
+  name: 4.5-priv
+  namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: 4.5-priv
+  namespace: ocp-private
+tests:
+- as: verify
+  commands: make verify
+  container:
+    from: src
+- as: unit
+  commands: make unit
+  container:
+    from: src
+- as: e2e-gcp
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp
+- as: e2e-aws-olm
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-console-olm
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: ./test-prow-e2e.sh olmFull
+      from: stable:console-tests
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-upgrade
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-upgrade-gcp
+zz_generated_metadata:
+  branch: release-4.5
+  org: openshift-priv
+  repo: operator-lifecycle-manager
