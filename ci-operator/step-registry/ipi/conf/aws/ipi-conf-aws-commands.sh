@@ -21,7 +21,6 @@ if [[ "${CLUSTER_TYPE}" == "aws-arm64" ]]; then
   # end of hack
 fi
 
-echo "Installer version: $(openshift-install version)"
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
 expiration_date=$(date -d '8 hours' --iso=minutes --utc)
