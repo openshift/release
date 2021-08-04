@@ -270,3 +270,8 @@ ci-secret-bootstrap-config:
 new-pool-admins:
 	hack/generate_new_pool_admins.sh $(TEAM) $(OWNERS)
 .PHONY: new-pool-admins
+
+openshift-image-mirror-mappings:
+	$(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/promoted-image-governor:latest
+	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR):/release:z" registry.ci.openshift.org/ci/promoted-image-governor:latest --ci-operator-config-path /release/ci-operator/config --release-controller-mirror-config-dir /release/core-services/release-controller/_releases --openshift-mapping-dir /release/core-services/image-mirroring/openshift --openshift-mapping-config /release/core-services/image-mirroring/openshift/_config.yaml
+.PHONY: openshift-image-mirror-mappings
