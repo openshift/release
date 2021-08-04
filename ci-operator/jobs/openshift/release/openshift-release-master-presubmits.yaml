@@ -1064,6 +1064,41 @@ presubmits:
         name: tmp
     trigger: (?m)^/test( | .* )vsphere-dry,?($|\s.*)
   - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: build02
+    context: ci/prow/openshift-image-mirror-mappings
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-openshift-image-mirror-mappings
+    rerun_command: /test openshift-image-mirror-mappings
+    spec:
+      containers:
+      - args:
+        - -c
+        - |
+          set -o errexit
+          set -o nounset
+          set -o pipefail
+          /usr/bin/promoted-image-governor --ci-operator-config-path=ci-operator/config --release-controller-mirror-config-dir=core-services/release-controller/_releases --openshift-mapping-dir=core-services/image-mirroring/openshift --openshift-mapping-config=core-services/image-mirroring/openshift/_config.yaml --dry-run=true
+          git add -N .
+          if ! git diff --exit-code; then
+            >&2 echo "run 'make openshift-image-mirror-mappings' if the promote tags to the ocp or origin namespaces are changed in the pull request"
+            git diff
+            exit 1
+          fi
+        command:
+        - /bin/bash
+        image: promoted-image-governor:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: "1"
+    trigger: (?m)^/test( | .* )openshift-image-mirror-mappings,?($|\s.*)
+  - agent: kubernetes
     always_run: false
     branches:
     - master
