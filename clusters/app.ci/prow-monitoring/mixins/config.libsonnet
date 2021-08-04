@@ -28,11 +28,6 @@
         channel: '#build-cop-alerts',
         notify: 'build-cop',
       },
-      'openshift-library': {
-        team: 'developer-experience',
-        channel: '#forum-devex',
-        notify: 'devex',
-      },
       'endurance-cluster': {
         team: 'build-cop',
         channel: '#build-cop-alerts',

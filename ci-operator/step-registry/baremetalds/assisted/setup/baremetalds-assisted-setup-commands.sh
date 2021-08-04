@@ -96,6 +96,7 @@ echo "export ASSISTED_SERVICE_HOST=${IP}" >> /root/config
 echo "export CHECK_CLUSTER_VERSION=True" >> /root/config
 echo "export NUM_WORKERS=2" >> /root/config
 echo "export TEST_TEARDOWN=false" >> /root/config
+echo "export TEST_FUNC=test_install" >> /root/config
 echo "export INSTALLER_KUBECONFIG=\${REPO_DIR}/build/kubeconfig" >> /root/config
 
 if [[ -e /root/assisted-additional-config ]]
@@ -105,7 +106,7 @@ fi
 
 source /root/config
 
-make \${MAKEFILE_TARGET:-all}
+make \${MAKEFILE_TARGET:-create_full_environment run test_parallel}
 
 EOF
 

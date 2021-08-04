@@ -74,6 +74,11 @@ operator:
 promotion:
   name: assisted
   namespace: ocp-kni
+releases:
+  candidate:
+    release:
+      channel: candidate
+      version: "4.8"
 resources:
   '*':
     requests:
@@ -84,7 +89,6 @@ tag_specification:
   namespace: ocp
 test_binary_build_commands: |
   make build-openshift-ci-test-bin
-  curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.36.0
   go mod vendor
   mkdir /.cache && chmod 775 -R /.cache && chmod 775 -R $GOPATH
 tests:
@@ -214,6 +218,9 @@ tests:
 - as: e2e-metal-assisted-operator-disconnected
   steps:
     cluster_profile: packet
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
     env:
       DEVSCRIPTS_CONFIG: |
         AWS=SAW
@@ -233,6 +240,9 @@ tests:
 - as: e2e-metal-assisted-operator-ztp
   steps:
     cluster_profile: packet
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
     env:
       IP_STACK: v4
     workflow: baremetalds-assisted-operator-ztp
@@ -250,8 +260,13 @@ tests:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.8
         IPv6=yes
-        TEST_FUNC=test_install
-        MAKEFILE_TARGET="create_full_environment run test_parallel"
+    workflow: baremetalds-assisted-install
+- as: e2e-metal-assisted-none
+  steps:
+    cluster_profile: packet
+    env:
+      ASSISTED_CONFIG: |
+        PLATFORM=none
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-single-node
   steps:
@@ -260,8 +275,6 @@ tests:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.8
         NUM_MASTERS=1
-        TEST_FUNC=test_install
-        MAKEFILE_TARGET="create_full_environment run test_parallel"
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-kube-api
   steps:
@@ -278,6 +291,7 @@ tests:
         KUBE_API=yes
         OPENSHIFT_VERSION=4.8
         ENABLE_KUBE_API=true
+        MAKEFILE_TARGET=all
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted
   steps:
@@ -285,8 +299,6 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=""
-        TEST_FUNC=test_install
-        MAKEFILE_TARGET="create_full_environment run test_parallel"
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-olm
   steps:
@@ -294,7 +306,6 @@ tests:
     env:
       ASSISTED_CONFIG: |
         TEST_FUNC=test_olm_operator
-        MAKEFILE_TARGET="create_full_environment run test_parallel"
     workflow: baremetalds-assisted-install
 zz_generated_metadata:
   branch: master

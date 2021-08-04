@@ -1,0 +1,65 @@
+base_images:
+  base:
+    name: "4.9"
+    namespace: ocp
+    tag: base
+  ocp_builder_rhel-8-golang-1.16-openshift-4.8:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.16-openshift-4.8
+  openshift_release_golang-1.13:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+  openshift_release_golang-1.15:
+    name: release
+    namespace: openshift
+    tag: golang-1.15
+binary_build_commands: NO_DOCKER=1 make build
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  inputs:
+    openshift_release_golang-1.15:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.15
+  to: ibmcloud-machine-controllers
+promotion:
+  disabled: true
+  name: "4.9"
+  namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.9"
+  namespace: ocp
+tests:
+- as: unit
+  commands: NO_DOCKER=1 make test
+  container:
+    from: src
+- as: goimports
+  commands: IS_CONTAINER=TRUE NO_DOCKER=1 make goimports
+  container:
+    from: src
+- as: govet
+  commands: IS_CONTAINER=TRUE NO_DOCKER=1 make vet
+  container:
+    from: src
+- as: generate
+  commands: IS_CONTAINER=TRUE NO_DOCKER=1 make generate
+  container:
+    from: src
+- as: golint
+  commands: IS_CONTAINER=TRUE NO_DOCKER=1 make lint
+  container:
+    from: src
+zz_generated_metadata:
+  branch: release-4.9
+  org: openshift
+  repo: cluster-api-provider-ibmcloud

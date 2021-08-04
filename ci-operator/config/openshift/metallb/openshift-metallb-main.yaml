@@ -3,6 +3,10 @@ base_images:
     name: "4.9"
     namespace: ocp
     tag: base
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
   ocp_builder_rhel-8-golang-1.16-openshift-4.8:
     name: builder
     namespace: ocp
@@ -42,6 +46,26 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
+- as: metallb-l2-e2e-metal-ipi
+  steps:
+    cluster_profile: packet
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OpenShiftSDN
+        ENABLE_METALLB_MODE=l2
+        METALLB_REPO=https://github.com/openshift/metallb.git
+    workflow: baremetalds-metallb-e2e
+- as: metallb-l2-e2e-metal-ipi-ovn
+  steps:
+    cluster_profile: packet
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+        ENABLE_METALLB_MODE=l2
+        METALLB_REPO=https://github.com/openshift/metallb.git
+    workflow: baremetalds-metallb-e2e
 zz_generated_metadata:
   branch: main
   org: openshift

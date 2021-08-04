@@ -54,7 +54,7 @@ function annotate() {
 			fi
 		fi
 
-		retry 3 oc annotate -n "${namespace}" "is/${name}" "release.openshift.io/config=$( cat "${conf}" | jq -c . )" --overwrite
+		retry 10 oc annotate -n "${namespace}" "is/${name}" "release.openshift.io/config=$( cat "${conf}" | jq -c . )" --overwrite
 	fi
 }
 

@@ -37,7 +37,6 @@ function prepare_next_steps() {
 trap 'prepare_next_steps' EXIT TERM
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=$(read_shared_dir 'OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE')
 if [[ -z "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" ]]; then
   echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE is an empty string, exiting"
   exit 1
@@ -69,6 +68,23 @@ echo "Creating manifest"
 mock-nss.sh openshift-install create manifests --dir=${dir}
 sed -i '/^  channel:/d' ${dir}/manifests/cvo-overrides.yaml
 
+# Bumping up reserve memory for worker for ppc64le
+if [ "${ARCH}" == "ppc64le" ]; then
+  cat > "${dir}/manifests/manifest-reserve-sys-mem-kubeletconfig.yml" << EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: KubeletConfig
+metadata:
+  name: reserve-sys-mem
+spec:
+  machineConfigPoolSelector:
+    matchLabels:
+      pools.operator.machineconfiguration.openshift.io/worker: ""
+  kubeletConfig: 
+    systemReserved:
+      memory: 2Gi
+EOF
+fi
+
 # Bump the libvirt masters memory to 16GB
 export TF_VAR_libvirt_master_memory=${MASTER_MEMORY}
 ls ${dir}/openshift
@@ -99,7 +115,6 @@ openshift_install="$!"
 if [ "${BRANCH}" == "4.7" ] || [ "${BRANCH}" == "4.6" ]; then
   REMOTE_LIBVIRT_URI=$(read_shared_dir 'REMOTE_LIBVIRT_URI')
   CLUSTER_NAME=$(read_shared_dir 'CLUSTER_NAME')
-  CLUSTER_SUBNET=$(read_shared_dir 'CLUSTER_SUBNET')
 
   i=0
   while kill -0 $openshift_install 2> /dev/null; do
@@ -107,20 +122,8 @@ if [ "${BRANCH}" == "4.7" ] || [ "${BRANCH}" == "4.6" ]; then
     echo "Polling libvirt for network, attempt #$((++i))"
     LIBVIRT_NETWORK=$(mock-nss.sh virsh --connect "${REMOTE_LIBVIRT_URI}" net-list --name | grep "${CLUSTER_NAME::21}" || true)
     if [[ -n "${LIBVIRT_NETWORK}" ]]; then
-      cat > ${dir}/worker-hostrecords.xml << EOF
-<host ip='192.168.${CLUSTER_SUBNET}.1'>
-  <hostname>alertmanager-main-openshift-monitoring.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
-  <hostname>canary-openshift-ingress-canary.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
-  <hostname>console-openshift-console.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
-  <hostname>downloads-openshift-console.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
-  <hostname>grafana-openshift-monitoring.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
-  <hostname>oauth-openshift.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
-  <hostname>prometheus-k8s-openshift-monitoring.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
-  <hostname>test-disruption-openshift-image-registry.apps.${CLUSTER_NAME}.${LEASED_RESOURCE}</hostname>
-</host>
-EOF
       echo "Libvirt network found. Injecting worker DNS records."
-      mock-nss.sh virsh --connect "${REMOTE_LIBVIRT_URI}" net-update --network "${LIBVIRT_NETWORK}" --command add-last --section dns-host --xml "$(< ${dir}/worker-hostrecords.xml)"
+      mock-nss.sh virsh --connect "${REMOTE_LIBVIRT_URI}" net-update --network "${LIBVIRT_NETWORK}" --command add-last --section dns-host --xml "$(< ${SHARED_DIR}/worker-hostrecords.xml)"
       break
     fi
   done

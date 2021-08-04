@@ -15,7 +15,7 @@ SCORECARD_CONFIG="${SCORECARD_CONFIG:-/tmp/config/scorecard-basic-config.yml}"
 NAMESPACE=$(grep "install_namespace:" "${SHARED_DIR}"/oo_deployment_details.yaml | cut -d ':' -f2 | xargs)
 
 pushd "${ARTIFACT_DIR}"
-OPERATOR_DIR="test-operator-basic"
+OPERATOR_DIR="test-operator"
 
 echo "Starting the basic operator-sdk scorecard test for ${BUNDLE_IMAGE}"
 
@@ -34,3 +34,13 @@ operator-sdk scorecard --config "${SCORECARD_CONFIG}" \
                        --kubeconfig "${KUBECONFIG}" \
                        --output json \
                        "${OPERATOR_DIR}" > "${ARTIFACT_DIR}"/scorecard-output-basic.json || true
+
+if [ -f "${OPERATOR_DIR}/tests/scorecard/config.yaml" ]; then
+  echo "CUSTOM SCORECARD TESTS DETECTED"
+  echo "Running the operator-sdk scorecard test using the custom, bundle-provided configuration, json output and storing it in the artifacts directory"
+  operator-sdk scorecard \
+    --namespace=${NAMESPACE} \
+    --kubeconfig ${KUBECONFIG} \
+    --output json \
+    "${OPERATOR_DIR}" > "${ARTIFACT_DIR}"/scorecard-output-custom.json || true
+fi

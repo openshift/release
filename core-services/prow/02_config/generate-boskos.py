@@ -75,7 +75,13 @@ CONFIG = {
     },
     'hypershift-quota-slice': {
         'default': 15,
-    }
+    },
+    'ibmcloud-quota-slice': {
+        'default': 15,
+    },
+    'alibaba-quota-slice': {
+        'us-east-1': 10,
+    },
 }
 
 for i in range(2):

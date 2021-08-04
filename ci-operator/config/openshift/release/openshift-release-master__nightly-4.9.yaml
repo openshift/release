@@ -51,6 +51,10 @@ base_images:
     name: "4.9"
     namespace: ocp
     tag: libvirt-installer
+  openstack-installer:
+    name: "4.9"
+    namespace: ocp
+    tag: openstack-installer
   upi-installer:
     name: "4.9"
     namespace: ocp
@@ -247,6 +251,13 @@ tests:
   steps:
     cluster_profile: ovirt
     workflow: openshift-e2e-ovirt-conformance
+- as: e2e-ovirt-ovn
+  cron: 0 */12 * * *
+  steps:
+    cluster_profile: ovirt
+    env:
+      NETWORK_TYPE: OVNKubernetes
+    workflow: openshift-e2e-ovirt-conformance
 - as: e2e-ovirt-csi
   interval: 12h
   steps:
@@ -332,6 +343,17 @@ tests:
     - chain: ipi-gcp-pre
     - ref: fips-check
     workflow: openshift-e2e-gcp
+- as: e2e-openstack-fips
+  interval: 48h
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      FIPS_ENABLED: "true"
+      TEST_SUITE: experimental/reliability/minimal
+    pre:
+    - chain: ipi-openstack-pre
+    - ref: fips-check
+    workflow: openshift-e2e-openstack-ipi
 - as: console-aws
   interval: 48h
   steps:
@@ -422,116 +444,19 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-csi
-- as: e2e-remote-libvirt-s390x
-  cluster: build01
-  cron: 0 8,20 * * *
+- as: e2e-openstack-az
+  interval: 48h
   steps:
-    cluster_profile: libvirt-s390x
+    cluster_profile: openstack-vh-mecha
     env:
-      ARCH: s390x
-      BRANCH: "4.9"
-      TEST_TYPE: conformance-parallel
-    workflow: openshift-e2e-libvirt
-- as: image-ecosystem-remote-libvirt-s390x
-  cluster: build01
-  cron: 0 11,23 * * *
-  steps:
-    cluster_profile: libvirt-s390x
-    env:
-      ARCH: s390x
-      BRANCH: "4.9"
-      TEST_TYPE: image-ecosystem
-    workflow: openshift-e2e-libvirt
-- as: jenkins-e2e-remote-libvirt-s390x
-  cluster: build01
-  cron: 0 11,23 * * *
-  steps:
-    cluster_profile: libvirt-s390x
-    env:
-      ARCH: s390x
-      BRANCH: "4.9"
-      TEST_TYPE: jenkins-e2e-rhel-only
-    workflow: openshift-e2e-libvirt
-- as: e2e-serial-remote-libvirt-s390x
-  cluster: build01
-  cron: 0 8 * * 2
-  steps:
-    cluster_profile: libvirt-s390x
-    env:
-      ARCH: s390x
-      BRANCH: "4.9"
-      TEST_TYPE: conformance-serial
-    workflow: openshift-e2e-libvirt
-- as: e2e-compact-remote-libvirt-s390x
-  cluster: build01
-  cron: 0 10,22 * * *
-  steps:
-    cluster_profile: libvirt-s390x
-    env:
-      ARCH: s390x
-      BRANCH: "4.9"
-      MASTER_DISK: "64424509440"
-      MASTER_MEMORY: "32768"
-      TEST_TYPE: conformance-parallel
-      WORKER_DISK: "64424509440"
-      WORKER_MEMORY: "32768"
-      WORKER_REPLICAS: "0"
-    workflow: openshift-e2e-libvirt
-- as: e2e-remote-libvirt-ppc64le
-  cluster: build01
-  cron: 0 4,16 * * *
-  steps:
-    cluster_profile: libvirt-ppc64le
-    env:
-      ARCH: ppc64le
-      BRANCH: "4.9"
-      TEST_TYPE: conformance-parallel
-    workflow: openshift-e2e-libvirt
-- as: image-ecosystem-remote-libvirt-ppc64le
-  cluster: build01
-  cron: 0 8,20 * * *
-  steps:
-    cluster_profile: libvirt-ppc64le
-    env:
-      ARCH: ppc64le
-      BRANCH: "4.9"
-      TEST_TYPE: image-ecosystem
-    workflow: openshift-e2e-libvirt
-- as: jenkins-e2e-remote-libvirt-ppc64le
-  cluster: build01
-  cron: 0 8,20 * * *
-  steps:
-    cluster_profile: libvirt-ppc64le
-    env:
-      ARCH: ppc64le
-      BRANCH: "4.9"
-      TEST_TYPE: jenkins-e2e-rhel-only
-    workflow: openshift-e2e-libvirt
-- as: e2e-serial-remote-libvirt-ppc64le
-  cluster: build01
-  cron: 0 2 * * 2
-  steps:
-    cluster_profile: libvirt-ppc64le
-    env:
-      ARCH: ppc64le
-      BRANCH: "4.9"
-      TEST_TYPE: conformance-serial
-    workflow: openshift-e2e-libvirt
-- as: e2e-compact-remote-libvirt-ppc64le
-  cluster: build01
-  cron: 0 4,16 * * *
-  steps:
-    cluster_profile: libvirt-ppc64le
-    env:
-      ARCH: ppc64le
-      BRANCH: "4.9"
-      MASTER_DISK: "64424509440"
-      MASTER_MEMORY: "32768"
-      TEST_TYPE: conformance-parallel
-      WORKER_DISK: "64424509440"
-      WORKER_MEMORY: "32768"
-      WORKER_REPLICAS: "0"
-    workflow: openshift-e2e-libvirt
+      BASTION_FLAVOR: m1.small
+      TEST_SKIPS: Kubectl Port forwarding With a server listening on 0.0.0.0 should
+        support forwarding over websockets \| Kubectl client Simple pod should support
+        exec through kubectl proxy \| Kubectl client Simple pod should support exec
+        through an HTTP proxy \| Kubectl Port forwarding With a server listening on
+        localhost should support forwarding over websockets \| In-tree Volumes
+      ZONES_COUNT: "1"
+    workflow: openshift-e2e-openstack-byon
 zz_generated_metadata:
   branch: master
   org: openshift

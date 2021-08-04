@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   decorate: true
   interval: 30m
   labels:
@@ -158,7 +158,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   decorate: true
   interval: 8h
   labels:
@@ -279,7 +279,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   decorate: true
   interval: 8h
   labels:
@@ -400,7 +400,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -667,7 +667,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   decorate: true
   interval: 24h
   labels:
@@ -786,397 +786,6 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-- agent: kubernetes
-  cluster: build02
-  decorate: true
-  interval: 24h
-  labels:
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: release-openshift-origin-installer-e2e-aws-ovn-4.4
-  spec:
-    containers:
-    - args:
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --secret-dir=/usr/local/e2e-aws-ovn-cluster-profile
-      - --secret-dir=/usr/local/pull-secret
-      - --target=e2e-aws
-      - --template=/usr/local/e2e-aws
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      command:
-      - ci-operator
-      env:
-      - name: RELEASE_IMAGE_LATEST
-        value: registry.ci.openshift.org/ocp/release:4.4
-      - name: BRANCH
-        value: "4.4"
-      - name: CLUSTER_TYPE
-        value: aws
-      - name: CLUSTER_VARIANT
-        value: ovn
-      - name: CONFIG_SPEC
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 4Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
-          tests:
-          - as: e2e-$(CLUSTER_TYPE)-ovn
-            commands: TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-      - name: JOB_NAME_SAFE
-        value: e2e-aws-ovn
-      - name: TEST_COMMAND
-        value: TEST_SUITE=openshift/conformance/parallel run-tests
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/e2e-aws-ovn-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /usr/local/e2e-aws
-        name: job-definition
-        subPath: cluster-launch-installer-e2e.yaml
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-aws
-    - configMap:
-        name: prow-job-cluster-launch-installer-e2e
-      name: job-definition
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-- agent: kubernetes
-  cluster: build02
-  decorate: true
-  interval: 24h
-  labels:
-    job-release: "4.4"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: release-openshift-ocp-installer-e2e-aws-ovn-4.4
-  spec:
-    containers:
-    - args:
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --secret-dir=/usr/local/e2e-aws-ovn-cluster-profile
-      - --secret-dir=/usr/local/pull-secret
-      - --target=e2e-aws
-      - --template=/usr/local/e2e-aws
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      command:
-      - ci-operator
-      env:
-      - name: RELEASE_IMAGE_LATEST
-        value: registry.ci.openshift.org/ocp/release:4.4
-      - name: BRANCH
-        value: "4.4"
-      - name: CLUSTER_TYPE
-        value: aws
-      - name: CLUSTER_VARIANT
-        value: ovn
-      - name: CONFIG_SPEC
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 4Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
-          tests:
-          - as: e2e-$(CLUSTER_TYPE)-ovn
-            commands: TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-      - name: JOB_NAME_SAFE
-        value: e2e-aws-ovn
-      - name: TEST_COMMAND
-        value: TEST_SUITE=openshift/conformance/parallel run-tests
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/e2e-aws-ovn-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /usr/local/e2e-aws
-        name: job-definition
-        subPath: cluster-launch-installer-e2e.yaml
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-aws
-    - configMap:
-        name: prow-job-cluster-launch-installer-e2e
-      name: job-definition
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-- agent: kubernetes
-  cluster: build02
-  decorate: true
-  interval: 24h
-  labels:
-    job-release: "4.4"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: release-openshift-ocp-installer-e2e-gcp-ovn-4.4
-  spec:
-    containers:
-    - args:
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --secret-dir=/usr/local/e2e-gcp-ovn-cluster-profile
-      - --secret-dir=/usr/local/pull-secret
-      - --target=e2e-gcp
-      - --template=/usr/local/e2e-gcp
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      command:
-      - ci-operator
-      env:
-      - name: RELEASE_IMAGE_LATEST
-        value: registry.ci.openshift.org/ocp/release:4.4
-      - name: BRANCH
-        value: "4.4"
-      - name: CLUSTER_TYPE
-        value: gcp
-      - name: CLUSTER_VARIANT
-        value: ovn
-      - name: CONFIG_SPEC
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 4Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
-          tests:
-          - as: e2e-$(CLUSTER_TYPE)-ovn
-            commands: TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-      - name: JOB_NAME_SAFE
-        value: e2e-gcp-ovn
-      - name: TEST_COMMAND
-        value: TEST_SUITE=openshift/conformance/parallel run-tests
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/e2e-gcp-ovn-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /usr/local/e2e-gcp
-        name: job-definition
-        subPath: cluster-launch-installer-e2e.yaml
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-gcp
-    - configMap:
-        name: prow-job-cluster-launch-installer-e2e
-      name: job-definition
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-- agent: kubernetes
-  cluster: build02
-  decorate: true
-  interval: 24h
-  labels:
-    job-release: "4.4"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: release-openshift-ocp-installer-e2e-azure-ovn-4.4
-  spec:
-    containers:
-    - args:
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --secret-dir=/usr/local/e2e-azure-ovn-cluster-profile
-      - --secret-dir=/usr/local/pull-secret
-      - --target=e2e-azure
-      - --template=/usr/local/e2e-azure
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      command:
-      - ci-operator
-      env:
-      - name: RELEASE_IMAGE_LATEST
-        value: registry.ci.openshift.org/ocp/release:4.4
-      - name: BRANCH
-        value: "4.4"
-      - name: CLUSTER_TYPE
-        value: azure4
-      - name: CLUSTER_VARIANT
-        value: ovn
-      - name: CONFIG_SPEC
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 4Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
-          tests:
-          - as: e2e-$(CLUSTER_TYPE)-ovn
-            commands: TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-      - name: JOB_NAME_SAFE
-        value: e2e-azure-ovn
-      - name: TEST_COMMAND
-        value: TEST_SUITE=openshift/conformance/parallel run-tests
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/e2e-azure-ovn-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /usr/local/e2e-azure
-        name: job-definition
-        subPath: cluster-launch-installer-e2e.yaml
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-azure4
-    - configMap:
-        name: prow-job-cluster-launch-installer-e2e
-      name: job-definition
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -1374,7 +983,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   decorate: true
   interval: 24h
   labels:
@@ -1474,7 +1083,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   decorate: true
   interval: 24h
   labels:
@@ -1576,7 +1185,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   decorate: true
   interval: 24h
   labels:
@@ -1689,7 +1298,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   decorate: true
   interval: 24h
   labels:
@@ -1802,7 +1411,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   decorate: true
   interval: 24h
   labels:
@@ -1915,7 +1524,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   decorate: true
   interval: 24h
   labels:
@@ -2026,7 +1635,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   decorate: true
   interval: 24h
   labels:
@@ -2126,7 +1735,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   decorate: true
   interval: 24h
   labels:
@@ -2224,7 +1833,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   decorate: true
   interval: 24h
   labels:
@@ -2324,7 +1933,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   decorate: true
   interval: 24h
   labels:
@@ -2436,7 +2045,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   decorate: true
   interval: 24h
   labels:
@@ -2536,7 +2145,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   decorate: true
   interval: 24h
   labels:
@@ -2672,7 +2281,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   decorate: true
   interval: 24h
   labels:
@@ -2772,7 +2381,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   decorate: true
   extra_refs:
   - base_ref: release-4.4
@@ -2852,7 +2461,7 @@ periodics:
       secret:
         secretName: registry-pull-credentials
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   decorate: true
   interval: 24h
   labels:

@@ -7,6 +7,10 @@ base_images:
     name: builder
     namespace: open-cluster-management
     tag: nodejs14-linux
+  open-cluster-management_common-nodejs-parent_nodejs-14:
+    name: common-nodejs-parent
+    namespace: open-cluster-management
+    tag: nodejs-14
 binary_build_commands: make build
 build_root:
   image_stream_tag:
@@ -19,11 +23,13 @@ images:
     open-cluster-management_builder_nodejs14-linux:
       as:
       - registry.ci.openshift.org/open-cluster-management/builder:nodejs14-linux
+    open-cluster-management_common-nodejs-parent_nodejs-14:
+      as:
+      - registry.ci.openshift.org/open-cluster-management/common-nodejs-parent:nodejs-14
   to: application-ui
 - dockerfile_path: Dockerfile.cypress
   to: application-ui-tests
 promotion:
-  disabled: true
   name: "2.3"
   namespace: open-cluster-management
 resources:
@@ -32,6 +38,38 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: e2e-cluster
+  steps:
+    dependencies:
+      COMPONENT_IMAGE_REF: application-ui
+    env:
+      CLUSTERPOOL_GROUP_NAME: AppLifecycle
+      CLUSTERPOOL_HOST_NAMESPACE: app
+      CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-app-ui-clusterpool
+      CLUSTERPOOL_LIST_INCLUSION_FILTER: prow
+      CLUSTERPOOL_MANAGED_COUNT: "1"
+    test:
+    - as: import
+      commands: |
+        KUBECONFIG=${SHARED_DIR}/hub-1.kc oc cm attach cluster --cluster managed --cluster-kubeconfig ${SHARED_DIR}/managed-1.kc
+      from: root
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: e2e-test
+      commands: |
+        ./run-prow-e2e.sh
+      credentials:
+      - mount_path: /etc/e2e-secrets
+        name: e2e-secrets
+        namespace: test-credentials
+      from: application-ui-tests
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-e2e-clusterpool
 - as: pr-image-mirror
   steps:
     dependencies:

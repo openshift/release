@@ -19,7 +19,7 @@ operator:
   bundles:
   - dockerfile_path: build/Dockerfile.bundle
   substitutions:
-  - pullspec: quay.io/konveyor/oadp-operator.v0.2.3:latest
+  - pullspec: quay.io/konveyor/oadp-operator:latest
     with: oadp-operator
 releases:
   latest:
@@ -47,6 +47,34 @@ tests:
     test:
     - as: e2e
       commands: make test-e2e
+      credentials:
+      - mount_path: /var/run/oadp-credentials
+        name: oadp-credentials
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-aws
+- as: operator-e2e-periodic-slack
+  cron: 0 4 * * *
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: oadp-operator
+      OO_PACKAGE: oadp-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: e2e
+      commands: make test-e2e
+      credentials:
+      - mount_path: /var/run/oadp-credentials
+        name: oadp-credentials
+        namespace: test-credentials
       from: src
       resources:
         requests:

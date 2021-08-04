@@ -3,8 +3,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.9
-    cluster: build02
+    - ^release-4\.9$
+    - ^release-4\.9-
+    cluster: build01
     context: ci/prow/e2e-aws
     decorate: true
     hidden: true
@@ -76,8 +77,83 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.9
-    cluster: build02
+    - ^release-4\.9$
+    - ^release-4\.9-
+    cluster: build01
+    context: ci/prow/e2e-aws-operator-disruptive-single-node
+    decorate: true
+    hidden: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-cluster-kube-apiserver-operator-release-4.9-e2e-aws-operator-disruptive-single-node
+    path_alias: github.com/openshift/cluster-kube-apiserver-operator
+    rerun_command: /test e2e-aws-operator-disruptive-single-node
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-aws-operator-disruptive-single-node-cluster-profile
+        - --target=e2e-aws-operator-disruptive-single-node
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-aws-operator-disruptive-single-node-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-operator-disruptive-single-node,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.9$
+    - ^release-4\.9-
+    cluster: build01
     context: ci/prow/e2e-aws-serial
     decorate: true
     hidden: true
@@ -149,8 +225,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.9
-    cluster: build02
+    - ^release-4\.9$
+    - ^release-4\.9-
+    cluster: build01
     context: ci/prow/e2e-aws-single-node
     decorate: true
     hidden: true
@@ -222,8 +299,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.9
-    cluster: build02
+    - ^release-4\.9$
+    - ^release-4\.9-
+    cluster: build01
     context: ci/prow/e2e-gcp-operator
     decorate: true
     hidden: true
@@ -297,8 +375,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.9
-    cluster: build02
+    - ^release-4\.9$
+    - ^release-4\.9-
+    cluster: build01
     context: ci/prow/e2e-gcp-operator-encryption
     decorate: true
     hidden: true
@@ -372,8 +451,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.9
-    cluster: build02
+    - ^release-4\.9$
+    - ^release-4\.9-
+    cluster: build01
     context: ci/prow/e2e-gcp-operator-encryption-perf
     decorate: true
     hidden: true
@@ -447,8 +527,85 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.9
-    cluster: build02
+    - ^release-4\.9$
+    - ^release-4\.9-
+    cluster: build01
+    context: ci/prow/e2e-gcp-operator-encryption-perf-single-node
+    decorate: true
+    hidden: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-cluster-kube-apiserver-operator-release-4.9-e2e-gcp-operator-encryption-perf-single-node
+    path_alias: github.com/openshift/cluster-kube-apiserver-operator
+    rerun_command: /test e2e-gcp-operator-encryption-perf-single-node
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-gcp-operator-encryption-perf-single-node-cluster-profile
+        - --target=e2e-gcp-operator-encryption-perf-single-node
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-gcp-operator-encryption-perf-single-node-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-gcp-operator-encryption-perf-single-node,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.9$
+    - ^release-4\.9-
+    cluster: build01
     context: ci/prow/e2e-gcp-operator-encryption-rotation
     decorate: true
     hidden: true
@@ -522,8 +679,237 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.9
-    cluster: build02
+    - ^release-4\.9$
+    - ^release-4\.9-
+    cluster: build01
+    context: ci/prow/e2e-gcp-operator-encryption-rotation-single-node
+    decorate: true
+    hidden: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-cluster-kube-apiserver-operator-release-4.9-e2e-gcp-operator-encryption-rotation-single-node
+    path_alias: github.com/openshift/cluster-kube-apiserver-operator
+    rerun_command: /test e2e-gcp-operator-encryption-rotation-single-node
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-gcp-operator-encryption-rotation-single-node-cluster-profile
+        - --target=e2e-gcp-operator-encryption-rotation-single-node
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-gcp-operator-encryption-rotation-single-node-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-gcp-operator-encryption-rotation-single-node,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.9$
+    - ^release-4\.9-
+    cluster: build01
+    context: ci/prow/e2e-gcp-operator-encryption-single-node
+    decorate: true
+    hidden: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-cluster-kube-apiserver-operator-release-4.9-e2e-gcp-operator-encryption-single-node
+    path_alias: github.com/openshift/cluster-kube-apiserver-operator
+    rerun_command: /test e2e-gcp-operator-encryption-single-node
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-gcp-operator-encryption-single-node-cluster-profile
+        - --target=e2e-gcp-operator-encryption-single-node
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-gcp-operator-encryption-single-node-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-gcp-operator-encryption-single-node,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.9$
+    - ^release-4\.9-
+    cluster: build01
+    context: ci/prow/e2e-gcp-operator-single-node
+    decorate: true
+    hidden: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-cluster-kube-apiserver-operator-release-4.9-e2e-gcp-operator-single-node
+    path_alias: github.com/openshift/cluster-kube-apiserver-operator
+    rerun_command: /test e2e-gcp-operator-single-node
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-gcp-operator-single-node-cluster-profile
+        - --target=e2e-gcp-operator-single-node
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-gcp-operator-single-node-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-gcp-operator-single-node,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.9$
+    - ^release-4\.9-
+    cluster: build01
     context: ci/prow/e2e-metal-single-node-live-iso
     decorate: true
     hidden: true
@@ -597,8 +983,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.9
-    cluster: build02
+    - ^release-4\.9$
+    - ^release-4\.9-
+    cluster: build01
     context: ci/prow/e2e-upgrade
     decorate: true
     hidden: true
@@ -670,8 +1057,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.9
-    cluster: build02
+    - ^release-4\.9$
+    - ^release-4\.9-
+    cluster: build01
     context: ci/prow/images
     decorate: true
     hidden: true
@@ -725,8 +1113,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.9
-    cluster: build02
+    - ^release-4\.9$
+    - ^release-4\.9-
+    cluster: build01
     context: ci/prow/k8s-e2e-gcp
     decorate: true
     hidden: true
@@ -800,8 +1189,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.9
-    cluster: build02
+    - ^release-4\.9$
+    - ^release-4\.9-
+    cluster: build01
     context: ci/prow/k8s-e2e-gcp-serial
     decorate: true
     hidden: true
@@ -875,8 +1265,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.9
-    cluster: build02
+    - ^release-4\.9$
+    - ^release-4\.9-
+    cluster: build01
     context: ci/prow/unit
     decorate: true
     hidden: true
@@ -930,8 +1321,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.9
-    cluster: build02
+    - ^release-4\.9$
+    - ^release-4\.9-
+    cluster: build01
     context: ci/prow/verify
     decorate: true
     hidden: true
@@ -985,8 +1377,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - release-4.9
-    cluster: build02
+    - ^release-4\.9$
+    - ^release-4\.9-
+    cluster: build01
     context: ci/prow/verify-deps
     decorate: true
     hidden: true

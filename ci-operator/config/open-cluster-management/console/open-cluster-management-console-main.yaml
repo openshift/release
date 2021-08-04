@@ -7,6 +7,10 @@ base_images:
     name: builder
     namespace: open-cluster-management
     tag: nodejs14-linux
+  repo-brancher:
+    name: repo-brancher
+    namespace: ci
+    tag: latest
 binary_build_commands: make -f Makefile.prow install && make -f Makefile.prow build
 build_root:
   image_stream_tag:
@@ -21,7 +25,7 @@ images:
       - registry.ci.openshift.org/open-cluster-management/builder:nodejs14-linux
   to: console
 promotion:
-  name: "2.3"
+  name: "2.4"
   namespace: open-cluster-management
 resources:
   '*':
@@ -47,6 +51,24 @@ tests:
     dependencies:
       SOURCE_IMAGE_REF: console
     workflow: ocm-ci-image-mirror
+- as: fast-forward
+  commands: |
+    git clone -b master https://github.com/openshift/release.git /tmp/release
+    repo-brancher \
+        --fast-forward \
+        --confirm \
+        --config-dir=/tmp/release/ci-operator/config/open-cluster-management/console/ \
+        --username=acm-cicd \
+        --token-path=/etc/github/token \
+        --current-promotion-namespace=open-cluster-management \
+        --current-release=2.4 \
+        --future-release=2.4
+  container:
+    from: repo-brancher
+  postsubmit: true
+  secrets:
+  - mount_path: /etc/github
+    name: acm-cicd-github
 zz_generated_metadata:
   branch: main
   org: open-cluster-management

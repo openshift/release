@@ -69,6 +69,11 @@ operator:
 promotion:
   name: ocm-2.3
   namespace: openshift
+releases:
+  candidate:
+    release:
+      channel: candidate
+      version: "4.8"
 resources:
   '*':
     requests:
@@ -79,7 +84,6 @@ tag_specification:
   namespace: ocp
 test_binary_build_commands: |
   make build-openshift-ci-test-bin
-  curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.36.0
   go mod vendor
   mkdir /.cache && chmod 775 -R /.cache && chmod 775 -R $GOPATH
 tests:
@@ -149,6 +153,9 @@ tests:
 - as: e2e-metal-assisted-operator-disconnected
   steps:
     cluster_profile: packet
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
     env:
       DISCONNECTED: "true"
       IP_STACK: v6
@@ -156,6 +163,9 @@ tests:
 - as: e2e-metal-assisted-operator-ztp
   steps:
     cluster_profile: packet
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
     env:
       IP_STACK: v4
     workflow: baremetalds-assisted-operator-ztp
@@ -175,6 +185,7 @@ tests:
         KUBE_API=yes
         OPENSHIFT_VERSION=4.8
         ENABLE_KUBE_API=true
+        MAKEFILE_TARGET=all
     workflow: baremetalds-assisted-install
 zz_generated_metadata:
   branch: ocm-2.3

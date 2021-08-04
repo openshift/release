@@ -17,6 +17,8 @@ apiVersion: v1
 baseDomain: ${BASE_DOMAIN}
 metadata:
   name: ${OCP_CLUSTER}
+networking:
+  networkType: ${NETWORK_TYPE}
 compute:
 - hyperthreading: Enabled
   name: worker
