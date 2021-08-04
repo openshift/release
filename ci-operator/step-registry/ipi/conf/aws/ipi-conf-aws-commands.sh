@@ -21,7 +21,7 @@ if [[ "${CLUSTER_TYPE}" == "aws-arm64" ]]; then
   # end of hack
 fi
 
-echo "Instalelr version: $(openshift-install version)"
+echo "Installer version: $(openshift-install version)"
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
 expiration_date=$(date -d '8 hours' --iso=minutes --utc)
@@ -71,7 +71,7 @@ if [[ ${existing_zones_setting} == "" ]]; then
   ZONES_STR="[ $(join_by , "${ZONES[@]}") ]"
   echo "AWS region: ${REGION} (zones: ${ZONES_STR})"
   PATCH="${SHARED_DIR}/install-config-zones.yaml.patch"
-  cat >> "${PATCH}" << EOF
+  cat > "${PATCH}" << EOF
 controlPlane:
   platform:
     aws:
@@ -87,7 +87,7 @@ else
 fi
 
 PATCH="${SHARED_DIR}/install-config-common.yaml.patch"
-cat >> "${PATCH}" << EOF
+cat > "${PATCH}" << EOF
 baseDomain: ${BASE_DOMAIN}
 platform:
   aws:

@@ -55,7 +55,7 @@ ZONES=("${AVAILABILITY_ZONES[@]:0:${ZONES_COUNT}}")
 ZONES_STR="[ $(join_by , "${ZONES[@]}") ]"
 echo "AWS region: ${REGION} (zones: ${ZONES_STR})"
 
-cat >> "${PATCH}" << EOF
+cat > "${PATCH}" << EOF
 controlPlane:
   platform:
     aws:
