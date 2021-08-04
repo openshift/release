@@ -1,0 +1,89 @@
+base_images:
+  base:
+    name: "4.10"
+    namespace: ocp
+    tag: base
+  openshift_release_golang-1.12:
+    name: release
+    namespace: openshift
+    tag: golang-1.12
+  openshift_release_golang-1.15:
+    name: release
+    namespace: openshift
+    tag: golang-1.15
+build_root:
+  from_repository: true
+images:
+- from: base
+  inputs:
+    openshift_release_golang-1.15:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.15
+  to: vertical-pod-autoscaler-operator
+- dockerfile_path: images/operator-registry/Dockerfile.registry.ci
+  from: base
+  inputs:
+    openshift_release_golang-1.15:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.15
+  to: vpa-operator-registry
+promotion:
+  name: "4.10"
+  namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.10"
+  namespace: ocp
+tests:
+- as: unit
+  commands: NO_DOCKER=1 make test
+  container:
+    from: src
+- as: manifest-diff
+  commands: IS_CONTAINER=TRUE make manifest-diff
+  container:
+    from: src
+- as: gofmt
+  commands: IS_CONTAINER=TRUE make fmt
+  container:
+    from: src
+- as: govet
+  commands: IS_CONTAINER=TRUE make vet
+  container:
+    from: src
+- as: golint
+  commands: IS_CONTAINER=TRUE make lint
+  container:
+    from: src
+- as: e2e-aws-operator
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make e2e-ci
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-olm
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make e2e-olm-ci
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-4.10
+  org: openshift
+  repo: vertical-pod-autoscaler-operator
