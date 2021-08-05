@@ -1,0 +1,27 @@
+binary_build_commands: make
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.12
+canonical_go_repository: github.com/openshift/kubernetes
+resources:
+  '*':
+    requests:
+      cpu: "3"
+      memory: 12Gi
+tests:
+- as: verify
+  commands: |
+    make verify -k
+  container:
+    from: bin
+- as: unit
+  commands: |
+    make test KUBE_JUNIT_REPORT_DIR=${ARTIFACT_DIR}/
+  container:
+    from: bin
+zz_generated_metadata:
+  branch: origin-4.2-kubernetes-1.14.0
+  org: openshift-priv
+  repo: kubernetes
