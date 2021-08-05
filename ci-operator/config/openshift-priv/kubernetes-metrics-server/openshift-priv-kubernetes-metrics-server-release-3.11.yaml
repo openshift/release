@@ -1,0 +1,35 @@
+base_rpm_images:
+  base:
+    name: origin-v3.11
+    namespace: openshift
+    tag: base
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.10
+canonical_go_repository: github.com/kubernetes-incubator/metrics-server
+images:
+- context_dir: images/metrics-server/
+  from: base
+  to: metrics-server
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+rpm_build_commands: make build-rpms
+tag_specification:
+  name: origin-v3.11
+  namespace: openshift
+test_binary_build_commands: OS_GOFLAGS='-race' make build
+tests:
+- as: unit
+  commands: JUNIT_REPORT=1 hack/test-go.sh
+  container:
+    from: test-bin
+zz_generated_metadata:
+  branch: release-3.11
+  org: openshift-priv
+  repo: kubernetes-metrics-server
