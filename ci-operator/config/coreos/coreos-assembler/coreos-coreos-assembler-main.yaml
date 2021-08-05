@@ -1,4 +1,4 @@
-binary_build_commands: make && make check && make install
+binary_build_commands: make && make check && make install && cp -a ci /usr/lib/coreos-assembler/ci
 build_root:
   image_stream_tag:
     name: cosa-buildroot
@@ -9,9 +9,20 @@ resources:
     requests:
       cpu: 1000m
       memory: 1Gi
+  rhcos:
+    limits:
+      devices.kubevirt.io/kvm: "1"
+    requests:
+      cpu: 1000m
+      devices.kubevirt.io/kvm: "1"
+      memory: 3Gi
 tests:
 - as: sanity
   commands: coreos-assembler shell true
+  container:
+    from: bin
+- as: rhcos
+  commands: /usr/lib/coreos-assembler/ci/prow-rhcos.sh
   container:
     from: bin
 zz_generated_metadata:
