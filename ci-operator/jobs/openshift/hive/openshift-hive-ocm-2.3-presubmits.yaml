@@ -3,8 +3,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ocm-2.3
-    cluster: build01
+    - ^ocm-2\.3$
+    - ^ocm-2\.3-
+    cluster: build02
     context: ci/prow/e2e
     decorate: true
     decoration_config:
@@ -18,10 +19,10 @@ presubmits:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/usr/local/e2e-cluster-profile
+        - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e
         command:
         - ci-operator
@@ -32,13 +33,14 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -48,17 +50,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
+      - name: ci-pull-credentials
         secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
+          secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -69,8 +66,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ocm-2.3
-    cluster: build01
+    - ^ocm-2\.3$
+    - ^ocm-2\.3-
+    cluster: build02
     context: ci/prow/e2e-azure
     decorate: true
     decoration_config:
@@ -136,8 +134,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ocm-2.3
-    cluster: build01
+    - ^ocm-2\.3$
+    - ^ocm-2\.3-
+    cluster: build02
     context: ci/prow/e2e-gcp
     decorate: true
     decoration_config:
@@ -205,8 +204,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ocm-2.3
-    cluster: build01
+    - ^ocm-2\.3$
+    - ^ocm-2\.3-
+    cluster: build02
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -253,8 +253,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ocm-2.3
-    cluster: build01
+    - ^ocm-2\.3$
+    - ^ocm-2\.3-
+    cluster: build02
     context: ci/prow/integration
     decorate: true
     decoration_config:
@@ -301,8 +302,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ocm-2.3
-    cluster: build01
+    - ^ocm-2\.3$
+    - ^ocm-2\.3-
+    cluster: build02
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -349,8 +351,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ocm-2.3
-    cluster: build01
+    - ^ocm-2\.3$
+    - ^ocm-2\.3-
+    cluster: build02
     context: ci/prow/verify
     decorate: true
     decoration_config:

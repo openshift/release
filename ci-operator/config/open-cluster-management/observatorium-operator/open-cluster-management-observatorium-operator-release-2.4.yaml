@@ -22,48 +22,30 @@ tag_specification:
   namespace: ocp
 test_binary_build_commands: "true"
 tests:
-- as: e2e-test
+- as: e2e-kind
   steps:
-    cluster_profile: aws
+    env:
+      AWS_CREDENTIALS_SECRET: ocm-obs-china-aws-kind
+      AWS_INSTANCE_TYPE: t3.small
+    post:
+    - ref: ocm-e2e-kind-destroy
+    pre:
+    - ref: ocm-ci-rbac
+    - ref: ocm-e2e-kind-create
     test:
-    - as: deploy-operator
-      cli: latest
+    - as: test
       commands: |
-        export OPERATOR_IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:observatorium-operator}
-        ./tests/e2e.sh deploy-operator
-      env:
-      - default: oc
-        name: KUBECTL
+        echo "OPERATOR_IMAGE_NAME=$OPERATOR_IMAGE_NAME"
+        ./tests/e2e.sh test-kind-prow
+      dependencies:
+      - env: OPERATOR_IMAGE_NAME
+        name: observatorium-operator
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
-    - as: run-test
-      cli: latest
-      commands: |
-        ./tests/e2e.sh test --tls
-      env:
-      - default: oc
-        name: KUBECTL
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: delete-cr
-      cli: latest
-      commands: |
-        ./tests/e2e.sh delete-cr
-      env:
-      - default: oc
-        name: KUBECTL
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: openshift-e2e-aws
+    workflow: ocm-e2e-kind
 zz_generated_metadata:
   branch: release-2.4
   org: open-cluster-management

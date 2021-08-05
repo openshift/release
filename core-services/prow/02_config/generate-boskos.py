@@ -31,6 +31,9 @@ CONFIG = {
         'eastus2': 8,
         'westus': 8
     },
+    'azurestack-quota-slice': {
+        'ppe3': 2
+    },
     'gcp-quota-slice': {
         'us-central1': 70,
     },
@@ -75,7 +78,13 @@ CONFIG = {
     },
     'hypershift-quota-slice': {
         'default': 15,
-    }
+    },
+    'ibmcloud-quota-slice': {
+        'default': 15,
+    },
+    'alibaba-quota-slice': {
+        'us-east-1': 10,
+    },
 }
 
 for i in range(2):

@@ -1,0 +1,58 @@
+ref:
+  as: identitatem-ci-image-mirror
+  from_image:
+    name: builder
+    namespace: open-cluster-management
+    tag: go1.16-linux
+  commands: identitatem-ci-image-mirror-commands.sh
+  credentials:
+  - mount_path: /secrets/identitatem-quay-push
+    name: identitatem-quay-push
+    namespace: test-credentials
+  dependencies:
+  - env: SOURCE_IMAGE_REF
+    name: src
+  env:
+  - name: SECRETS_PATH
+    default: /secrets
+    documentation: |-
+      The directory where credentials will be mounted.
+  - name: REGISTRY_SECRET
+    default: identitatem-quay-push
+    documentation: |-
+      The name of the kube secret that contains the registry token file.
+  - name: REGISTRY_SECRET_FILE
+    default: token
+    documentation: |-
+      The name of the file in REGISTRY_SECRET with the contents of
+      the .docker/config.json file encoded in base64.
+  - name: RELEASE_VERSION
+    default: "0.1"
+    documentation: |-
+      The current release version for the product.
+  - name: REGISTRY_HOST
+    default: quay.io
+    documentation: |-
+      The hostname (and port) of the destination registry.
+  - name: REGISTRY_ORG
+    default: identitatem
+    documentation: |-
+      The organization of the destination image reference.
+  - name: IMAGE_REPO
+    default: ''
+    documentation: |-
+      The repository name of the destination image reference. If blank, the
+      COMPONENT_NAME file will be used.
+  - name: IMAGE_TAG
+    default: ''
+    documentation: |-
+      The tag for the destination image reference. If blank, the tag for
+      a presubmit will be <version>-PR<pull_num>-<commit_sha> and for a
+      postsubmit will be <version>-<commit_sha>.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: |-
+    This workflow mirrors an image from the CI Registry to a given
+    image ref.
