@@ -7,7 +7,6 @@ set -o pipefail
 if [ "${AWS_REGION_OVERRIDE}" == "cn-north-1" ] || [ "${AWS_REGION_OVERRIDE}" == "cn-northwest-1" ]; then
   # use inject credential
   export AWS_SHARED_CREDENTIALS_FILE="/var/run/aws-china-credential/.awscred"
-  cat $AWS_SHARED_CREDENTIALS_FILE
 else
   export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 fi
