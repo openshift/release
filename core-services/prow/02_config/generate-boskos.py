@@ -31,6 +31,9 @@ CONFIG = {
         'eastus2': 8,
         'westus': 8
     },
+    'azurestack-quota-slice': {
+        'ppe3': 2
+    },
     'gcp-quota-slice': {
         'us-central1': 70,
     },
