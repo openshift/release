@@ -129,6 +129,30 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: optional-operators-ci-azure
+- as: operator-e2e-vsphere-periodic-slack
+  cron: 0 4 * * *
+  steps:
+    cluster_profile: vsphere
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: oadp-operator
+      OO_PACKAGE: oadp-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: e2e
+      commands: make test-e2e
+      credentials:
+      - mount_path: /var/run/oadp-credentials
+        name: oadp-credentials
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-vsphere
 zz_generated_metadata:
   branch: master
   org: openshift
