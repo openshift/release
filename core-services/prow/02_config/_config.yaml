@@ -136,8 +136,8 @@ owners_dir_denylist:
   default:
   - vendor/.*
 plank:
-  default_decoration_configs:
-    '*':
+  default_decoration_config_entries:
+  - config:
       censor_secrets: true
       gcs_configuration:
         bucket: origin-ci-test
@@ -175,18 +175,27 @@ plank:
             memory: 250Mi
       timeout: 4h0m0s
       utility_images:
-        clonerefs: gcr.io/k8s-prow/clonerefs:v20210730-987d7118e9
-        entrypoint: gcr.io/k8s-prow/entrypoint:v20210730-987d7118e9
-        initupload: gcr.io/k8s-prow/initupload:v20210730-987d7118e9
-        sidecar: gcr.io/k8s-prow/sidecar:v20210730-987d7118e9
-    openshift-priv:
+        clonerefs: gcr.io/k8s-prow/clonerefs:v20210804-21c9501556
+        entrypoint: gcr.io/k8s-prow/entrypoint:v20210804-21c9501556
+        initupload: gcr.io/k8s-prow/initupload:v20210804-21c9501556
+        sidecar: gcr.io/k8s-prow/sidecar:v20210804-21c9501556
+  - cluster: arm01
+    config:
+      utility_images:
+        clonerefs: gcr.io/k8s-prow/clonerefs:v20210804-21c9501556-arm64
+        entrypoint: gcr.io/k8s-prow/entrypoint:v20210804-21c9501556-arm64
+        initupload: gcr.io/k8s-prow/initupload:v20210804-21c9501556-arm64
+        sidecar: gcr.io/k8s-prow/sidecar:v20210804-21c9501556-arm64
+  - config:
       gcs_configuration:
         bucket: origin-ci-private
         mediaTypes:
           log: text/plain
       gcs_credentials_secret: gce-sa-credentials-gcs-private
-    openshift/osde2e:
+    repo: openshift-priv
+  - config:
       timeout: 6h0m0s
+    repo: openshift/osde2e
   job_url_prefix_config:
     '*': https://prow.ci.openshift.org/view/
     openshift-priv: https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
@@ -280,6 +289,7 @@ tide:
         repos:
           release:
             skip-unknown-contexts: true
+  display_all_tide_queries_in_status: true
   max_goroutines: 100
   merge_label: tide/merge-method-merge
   pr_status_base_urls:

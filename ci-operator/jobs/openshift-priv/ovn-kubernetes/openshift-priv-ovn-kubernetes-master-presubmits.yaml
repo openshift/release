@@ -3,7 +3,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/e2e-aws-ovn
     decorate: true
@@ -76,7 +77,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/e2e-aws-ovn-local-gateway
     decorate: true
@@ -149,7 +151,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/e2e-aws-ovn-windows
     decorate: true
@@ -222,7 +225,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/e2e-azure-ovn
     decorate: true
@@ -295,7 +299,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/e2e-gcp-ovn
     decorate: true
@@ -370,7 +375,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/e2e-gcp-ovn-upgrade
     decorate: true
@@ -445,7 +451,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/e2e-metal-ipi-ovn-dualstack
     decorate: true
@@ -520,7 +527,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/e2e-metal-ipi-ovn-ipv6
     decorate: true
@@ -595,7 +603,82 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
+    cluster: build01
+    context: ci/prow/e2e-openstack-ovn
+    decorate: true
+    hidden: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-ovn-kubernetes-master-e2e-openstack-ovn
+    path_alias: github.com/openshift/ovn-kubernetes
+    rerun_command: /test e2e-openstack-ovn
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-openstack-ovn-cluster-profile
+        - --target=e2e-openstack-ovn
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-openstack-ovn-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-openstack-vexxhost
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-openstack-ovn,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/e2e-ovn-hybrid-step-registry
     decorate: true
@@ -668,7 +751,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: vsphere
     context: ci/prow/e2e-vsphere-ovn
     decorate: true
@@ -741,7 +825,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: vsphere
     context: ci/prow/e2e-vsphere-windows
     decorate: true
@@ -814,7 +899,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/images
     decorate: true

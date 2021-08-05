@@ -5,6 +5,12 @@ set -o errexit
 set -o pipefail
 
 if [[ "${CONFIG_TYPE}" != "byon" ]]; then
+    # For now, we only support the deployment of OCP into specific availability zones when pre-configuring
+    # the network (BYON), for known limitations that will be addressed in the future.
+    if [[ "$ZONES_COUNT" != "0" ]]; then
+        echo "ZONES_COUNT was set to '${ZONES_COUNT}', although CONFIG_TYPE was not set to 'byon'."
+        exit 1
+    fi
     echo "Skipping step due to CONFIG_TYPE not being byon."
     exit 0
 fi
@@ -32,6 +38,28 @@ WORK_DIR=${WORK_DIR:-$(mktemp -d -t shiftstack-ci-XXXXXXXXXX)}
 CLUSTER_NAME=$(<"${SHARED_DIR}"/CLUSTER_NAME)
 NET_ID=$(<"${SHARED_DIR}"/MACHINESSUBNET_NET_ID)
 OPENSTACK_EXTERNAL_NETWORK="${OPENSTACK_EXTERNAL_NETWORK:-$(<"${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK")}"
+ZONES=$(<"${SHARED_DIR}"/ZONES)
+
+mapfile -t ZONES < <(printf ${ZONES})
+MAX_ZONES_COUNT=${#ZONES[@]}
+
+if [[ ${ZONES_COUNT} -gt ${MAX_ZONES_COUNT} ]]; then
+  echo "Too many zones were requested: ${ZONES_COUNT}; only ${MAX_ZONES_COUNT} are available: ${ZONES[*]}"
+  exit 1
+fi
+
+if [[ "${ZONES_COUNT}" == "0" ]]; then
+  ZONES_ARGS=""
+elif [[ "${ZONES_COUNT}" == "1" ]]; then
+  for ((i=0; i<${MAX_ZONES_COUNT}; ++i )) ; do
+    ZONES_ARGS+="--availability-zone ${ZONES[$i]} "
+  done
+else
+  # For now, we only support a cluster within a single AZ.
+  # This will change in the future.
+  echo "Wrong ZONE_COUNT, can only be 0 or 1, got ${ZONES_COUNT}"
+  exit 1
+fi
 
 if ! openstack image show $BASTION_IMAGE >/dev/null; then
 		echo "ERROR: Bastion image does not exist: $BASTION_IMAGE"
@@ -52,7 +80,7 @@ openstack security group rule create --ingress --protocol tcp --dst-port 22 --de
 openstack security group rule create --ingress --protocol tcp --dst-port 8213 --description "${CLUSTER_NAME} squid" "$sg_id" >/dev/null
 >&2 echo "Security group rules created in ${sg_id} to allow SSH and squid access"
 
-server_id="$(openstack server create -f value -c id \
+server_id="$(openstack server create -f value -c id $ZONES_ARGS \
 		--image "$BASTION_IMAGE" \
 		--flavor "$BASTION_FLAVOR" \
 		--network "$NET_ID" \
@@ -67,7 +95,7 @@ bastion_fip="$(openstack floating ip create -f value -c floating_ip_address \
 		"$OPENSTACK_EXTERNAL_NETWORK")"
 >&2 echo "Created floating IP ${bastion_fip}"
 >&2 openstack server add floating ip "$server_id" "$bastion_fip"
-echo ${bastion_fip} |awk '{print $2}' >> ${SHARED_DIR}/DELETE_FIPS
+echo ${bastion_fip} >> ${SHARED_DIR}/DELETE_FIPS
 cp ${SHARED_DIR}/DELETE_FIPS ${ARTIFACT_DIR}
 
 # configure the local container environment to have the correct SSH configuration

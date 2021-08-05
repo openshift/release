@@ -1,0 +1,32 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.16
+images:
+- dockerfile_path: Dockerfiles/Dockerfile.blocker-slack
+  to: blocker-slack
+- dockerfile_path: Dockerfiles/Dockerfile.git-build-watcher
+  to: git-build-watcher
+- dockerfile_path: Dockerfiles/Dockerfile.redirect
+  to: redirect
+- dockerfile_path: Dockerfiles/Dockerfile.bug-automation
+  to: bug-automation
+- dockerfile_path: Dockerfiles/Dockerfile.jira-daily-diff
+  to: jira-daily-diff
+- dockerfile_path: Dockerfiles/Dockerfile.team-slo-results
+  to: team-slo-results
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: build
+  commands: make build
+  container:
+    from: src
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: bugzilla-tools

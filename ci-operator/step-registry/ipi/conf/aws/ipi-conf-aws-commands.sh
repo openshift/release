@@ -6,19 +6,6 @@ set -o pipefail
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
-if [[ "${CLUSTER_TYPE}" == "aws-arm64" ]]; then
-  # Hack to avoid importing arm64 release image by using an image override
-  # Find a better way of doing this once https://issues.redhat.com/browse/DPTP-2265 is resolved
-  if [[ -z "${ARM64_RELEASE_OVERRIDE}" ]]; then
-    echo "ARM64_RELEASE_OVERRIDE is an empty string, exiting"
-    exit 1
-  fi
-  OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${ARM64_RELEASE_OVERRIDE}
-  echo "Installing from initial release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
-  openshift-install version
-  # end of hack
-fi
-
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
 expiration_date=$(date -d '8 hours' --iso=minutes --utc)
