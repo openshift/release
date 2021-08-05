@@ -126,15 +126,15 @@ images:
       paths:
       - destination_dir: .
         source_path: /usr/bin/oc
-    openshift_knative-v0.22.0_knative-eventing-src:
+    openshift_knative-v0.23.0_knative-eventing-src:
       as:
-      - registry.ci.openshift.org/openshift/knative-v0.22.0:knative-eventing-src
-    openshift_knative-v0.22.3_knative-eventing-kafka-src:
-      as:
-      - registry.ci.openshift.org/openshift/knative-v0.22.3:knative-eventing-kafka-src
+      - registry.ci.openshift.org/openshift/knative-v0.23.0:knative-eventing-src
     openshift_knative-v0.23.1_knative-serving-src:
       as:
       - registry.ci.openshift.org/openshift/knative-v0.23.1:knative-serving-src
+    openshift_knative-v0.23.3_knative-eventing-kafka-src:
+      as:
+      - registry.ci.openshift.org/openshift/knative-v0.23.3:knative-eventing-kafka-src
   to: serverless-operator-src
 - context_dir: .
   dockerfile_path: serving/ingress/Dockerfile
@@ -278,6 +278,50 @@ tests:
     test:
     - as: serverless-e2e
       commands: make test-upgrade
+      dependencies:
+      - env: KNATIVE_OPENSHIFT_INGRESS
+        name: knative-openshift-ingress
+      - env: KNATIVE_OPERATOR
+        name: knative-operator
+      - env: OPENSHIFT_KNATIVE_OPERATOR
+        name: openshift-knative-operator
+      from: serverless-operator-src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: "2"
+          memory: 4Gi
+    workflow: openshift-e2e-aws
+- as: e2e-mesh-ocp-47-continuous
+  cron: 0 */12 * * 1-5
+  steps:
+    cluster_profile: aws
+    test:
+    - as: serverless-e2e
+      commands: make test-upstream-e2e-mesh
+      dependencies:
+      - env: KNATIVE_OPENSHIFT_INGRESS
+        name: knative-openshift-ingress
+      - env: KNATIVE_OPERATOR
+        name: knative-operator
+      - env: OPENSHIFT_KNATIVE_OPERATOR
+        name: openshift-knative-operator
+      from: serverless-operator-src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-aws
+- as: upstream-e2e-mesh-aws-ocp-47
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws
+    test:
+    - as: serverless-e2e
+      commands: make test-upstream-e2e-mesh
       dependencies:
       - env: KNATIVE_OPENSHIFT_INGRESS
         name: knative-openshift-ingress

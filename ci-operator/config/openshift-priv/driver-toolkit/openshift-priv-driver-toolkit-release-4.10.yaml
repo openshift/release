@@ -1,0 +1,41 @@
+base_images:
+  base:
+    name: 4.10-priv
+    namespace: ocp-private
+    tag: base
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/driver-toolkit
+images:
+- build_args:
+  - name: RHEL_VERSION
+    value: "8.4"
+  dockerfile_path: Dockerfile
+  from: base
+  to: driver-toolkit
+promotion:
+  name: 4.10-priv
+  namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: 4.10-priv
+  namespace: ocp-private
+tests:
+- as: verify
+  commands: make verify
+  container:
+    from: src
+- as: image-contents
+  commands: cat /etc/driver-toolkit-release.json
+  container:
+    from: driver-toolkit
+zz_generated_metadata:
+  branch: release-4.10
+  org: openshift-priv
+  repo: driver-toolkit

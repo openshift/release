@@ -7,7 +7,7 @@ set -o pipefail
 echo "************ baremetalds devscripts proxy command ************"
 
 # Fetch packet basic configuration
-# shellcheck source=/dev/null
+# shellcheck disable=SC1090
 source "${SHARED_DIR}/packet-conf.sh"
 
 # Setup a squid proxy for accessing the cluster

@@ -146,7 +146,7 @@ presubmits:
         - core-services/prow/02_config/_boskos.yaml
         command:
         - /app
-        image: gcr.io/k8s-staging-boskos/checkconfig:v20210521-36bb085
+        image: gcr.io/k8s-staging-boskos/checkconfig:v20210803-9fae386
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -434,7 +434,7 @@ presubmits:
     always_run: true
     branches:
     - master
-    cluster: build02
+    cluster: app.ci
     context: ci/prow/config
     decorate: true
     labels:
@@ -444,6 +444,11 @@ presubmits:
     spec:
       containers:
       - args:
+        - --github-app-id=$(GITHUB_APP_ID)
+        - --github-app-private-key-path=/etc/github/cert
+        - --github-endpoint=http://ghproxy
+        - --github-endpoint=https://api.github.com
+        - --github-graphql-endpoint=http://ghproxy/graphql
         - --config-path
         - ./core-services/prow/02_config/_config.yaml
         - --supplemental-prow-config-dir
@@ -461,17 +466,32 @@ presubmits:
         - mismatched-tide-lenient
         command:
         - /checkconfig
-        image: gcr.io/k8s-prow/checkconfig:v20210722-a7efb93946
-        imagePullPolicy: Always
+        env:
+        - name: GITHUB_APP_ID
+          valueFrom:
+            secretKeyRef:
+              key: appid
+              name: openshift-prow-github-app
+        image: gcr.io/k8s-prow/checkconfig:v20210805-68e8634d20
+        imagePullPolicy: IfNotPresent
         name: ""
         resources:
           requests:
             cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/github
+          name: github-app-credentials
+          readOnly: true
+      volumes:
+      - name: github-app-credentials
+        secret:
+          secretName: openshift-prow-github-app
     trigger: (?m)^/test( | .* )config,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build02
     context: ci/prow/core-valid
     decorate: true
@@ -717,7 +737,7 @@ presubmits:
     decorate: true
     extra_refs:
     - base_ref: master
-      org: redhat-operator-ecosystem
+      org: redhat-openshift-ecosystem
       repo: release
     name: pull-ci-openshift-release-master-pj-rehearse
     optional: true
@@ -900,7 +920,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build02
     context: ci/prow/services-valid
     decorate: true
@@ -1003,6 +1024,7 @@ presubmits:
     labels:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-release-master-vsphere-dry
+    optional: true
     rerun_command: /test vsphere-dry
     spec:
       containers:

@@ -1,1 +1,1 @@
-See [CONFIGURATION.md](https://github.com/openshift/ci-tools/blob/master/CONFIGURATION.md).
+See [CONFIGURATION.md](https://docs.ci.openshift.org/docs/architecture/ci-operator/).

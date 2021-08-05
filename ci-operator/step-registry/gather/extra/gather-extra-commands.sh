@@ -31,8 +31,8 @@ fi
 # that libcurl doesn't recognize the uppercase variables).
 if test -f "${SHARED_DIR}/proxy-conf.sh"
 then
-	# shellcheck source=/dev/null
-	source "${SHARED_DIR}/proxy-conf.sh"
+    # shellcheck disable=SC1090
+    source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
 echo "Gathering artifacts ..."
@@ -138,6 +138,7 @@ cat >> ${SHARED_DIR}/custom-links.txt << EOF
 let a = document.createElement('a');
 a.href="https://promecieus.dptools.openshift.org/?search="+document.referrer;
 a.innerHTML="PromeCIeus";
+a.target="_blank";
 document.getElementById("wrapper").append(a);
 </script>
 EOF
