@@ -13,7 +13,7 @@ EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
 TAGS="Key=expirationDate,Value=${EXPIRATION_DATE}"
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
-PATCH="${SHARED_DIR}/install-config-sharednetwork.yaml.patch"
+PATCH=/tmp/install-config-sharednetwork.yaml.patch
 
 REGION="${LEASED_RESOURCE}"
 
@@ -50,7 +50,7 @@ echo "Subnets : ${subnets}"
 # save stack information to ${SHARED_DIR} for deprovision step
 echo "${STACK_NAME}" >> "${SHARED_DIR}/sharednetworkstackname"
 
-cat >> "${PATCH}" << EOF
+cat > "${PATCH}" << EOF
 platform:
   aws:
     subnets: ${subnets}
