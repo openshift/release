@@ -4,7 +4,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+if [ "${AWS_REGION_OVERRIDE}" == "cn-north-1" ] || [ "${AWS_REGION_OVERRIDE}" == "cn-northwest-1" ]; then
+  # use inject credential
+  export AWS_SHARED_CREDENTIALS_FILE=/var/run/aws-china-credential/.awscred
+else
+  export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+fi
 
 curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
 CONFIG="${SHARED_DIR}/install-config.yaml"
