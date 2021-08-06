@@ -3,19 +3,18 @@ base_images:
     name: "4.9"
     namespace: ocp
     tag: base
-build_root: # declares that the release:golang-1.13 image has the build-time dependencies
+  os:
+    name: centos
+    namespace: openshift
+    tag: "7"
+build_root:
   image_stream_tag:
-    name: "release"
-    namespace: "openshift"
-    tag: "golang-1.14"
-images:
-- dockerfile_path: Dockerfile
-  to: quay.io/konveyor/openshift-velero-plugin:latest
-releases:
-  latest:
-    release:
-      channel: stable
-      version: "4.7"
+    name: release
+    namespace: openshift
+    tag: golang-1.14
+promotion:
+  name: "4.9"
+  namespace: ocp
 resources:
   '*':
     limits:
@@ -23,19 +22,14 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tag_specification:
+  name: "4.9"
+  namespace: ocp
 tests:
-- as: plugin-e2e
+- as: e2e-aws
   steps:
     cluster_profile: aws
-    test:
-    - as: e2e
-      commands: make test
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: optional-operators-ci-aws
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: master
   org: openshift
