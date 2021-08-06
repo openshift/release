@@ -39,16 +39,19 @@ tests:
   commands: make test
   container:
     from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: verify
   commands: make verify
   container:
     from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: coverage
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
     make coverage
   container:
     from: src
+  run_if_changed: \.go$
   secret:
     mount_path: /tmp/secret
     name: hive-codecov-token
@@ -70,6 +73,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.7"
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     test:
     - as: test
@@ -116,6 +120,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.7"
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     test:
     - as: test
