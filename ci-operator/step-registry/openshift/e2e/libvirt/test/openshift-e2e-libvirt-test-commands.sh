@@ -16,7 +16,7 @@ function upgrade() {
     openshift-tests run-upgrade all \
         --to-image "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}" \
         --options "${TEST_UPGRADE_OPTIONS-}" \
-        --provider "${TEST_PROVIDER}" \
+        --provider "${TEST_PROVIDER:-}" \
         -o "${ARTIFACT_DIR}/e2e.log" \
         --junit-dir "${ARTIFACT_DIR}/junit" &
     wait "$!"
