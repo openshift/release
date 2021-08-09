@@ -1982,21 +1982,24 @@ periodics:
     org: openshift
     repo: release
   labels:
-    ci.openshift.io/role: infra
+    #ci.openshift.io/role: infra
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-promoted-image-governor
   spec:
     containers:
-    - command:
-      - /usr/bin/promoted-image-governor
+    - args:
       - --ci-operator-config-path=ci-operator/config
       - --release-controller-mirror-config-dir=core-services/release-controller/_releases
+      - --ensure-promoted-images-up-to-date=true
       - --ignored-image-stream-tags
       - ^ocp\S*/\S+:machine-os-content$
       - --ignored-image-stream-tags
       - '^openshift/origin-v3.11:'
       - --ignored-image-stream-tags
       - '^origin/4.([6-9]|\d\d+):'
-      - --dry-run=false
+      - --dry-run=true
+      command:
+      - /usr/bin/promoted-image-governor
       image: registry.ci.openshift.org/ci/promoted-image-governor:latest
       imagePullPolicy: Always
       name: promoted-image-governor
