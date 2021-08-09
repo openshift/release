@@ -23,6 +23,16 @@ promotion:
   name: hive-v4.0
   namespace: openshift
 releases:
+  e2e-hub-4.9:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.9"
+  e2e-spoke:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.7"
   initial:
     integration:
       name: "4.7"
@@ -32,11 +42,6 @@ releases:
       include_built_images: true
       name: "4.7"
       namespace: ocp
-  e2e-spoke:
-    candidate:
-      product: ocp
-      stream: nightly
-      version: "4.7"
 resources:
   '*':
     requests:
@@ -124,6 +129,25 @@ tests:
         requests:
           cpu: 100m
     workflow: generic-claim
+- as: e2e-4.9
+  steps:
+    cluster_profile: aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:e2e-hub-4.9
+    test:
+    - as: test
+      cli: e2e-spoke
+      commands: CLOUD=aws make test-e2e
+      dependencies:
+      - env: HIVE_IMAGE
+        name: hive
+      - env: RELEASE_IMAGE
+        name: release:e2e-spoke
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: e2e-pool
   cluster_claim:
     architecture: amd64
