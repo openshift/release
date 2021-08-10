@@ -1,19 +1,11 @@
 base_images:
-  ansible-operator:
-    name: "4.9"
-    namespace: ocp
-    tag: ansible-operator
   base:
     name: "4.9"
     namespace: ocp
     tag: base
-build_root:
-  project_image:
-    dockerfile_path: build/custom-ci-Dockerfile
-  use_build_cache: true
 images:
-- dockerfile_path: build/Dockerfile
-  from: ansible-operator
+- dockerfile_path: Dockerfile
+  from: base
   to: oadp-operator
 operator:
   bundles:
@@ -45,8 +37,8 @@ tests:
       OO_PACKAGE: oadp-operator
       OO_TARGET_NAMESPACES: '!install'
     test:
-    - as: e2e
-      commands: make test-e2e
+    - as: unit
+      commands: make test
       credentials:
       - mount_path: /var/run/oadp-credentials
         name: oadp-credentials
@@ -69,8 +61,8 @@ tests:
       OO_PACKAGE: oadp-operator
       OO_TARGET_NAMESPACES: '!install'
     test:
-    - as: e2e
-      commands: make test-e2e
+    - as: unit
+      commands: make test
       credentials:
       - mount_path: /var/run/oadp-credentials
         name: oadp-credentials
