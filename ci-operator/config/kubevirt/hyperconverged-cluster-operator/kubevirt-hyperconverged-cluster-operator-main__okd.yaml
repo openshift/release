@@ -1,10 +1,10 @@
 base_images:
   base:
-    name: "4.8"
+    name: "4.9"
     namespace: origin
     tag: base
   cli:
-    name: "4.8"
+    name: "4.9"
     namespace: origin
     tag: cli
   hco-index:
@@ -15,16 +15,16 @@ base_images:
     name: hyperconverged-cluster-index
     namespace: ci
     tag: 1.4.0-unstable
-  operator-registry:
-    name: "4.8"
-    namespace: origin
-    tag: operator-registry
+  ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.16-openshift-4.9
 binary_build_commands: make install
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.15
+    tag: golang-1.16
 images:
 - dockerfile_path: build/Dockerfile.okd
   from: base
@@ -42,14 +42,12 @@ images:
       - destination_dir: .
         source_path: /go/bin/hyperconverged-cluster-webhook
   to: hyperconverged-cluster-webhook
-- dockerfile_path: build/Dockerfile.functest
+- dockerfile_path: build/Dockerfile.functest.ci
+  inputs:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
   to: hyperconverged-cluster-functest
-- dockerfile_path: deploy/Dockerfile.registry.intermediate
-  from: operator-registry
-  to: operator-registry-base
-- dockerfile_path: deploy/Dockerfile.registry.ci
-  from: operator-registry-base
-  to: hco-registry
 - dockerfile_path: deploy/Dockerfile.src.ci
   from: src
   inputs:
@@ -80,10 +78,7 @@ operator:
 promotion:
   additional_images:
     hyperconverged-cluster-operator-tests: src
-  excluded_images:
-  - operator-registry-base
-  - hco-registry
-  name: "4.8"
+  name: "4.9"
   namespace: origin
 resources:
   '*':
@@ -91,7 +86,7 @@ resources:
       cpu: 500m
       memory: 1Gi
 tag_specification:
-  name: "4.8"
+  name: "4.9"
   namespace: origin
 tests:
 - as: hco-e2e-image-index-gcp

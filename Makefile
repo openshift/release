@@ -54,7 +54,7 @@ release-controllers:
 	./hack/generators/release-controllers/generate-release-controllers.py .
 
 checkconfig:
-	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR):/release:z" gcr.io/k8s-prow/checkconfig:v20210727-b2b0794248 --config-path /release/core-services/prow/02_config/_config.yaml --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
+	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR):/release:z" gcr.io/k8s-prow/checkconfig:v20210809-f7cf0bd038 --config-path /release/core-services/prow/02_config/_config.yaml --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
 
 jobs:
 	$(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/ci-operator-prowgen:latest
@@ -270,3 +270,8 @@ ci-secret-bootstrap-config:
 new-pool-admins:
 	hack/generate_new_pool_admins.sh $(TEAM) $(OWNERS)
 .PHONY: new-pool-admins
+
+openshift-image-mirror-mappings:
+	$(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/promoted-image-governor:latest
+	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR):/release:z" registry.ci.openshift.org/ci/promoted-image-governor:latest --ci-operator-config-path /release/ci-operator/config --release-controller-mirror-config-dir /release/core-services/release-controller/_releases --openshift-mapping-dir /release/core-services/image-mirroring/openshift --openshift-mapping-config /release/core-services/image-mirroring/openshift/_config.yaml
+.PHONY: openshift-image-mirror-mappings

@@ -10,6 +10,22 @@ echo "************ baremetalds assisted operator ztp command ************"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
 
+# ZTP scripts have a lot of default values for the spoke cluster configuration. Adding this so that they can be changed.
+if [[ -n "${ASSISTED_ZTP_CONFIG:-}" ]]; then
+  readarray -t config <<< "${ASSISTED_ZTP_CONFIG}"
+  for var in "${config[@]}"; do
+    if [[ ! -z "${var}" ]]; then
+      echo "export ${var}" >> "${SHARED_DIR}/assisted-ztp-config"
+    fi
+  done
+fi
+
+# Copy configuration for ZTP vars if present
+if [[ -e "${SHARED_DIR}/assisted-ztp-config" ]]
+then
+  scp "${SSHOPTS[@]}" "${SHARED_DIR}/assisted-ztp-config" "root@${IP}:assisted-ztp-config"
+fi
+
 tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/assisted-service.tar.gz"
 
 # shellcheck disable=SC2087
@@ -32,11 +48,17 @@ fi
 
 cd "\${REPO_DIR}/deploy/operator/ztp/"
 
-echo "### Deploying SNO spoke cluster..."
+echo "### Deploying spoke cluster..."
 
 export EXTRA_BAREMETALHOSTS_FILE="/root/dev-scripts/\${EXTRA_BAREMETALHOSTS_FILE}"
 
 source /root/config
+
+# Inject job configuration for ZTP, if available
+if [[ -e /root/assisted-ztp-config ]]
+then
+  source /root/assisted-ztp-config
+fi
 
 ./deploy_spoke_cluster.sh
 

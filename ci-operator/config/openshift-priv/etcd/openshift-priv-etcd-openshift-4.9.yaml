@@ -15,11 +15,15 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-etcd-golang-1.15
+  ocp_builder_rhel-8-etcd-golang-1.16:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-etcd-golang-1.16
   ocp_builder_rhel-8-golang-1.15-openshift-4.8:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.15-openshift-4.8
-binary_build_commands: make build --warn-undefined-variables
+binary_build_commands: GOFLAGS=-mod=readonly make build --warn-undefined-variables
 build_root:
   image_stream_tag:
     name: release
@@ -30,9 +34,9 @@ images:
 - dockerfile_path: Dockerfile.rhel
   from: base
   inputs:
-    ocp_builder_rhel-8-etcd-golang-1.15:
+    ocp_builder_rhel-8-etcd-golang-1.16:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-etcd-golang-1.15
+      - registry.ci.openshift.org/ocp/builder:rhel-8-etcd-golang-1.16
   to: etcd
 promotion:
   name: 4.9-priv
@@ -47,7 +51,7 @@ tag_specification:
   namespace: ocp-private
 tests:
 - as: unit
-  commands: make test --warn-undefined-variables
+  commands: CGO_ENABLED=1 make test --warn-undefined-variables
   container:
     from: bin
 - as: e2e-aws
