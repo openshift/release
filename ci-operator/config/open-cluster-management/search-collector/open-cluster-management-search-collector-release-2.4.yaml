@@ -21,6 +21,7 @@ images:
       - registry.ci.openshift.org/open-cluster-management/builder:go1.16-linux
   to: search-collector
 promotion:
+  disabled: true
   name: "2.4"
   namespace: open-cluster-management
 resources:
@@ -29,38 +30,38 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: backplane-fast-forward
-  postsubmit: true
-  steps:
-    env:
-      DESTINATION_BRANCH: release-2.4
-    workflow: ocm-ci-fastforward
 - as: test-unit
   commands: |
     export SELF="make -f Makefile.prow"
     make -f Makefile.prow unit-test
   container:
     from: src
-- as: sonar-pre-submit
-  commands: |
-    export SELF="make -f Makefile.prow"
-    make -f Makefile.prow sonar/go/prow
-  container:
-    from: src
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
-- as: sonar-post-submit
-  commands: |
-    export SELF="make -f Makefile.prow"
-    make -f Makefile.prow sonar/go/prow
-  container:
-    from: src
+- as: publish
   postsubmit: true
-  secrets:
-  - mount_path: /etc/github
-    name: acm-cicd-github
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: search-collector
+    env:
+      IMAGE_REPO: search-collector
+      REGISTRY_ORG: open-cluster-management
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/open-cluster-management"
+        export SELF="make -f Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: main
+  branch: release-2.4
   org: open-cluster-management
   repo: search-collector
