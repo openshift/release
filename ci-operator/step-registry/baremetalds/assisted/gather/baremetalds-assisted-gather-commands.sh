@@ -21,7 +21,7 @@ function getlogs() {
   ssh  "${SSHOPTS[@]}" "root@${IP}" bash - <<EOF
   set -xeuo pipefail
   cd /home/assisted
-  cp -R ./reports /tmp/artifacts || true
+  cp -v -R ./reports /tmp/artifacts || true
   find -name '*.log' -exec cp -v {} /tmp/artifacts \; || true
 EOF
 
@@ -44,7 +44,7 @@ sos report --batch --tmp-dir /tmp/artifacts \
   -k podman.all -k podman.logs
 
 # TODO: remove when https://github.com/sosreport/sos/pull/2594 is available
-cp -r /var/lib/libvirt/dnsmasq /tmp/artifacts/libvirt-dnsmasq
+cp -v -r /var/lib/libvirt/dnsmasq /tmp/artifacts/libvirt-dnsmasq
 
 # Get assisted logs
 export LOGS_DEST=/tmp/artifacts
