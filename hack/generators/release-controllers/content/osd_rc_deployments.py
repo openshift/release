@@ -163,7 +163,12 @@ def _add_osd_rc_deployment(gendoc):
                 'metadata': {
                     'labels': {
                         'app': context.rc_service_name
-                    }
+                    },
+                    'annotations': {
+                        'prometheus.io/scrape': 'true',
+                        'prometheus.io/port': '80',
+                        'prometheus.io/path': '/metrics'
+                    },
                 },
                 'spec': {
                     'containers': [
