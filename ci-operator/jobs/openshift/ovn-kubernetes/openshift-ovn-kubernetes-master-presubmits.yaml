@@ -3,8 +3,9 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - master
-    cluster: build02
+    - ^master$
+    - ^master-
+    cluster: build01
     context: ci/prow/4.9-upgrade-from-stable-4.8-e2e-aws-ovn-upgrade
     decorate: true
     decoration_config:
@@ -80,8 +81,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
-    cluster: build02
+    - ^master$
+    - ^master-
+    cluster: build01
     context: ci/prow/e2e-aws-ovn
     decorate: true
     labels:
@@ -144,8 +146,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
-    cluster: build02
+    - ^master$
+    - ^master-
+    cluster: build01
     context: ci/prow/e2e-aws-ovn-local-gateway
     decorate: true
     labels:
@@ -208,8 +211,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
-    cluster: build02
+    - ^master$
+    - ^master-
+    cluster: build01
     context: ci/prow/e2e-aws-ovn-windows
     decorate: true
     labels:
@@ -272,8 +276,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
-    cluster: build02
+    - ^master$
+    - ^master-
+    cluster: build01
     context: ci/prow/e2e-azure-ovn
     decorate: true
     labels:
@@ -337,8 +342,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
-    cluster: build02
+    - ^master$
+    - ^master-
+    cluster: build01
     context: ci/prow/e2e-gcp-ovn
     decorate: true
     labels:
@@ -403,8 +409,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
-    cluster: build02
+    - ^master$
+    - ^master-
+    cluster: build01
     context: ci/prow/e2e-gcp-ovn-upgrade
     decorate: true
     labels:
@@ -470,8 +477,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
-    cluster: build02
+    - ^master$
+    - ^master-
+    cluster: build01
     context: ci/prow/e2e-metal-ipi-ovn-dualstack
     decorate: true
     labels:
@@ -536,8 +544,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
-    cluster: build02
+    - ^master$
+    - ^master-
+    cluster: build01
     context: ci/prow/e2e-metal-ipi-ovn-ipv6
     decorate: true
     labels:
@@ -602,11 +611,13 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
-    cluster: build02
+    - ^master$
+    - ^master-
+    cluster: build01
     context: ci/prow/e2e-openstack-ovn
     decorate: true
     labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-ovn-kubernetes-master-e2e-openstack-ovn
     optional: true
@@ -615,26 +626,13 @@ presubmits:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --give-pr-author-access-to-namespace=true
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
-        - --repo=ovn-kubernetes
+        - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/usr/local/e2e-openstack-ovn-cluster-profile
         - --target=e2e-openstack-ovn
-        - --template=/usr/local/e2e-openstack-ovn
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: openstack
-        - name: CLUSTER_VARIANT
-          value: ovn
-        - name: JOB_NAME_SAFE
-          value: e2e-openstack-ovn
-        - name: KURYR_ENABLED
-          value: "false"
-        - name: TEST_COMMAND
-          value: TEST_SUITE=openshift/conformance/parallel run-tests
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -650,11 +648,11 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-openstack-ovn
-          name: job-definition
-          subPath: cluster-launch-installer-openstack-e2e.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
@@ -668,19 +666,20 @@ presubmits:
         projected:
           sources:
           - secret:
-              name: cluster-secrets-openstack
-      - configMap:
-          name: prow-job-cluster-launch-installer-openstack-e2e
-        name: job-definition
+              name: cluster-secrets-openstack-vexxhost
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-openstack-ovn,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - master
-    cluster: build02
+    - ^master$
+    - ^master-
+    cluster: build01
     context: ci/prow/e2e-ovn-hybrid-step-registry
     decorate: true
     labels:
@@ -744,7 +743,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: vsphere
     context: ci/prow/e2e-vsphere-ovn
     decorate: true
@@ -809,7 +809,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: vsphere
     context: ci/prow/e2e-vsphere-windows
     decorate: true
@@ -874,8 +875,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
-    cluster: build02
+    - ^master$
+    - ^master-
+    cluster: build01
     context: ci/prow/images
     decorate: true
     labels:
@@ -921,8 +923,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
-    cluster: build02
+    - ^master$
+    - ^master-
+    cluster: build01
     context: ci/prow/okd-e2e-gcp-ovn
     decorate: true
     decoration_config:
@@ -992,8 +995,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
-    cluster: build02
+    - ^master$
+    - ^master-
+    cluster: build01
     context: ci/prow/okd-images
     decorate: true
     decoration_config:

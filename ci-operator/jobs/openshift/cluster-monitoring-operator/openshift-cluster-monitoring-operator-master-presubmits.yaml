@@ -3,8 +3,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
-    cluster: build01
+    - ^master$
+    - ^master-
+    cluster: build02
     context: ci/prow/e2e-agnostic
     decorate: true
     labels:
@@ -67,8 +68,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
-    cluster: build01
+    - ^master$
+    - ^master-
+    cluster: build02
     context: ci/prow/e2e-agnostic-operator
     decorate: true
     labels:
@@ -131,8 +133,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
-    cluster: build01
+    - ^master$
+    - ^master-
+    cluster: build02
     context: ci/prow/e2e-agnostic-upgrade
     decorate: true
     labels:
@@ -195,8 +198,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
-    cluster: build01
+    - ^master$
+    - ^master-
+    cluster: build02
     context: ci/prow/e2e-aws-single-node
     decorate: true
     labels:
@@ -260,8 +264,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
-    cluster: build01
+    - ^master$
+    - ^master-
+    cluster: build02
     context: ci/prow/generate
     decorate: true
     labels:
@@ -306,8 +311,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
-    cluster: build01
+    - ^master$
+    - ^master-
+    cluster: build02
     context: ci/prow/images
     decorate: true
     labels:
@@ -353,8 +359,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
-    cluster: build01
+    - ^master$
+    - ^master-
+    cluster: build02
     context: ci/prow/jsonnet-fmt
     decorate: true
     labels:
@@ -399,8 +406,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
-    cluster: build01
+    - ^master$
+    - ^master-
+    cluster: build02
     context: ci/prow/rules
     decorate: true
     labels:
@@ -445,8 +453,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
-    cluster: build01
+    - ^master$
+    - ^master-
+    cluster: build02
     context: ci/prow/shellcheck
     decorate: true
     labels:
@@ -491,8 +500,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
-    cluster: build01
+    - ^master$
+    - ^master-
+    cluster: build02
     context: ci/prow/unit
     decorate: true
     labels:
@@ -537,8 +547,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - master
-    cluster: build01
+    - ^master$
+    - ^master-
+    cluster: build02
     context: ci/prow/vendor
     decorate: true
     labels:
@@ -580,3 +591,51 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )vendor,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build02
+    context: ci/prow/versions
+    decorate: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-monitoring-operator-master-versions
+    optional: true
+    rerun_command: /test versions
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=versions
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )versions,?($|\s.*)

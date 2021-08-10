@@ -27,6 +27,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.16-openshift-4.8
+  ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.16-openshift-4.9
   ocp_builder_rhel-8-golang-openshift-4.6:
     name: builder
     namespace: ocp
@@ -43,9 +47,9 @@ images:
 - dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.8:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
   to: cluster-network-operator
 promotion:
   disabled: true
@@ -151,6 +155,19 @@ tests:
       NETWORK_TYPE: Kuryr
     test:
     - ref: openstack-noop
+    workflow: openshift-e2e-openstack-ipi
+- as: e2e-openstack
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      TEST_SUITE: openshift/conformance/parallel
+    workflow: openshift-e2e-openstack-ipi
+- as: e2e-openstack-ovn
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      NETWORK_TYPE: OVNKubernetes
+      TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
 zz_generated_metadata:
   branch: release-4.9

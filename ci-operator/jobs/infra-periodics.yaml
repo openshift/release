@@ -45,7 +45,7 @@ periodics:
     serviceAccountName: upgrader
 - agent: kubernetes
   cluster: app.ci
-  cron: 0 1 * * *
+  cron: 2 7 * * *
   decorate: true
   labels:
     ci.openshift.io/role: infra
@@ -112,7 +112,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210727-b2b0794248
+      image: gcr.io/k8s-prow/commenter:v20210809-f7cf0bd038
       imagePullPolicy: Always
       name: ""
       resources:
@@ -196,7 +196,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210727-b2b0794248
+      image: gcr.io/k8s-prow/commenter:v20210809-f7cf0bd038
       imagePullPolicy: Always
       name: ""
       resources:
@@ -219,11 +219,11 @@ periodics:
   spec:
     containers:
     - args:
-      - --query=is:pr state:open label:lgtm label:approved status:failure -label:do-not-merge
-        -label:do-not-merge/work-in-progress -label:do-not-merge/hold -label:needs-rebase
-        -label:needs-ok-to-test org:openshift org:openshift-priv repo:operator-framework/operator-lifecycle-manager
-        repo:operator-framework/operator-marketplace repo:operator-framework/operator-registry
-        repo:tnozicka/openshift-acme repo:cri-o/cri-o
+      - --query=is:pr state:open label:lgtm label:approved status:failure comments:<2500
+        -label:do-not-merge -label:do-not-merge/work-in-progress -label:do-not-merge/hold
+        -label:needs-rebase -label:needs-ok-to-test org:openshift org:openshift-priv
+        repo:operator-framework/operator-lifecycle-manager repo:operator-framework/operator-marketplace
+        repo:operator-framework/operator-registry repo:tnozicka/openshift-acme repo:cri-o/cri-o
       - --token=/etc/oauth/oauth
       - --updated=0
       - |-
@@ -236,7 +236,7 @@ periodics:
       - --random
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210727-b2b0794248
+      image: gcr.io/k8s-prow/commenter:v20210809-f7cf0bd038
       imagePullPolicy: Always
       name: ""
       resources:
@@ -281,7 +281,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210727-b2b0794248
+      image: gcr.io/k8s-prow/commenter:v20210809-f7cf0bd038
       imagePullPolicy: Always
       name: ""
       resources:
@@ -330,7 +330,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210727-b2b0794248
+      image: gcr.io/k8s-prow/commenter:v20210809-f7cf0bd038
       imagePullPolicy: Always
       name: ""
       resources:
@@ -378,7 +378,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210727-b2b0794248
+      image: gcr.io/k8s-prow/commenter:v20210809-f7cf0bd038
       imagePullPolicy: Always
       name: ""
       resources:
@@ -412,7 +412,7 @@ periodics:
       - --debug
       command:
       - /app/label_sync/app.binary
-      image: gcr.io/k8s-prow/label_sync:v20210727-b2b0794248
+      image: gcr.io/k8s-prow/label_sync:v20210809-f7cf0bd038
       imagePullPolicy: Always
       name: ""
       resources:
@@ -663,7 +663,7 @@ periodics:
       - --config=core-services/prow/02_config/_bumper.yaml
       command:
       - /app/prow/cmd/generic-autobumper/app.binary
-      image: gcr.io/k8s-prow/generic-autobumper:v20210727-b2b0794248
+      image: gcr.io/k8s-prow/generic-autobumper:v20210809-f7cf0bd038
       imagePullPolicy: IfNotPresent
       name: autobump
       resources:
@@ -705,6 +705,7 @@ periodics:
       - --config-dir=./ci-operator/config
       - --current-release=4.9
       - --future-release=4.9
+      - --future-release=4.10
       - --self-approve=true
       - --assign=ghost
       - --whitelist-file=./core-services/openshift-priv/_whitelist.yaml
@@ -920,7 +921,7 @@ periodics:
       - --github-enabled-org=openshift
       command:
       - /app/prow/cmd/branchprotector/app.binary
-      image: gcr.io/k8s-prow/branchprotector:v20210727-b2b0794248
+      image: gcr.io/k8s-prow/branchprotector:v20210809-f7cf0bd038
       imagePullPolicy: Always
       name: ""
       resources:
@@ -968,7 +969,7 @@ periodics:
           secretKeyRef:
             key: appid
             name: openshift-prow-github-app
-      image: gcr.io/k8s-prow/branchprotector:v20210727-b2b0794248
+      image: gcr.io/k8s-prow/branchprotector:v20210809-f7cf0bd038
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1017,7 +1018,7 @@ periodics:
       - --github-allowed-burst=600
       command:
       - /app/prow/cmd/peribolos/app.binary
-      image: gcr.io/k8s-prow/peribolos:v20210727-b2b0794248
+      image: gcr.io/k8s-prow/peribolos:v20210809-f7cf0bd038
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1232,9 +1233,6 @@ periodics:
   - base_ref: master
     org: openshift
     repo: release
-  - base_ref: master
-    org: redhat-operator-ecosystem
-    repo: release
   interval: 1h
   labels:
     ci.openshift.io/role: infra
@@ -1244,7 +1242,6 @@ periodics:
     - args:
       - --dry-run=false
       - --source-path=.
-      - --source-path=../../redhat-operator-ecosystem/release
       - --config-path=core-services/prow/02_config/_config.yaml
       - --supplemental-prow-config-dir=./core-services/prow/02_config
       - --plugin-config=core-services/prow/02_config/_plugins.yaml
@@ -1254,7 +1251,7 @@ periodics:
       env:
       - name: KUBECONFIG
         value: /etc/build-farm-credentials/build01.kubeconfig:/etc/build-farm-credentials/app.ci.kubeconfig:/etc/build-farm-credentials/build02.kubeconfig:/etc/build-farm-credentials/vsphere.kubeconfig
-      image: gcr.io/k8s-prow/config-bootstrapper:v20210727-b2b0794248
+      image: gcr.io/k8s-prow/config-bootstrapper:v20210809-f7cf0bd038
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1898,7 +1895,7 @@ periodics:
       - --dry-run=false
       command:
       - /app/prow/cmd/invitations-accepter/app.binary
-      image: gcr.io/k8s-prow/invitations-accepter:v20210727-b2b0794248
+      image: gcr.io/k8s-prow/invitations-accepter:v20210809-f7cf0bd038
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1930,7 +1927,7 @@ periodics:
       - --dry-run=false
       command:
       - /app/prow/cmd/invitations-accepter/app.binary
-      image: gcr.io/k8s-prow/invitations-accepter:v20210727-b2b0794248
+      image: gcr.io/k8s-prow/invitations-accepter:v20210809-f7cf0bd038
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1962,7 +1959,7 @@ periodics:
       - --dry-run=false
       command:
       - /app/prow/cmd/invitations-accepter/app.binary
-      image: gcr.io/k8s-prow/invitations-accepter:v20210727-b2b0794248
+      image: gcr.io/k8s-prow/invitations-accepter:v20210809-f7cf0bd038
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1976,3 +1973,34 @@ periodics:
     - name: token
       secret:
         secretName: github-credentials-openshift-ci-robot
+- agent: kubernetes
+  cluster: app.ci
+  cron: 30 7 * * *
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-promoted-image-governor
+  spec:
+    containers:
+    - command:
+      - /usr/bin/promoted-image-governor
+      - --ci-operator-config-path=ci-operator/config
+      - --release-controller-mirror-config-dir=core-services/release-controller/_releases
+      - --ignored-image-stream-tags
+      - ^ocp\S*/\S+:machine-os-content$
+      - --ignored-image-stream-tags
+      - '^openshift/origin-v3.11:'
+      - --ignored-image-stream-tags
+      - '^origin/4.([6-9]|\d\d+):'
+      - --dry-run=false
+      image: registry.ci.openshift.org/ci/promoted-image-governor:latest
+      imagePullPolicy: Always
+      name: promoted-image-governor
+      resources:
+        requests:
+          cpu: 500m
+    serviceAccountName: promoted-image-governor

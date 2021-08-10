@@ -36,14 +36,13 @@ tests:
     - as: e2e-functests
       cli: latest
       commands: |
-        ./hack/deploy-kubevirt-and-cdi.sh
+        ./automation/e2e-functests/setup.sh
         export component=ssp-operator-container
-        export IMG=$(echo $IMAGE_FORMAT | envsubst)
+        export CI_OPERATOR_IMG=$(echo $IMAGE_FORMAT | envsubst)
         export component=template-validator-container
-        export VALIDATOR_IMG=$(echo $IMAGE_FORMAT | envsubst)
+        export CI_VALIDATOR_IMG=$(echo $IMAGE_FORMAT | envsubst)
         export GOFLAGS=
-        export SKIP_CLEANUP_AFTER_TESTS=true
-        make deploy functest
+        ./automation/e2e-functests/run.sh
       from: src
       resources:
         requests:
@@ -57,11 +56,13 @@ tests:
     - as: e2e-upgrade-functests
       cli: latest
       commands: |
+        ./automation/e2e-upgrade-functests/setup.sh
         export component=ssp-operator-container
-        export IMG=$(echo $IMAGE_FORMAT | envsubst)
+        export CI_OPERATOR_IMG=$(echo $IMAGE_FORMAT | envsubst)
         export component=template-validator-container
-        export VALIDATOR_IMG=$(echo $IMAGE_FORMAT | envsubst)
-        ./automation/ocp-ci-run-e2e-upgrade-tests.sh
+        export CI_VALIDATOR_IMG=$(echo $IMAGE_FORMAT | envsubst)
+        export GOFLAGS=
+        ./automation/e2e-upgrade-functests/run.sh
       from: src
       resources:
         requests:
@@ -75,15 +76,13 @@ tests:
     - as: e2e-upgrade-from-old-operator-functests
       cli: latest
       commands: |
-        ./hack/deploy-kubevirt-and-cdi.sh
-        ./hack/deploy-old-ssp-operator.sh
+        ./automation/e2e-upgrade-from-old-operator-functests/setup.sh
         export component=ssp-operator-container
-        export IMG=$(echo $IMAGE_FORMAT | envsubst)
+        export CI_OPERATOR_IMG=$(echo $IMAGE_FORMAT | envsubst)
         export component=template-validator-container
-        export VALIDATOR_IMG=$(echo $IMAGE_FORMAT | envsubst)
+        export CI_VALIDATOR_IMG=$(echo $IMAGE_FORMAT | envsubst)
         export GOFLAGS=
-        export SKIP_CLEANUP_AFTER_TESTS=true
-        make deploy functest
+        ./automation/e2e-upgrade-from-old-operator-functests/run.sh
       from: src
       resources:
         requests:
