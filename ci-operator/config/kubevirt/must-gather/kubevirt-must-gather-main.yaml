@@ -3,6 +3,10 @@ base_images:
     name: "4.8"
     namespace: ocp
     tag: base
+  cli:
+    name: "4.9"
+    namespace: ocp
+    tag: cli
 binary_build_commands: make install
 build_root:
   image_stream_tag:
@@ -24,26 +28,38 @@ resources:
 tag_specification:
   name: "4.8"
   namespace: ocp
+test_binary_build_commands: |-
+  (
+    cd tests
+    go test -c -o must-gather.test .
+  )
+  mv tests/must-gather.test /go/bin/
 tests:
-- as: kubevirt-must-gather-e2e-aws
+- as: kubevirt-must-gather-e2e-azure
   steps:
-    cluster_profile: aws
+    cluster_profile: azure4
     test:
-    - as: test
+    - as: deploy
       cli: latest
       commands: |
-        git clone https://github.com/kubevirt/hyperconverged-cluster-operator
-        cd hyperconverged-cluster-operator
-        sed -i "s#15m#30m#g" ./deploy/kustomize/deploy_kustomize.sh
-        CONTENT_ONLY=false MARKETPLACE_MODE=false ./deploy/kustomize/deploy_kustomize.sh
-        image=$(component=kubevirt-must-gather eval echo ${IMAGE_FORMAT})
-        oc adm must-gather --image="${image}"
+        ./automation/deploy_hco.sh
+        ./automation/create_workloads.sh
       from: src
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    - as: test
+      cli: latest
+      commands: |
+        image=$(component=kubevirt-must-gather eval echo ${IMAGE_FORMAT})
+        oc adm must-gather --image="${image}" --dest-dir=must-gather-output
+        KUBECONFIG=${KUBECONFIG} /go/bin/must-gather.test
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-azure
 zz_generated_metadata:
-  branch: master
+  branch: main
   org: kubevirt
   repo: must-gather
