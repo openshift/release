@@ -3,8 +3,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
+    - ^main$
+    - ^main-
     cluster: build01
     context: ci/prow/images
     decorate: true
@@ -13,7 +13,7 @@ presubmits:
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-kubevirt-must-gather-master-images
+    name: pull-ci-kubevirt-must-gather-main-images
     rerun_command: /test images
     spec:
       containers:
@@ -53,18 +53,18 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
+    - ^main$
+    - ^main-
     cluster: build01
-    context: ci/prow/kubevirt-must-gather-e2e-aws
+    context: ci/prow/kubevirt-must-gather-e2e-azure
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-kubevirt-must-gather-master-kubevirt-must-gather-e2e-aws
-    rerun_command: /test kubevirt-must-gather-e2e-aws
+    name: pull-ci-kubevirt-must-gather-main-kubevirt-must-gather-e2e-azure
+    rerun_command: /test kubevirt-must-gather-e2e-azure
     spec:
       containers:
       - args:
@@ -72,8 +72,8 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/usr/local/kubevirt-must-gather-e2e-aws-cluster-profile
-        - --target=kubevirt-must-gather-e2e-aws
+        - --secret-dir=/usr/local/kubevirt-must-gather-e2e-azure-cluster-profile
+        - --target=kubevirt-must-gather-e2e-azure
         command:
         - ci-operator
         image: ci-operator:latest
@@ -86,7 +86,7 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/kubevirt-must-gather-e2e-aws-cluster-profile
+        - mountPath: /usr/local/kubevirt-must-gather-e2e-azure-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -109,11 +109,11 @@ presubmits:
         projected:
           sources:
           - secret:
-              name: cluster-secrets-aws
+              name: cluster-secrets-azure4
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )kubevirt-must-gather-e2e-aws,?($|\s.*)
+    trigger: (?m)^/test( | .* )kubevirt-must-gather-e2e-azure,?($|\s.*)
