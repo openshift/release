@@ -47,8 +47,10 @@ EOF
 
 # Fail fast if step storage-obj-save did not succeed.
 if [ ! -e $SAVE_FILE ]; then
-    echo "Cannot find $SAVE_FILE, looks like step storage-obj-save failed."
-    exit 1
+    STDOUT="Cannot find $SAVE_FILE, looks like step storage-obj-save failed. Did cluster installation succeed? $( cat $SAVE_FILE 2>&1 )"
+    MSG="Error: cannot find $SAVE_FILE"
+    report_flake "$MSG" "$STDOUT"
+    exit 0
 fi
 
 STEP=1
