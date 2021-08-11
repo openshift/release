@@ -6,8 +6,8 @@ set -o pipefail
 
 set +x
 
-PACKET_PROJECT_ID=$(cat "${CLUSTER_PROFILE_DIR}/packet-project-id")
-PACKET_AUTH_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/packet-auth-token")
+PACKET_PROJECT_ID=$(cat "/var/run/secrets/packet/${PACKET_ACCOUNT}/packet-project-id")
+PACKET_AUTH_TOKEN=$(cat "/var/run/secrets/packet/${PACKET_ACCOUNT}/packet-auth-token")
 SLACK_AUTH_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/slackhook")
 
 # Initial check
@@ -22,7 +22,7 @@ servers="$(curl -X GET --header 'Accept: application/json' --header "X-Auth-Toke
 )"
 
 #Assuming all servers created more than 4 hours = 14400 sec ago are leaks
-leaks="$(echo "$servers" | jq -r '.devices[]|select((now-(.created_at|fromdate))>14400 and any(.hostname; startswith("ipi-")) and .state!="queued")')"
+leaks="$(echo "$servers" | jq -r '.devices[]|select((now-(.created_at|fromdate))>14400 and any(.hostname; startswith("metal-")) and .state!="queued")')"
 
 leak_report="$(echo "$leaks" | jq --tab  '.hostname,.id,.created_at,.tags'|sed 's/\"/ /g')"
 leak_ids="$(echo "$leaks" | jq -c '.id'|sed 's/\"//g')"

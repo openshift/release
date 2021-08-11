@@ -17,8 +17,7 @@ cat > packet-setup.yaml <<-EOF
   vars:
     - cluster_type: "{{ lookup('env', 'CLUSTER_TYPE') }}"
     - slackhook_path: "{{ lookup('env', 'CLUSTER_PROFILE_DIR') }}/slackhook"
-    - packet_project_id: "{{ lookup('file', lookup('env', 'CLUSTER_PROFILE_DIR') + '/packet-project-id') }}"
-    - packet_auth_token: "{{ lookup('file', lookup('env', 'CLUSTER_PROFILE_DIR') + '/packet-auth-token') }}"
+    - packet_credentials_dir: "{{ '/var/run/secrets/packet/' + lookup('env', 'PACKET_ACCOUNT') + '/' }}"
 
   tasks:
   - name: check cluster type
@@ -30,8 +29,8 @@ cat > packet-setup.yaml <<-EOF
     block:
     - name: create Packet host {{ packet_hostname }}
       packet_device:
-        auth_token: "{{ packet_auth_token }}"
-        project_id: "{{ packet_project_id }}"
+        auth_token: "{{ lookup('file', packet_credentials_dir + 'packet-auth-token') }}"
+        project_id: "{{ lookup('file', packet_credentials_dir + 'packet-project-id') }}"
         hostnames: "{{ packet_hostname }}"
         operating_system: centos_8
         plan: m2.xlarge.x86
@@ -97,7 +96,7 @@ cat > packet-setup.yaml <<-EOF
         fi
 
         IP=\$(cat "\${SHARED_DIR}/server-ip")
-        SSHOPTS=(-o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -i "\${CLUSTER_PROFILE_DIR}/packet-ssh-key")
+        SSHOPTS=(-o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -i "{{ packet_credentials_dir }}packet-private-ssh-key")
 
         # Checkout packet server
         for x in \$(seq 10) ; do
@@ -108,4 +107,4 @@ cat > packet-setup.yaml <<-EOF
       dest: "${SHARED_DIR}/packet-conf.sh"
 EOF
 
-ansible-playbook packet-setup.yaml -e "packet_hostname=ipi-${NAMESPACE}-${JOB_NAME_HASH}-${BUILD_ID}"  |& gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0; fflush(); }'
+ansible-playbook packet-setup.yaml -e "packet_hostname=${PACKET_ACCOUNT}-${NAMESPACE}-${JOB_NAME_HASH}-${BUILD_ID}"  |& gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0; fflush(); }'
