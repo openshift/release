@@ -121,6 +121,10 @@ aws|aws-arm64)
     export KUBE_SSH_USER=core
     ;;
 azure4) export TEST_PROVIDER=azure;;
+azurestack) 
+    export TEST_PROVIDER=azure
+    export AZURE_AUTH_LOCATION=${SHARED_DIR}/osServicePrincipal.json
+    ;;
 vsphere) export TEST_PROVIDER=vsphere;;
 openstack*)
     # shellcheck disable=SC1090
