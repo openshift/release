@@ -57,10 +57,10 @@ CONFIG = {
         'default': 3,
     },
     'openstack-vh-mecha-quota-slice': {
-        'default': 6,
+        'default': 12,
     },
     'openstack-vh-mecha-central-quota-slice': {
-        'default': 6,
+        'default': 12,
     },
     'openstack-vh-mecha-az0-quota-slice': {
         'default': 6,
