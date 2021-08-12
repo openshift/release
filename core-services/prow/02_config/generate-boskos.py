@@ -67,6 +67,7 @@ CONFIG = {
     },
     'openstack-ppc64le-quota-slice': {},
     'ovirt-quota-slice': {},
+    'ovirt-upgrade-quota-slice': {},
     'packet-quota-slice': {
         'default': 60,
     },
@@ -111,6 +112,9 @@ for i in range(4):
 
 for i in range(10, 20):
     CONFIG['ovirt-quota-slice']['ovirt-{}'.format(i)] = 1
+
+for i in range(1, 7):
+    CONFIG['ovirt-upgrade-quota-slice']['ovirt-upgrade-{}'.format(i)] = 1
 
 for i in range(1, 3):
     CONFIG['kubevirt-quota-slice']['tenant-cluster-{}'.format(i)] = 1
