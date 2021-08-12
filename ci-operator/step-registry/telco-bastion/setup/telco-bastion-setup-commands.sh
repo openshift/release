@@ -119,10 +119,22 @@ cat << EOF > ~/ocp-install.yml
   - name: Remove last run
     shell: kcli delete plan --yes upstream_ci
     ignore_errors: yes
+  - name: Remove lock file
+    file:
+      path: /home/tester/vm_ready.txt
+      state: absent
   - name: Run deployment
-    shell: timeout 2h kcli create plan --paramfile /home/tester/kcli_parameters.yml upstream_ci $KCLI_PARAM
+    shell: kcli create plan --paramfile /home/tester/kcli_parameters.yml upstream_ci $KCLI_PARAM
     args:
       chdir: ~/kcli-openshift4-baremetal
+    async: 20
+    poll: 0
+EOF
+cat << EOF > ~/copy-kubeconfig-to-bastion.yml
+---
+- name: Copy kubeconfig from installer to bastion
+  hosts: all
+  tasks:
   - name: Run playbook to copy kubeconfig from installer vm to bastion vm
     shell: ansible-playbook -i /home/tester/inventory /home/tester/kubeconfig.yml
 EOF
@@ -144,5 +156,32 @@ cat << EOF > ~/fetch-kubeconfig.yml
     delegate_to: localhost
 EOF
 
+# Workaround for ssh connection killed
+cat << EOF > ~/ssh-connection-workaround.yml
+---
+- name: Wait for kcli install to finish
+  hosts: all
+  tasks:
+  - name: Try to grab file to see install finished
+    shell: kcli scp root@cnfdc5-installer:/root/cluster_ready.txt /home/tester/vm_ready.txt
+  - name: Check if successful
+    stat: path=/home/tester/vm_ready.txt
+    register: ready
+  - name: Fail if file was not there
+    fail:
+      msg: Installation not finished yet
+    when: ready.stat.exists == False
+EOF
+
 ansible-playbook -i ~/inventory ~/ocp-install.yml -vvvv || sleep 10800 # sleep 3 hours
+
+MINUTES_WAITED=0
+until [ $MINUTES_WAITED -ge 180 ] || ansible-playbook -i ~/inventory ~/ssh-connection-workaround.yml
+do
+    sleep 60
+    echo "Installation not finished yet."
+    ((MINUTES_WAITED+=1))
+done
+
+ansible-playbook -i ~/inventory ~/copy-kubeconfig-to-bastion.yml
 ansible-playbook -i ~/inventory ~/fetch-kubeconfig.yml -vvvv
