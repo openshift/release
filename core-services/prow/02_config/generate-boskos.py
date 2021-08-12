@@ -47,7 +47,7 @@ CONFIG = {
         'default': 1000,
     },
     'openstack-osuosl-quota-slice': {},
-    'openstack-quota-slice': {
+    'openstack-moc-quota-slice': {
         'default': 7,
     },
     'openstack-vexxhost-quota-slice': {

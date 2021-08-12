@@ -7,7 +7,7 @@ declare -A external_network=(
 	['openstack-vexxhost']='public'
 	['openstack-vh-mecha-central']='external'
 	['openstack-vh-mecha-az0']='external'
-	['openstack']='external'
+	['openstack-moc']='external'
 	)
 
 declare -A compute_flavor=(
@@ -15,7 +15,7 @@ declare -A compute_flavor=(
 	['openstack-vexxhost']='ci.m1.xlarge'
 	['openstack-vh-mecha-central']='m1.xlarge'
 	['openstack-vh-mecha-az0']='m1.xlarge'
-	['openstack']='m1.s2.xlarge'
+	['openstack-moc']='m1.s2.xlarge'
 	)
 
 declare -A compute_azs=(
@@ -23,7 +23,7 @@ declare -A compute_azs=(
 	['openstack-vexxhost']=''
 	['openstack-vh-mecha-central']=''
 	['openstack-vh-mecha-az0']='az0'
-	['openstack']=''
+	['openstack-moc']=''
 	)
 
 if [[ -z "${OPENSTACK_EXTERNAL_NETWORK:-}" ]]; then
