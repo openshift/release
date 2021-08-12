@@ -1,5 +1,5 @@
 base_images:
-  base:
+  ocp_base:
     name: "4.8"
     namespace: ocp
     tag: base
@@ -13,19 +13,22 @@ build_root:
     namespace: openshift
     tag: golang-1.15
 images:
-- dockerfile_path: Dockerfile.rhel8
-  from: base
+- dockerfile_path: Dockerfile
   inputs:
+    ocp_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.8:base
     ocp_builder_rhel-8-golang-1.15:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
-  to: logging-eventrouter
+  to: log-file-metric-exporter
 promotion:
-  name: "5.3"
+  name: "5.2"
   namespace: logging
 releases:
   latest:
     release:
+      architecture: amd64
       channel: stable
       version: "4.8"
 resources:
@@ -41,6 +44,6 @@ tests:
   container:
     from: src
 zz_generated_metadata:
-  branch: master
-  org: openshift
-  repo: eventrouter
+  branch: release-5.2
+  org: ViaQ
+  repo: log-file-metric-exporter
