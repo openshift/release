@@ -62,10 +62,33 @@ metadata:
   namespace: ci
 spec:
   ports:
-  - port: 443
+  - name: main
+    port: 443
     targetPort: 8443
   selector:
     app: release-controller-ocp-priv
+---
+#---------------------------------------------------------------------------------
+# osd_rc_deployments.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  annotations: {}
+  name: release-controller-ocp-priv
+  namespace: prow-monitoring
+spec:
+  endpoints:
+  - interval: 30s
+    port: main
+    scheme: https
+  namespaceSelector:
+    matchNames:
+    - ci
+  selector:
+    matchLabels:
+      app: release-controller-ocp-priv
 ---
 #---------------------------------------------------------------------------------
 # osd_rc_deployments.py added the following resource
@@ -85,10 +108,6 @@ spec:
       app: release-controller-ocp-priv
   template:
     metadata:
-      annotations:
-        prometheus.io/path: /metrics
-        prometheus.io/port: '80'
-        prometheus.io/scrape: 'true'
       labels:
         app: release-controller-ocp-priv
     spec:
