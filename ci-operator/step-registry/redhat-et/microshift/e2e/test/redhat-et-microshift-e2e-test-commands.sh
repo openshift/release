@@ -48,7 +48,7 @@ EOF
 # TODO: edit this file to launch microshift and run tests
 cat  > "${HOME}"/run-smoke-tests.sh << 'EOF'
 #!/bin/bash
-set -euo pipefail
+set -xeuo pipefail
 
 systemctl disable --now firewalld
 
@@ -64,8 +64,8 @@ while :; do
   fi
   echo "waiting for node response" >&2
   # get the condation where type == Ready, where condition.statusx == True.
-  node="$(oc get nodes -o jsonpath='{.items[*].status.conditions}' | jq '.[] | select(.type == "Ready") | select(.status == "True")')"
-  if [ -z "$node" ]; then
+  node="$(oc get nodes -o jsonpath='{.items[*].status.conditions}' | jq '.[] | select(.type == "Ready") | select(.status == "True")')" || echo ''
+  if [ "$node" ]; then
     echo "node posted ready status" >&2
     break
   fi
