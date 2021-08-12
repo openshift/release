@@ -76,6 +76,9 @@ def _add_osd_rc_service(gendoc):
             'name': context.rc_service_name,
             'namespace': context.config.rc_deployment_namespace,
             'annotations': annotations,
+            'labels': {
+                'app': context.rc_service_name
+            }
         },
         'spec': {
             'ports': [{
