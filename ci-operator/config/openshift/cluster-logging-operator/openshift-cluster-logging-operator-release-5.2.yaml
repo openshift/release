@@ -3,30 +3,14 @@ base_images:
     name: "4.8"
     namespace: ocp
     tag: base
-  cluster-logging-operator:
-    name: "5.2"
-    namespace: logging
-    tag: cluster-logging-operator
-  cluster-logging-operator-e2e:
-    name: "5.2"
-    namespace: logging
-    tag: cluster-logging-operator-e2e
-  cluster-logging-operator-registry:
-    name: "5.2"
-    namespace: logging
-    tag: cluster-logging-operator-registry
-  elasticsearch-operator:
-    name: "5.2"
-    namespace: logging
-    tag: elasticsearch-operator
-  elasticsearch-operator-registry:
-    name: "5.2"
-    namespace: logging
-    tag: elasticsearch-operator-registry
   elasticsearch-operator-src:
     name: "5.2"
     namespace: logging
     tag: elasticsearch-operator-src
+  elasticsearch-proxy:
+    name: "5.2"
+    namespace: logging
+    tag: elasticsearch-proxy
   log-file-metric-exporter:
     name: "5.2"
     namespace: logging
@@ -59,21 +43,33 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.15-openshift-4.8
+  ocp_cli:
+    name: "4.8"
+    namespace: ocp
+    tag: cli
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.15
+    tag: golang-1.14
 images:
-- dockerfile_path: Dockerfile
-  from: base
+- from: base
   inputs:
     ocp_builder_rhel-8-golang-1.15:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
-  to: elasticsearch-proxy
+    ocp_cli:
+      as:
+      - registry.ci.openshift.org/ocp/4.8:cli
+  to: cluster-logging-operator
+- dockerfile_path: olm_deploy/operatorregistry/Dockerfile
+  from: base
+  to: cluster-logging-operator-registry
+- dockerfile_path: Dockerfile.e2e
+  from: elasticsearch-operator-src
+  to: cluster-logging-operator-e2e
 promotion:
-  name: "5.3"
+  name: "5.2"
   namespace: logging
 releases:
   latest:
@@ -91,18 +87,17 @@ tests:
   container:
     from: src
 - as: unit
-  commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/es-proxy-logs ARTIFACT_DIR=${ARTIFACT_DIR}/es-proxy-artifacts
-    make test
+  commands: make test-unit
   container:
     from: src
-- as: cluster-logging-operator-e2e
+- as: e2e-gcp
   steps:
     cluster_profile: gcp
     test:
     - as: test
       cli: latest
       commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts
-        make test-e2e-olm E2E_TEST_INCLUDES=logforwarding CLF_TEST_INCLUDES=elasticsearchmanaged
+        make test-e2e-olm
       dependencies:
       - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
         name: pipeline:cluster-logging-operator-registry
@@ -128,34 +123,42 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-gcp
-- as: elasticsearch-operator-e2e
+    workflow: openshift-e2e-gcp-hosted-loki
+- as: functional
   steps:
     cluster_profile: gcp
     test:
     - as: test
       cli: latest
       commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts
-        make test-e2e-olm
+        make test-functional
       dependencies:
-      - env: IMAGE_ELASTICSEARCH_OPERATOR_REGISTRY
-        name: pipeline:elasticsearch-operator-registry
-      - env: IMAGE_ELASTICSEARCH_OPERATOR
-        name: pipeline:elasticsearch-operator
+      - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
+        name: pipeline:cluster-logging-operator-registry
+      - env: IMAGE_CLUSTER_LOGGING_OPERATOR
+        name: pipeline:cluster-logging-operator
       - env: IMAGE_OAUTH_PROXY
         name: pipeline:oauth-proxy
+      - env: IMAGE_LOGGING_CURATOR5
+        name: pipeline:logging-curator5
+      - env: IMAGE_LOGGING_FLUENTD
+        name: pipeline:logging-fluentd
       - env: IMAGE_ELASTICSEARCH_PROXY
         name: pipeline:elasticsearch-proxy
       - env: IMAGE_ELASTICSEARCH6
         name: pipeline:logging-elasticsearch6
       - env: IMAGE_LOGGING_KIBANA6
         name: pipeline:logging-kibana6
-      from: pipeline:elasticsearch-operator-src
+      - env: IMAGE_LOGGING_EVENTROUTER
+        name: pipeline:logging-eventrouter
+      - env: IMAGE_LOG_FILE_METRIC_EXPORTER
+        name: pipeline:log-file-metric-exporter
+      from: pipeline:cluster-logging-operator-e2e
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-gcp
+    workflow: openshift-e2e-gcp
 zz_generated_metadata:
-  branch: master
+  branch: release-5.2
   org: openshift
-  repo: elasticsearch-proxy
+  repo: cluster-logging-operator
