@@ -10,6 +10,9 @@ function read_shared_dir() {
 }
 
 function populate_artifact_dir() {
+  echo "Running installer-gather post installation..."
+  mock-nss.sh openshift-install --dir=${dir} gather bootstrap
+
   set +e
   echo "Copying log bundle..."
   cp "${dir}"/log-bundle-*.tar.gz "${ARTIFACT_DIR}/" 2>/dev/null
