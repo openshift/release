@@ -38,9 +38,6 @@ cluster_domain=$(<"${SHARED_DIR}"/clusterdomain.txt)
 
 ssh_pub_key_path="${CLUSTER_PROFILE_DIR}/ssh-publickey"
 install_config="${SHARED_DIR}/install-config.yaml"
-tfvars_path=/var/run/vault/vsphere/secret.auto.tfvars
-vsphere_user=$(grep -oP 'vsphere_user\s*=\s*"\K[^"]+' ${tfvars_path})
-vsphere_password=$(grep -oP 'vsphere_password\s*=\s*"\K[^"]+' ${tfvars_path})
 
 # https://github.com/openshift/installer/blob/master/docs/user/overview.md#coreos-bootimages
 # This code needs to handle pre-4.8 installers though too.
@@ -68,14 +65,33 @@ target_hw_version=${hw_versions[$selected_hw_version_index]}
 echo "$(date -u --rfc-3339=seconds) - Selected hardware version ${target_hw_version}"
 vm_template=${vm_template}-hw${target_hw_version}
 
+vsphere_datacenter="SDDC-Datacenter"
+vsphere_datastore="WorkloadDatastore"
+vsphere_cluster="Cluster-1"
+vsphere_url="vcenter.sddc-44-236-21-251.vmwarevmc.com"
+TFVARS_PATH=/var/run/vault/vsphere/secret.auto.tfvars
+
+# **testing** for IBM cloud, only run specific jobs on specific lease numbers
+if [ $((${LEASED_RESOURCE//[!0-9]/})) -ge 88 ]; then     
+  echo Scheduling job on IBM Cloud instance
+  TFVARS_PATH=/var/run/vault/ibmcloud/secret.auto.tfvars
+  vsphere_url="ibmvcenter.vmc-ci.devcluster.openshift.com"
+  vsphere_datacenter="IBMCloud"
+  vsphere_cluster="vcs-ci-workload"
+  vsphere_datastore="vsanDatastore"
+fi
+
+vsphere_user=$(grep -oP 'vsphere_user\s*=\s*"\K[^"]+' ${TFVARS_PATH})
+vsphere_password=$(grep -oP 'vsphere_password\s*=\s*"\K[^"]+' ${TFVARS_PATH})
+
 echo "$(date -u --rfc-3339=seconds) - Creating govc.sh file..."
 cat >> "${SHARED_DIR}/govc.sh" << EOF
-export GOVC_URL=vcenter.sddc-44-236-21-251.vmwarevmc.com
+export GOVC_URL="${vsphere_url}"
 export GOVC_USERNAME="${vsphere_user}"
 export GOVC_PASSWORD="${vsphere_password}"
 export GOVC_INSECURE=1
-export GOVC_DATACENTER=SDDC-Datacenter
-export GOVC_DATASTORE=WorkloadDatastore
+export GOVC_DATACENTER="${vsphere_datacenter}"
+export GOVC_DATASTORE="${vsphere_datastore}"
 EOF
 
 echo "$(date -u --rfc-3339=seconds) - Extend install-config.yaml ..."
@@ -90,24 +106,24 @@ compute:
   replicas: 0
 platform:
   vsphere:
-    cluster: Cluster-1
-    datacenter: SDDC-Datacenter
-    defaultDatastore: WorkloadDatastore
+    vcenter: "${vsphere_url}"
+    datacenter: "${vsphere_datacenter}"
+    defaultDatastore: "${vsphere_datastore}"
+    cluster: "${vsphere_cluster}"
     network: "${LEASED_RESOURCE}"
-    password: ${vsphere_password}
-    username: ${vsphere_user}
-    vCenter: vcenter.sddc-44-236-21-251.vmwarevmc.com
-    folder: "/SDDC-Datacenter/vm/${cluster_name}"
+    password: "${vsphere_password}"
+    username: "${vsphere_user}"
+    folder: "/${vsphere_datacenter}/vm/${cluster_name}"
 EOF
 
 echo "$(date -u --rfc-3339=seconds) - Create terraform.tfvars ..."
 cat > "${SHARED_DIR}/terraform.tfvars" <<-EOF
 machine_cidr = "192.168.${third_octet}.0/25"
 vm_template = "${vm_template}"
-vsphere_cluster = "Cluster-1"
-vsphere_datacenter = "SDDC-Datacenter"
-vsphere_datastore = "WorkloadDatastore"
-vsphere_server = "vcenter.sddc-44-236-21-251.vmwarevmc.com"
+vsphere_cluster = "${vsphere_cluster}"
+vsphere_datacenter = "${vsphere_datacenter}"
+vsphere_datastore = "${vsphere_datastore}"
+vsphere_server = "${vsphere_url}"
 ipam = "ipam.vmc.ci.openshift.org"
 cluster_id = "${cluster_name}"
 base_domain = "${base_domain}"
