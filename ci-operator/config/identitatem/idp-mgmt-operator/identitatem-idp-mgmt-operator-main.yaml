@@ -7,11 +7,7 @@ base_images:
     name: builder
     namespace: open-cluster-management
     tag: go1.16-linux
-  repo-brancher:
-    name: repo-brancher
-    namespace: ci
-    tag: latest
-binary_build_commands: go build ./cmd/manager
+binary_build_commands: make build
 build_root:
   image_stream_tag:
     name: builder
@@ -26,7 +22,7 @@ images:
       - registry.ci.openshift.org/open-cluster-management/builder:go1.16-linux
   to: idp-mgmt-operator
 promotion:
-  name: "0.1"
+  name: stable
   namespace: identitatem
 resources:
   '*':
@@ -45,23 +41,28 @@ tests:
   container:
     from: src
 - as: fast-forward
-  commands: |
-    git clone -b master https://github.com/openshift/release.git /tmp/release
-    repo-brancher \
-        --fast-forward \
-        --confirm \
-        --config-dir=/tmp/release/ci-operator/config/identitatem/idp-mgmt-operator/ \
-        --username=acm-cicd \
-        --token-path=/etc/github/token \
-        --current-promotion-namespace=identitatem \
-        --current-release=0.1 \
-        --future-release=0.1
-  container:
-    from: repo-brancher
   postsubmit: true
-  secrets:
-  - mount_path: /etc/github
-    name: acm-cicd-github
+  steps:
+    env:
+      DESTINATION_BRANCH: stable
+    workflow: ocm-ci-fastforward
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: idp-mgmt-operator
+    env:
+      IMAGE_REPO: idp-mgmt-operator
+      REGISTRY_ORG: identitatem
+    workflow: identitatem-ci-image-mirror
+- as: pr-merge-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: idp-mgmt-operator
+    env:
+      IMAGE_REPO: idp-mgmt-operator
+      REGISTRY_ORG: identitatem
+    workflow: identitatem-ci-image-mirror
 zz_generated_metadata:
   branch: main
   org: identitatem

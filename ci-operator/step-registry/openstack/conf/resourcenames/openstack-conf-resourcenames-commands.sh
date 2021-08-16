@@ -5,21 +5,24 @@ set -Eeuo pipefail
 declare -A external_network=(
 	['openstack-kuryr']='external'
 	['openstack-vexxhost']='public'
-	['openstack-vh-mecha']='external'
+	['openstack-vh-mecha-central']='external'
+	['openstack-vh-mecha-az0']='external'
 	['openstack']='external'
 	)
 
 declare -A compute_flavor=(
 	['openstack-kuryr']='m1.xlarge'
 	['openstack-vexxhost']='ci.m1.xlarge'
-	['openstack-vh-mecha']='m1.xlarge'
+	['openstack-vh-mecha-central']='m1.xlarge'
+	['openstack-vh-mecha-az0']='m1.xlarge'
 	['openstack']='m1.s2.xlarge'
 	)
 
 declare -A compute_azs=(
 	['openstack-kuryr']=''
 	['openstack-vexxhost']=''
-	['openstack-vh-mecha']='az0'
+	['openstack-vh-mecha-central']=''
+	['openstack-vh-mecha-az0']='az0'
 	['openstack']=''
 	)
 
