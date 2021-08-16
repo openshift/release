@@ -89,7 +89,6 @@ tag_specification:
   namespace: ocp
 test_binary_build_commands: |
   make build-openshift-ci-test-bin
-  curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.36.0
   go mod vendor
   mkdir /.cache && chmod 775 -R /.cache && chmod 775 -R $GOPATH
 tests:
@@ -223,20 +222,14 @@ tests:
       ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
     env:
-      DEVSCRIPTS_CONFIG: |
-        AWS=SAW
       DISCONNECTED: "true"
-      IP_STACK: v6
     workflow: baremetalds-assisted-operator-ztp
 - as: e2e-metal-assisted-operator-disconnected-periodic
   cron: '@daily'
   steps:
     cluster_profile: packet
     env:
-      DEVSCRIPTS_CONFIG: |
-        AWS=SAW
       DISCONNECTED: "true"
-      IP_STACK: v6
     workflow: baremetalds-assisted-operator-ztp
 - as: e2e-metal-assisted-operator-ztp
   steps:
@@ -245,13 +238,40 @@ tests:
       ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
     env:
+      DISCONNECTED: "false"
       IP_STACK: v4
+    workflow: baremetalds-assisted-operator-ztp
+- as: e2e-metal-assisted-operator-ztp-multinode-spoke-periodic
+  cron: '@daily'
+  steps:
+    cluster_profile: packet
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
+    env:
+      ASSISTED_ZTP_CONFIG: |
+        SPOKE_CONTROLPLANE_AGENTS=3
+      IP_STACK: v4
+      NUM_EXTRA_WORKERS: "3"
+    workflow: baremetalds-assisted-operator-ztp
+- as: e2e-metal-assisted-operator-ztp-multinode-spoke
+  steps:
+    cluster_profile: packet
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
+    env:
+      ASSISTED_ZTP_CONFIG: |
+        SPOKE_CONTROLPLANE_AGENTS=3
+      IP_STACK: v4
+      NUM_EXTRA_WORKERS: "3"
     workflow: baremetalds-assisted-operator-ztp
 - as: e2e-metal-assisted-operator-ztp-periodic
   cron: '@daily'
   steps:
     cluster_profile: packet
     env:
+      DISCONNECTED: "false"
       IP_STACK: v4
     workflow: baremetalds-assisted-operator-ztp
 - as: e2e-metal-assisted-ipv6
@@ -261,6 +281,13 @@ tests:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.8
         IPv6=yes
+    workflow: baremetalds-assisted-install
+- as: e2e-metal-assisted-none
+  steps:
+    cluster_profile: packet
+    env:
+      ASSISTED_CONFIG: |
+        PLATFORM=none
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-single-node
   steps:

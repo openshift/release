@@ -7,6 +7,8 @@ set -o pipefail
 CLUSTER_NAME=$(<"${SHARED_DIR}/CLUSTER_NAME")
 OPENSTACK_EXTERNAL_NETWORK="${OPENSTACK_EXTERNAL_NETWORK:-$(<"${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK")}"
 OPENSTACK_COMPUTE_FLAVOR="${OPENSTACK_COMPUTE_FLAVOR:-$(<"${SHARED_DIR}/OPENSTACK_COMPUTE_FLAVOR")}"
+ZONES="${ZONES:-$(<"${SHARED_DIR}/ZONES")}"
+ZONES_COUNT="${ZONES_COUNT:-0}"
 
 API_IP=$(<"${SHARED_DIR}"/API_IP)
 INGRESS_IP=$(<"${SHARED_DIR}"/INGRESS_IP)
@@ -24,6 +26,30 @@ case "$CONFIG_TYPE" in
     exit 1
     ;;
 esac
+
+mapfile -t ZONES < <(printf ${ZONES})
+MAX_ZONES_COUNT=${#ZONES[@]}
+
+if [[ ${ZONES_COUNT} -gt ${MAX_ZONES_COUNT} ]]; then
+  echo "Too many zones were requested: ${ZONES_COUNT}; only ${MAX_ZONES_COUNT} are available: ${ZONES[*]}"
+  exit 1
+fi
+
+if [[ "${ZONES_COUNT}" == "0" ]]; then
+  ZONES_STR="[]"
+elif [[ "${ZONES_COUNT}" == "1" ]]; then
+  function join_by { local IFS="$1"; shift; echo "$*"; }
+  ZONES=("${ZONES[@]:0:${ZONES_COUNT}}")
+  ZONES_STR="[ "
+  ZONES_STR+=$(join_by , "${ZONES[@]}")
+  ZONES_STR+=" ]"
+else
+  # For now, we only support a cluster within a single AZ.
+  # This will change in the future.
+  echo "Wrong ZONE_COUNT, can only be 0 or 1, got ${ZONES_COUNT}"
+  exit 1
+fi
+echo "OpenStack Availability Zones: ${ZONES_STR}"
 
 cat > "${CONFIG}" << EOF
 apiVersion: v1
@@ -62,11 +88,32 @@ cat >> "${CONFIG}" << EOF
 EOF
 fi
 cat >> "${CONFIG}" << EOF
+compute:
+- name: worker
+  platform:
+    openstack:
+      type: ${OPENSTACK_COMPUTE_FLAVOR}
+      zones: ${ZONES_STR}
+  replicas: 3
+controlPlane:
+  name: master
+  platform:
+    openstack:
+      type: ${OPENSTACK_COMPUTE_FLAVOR}
+      zones: ${ZONES_STR}
+  replicas: 3
 pullSecret: >
   ${PULL_SECRET}
 sshKey: |
   ${SSH_PUB_KEY}
 EOF
+
+if [ ${FIPS_ENABLED} = "true" ]; then
+  echo "Adding 'fips: true' to install-config.yaml"
+  cat >> "${CONFIG}" << EOF
+fips: true
+EOF
+fi
 
 # Lets  check the syntax of yaml file by reading it.
 python -c 'import yaml;

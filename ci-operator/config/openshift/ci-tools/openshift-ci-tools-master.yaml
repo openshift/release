@@ -155,6 +155,18 @@ images:
       - destination_dir: .
         source_path: /go/bin/dptp-pools-cm
   to: dptp-pools-cm
+- dockerfile_literal: |-
+    FROM centos:8
+    RUN dnf install -y git && dnf clean all && rm -rf /var/cache/dnf
+    ADD promoted-image-governor /usr/bin/promoted-image-governor
+    ENTRYPOINT ["promoted-image-governor"]
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/promoted-image-governor
+  to: promoted-image-governor
 - context_dir: images/autoconfigbrancher/
   from: os
   inputs:
@@ -589,6 +601,10 @@ tests:
   commands: make validate-vendor
   container:
     from: src
+- as: frontend-checks
+  commands: make verify-frontend-format frontend-checks
+  container:
+    from: test-bin
 - as: lint
   commands: make lint
   container:

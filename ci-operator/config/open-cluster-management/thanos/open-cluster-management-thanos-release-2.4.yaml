@@ -15,10 +15,6 @@ build_root:
 images:
 - dockerfile_path: Dockerfile.multi-stage
   from: base
-  inputs:
-    open-cluster-management_builder_go1.16-linux:
-      as:
-      - registry.ci.openshift.org/open-cluster-management/builder:go1.16-linux
   to: thanos
 promotion:
   name: "2.4"
@@ -41,6 +37,25 @@ tests:
     make -f Makefile test-local
   container:
     from: src
+- as: e2e-kind
+  steps:
+    env:
+      AWS_CREDENTIALS_SECRET: ocm-obs-china-aws-kind
+      AWS_INSTANCE_TYPE: t3.small
+    post:
+    - ref: ocm-e2e-kind-destroy
+    pre:
+    - ref: ocm-ci-rbac
+    - ref: ocm-e2e-kind-create
+    test:
+    - as: test
+      commands: "export SELF=\"make\"\n./test-kind-prow.sh \n"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-e2e-kind
 zz_generated_metadata:
   branch: release-2.4
   org: open-cluster-management

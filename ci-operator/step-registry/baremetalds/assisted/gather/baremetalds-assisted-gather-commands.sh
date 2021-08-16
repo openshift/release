@@ -17,6 +17,14 @@ source "${SHARED_DIR}/packet-conf.sh"
 
 function getlogs() {
   echo "### Downloading logs..."
+
+  ssh  "${SSHOPTS[@]}" "root@${IP}" bash - <<EOF
+  set -xeuo pipefail
+  cd /home/assisted
+  cp -v -R ./reports /tmp/artifacts || true
+  find -name '*.log' -exec cp -v {} /tmp/artifacts \; || true
+EOF
+
   scp -r "${SSHOPTS[@]}" "root@${IP}:/tmp/artifacts/*" "${ARTIFACT_DIR}"
 }
 
@@ -27,9 +35,7 @@ echo "### Gathering logs..."
 timeout -s 9 30m ssh "${SSHOPTS[@]}" "root@${IP}" bash - <<EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
 
 set -xeuo pipefail
-
 cd /home/assisted
-
 source /root/config
 
 # Get sosreport including sar data
@@ -38,10 +44,7 @@ sos report --batch --tmp-dir /tmp/artifacts \
   -k podman.all -k podman.logs
 
 # TODO: remove when https://github.com/sosreport/sos/pull/2594 is available
-cp -r /var/lib/libvirt/dnsmasq /tmp/artifacts/libvirt-dnsmasq
-
-cp -R ./reports /tmp/artifacts || true
-find -name '*.log' -exec cp -v {} /tmp/artifacts \; || true
+cp -v -r /var/lib/libvirt/dnsmasq /tmp/artifacts/libvirt-dnsmasq
 
 # Get assisted logs
 export LOGS_DEST=/tmp/artifacts

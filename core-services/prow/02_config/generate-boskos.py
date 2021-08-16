@@ -31,6 +31,9 @@ CONFIG = {
         'eastus2': 8,
         'westus': 8
     },
+    'azurestack-quota-slice': {
+        'ppe3': 2
+    },
     'gcp-quota-slice': {
         'us-central1': 70,
     },
@@ -48,16 +51,20 @@ CONFIG = {
         'default': 7,
     },
     'openstack-vexxhost-quota-slice': {
-        'default': 9,
+        'default': 13,
     },
     'openstack-kuryr-quota-slice': {
         'default': 3,
     },
-    'openstack-vh-mecha-quota-slice': {
+    'openstack-vh-mecha-central-quota-slice': {
+        'default': 12,
+    },
+    'openstack-vh-mecha-az0-quota-slice': {
         'default': 6,
     },
     'openstack-ppc64le-quota-slice': {},
     'ovirt-quota-slice': {},
+    'ovirt-upgrade-quota-slice': {},
     'packet-quota-slice': {
         'default': 60,
     },
@@ -78,7 +85,10 @@ CONFIG = {
     },
     'ibmcloud-quota-slice': {
         'default': 15,
-    }
+    },
+    'alibaba-quota-slice': {
+        'us-east-1': 10,
+    },
 }
 
 for i in range(2):
@@ -100,10 +110,13 @@ for i in range(4):
 for i in range(10, 20):
     CONFIG['ovirt-quota-slice']['ovirt-{}'.format(i)] = 1
 
+for i in range(1, 7):
+    CONFIG['ovirt-upgrade-quota-slice']['ovirt-upgrade-{}'.format(i)] = 1
+
 for i in range(1, 3):
     CONFIG['kubevirt-quota-slice']['tenant-cluster-{}'.format(i)] = 1
 
-for i in range(0,13):
+for i in range(75,88):
     CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 config = {
