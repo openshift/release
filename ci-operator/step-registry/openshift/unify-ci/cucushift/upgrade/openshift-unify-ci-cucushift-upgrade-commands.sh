@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# TO_VERSION="${RELEASE_IMAGE_LATEST}"
+TO_VERSION="${RELEASE_IMAGE_LATEST}"
 # TO_VERSION="4.7.24"
 # CHANNEL="stable"
 # FORCE="true"
