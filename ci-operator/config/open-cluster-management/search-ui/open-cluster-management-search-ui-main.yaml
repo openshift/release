@@ -25,6 +25,14 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: lint
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow install
+    make -f Makefile.prow lint
+    make -f Makefile.prow check
+  container:
+    from: src
 - as: backplane-fast-forward
   postsubmit: true
   steps:
@@ -35,8 +43,6 @@ tests:
   commands: |
     export SELF="make -f Makefile.prow"
     make -f Makefile.prow install
-    make -f Makefile.prow lint
-    make -f Makefile.prow check
     make -f Makefile.prow sonar/js/jest-init
     make -f Makefile.prow unit-test
     make -f Makefile.prow sonar/js/prow

@@ -35,10 +35,14 @@ tests:
     env:
       DESTINATION_BRANCH: release-2.4
     workflow: ocm-ci-fastforward
+- as: lint
+  commands: |
+    GOLANGCI_LINT_CACHE=/tmp/golangci-cache make -f Makefile.prow lint
+  container:
+    from: src
 - as: test-unit
   commands: |
     export SELF="make -f Makefile.prow"
-    GOLANGCI_LINT_CACHE=/tmp/golangci-cache make -f Makefile.prow lint
     make -f Makefile.prow unit-test
   container:
     from: src
