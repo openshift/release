@@ -63,6 +63,7 @@ echo "export PULL_SECRET='\$(cat /root/pull-secret)'" >> /root/config
 set -x
 
 # Save Prow variables that might become handy inside the Packet server
+echo "export CI=true" >> /root/config
 echo "export RELEASE_IMAGE_LATEST=${RELEASE_IMAGE_LATEST}" >> /root/config
 
 # Override default images
