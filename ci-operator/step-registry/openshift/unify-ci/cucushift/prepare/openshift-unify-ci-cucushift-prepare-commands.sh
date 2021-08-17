@@ -4,6 +4,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+ARTIFACT_DIR="/home/jianl/automation/jianl/release/ci-operator/step-registry/openshift/unify-ci/cucushift/prepare"
+KUBECONFIG="./kubeconfig"
+
 # prepare users
 # users=`cat ${CLUSTER_PROFILE_DIR}/users.spec`
 users=""
@@ -22,6 +25,33 @@ done
 
 users=${users::-1}
 
+oc apply -f - <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: htpass-secret
+  namespace: openshift-config
+stringData:
+  htpasswd: ${data_htpasswd}
+EOF
+
+oc apply -f - <<EOF
+apiVersion: config.openshift.io/v1
+kind: OAuth
+metadata:
+  name: cluster
+spec:
+  identityProviders:
+  - name: htpassidp
+    challenge: true
+    login: true
+    mappingMethod: claim
+    type: HTPasswd
+    htpasswd:
+      fileData:
+        name: htpass-secret
+EOF
+
 # Export those parameters before running
 export BUSHSLICER_DEFAULT_ENVIRONMENT=ocp4
 export OPENSHIFT_ENV_OCP4_USER_MANAGER=UpgradeUserManager
@@ -38,3 +68,4 @@ export BUSHSLICER_CONFIG="{'environments': {'ocp4': {'version': '${ver_cli:0:3}'
 
 cd verification-tests
 scl enable rh-ruby27 cucumber -p junit --tags "@upgrade-prepare"
+# bash -l -c "bundle exec cucumber --tags @upgrade-prepare --format junit --out ./"

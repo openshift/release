@@ -22,6 +22,33 @@ done
 
 users=${users::-1}
 
+oc apply -f - <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: htpass-secret
+  namespace: openshift-config
+stringData:
+  htpasswd: ${data_htpasswd}
+EOF
+
+oc apply -f - <<EOF
+apiVersion: config.openshift.io/v1
+kind: OAuth
+metadata:
+  name: cluster
+spec:
+  identityProviders:
+  - name: htpassidp
+    challenge: true
+    login: true
+    mappingMethod: claim
+    type: HTPasswd
+    htpasswd:
+      fileData:
+        name: htpass-secret
+EOF
+
 # Export those parameters before running
 export BUSHSLICER_DEFAULT_ENVIRONMENT=ocp4
 export BUSHSLICER_REPORT_DIR=${ARTIFACT_DIR}
