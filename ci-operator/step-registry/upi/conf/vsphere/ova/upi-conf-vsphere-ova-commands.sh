@@ -9,21 +9,8 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 HOME=/tmp
 export HOME
 
-echo "$(date -u --rfc-3339=seconds) - Locating RHCOS image for release..."
-
-openshift_install_path="/var/lib/openshift-install"
-image_json_file="${openshift_install_path}/rhcos.json"
-fcos_json_file="${openshift_install_path}/fcos.json"
-
-if [[ -f "$fcos_json_file" ]]; then
-    image_json_file=$fcos_json_file
-fi
-
-ova_url="$(jq -r '.baseURI + .images["vmware"].path' $image_json_file)"
-vm_template="${ova_url##*/}"
-
-# Troubleshooting UPI OVA import issue
-echo "$(date -u --rfc-3339=seconds) - vm_template: ${vm_template}"
+cluster_name=$(<"${SHARED_DIR}"/clustername.txt)
+ova_url=$(<"${SHARED_DIR}"/ovaurl.txt)
 
 echo "$(date -u --rfc-3339=seconds) - Configuring govc exports..."
 # shellcheck source=/dev/null
@@ -36,23 +23,23 @@ cat > /tmp/rhcos.json << EOF
    "PowerOn": false,
    "InjectOvfEnv": false,
    "WaitForIP": false,
-   "Name": "${vm_template}",
+   "Name": "${cluster_name}",
    "NetworkMapping":[{"Name":"VM Network","Network":"${LEASED_RESOURCE}"}]
 }
 EOF
 
-echo "$(date -u --rfc-3339=seconds) - Checking if RHCOS OVA needs to be downloaded from ${ova_url}..."
+# Hardware versions supported by ESXi
+# 6.7U2 - 7.0U2
+# https://kb.vmware.com/s/article/1003746
+# https://docs.vmware.com/en/VMware-Cloud-on-AWS/services/com.vmware.vmc-aws-operations/GUID-52CED8FB-2E3A-4766-8C59-2EAD8E2C1D31.html
+hardware_versions=("13" "15" "17")
 
-# Troubleshooting UPI OVA import issue
-export GOVC_DEBUG_PATH="${ARTIFACT_DIR}/govc"
-mkdir -p "${GOVC_DEBUG_PATH}"
-govc vm.info -debug "${vm_template}" || true
-unset GOVC_DEBUG_PATH
+echo "$(date -u --rfc-3339=seconds) - Creating a template for the VMs from ${ova_url}..."
+curl -L -o /tmp/rhcos.ova "${ova_url}"
+govc import.ova -options=/tmp/rhcos.json /tmp/rhcos.ova &
+wait "$!"
 
-if [[ "$(govc vm.info "${vm_template}" | wc -c)" -eq 0 ]]
-then
-    echo "$(date -u --rfc-3339=seconds) - Creating a template for the VMs from ${ova_url}..."
-    curl -L -o /tmp/rhcos.ova "${ova_url}"
-    govc import.ova -options=/tmp/rhcos.json /tmp/rhcos.ova &
-    wait "$!"
-fi
+set -x
+version=${hardware_versions[$((RANDOM % 3))]}
+govc vm.upgrade -version="${version}" -vm "${cluster_name}"
+set +x

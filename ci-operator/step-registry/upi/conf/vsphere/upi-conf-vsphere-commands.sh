@@ -42,6 +42,14 @@ tfvars_path=/var/run/vault/vsphere/secret.auto.tfvars
 vsphere_user=$(grep -oP 'vsphere_user\s*=\s*"\K[^"]+' ${tfvars_path})
 vsphere_password=$(grep -oP 'vsphere_password\s*=\s*"\K[^"]+' ${tfvars_path})
 
+openshift_install_path="/var/lib/openshift-install"
+legacy_installer_json="${openshift_install_path}/rhcos.json"
+fcos_json_file="${openshift_install_path}/fcos.json"
+
+if [[ -f "$fcos_json_file" ]]; then
+    legacy_installer_json=$fcos_json_file
+fi
+
 # https://github.com/openshift/installer/blob/master/docs/user/overview.md#coreos-bootimages
 # This code needs to handle pre-4.8 installers though too.
 if openshift-install coreos print-stream-json 2>/tmp/err.txt >${SHARED_DIR}/coreos.json; then
@@ -53,12 +61,13 @@ else
     cat /tmp/err.txt
     exit 1
   fi
-  legacy_installer_json=/var/lib/openshift-install/rhcos.json
   echo "Falling back to parsing ${legacy_installer_json}"
   ova_url="$(jq -r '.baseURI + .images["vmware"].path' ${legacy_installer_json})"
 fi
 rm -f /tmp/err.txt
-vm_template="${ova_url##*/}"
+##vm_template="${ova_url##*/}"
+
+echo "${ova_url}" > "${SHARED_DIR}"/ovaurl.txt
 
 echo "$(date -u --rfc-3339=seconds) - Creating govc.sh file..."
 cat >> "${SHARED_DIR}/govc.sh" << EOF
@@ -95,7 +104,7 @@ EOF
 echo "$(date -u --rfc-3339=seconds) - Create terraform.tfvars ..."
 cat > "${SHARED_DIR}/terraform.tfvars" <<-EOF
 machine_cidr = "192.168.${third_octet}.0/25"
-vm_template = "${vm_template}"
+vm_template = "${cluster_name}"
 vsphere_cluster = "Cluster-1"
 vsphere_datacenter = "SDDC-Datacenter"
 vsphere_datastore = "WorkloadDatastore"
