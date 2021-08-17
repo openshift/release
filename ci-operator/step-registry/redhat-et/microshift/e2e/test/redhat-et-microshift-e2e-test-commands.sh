@@ -48,60 +48,29 @@ EOF
 # TODO: edit this file to launch microshift and run tests
 cat  > "${HOME}"/run-smoke-tests.sh << 'EOF'
 #!/bin/bash
-set -euo pipefail
+set -xeuo pipefail
 
 systemctl disable --now firewalld
 
 export KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig
 
-# Tests execution
-echo '### Running microshift smoke-tests'
-
-echo '### Start /usr/bin/microshift run and run commands to perform smoke-tests'
 systemctl enable --now microshift.service
 start=$(date '+%s')
-to=120
-until oc get nodes; do
-  echo "waiting for node response"
-  sleep 10
+to=300
+while :; do
   if [ $(( $(date '+%s') - start )) -ge $to ]; then
+    echo "timed out waiting for node to start ($to seconds)" >&2
     exit 1
   fi
+  echo "waiting for node response" >&2
+  # get the condation where type == Ready, where condition.statusx == True.
+  node="$(oc get nodes -o jsonpath='{.items[*].status.conditions}' | jq '.[] | select(.type == "Ready") | select(.status == "True")')" || echo ''
+  if [ "$node" ]; then
+    echo "node posted ready status" >&2
+    break
+  fi
+  sleep 10
 done
-
-LABELS=(
-'dns.operator.openshift.io/daemonset-dns=default'
-'app=flannel'
-'ingresscontroller.operator.openshift.io/deployment-ingresscontroller=default'
-'app=service-ca'
-'k8s-app=kubevirt-hostpath-provisioner'
-)
-
-to=300
-for l in "${LABELS[@]}"; do
-  echo "waiting on pods with label $l"
-  start=$(date '+%s')
-  while :; do
-    containersReady="$(oc get pods -A -l $l -o jsonpath='{.items[*].status.conditions}' | \
-        jq -r '.[] | select(.type == "ContainersReady") | .status')"
-    if [ "$containersReady" = "True" ]; then
-    echo "Pod (label: $l), all containers running"
-      break
-    elif [ $(( $(date '+%s') - start )) -ge $to ]; then
-      echo "timed out waiting for pod, label: $l"
-      podNamespaceName="$(oc get pod -A -l $l --no-headers -o custom-columns="NS:.metadata.namespace,NAME:.metadata.name")"
-      if [ "$l" = "dns" ]; then
-        container="-c dns"
-      fi
-      oc logs -f -n $podNamespaceName  "$l" || true
-      journalctl -u microshift
-      exit 1
-    fi
-    echo "retrying pod, label $l"
-    sleep 3
-  done
-done
-echo "All pod containers are Ready"
 EOF
 chmod +x "${HOME}"/run-smoke-tests.sh
 
