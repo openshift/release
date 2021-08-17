@@ -28,7 +28,7 @@ if [[ "${CLUSTER_TYPE}" == "ovirt" ]]; then
   set -e
 fi
 
-openshift-install --dir /tmp/installer destroy cluster &
+openshift-install --dir /tmp/installer destroy cluster --log-level debug &
 
 set +e
 wait "$!"
