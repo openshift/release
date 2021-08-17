@@ -5,7 +5,6 @@ set -o errexit
 set -o pipefail
 
 # prepare users
-# users=`cat ${CLUSTER_PROFILE_DIR}/users.spec`
 users=""
 data_htpasswd=""
 

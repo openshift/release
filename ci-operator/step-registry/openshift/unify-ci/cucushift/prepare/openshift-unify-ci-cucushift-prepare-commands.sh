@@ -4,11 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-ARTIFACT_DIR="/home/jianl/automation/jianl/release/ci-operator/step-registry/openshift/unify-ci/cucushift/prepare"
-KUBECONFIG="./kubeconfig"
-
 # prepare users
-# users=`cat ${CLUSTER_PROFILE_DIR}/users.spec`
 users=""
 data_htpasswd=""
 
