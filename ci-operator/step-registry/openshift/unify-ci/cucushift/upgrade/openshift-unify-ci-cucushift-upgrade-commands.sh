@@ -99,13 +99,13 @@ do
 
     echo "Wait all nodes ready............."
     str_nodes=$(oc get nodes)
-    for var in ${str_nodes[@]}
+    for var in "${str_nodes[@]}"
     do
         # Example:
         # NAME                                        STATUS   ROLES    AGE   VERSION
         # ip-10-0-140-44.us-east-2.compute.internal   Ready    worker   12h   v1.20.0+558d959
         # ip-10-0-150-59.us-east-2.compute.internal   Ready    master   12h   v1.20.0+558d959
-        for item in ${var[@]}
+        for item in "${var[@]}"
         do
             node=$(echo $item|awk '{print $1}')
             status=$(echo $item|awk '{print $2}')
@@ -122,13 +122,13 @@ do
 
     echo "Wait all mcp ready............."
     str_mcp=$(oc get mcp)
-    for var in ${str_mcp[@]}
+    for var in "${str_mcp[@]}"
     do
         # Example:
         # NAME     CONFIG                                             UPDATED   UPDATING   DEGRADED   MACHINECOUNT   READYMACHINECOUNT   UPDATEDMACHINECOUNT   DEGRADEDMACHINECOUNT   AGE
         # master   rendered-master-092473c2a029f74d51adab6ea3384b53   True      False      False      3              3                   3                     0                      12h
         # worker   rendered-worker-29ff2da152f7fd375b64703b13f3979e   True      False      False      3              3                   3                     0                      12h   
-        for item in ${var[@]}
+        for item in "${var[@]}"
         do
             mcp=$(echo $item|awk '{print $1}')
             updated=$(echo $item|awk '{print $3}')
