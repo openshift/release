@@ -7,14 +7,6 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.16-openshift-4.8
-  ocp_builder_rhel-8-golang-openshift-4.6:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-openshift-4.6
-  openshift_release_golang-1.13:
-    name: release
-    namespace: openshift
-    tag: golang-1.13
 binary_build_commands: make build
 build_root:
   image_stream_tag:
@@ -31,6 +23,8 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
   to: csi-driver-shared-resource
 promotion:
+  additional_images:
+    csi-driver-shared-resource-scripts: src
   name: 4.9-priv
   namespace: ocp-private
 resources:
@@ -52,37 +46,52 @@ tests:
     make test JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
   container:
     from: src
-- as: e2e-aws-operator
+- as: e2e-aws-csi-driver
   steps:
     cluster_profile: aws
     test:
     - as: test
       cli: latest
       commands: make test-e2e
+      dependencies:
+      - env: DRIVER_IMAGE
+        name: csi-driver-shared-resource
+      - env: NODE_REGISTRAR_IMAGE
+        name: csi-node-driver-registrar
       from: src
       resources:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-aws-operator-disruptive
+- as: e2e-aws-csi-driver-disruptive
   steps:
     cluster_profile: aws
     test:
     - as: test
       cli: latest
       commands: make test-e2e-disruptive
+      dependencies:
+      - env: DRIVER_IMAGE
+        name: csi-driver-shared-resource
+      - env: NODE_REGISTRAR_IMAGE
+        name: csi-node-driver-registrar
       from: src
       resources:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-aws-operator-slow
+- as: e2e-aws-csi-driver-slow
   steps:
     cluster_profile: aws
     test:
     - as: test
       cli: latest
       commands: make test-e2e-slow
+      dependencies:
+      - env: DRIVER_IMAGE
+        name: csi-driver-shared-resource
+      - env: NODE_REGISTRAR_IMAGE
+        name: csi-node-driver-registrar
       from: src
       resources:
         requests:

@@ -15,7 +15,7 @@ EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
 TAGS="Key=expirationDate,Value=${EXPIRATION_DATE}"
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
-PATCH="${SHARED_DIR}/install-config-blackholenetwork.yaml.patch"
+PATCH=/tmp/install-config-blackholenetwork.yaml.patch
 
 REGION="${LEASED_RESOURCE}"
 

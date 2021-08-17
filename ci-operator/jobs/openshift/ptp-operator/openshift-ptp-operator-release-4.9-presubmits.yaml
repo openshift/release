@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build02
+    cluster: build01
     context: ci/prow/ci-index
     decorate: true
     labels:
@@ -52,7 +52,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-aws
     decorate: true
     labels:
@@ -117,7 +117,54 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build02
+    cluster: build01
+    context: ci/prow/gofmt
+    decorate: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ptp-operator-release-4.9-gofmt
+    rerun_command: /test gofmt
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=gofmt
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )gofmt,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.9$
+    - ^release-4\.9-
+    cluster: build01
     context: ci/prow/images
     decorate: true
     labels:
@@ -164,7 +211,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build02
+    cluster: build01
     context: ci/prow/operator-e2e
     decorate: true
     labels:

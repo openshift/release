@@ -146,7 +146,7 @@ presubmits:
         - core-services/prow/02_config/_boskos.yaml
         command:
         - /app
-        image: gcr.io/k8s-staging-boskos/checkconfig:v20210803-9fae386
+        image: gcr.io/k8s-staging-boskos/checkconfig:v20210810-be45206
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -472,7 +472,7 @@ presubmits:
             secretKeyRef:
               key: appid
               name: openshift-prow-github-app
-        image: gcr.io/k8s-prow/checkconfig:v20210803-c0366738af
+        image: gcr.io/k8s-prow/checkconfig:v20210816-e93f2592ba
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -735,10 +735,6 @@ presubmits:
     cluster: build02
     context: ci/prow/pj-rehearse
     decorate: true
-    extra_refs:
-    - base_ref: master
-      org: redhat-openshift-ecosystem
-      repo: release
     name: pull-ci-openshift-release-master-pj-rehearse
     optional: true
     rerun_command: /test pj-rehearse
@@ -1067,6 +1063,40 @@ presubmits:
       - emptyDir: {}
         name: tmp
     trigger: (?m)^/test( | .* )vsphere-dry,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: build02
+    context: ci/prow/openshift-image-mirror-mappings
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-openshift-image-mirror-mappings
+    rerun_command: /test openshift-image-mirror-mappings
+    spec:
+      containers:
+      - args:
+        - -c
+        - |
+          set -o errexit
+          set -o nounset
+          set -o pipefail
+          /usr/bin/promoted-image-governor --ci-operator-config-path=ci-operator/config --release-controller-mirror-config-dir=core-services/release-controller/_releases --openshift-mapping-dir=core-services/image-mirroring/openshift --openshift-mapping-config=core-services/image-mirroring/openshift/_config.yaml --dry-run=true
+          git add -N .
+          if ! git diff --exit-code; then
+            >&2 echo "ERROR: run 'make openshift-image-mirror-mappings' if the promote tags to the ocp or origin namespaces are changed in the pull request"
+            exit 1
+          fi
+        command:
+        - /bin/bash
+        image: promoted-image-governor:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: "1"
+    trigger: (?m)^/test( | .* )openshift-image-mirror-mappings,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:

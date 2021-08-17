@@ -1,0 +1,118 @@
+base_images:
+  assisted-installer:
+    name: assisted
+    namespace: ocp-kni
+    tag: assisted-installer
+  assisted-installer-agent:
+    name: assisted
+    namespace: ocp-kni
+    tag: assisted-installer-agent
+  assisted-installer-controller:
+    name: assisted
+    namespace: ocp-kni
+    tag: assisted-installer-controller
+  assisted-test-infra:
+    name: assisted-test
+    namespace: ocp-kni
+    tag: assisted-test-infra
+  coreos_centos_stream8:
+    name: stream8
+    namespace: coreos
+    tag: "8"
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  openshift_release_golang-1.16:
+    name: release
+    namespace: openshift
+    tag: golang-1.16
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.16
+images:
+- dockerfile_path: Dockerfile.assisted-service
+  from: coreos_centos_stream8
+  inputs:
+    openshift_release_golang-1.16:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.16
+  to: assisted-service
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.8"
+  namespace: ocp
+test_binary_build_commands: |
+  make build-openshift-ci-test-bin
+  curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.36.0
+  go mod vendor
+  mkdir /.cache && chmod 775 -R /.cache && chmod 775 -R $GOPATH
+tests:
+- as: lint
+  commands: export GOLANGCI_LINT_CACHE=/tmp/.cache && export GOPROXY=https://proxy.golang.org
+    && make lint
+  container:
+    from: test-bin
+- as: subsystem-aws
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.8"
+  steps:
+    test:
+    - as: subsystem-deploy-and-run
+      cli: latest
+      commands: |
+        export BUILD_TYPE=CI
+        export REPORTS=${ARTIFACT_DIR}
+        export TARGET=oc
+
+        make deploy-on-openshift-ci
+        make test
+      dependencies:
+      - env: SERVICE
+        name: assisted-service
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
+- as: e2e-metal-assisted-single-node
+  steps:
+    cluster_profile: packet
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.8
+        NUM_MASTERS=1
+      TEST_SUITE: minimal
+    workflow: baremetalds-assisted-install
+- as: e2e-metal-assisted
+  steps:
+    cluster_profile: packet
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=""
+      TEST_SUITE: minimal
+    workflow: baremetalds-assisted-install
+- as: e2e-metal-assisted-olm
+  steps:
+    cluster_profile: packet
+    env:
+      ASSISTED_CONFIG: |
+        TEST_FUNC=test_olm_operator
+      TEST_SUITE: minimal
+    workflow: baremetalds-assisted-install
+zz_generated_metadata:
+  branch: cloud_hotfix_releases
+  org: openshift
+  repo: assisted-service
