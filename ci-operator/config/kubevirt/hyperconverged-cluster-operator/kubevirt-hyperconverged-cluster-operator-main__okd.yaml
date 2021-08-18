@@ -42,6 +42,9 @@ images:
       - destination_dir: .
         source_path: /go/bin/hyperconverged-cluster-webhook
   to: hyperconverged-cluster-webhook
+- dockerfile_path: build/Dockerfile.artifacts
+  optional: true
+  to: virt-artifacts-server
 - dockerfile_path: build/Dockerfile.functest.ci
   inputs:
     ocp_builder_rhel-8-golang-1.16-openshift-4.9:
@@ -75,6 +78,8 @@ operator:
     with: hyperconverged-cluster-operator
   - pullspec: +WEBHOOK_IMAGE_TO_REPLACE+
     with: hyperconverged-cluster-webhook
+  - pullspec: +ARTIFACTS_SERVER_IMAGE_TO_REPLACE+
+    with: virt-artifacts-server
 promotion:
   additional_images:
     hyperconverged-cluster-operator-tests: src
@@ -93,7 +98,7 @@ tests:
   steps:
     cluster_profile: gcp
     env:
-      OO_CHANNEL: 1.5.0
+      OO_CHANNEL: "1.5"
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
@@ -112,7 +117,7 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      OO_CHANNEL: 1.5.0
+      OO_CHANNEL: "1.5"
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
@@ -133,7 +138,7 @@ tests:
     dependencies:
       OO_INDEX: ci-index-hco-upgrade-bundle
     env:
-      OO_CHANNEL: 1.5.0
+      OO_CHANNEL: "1.5"
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
@@ -152,7 +157,7 @@ tests:
     dependencies:
       OO_INDEX: ci-index-hco-upgrade-bundle
     env:
-      OO_CHANNEL: 1.5.0
+      OO_CHANNEL: "1.5"
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
