@@ -1,0 +1,76 @@
+base_images:
+  base:
+    name: "4.9"
+    namespace: origin
+    tag: base
+  openshift_release_golang-1.13:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- dockerfile_path: Dockerfile.okd
+  from: base
+  inputs:
+    openshift_release_golang-1.13:
+      as:
+      - registry.svc.ci.openshift.org/openshift/release:golang-1.13
+  to: cluster-samples-operator
+promotion:
+  disabled: true
+  name: "4.9"
+  namespace: origin
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.9"
+  namespace: origin
+tests:
+- as: unit
+  commands: make test-unit
+  container:
+    from: src
+- as: e2e-aws
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- as: e2e-aws-operator
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e-okd
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-builds
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-builds
+- as: e2e-aws-jenkins
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-jenkins
+- as: e2e-aws-image-ecosystem
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-image-ecosystem
+- as: e2e-aws-upgrade
+  steps:
+    cluster_profile: aws
+    workflow: openshift-upgrade-aws
+zz_generated_metadata:
+  branch: release-4.9
+  org: openshift
+  repo: cluster-samples-operator
+  variant: okd
