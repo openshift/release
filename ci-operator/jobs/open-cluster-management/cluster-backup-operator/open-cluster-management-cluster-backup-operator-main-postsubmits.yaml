@@ -1,25 +1,68 @@
-presubmits:
-  open-cluster-management/node_exporter:
+postsubmits:
+  open-cluster-management/cluster-backup-operator:
   - agent: kubernetes
-    always_run: true
     branches:
-    - ^release-2\.4$
-    - ^release-2\.4-
-    cluster: build01
-    context: ci/prow/images
+    - ^main$
+    cluster: build02
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-open-cluster-management-node_exporter-release-2.4-images
-    rerun_command: /test images
+    max_concurrency: 1
+    name: branch-ci-open-cluster-management-cluster-backup-operator-main-fast-forward
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=fast-forward
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    branches:
+    - ^main$
+    cluster: build02
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/is-promotion: "true"
+      ci-operator.openshift.io/prowgen-controlled: "true"
+    max_concurrency: 1
+    name: branch-ci-open-cluster-management-cluster-backup-operator-main-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+        - --promote
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
         command:
@@ -37,6 +80,9 @@ presubmits:
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
+        - mountPath: /etc/push-secret
+          name: push-secret
+          readOnly: true
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
@@ -45,32 +91,30 @@ presubmits:
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
+      - name: push-secret
+        secret:
+          secretName: registry-push-credentials-ci-central
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
     branches:
-    - ^release-2\.4$
-    - ^release-2\.4-
-    cluster: build01
-    context: ci/prow/test-e2e
+    - ^main$
+    cluster: build02
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-open-cluster-management-node_exporter-release-2.4-test-e2e
-    rerun_command: /test test-e2e
+    max_concurrency: 1
+    name: branch-ci-open-cluster-management-cluster-backup-operator-main-pr-merge-image-mirror
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=test-e2e
+        - --target=pr-merge-image-mirror
         command:
         - ci-operator
         image: ci-operator:latest
@@ -97,53 +141,3 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )test-e2e,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-2\.4$
-    - ^release-2\.4-
-    cluster: build01
-    context: ci/prow/test-unit
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/prowgen-controlled: "true"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-open-cluster-management-node_exporter-release-2.4-test-unit
-    rerun_command: /test test-unit
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=test-unit
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )test-unit,?($|\s.*)
