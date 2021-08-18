@@ -13,8 +13,14 @@ fi
 if [ "${TEST_TYPE}" != "conformance-parallel" ]; then 
     exit 0 
 fi
+
+# DNS query is blocked on s390x yellow zone
+if [ "${BRANCH}" == "4.9" ] && [ "${ARCH}" == "s390x" ]; then
+    cat > "${SHARED_DIR}/excluded_tests" << EOF
+"[sig-network] Networking should provide Internet connection for containers [Feature:Networking-IPv4] [Skipped:Disconnected] [Skipped:azure] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+EOF
 # List of exclude tests from conformance/parallel suite for 4.7 & 4.6
-if [ "${BRANCH}" == "4.7" ] && [ "${ARCH}" == "ppc64le" ]; then
+elif [ "${BRANCH}" == "4.7" ] && [ "${ARCH}" == "ppc64le" ]; then
     cat > "${SHARED_DIR}/excluded_tests" << EOF
 "[sig-api-machinery] Servers with support for Table transformation should return chunks of table results for list calls [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-api-machinery] Servers with support for Table transformation should return generic metadata details across all namespaces for nodes [Suite:openshift/conformance/parallel] [Suite:k8s]"
