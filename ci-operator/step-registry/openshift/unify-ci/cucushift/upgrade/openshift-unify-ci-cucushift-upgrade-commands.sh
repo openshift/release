@@ -4,6 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if [[ -z "$RELEASE_IMAGE_LATEST" ]]; then
+  echo "RELEASE_IMAGE_LATEST is an empty string, exiting"
+  exit 1
+fi
+
 TO_VERSION="${RELEASE_IMAGE_LATEST}"
 # TO_VERSION="4.7.24"
 # CHANNEL="stable"
