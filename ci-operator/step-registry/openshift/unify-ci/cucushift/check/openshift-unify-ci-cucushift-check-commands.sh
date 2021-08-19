@@ -21,32 +21,36 @@ done
 
 users=${users::-1}
 
-oc apply -f - <<EOF
-apiVersion: v1
-kind: Secret
-metadata:
-  name: htpass-secret
-  namespace: openshift-config
-stringData:
-  htpasswd: ${data_htpasswd}
-EOF
+# HACK: HyperShift clusters use their own profile type, but the cluster type
+# underneath is actually AWS and the type identifier is derived from the profile
+# type. For now, just treat the `hypershift` type the same as `aws` until
+# there's a clean way to decouple the notion of a cluster provider and the
+# platform type.
+#
+# See also: https://issues.redhat.com/browse/DPTP-1988
+if [[ "${CLUSTER_TYPE}" == "hypershift" ]]; then
+    export CLUSTER_TYPE="aws"
+    echo "Overriding 'hypershift' cluster type to be 'aws'"
+fi
 
-oc apply -f - <<EOF
-apiVersion: config.openshift.io/v1
-kind: OAuth
-metadata:
-  name: cluster
-spec:
-  identityProviders:
-  - name: htpassidp
-    challenge: true
-    login: true
-    mappingMethod: claim
-    type: HTPasswd
-    htpasswd:
-      fileData:
-        name: htpass-secret
-EOF
+# For disconnected or otherwise unreachable environments, we want to
+# have steps use an HTTP(S) proxy to reach the API server. This proxy
+# configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
+# environment variables, as well as their lowercase equivalents (note
+# that libcurl doesn't recognize the uppercase variables).
+if test -f "${SHARED_DIR}/proxy-conf.sh"
+then
+    # shellcheck disable=SC1090
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
+# if the cluster profile included an insights secret, install it to the cluster to
+# report support data from the support-operator
+if [[ -f "${CLUSTER_PROFILE_DIR}/insights-live.yaml" ]]; then
+    oc create -f "${CLUSTER_PROFILE_DIR}/insights-live.yaml" || true
+fi
+
+oc get pods
 
 # # Export those parameters before running
 # export BUSHSLICER_DEFAULT_ENVIRONMENT=ocp4

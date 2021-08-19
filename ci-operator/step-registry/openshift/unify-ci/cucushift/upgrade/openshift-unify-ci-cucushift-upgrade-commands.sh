@@ -16,11 +16,37 @@ TO_VERSION="${RELEASE_IMAGE_LATEST}"
 
 step=20 # second
 
+# HACK: HyperShift clusters use their own profile type, but the cluster type
+# underneath is actually AWS and the type identifier is derived from the profile
+# type. For now, just treat the `hypershift` type the same as `aws` until
+# there's a clean way to decouple the notion of a cluster provider and the
+# platform type.
+#
+# See also: https://issues.redhat.com/browse/DPTP-1988
+if [[ "${CLUSTER_TYPE}" == "hypershift" ]]; then
+    export CLUSTER_TYPE="aws"
+    echo "Overriding 'hypershift' cluster type to be 'aws'"
+fi
+
+# For disconnected or otherwise unreachable environments, we want to
+# have steps use an HTTP(S) proxy to reach the API server. This proxy
+# configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
+# environment variables, as well as their lowercase equivalents (note
+# that libcurl doesn't recognize the uppercase variables).
+if test -f "${SHARED_DIR}/proxy-conf.sh"
+then
+    # shellcheck disable=SC1090
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
+# if the cluster profile included an insights secret, install it to the cluster to
+# report support data from the support-operator
+if [[ -f "${CLUSTER_PROFILE_DIR}/insights-live.yaml" ]]; then
+    oc create -f "${CLUSTER_PROFILE_DIR}/insights-live.yaml" || true
+fi
+
 export OPENSHIFT_ENV_OCP4_ADMIN_CREDS_SPEC=${KUBECONFIG}
 export KUBECONFIG=${KUBECONFIG}
-
-# TODO: Proxy
-# [ -f ./client_proxy_setting.sh ] && source ./client_proxy_setting.sh
 
 # Update channel if needed
 current_channel=$(oc get clusterversion -o json|jq ".items[0].spec.channel")
