@@ -4,22 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# prepare users
-users=""
-data_htpasswd=""
-
-for i in $(seq 1 10);
-do
-    username="testuser-${i}"
-    password=`cat /dev/urandom | tr -dc 'a-z0-9' | fold -w 12 | head -n 1 || true`
-
-    users+="${username}:${password},"
-
-    data_htpasswd+=`htpasswd -B -b -n ${username} ${password}`
-    data_htpasswd+="\n"
-done
-
-users=${users::-1}
+export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
+export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
+export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
+export HOME=/tmp/home
+export PATH=/usr/libexec/origin:$PATH
 
 # HACK: HyperShift clusters use their own profile type, but the cluster type
 # underneath is actually AWS and the type identifier is derived from the profile
@@ -44,6 +33,23 @@ then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+if [[ -n "${TEST_CSI_DRIVER_MANIFEST}" ]]; then
+    export TEST_CSI_DRIVER_FILES=${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
+fi
+
+trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+
+mkdir -p "${HOME}"
+
+# Override the upstream docker.io registry due to issues with rate limiting
+# https://bugzilla.redhat.com/show_bug.cgi?id=1895107
+# sjenning: TODO: use of personal repo is temporary; should find long term location for these mirrored images
+export KUBE_TEST_REPO_LIST=${HOME}/repo_list.yaml
+cat <<EOF > ${KUBE_TEST_REPO_LIST}
+dockerLibraryRegistry: quay.io/sjenning
+dockerGluster: quay.io/sjenning
+EOF
+
 # if the cluster profile included an insights secret, install it to the cluster to
 # report support data from the support-operator
 if [[ -f "${CLUSTER_PROFILE_DIR}/insights-live.yaml" ]]; then
@@ -52,6 +58,23 @@ fi
 
 export KUBECONFIG=${KUBECONFIG}
 oc get clusterversion
+
+# prepare users
+users=""
+data_htpasswd=""
+
+for i in $(seq 1 10);
+do
+    username="testuser-${i}"
+    password=`cat /dev/urandom | tr -dc 'a-z0-9' | fold -w 12 | head -n 1 || true`
+
+    users+="${username}:${password},"
+
+    data_htpasswd+=`htpasswd -B -b -n ${username} ${password}`
+    data_htpasswd+="\n"
+done
+
+users=${users::-1}
 
 # # Export those parameters before running
 # export BUSHSLICER_DEFAULT_ENVIRONMENT=ocp4
