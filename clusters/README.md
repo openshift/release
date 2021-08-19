@@ -7,6 +7,7 @@ This folder includes the resources for installation and configuration of [CI-clu
     * [02_cluster](./build-clusters/02_cluster): build cluster hosted on GCP managed by DPTP-team.
     * [vsphere](./build-clusters/vsphere): build cluster hosted on vSphere managed by SPLAT-team.
     * [arm01](./build-clusters/arm01): build cluster hosted on AWS managed by the ARMOCP-team.
+    * [ppc64le01](./build-clusters/ppc64le01): build cluster hosted on PowerVS managed by the MULTIARCHOCP-team
 
 ## Best practice for applyConfig
 
