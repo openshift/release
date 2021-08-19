@@ -1245,11 +1245,9 @@ periodics:
       - --supplemental-prow-config-dir=./core-services/prow/02_config
       - --plugin-config=core-services/prow/02_config/_plugins.yaml
       - --supplemental-plugin-config-dir=core-services/prow/02_config
+      - --kubeconfig-dir=/etc/build-farm-credentials
       command:
       - /app/prow/cmd/config-bootstrapper/app.binary
-      env:
-      - name: KUBECONFIG
-        value: /etc/build-farm-credentials/build01.kubeconfig:/etc/build-farm-credentials/app.ci.kubeconfig:/etc/build-farm-credentials/build02.kubeconfig:/etc/build-farm-credentials/vsphere.kubeconfig
       image: gcr.io/k8s-prow/config-bootstrapper:v20210819-b72c0677ac
       imagePullPolicy: Always
       name: ""
@@ -1264,16 +1262,7 @@ periodics:
     volumes:
     - name: build-farm-credentials
       secret:
-        items:
-        - key: sa.hook.app.ci.config
-          path: app.ci.kubeconfig
-        - key: sa.hook.build01.config
-          path: build01.kubeconfig
-        - key: sa.hook.build02.config
-          path: build02.kubeconfig
-        - key: sa.hook.vsphere.config
-          path: vsphere.kubeconfig
-        secretName: build-farm-credentials
+        secretName: hook
 - agent: kubernetes
   cluster: app.ci
   cron: '@hourly'

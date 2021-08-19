@@ -131,10 +131,8 @@ items:
           - --jira-password-file=/etc/jira/password
           - --projected-token-file=/var/sa-token/token
           - --supplemental-plugin-config-dir=/etc/plugins
+          - --kubeconfig-dir=/etc/build-farm-credentials
           env:
-          # Multiple configs can only be passed via the env var and not via the flag
-          - name: KUBECONFIG
-            value: /etc/build-farm-credentials/app.ci.kubeconfig:/etc/build-farm-credentials/build01.kubeconfig:/etc/build-farm-credentials/build02.kubeconfig:/etc/build-farm-credentials/vsphere.kubeconfig:/etc/build-farm-credentials/arm01.kubeconfig
           - name: GITHUB_APP_ID
             valueFrom:
               secretKeyRef:
@@ -283,17 +281,6 @@ items:
             name: job-config-4.9
         - name: build-farm-credentials
           secret:
-            items:
-            - key: sa.hook.app.ci.config
-              path: app.ci.kubeconfig
-            - key: sa.hook.arm01.config
-              path: arm01.kubeconfig
-            - key: sa.hook.build01.config
-              path: build01.kubeconfig
-            - key: sa.hook.build02.config
-              path: build02.kubeconfig
-            - key: sa.hook.vsphere.config
-              path: vsphere.kubeconfig
-            secretName: build-farm-credentials
+            secretName: hook
         - name: tmp
           emptyDir: {}
