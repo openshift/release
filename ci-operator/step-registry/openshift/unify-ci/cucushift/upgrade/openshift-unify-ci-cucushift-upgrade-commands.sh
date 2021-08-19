@@ -16,18 +16,6 @@ TO_VERSION="${RELEASE_IMAGE_LATEST}"
 
 step=20 # second
 
-# HACK: HyperShift clusters use their own profile type, but the cluster type
-# underneath is actually AWS and the type identifier is derived from the profile
-# type. For now, just treat the `hypershift` type the same as `aws` until
-# there's a clean way to decouple the notion of a cluster provider and the
-# platform type.
-#
-# See also: https://issues.redhat.com/browse/DPTP-1988
-if [[ "${CLUSTER_TYPE}" == "hypershift" ]]; then
-    export CLUSTER_TYPE="aws"
-    echo "Overriding 'hypershift' cluster type to be 'aws'"
-fi
-
 # For disconnected or otherwise unreachable environments, we want to
 # have steps use an HTTP(S) proxy to reach the API server. This proxy
 # configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
