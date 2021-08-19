@@ -33,10 +33,6 @@ then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-if [[ -n "${TEST_CSI_DRIVER_MANIFEST}" ]]; then
-    export TEST_CSI_DRIVER_FILES=${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
-fi
-
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 mkdir -p "${HOME}"
