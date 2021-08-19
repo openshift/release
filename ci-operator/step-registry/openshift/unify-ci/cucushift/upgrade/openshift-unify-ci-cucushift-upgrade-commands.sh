@@ -39,12 +39,6 @@ then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-# if the cluster profile included an insights secret, install it to the cluster to
-# report support data from the support-operator
-if [[ -f "${CLUSTER_PROFILE_DIR}/insights-live.yaml" ]]; then
-    oc create -f "${CLUSTER_PROFILE_DIR}/insights-live.yaml" || true
-fi
-
 export OPENSHIFT_ENV_OCP4_ADMIN_CREDS_SPEC=${KUBECONFIG}
 export KUBECONFIG=${KUBECONFIG}
 
