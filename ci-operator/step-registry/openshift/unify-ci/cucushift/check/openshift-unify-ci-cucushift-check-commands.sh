@@ -28,4 +28,4 @@ ver_cli=`oc version | grep Client | cut -d ' ' -f 3`
 export BUSHSLICER_CONFIG="{'environments': {'ocp4': {'version': '${ver_cli:0:3}'}}}"
 
 cd verification-tests
-bash -l -c "bundle exec cucumber --tags @upgrade-check --format junit --out ${ARTIFACT_DIR}"
+# bash -l -c "bundle exec cucumber --tags @upgrade-check --format junit --out ${ARTIFACT_DIR}"
