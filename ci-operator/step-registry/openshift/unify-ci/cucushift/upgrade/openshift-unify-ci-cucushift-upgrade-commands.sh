@@ -10,6 +10,7 @@ if [[ -z "$RELEASE_IMAGE_LATEST" ]]; then
 fi
 
 TO_VERSION="$RELEASE_IMAGE_LATEST"
+echo "The OCP version will upgrade to is: $RELEASE_IMAGE_LATEST"
 # TO_VERSION="4.7.24"
 # CHANNEL="stable"
 # FORCE="true"

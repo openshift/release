@@ -29,4 +29,5 @@ export BUSHSLICER_CONFIG="{'environments': {'ocp4': {'version': '${ver_cli:0:3}'
 
 cd verification-tests
 # bash -l -c "bundle exec cucumber --tags @upgrade-prepare --format junit --out ${ARTIFACT_DIR}"
-oc get clusterversion
+version=$(oc get clusterversion)
+echo "OCP version before upgrading: $version"
