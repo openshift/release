@@ -9,7 +9,7 @@ if [[ -z "$RELEASE_IMAGE_LATEST" ]]; then
   exit 1
 fi
 
-TO_VERSION="${RELEASE_IMAGE_LATEST}"
+TO_VERSION="$RELEASE_IMAGE_LATEST"
 # TO_VERSION="4.7.24"
 # CHANNEL="stable"
 # FORCE="true"
