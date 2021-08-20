@@ -110,7 +110,15 @@ elif mode == "errors":
             any(
                 s in message.get(m, "") for s in ["connect: connection refused", "i/o timeout"]
             ) for m in ["msg", "error"]
+        ),
+        # DPTP-2462
+        lambda message: "vault-secret-collection-manager" in message.get("component", "") and
+        "Failed to reconcile policies" in message.get("msg", "") and
+        "missing client token" in message.get("error", "") and
+        any(
+            err in message.get("error", "") for err in ("failed to get policy", "failed to list policies")
         )
+        ,
     ]
 else:
     print("Filter mode must be 'warnings' or 'errors', not " + mode)
