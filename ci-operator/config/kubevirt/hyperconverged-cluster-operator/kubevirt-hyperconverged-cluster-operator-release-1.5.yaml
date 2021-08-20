@@ -1,20 +1,20 @@
 base_images:
   base:
     name: "4.9"
-    namespace: origin
+    namespace: ocp
     tag: base
   cli:
     name: "4.9"
-    namespace: origin
+    namespace: ocp
     tag: cli
   hco-index:
     name: hyperconverged-cluster-index
     namespace: ci
-    tag: 1.6.0-unstable
+    tag: 1.5.0-unstable
   hco-index-prev:
     name: hyperconverged-cluster-index
     namespace: ci
-    tag: 1.5.0-unstable
+    tag: 1.4.0-unstable
   ocp_builder_rhel-8-golang-1.16-openshift-4.9:
     name: builder
     namespace: ocp
@@ -83,8 +83,13 @@ operator:
 promotion:
   additional_images:
     hyperconverged-cluster-operator-tests: src
-  name: "4.9"
-  namespace: origin
+  excluded_images:
+  - operator-registry-base
+  - hco-registry
+  - hco-registry-upgrade
+  - hco-registry-upgrade-prev
+  name: hco1.5_4.9
+  namespace: ocp
 resources:
   '*':
     requests:
@@ -92,13 +97,13 @@ resources:
       memory: 1Gi
 tag_specification:
   name: "4.9"
-  namespace: origin
+  namespace: ocp
 tests:
-- as: hco-e2e-image-index-gcp
+- as: hco-e2e-image-index-azure
   steps:
-    cluster_profile: gcp
+    cluster_profile: azure4
     env:
-      OO_CHANNEL: 1.6.0
+      OO_CHANNEL: 1.5.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
@@ -112,12 +117,31 @@ tests:
         requests:
           cpu: 500m
           memory: 1Gi
-    workflow: optional-operators-ci-gcp
+    workflow: optional-operators-ci-azure
+- as: hco-e2e-kv-smoke-azure
+  steps:
+    cluster_profile: azure4
+    env:
+      OO_CHANNEL: 1.5.0
+      OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
+      OO_PACKAGE: community-kubevirt-hyperconverged
+      OO_TARGET_NAMESPACES: '!all'
+    test:
+    - as: e2e-test
+      commands: |
+        make deploy_cr
+        make test-kv-smoke-prow
+      from: hco-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-azure
 - as: hco-e2e-image-index-aws
   steps:
     cluster_profile: aws
     env:
-      OO_CHANNEL: 1.6.0
+      OO_CHANNEL: 1.5.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
@@ -132,13 +156,51 @@ tests:
           cpu: 500m
           memory: 1Gi
     workflow: optional-operators-ci-aws
+- as: hco-e2e-image-index-gcp
+  steps:
+    cluster_profile: gcp
+    env:
+      OO_CHANNEL: 1.5.0
+      OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
+      OO_PACKAGE: community-kubevirt-hyperconverged
+      OO_TARGET_NAMESPACES: '!all'
+    test:
+    - as: e2e-test
+      commands: |
+        make deploy_cr
+        make functest
+      from: hco-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-gcp
+- as: hco-e2e-kv-smoke-gcp
+  steps:
+    cluster_profile: gcp
+    env:
+      OO_CHANNEL: 1.5.0
+      OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
+      OO_PACKAGE: community-kubevirt-hyperconverged
+      OO_TARGET_NAMESPACES: '!all'
+    test:
+    - as: e2e-test
+      commands: |
+        make deploy_cr
+        make test-kv-smoke-prow
+      from: hco-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-gcp
 - as: hco-e2e-upgrade-index-aws
   steps:
     cluster_profile: aws
     dependencies:
       OO_INDEX: ci-index-hco-upgrade-bundle
     env:
-      OO_CHANNEL: 1.6.0
+      OO_CHANNEL: 1.5.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
@@ -151,27 +213,64 @@ tests:
           cpu: 500m
           memory: 1Gi
     workflow: optional-operators-ci-aws
-- as: hco-e2e-upgrade-index-gcp
+- as: hco-e2e-upgrade-index-azure
   steps:
-    cluster_profile: gcp
+    cluster_profile: azure4
     dependencies:
       OO_INDEX: ci-index-hco-upgrade-bundle
     env:
-      OO_CHANNEL: 1.6.0
+      OO_CHANNEL: 1.5.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
     test:
-    - as: e2e-index-image-upgrade-gcp
+    - as: e2e-index-image-upgrade-azure
       commands: RELEASE_DELTA=1 make upgrade-test-index-image
       from: hco-oc-bin-image
       resources:
         requests:
           cpu: 500m
           memory: 1Gi
-    workflow: optional-operators-ci-gcp
+    workflow: optional-operators-ci-azure
+- as: hco-e2e-upgrade-prev-index-aws
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-hco-upgrade-prev-bundle
+    env:
+      OO_CHANNEL: 1.4.0
+      OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
+      OO_PACKAGE: community-kubevirt-hyperconverged
+      OO_TARGET_NAMESPACES: '!all'
+    test:
+    - as: e2e-upgrade-test
+      commands: RELEASE_DELTA=2 KVM_EMULATION=true make upgrade-test-index-image
+      from: hco-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-aws
+- as: hco-e2e-upgrade-prev-index-azure
+  steps:
+    cluster_profile: azure4
+    dependencies:
+      OO_INDEX: ci-index-hco-upgrade-prev-bundle
+    env:
+      OO_CHANNEL: 1.4.0
+      OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
+      OO_PACKAGE: community-kubevirt-hyperconverged
+      OO_TARGET_NAMESPACES: '!all'
+    test:
+    - as: e2e-upgrade-test
+      commands: RELEASE_DELTA=2 make upgrade-test-index-image
+      from: hco-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-azure
 zz_generated_metadata:
-  branch: main
+  branch: release-1.5
   org: kubevirt
   repo: hyperconverged-cluster-operator
-  variant: okd
