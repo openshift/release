@@ -79,8 +79,7 @@ set -e
 
 if [ "${JOB_TYPE:-}" = "presubmit" ] && (( ! \${IS_REHEARSAL} )); then
   # We would like to keep running a stable version for PRs
-  OPENSHIFT_VERSION=\$(jq -r 'to_entries | .[] | select(.value.default) | .key' "\${REPO_DIR}/data/default_ocp_versions.json")
-  echo "export OPENSHIFT_VERSION=\${OPENSHIFT_VERSION}" >> /root/config
+  echo "export OPENSHIFT_VERSION=4.8" >> /root/config
 
   if [ "${REPO_NAME:-}" = "assisted-service" ]; then
     echo "export SERVICE_BRANCH=${PULL_PULL_SHA:-master}" >> /root/config
