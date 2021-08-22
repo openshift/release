@@ -38,7 +38,7 @@ timeout -s 9 175m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*
 
 set -xeuo pipefail
 
-yum install -y git sysstat sos
+yum install -y git sysstat sos jq
 systemctl start sysstat
 
 mkdir -p /tmp/artifacts
