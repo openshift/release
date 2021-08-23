@@ -5,19 +5,29 @@ set -o errexit
 set -o pipefail
 
 # List of exclude tests from conformance/serial suite
-if [ "${TEST_TYPE}" == "conformance-serial" ]; then 
+if [ "${TEST_TYPE}" == "conformance-serial" ]; then
     cat > "${SHARED_DIR}/excluded_tests" << EOF
 "[sig-imageregistry][Serial][Suite:openshift/registry/serial] Image signature workflow can push a signed image to openshift registry and verify it [Suite:openshift/conformance/serial]"
 EOF
 fi
-if [ "${TEST_TYPE}" != "conformance-parallel" ]; then 
-    exit 0 
+if [ "${TEST_TYPE}" != "conformance-parallel" ]; then
+    exit 0
 fi
 
 # DNS query is blocked on s390x yellow zone
 if [ "${BRANCH}" == "4.9" ] && [ "${ARCH}" == "s390x" ]; then
     cat > "${SHARED_DIR}/excluded_tests" << EOF
 "[sig-network] Networking should provide Internet connection for containers [Feature:Networking-IPv4] [Skipped:Disconnected] [Skipped:azure] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] NetworkPolicyLegacy [LinuxOnly] NetworkPolicy between server and client should allow egress access on one named port [Feature:NetworkPolicy] [Skipped:Network/OVNKubernetes] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] NetworkPolicyLegacy [LinuxOnly] NetworkPolicy between server and client should allow egress access to server in CIDR block [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] NetworkPolicyLegacy [LinuxOnly] NetworkPolicy between server and client should allow ingress access from namespace on one named port [Feature:NetworkPolicy] [Skipped:Network/OVNKubernetes] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] NetworkPolicyLegacy [LinuxOnly] NetworkPolicy between server and client should allow ingress access on one named port [Feature:NetworkPolicy] [Skipped:Network/OVNKubernetes] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] NetworkPolicyLegacy [LinuxOnly] NetworkPolicy between server and client should enforce egress policy allowing traffic to a server in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] NetworkPolicyLegacy [LinuxOnly] NetworkPolicy between server and client should enforce except clause while egress access to server in CIDR block [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] NetworkPolicyLegacy [LinuxOnly] NetworkPolicy between server and client should enforce multiple egress policies with egress allow-all policy taking precedence [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] NetworkPolicyLegacy [LinuxOnly] NetworkPolicy between server and client should ensure an IP overlapping both IPBlock.CIDR and IPBlock.Except is allowed [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] NetworkPolicyLegacy [LinuxOnly] NetworkPolicy between server and client should support a 'default-deny-all' policy [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-network] NetworkPolicyLegacy [LinuxOnly] NetworkPolicy between server and client should work with Ingress,Egress specified together [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
 EOF
 # List of exclude tests from conformance/parallel suite for 4.7 & 4.6
 elif [ "${BRANCH}" == "4.7" ] && [ "${ARCH}" == "ppc64le" ]; then
