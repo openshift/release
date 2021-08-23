@@ -152,7 +152,7 @@ EOF"
 
 sudo mkdir -p /etc/squid/certs
 cd /etc/squid/certs
-sudo openssl req -newkey rsa:4096 -nodes -sha256 -keyout domain.key -x509 -days 365 \
+sudo openssl req -newkey rsa:4096 -nodes -sha256 -keyout domain.key -x509 -days 1 \
  -addext "subjectAltName = IP:$SQUID_IP" -subj "/C=US/ST=Denial/L=Springfield/O=RedHat/CN=shiftstack.com" -out domain.crt
 sudo cp /etc/squid/certs/domain.crt /etc/pki/ca-trust/source/anchors/domain.crt
 sudo update-ca-trust
