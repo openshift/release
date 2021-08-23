@@ -99,7 +99,7 @@ elif mode == "errors":
         ),
         # deck is spamming us for no good reason
         lambda message: "deck" in message.get("component", "") and
-        "error executing template pr-history.html" in message.get("msg", ""),
+        "error executing template" in message.get("msg", ""),
         # deck trying to talk to Tide, this fails when we bump. We have probes in Tide so we get alerted when it's down for longer time.
         lambda message: "deck" in message.get("component", "") and
         "Updating" in message.get("msg", "") and
