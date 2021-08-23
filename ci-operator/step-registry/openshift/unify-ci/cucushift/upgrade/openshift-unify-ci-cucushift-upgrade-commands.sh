@@ -109,8 +109,15 @@ do
     version=$(echo ${version#\"})
     version=$(echo ${version%\"})
     state=$( echo $version_json|jq ".items[0].status.history[0].state" )
+    echo "OCP is updating, current version is: $version, state is $state"
     # There should be an error when OCP upgraded from more than 2 versions
-    if [[ "$version" != "$TO_VERSION" || "$state" != "\"Completed\"" ]]
+    # if [[ "$version" != "$TO_VERSION" || "$state" != "\"Completed\"" ]]
+    # then
+    #     echo "OCP updating is not finished, current version is: $version, state is $state"
+    #     sleep $step
+    #     continue
+    # fi
+    if [[ "$state" != "\"Completed\"" ]]
     then
         echo "OCP updating is not finished, current version is: $version, state is $state"
         sleep $step
