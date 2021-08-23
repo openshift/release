@@ -9,8 +9,15 @@ if [[ -z "$RELEASE_IMAGE_LATEST" ]]; then
   exit 1
 fi
 
-TO_VERSION="$RELEASE_IMAGE_LATEST"
-echo "The OCP version will upgrade to is: $RELEASE_IMAGE_LATEST"
+TARGET_RELEASES="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:-}"
+if [[ -f "${SHARED_DIR}/override-upgrade" ]]; then
+    TARGET_RELEASES="$(< "${SHARED_DIR}/override-upgrade")"
+    echo "Overriding upgrade target to ${TARGET_RELEASES}"
+fi
+TO_VERSION="$(echo $TARGET_RELEASES | cut -f2 -d,)"
+
+# TO_VERSION="$RELEASE_IMAGE_LATEST"
+echo "The OCP version will be upgrade to: $TO_VERSION"
 # TO_VERSION="4.7.24"
 # CHANNEL="stable"
 # FORCE="true"
@@ -29,7 +36,6 @@ then
 fi
 
 export OPENSHIFT_ENV_OCP4_ADMIN_CREDS_SPEC=${KUBECONFIG}
-export KUBECONFIG=${KUBECONFIG}
 
 # Update channel if needed
 current_channel=$(oc get clusterversion -o json|jq ".items[0].spec.channel")
