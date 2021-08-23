@@ -108,7 +108,7 @@ def _add_osd_rc_servicemonitor(gendoc):
             'endpoints': [{
                 'interval': '30s',
                 'port': 'main',
-                'scheme': 'https',
+                'scheme': 'http',
             }],
             'namespaceSelector': {
                 'matchNames': ['ci'],
