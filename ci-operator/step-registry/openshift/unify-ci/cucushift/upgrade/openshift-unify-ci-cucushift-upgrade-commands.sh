@@ -5,23 +5,23 @@ set -o errexit
 set -o pipefail
 
 
-export OPENSHIFT_ENV_OCP4_ADMIN_CREDS_SPEC=${KUBECONFIG}
+# export OPENSHIFT_ENV_OCP4_ADMIN_CREDS_SPEC=${KUBECONFIG}
 
-if [[ -z "$RELEASE_IMAGE_LATEST" ]]; then
-  echo "RELEASE_IMAGE_LATEST is an empty string, exiting"
-  exit 1
-fi
+# if [[ -z "$RELEASE_IMAGE_LATEST" ]]; then
+#   echo "RELEASE_IMAGE_LATEST is an empty string, exiting"
+#   exit 1
+# fi
 
-TARGET_RELEASES="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:-}"
-echo "OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE is $OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE"
-if [[ -f "${SHARED_DIR}/override-upgrade" ]]; then
-    TARGET_RELEASES="$(< "${SHARED_DIR}/override-upgrade")"
-    echo "Overriding upgrade target to ${TARGET_RELEASES}"
-fi
-TO_VERSION="$(echo $TARGET_RELEASES | cut -f2 -d,)"
+# TARGET_RELEASES="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:-}"
+# echo "OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE is $OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE"
+# if [[ -f "${SHARED_DIR}/override-upgrade" ]]; then
+#     TARGET_RELEASES="$(< "${SHARED_DIR}/override-upgrade")"
+#     echo "Overriding upgrade target to ${TARGET_RELEASES}"
+# fi
+# TO_VERSION="$(echo $TARGET_RELEASES | cut -f2 -d,)"
 
 # TO_VERSION="$RELEASE_IMAGE_LATEST"
-echo "The OCP version will be upgrade to: $TO_VERSION"
+echo "The OCP cluster will be upgrade to: $OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE"
 # TO_VERSION="4.7.24"
 # CHANNEL="stable"
 # FORCE="true"
@@ -39,32 +39,33 @@ then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-# Update channel if needed
-current_channel=$(oc get clusterversion -o json|jq ".items[0].spec.channel")
-echo "current channel is: $current_channel"
-IFS='.' read -r -a arr <<<"$TO_VERSION"
-target_channel="$(echo "$CHANNEL-${arr[0]}.${arr[1]}")"
-if [ "$current_channel" != "$target_channel" ]
-then
-    echo "Target channel is $target_channel, prepare update channel..."
+# # Update channel if needed
+# current_channel=$(oc get clusterversion -o json|jq ".items[0].spec.channel")
+# echo "current channel is: $current_channel"
+# IFS='.' read -r -a arr <<<"$TO_VERSION"
+# target_channel="$(echo "$CHANNEL-${arr[0]}.${arr[1]}")"
+# if [ "$current_channel" != "$target_channel" ]
+# then
+#     echo "Target channel is $target_channel, prepare update channel..."
 
-    oc patch clusterversion/version --patch '{"spec": {"channel": "'$target_channel'"}}' --type merge
-    oc patch clusterversion/version --patch '{"spec":{"upstream":"https://amd64.ocp.releases.ci.openshift.org/graph"}}' --type=merge
+#     oc patch clusterversion/version --patch '{"spec": {"channel": "'$target_channel'"}}' --type merge
+#     oc patch clusterversion/version --patch '{"spec":{"upstream":"https://amd64.ocp.releases.ci.openshift.org/graph"}}' --type=merge
 
-    current_channel=$(oc get clusterversion -o json|jq ".items[0].spec.channel")
-    echo "New channel is: $current_channel"
-fi
+#     current_channel=$(oc get clusterversion -o json|jq ".items[0].spec.channel")
+#     echo "New channel is: $current_channel"
+# fi
 
-script="oc adm upgrade --to=$TO_VERSION"
-if [[ "$TO_VERSION" == *x86_64* ]]
-then
-    script="oc adm upgrade --to-image=quay.io/openshift-release-dev/ocp-release:$TO_VERSION"
-fi
+script="oc adm upgrade --to-image=$OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE"
+# script="oc adm upgrade --to=$TO_VERSION"
+# if [[ "$TO_VERSION" == *x86_64* ]]
+# then
+#     script="oc adm upgrade --to-image=quay.io/openshift-release-dev/ocp-release:$TO_VERSION"
+# fi
 
-if [[ "$TO_VERSION" == *nightly* || "$TO_VERSION" == *ci* ]]
-then
-    script="oc adm upgrade --to-image=registry.ci.openshift.org/ocp/release:$TO_VERSION"
-fi
+# if [[ "$TO_VERSION" == *nightly* || "$TO_VERSION" == *ci* ]]
+# then
+#     script="oc adm upgrade --to-image=registry.ci.openshift.org/ocp/release:$TO_VERSION"
+# fi
 
 if [[ ${FORCE} == "true" ]]
 then
