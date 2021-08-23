@@ -2,7 +2,7 @@ SHELL=/usr/bin/env bash -o errexit
 
 .PHONY: help check check-boskos check-core check-services dry-core core dry-services services all update template-allowlist release-controllers checkconfig jobs ci-operator-config registry-metadata boskos-config prow-config validate-step-registry new-repo branch-cut prow-config
 
-CONTAINER_ENGINE ?= docker
+export CONTAINER_ENGINE ?= docker
 
 help:
 	@echo "Run 'make all' to update configuration against the current KUBECONFIG"
@@ -210,35 +210,26 @@ job:
 .PHONY: job
 
 kerberos_id ?= dptp
-dry_run ?= true
-force ?= false
-bw_password_path ?= /tmp/bw_password
-kubeconfig_path ?= $(HOME)/.kube/config
+export dry_run ?= true
+export force ?= false
+export kubeconfig_path ?= $(HOME)/.kube/config
 
 # these are useful for dptp-team
-# echo -n "bw_password" > /tmp/bw_password
-# make kerberos_id=<your_kerberos_id> cluster=app.ci ci-secret-bootstrap
+# make cluster=app.ci ci-secret-bootstrap
 ci-secret-bootstrap:
-	$(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/ci-secret-bootstrap:latest
-	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR)/core-services/ci-secret-bootstrap/_config.yaml:/_config.yaml:z" \
-		-v "$(kubeconfig_path):/_kubeconfig:z" \
-		-v "$(bw_password_path):/_bw_password:z" \
-		registry.ci.openshift.org/ci/ci-secret-bootstrap:latest \
-		--bw-password-path=/_bw_password --bw-user $(kerberos_id)@redhat.com --config=/_config.yaml --kubeconfig=/_kubeconfig --dry-run=$(dry_run) --force=$(force) --cluster=$(cluster) --as=system:admin
+	@./hack/ci-secret-bootstrap.sh
 .PHONY: ci-secret-bootstrap
 
-ci-secret-generator:
-	$(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/ci-secret-generator:latest
-	@# This needs a bunch of stuff from the host for auth so just copy it there
-	$(eval ID = $(shell $(CONTAINER_ENGINE) create registry.ci.openshift.org/ci/ci-secret-generator))
-	$(CONTAINER_ENGINE) cp $(ID):/usr/bin/ci-secret-generator /tmp/secret-generator
-	$(CONTAINER_ENGINE) rm $(ID)
-	/tmp/secret-generator --bw-password-path=$(bw_password_path) --bw-user $(kerberos_id)@redhat.com \
-		--config=$(CURDIR)/core-services/ci-secret-generator/_config.yaml \
-		--bootstrap-config=$(CURDIR)/core-services/ci-secret-bootstrap/_config.yaml \
-		--dry-run=$(dry_run)
-	rm /tmp/secret-generator
+ci-secret-generator: build_farm_credentials_folder
+	./hack/ci-secret-generator.sh
 .PHONY: ci-secret-generator
+
+build_farm_credentials_folder ?= /tmp/build-farm-credentials
+
+build_farm_credentials_folder:
+	mkdir -p $(build_farm_credentials_folder)
+	oc --context app.ci -n ci extract secret/config-updater --to=$(build_farm_credentials_folder) --confirm
+.PHONY: build_farm_credentials_folder
 
 verify-app-ci:
 	true
@@ -275,3 +266,17 @@ openshift-image-mirror-mappings:
 	$(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/promoted-image-governor:latest
 	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR):/release:z" registry.ci.openshift.org/ci/promoted-image-governor:latest --ci-operator-config-path /release/ci-operator/config --release-controller-mirror-config-dir /release/core-services/release-controller/_releases --openshift-mapping-dir /release/core-services/image-mirroring/openshift --openshift-mapping-config /release/core-services/image-mirroring/openshift/_config.yaml
 .PHONY: openshift-image-mirror-mappings
+
+config_updater_vault_secret:
+	@[[ -z $$cluster ]] && echo "ERROR: \$$cluster must be set" && exit 1
+	$(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/applyconfig:latest
+	$(CONTAINER_ENGINE) run --rm \
+		-v $(CURDIR)/clusters/build-clusters/common:/manifests:z \
+		-v "$(kubeconfig_path):/_kubeconfig:z" \
+		registry.ci.openshift.org/ci/applyconfig:latest \
+		--config-dir=/manifests \
+		--context=$(cluster) \
+		--kubeconfig=/_kubeconfig
+	oc --context "$(cluster)" sa create-kubeconfig -n ci config-updater > "$(build_farm_credentials_folder)/sa.config-updater.$(cluster).config"
+	make ci-secret-generator
+.PHONY: config_updater_vault_secret
