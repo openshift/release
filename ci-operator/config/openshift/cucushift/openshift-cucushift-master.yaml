@@ -27,19 +27,25 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: unify-ci-upgrade
+- as: unify-ci-upgrade-aws
   interval: 24h
   steps:
     cluster_profile: aws
+    workflow: openshift-unify-ci-cucushift-aws
     test:
-    - as: unify-ci-upgrade-aws
+    - as: unify-ci-upgrade
       cli: latest
-      workflow: openshift-unify-ci-cucushift-aws
+      from: cucushift
+      commands: run cluster upgrade
       dependencies:
         - env: CLUSTER_UPGRADE_INITIAL_IMAGE
           name: release:initial
         - env: CLUSTER_UPGRADE_TARGET_IMAGE
           name: release:latest
+      resources:
+        requests:
+          cpu: 300m
+          memory: 1Gi
 zz_generated_metadata:
   branch: master
   org: openshift
