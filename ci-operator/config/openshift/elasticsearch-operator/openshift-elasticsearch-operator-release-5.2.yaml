@@ -15,18 +15,10 @@ base_images:
     name: "5.2"
     namespace: logging
     tag: cluster-logging-operator-registry
-  elasticsearch-operator:
+  elasticsearch-proxy:
     name: "5.2"
     namespace: logging
-    tag: elasticsearch-operator
-  elasticsearch-operator-registry:
-    name: "5.2"
-    namespace: logging
-    tag: elasticsearch-operator-registry
-  elasticsearch-operator-src:
-    name: "5.2"
-    namespace: logging
-    tag: elasticsearch-operator-src
+    tag: elasticsearch-proxy
   log-file-metric-exporter:
     name: "5.2"
     namespace: logging
@@ -63,17 +55,22 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.15
+    tag: golang-1.14
 images:
-- dockerfile_path: Dockerfile
-  from: base
+- from: base
   inputs:
     ocp_builder_rhel-8-golang-1.15:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
-  to: elasticsearch-proxy
+  to: elasticsearch-operator
+- dockerfile_path: olm_deploy/operatorregistry/Dockerfile
+  from: base
+  to: elasticsearch-operator-registry
+- dockerfile_path: Dockerfile.src
+  from: src
+  to: elasticsearch-operator-src
 promotion:
-  name: "5.3"
+  name: "5.2"
   namespace: logging
 releases:
   latest:
@@ -91,10 +88,36 @@ tests:
   container:
     from: src
 - as: unit
-  commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/es-proxy-logs ARTIFACT_DIR=${ARTIFACT_DIR}/es-proxy-artifacts
-    make test
+  commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/eo-logs ARTIFACT_DIR=${ARTIFACT_DIR}/eo-artifacts
+    make test-unit
   container:
     from: src
+- as: e2e-operator
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/eo-logs ARTIFACT_DIR=${ARTIFACT_DIR}/eo-artifacts
+        make test-e2e-olm
+      dependencies:
+      - env: IMAGE_ELASTICSEARCH_OPERATOR_REGISTRY
+        name: pipeline:elasticsearch-operator-registry
+      - env: IMAGE_ELASTICSEARCH_OPERATOR
+        name: pipeline:elasticsearch-operator
+      - env: IMAGE_OAUTH_PROXY
+        name: pipeline:oauth-proxy
+      - env: IMAGE_ELASTICSEARCH_PROXY
+        name: pipeline:elasticsearch-proxy
+      - env: IMAGE_ELASTICSEARCH6
+        name: pipeline:logging-elasticsearch6
+      - env: IMAGE_LOGGING_KIBANA6
+        name: pipeline:logging-kibana6
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
 - as: cluster-logging-operator-e2e
   steps:
     cluster_profile: gcp
@@ -114,6 +137,10 @@ tests:
         name: pipeline:logging-curator5
       - env: IMAGE_LOGGING_FLUENTD
         name: pipeline:logging-fluentd
+      - env: IMAGE_ELASTICSEARCH_OPERATOR_REGISTRY
+        name: pipeline:elasticsearch-operator-registry
+      - env: IMAGE_ELASTICSEARCH_OPERATOR
+        name: pipeline:elasticsearch-operator
       - env: IMAGE_ELASTICSEARCH_PROXY
         name: pipeline:elasticsearch-proxy
       - env: IMAGE_ELASTICSEARCH6
@@ -129,33 +156,19 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
-- as: elasticsearch-operator-e2e
+- as: e2e-upgrade
   steps:
     cluster_profile: gcp
     test:
     - as: test
       cli: latest
-      commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts
-        make test-e2e-olm
-      dependencies:
-      - env: IMAGE_ELASTICSEARCH_OPERATOR_REGISTRY
-        name: pipeline:elasticsearch-operator-registry
-      - env: IMAGE_ELASTICSEARCH_OPERATOR
-        name: pipeline:elasticsearch-operator
-      - env: IMAGE_OAUTH_PROXY
-        name: pipeline:oauth-proxy
-      - env: IMAGE_ELASTICSEARCH_PROXY
-        name: pipeline:elasticsearch-proxy
-      - env: IMAGE_ELASTICSEARCH6
-        name: pipeline:logging-elasticsearch6
-      - env: IMAGE_LOGGING_KIBANA6
-        name: pipeline:logging-kibana6
-      from: pipeline:elasticsearch-operator-src
+      commands: make test-e2e-upgrade
+      from: src
       resources:
         requests:
           cpu: 100m
     workflow: ipi-gcp
 zz_generated_metadata:
-  branch: master
+  branch: release-5.2
   org: openshift
-  repo: elasticsearch-proxy
+  repo: elasticsearch-operator
