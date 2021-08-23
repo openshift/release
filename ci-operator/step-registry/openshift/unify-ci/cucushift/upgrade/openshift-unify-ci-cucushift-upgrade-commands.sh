@@ -4,12 +4,16 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+
+export OPENSHIFT_ENV_OCP4_ADMIN_CREDS_SPEC=${KUBECONFIG}
+
 if [[ -z "$RELEASE_IMAGE_LATEST" ]]; then
   echo "RELEASE_IMAGE_LATEST is an empty string, exiting"
   exit 1
 fi
 
 TARGET_RELEASES="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:-}"
+echo "OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE is $OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE"
 if [[ -f "${SHARED_DIR}/override-upgrade" ]]; then
     TARGET_RELEASES="$(< "${SHARED_DIR}/override-upgrade")"
     echo "Overriding upgrade target to ${TARGET_RELEASES}"
@@ -35,8 +39,6 @@ then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-export OPENSHIFT_ENV_OCP4_ADMIN_CREDS_SPEC=${KUBECONFIG}
-
 # Update channel if needed
 current_channel=$(oc get clusterversion -o json|jq ".items[0].spec.channel")
 echo "current channel is: $current_channel"
@@ -53,9 +55,6 @@ then
     echo "New channel is: $current_channel"
 fi
 
-# TODO： Upgrade for disconnected cluster
-
-echo "Upgrade OCP to $TO_VERSION"
 script="oc adm upgrade --to=$TO_VERSION"
 if [[ "$TO_VERSION" == *x86_64* ]]
 then
