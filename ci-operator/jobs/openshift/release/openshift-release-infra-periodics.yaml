@@ -1537,3 +1537,88 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+- agent: kubernetes
+  cluster: build01
+  cron: '@yearly'
+  decorate: true
+  name: release-openshift-release-analysis-aggregator
+  spec:
+    containers:
+    - args:
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --secret-dir=/usr/local/pull-secret
+      - --target=release-analysis-aggregator
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      command:
+      - ci-operator
+      env:
+      - name: GOOGLE_SA_CREDENTIAL_FILE
+        value: /var/run/secrets/google-serviceaccount-credentials.json
+      - name: VERIFICATION_JOB_NAME
+      - name: JOB_START_TIME
+      - name: PAYLOAD_TAG
+      - name: WORKING_DIR
+        value: $(ARTIFACT_DIR)/release-analysis-aggregator
+      - name: UNRESOLVED_CONFIG
+        value: |
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: release-analysis-aggregator
+            steps:
+              env:
+                GOOGLE_SA_CREDENTIAL_FILE: "$(GOOGLE_SA_CREDENTIAL_FILE)"
+                VERIFICATION_JOB_NAME: "$(VERIFICATION_JOB_NAME)"
+                JOB_START_TIME: "$(JOB_START_TIME)"
+                PAYLOAD_TAG: "$(PAYLOAD_TAG)"
+                WORKING_DIR: "$(WORKING_DIR)"
+              test:
+              - ref: openshift-release-analysis-aggregator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: aggregator
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
