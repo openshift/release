@@ -11,6 +11,10 @@ base_images:
     name: "4.8"
     namespace: ocp
     tag: libvirt-installer
+  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.7
   os:
     name: centos
     namespace: origin
@@ -22,7 +26,7 @@ build_root:
       FROM registry.access.redhat.com/ubi8/go-toolset
       USER root
       ENV GOPATH=/go GOCACHE=/go/src/.cache GO111MODULE=on
-      RUN mkdir -p $GOCACHE && mkdir -p /root/.aws
+      RUN mkdir -p $GOCACHE
       WORKDIR $GOPATH/src/github.com/redhat-et/microshift
       RUN yum install gpgme-devel glibc-static libassuan-devel -y
     inputs:
@@ -83,6 +87,23 @@ images:
       - destination_dir: .
         source_path: /etc/yum.repos.d/google-cloud-sdk.repo
   to: microshift-setup
+- dockerfile_literal: |
+    FROM ocp_builder_rhel-8-golang-1.15-openshift-4.7 as openshift-test-source
+    ENV GOPATH=/go GOCACHE=/go/src/.cache GO111MODULE=on
+    WORKDIR $GOPATH/src/github.com/openshift/origin
+    RUN dnf install -y git
+    RUN git clone git@github.com:openshift/origin.git . && git checkout release-4.7
+    RUN make build
+    FROM os
+    COPY --from=openshift-test-source /go/src/github.com/openshift/origin/openshift-tests /usr/bin/openshift-tests
+  to: microshift-openshift-tests-bin
+promotion:
+  additional_images:
+    linux-amd64-4.7.0-0.microshift: linux-amd64-4.7.0-0.microshift
+    linux-arm64-4.7.0-0.microshift: linux-arm64-4.7.0-0.microshift
+    microshift-setup: microshift-setup
+  namespace: microshift
+  tag: latest
 resources:
   '*':
     limits:
