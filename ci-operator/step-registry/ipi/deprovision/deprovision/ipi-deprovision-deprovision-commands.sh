@@ -19,6 +19,9 @@ if [[ ! -s "${SHARED_DIR}/metadata.json" ]]; then
 fi
 
 cp -ar "${SHARED_DIR}" /tmp/installer
+mv /tmp/installer/metadata.json{,.tmp}
+jq --arg shared_dir "${SHARED_DIR}" '.quotaRecordPath="$shared_dir/quota.json"' /tmp/installer/metadata.json.tmp > /tmp/installer/metadata.json
+
 
 # TODO: remove once BZ#1926093 is done and backported
 if [[ "${CLUSTER_TYPE}" == "ovirt" ]]; then
