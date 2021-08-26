@@ -92,14 +92,15 @@ images:
     ENV GOPATH=/go GOCACHE=/go/src/.cache GO111MODULE=on
     WORKDIR $GOPATH/src/github.com/openshift/origin
     RUN dnf install -y git
-    RUN git clone git@github.com:openshift/origin.git . && git checkout release-4.7
+    RUN git clone https://github.com/openshift/origin.git . && git checkout release-4.7
     RUN make build
     FROM os
     COPY --from=openshift-test-source /go/src/github.com/openshift/origin/openshift-tests /usr/bin/openshift-tests
+  from: os
   inputs:
     ocp_builder_rhel-8-golang-1.15-openshift-4.7:
       as:
-      - centos
+      - registry.access.redhat.com/ubi8/go-toolset
   to: microshift-openshift-tests-bin
 promotion:
   additional_images:
