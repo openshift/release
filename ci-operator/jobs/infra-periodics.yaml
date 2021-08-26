@@ -137,11 +137,9 @@ periodics:
     - args:
       - --namespace=ci
       - --dry-run=true
+      - --kubeconfig-dir=/etc/build-farm-credentials
       command:
       - /usr/bin/serviceaccount-secret-rotation-trigger
-      env:
-      - name: KUBECONFIG
-        value: /etc/build-farm-credentials/sa.config-updater.app.ci.config:/etc/build-farm-credentials/sa.config-updater.build01.config:/etc/build-farm-credentials/sa.config-updater.build02.config:/etc/build-farm-credentials/sa.config-updater.vsphere.config
       image: serviceaccount-secret-rotation-trigger:latest
       imagePullPolicy: Always
       name: ""
@@ -155,16 +153,7 @@ periodics:
     volumes:
     - name: build-farm-credentials
       secret:
-        items:
-        - key: sa.config-updater.app.ci.config
-          path: sa.config-updater.app.ci.config
-        - key: sa.config-updater.build01.config
-          path: sa.config-updater.build01.config
-        - key: sa.config-updater.build02.config
-          path: sa.config-updater.build02.config
-        - key: sa.config-updater.vsphere.config
-          path: sa.config-updater.vsphere.config
-        secretName: build-farm-credentials
+        secretName: config-updater
 - agent: kubernetes
   cluster: app.ci
   cron: 0 1 * * *
