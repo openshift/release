@@ -141,7 +141,7 @@ periodics:
       - /usr/bin/serviceaccount-secret-rotation-trigger
       env:
       - name: KUBECONFIG
-        value: /etc/build-farm-credentials/sa.config-updater.app.ci.config:/etc/build-farm-credentials/sa.config-updater.build01.config:/etc/build-farm-credentials/sa.config-updater.build02.config:/etc/build-farm-credentials/sa.config-updater.vsphere.config:/etc/build-farm-credentials/sa.config-updater.build04.config:/etc/build-farm-credentials/sa.config-updater.build05.config:/etc/build-farm-credentials/sa.config-updater.build06.config:/etc/build-farm-credentials/sa.config-updater.build07.config
+        value: /etc/build-farm-credentials/sa.config-updater.app.ci.config:/etc/build-farm-credentials/sa.config-updater.build01.config:/etc/build-farm-credentials/sa.config-updater.build02.config:/etc/build-farm-credentials/sa.config-updater.vsphere.config:/etc/build-farm-credentials/sa.config-updater.build04.config:/etc/build-farm-credentials/sa.config-updater.build05.config:/etc/build-farm-credentials/sa.config-updater.build06.config:/etc/build-farm-credentials/sa.config-updater.build07.config:/etc/build-farm-credentials/sa.config-updater.build08.config
       image: serviceaccount-secret-rotation-trigger:latest
       imagePullPolicy: Always
       name: ""
@@ -172,6 +172,8 @@ periodics:
           path: sa.config-updater.build06.config
         - key: sa.config-updater.build07.config
           path: sa.config-updater.build07.config
+        - key: sa.config-updater.build08.config
+          path: sa.config-updater.build08.config
         secretName: build-farm-credentials
 - agent: kubernetes
   cluster: app.ci
@@ -1579,7 +1581,7 @@ periodics:
       - --dry-run=false
       env:
       - name: KUBECONFIG
-        value: /etc/build-farm-credentials/sa.config-updater.app.ci.config:/etc/build-farm-credentials/sa.config-updater.build01.config:/etc/build-farm-credentials/sa.config-updater.build02.config:/etc/build-farm-credentials/sa.config-updater.vsphere.config:/etc/build-farm-credentials/sa.config-updater.arm01.config:/etc/build-farm-credentials/sa.config-updater.hive.config:/etc/build-farm-credentials/sa.config-updater.build04.config:/etc/build-farm-credentials/sa.config-updater.build05.config:/etc/build-farm-credentials/sa.config-updater.build06.config:/etc/build-farm-credentials/sa.config-updater.build07.config
+        value: /etc/build-farm-credentials/sa.config-updater.app.ci.config:/etc/build-farm-credentials/sa.config-updater.build01.config:/etc/build-farm-credentials/sa.config-updater.build02.config:/etc/build-farm-credentials/sa.config-updater.vsphere.config:/etc/build-farm-credentials/sa.config-updater.arm01.config:/etc/build-farm-credentials/sa.config-updater.hive.config:/etc/build-farm-credentials/sa.config-updater.build04.config:/etc/build-farm-credentials/sa.config-updater.build05.config:/etc/build-farm-credentials/sa.config-updater.build06.config:/etc/build-farm-credentials/sa.config-updater.build07.config:/etc/build-farm-credentials/sa.config-updater.build08.config
       - name: HOME
         value: /tmp
       image: registry.ci.openshift.org/ci/ci-secret-generator:latest
@@ -1627,6 +1629,8 @@ periodics:
           path: sa.config-updater.build06.config
         - key: sa.config-updater.build07.config
           path: sa.config-updater.build07.config
+        - key: sa.config-updater.build08.config
+          path: sa.config-updater.build08.config
         secretName: build-farm-credentials
 - agent: kubernetes
   cluster: app.ci
@@ -1678,7 +1682,7 @@ periodics:
       - /usr/bin/ci-secret-bootstrap
       env:
       - name: KUBECONFIG
-        value: /etc/build-farm-credentials/sa.config-updater.app.ci.config:/etc/build-farm-credentials/sa.config-updater.build01.config:/etc/build-farm-credentials/sa.config-updater.build02.config:/etc/build-farm-credentials/sa.config-updater.vsphere.config:/etc/build-farm-credentials/sa.config-updater.arm01.config:/etc/build-farm-credentials/sa.config-updater.hive.config:/etc/build-farm-credentials/sa.config-updater.build04.config:/etc/build-farm-credentials/sa.config-updater.build05.config:/etc/build-farm-credentials/sa.config-updater.build06.config:/etc/build-farm-credentials/sa.config-updater.build07.config
+        value: /etc/build-farm-credentials/sa.config-updater.app.ci.config:/etc/build-farm-credentials/sa.config-updater.build01.config:/etc/build-farm-credentials/sa.config-updater.build02.config:/etc/build-farm-credentials/sa.config-updater.vsphere.config:/etc/build-farm-credentials/sa.config-updater.arm01.config:/etc/build-farm-credentials/sa.config-updater.hive.config:/etc/build-farm-credentials/sa.config-updater.build04.config:/etc/build-farm-credentials/sa.config-updater.build05.config:/etc/build-farm-credentials/sa.config-updater.build06.config:/etc/build-farm-credentials/sa.config-updater.build07.config:/etc/build-farm-credentials/sa.config-updater.build08.config
       image: registry.ci.openshift.org/ci/ci-secret-bootstrap:latest
       imagePullPolicy: Always
       name: ci-secret-bootstrap
@@ -1727,6 +1731,8 @@ periodics:
           path: sa.config-updater.build06.config
         - key: sa.config-updater.build07.config
           path: sa.config-updater.build07.config
+        - key: sa.config-updater.build08.config
+          path: sa.config-updater.build08.config
         secretName: build-farm-credentials
     - emptyDir: {}
       name: config-volume
@@ -2177,5 +2183,43 @@ periodics:
       secret:
         items:
         - key: sa.config-updater.build07.config
+          path: kubeconfig
+        secretName: build-farm-credentials
+- agent: kubernetes
+  cluster: app.ci
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  interval: 12h
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-openshift-release-master-build08-apply
+  spec:
+    containers:
+    - args:
+      - --config-dir=clusters/build-clusters/build08
+      - --as=
+      - --KUBECONFIG=/etc/build-farm-credentials/KUBECONFIG
+      - --confirm=true
+      command:
+      - applyconfig
+      image: applyconfig:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/build-farm-credentials
+        name: build-farm-credentials
+        readOnly: true
+    serviceAccountName: config-updater
+    volumes:
+    - name: build-farm-credentials
+      secret:
+        items:
+        - key: sa.config-updater.build08.config
           path: kubeconfig
         secretName: build-farm-credentials
