@@ -88,7 +88,7 @@ images:
         source_path: /etc/yum.repos.d/google-cloud-sdk.repo
   to: microshift-setup
 - dockerfile_literal: |
-    FROM ocp_builder_rhel-8-golang-1.15-openshift-4.7 as openshift-test-source
+    FROM registry.access.redhat.com/ubi8/go-toolset as openshift-test-source
     ENV GOPATH=/go GOCACHE=/go/src/.cache GO111MODULE=on
     WORKDIR $GOPATH/src/github.com/openshift/origin
     RUN dnf install -y git
@@ -96,6 +96,10 @@ images:
     RUN make build
     FROM os
     COPY --from=openshift-test-source /go/src/github.com/openshift/origin/openshift-tests /usr/bin/openshift-tests
+  inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+      as:
+      - centos
   to: microshift-openshift-tests-bin
 promotion:
   additional_images:
