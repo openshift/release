@@ -19,6 +19,10 @@ base_images:
     name: "5.2"
     namespace: logging
     tag: elasticsearch-proxy
+  kube-rbac-proxy:
+    name: "4.8"
+    namespace: ocp
+    tag: kube-rbac-proxy
   log-file-metric-exporter:
     name: "5.2"
     namespace: logging
@@ -51,11 +55,15 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.16-openshift-4.8
+  operator-index:
+    name: redhat-operator-index
+    namespace: ci
+    tag: v4.8
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.14
+    tag: golang-1.16
 images:
 - from: base
   inputs:
@@ -63,12 +71,32 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
   to: elasticsearch-operator
-- dockerfile_path: olm_deploy/operatorregistry/Dockerfile
-  from: base
-  to: elasticsearch-operator-registry
 - dockerfile_path: Dockerfile.src
   from: src
   to: elasticsearch-operator-src
+- dockerfile_path: olm_deploy/operatorregistry/Dockerfile
+  from: base
+  to: elasticsearch-operator-registry
+operator:
+  bundles:
+  - as: elasticsearch-operator-bundle
+    base_index: operator-index
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/openshift-logging/elasticsearch-operator:latest
+    with: pipeline:elasticsearch-operator
+  - pullspec: quay.io/openshift/origin-kube-rbac-proxy:latest
+    with: pipeline:kube-rbac-proxy
+  - pullspec: quay.io/openshift-logging/elasticsearch6:latest
+    with: pipeline:logging-elasticsearch6
+  - pullspec: quay.io/openshift-logging/elasticsearch-proxy:latest
+    with: pipeline:elasticsearch-proxy
+  - pullspec: quay.io/openshift/origin-oauth-proxy:latest
+    with: pipeline:oauth-proxy
+  - pullspec: quay.io/openshift-logging/kibana6:latest
+    with: pipeline:logging-kibana6
+  - pullspec: quay.io/openshift-logging/curator5
+    with: pipeline:logging-curator5
 promotion:
   name: "5.3"
   namespace: logging
