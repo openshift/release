@@ -217,6 +217,14 @@ images:
       - destination_dir: .
         source_path: /go/bin/readiness
   to: knative-serving-test-readiness
+- dockerfile_path: openshift/ci-operator/knative-test-images/emptydir/Dockerfile
+  from: base
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/emptydir
+  to: knative-serving-test-emptydir
 promotion:
   name: knative-nightly
   namespace: openshift
@@ -231,8 +239,14 @@ tag_specification:
 test_binary_build_commands: make test-install
 tests:
 - as: e2e-aws-ocp-48
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.8"
   steps:
-    cluster_profile: aws
     test:
     - as: test
       cli: latest
@@ -290,11 +304,13 @@ tests:
         name: knative-serving-test-hellovolume
       - env: KNATIVE_SERVING_TEST_READINESS
         name: knative-serving-test-readiness
+      - env: KNATIVE_SERVING_TEST_EMPTYDIR
+        name: knative-serving-test-emptydir
       from: src
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    workflow: generic-claim
 zz_generated_metadata:
   branch: release-next
   org: openshift

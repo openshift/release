@@ -44,104 +44,136 @@ tag_specification:
   name: "4.8"
   namespace: ocp
 tests:
+- as: assisted-packet-check
+  cron: 0 */2 * * *
+  steps:
+    cluster_profile: packet-assisted
+    test:
+    - ref: baremetalds-packet-check
+- as: sno-packet-check
+  cron: 0 */2 * * *
+  steps:
+    cluster_profile: packet-sno
+    test:
+    - ref: baremetalds-packet-check
 - as: e2e-metal-assisted
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
-      ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=""
+      TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-periodic
   cron: '@daily'
   steps:
     cluster_profile: packet
     env:
-      ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=""
+      TEST_SUITE: full
     workflow: baremetalds-assisted
-- as: e2e-metal-assisted-olm
+- as: e2e-metal-assisted-multi-version
   steps:
     cluster_profile: packet
     env:
       ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=""
+      TEST_SUITE: minimal
+    workflow: baremetalds-assisted-install
+- as: e2e-metal-assisted-multi-version-periodic
+  cron: '@daily'
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=""
+      TEST_SUITE: full
+    workflow: baremetalds-assisted-install
+- as: e2e-metal-assisted-olm
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
         TEST_FUNC=test_olm_operator
+      TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-olm-periodic
   cron: '@daily'
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         TEST_FUNC=test_olm_operator
+      TEST_SUITE: full
     workflow: baremetalds-assisted
 - as: system-test-operator
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.8
         TEST=./discovery-infra/tests/test_kube_api.py
         TEST_FUNC=test_kube_api_ipv4
         POST_INSTALL_COMMAND="export KUBECONFIG=\$(find \${KUBECONFIG} -type f); make deploy_assisted_operator test_parallel"
+      TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
 - as: system-test-operator-periodic
   cron: '@daily'
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.8
         TEST=./discovery-infra/tests/test_kube_api.py
         TEST_FUNC=test_kube_api_ipv4
         POST_INSTALL_COMMAND="export KUBECONFIG=\$(find \${KUBECONFIG} -type f); make deploy_assisted_operator test_parallel"
+      TEST_SUITE: full
     workflow: baremetalds-assisted
 - as: e2e-metal-assisted-ipv6
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.8
         IPv6=true
+      TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-ipv6-periodic
   cron: '@daily'
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         IPv6=true
+      TEST_SUITE: full
     workflow: baremetalds-assisted
 - as: e2e-metal-assisted-none
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         PLATFORM=none
+      TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-none-periodic
   cron: '@daily'
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         PLATFORM=none
+      TEST_SUITE: full
     workflow: baremetalds-assisted
 - as: e2e-metal-assisted-none-ipv6
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         IPv6=yes
         IPv4=no
         VIP_DHCP_ALLOCATION=no
         PROXY=yes
-        OPENSHIFT_VERSION=4.8
         PLATFORM=none
+      TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-none-ipv6-periodic
   cron: '@daily'
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         IPv6=yes
@@ -149,26 +181,28 @@ tests:
         VIP_DHCP_ALLOCATION=no
         PROXY=yes
         PLATFORM=none
+      TEST_SUITE: full
     workflow: baremetalds-assisted
 - as: e2e-metal-assisted-single-node
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.8
         NUM_MASTERS=1
+      TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-single-node-periodic
   cron: '@daily'
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
+      TEST_SUITE: full
     workflow: baremetalds-assisted
 - as: e2e-metal-assisted-kube-api
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
@@ -179,14 +213,14 @@ tests:
         ADDITIONAL_PARAMS="--with-static-network-config"
         ISO_IMAGE_TYPE=minimal-iso
         KUBE_API=yes
-        OPENSHIFT_VERSION=4.8
         ENABLE_KUBE_API=true
         MAKEFILE_TARGET=all
+      TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-kube-api-periodic
   cron: '@daily'
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
@@ -197,18 +231,18 @@ tests:
         ADDITIONAL_PARAMS="--with-static-network-config"
         ISO_IMAGE_TYPE=minimal-iso
         KUBE_API=yes
-        OPENSHIFT_VERSION=4.8
         ENABLE_KUBE_API=true
         MAKEFILE_TARGET=all
+      TEST_SUITE: full
     workflow: baremetalds-assisted
 - as: e2e-metal-single-node-live-iso
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-sno
     workflow: baremetalds-sno
 - as: e2e-metal-single-node-live-iso-periodic
   cron: '@daily'
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-sno
     workflow: baremetalds-sno
 zz_generated_metadata:
   branch: master

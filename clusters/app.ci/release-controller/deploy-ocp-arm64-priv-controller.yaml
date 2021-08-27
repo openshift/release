@@ -58,14 +58,39 @@ kind: Service
 metadata:
   annotations:
     service.alpha.openshift.io/serving-cert-secret-name: release-controller-arm64-priv-tls
+  labels:
+    app: release-controller-ocp-arm64-priv
   name: release-controller-ocp-arm64-priv
   namespace: ci
 spec:
   ports:
-  - port: 443
+  - name: main
+    port: 443
     targetPort: 8443
   selector:
     app: release-controller-ocp-arm64-priv
+---
+#---------------------------------------------------------------------------------
+# osd_rc_deployments.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  annotations: {}
+  name: release-controller-ocp-arm64-priv
+  namespace: prow-monitoring
+spec:
+  endpoints:
+  - interval: 30s
+    port: main
+    scheme: http
+  namespaceSelector:
+    matchNames:
+    - ci
+  selector:
+    matchLabels:
+      app: release-controller-ocp-arm64-priv
 ---
 #---------------------------------------------------------------------------------
 # osd_rc_deployments.py added the following resource

@@ -8,7 +8,7 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: open-cluster-management
-    tag: nodejs14-linux-amd64
+    tag: nodejs14-linux
 images:
 - dockerfile_path: Dockerfile
   inputs:
@@ -17,7 +17,7 @@ images:
       - registry.ci.openshift.org/open-cluster-management/builder:nodejs14-linux
   to: search-ui
 promotion:
-  name: "2.3"
+  name: "2.4"
   namespace: open-cluster-management
 resources:
   '*':
@@ -25,6 +25,14 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: lint
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow install
+    make -f Makefile.prow lint
+    make -f Makefile.prow check
+  container:
+    from: src
 - as: backplane-fast-forward
   postsubmit: true
   steps:

@@ -1,0 +1,40 @@
+base_images:
+  coreos_centos_stream8:
+    name: stream8
+    namespace: coreos
+    tag: "8"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.16
+images:
+- dockerfile_path: Dockerfile.build
+  inputs:
+    coreos_centos_stream8:
+      as:
+      - quay.io/centos/centos:stream8
+  to: assisted-installer-deployment-build
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lint
+  commands: make lint
+  container:
+    clone: true
+    from: assisted-installer-deployment-build
+- as: lint-post-submit
+  commands: make lint
+  container:
+    clone: true
+    from: assisted-installer-deployment-build
+  postsubmit: true
+zz_generated_metadata:
+  branch: master
+  org: openshift-assisted
+  repo: assisted-installer-deployment
