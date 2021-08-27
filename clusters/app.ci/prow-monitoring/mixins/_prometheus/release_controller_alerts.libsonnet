@@ -17,6 +17,23 @@
           }
         ],
       },
+      {
+        name: 'release-controller-bugzilla-errors',
+        rules: [
+          {
+            alert: 'releaseControllerBugzillaError',
+            expr: 'rate(release_controller_bugzilla_errors_total[5m]) >= 1',
+            'for': '1m',
+            labels: {
+              severity: 'critical',
+              team: 'release-controller',
+            },
+            annotations: {
+              message: 'Release-controller has reported errors in bugzilla verification.'
+            },
+          }
+        ],
+      },
     ],
   },
 }
