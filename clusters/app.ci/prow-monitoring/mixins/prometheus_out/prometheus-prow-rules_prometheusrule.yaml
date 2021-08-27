@@ -208,7 +208,7 @@ spec:
     - alert: plank-job-with-infra-role-failures
       annotations:
         message: plank jobs {{ $labels.job_name }} with infra role has failures. Check
-          on <https://grafana-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/d/8ce131e226b7fd2901c2fce45d4e21c1/dptp-dashboard?orgId=1&fullscreen&panelId=4|grafana>
+          on <https://grafana-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/d/8ce131e226b7fd2901c2fce45d4e21c1/dptp-dashboard?orgId=1&fullscreen&viewPanel=4|grafana>
           and <https://prow.ci.openshift.org/?job={{ $labels.job_name }}|deck>.
       expr: |
         sum by (job_name) (
@@ -306,7 +306,7 @@ spec:
       annotations:
         message: '{{ $value | humanize }}% of all requests for {{ $labels.path }}
           through the GitHub proxy are errorring with code {{ $labels.status }}. Check
-          <https://grafana-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1&refresh=1m&fullscreen&panelId=9|grafana>'
+          <https://grafana-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1&refresh=1m&fullscreen&viewPanel=9|grafana>'
       expr: |
         sum(rate(github_request_duration_count{status=~"[45]..",status!="404",status!="410"}[5m])) by (status,path) / ignoring(status) group_left sum(rate(github_request_duration_count[5m])) by (path) * 100 > 10
       labels:
@@ -314,7 +314,7 @@ spec:
     - alert: ghproxy-global-status-code-abnormal
       annotations:
         message: '{{ $value | humanize }}% of all API requests through the GitHub
-          proxy are errorring with code {{ $labels.status }}. Check <https://grafana-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1&fullscreen&panelId=8|grafana>'
+          proxy are errorring with code {{ $labels.status }}. Check <https://grafana-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1&fullscreen&viewPanel=8|grafana>'
       expr: |
         sum(rate(github_request_duration_count{status=~"[45]..",status!="404",status!="410"}[5m])) by (status) / ignoring(status) group_left sum(rate(github_request_duration_count[5m])) * 100 > 3
       labels:
@@ -448,16 +448,6 @@ spec:
       labels:
         severity: critical
         team: OLM
-    - alert: release-openshift-ocp-installer-cluster-logging-operator-e2e-4.5-failures
-      annotations:
-        message: '@aoslogging Prow job release-openshift-ocp-installer-cluster-logging-operator-e2e-4.5
-          has failures. Check on <https://prow.ci.openshift.org/?type=periodic&job=release-openshift-ocp-installer-cluster-logging-operator-e2e-4.5|deck>'
-      expr: |
-        rate(prowjob_state_transitions{job_name="release-openshift-ocp-installer-cluster-logging-operator-e2e-4.5",state="failure"}[5m]) > 0
-      for: 1m
-      labels:
-        severity: critical
-        team: logging
     - alert: release-openshift-ocp-installer-e2e-gcp-rt-4.4-failures
       annotations:
         message: '@cnf-cop Prow job release-openshift-ocp-installer-e2e-gcp-rt-4.4
@@ -506,6 +496,15 @@ spec:
       expr: sum(rate(prowjob_state_transitions{state="triggered"}[5m])) - sum(rate(prowjob_state_transitions{state!="triggered"}[5m]))
         > 0
       for: 60m
+      labels:
+        severity: critical
+    - alert: Controller backlog is not being drained
+      annotations:
+        message: The backlog for {{ $labels.name }} is not getting drained. Check
+          <https://prometheus-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/graph?g0.range_input=1h&g0.expr=workqueue_depth%7Bname%3D~%22{{
+          $labels.name }}%22%7D%20%3E%20100&g0.tab=0|Prometheus>
+      expr: workqueue_depth{name=~"crier.*|plank"} > 100
+      for: 20m
       labels:
         severity: critical
     - expr: count(label_replace(count(github_token_usage{token_hash =~ "openshift.*"})

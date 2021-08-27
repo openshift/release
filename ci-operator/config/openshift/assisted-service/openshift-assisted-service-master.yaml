@@ -15,10 +15,6 @@ base_images:
     name: assisted-test
     namespace: ocp-kni
     tag: assisted-test-infra
-  coreos_centos:
-    name: coreos-centos8-buildroot
-    namespace: coreos
-    tag: latest
   coreos_centos_stream8:
     name: stream8
     namespace: coreos
@@ -27,10 +23,6 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  openshift_release_golang-1.15:
-    name: release
-    namespace: openshift
-    tag: golang-1.15
   openshift_release_golang-1.16:
     name: release
     namespace: openshift
@@ -217,89 +209,132 @@ tests:
     workflow: generic-claim
 - as: e2e-metal-assisted-operator-disconnected
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     dependencies:
       ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
     env:
+      DEVSCRIPTS_CONFIG: |
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=32768
+        EXTRA_WORKER_DISK=120
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
       DISCONNECTED: "true"
+      NUM_EXTRA_WORKERS: "1"
     workflow: baremetalds-assisted-operator-ztp
 - as: e2e-metal-assisted-operator-disconnected-periodic
   cron: '@daily'
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
+      DEVSCRIPTS_CONFIG: |
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=32768
+        EXTRA_WORKER_DISK=120
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
       DISCONNECTED: "true"
+      NUM_EXTRA_WORKERS: "1"
     workflow: baremetalds-assisted-operator-ztp
 - as: e2e-metal-assisted-operator-ztp
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     dependencies:
       ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
     env:
+      DEVSCRIPTS_CONFIG: |
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=32768
+        EXTRA_WORKER_DISK=120
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
       DISCONNECTED: "false"
       IP_STACK: v4
+      NUM_EXTRA_WORKERS: "1"
     workflow: baremetalds-assisted-operator-ztp
 - as: e2e-metal-assisted-operator-ztp-multinode-spoke-periodic
   cron: '@daily'
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     dependencies:
       ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
     env:
       ASSISTED_ZTP_CONFIG: |
         SPOKE_CONTROLPLANE_AGENTS=3
+      DEVSCRIPTS_CONFIG: |
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=32768
+        EXTRA_WORKER_DISK=120
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      DISCONNECTED: "false"
       IP_STACK: v4
       NUM_EXTRA_WORKERS: "3"
     workflow: baremetalds-assisted-operator-ztp
 - as: e2e-metal-assisted-operator-ztp-multinode-spoke
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     dependencies:
       ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
     env:
       ASSISTED_ZTP_CONFIG: |
         SPOKE_CONTROLPLANE_AGENTS=3
+      DEVSCRIPTS_CONFIG: |
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=32768
+        EXTRA_WORKER_DISK=120
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      DISCONNECTED: "false"
       IP_STACK: v4
       NUM_EXTRA_WORKERS: "3"
     workflow: baremetalds-assisted-operator-ztp
 - as: e2e-metal-assisted-operator-ztp-periodic
   cron: '@daily'
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
+      DEVSCRIPTS_CONFIG: |
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=32768
+        EXTRA_WORKER_DISK=120
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
       DISCONNECTED: "false"
       IP_STACK: v4
+      NUM_EXTRA_WORKERS: "1"
     workflow: baremetalds-assisted-operator-ztp
 - as: e2e-metal-assisted-ipv6
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.8
         IPv6=yes
+      TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-none
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         PLATFORM=none
+      TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-single-node
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.8
         NUM_MASTERS=1
+      TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-kube-api
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
@@ -310,23 +345,31 @@ tests:
         ADDITIONAL_PARAMS="--with-static-network-config"
         ISO_IMAGE_TYPE=minimal-iso
         KUBE_API=yes
-        OPENSHIFT_VERSION=4.8
         ENABLE_KUBE_API=true
         MAKEFILE_TARGET=all
+      TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      TEST_SUITE: minimal
+    workflow: baremetalds-assisted-install
+- as: e2e-metal-assisted-multi-version
   steps:
     cluster_profile: packet
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=""
+      TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-olm
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         TEST_FUNC=test_olm_operator
+      TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
 zz_generated_metadata:
   branch: master

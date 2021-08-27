@@ -7,10 +7,6 @@ base_images:
     name: builder
     namespace: open-cluster-management
     tag: go1.16-linux
-  placement:
-    name: "2.4"
-    namespace: open-cluster-management
-    tag: placement
   registration:
     name: "2.4"
     namespace: open-cluster-management
@@ -130,6 +126,33 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: openshift-e2e-aws
+- as: publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: registration-operator
+    env:
+      IMAGE_REPO: registration-operator
+      REGISTRY_ORG: open-cluster-management
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_COMPONENT_NAME=registration-operator
+        export OSCI_COMPONENT_VERSION=0.5.0
+        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/open-cluster-management"
+        export SELF="make -f /opt/build-harness/Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        make -f /opt/build-harness/Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
   branch: release-2.4
   org: open-cluster-management

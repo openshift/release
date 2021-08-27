@@ -112,7 +112,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210813-7f65f6f13b
+      image: gcr.io/k8s-prow/commenter:v20210826-d4b68720ec
       imagePullPolicy: Always
       name: ""
       resources:
@@ -137,11 +137,9 @@ periodics:
     - args:
       - --namespace=ci
       - --dry-run=true
+      - --kubeconfig-dir=/etc/build-farm-credentials
       command:
       - /usr/bin/serviceaccount-secret-rotation-trigger
-      env:
-      - name: KUBECONFIG
-        value: /etc/build-farm-credentials/sa.config-updater.app.ci.config:/etc/build-farm-credentials/sa.config-updater.build01.config:/etc/build-farm-credentials/sa.config-updater.build02.config:/etc/build-farm-credentials/sa.config-updater.vsphere.config
       image: serviceaccount-secret-rotation-trigger:latest
       imagePullPolicy: Always
       name: ""
@@ -155,16 +153,7 @@ periodics:
     volumes:
     - name: build-farm-credentials
       secret:
-        items:
-        - key: sa.config-updater.app.ci.config
-          path: sa.config-updater.app.ci.config
-        - key: sa.config-updater.build01.config
-          path: sa.config-updater.build01.config
-        - key: sa.config-updater.build02.config
-          path: sa.config-updater.build02.config
-        - key: sa.config-updater.vsphere.config
-          path: sa.config-updater.vsphere.config
-        secretName: build-farm-credentials
+        secretName: config-updater
 - agent: kubernetes
   cluster: app.ci
   cron: 0 1 * * *
@@ -197,7 +186,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210813-7f65f6f13b
+      image: gcr.io/k8s-prow/commenter:v20210826-d4b68720ec
       imagePullPolicy: Always
       name: ""
       resources:
@@ -237,7 +226,7 @@ periodics:
       - --random
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210813-7f65f6f13b
+      image: gcr.io/k8s-prow/commenter:v20210826-d4b68720ec
       imagePullPolicy: Always
       name: ""
       resources:
@@ -282,7 +271,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210813-7f65f6f13b
+      image: gcr.io/k8s-prow/commenter:v20210826-d4b68720ec
       imagePullPolicy: Always
       name: ""
       resources:
@@ -331,7 +320,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210813-7f65f6f13b
+      image: gcr.io/k8s-prow/commenter:v20210826-d4b68720ec
       imagePullPolicy: Always
       name: ""
       resources:
@@ -379,7 +368,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210813-7f65f6f13b
+      image: gcr.io/k8s-prow/commenter:v20210826-d4b68720ec
       imagePullPolicy: Always
       name: ""
       resources:
@@ -413,7 +402,7 @@ periodics:
       - --debug
       command:
       - /app/label_sync/app.binary
-      image: gcr.io/k8s-prow/label_sync:v20210813-7f65f6f13b
+      image: gcr.io/k8s-prow/label_sync:v20210826-d4b68720ec
       imagePullPolicy: Always
       name: ""
       resources:
@@ -664,7 +653,7 @@ periodics:
       - --config=core-services/prow/02_config/_bumper.yaml
       command:
       - /app/prow/cmd/generic-autobumper/app.binary
-      image: gcr.io/k8s-prow/generic-autobumper:v20210813-7f65f6f13b
+      image: gcr.io/k8s-prow/generic-autobumper:v20210826-d4b68720ec
       imagePullPolicy: IfNotPresent
       name: autobump
       resources:
@@ -920,7 +909,7 @@ periodics:
       - --github-enabled-org=openshift
       command:
       - /app/prow/cmd/branchprotector/app.binary
-      image: gcr.io/k8s-prow/branchprotector:v20210813-7f65f6f13b
+      image: gcr.io/k8s-prow/branchprotector:v20210826-d4b68720ec
       imagePullPolicy: Always
       name: ""
       resources:
@@ -968,7 +957,7 @@ periodics:
           secretKeyRef:
             key: appid
             name: openshift-prow-github-app
-      image: gcr.io/k8s-prow/branchprotector:v20210813-7f65f6f13b
+      image: gcr.io/k8s-prow/branchprotector:v20210826-d4b68720ec
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1017,7 +1006,7 @@ periodics:
       - --github-allowed-burst=600
       command:
       - /app/prow/cmd/peribolos/app.binary
-      image: gcr.io/k8s-prow/peribolos:v20210813-7f65f6f13b
+      image: gcr.io/k8s-prow/peribolos:v20210826-d4b68720ec
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1126,7 +1115,7 @@ periodics:
         items:
         - key: sa.config-updater.build01.config
           path: kubeconfig
-        secretName: build-farm-credentials
+        secretName: config-updater
 - agent: kubernetes
   cluster: app.ci
   decorate: true
@@ -1180,7 +1169,7 @@ periodics:
         items:
         - key: sa.config-updater.build02.config
           path: kubeconfig
-        secretName: build-farm-credentials
+        secretName: config-updater
 - agent: kubernetes
   cluster: app.ci
   decorate: true
@@ -1224,7 +1213,7 @@ periodics:
         items:
         - key: sa.config-updater.vsphere.config
           path: kubeconfig
-        secretName: build-farm-credentials
+        secretName: config-updater
 - agent: kubernetes
   cluster: app.ci
   decorate: true
@@ -1245,12 +1234,10 @@ periodics:
       - --supplemental-prow-config-dir=./core-services/prow/02_config
       - --plugin-config=core-services/prow/02_config/_plugins.yaml
       - --supplemental-plugin-config-dir=core-services/prow/02_config
+      - --kubeconfig-dir=/etc/build-farm-credentials
       command:
       - /app/prow/cmd/config-bootstrapper/app.binary
-      env:
-      - name: KUBECONFIG
-        value: /etc/build-farm-credentials/build01.kubeconfig:/etc/build-farm-credentials/app.ci.kubeconfig:/etc/build-farm-credentials/build02.kubeconfig:/etc/build-farm-credentials/vsphere.kubeconfig
-      image: gcr.io/k8s-prow/config-bootstrapper:v20210813-7f65f6f13b
+      image: gcr.io/k8s-prow/config-bootstrapper:v20210826-d4b68720ec
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1264,16 +1251,7 @@ periodics:
     volumes:
     - name: build-farm-credentials
       secret:
-        items:
-        - key: sa.hook.app.ci.config
-          path: app.ci.kubeconfig
-        - key: sa.hook.build01.config
-          path: build01.kubeconfig
-        - key: sa.hook.build02.config
-          path: build02.kubeconfig
-        - key: sa.hook.vsphere.config
-          path: vsphere.kubeconfig
-        secretName: build-farm-credentials
+        secretName: hook
 - agent: kubernetes
   cluster: app.ci
   cron: '@hourly'
@@ -1569,11 +1547,6 @@ periodics:
       - --bootstrap-config=/etc/ci-secret-bootstrap/_config.yaml
       - --config=/etc/ci-secret-generator/_config.yaml
       - --dry-run=false
-      env:
-      - name: KUBECONFIG
-        value: /etc/build-farm-credentials/sa.config-updater.app.ci.config:/etc/build-farm-credentials/sa.config-updater.build01.config:/etc/build-farm-credentials/sa.config-updater.build02.config:/etc/build-farm-credentials/sa.config-updater.vsphere.config:/etc/build-farm-credentials/sa.config-updater.arm01.config:/etc/build-farm-credentials/sa.config-updater.hive.config
-      - name: HOME
-        value: /tmp
       image: registry.ci.openshift.org/ci/ci-secret-generator:latest
       imagePullPolicy: Always
       name: ci-secret-bootstrap
@@ -1583,7 +1556,7 @@ periodics:
       volumeMounts:
       - mountPath: /etc/ci-secret-bootstrap
         name: ci-secret-bootstrap
-      - mountPath: /etc/build-farm-credentials
+      - mountPath: /tmp/build-farm-credentials
         name: build-farm-credentials
         readOnly: true
       - mountPath: /etc/ci-secret-generator
@@ -1598,20 +1571,7 @@ periodics:
       name: ci-secret-bootstrap
     - name: build-farm-credentials
       secret:
-        items:
-        - key: sa.config-updater.app.ci.config
-          path: sa.config-updater.app.ci.config
-        - key: sa.config-updater.build01.config
-          path: sa.config-updater.build01.config
-        - key: sa.config-updater.build02.config
-          path: sa.config-updater.build02.config
-        - key: sa.config-updater.vsphere.config
-          path: sa.config-updater.vsphere.config
-        - key: sa.config-updater.arm01.config
-          path: sa.config-updater.arm01.config
-        - key: sa.config-updater.hive.config
-          path: sa.config-updater.hive.config
-        secretName: build-farm-credentials
+        secretName: config-updater
 - agent: kubernetes
   cluster: app.ci
   decorate: true
@@ -1658,11 +1618,9 @@ periodics:
       - --bw-allow-unused=dptp/quay.io/multi-arch
       - --bw-allow-unused=dptp/cluster-bot-cloud-sso-for-ocm-ephemeral-osd
       - --bw-allow-unused=dptp/cluster-bot-aws-account-for-ephemeral-osd
+      - --kubeconfig-dir=/etc/build-farm-credentials
       command:
       - /usr/bin/ci-secret-bootstrap
-      env:
-      - name: KUBECONFIG
-        value: /etc/build-farm-credentials/sa.config-updater.app.ci.config:/etc/build-farm-credentials/sa.config-updater.build01.config:/etc/build-farm-credentials/sa.config-updater.build02.config:/etc/build-farm-credentials/sa.config-updater.vsphere.config:/etc/build-farm-credentials/sa.config-updater.arm01.config:/etc/build-farm-credentials/sa.config-updater.hive.config
       image: registry.ci.openshift.org/ci/ci-secret-bootstrap:latest
       imagePullPolicy: Always
       name: ci-secret-bootstrap
@@ -1690,20 +1648,7 @@ periodics:
       name: ci-secret-bootstrap
     - name: build-farm-credentials
       secret:
-        items:
-        - key: sa.config-updater.app.ci.config
-          path: sa.config-updater.app.ci.config
-        - key: sa.config-updater.build01.config
-          path: sa.config-updater.build01.config
-        - key: sa.config-updater.build02.config
-          path: sa.config-updater.build02.config
-        - key: sa.config-updater.vsphere.config
-          path: sa.config-updater.vsphere.config
-        - key: sa.config-updater.arm01.config
-          path: sa.config-updater.arm01.config
-        - key: sa.config-updater.hive.config
-          path: sa.config-updater.hive.config
-        secretName: build-farm-credentials
+        secretName: config-updater
     - emptyDir: {}
       name: config-volume
 - agent: kubernetes
@@ -1837,7 +1782,7 @@ periodics:
         items:
         - key: sa.config-updater.arm01.config
           path: kubeconfig
-        secretName: build-farm-credentials
+        secretName: config-updater
 - agent: kubernetes
   cluster: app.ci
   decorate: true
@@ -1875,11 +1820,11 @@ periodics:
         items:
         - key: sa.config-updater.hive.config
           path: kubeconfig
-        secretName: build-farm-credentials
+        secretName: config-updater
 - agent: kubernetes
   cluster: app.ci
   decorate: true
-  interval: 12h
+  interval: 4h
   labels:
     ci.openshift.io/role: infra
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -1894,7 +1839,7 @@ periodics:
       - --dry-run=false
       command:
       - /app/prow/cmd/invitations-accepter/app.binary
-      image: gcr.io/k8s-prow/invitations-accepter:v20210813-7f65f6f13b
+      image: gcr.io/k8s-prow/invitations-accepter:v20210826-d4b68720ec
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1911,7 +1856,7 @@ periodics:
 - agent: kubernetes
   cluster: app.ci
   decorate: true
-  interval: 12h
+  interval: 4h
   labels:
     ci.openshift.io/role: infra
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -1926,7 +1871,7 @@ periodics:
       - --dry-run=false
       command:
       - /app/prow/cmd/invitations-accepter/app.binary
-      image: gcr.io/k8s-prow/invitations-accepter:v20210813-7f65f6f13b
+      image: gcr.io/k8s-prow/invitations-accepter:v20210826-d4b68720ec
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1943,7 +1888,7 @@ periodics:
 - agent: kubernetes
   cluster: app.ci
   decorate: true
-  interval: 12h
+  interval: 4h
   labels:
     ci.openshift.io/role: infra
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -1958,7 +1903,7 @@ periodics:
       - --dry-run=false
       command:
       - /app/prow/cmd/invitations-accepter/app.binary
-      image: gcr.io/k8s-prow/invitations-accepter:v20210813-7f65f6f13b
+      image: gcr.io/k8s-prow/invitations-accepter:v20210826-d4b68720ec
       imagePullPolicy: Always
       name: ""
       resources:

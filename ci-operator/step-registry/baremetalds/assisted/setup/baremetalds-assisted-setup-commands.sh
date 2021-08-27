@@ -38,7 +38,7 @@ timeout -s 9 175m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*
 
 set -xeuo pipefail
 
-yum install -y git sysstat sos
+yum install -y git sysstat sos jq
 systemctl start sysstat
 
 mkdir -p /tmp/artifacts
@@ -63,6 +63,7 @@ echo "export PULL_SECRET='\$(cat /root/pull-secret)'" >> /root/config
 set -x
 
 # Save Prow variables that might become handy inside the Packet server
+echo "export CI=true" >> /root/config
 echo "export RELEASE_IMAGE_LATEST=${RELEASE_IMAGE_LATEST}" >> /root/config
 
 # Override default images
@@ -78,7 +79,7 @@ set -e
 
 if [ "${JOB_TYPE:-}" = "presubmit" ] && (( ! \${IS_REHEARSAL} )); then
   # We would like to keep running a stable version for PRs
-  echo "export OPENSHIFT_VERSION=4.7" >> /root/config
+  echo "export OPENSHIFT_VERSION=4.8" >> /root/config
 
   if [ "${REPO_NAME:-}" = "assisted-service" ]; then
     echo "export SERVICE_BRANCH=${PULL_PULL_SHA:-master}" >> /root/config

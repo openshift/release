@@ -11,7 +11,7 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: open-cluster-management
-    tag: go1.16-linux-amd64
+    tag: go1.16-linux
 images:
 - dockerfile_path: Dockerfile
   from: base
@@ -35,6 +35,11 @@ tests:
     env:
       DESTINATION_BRANCH: release-2.4
     workflow: ocm-ci-fastforward
+- as: lint
+  commands: |
+    GOLANGCI_LINT_CACHE=/tmp/golangci-cache make -f Makefile.prow lint
+  container:
+    from: src
 - as: test-unit
   commands: |
     export SELF="make -f Makefile.prow"

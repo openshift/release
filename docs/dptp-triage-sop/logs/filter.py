@@ -74,6 +74,7 @@ elif mode == "errors":
         lambda message: any(
             any(s in message.get(m, "") for m in ["msg", "error"]) for s in [
                 "You have triggered an abuse detection mechanism.",  # nothing to do post-hoc for this
+                "You have exceeded a secondary rate limit. Please wait a few minutes before you try again", # nothing to do post-hoc for this
                 "Something went wrong while executing your query. This may be the result of a timeout, or it could be a GitHub bug.",  # nothing to do post-hoc
                 "no new finalizers can be added if the object is being deleted",  # https://github.com/kubernetes/test-infra/issues/22846
             ]
@@ -86,7 +87,7 @@ elif mode == "errors":
         lambda message: any(
             s in message.get("error", "") for s in ["context canceled", "context deadline exceeded"]
         ) and any(
-            s in message.get("component", "") for s in ["crier", "dptp-controller-manager", 'prow-controller-manager']
+            s in message.get("component", "") for s in ["crier", "dptp-controller-manager", 'prow-controller-manager', "deck"]
         ) or message.get("logger", "") == "controller-runtime",
         # do we even care?
         lambda message: "kata-jenkins-operator" in json.dumps(message),
@@ -98,7 +99,7 @@ elif mode == "errors":
         ),
         # deck is spamming us for no good reason
         lambda message: "deck" in message.get("component", "") and
-        "error executing template pr-history.html" in message.get("msg", ""),
+        "error executing template" in message.get("msg", ""),
         # deck trying to talk to Tide, this fails when we bump. We have probes in Tide so we get alerted when it's down for longer time.
         lambda message: "deck" in message.get("component", "") and
         "Updating" in message.get("msg", "") and
@@ -109,7 +110,15 @@ elif mode == "errors":
             any(
                 s in message.get(m, "") for s in ["connect: connection refused", "i/o timeout"]
             ) for m in ["msg", "error"]
+        ),
+        # DPTP-2462
+        lambda message: "vault-secret-collection-manager" in message.get("component", "") and
+        "Failed to reconcile policies" in message.get("msg", "") and
+        "missing client token" in message.get("error", "") and
+        any(
+            err in message.get("error", "") for err in ("failed to get policy", "failed to list policies")
         )
+        ,
     ]
 else:
     print("Filter mode must be 'warnings' or 'errors', not " + mode)

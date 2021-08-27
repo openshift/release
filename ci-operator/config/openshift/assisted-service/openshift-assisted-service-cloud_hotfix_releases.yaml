@@ -15,10 +15,6 @@ base_images:
     name: assisted-test
     namespace: ocp-kni
     tag: assisted-test-infra
-  coreos_centos:
-    name: coreos-centos8-buildroot
-    namespace: coreos
-    tag: latest
   coreos_centos_stream8:
     name: stream8
     namespace: coreos
@@ -27,18 +23,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  openshift_release_golang-1.15:
-    name: release
-    namespace: openshift
-    tag: golang-1.15
   openshift_release_golang-1.16:
     name: release
     namespace: openshift
     tag: golang-1.16
-  postgresql-12-centos7:
-    name: postgresql-12-centos7
-    namespace: ocp-kni
-    tag: latest
 build_root:
   image_stream_tag:
     name: release
@@ -101,25 +89,28 @@ tests:
     workflow: generic-claim
 - as: e2e-metal-assisted-single-node
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.8
         NUM_MASTERS=1
+      TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=""
+      TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-olm
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         TEST_FUNC=test_olm_operator
+      TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
 zz_generated_metadata:
   branch: cloud_hotfix_releases
