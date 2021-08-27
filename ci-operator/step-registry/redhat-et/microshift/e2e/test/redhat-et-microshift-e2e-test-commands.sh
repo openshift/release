@@ -27,6 +27,9 @@ chmod 0600 "${HOME}"/.ssh/config
 # Copy pull secret to user home
 cp "${CLUSTER_PROFILE_DIR}"/pull-secret "${HOME}"/pull-secret
 
+# Copy the compiled openshift-tests binary
+cp "${ARTIFACT_DIR}/openshift-tests" "${HOME}"/openshift-tests
+
 gcloud auth activate-service-account --quiet --key-file "${CLUSTER_PROFILE_DIR}"/gce.json
 gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
 gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
@@ -152,6 +155,18 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   --recurse "${HOME}"/microshift-service rhel8user@"${INSTANCE_PREFIX}":~/microshift-service
+
+# scp and install openshift-tests binary
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+  --quiet \
+  --project "${GOOGLE_PROJECT_ID}" \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  --recurse "${HOME}"/openshift-tests rhel8user@"${INSTANCE_PREFIX}":~/openshift-tests
+
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  rhel8user@"${INSTANCE_PREFIX}" \
+  --command 'sudo mv openshift-tests /usr/bin/openshift-tests'
 
 # start the test
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
