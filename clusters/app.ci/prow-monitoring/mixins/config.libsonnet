@@ -55,7 +55,7 @@
       },
       'release-controller': {
         team: 'release-controller',
-        channel: '#forum-release-controller',
+        channel: '#ops-crt',
       },
     },
   },
