@@ -6,6 +6,7 @@ set -x
 
 pushd /tmp
 curl -sSL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz | tar xz
+unset VERSION
 export HOME=/tmp
 export PATH=${PATH}:/tmp
 export METADATA_COLLECTION=false

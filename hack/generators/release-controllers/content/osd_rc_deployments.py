@@ -76,9 +76,13 @@ def _add_osd_rc_service(gendoc):
             'name': context.rc_service_name,
             'namespace': context.config.rc_deployment_namespace,
             'annotations': annotations,
+            'labels': {
+                'app': context.rc_service_name
+            }
         },
         'spec': {
             'ports': [{
+                'name': 'main',
                 'port': 443 if context.private else 80,
                 'targetPort': 8443 if context.private else 8080
             }],
@@ -88,6 +92,34 @@ def _add_osd_rc_service(gendoc):
         }
     })
 
+def _add_osd_rc_servicemonitor(gendoc):
+    annotations = {}
+    context = gendoc.context
+
+    gendoc.append({
+        'apiVersion': 'monitoring.coreos.com/v1',
+        'kind': 'ServiceMonitor',
+        'metadata': {
+            'name': context.rc_service_name,
+            'namespace': 'prow-monitoring',
+            'annotations': annotations,
+        },
+        'spec': {
+            'endpoints': [{
+                'interval': '30s',
+                'port': 'main',
+                'scheme': 'http',
+            }],
+            'namespaceSelector': {
+                'matchNames': ['ci'],
+            },
+            'selector': {
+                'matchLabels': {
+                    'app': context.rc_service_name,
+                }
+            }
+        }
+    })
 
 def _get_osd_rc_deployment_sidecars(context):
     sidecars = list()
@@ -218,4 +250,5 @@ the app.ci clusters.
     _add_osd_rc_bootstrap(gendoc)
     _add_osd_rc_route(gendoc)
     _add_osd_rc_service(gendoc)
+    _add_osd_rc_servicemonitor(gendoc)
     _add_osd_rc_deployment(gendoc)

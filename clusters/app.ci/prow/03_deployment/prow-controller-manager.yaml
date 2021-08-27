@@ -42,7 +42,7 @@ items:
         serviceAccountName: prow-controller-manager
         containers:
         - name: prow-controller-manager
-          image: gcr.io/k8s-prow/prow-controller-manager:v20210809-f7cf0bd038
+          image: gcr.io/k8s-prow/prow-controller-manager:v20210826-b031910912
           args:
           - --config-path=/etc/config/config.yaml
           - --supplemental-prow-config-dir=/etc/config
@@ -53,10 +53,7 @@ items:
           - --github-endpoint=https://api.github.com
           - --github-graphql-endpoint=http://ghproxy/graphql
           - --projected-token-file=/var/sa-token/token
-          env:
-          # Multiple configs can only be passed via the env var and not via the flag
-          - name: KUBECONFIG
-            value: /etc/build-farm-credentials/build01.kubeconfig:/etc/build-farm-credentials/app.ci.kubeconfig:/etc/build-farm-credentials/build02.kubeconfig:/etc/build-farm-credentials/vsphere.kubeconfig:/etc/build-farm-credentials/arm01.kubeconfig
+          - --kubeconfig-dir=/etc/build-farm-credentials
           ports:
           - name: metrics
             containerPort: 9090
@@ -168,15 +165,4 @@ items:
             name: job-config-4.10
         - name: build-farm-credentials
           secret:
-            items:
-            - key: sa.prow-controller-manager.arm01.config
-              path: arm01.kubeconfig
-            - key: sa.prow-controller-manager.build01.config
-              path: build01.kubeconfig
-            - key: sa.prow-controller-manager.app.ci.config
-              path: app.ci.kubeconfig
-            - key: sa.prow-controller-manager.build02.config
-              path: build02.kubeconfig
-            - key: sa.prow-controller-manager.vsphere.config
-              path: vsphere.kubeconfig
-            secretName: build-farm-credentials
+            secretName: prow-controller-manager

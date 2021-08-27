@@ -27,10 +27,6 @@ base_images:
     name: release
     namespace: openshift
     tag: golang-1.15
-  openshift_release_golang-1.16:
-    name: release
-    namespace: openshift
-    tag: golang-1.16
 build_root:
   project_image:
     dockerfile_path: Dockerfile.assisted_installer_agent-build
@@ -70,16 +66,17 @@ tests:
     from: test-bin
 - as: e2e-metal-assisted
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     dependencies:
       ASSISTED_AGENT_IMAGE: pipeline:assisted-installer-agent
     env:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=ocm-2.3
+      TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-ipv6
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     dependencies:
       ASSISTED_AGENT_IMAGE: pipeline:assisted-installer-agent
     env:
@@ -87,6 +84,7 @@ tests:
         SERVICE_BASE_REF=ocm-2.3
         OPENSHIFT_VERSION=4.8
         IPv6=yes
+      TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
 zz_generated_metadata:
   branch: ocm-2.3

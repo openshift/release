@@ -1,16 +1,8 @@
 base_images:
-  builder-go1.16-linux:
-    name: builder
-    namespace: open-cluster-management
-    tag: go1.16-linux
   open-cluster-management_builder_go1.16-linux:
     name: builder
     namespace: open-cluster-management
     tag: go1.16-linux
-  open-cluster-management_builder_go1.16-linux-amd64:
-    name: builder
-    namespace: open-cluster-management
-    tag: go1.16-linux-amd64
 binary_build_commands: make build
 build_root:
   image_stream_tag:
@@ -24,6 +16,12 @@ images:
       as:
       - registry.ci.openshift.org/open-cluster-management/builder:go1.16-linux
   to: backplane-operator
+- dockerfile_path: Dockerfile.test.prow
+  inputs:
+    open-cluster-management_builder_go1.16-linux:
+      as:
+      - registry.ci.openshift.org/open-cluster-management/builder:go1.16-linux
+  to: backplane-operator-test
 promotion:
   name: "1.0"
   namespace: open-cluster-management
@@ -35,9 +33,6 @@ resources:
 tests:
 - as: backplane-fast-forward
   postsubmit: true
-  secrets:
-  - mount_path: /etc/github
-    name: acm-cicd-github
   steps:
     env:
       DESTINATION_BRANCH: backplane-1.0

@@ -7,7 +7,7 @@ base_images:
     name: builder
     namespace: open-cluster-management
     tag: go1.16-linux
-binary_build_commands: go build ./cmd/manager
+binary_build_commands: make build
 build_root:
   image_stream_tag:
     name: builder
@@ -37,7 +37,7 @@ tests:
   container:
     from: src
 - as: unit
-  commands: make test
+  commands: HOME=/tmp make test
   container:
     from: src
 - as: fast-forward
@@ -46,6 +46,32 @@ tests:
     env:
       DESTINATION_BRANCH: stable
     workflow: ocm-ci-fastforward
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: idp-strategy-operator
+    env:
+      IMAGE_REPO: idp-strategy-operator
+      REGISTRY_ORG: identitatem
+    workflow: identitatem-ci-image-mirror
+- as: pr-merge-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: idp-strategy-operator
+    env:
+      IMAGE_REPO: idp-strategy-operator
+      REGISTRY_ORG: identitatem
+    workflow: identitatem-ci-image-mirror
+- as: latest-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: idp-strategy-operator
+    env:
+      IMAGE_TAG: latest
+      REGISTRY_ORG: identitatem
+    workflow: identitatem-ci-image-mirror
 zz_generated_metadata:
   branch: main
   org: identitatem

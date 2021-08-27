@@ -117,8 +117,6 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-packet
-          - configMap:
-              name: cluster-profile-packet
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -195,8 +193,6 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-packet
-          - configMap:
-              name: cluster-profile-packet
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -272,8 +268,6 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-packet
-          - configMap:
-              name: cluster-profile-packet
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -281,6 +275,81 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-metal-assisted-kube-api,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build01
+    context: ci/prow/e2e-metal-assisted-multi-version
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-assisted-service-master-e2e-metal-assisted-multi-version
+    rerun_command: /test e2e-metal-assisted-multi-version
+    run_if_changed: ^(data/.*)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-metal-assisted-multi-version-cluster-profile
+        - --target=e2e-metal-assisted-multi-version
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-metal-assisted-multi-version-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-packet
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-metal-assisted-multi-version,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -349,8 +418,6 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-packet
-          - configMap:
-              name: cluster-profile-packet
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -427,8 +494,6 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-packet
-          - configMap:
-              name: cluster-profile-packet
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -505,8 +570,6 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-packet
-          - configMap:
-              name: cluster-profile-packet
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -582,8 +645,6 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-packet
-          - configMap:
-              name: cluster-profile-packet
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -591,6 +652,81 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-metal-assisted-operator-ztp,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build01
+    context: ci/prow/e2e-metal-assisted-operator-ztp-multinode-spoke
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-assisted-service-master-e2e-metal-assisted-operator-ztp-multinode-spoke
+    optional: true
+    rerun_command: /test e2e-metal-assisted-operator-ztp-multinode-spoke
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-metal-assisted-operator-ztp-multinode-spoke-cluster-profile
+        - --target=e2e-metal-assisted-operator-ztp-multinode-spoke
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-metal-assisted-operator-ztp-multinode-spoke-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-packet
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-metal-assisted-operator-ztp-multinode-spoke,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -660,8 +796,6 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-packet
-          - configMap:
-              name: cluster-profile-packet
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials

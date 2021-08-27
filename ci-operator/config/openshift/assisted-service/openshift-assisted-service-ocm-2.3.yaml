@@ -31,10 +31,6 @@ base_images:
     name: release
     namespace: openshift
     tag: golang-1.15
-  openshift_release_golang-1.16:
-    name: release
-    namespace: openshift
-    tag: golang-1.16
   postgresql-12-centos7:
     name: postgresql-12-centos7
     namespace: ocp-kni
@@ -152,35 +148,58 @@ tests:
     workflow: generic-claim
 - as: e2e-metal-assisted-operator-disconnected
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     dependencies:
       ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
     env:
+      DEVSCRIPTS_CONFIG: |
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=32768
+        EXTRA_WORKER_DISK=120
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
       DISCONNECTED: "true"
+      NUM_EXTRA_WORKERS: "1"
     workflow: baremetalds-assisted-operator-ztp
 - as: e2e-metal-assisted-operator-ztp
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     dependencies:
       ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
     env:
+      DEVSCRIPTS_CONFIG: |
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=32768
+        EXTRA_WORKER_DISK=120
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      DISCONNECTED: "false"
       IP_STACK: v4
+      NUM_EXTRA_WORKERS: "1"
     workflow: baremetalds-assisted-operator-ztp
 - as: e2e-metal-assisted-operator-ztp-periodic
   cron: 0 0 */2 * *
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     dependencies:
       ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
     env:
+      DEVSCRIPTS_CONFIG: |
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=32768
+        EXTRA_WORKER_DISK=120
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      DISCONNECTED: "false"
       IP_STACK: v4
+      NUM_EXTRA_WORKERS: "1"
     workflow: baremetalds-assisted-operator-ztp
 - as: e2e-metal-assisted-kube-api
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=ocm-2.3
@@ -195,6 +214,7 @@ tests:
         OPENSHIFT_VERSION=4.8
         ENABLE_KUBE_API=true
         MAKEFILE_TARGET=all
+      TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
 zz_generated_metadata:
   branch: ocm-2.3

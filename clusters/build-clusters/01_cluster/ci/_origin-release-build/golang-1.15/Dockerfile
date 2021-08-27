@@ -6,7 +6,7 @@
 #
 FROM        registry.centos.org/centos/centos:7
 
-ENV VERSION=1.15.7 \
+ENV VERSION=1.15.15 \
     GOCACHE=/go/.cache \
     GOARM=5 \
     GOPATH=/go \

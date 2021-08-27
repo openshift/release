@@ -4,6 +4,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+export OS_CLIENT_CONFIG_FILE=${SHARED_DIR}/clouds.yaml
+
 CLUSTER_NAME=$(<"${SHARED_DIR}/CLUSTER_NAME")
 OPENSTACK_EXTERNAL_NETWORK="${OPENSTACK_EXTERNAL_NETWORK:-$(<"${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK")}"
 OPENSTACK_COMPUTE_FLAVOR="${OPENSTACK_COMPUTE_FLAVOR:-$(<"${SHARED_DIR}/OPENSTACK_COMPUTE_FLAVOR")}"
@@ -27,7 +29,7 @@ case "$CONFIG_TYPE" in
     ;;
 esac
 
-mapfile -t ZONES < <(printf ${ZONES})
+mapfile -t ZONES < <(printf ${ZONES}) >/dev/null
 MAX_ZONES_COUNT=${#ZONES[@]}
 
 if [[ ${ZONES_COUNT} -gt ${MAX_ZONES_COUNT} ]]; then
@@ -119,3 +121,15 @@ fi
 python -c 'import yaml;
 import sys;
 data = yaml.safe_load(open(sys.argv[1]))' "${SHARED_DIR}/install-config.yaml"
+
+# This block will remove the ports created in openstack-provision-machinesubnet-commands.sh
+# since the installer will create them again, based on install-config.yaml.
+if [[ ${OPENSTACK_PROVIDER_NETWORK} != "" ]]; then
+  echo "Provider network detected, will clean-up reserved ports"
+  for p in api ingress; do
+    if openstack port show ${CLUSTER_NAME}-${p} >/dev/null; then
+      echo "Port exists for $p: removing it"
+      openstack port delete ${CLUSTER_NAME}-${p}
+    fi
+  done
+fi

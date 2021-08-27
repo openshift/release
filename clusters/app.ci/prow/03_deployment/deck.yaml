@@ -86,7 +86,7 @@ objects:
         serviceAccountName: deck
         containers:
         - name: deck
-          image: gcr.io/k8s-prow/deck:v20210809-f7cf0bd038
+          image: gcr.io/k8s-prow/deck:v20210826-b031910912
           args:
           - --config-path=/etc/config/config.yaml
           - --supplemental-prow-config-dir=/etc/config
@@ -104,10 +104,7 @@ objects:
           - --projected-token-file=/var/sa-token/token
           - --rerun-creates-job=true
           - --supplemental-plugin-config-dir=/etc/plugins
-          env:
-          # Multiple configs can only be passed via the env var and not via the flag
-          - name: KUBECONFIG
-            value: /etc/build-farm-credentials/build01.kubeconfig:/etc/build-farm-credentials/app.ci.kubeconfig:/etc/build-farm-credentials/build02.kubeconfig:/etc/build-farm-credentials/vsphere.kubeconfig:/etc/build-farm-credentials/arm01.kubeconfig
+          - --kubeconfig-dir=/etc/build-farm-credentials
           ports:
             - name: main
               containerPort: 8080
@@ -252,18 +249,7 @@ objects:
             name: job-config-4.10
         - name: build-farm-credentials
           secret:
-            items:
-            - key: sa.deck.arm01.config
-              path: arm01.kubeconfig
-            - key: sa.deck.build01.config
-              path: build01.kubeconfig
-            - key: sa.deck.app.ci.config
-              path: app.ci.kubeconfig
-            - key: sa.deck.build02.config
-              path: build02.kubeconfig
-            - key: sa.deck.vsphere.config
-              path: vsphere.kubeconfig
-            secretName: build-farm-credentials
+            secretName: deck
 - apiVersion: v1
   kind: Route
   metadata:
@@ -352,7 +338,7 @@ objects:
           - mountPath: /etc/proxy/secrets
             name: session-secret
         - name: deck
-          image: gcr.io/k8s-prow/deck:v20210809-f7cf0bd038
+          image: gcr.io/k8s-prow/deck:v20210826-b031910912
           args:
           - --github-oauth-config-file=/etc/github/config.json
           - --github-token-path=/etc/oauth/oauth
@@ -372,12 +358,10 @@ objects:
           - --projected-token-file=/var/sa-token/token
           - --rerun-creates-job=true
           - --supplemental-plugin-config-dir=/etc/plugins
+          - --kubeconfig-dir=/etc/build-farm-credentials
           ports:
             - name: http
               containerPort: 8080
-          env:
-          - name: KUBECONFIG
-            value: /etc/build-farm-credentials/build01.kubeconfig:/etc/build-farm-credentials/app.ci.kubeconfig:/etc/build-farm-credentials/build02.kubeconfig:/etc/build-farm-credentials/vsphere.kubeconfig:/etc/build-farm-credentials/arm01.kubeconfig
           volumeMounts:
           - name: service-account-token
             mountPath: /var/sa-token
@@ -512,18 +496,7 @@ objects:
             name: job-config-4.10
         - name: build-farm-credentials
           secret:
-            items:
-            - key: sa.deck.arm01.config
-              path: arm01.kubeconfig
-            - key: sa.deck.build01.config
-              path: build01.kubeconfig
-            - key: sa.deck.build02.config
-              path: build02.kubeconfig
-            - key: sa.deck.app.ci.config
-              path: app.ci.kubeconfig
-            - key: sa.deck.vsphere.config
-              path: vsphere.kubeconfig
-            secretName: build-farm-credentials
+            secretName: deck
 - apiVersion: v1
   kind: Secret
   metadata:

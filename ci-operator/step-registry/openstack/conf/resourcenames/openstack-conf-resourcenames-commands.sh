@@ -5,21 +5,32 @@ set -Eeuo pipefail
 declare -A external_network=(
 	['openstack-kuryr']='external'
 	['openstack-vexxhost']='public'
-	['openstack-vh-mecha']='external'
+	['openstack-vh-mecha-central']='external'
+	['openstack-vh-mecha-az0']='external'
 	['openstack']='external'
 	)
 
 declare -A compute_flavor=(
 	['openstack-kuryr']='m1.xlarge'
 	['openstack-vexxhost']='ci.m1.xlarge'
-	['openstack-vh-mecha']='m1.xlarge'
+	['openstack-vh-mecha-central']='m1.xlarge'
+	['openstack-vh-mecha-az0']='m1.xlarge'
 	['openstack']='m1.s2.xlarge'
 	)
 
 declare -A compute_azs=(
 	['openstack-kuryr']=''
 	['openstack-vexxhost']=''
-	['openstack-vh-mecha']='az0'
+	['openstack-vh-mecha-central']=''
+	['openstack-vh-mecha-az0']='az0'
+	['openstack']=''
+	)
+
+declare -A bastion_flavor=(
+	['openstack-kuryr']=''
+	['openstack-vexxhost']='1vcpu_2gb'
+	['openstack-vh-mecha-central']='m1.small'
+	['openstack-vh-mecha-az0']='m1.small'
 	['openstack']=''
 	)
 
@@ -65,9 +76,24 @@ if [[ -z "${ZONES:-}" ]]; then
 	ZONES="${compute_azs[$CLUSTER_TYPE]}"
 fi
 
+if [[ -z "${BASTION_FLAVOR:-}" ]]; then
+	if [[ -z "${CLUSTER_TYPE:-}" ]]; then
+		echo 'Set CLUSTER_TYPE or BASTION_FLAVOR'
+		exit 1
+	fi
+
+	if ! [[ -v bastion_flavor[$CLUSTER_TYPE] ]]; then
+		echo "BASTION_FLAVOR value for CLUSTER_TYPE '$CLUSTER_TYPE' not known."
+		exit 1
+	fi
+
+	BASTION_FLAVOR="${bastion_flavor[$CLUSTER_TYPE]}"
+fi
+
 cat <<< "$OPENSTACK_EXTERNAL_NETWORK" > "${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK"
 cat <<< "$OPENSTACK_COMPUTE_FLAVOR"   > "${SHARED_DIR}/OPENSTACK_COMPUTE_FLAVOR"
 cat <<< "$ZONES"                      > "${SHARED_DIR}/ZONES"
+cat <<< "$BASTION_FLAVOR"             > "${SHARED_DIR}/BASTION_FLAVOR"
 
 
 # We have to truncate cluster name to 14 chars, because there is a limitation in the install-config
@@ -82,4 +108,5 @@ OPENSTACK_EXTERNAL_NETWORK: $OPENSTACK_EXTERNAL_NETWORK
 OPENSTACK_COMPUTE_FLAVOR: $OPENSTACK_COMPUTE_FLAVOR
 CLUSTER_NAME: "${UNSAFE_CLUSTER_NAME#"ci-op-"}"
 ZONES: $ZONES
+BASTION_FLAVOR: $BASTION_FLAVOR
 EOF
