@@ -57,11 +57,20 @@ images:
         source_path: /go/src/github.com/redhat-et/microshift/_output/bin/linux_arm64/microshift
   to: linux-arm64-4.7.0-0.microshift
 - dockerfile_literal: |
+    # Build openshift-tests bin
+    FROM registry.access.redhat.com/ubi8/go-toolset as openshift-tests-source
+    ENV GOPATH=/go GOCACHE=/go/src/.cache GO111MODULE=on
+    WORKDIR $GOPATH/src/github.com/openshift/origin
+    RUN dnf install -y git
+    RUN git clone https://github.com/openshift/origin.git . && git checkout release-4.7
+    RUN make build && mv ./openshift-tests /usr/bin/openshift-tests
+    # Runner
     FROM os
     COPY mock-nss.sh /usr/bin/mock-nss.sh
     COPY google-cloud-sdk.repo /etc/yum.repos.d/google-cloud-sdk.repo
     COPY microshift /usr/bin/microshift
     COPY oc /usr/bin/oc
+    COPY --from=openshift-tests-source /usr/bin/openshift-tests /usr/bin/openshift-tests
     COPY install.sh /usr/bin/install.sh
     RUN  dnf update -y && \
          dnf --enablerepo=powertools install --setopt=tsflags=nodocs -y \
@@ -86,27 +95,15 @@ images:
         source_path: /bin/mock-nss.sh
       - destination_dir: .
         source_path: /etc/yum.repos.d/google-cloud-sdk.repo
-  to: microshift-setup
-- dockerfile_literal: |
-    FROM registry.access.redhat.com/ubi8/go-toolset as openshift-test-source
-    ENV GOPATH=/go GOCACHE=/go/src/.cache GO111MODULE=on
-    WORKDIR $GOPATH/src/github.com/openshift/origin
-    RUN dnf install -y git
-    RUN git clone https://github.com/openshift/origin.git . && git checkout release-4.7
-    RUN make build
-    FROM os
-    COPY --from=openshift-test-source /go/src/github.com/openshift/origin/openshift-tests /usr/bin/openshift-tests
-  from: os
-  inputs:
     ocp_builder_rhel-8-golang-1.15-openshift-4.7:
       as:
       - registry.access.redhat.com/ubi8/go-toolset
-  to: microshift-openshift-tests-bin
+  to: microshift-e2e-runner
 promotion:
   additional_images:
     linux-amd64-4.7.0-0.microshift: linux-amd64-4.7.0-0.microshift
     linux-arm64-4.7.0-0.microshift: linux-arm64-4.7.0-0.microshift
-    microshift-setup: microshift-setup
+    microshift-e2e-runner: microshift-e2e-runner
   namespace: microshift
   tag: latest
 resources:

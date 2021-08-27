@@ -27,9 +27,6 @@ chmod 0600 "${HOME}"/.ssh/config
 # Copy pull secret to user home
 cp "${CLUSTER_PROFILE_DIR}"/pull-secret "${HOME}"/pull-secret
 
-# Copy the compiled openshift-tests binary
-cp "${ARTIFACT_DIR}/openshift-tests" "${HOME}"/openshift-tests
-
 gcloud auth activate-service-account --quiet --key-file "${CLUSTER_PROFILE_DIR}"/gce.json
 gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
 gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
@@ -58,6 +55,24 @@ systemctl disable --now firewalld
 export KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig
 
 systemctl enable --now microshift.service
+
+start=$(date '+%s')
+to=300
+while :; do
+  if [ $(( $(date '+%s') - start )) -ge $to ]; then
+    echo "timed out waiting for node to start ($to seconds)" >&2
+    exit 1
+  fi
+  echo "waiting for node response" >&2
+  # get the condation where type == Ready, where condition.statusx == True.
+  node="$(oc get nodes -o jsonpath='{.items[*].status.conditions}' | \
+    jq '.[] | select(.type == "Ready") | \
+    select(.status == "True")')" || echo ''
+  if [ -n "$node" ]; then
+    echo "node posted ready status" >&2
+    break
+  fi
+done
 
 openshift-tests run kubernetes/conformance --provider=none
 
@@ -166,7 +181,7 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
-  --command 'sudo mv openshift-tests /usr/bin/openshift-tests'
+  --command 'sudo mv /usr/bin/openshift-tests /usr/bin/openshift-tests'
 
 # start the test
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
