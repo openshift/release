@@ -339,8 +339,13 @@ spec:
         severity: critical
     - alert: ghproxy-90-inode-percent
       annotations:
-        message: '{{ $labels.token_hash }} uses 90% of the available inodes. Check
-          <ghcache_disk_inode_used / ghcache_disk_inode_total * 100 |prometheus>'
+        message: |+
+          {{ $labels.token_hash }} uses 90% of the available inode (<https://grafana-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?viewPanel=5&orgId=1|dashboard>)
+
+          Resolve by pruning the cache inside the ghproxy pod:
+
+          $ oc --context app.ci -n ci exec $(oc --context app.ci get pod -n ci -l component=ghproxy -o custom-columns=":metadata.name" --no-headers) -- find /cache/data /cache/temp -mtime +1 -type f -delete
+
       expr: |
         ghcache_disk_inode_used / ghcache_disk_inode_total * 100 > 90
       for: 5m
