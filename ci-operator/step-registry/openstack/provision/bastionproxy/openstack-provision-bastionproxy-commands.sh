@@ -57,15 +57,10 @@ fi
 
 if [[ "${ZONES_COUNT}" == "0" ]]; then
   ZONES_ARGS=""
-elif [[ "${ZONES_COUNT}" == "1" ]]; then
+else
   for ((i=0; i<${MAX_ZONES_COUNT}; ++i )) ; do
     ZONES_ARGS+="--availability-zone ${ZONES[$i]} "
   done
-else
-  # For now, we only support a cluster within a single AZ.
-  # This will change in the future.
-  echo "Wrong ZONE_COUNT, can only be 0 or 1, got ${ZONES_COUNT}"
-  exit 1
 fi
 
 if ! openstack image show $BASTION_IMAGE >/dev/null; then

@@ -39,17 +39,12 @@ fi
 
 if [[ "${ZONES_COUNT}" == "0" ]]; then
   ZONES_STR="[]"
-elif [[ "${ZONES_COUNT}" == "1" ]]; then
+else
   function join_by { local IFS="$1"; shift; echo "$*"; }
   ZONES=("${ZONES[@]:0:${ZONES_COUNT}}")
   ZONES_STR="[ "
   ZONES_STR+=$(join_by , "${ZONES[@]}")
   ZONES_STR+=" ]"
-else
-  # For now, we only support a cluster within a single AZ.
-  # This will change in the future.
-  echo "Wrong ZONE_COUNT, can only be 0 or 1, got ${ZONES_COUNT}"
-  exit 1
 fi
 echo "OpenStack Availability Zones: ${ZONES_STR}"
 

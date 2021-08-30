@@ -22,7 +22,7 @@ declare -A compute_azs=(
 	['openstack-kuryr']=''
 	['openstack-vexxhost']=''
 	['openstack-vh-mecha-central']=''
-	['openstack-vh-mecha-az0']='az0'
+	['openstack-vh-mecha-az0']='az0\ncentral'
 	['openstack']=''
 	)
 
