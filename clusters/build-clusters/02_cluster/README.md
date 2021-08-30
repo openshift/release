@@ -206,7 +206,7 @@ oc get deployment -n cert-manager cert-manager -o yaml | yq -r '.spec.template.s
 * The above workaround does NOT work when we have selector defined in the clusterissuer
 
 ```
-apiVersion: cert-manager.io/v1alpha2
+apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
   name: cert-issuer-staging
@@ -218,7 +218,7 @@ spec:
       name: cert-issuer-account-key
     solvers:
     - dns01:
-        clouddns:
+        cloudDNS:
           project: openshift-ci-infra
           serviceAccountSecretRef:
             name: cert-issuer
@@ -227,7 +227,7 @@ spec:
           matchLabels:
             gcp-project: openshift-ci-infra
     - dns01:
-        clouddns:
+        cloudDNS:
           project: openshift-ci-build-farm
           serviceAccountSecretRef:
             name: cert-issuer
