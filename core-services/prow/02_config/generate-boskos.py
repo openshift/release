@@ -68,6 +68,9 @@ CONFIG = {
     'packet-quota-slice': {
         'default': 60,
     },
+    'packet-edge-quota-slice': {
+        'default': 50,
+    },
     'kubevirt-quota-slice':{},
     'vsphere-quota-slice':{},
     'osd-ephemeral-quota-slice': {
