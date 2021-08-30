@@ -177,15 +177,34 @@ tests:
 - as: e2e-upgrade
   steps:
     cluster_profile: gcp
-    test:
-    - as: test
+    dependencies:
+      OO_INDEX: ci-index-elasticsearch-operator-bundle
+    env:
+      INITIAL_CHANNEL: stable-5.1
+      INITIAL_CSV: elasticsearch-operator.v5.1.0
+      OO_CHANNEL: stable-5.2
+      OO_INSTALL_NAMESPACE: openshift-operators-redhat
+      OO_LATEST_CSV: elasticsearch-operator.v5.2.0
+      OO_PACKAGE: elasticsearch-operator
+      OO_TARGET_NAMESPACES: '!all'
+    pre:
+    - as: install-cr
       cli: latest
-      commands: make test-e2e-upgrade
+      commands: ./hack/testing-olm-upgrade/pre-upgrade-commands.sh
       from: src
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-gcp
+    - ref: optional-operators-ci-upgrade
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e-upgrade-ci
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: optional-operators-ci-gcp
 zz_generated_metadata:
   branch: master
   org: openshift
