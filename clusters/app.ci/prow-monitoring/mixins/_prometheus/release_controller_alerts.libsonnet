@@ -22,8 +22,7 @@
         rules: [
           {
             alert: 'releaseControllerBugzillaError',
-            expr: 'rate(release_controller_bugzilla_errors_total[5m]) >= 1',
-            'for': '1m',
+            expr: 'rate(release_controller_bugzilla_errors_total[5m]) > 0',
             labels: {
               severity: 'critical',
               team: 'release-controller',
