@@ -8,6 +8,8 @@ set -x
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 export OPS_MIRROR_KEY=${CLUSTER_PROFILE_DIR}/ops-mirror.pem
 
+echo "PLATFORM_VERSION: '${PLATFORM_VERSION}'"
+
 # Ensure our UID, which is randomly generated, is in /etc/passwd. This is required
 # to be able to SSH.
 if ! whoami &> /dev/null; then
@@ -35,6 +37,8 @@ cat > prep.yaml <<-'EOF'
   vars:
     kubeconfig_path: "{{ lookup('env', 'KUBECONFIG') }}"
     ops_mirror_path: "{{ lookup('env', 'OPS_MIRROR_KEY') }}"
+    platform_version: "{{ lookup('env', 'PLATFORM_VERSION') }}"
+    major_platform_version: "{{ platform_version[:1] }}"
 
   tasks:
   - name: Get cluster version
@@ -60,18 +64,18 @@ cat > prep.yaml <<-'EOF'
       src: "{{ ops_mirror_path }}"
       dest: /var/lib/yum/
 
-  - name: Create rhel-7-server-ose-rpms repo file
+  - name: Create rhel-X-server-ose-rpms repo file
     template:
-      src: rhel-7-server-ose-4.X-devel-rpms.repo.j2
-      dest: /etc/yum.repos.d/rhel-7-server-ose-rpms.repo
+      src: "rhel-{{ major_platform_version }}-server-ose-devel-rpms.repo.j2"
+      dest: "/etc/yum.repos.d/rhel-{{ major_platform_version }}-server-ose-rpms.repo"
 
-  - name: Create rhel-7-server-rpms repo file
+  - name: Create rhel-X-server-rpms repo file
     copy:
-      src: rhel-7-server-rpms-4.X.repo
+      src: "rhel-{{ major_platform_version }}-server-rpms.repo"
       dest: /etc/yum.repos.d/
 EOF
 
-cat > rhel-7-server-ose-4.X-devel-rpms.repo.j2 <<-'EOF'
+cat > rhel-7-server-ose-devel-rpms.repo.j2 <<-'EOF'
 [rhel-7-server-ose-{{ release_version }}-devel-rpms]
 name = A repository of dependencies for Atomic OpenShift {{ release_version }}
 baseurl = https://mirror.openshift.com/enterprise/reposync/{{ release_version }}/rhel-server-ose-rpms/
@@ -83,7 +87,7 @@ sslverify = 0
 enabled = 1
 EOF
 
-cat > rhel-7-server-rpms-4.X.repo <<-'EOF'
+cat > rhel-7-server-rpms.repo <<-'EOF'
 [rhel-7-server-rpms]
 name = Red Hat Enterprise Linux 7 Server (RPMs)
 baseurl = https://mirror.openshift.com/enterprise/reposync/ci-deps/rhel-server-rpms/
@@ -123,6 +127,56 @@ sslclientcert = /var/lib/yum/ops-mirror.pem
 sslclientkey = /var/lib/yum/ops-mirror.pem
 sslverify = 0
 enabled = 1
+EOF
+
+cat > rhel-8-server-ose-devel-rpms.repo.j2 <<-'EOF'
+[rhel-8-server-ose-{{ release_version }}-devel-rpms]
+name = A repository of dependencies for OpenShift Container Platform {{ release_version }}
+baseurl = https://mirror.openshift.com/enterprise/reposync/{{ release_version }}/rhel-8-server-ose-rpms/
+failovermethod = priority
+gpgcheck = 0
+sslclientcert = /var/lib/yum/ops-mirror.pem
+sslclientkey = /var/lib/yum/ops-mirror.pem
+sslverify = 0
+enabled = 1
+module_hotfixes = 1
+
+[rhel-8-fast-datapath-{{ release_version }}-devel-rpms]
+name = A repository of dependencies for OpenShift Container Platform {{ release_version }}
+baseurl = https://mirror.openshift.com/enterprise/reposync/{{ release_version }}/rhel-8-fast-datapath-rpms/
+failovermethod = priority
+gpgcheck = 0
+sslclientcert = /var/lib/yum/ops-mirror.pem
+sslclientkey = /var/lib/yum/ops-mirror.pem
+sslverify = 0
+enabled = 1
+module_hotfixes = 1
+EOF
+
+cat > rhel-8-server-rpms.repo <<-'EOF'
+[rhel-8-for-x86_64-baseos-rpms]
+name = Red Hat Enterprise Linux 8 for x86_64 - BaseOS (RPMs)
+baseurl = https://mirror.openshift.com/enterprise/reposync/ci-deps/rhel-8-baseos-rpms/
+gpgcheck = 0
+sslclientcert = /var/lib/yum/ops-mirror.pem
+sslclientkey = /var/lib/yum/ops-mirror.pem
+sslverify = 0
+enabled = 1
+metadata_expire = 86400
+enabled_metadata = 1
+module_hotfixes = 1
+
+[rhel-8-for-x86_64-appstream-rpms]
+name = Red Hat Enterprise Linux 8 for x86_64 - AppStream (RPMs)
+baseurl = https://mirror.openshift.com/enterprise/reposync/ci-deps/rhel-8-appstream-rpms/
+gpgcheck = 0
+sslclientcert = /var/lib/yum/ops-mirror.pem
+sslclientkey = /var/lib/yum/ops-mirror.pem
+sslverify = 0
+enabled = 1
+metadata_expire = 86400
+enabled_metadata = 1
+module_hotfixes = 1
 EOF
 
 ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
