@@ -3,6 +3,10 @@ base_images:
     name: 4.8-priv
     namespace: ocp-private
     tag: must-gather
+  operator-index:
+    name: redhat-operator-index
+    namespace: ci
+    tag: v4.8
   operator-registry:
     name: 4.8-priv
     namespace: ocp-private
@@ -33,6 +37,10 @@ images:
 - dockerfile_path: openshift-ci/Dockerfile.registry.build
   from: operator-registry
   to: ocs-registry
+- context_dir: openshift-ci/
+  dockerfile_path: index.Dockerfile
+  from: operator-index
+  to: noobaa-index
 - dockerfile_path: build/Dockerfile
   from: os
   inputs:
@@ -65,8 +73,10 @@ images:
 operator:
   bundles:
   - as: dev-master-dependencies
+    base_index: noobaa-index
     dockerfile_path: openshift-ci/Dockerfile.bundle.master
   - as: fixed-dependencies
+    base_index: noobaa-index
     context_dir: deploy/
     dockerfile_path: Dockerfile
   substitutions:
@@ -76,6 +86,7 @@ promotion:
   excluded_images:
   - ocs-operator
   - operator-registry-base
+  - noobaa-index
   - ocs-registry
   - ocs-registry-master
   name: ocs-4.9-priv
