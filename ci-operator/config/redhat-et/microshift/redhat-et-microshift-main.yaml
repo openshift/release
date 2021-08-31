@@ -16,35 +16,14 @@ base_images:
     namespace: origin
     tag: "8"
 build_root:
-  project_image:
-    dockerfile_path: ./images/build/Dockerfile
-    inputs:
-      ocp_builder_rhel-8-golang-1.15-openshift-4.7:
-        as:
-        - registry.access.redhat.com/ubi8/go-toolset
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.15
 images:
-- dockerfile_literal: |
-    FROM base
-    ADD microshift /usr/bin/
-    ENTRYPOINT ["/usr/bin/microshift", "run"]
+- dockerfile_path: images/build/Dockerfile
   from: base
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/redhat-et/microshift/_output/bin/linux_amd64/microshift
   to: linux-amd64-4.7.0-0.microshift
-- dockerfile_literal: |
-    FROM base
-    ADD microshift /usr/bin/
-    ENTRYPOINT ["/usr/bin/microshift", "run"]
-  from: base
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/redhat-et/microshift/_output/bin/linux_arm64/microshift
-  to: linux-arm64-4.7.0-0.microshift
 - dockerfile_literal: |
     FROM os
     COPY mock-nss.sh /usr/bin/mock-nss.sh
