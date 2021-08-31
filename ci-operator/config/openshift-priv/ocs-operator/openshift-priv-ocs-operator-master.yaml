@@ -15,24 +15,16 @@ base_images:
     name: ubi
     namespace: ocp
     tag: "8"
-binary_build_commands: make build
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/ocs-operator
 images:
-- dockerfile_path: openshift-ci/Dockerfile.deploy
+- dockerfile_path: build/Dockerfile.build
   from: os
   inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/ocs-operator/build/_output/bin/ocs-operator
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/ocs-operator/build/_output/bin/metrics-exporter
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/ocs-operator/metrics/deploy/prometheus-ocs-rules-external.yaml
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/ocs-operator/metrics/deploy/prometheus-ocs-rules.yaml
+    root:
+      as:
+      - golang:1.16
   to: ocs-operator
 - dockerfile_path: openshift-ci/Dockerfile.registry.build
   from: operator-registry
@@ -41,20 +33,6 @@ images:
   dockerfile_path: index.Dockerfile
   from: operator-index
   to: noobaa-index
-- dockerfile_path: build/Dockerfile
-  from: os
-  inputs:
-    bin:
-      paths:
-      - destination_dir: _output/bin
-        source_path: /go/src/github.com/openshift/ocs-operator/build/_output/bin/ocs-operator
-      - destination_dir: _output/bin
-        source_path: /go/src/github.com/openshift/ocs-operator/build/_output/bin/metrics-exporter
-      - destination_dir: _output
-        source_path: /go/src/github.com/openshift/ocs-operator/metrics/deploy/prometheus-ocs-rules-external.yaml
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/ocs-operator/metrics/deploy/prometheus-ocs-rules.yaml
-  to: ocs-operator-quay
 - dockerfile_path: openshift-ci/Dockerfile.registry
   from: operator-registry
   to: ocs-registry-quay
@@ -76,7 +54,6 @@ operator:
     with: ocs-operator
 promotion:
   excluded_images:
-  - ocs-operator
   - operator-registry-base
   - noobaa-index
   - ocs-registry
