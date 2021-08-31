@@ -9,15 +9,18 @@ if ! vault kv get kv/dptp/build_farm >/dev/null; then
 fi
 
 VAULT_TOKEN="${VAULT_TOKEN:-$(cat ~/.vault-token)}"
+BUILD_FARM_CREDENTIALS_FOLDER="${BUILD_FARM_CREDENTIALS_FOLDER:-/tmp/build-farm-credentials}"
+echo "BUILD_FARM_CREDENTIALS_FOLDER=${BUILD_FARM_CREDENTIALS_FOLDER}"
 
 BASE_DIR="$( cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/.."
+echo "BASE_DIR=${BASE_DIR}"
 cluster="${cluster:-}"
-echo $BASE_DIR
 
 $CONTAINER_ENGINE pull registry.ci.openshift.org/ci/ci-secret-generator:latest
 $CONTAINER_ENGINE run --rm \
   -v "${BASE_DIR}/core-services/ci-secret-bootstrap/_config.yaml:/bootstrap/_config.yaml:z" \
   -v "${BASE_DIR}/core-services/ci-secret-generator/_config.yaml:/generator/_config.yaml:z" \
+  -v "${BUILD_FARM_CREDENTIALS_FOLDER}:/tmp/build-farm-credentials:z" \
   -v "$kubeconfig_path:/_kubeconfig:z" \
   -e VAULT_TOKEN="$VAULT_TOKEN" \
   -e KUBECONFIG=/_kubeconfig \
