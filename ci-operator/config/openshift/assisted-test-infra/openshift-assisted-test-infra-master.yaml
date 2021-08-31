@@ -44,23 +44,35 @@ tag_specification:
   name: "4.9"
   namespace: ocp
 tests:
+- as: assisted-packet-check
+  cron: 0 */2 * * *
+  steps:
+    cluster_profile: packet-assisted
+    test:
+    - ref: baremetalds-packet-check
+- as: sno-packet-check
+  cron: 0 */2 * * *
+  steps:
+    cluster_profile: packet-sno
+    test:
+    - ref: baremetalds-packet-check
 - as: e2e-metal-assisted
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-periodic
   cron: '@daily'
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       TEST_SUITE: full
     workflow: baremetalds-assisted
 - as: e2e-metal-assisted-multi-version
   optional: true
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=""
@@ -69,7 +81,7 @@ tests:
 - as: e2e-metal-assisted-multi-version-periodic
   cron: '@daily'
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=""
@@ -78,7 +90,7 @@ tests:
 - as: e2e-metal-assisted-olm
   optional: true
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         TEST_FUNC=test_olm_operator
@@ -87,7 +99,7 @@ tests:
 - as: e2e-metal-assisted-olm-periodic
   cron: '@daily'
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         TEST_FUNC=test_olm_operator
@@ -96,7 +108,7 @@ tests:
 - as: system-test-operator
   optional: true
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       POST_INSTALL_COMMANDS: |
         export TEST=./discovery-infra/tests/test_kube_api.py
@@ -108,7 +120,7 @@ tests:
 - as: system-test-operator-periodic
   cron: '@daily'
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       POST_INSTALL_COMMANDS: |
         export TEST=./discovery-infra/tests/test_kube_api.py
@@ -120,7 +132,7 @@ tests:
 - as: e2e-metal-assisted-ipv6
   optional: true
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         IPv6=true
@@ -129,7 +141,7 @@ tests:
 - as: e2e-metal-assisted-ipv6-periodic
   cron: '@daily'
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         IPv6=true
@@ -138,7 +150,7 @@ tests:
 - as: e2e-metal-assisted-none
   optional: true
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         PLATFORM=none
@@ -147,7 +159,7 @@ tests:
 - as: e2e-metal-assisted-none-periodic
   cron: '@daily'
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         PLATFORM=none
@@ -156,7 +168,7 @@ tests:
 - as: e2e-metal-assisted-none-ipv6
   optional: true
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         IPv6=yes
@@ -169,7 +181,7 @@ tests:
 - as: e2e-metal-assisted-none-ipv6-periodic
   cron: '@daily'
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         IPv6=yes
@@ -182,7 +194,7 @@ tests:
 - as: e2e-metal-assisted-single-node
   optional: true
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
@@ -191,7 +203,7 @@ tests:
 - as: e2e-metal-assisted-single-node-periodic
   cron: '@daily'
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
@@ -199,7 +211,7 @@ tests:
     workflow: baremetalds-assisted
 - as: e2e-metal-assisted-kube-api
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
@@ -217,7 +229,7 @@ tests:
 - as: e2e-metal-assisted-kube-api-periodic
   cron: '@daily'
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
@@ -235,12 +247,12 @@ tests:
 - as: e2e-metal-single-node-live-iso
   optional: true
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-sno
     workflow: baremetalds-sno
 - as: e2e-metal-single-node-live-iso-periodic
   cron: '@daily'
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-sno
     workflow: baremetalds-sno
 zz_generated_metadata:
   branch: master
