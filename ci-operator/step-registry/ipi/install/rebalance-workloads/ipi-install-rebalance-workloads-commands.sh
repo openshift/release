@@ -8,7 +8,7 @@ function rebalancePods() {
   NS=$1
   LABEL_SELECTOR=$2
 
-  NODE=$(oc get pods -n "${NS}" -l "${LABEL_SELECTOR}" -o jsonpath=\{'.items[*].spec.nodeName'\})
+  NODE=$(oc get pods -n "${NS}" -l "${LABEL_SELECTOR}" --field-selector status.phase=Running -o jsonpath=\{'.items[*].spec.nodeName'\})
 
   # If the workload is spread across more than 1 node, we don't need to rebalance its pods
   NODE_COUNT=$(wc -w <<< "${NODE}")
