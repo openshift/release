@@ -221,7 +221,7 @@ ci-secret-bootstrap:
 .PHONY: ci-secret-bootstrap
 
 ci-secret-generator: build_farm_credentials_folder
-	./hack/ci-secret-generator.sh
+	BUILD_FARM_CREDENTIALS_FOLDER=$(build_farm_credentials_folder) ./hack/ci-secret-generator.sh
 .PHONY: ci-secret-generator
 
 build_farm_credentials_folder ?= /tmp/build-farm-credentials
@@ -268,7 +268,7 @@ openshift-image-mirror-mappings:
 .PHONY: openshift-image-mirror-mappings
 
 config_updater_vault_secret:
-	@[[ -z $$cluster ]] && echo "ERROR: \$$cluster must be set" && exit 1
+	@[[ $$cluster ]] || (echo "ERROR: \$$cluster must be set"; exit 1)
 	$(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/applyconfig:latest
 	$(CONTAINER_ENGINE) run --rm \
 		-v $(CURDIR)/clusters/build-clusters/common:/manifests:z \
@@ -276,7 +276,9 @@ config_updater_vault_secret:
 		registry.ci.openshift.org/ci/applyconfig:latest \
 		--config-dir=/manifests \
 		--context=$(cluster) \
+		--confirm \
 		--kubeconfig=/_kubeconfig
+	mkdir -p $(build_farm_credentials_folder)
 	oc --context "$(cluster)" sa create-kubeconfig -n ci config-updater > "$(build_farm_credentials_folder)/sa.config-updater.$(cluster).config"
 	make ci-secret-generator
 .PHONY: config_updater_vault_secret
