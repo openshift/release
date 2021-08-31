@@ -84,6 +84,7 @@ presubmits:
     labels:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-release-master-arm01-dry
+    optional: true
     rerun_command: /test arm01-dry
     spec:
       containers:
@@ -124,7 +125,7 @@ presubmits:
           items:
           - key: sa.config-updater.arm01.config
             path: kubeconfig
-          secretName: build-farm-credentials
+          secretName: config-updater
       - emptyDir: {}
         name: tmp
     trigger: (?m)^/test( | .* )arm01-dry,?($|\s.*)
@@ -233,7 +234,7 @@ presubmits:
           items:
           - key: sa.config-updater.build01.config
             path: kubeconfig
-          secretName: build-farm-credentials
+          secretName: config-updater
       - emptyDir: {}
         name: tmp
     trigger: (?m)^/test( | .* )build01-dry,?($|\s.*)
@@ -295,7 +296,7 @@ presubmits:
           items:
           - key: sa.config-updater.build02.config
             path: kubeconfig
-          secretName: build-farm-credentials
+          secretName: config-updater
       - emptyDir: {}
         name: tmp
     trigger: (?m)^/test( | .* )build02-dry,?($|\s.*)
@@ -472,7 +473,7 @@ presubmits:
             secretKeyRef:
               key: appid
               name: openshift-prow-github-app
-        image: gcr.io/k8s-prow/checkconfig:v20210824-9ef10941f6
+        image: gcr.io/k8s-prow/checkconfig:v20210831-87a76d4505
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -675,7 +676,7 @@ presubmits:
           items:
           - key: sa.config-updater.hive.config
             path: kubeconfig
-          secretName: build-farm-credentials
+          secretName: config-updater
       - emptyDir: {}
         name: tmp
     trigger: (?m)^/test( | .* )hive-dry,?($|\s.*)
@@ -746,11 +747,9 @@ presubmits:
         - $(ARTIFACTS)/debug-log.txt
         - --dry-run=false
         - --prowjob-kubeconfig=/var/kubeconfigs/sa.pj-rehearse.app.ci.config
+        - --kubeconfig-dir=/var/kubeconfigs
         command:
         - ./hack/pj-rehearse.sh
-        env:
-        - name: KUBECONFIG
-          value: /var/kubeconfigs/sa.ci-operator.build01.config:/var/kubeconfigs/sa.ci-operator.build02.config:/var/kubeconfigs/sa.pj-rehearse.app.ci.config:/var/kubeconfigs/sa.ci-operator.vsphere.config:/var/kubeconfigs/sa.ci-operator.arm01.config
         image: pj-rehearse:latest
         imagePullPolicy: Always
         name: ""
@@ -1059,7 +1058,7 @@ presubmits:
           items:
           - key: sa.config-updater.vsphere.config
             path: kubeconfig
-          secretName: build-farm-credentials
+          secretName: config-updater
       - emptyDir: {}
         name: tmp
     trigger: (?m)^/test( | .* )vsphere-dry,?($|\s.*)

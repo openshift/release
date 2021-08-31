@@ -118,6 +118,7 @@ bastion_fip="$(openstack floating ip create -f value -c floating_ip_address \
 >&2 echo "Created floating IP ${bastion_fip}"
 >&2 openstack server add floating ip "$server_id" "$bastion_fip"
 echo ${bastion_fip} >> ${SHARED_DIR}/DELETE_FIPS
+echo ${bastion_fip} > ${SHARED_DIR}/BASTION_FIP
 cp ${SHARED_DIR}/DELETE_FIPS ${ARTIFACT_DIR}
 
 # configure the local container environment to have the correct SSH configuration
@@ -156,14 +157,14 @@ acl Safe_ports port 443
 acl Safe_ports port 1025-65535
 acl CONNECT method CONNECT
 http_access deny !Safe_ports
-http_access deny CONNECT !SSL_ports
+http_access deny !SSL_ports
 http_access allow localnet
 http_access deny all
 http_port 3128
 https_port 3130 cert=/etc/squid/certs/domain.crt key=/etc/squid/certs/domain.key cafile=/etc/squid/certs/domain.crt
 # Leave coredumps in the first cache dir
 coredump_dir /var/spool/squid
-auth_param basic program /usr/lib64/squid/basic_ncsa_auth /etc/squid/passwd
+auth_param basic program /usr/lib64/squid/basic_ncsa_auth /etc/squid/htpasswd
 auth_param basic children 5
 auth_param basic realm Squid Basic Authentication
 auth_param basic credentialsttl 2 hours

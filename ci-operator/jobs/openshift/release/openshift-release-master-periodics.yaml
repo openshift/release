@@ -6204,6 +6204,81 @@ periodics:
   - base_ref: master
     org: openshift
     repo: release
+  interval: 48h
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: ci-4.7-upgrade-from-stable-4.6
+    job-release: "4.7"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ci-4.7-upgrade-from-stable-4.6-e2e-aws-uwm
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-aws-uwm-cluster-profile
+      - --target=e2e-aws-uwm
+      - --variant=ci-4.7-upgrade-from-stable-4.6
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-aws-uwm-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws-2
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
   interval: 72h
   labels:
     ci-operator.openshift.io/prowgen-controlled: "true"
@@ -7717,16 +7792,6 @@ periodics:
     job-release: "4.8"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-release-master-ci-4.8-e2e-aws-upgrade-single-node
-  reporter_config:
-    slack:
-      channel: '#edge-group-single-node'
-      job_states_to_report:
-      - failure
-      - error
-      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
-        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs> | <https://openshift-release.apps.ci.l2s4.p1.openshiftapps.com/releasestream/4.8.0-0.ci/release/{{index
-        .Metadata.Annotations "release.openshift.io/tag"}}|Release status>'
   spec:
     containers:
     - args:
@@ -8402,16 +8467,6 @@ periodics:
     job-release: "4.8"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-release-master-ci-4.8-e2e-azure-upgrade-single-node
-  reporter_config:
-    slack:
-      channel: '#edge-group-single-node'
-      job_states_to_report:
-      - failure
-      - error
-      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
-        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs> | <https://openshift-release.apps.ci.l2s4.p1.openshiftapps.com/releasestream/4.8.0-0.ci/release/{{index
-        .Metadata.Annotations "release.openshift.io/tag"}}|Release status>'
   spec:
     containers:
     - args:
@@ -9661,6 +9716,81 @@ periodics:
         name: ci-pull-credentials
         readOnly: true
       - mountPath: /usr/local/e2e-aws-upgrade-rollback-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws-2
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  interval: 48h
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: ci-4.8-upgrade-from-stable-4.7
+    job-release: "4.8"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ci-4.8-upgrade-from-stable-4.7-e2e-aws-uwm
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-aws-uwm-cluster-profile
+      - --target=e2e-aws-uwm
+      - --variant=ci-4.8-upgrade-from-stable-4.7
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-aws-uwm-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -11200,7 +11330,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -11210,6 +11340,7 @@ periodics:
     repo: release
   interval: 24h
   labels:
+    ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/prowgen-controlled: "true"
     ci-operator.openshift.io/variant: ci-4.9
     job-release: "4.9"
@@ -11373,8 +11504,7 @@ periodics:
       - error
       report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
         {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs> | <https://openshift-release.apps.ci.l2s4.p1.openshiftapps.com/releasestream/4.9.0-0.ci/release/{{index
-        .Metadata.Annotations "release.openshift.io/tag"}}|Release status>'
+        <{{.Status.URL}}|View logs>'
   spec:
     containers:
     - args:
@@ -12208,8 +12338,7 @@ periodics:
       - error
       report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
         {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs> | <https://openshift-release.apps.ci.l2s4.p1.openshiftapps.com/releasestream/4.9.0-0.ci/release/{{index
-        .Metadata.Annotations "release.openshift.io/tag"}}|Release status>'
+        <{{.Status.URL}}|View logs>'
   spec:
     containers:
     - args:
@@ -12732,7 +12861,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -12742,6 +12871,7 @@ periodics:
     repo: release
   interval: 24h
   labels:
+    ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/prowgen-controlled: "true"
     ci-operator.openshift.io/variant: ci-4.9
     job-release: "4.9"
@@ -13650,6 +13780,81 @@ periodics:
   - base_ref: master
     org: openshift
     repo: release
+  interval: 48h
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: ci-4.9-upgrade-from-stable-4.8
+    job-release: "4.9"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ci-4.9-upgrade-from-stable-4.8-e2e-aws-uwm
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-aws-uwm-cluster-profile
+      - --target=e2e-aws-uwm
+      - --variant=ci-4.9-upgrade-from-stable-4.8
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-aws-uwm-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws-2
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
   interval: 24h
   labels:
     ci-operator.openshift.io/prowgen-controlled: "true"
@@ -13792,7 +13997,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -13802,6 +14007,7 @@ periodics:
     repo: release
   interval: 48h
   labels:
+    ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/prowgen-controlled: "true"
     ci-operator.openshift.io/variant: ci-4.9-upgrade-from-stable-4.8
     job-release: "4.9"
@@ -13869,7 +14075,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -13879,6 +14085,7 @@ periodics:
     repo: release
   interval: 24h
   labels:
+    ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/prowgen-controlled: "true"
     ci-operator.openshift.io/variant: ci-4.9-upgrade-from-stable-4.8
     job-release: "4.9"
@@ -19784,8 +19991,8 @@ periodics:
       - error
       report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
         {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs> | <https://openshift-release.apps.ci.l2s4.p1.openshiftapps.com/releasestream/4.6.0-0.nightly/release/{{index
-        .Metadata.Annotations "release.openshift.io/tag"}}|Release status>'
+        <{{.Status.URL}}|View logs> | <https://amd64.ocp.releases.ci.openshift.org/releasestream/4.6.0-0.nightly/release/{{index
+        .Annotations "release.openshift.io/tag"}}|Release status>'
   spec:
     containers:
     - args:
@@ -21981,8 +22188,8 @@ periodics:
       - error
       report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
         {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs> | <https://openshift-release.apps.ci.l2s4.p1.openshiftapps.com/releasestream/4.7.0-0.nightly/release/{{index
-        .Metadata.Annotations "release.openshift.io/tag"}}|Release status>'
+        <{{.Status.URL}}|View logs> | <https://amd64.ocp.releases.ci.openshift.org/releasestream/4.7.0-0.nightly/release/{{index
+        .Annotations "release.openshift.io/tag"}}|Release status>'
   spec:
     containers:
     - args:
@@ -23924,16 +24131,6 @@ periodics:
     job-release: "4.8"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-release-master-nightly-4.8-e2e-aws-single-node
-  reporter_config:
-    slack:
-      channel: '#edge-group-single-node'
-      job_states_to_report:
-      - failure
-      - error
-      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
-        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs> | <https://openshift-release.apps.ci.l2s4.p1.openshiftapps.com/releasestream/4.8.0-0.nightly/release/{{index
-        .Metadata.Annotations "release.openshift.io/tag"}}|Release status>'
   spec:
     containers:
     - args:
@@ -25004,8 +25201,8 @@ periodics:
       - error
       report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
         {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs> | <https://openshift-release.apps.ci.l2s4.p1.openshiftapps.com/releasestream/4.8.0-0.nightly/release/{{index
-        .Metadata.Annotations "release.openshift.io/tag"}}|Release status>'
+        <{{.Status.URL}}|View logs> | <https://amd64.ocp.releases.ci.openshift.org/releasestream/4.8.0-0.nightly/release/{{index
+        .Annotations "release.openshift.io/tag"}}|Release status>'
   spec:
     containers:
     - args:
@@ -25089,8 +25286,8 @@ periodics:
       - error
       report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
         {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs> | <https://openshift-release.apps.ci.l2s4.p1.openshiftapps.com/releasestream/4.8.0-0.nightly/release/{{index
-        .Metadata.Annotations "release.openshift.io/tag"}}|Release status>'
+        <{{.Status.URL}}|View logs> | <https://amd64.ocp.releases.ci.openshift.org/releasestream/4.8.0-0.nightly/release/{{index
+        .Annotations "release.openshift.io/tag"}}|Release status>'
   spec:
     containers:
     - args:
@@ -25766,16 +25963,6 @@ periodics:
     job-release: "4.8"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-release-master-nightly-4.8-e2e-metal-single-node-live-iso
-  reporter_config:
-    slack:
-      channel: '#edge-group-single-node'
-      job_states_to_report:
-      - failure
-      - error
-      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
-        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs> | <https://openshift-release.apps.ci.l2s4.p1.openshiftapps.com/releasestream/4.8.0-0.nightly/release/{{index
-        .Metadata.Annotations "release.openshift.io/tag"}}|Release status>'
   spec:
     containers:
     - args:
@@ -26748,81 +26935,6 @@ periodics:
   - base_ref: master
     org: openshift
     repo: release
-  interval: 24h
-  labels:
-    ci-operator.openshift.io/prowgen-controlled: "true"
-    ci-operator.openshift.io/variant: nightly-4.9
-    job-release: "4.9"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-master-nightly-4.9-e2e-aws-arm64
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-aws-arm64-cluster-profile
-      - --target=e2e-aws-arm64
-      - --variant=nightly-4.9
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/e2e-aws-arm64-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-aws-arm64
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build02
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: release
   interval: 12h
   labels:
     ci-operator.openshift.io/prowgen-controlled: "true"
@@ -27445,8 +27557,8 @@ periodics:
       - error
       report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
         {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs> | <https://openshift-release.apps.ci.l2s4.p1.openshiftapps.com/releasestream/4.9.0-0.nightly/release/{{index
-        .Metadata.Annotations "release.openshift.io/tag"}}|Release status>'
+        <{{.Status.URL}}|View logs> | <https://amd64.ocp.releases.ci.openshift.org/releasestream/4.9.0-0.nightly/release/{{index
+        .Annotations "release.openshift.io/tag"}}|Release status>'
   spec:
     containers:
     - args:
@@ -27530,8 +27642,8 @@ periodics:
       - error
       report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
         {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs> | <https://openshift-release.apps.ci.l2s4.p1.openshiftapps.com/releasestream/4.9.0-0.nightly/release/{{index
-        .Metadata.Annotations "release.openshift.io/tag"}}|Release status>'
+        <{{.Status.URL}}|View logs> | <https://amd64.ocp.releases.ci.openshift.org/releasestream/4.9.0-0.nightly/release/{{index
+        .Annotations "release.openshift.io/tag"}}|Release status>'
   spec:
     containers:
     - args:
@@ -27709,6 +27821,81 @@ periodics:
         name: ci-pull-credentials
         readOnly: true
       - mountPath: /usr/local/e2e-aws-workers-rhel7-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  cron: 30 */6 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    ci-operator.openshift.io/variant: nightly-4.9
+    job-release: "4.9"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-nightly-4.9-e2e-aws-workers-rhel8
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-aws-workers-rhel8-cluster-profile
+      - --target=e2e-aws-workers-rhel8
+      - --variant=nightly-4.9
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-aws-workers-rhel8-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -28527,8 +28714,8 @@ periodics:
       - error
       report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
         {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs> | <https://openshift-release.apps.ci.l2s4.p1.openshiftapps.com/releasestream/4.9.0-0.nightly/release/{{index
-        .Metadata.Annotations "release.openshift.io/tag"}}|Release status>'
+        <{{.Status.URL}}|View logs> | <https://amd64.ocp.releases.ci.openshift.org/releasestream/4.9.0-0.nightly/release/{{index
+        .Annotations "release.openshift.io/tag"}}|Release status>'
   spec:
     containers:
     - args:
@@ -28612,8 +28799,8 @@ periodics:
       - error
       report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
         {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs> | <https://openshift-release.apps.ci.l2s4.p1.openshiftapps.com/releasestream/4.9.0-0.nightly/release/{{index
-        .Metadata.Annotations "release.openshift.io/tag"}}|Release status>'
+        <{{.Status.URL}}|View logs> | <https://amd64.ocp.releases.ci.openshift.org/releasestream/4.9.0-0.nightly/release/{{index
+        .Annotations "release.openshift.io/tag"}}|Release status>'
   spec:
     containers:
     - args:
@@ -29297,8 +29484,8 @@ periodics:
       - error
       report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
         {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs> | <https://openshift-release.apps.ci.l2s4.p1.openshiftapps.com/releasestream/4.9.0-0.nightly/release/{{index
-        .Metadata.Annotations "release.openshift.io/tag"}}|Release status>'
+        <{{.Status.URL}}|View logs> | <https://amd64.ocp.releases.ci.openshift.org/releasestream/4.9.0-0.nightly/release/{{index
+        .Annotations "release.openshift.io/tag"}}|Release status>'
   spec:
     containers:
     - args:

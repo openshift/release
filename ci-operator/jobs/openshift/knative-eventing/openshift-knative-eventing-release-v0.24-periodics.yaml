@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: 0 */12 * * 1-5
   decorate: true
   decoration_config:
@@ -79,7 +79,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: 0 */12 * * 1-5
   decorate: true
   decoration_config:
@@ -109,10 +109,10 @@ periodics:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/usr/local/e2e-aws-ocp-48-continuous-cluster-profile
+      - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-aws-ocp-48-continuous
       - --variant=48
       command:
@@ -124,13 +124,14 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-aws-ocp-48-continuous-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/hive-hive-credentials
+        name: hive-hive-credentials
         readOnly: true
       - mountPath: /etc/pull-secret
         name: pull-secret
@@ -140,17 +141,12 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: boskos
+    - name: ci-pull-credentials
       secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-aws
+        secretName: ci-pull-credentials
+    - name: hive-hive-credentials
+      secret:
+        secretName: hive-hive-credentials
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials

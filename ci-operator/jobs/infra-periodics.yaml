@@ -112,7 +112,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210824-9ef10941f6
+      image: gcr.io/k8s-prow/commenter:v20210831-87a76d4505
       imagePullPolicy: Always
       name: ""
       resources:
@@ -137,11 +137,9 @@ periodics:
     - args:
       - --namespace=ci
       - --dry-run=true
+      - --kubeconfig-dir=/etc/build-farm-credentials
       command:
       - /usr/bin/serviceaccount-secret-rotation-trigger
-      env:
-      - name: KUBECONFIG
-        value: /etc/build-farm-credentials/sa.config-updater.app.ci.config:/etc/build-farm-credentials/sa.config-updater.build01.config:/etc/build-farm-credentials/sa.config-updater.build02.config:/etc/build-farm-credentials/sa.config-updater.vsphere.config
       image: serviceaccount-secret-rotation-trigger:latest
       imagePullPolicy: Always
       name: ""
@@ -155,16 +153,7 @@ periodics:
     volumes:
     - name: build-farm-credentials
       secret:
-        items:
-        - key: sa.config-updater.app.ci.config
-          path: sa.config-updater.app.ci.config
-        - key: sa.config-updater.build01.config
-          path: sa.config-updater.build01.config
-        - key: sa.config-updater.build02.config
-          path: sa.config-updater.build02.config
-        - key: sa.config-updater.vsphere.config
-          path: sa.config-updater.vsphere.config
-        secretName: build-farm-credentials
+        secretName: config-updater
 - agent: kubernetes
   cluster: app.ci
   cron: 0 1 * * *
@@ -197,7 +186,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210824-9ef10941f6
+      image: gcr.io/k8s-prow/commenter:v20210831-87a76d4505
       imagePullPolicy: Always
       name: ""
       resources:
@@ -237,7 +226,7 @@ periodics:
       - --random
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210824-9ef10941f6
+      image: gcr.io/k8s-prow/commenter:v20210831-87a76d4505
       imagePullPolicy: Always
       name: ""
       resources:
@@ -266,6 +255,7 @@ periodics:
         repo:operator-framework/operator-lib
         repo:tnozicka/openshift-acme
         -label:lifecycle/frozen
+        -label:tide/merge-blocker
         label:lifecycle/rotten
       - --updated=720h
       - --token=/etc/oauth/oauth
@@ -282,7 +272,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210824-9ef10941f6
+      image: gcr.io/k8s-prow/commenter:v20210831-87a76d4505
       imagePullPolicy: Always
       name: ""
       resources:
@@ -310,6 +300,7 @@ periodics:
         repo:operator-framework/operator-sdk
         repo:operator-framework/operator-lib
         repo:tnozicka/openshift-acme
+        -label:tide/merge-blocker
         -label:lifecycle/frozen
         label:lifecycle/stale
         -label:lifecycle/rotten
@@ -331,7 +322,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210824-9ef10941f6
+      image: gcr.io/k8s-prow/commenter:v20210831-87a76d4505
       imagePullPolicy: Always
       name: ""
       resources:
@@ -362,6 +353,7 @@ periodics:
         -label:lifecycle/frozen
         -label:lifecycle/stale
         -label:lifecycle/rotten
+        -label:tide/merge-blocker
       - --updated=2160h
       - --token=/etc/oauth/oauth
       - |-
@@ -379,7 +371,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210824-9ef10941f6
+      image: gcr.io/k8s-prow/commenter:v20210831-87a76d4505
       imagePullPolicy: Always
       name: ""
       resources:
@@ -413,7 +405,7 @@ periodics:
       - --debug
       command:
       - /app/label_sync/app.binary
-      image: gcr.io/k8s-prow/label_sync:v20210824-9ef10941f6
+      image: gcr.io/k8s-prow/label_sync:v20210831-87a76d4505
       imagePullPolicy: Always
       name: ""
       resources:
@@ -647,37 +639,6 @@ periodics:
         - key: gce.json
           path: gce.json
         secretName: cluster-secrets-gcp-openshift-gce-devel-ci-2
-- agent: kubernetes
-  cluster: app.ci
-  decorate: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: release
-  interval: 12h
-  labels:
-    ci.openshift.io/role: infra
-  name: periodic-prow-image-autobump
-  spec:
-    containers:
-    - args:
-      - --config=core-services/prow/02_config/_bumper.yaml
-      command:
-      - /app/prow/cmd/generic-autobumper/app.binary
-      image: gcr.io/k8s-prow/generic-autobumper:v20210824-9ef10941f6
-      imagePullPolicy: IfNotPresent
-      name: autobump
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /etc/github
-        name: token
-        readOnly: true
-    volumes:
-    - name: token
-      secret:
-        secretName: github-credentials-openshift-bot
 - agent: kubernetes
   cluster: app.ci
   cron: '@hourly'
@@ -920,7 +881,7 @@ periodics:
       - --github-enabled-org=openshift
       command:
       - /app/prow/cmd/branchprotector/app.binary
-      image: gcr.io/k8s-prow/branchprotector:v20210824-9ef10941f6
+      image: gcr.io/k8s-prow/branchprotector:v20210831-87a76d4505
       imagePullPolicy: Always
       name: ""
       resources:
@@ -968,7 +929,7 @@ periodics:
           secretKeyRef:
             key: appid
             name: openshift-prow-github-app
-      image: gcr.io/k8s-prow/branchprotector:v20210824-9ef10941f6
+      image: gcr.io/k8s-prow/branchprotector:v20210831-87a76d4505
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1017,7 +978,7 @@ periodics:
       - --github-allowed-burst=600
       command:
       - /app/prow/cmd/peribolos/app.binary
-      image: gcr.io/k8s-prow/peribolos:v20210824-9ef10941f6
+      image: gcr.io/k8s-prow/peribolos:v20210831-87a76d4505
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1126,7 +1087,7 @@ periodics:
         items:
         - key: sa.config-updater.build01.config
           path: kubeconfig
-        secretName: build-farm-credentials
+        secretName: config-updater
 - agent: kubernetes
   cluster: app.ci
   decorate: true
@@ -1180,7 +1141,7 @@ periodics:
         items:
         - key: sa.config-updater.build02.config
           path: kubeconfig
-        secretName: build-farm-credentials
+        secretName: config-updater
 - agent: kubernetes
   cluster: app.ci
   decorate: true
@@ -1224,7 +1185,7 @@ periodics:
         items:
         - key: sa.config-updater.vsphere.config
           path: kubeconfig
-        secretName: build-farm-credentials
+        secretName: config-updater
 - agent: kubernetes
   cluster: app.ci
   decorate: true
@@ -1248,7 +1209,7 @@ periodics:
       - --kubeconfig-dir=/etc/build-farm-credentials
       command:
       - /app/prow/cmd/config-bootstrapper/app.binary
-      image: gcr.io/k8s-prow/config-bootstrapper:v20210824-9ef10941f6
+      image: gcr.io/k8s-prow/config-bootstrapper:v20210831-87a76d4505
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1629,11 +1590,9 @@ periodics:
       - --bw-allow-unused=dptp/quay.io/multi-arch
       - --bw-allow-unused=dptp/cluster-bot-cloud-sso-for-ocm-ephemeral-osd
       - --bw-allow-unused=dptp/cluster-bot-aws-account-for-ephemeral-osd
+      - --kubeconfig-dir=/etc/build-farm-credentials
       command:
       - /usr/bin/ci-secret-bootstrap
-      env:
-      - name: KUBECONFIG
-        value: /etc/build-farm-credentials/sa.config-updater.app.ci.config:/etc/build-farm-credentials/sa.config-updater.build01.config:/etc/build-farm-credentials/sa.config-updater.build02.config:/etc/build-farm-credentials/sa.config-updater.vsphere.config:/etc/build-farm-credentials/sa.config-updater.arm01.config:/etc/build-farm-credentials/sa.config-updater.hive.config
       image: registry.ci.openshift.org/ci/ci-secret-bootstrap:latest
       imagePullPolicy: Always
       name: ci-secret-bootstrap
@@ -1661,20 +1620,7 @@ periodics:
       name: ci-secret-bootstrap
     - name: build-farm-credentials
       secret:
-        items:
-        - key: sa.config-updater.app.ci.config
-          path: sa.config-updater.app.ci.config
-        - key: sa.config-updater.build01.config
-          path: sa.config-updater.build01.config
-        - key: sa.config-updater.build02.config
-          path: sa.config-updater.build02.config
-        - key: sa.config-updater.vsphere.config
-          path: sa.config-updater.vsphere.config
-        - key: sa.config-updater.arm01.config
-          path: sa.config-updater.arm01.config
-        - key: sa.config-updater.hive.config
-          path: sa.config-updater.hive.config
-        secretName: build-farm-credentials
+        secretName: config-updater
     - emptyDir: {}
       name: config-volume
 - agent: kubernetes
@@ -1808,7 +1754,7 @@ periodics:
         items:
         - key: sa.config-updater.arm01.config
           path: kubeconfig
-        secretName: build-farm-credentials
+        secretName: config-updater
 - agent: kubernetes
   cluster: app.ci
   decorate: true
@@ -1846,7 +1792,7 @@ periodics:
         items:
         - key: sa.config-updater.hive.config
           path: kubeconfig
-        secretName: build-farm-credentials
+        secretName: config-updater
 - agent: kubernetes
   cluster: app.ci
   decorate: true
@@ -1865,7 +1811,7 @@ periodics:
       - --dry-run=false
       command:
       - /app/prow/cmd/invitations-accepter/app.binary
-      image: gcr.io/k8s-prow/invitations-accepter:v20210824-9ef10941f6
+      image: gcr.io/k8s-prow/invitations-accepter:v20210831-87a76d4505
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1897,7 +1843,7 @@ periodics:
       - --dry-run=false
       command:
       - /app/prow/cmd/invitations-accepter/app.binary
-      image: gcr.io/k8s-prow/invitations-accepter:v20210824-9ef10941f6
+      image: gcr.io/k8s-prow/invitations-accepter:v20210831-87a76d4505
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1929,7 +1875,7 @@ periodics:
       - --dry-run=false
       command:
       - /app/prow/cmd/invitations-accepter/app.binary
-      image: gcr.io/k8s-prow/invitations-accepter:v20210824-9ef10941f6
+      image: gcr.io/k8s-prow/invitations-accepter:v20210831-87a76d4505
       imagePullPolicy: Always
       name: ""
       resources:

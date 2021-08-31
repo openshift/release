@@ -180,9 +180,7 @@ spec:
         - -tls-key-file=/var/run/serving-cert/tls.key
         - -vault-addr=http://127.0.0.1:8200
         - -vault-role=vault-subpath-proxy
-        env:
-        - name: KUBECONFIG
-          value: /etc/build-farm-credentials/sa.config-updater.app.ci.config:/etc/build-farm-credentials/sa.config-updater.build01.config:/etc/build-farm-credentials/sa.config-updater.build02.config:/etc/build-farm-credentials/sa.config-updater.vsphere.config:/etc/build-farm-credentials/sa.config-updater.arm01.config:/etc/build-farm-credentials/sa.config-updater.hive.config
+        - --kubeconfig-dir=/etc/build-farm-credentials
         volumeMounts:
         - name: serving-cert
           mountPath: /var/run/serving-cert
@@ -287,20 +285,7 @@ spec:
               fieldPath: metadata.annotations['config.hcl']
       - name: build-farm-credentials
         secret:
-          items:
-          - key: sa.config-updater.app.ci.config
-            path: sa.config-updater.app.ci.config
-          - key: sa.config-updater.build01.config
-            path: sa.config-updater.build01.config
-          - key: sa.config-updater.build02.config
-            path: sa.config-updater.build02.config
-          - key: sa.config-updater.vsphere.config
-            path: sa.config-updater.vsphere.config
-          - key: sa.config-updater.arm01.config
-            path: sa.config-updater.arm01.config
-          - key: sa.config-updater.hive.config
-            path: sa.config-updater.hive.config
-          secretName: build-farm-credentials
+          secretName: config-updater
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
