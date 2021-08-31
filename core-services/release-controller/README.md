@@ -1,4 +1,4 @@
-release-controller
+test-pr-release-controller
 ==================
 
 Source code for the controller is at https://github.com/openshift/release-controller
