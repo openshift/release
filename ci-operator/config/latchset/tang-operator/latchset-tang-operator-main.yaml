@@ -1,0 +1,42 @@
+base_images:
+  base:
+    name: "4.9"
+    namespace: ocp
+    tag: base
+binary_build_commands: make
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.16
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.8:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
+  to: tang-operator
+promotion:
+  name: "4.9"
+  namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 200m
+      memory: 400Mi
+tests:
+- as: test
+  commands: make test
+  container:
+    from: src
+tag_specification:
+  name: "4.9"
+  namespace: ocp
+test_binary_build_commands: make test
+zz_generated_metadata:
+  branch: main
+  org: latchset
+  repo: tang-operator
