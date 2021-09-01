@@ -60,6 +60,14 @@ fi
 rm -f /tmp/err.txt
 vm_template="${ova_url##*/}"
 
+# select a hardware version for testing
+hw_versions=(13 15 17)
+hw_available_versions=${#hw_versions[@]}
+selected_hw_version_index=$((RANDOM % ${hw_available_versions}))
+target_hw_version=${hw_versions[$selected_hw_version_index]}
+echo "$(date -u --rfc-3339=seconds) - Selected hardware version ${target_hw_version}"
+vm_template=${vm_template}-hw${target_hw_version}
+
 echo "$(date -u --rfc-3339=seconds) - Creating govc.sh file..."
 cat >> "${SHARED_DIR}/govc.sh" << EOF
 export GOVC_URL=vcenter.sddc-44-236-21-251.vmwarevmc.com
