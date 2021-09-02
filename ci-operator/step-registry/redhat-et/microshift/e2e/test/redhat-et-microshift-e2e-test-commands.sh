@@ -71,6 +71,9 @@ while :; do
   fi
   sleep 10
 done
+
+openshift-tests run kubernetes/conformance --provider=none
+
 EOF
 chmod +x "${HOME}"/run-smoke-tests.sh
 
@@ -80,7 +83,7 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJE
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
   --command 'sudo dnf install subscription-manager -y'
-  
+
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
