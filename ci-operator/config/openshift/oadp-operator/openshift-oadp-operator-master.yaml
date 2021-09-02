@@ -7,6 +7,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.16-openshift-4.9
+  test_temp:
+    name: test-oadp-operator
+    namespace: openshift
+    tag: test
 build_root:
   image_stream_tag:
     name: release
@@ -28,14 +32,14 @@ operator:
   - dockerfile_path: build/Dockerfile.bundle
   substitutions:
   - pullspec: quay.io/konveyor/oadp-operator:latest
-    with: oadp-operator
+    with: test-oadp-operator
 promotion:
   additional_images:
-    test-oadp-operator: src
+    test: test-oadp-operator
   excluded_images:
   - oadp-operator
-  name: test-oadp-operator
   namespace: openshift
+  name: test-oadp-operator
 releases:
   latest:
     release:
@@ -58,7 +62,7 @@ tests:
       - mount_path: /var/run/oadp-credentials
         name: oadp-credentials
         namespace: test-credentials
-      from: test-oadp-operators
+      from: test_temp
       resources:
         requests:
           cpu: 100m
