@@ -7,7 +7,12 @@ set -o pipefail
 # TODO: move to image
 curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
 
-export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+if [ "${AWS_REGION_OVERRIDE}" == "cn-north-1" ] || [ "${AWS_REGION_OVERRIDE}" == "cn-northwest-1" ]; then
+  # use inject credential
+  export AWS_SHARED_CREDENTIALS_FILE="/var/run/aws-china-credential/.awscred"
+else
+  export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+fi
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
@@ -15,7 +20,13 @@ expiration_date=$(date -d '8 hours' --iso=minutes --utc)
 
 function join_by { local IFS="$1"; shift; echo "$*"; }
 
-REGION="${LEASED_RESOURCE}"
+# If no REGION was not provided by user, will get region from Boskos lease
+if [ -z ${AWS_REGION_OVERRIDE} ]; then
+  REGION="${LEASED_RESOURCE}"
+else
+  REGION="${AWS_REGION_OVERRIDE}"
+fi
+
 # BootstrapInstanceType gets its value from pkg/types/aws/defaults/platform.go
 architecture="amd64"
 arch_instance_type=m5
@@ -95,4 +106,15 @@ compute:
     aws:
       type: ${COMPUTE_NODE_TYPE}
 EOF
+
+if [ -z ${AWS_RHCOS_AMI_OVERRIDE} ]; then
+  CONFIG_PATCH_AMI="${SHARED_DIR}/install-config-ami.yaml.patch"
+  cat >> "${CONFIG_PATCH_AMI}" << EOF
+platform:
+  aws:
+    amiID: ${AWS_RHCOS_AMI_OVERRIDE}
+EOF
+  /tmp/yq m -x -i "${CONFIG}" "${CONFIG_PATCH_AMI}"  
+fi
+
 /tmp/yq m -x -i "${CONFIG}" "${PATCH}"
