@@ -8,9 +8,8 @@ set -o pipefail
 curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
 
 case "${CLUSTER_TYPE}" in
-aws|aws-arm64) export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred;;
 aws-china) export AWS_SHARED_CREDENTIALS_FILE=/var/run/aws-china-credential/.awscred;;
-*) ;;
+*) export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred";;
 esac
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
@@ -20,7 +19,6 @@ expiration_date=$(date -d '8 hours' --iso=minutes --utc)
 function join_by { local IFS="$1"; shift; echo "$*"; }
 
 REGION="${LEASED_RESOURCE}"
-
 # BootstrapInstanceType gets its value from pkg/types/aws/defaults/platform.go
 architecture="amd64"
 arch_instance_type=m5
