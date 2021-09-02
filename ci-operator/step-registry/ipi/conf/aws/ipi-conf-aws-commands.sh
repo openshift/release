@@ -7,12 +7,11 @@ set -o pipefail
 # TODO: move to image
 curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
 
-if [ "${AWS_REGION_OVERRIDE}" == "cn-north-1" ] || [ "${AWS_REGION_OVERRIDE}" == "cn-northwest-1" ]; then
-  # use inject credential
-  export AWS_SHARED_CREDENTIALS_FILE="/var/run/aws-china-credential/.awscred"
-else
-  export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-fi
+case "${CLUSTER_TYPE}" in
+aws|aws-arm64) export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred;;
+aws-china) export AWS_SHARED_CREDENTIALS_FILE=/var/run/aws-china-credential/.awscred;;
+*) ;;
+esac
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
@@ -20,12 +19,7 @@ expiration_date=$(date -d '8 hours' --iso=minutes --utc)
 
 function join_by { local IFS="$1"; shift; echo "$*"; }
 
-# If no REGION was not provided by user, will get region from Boskos lease
-if [ -z ${AWS_REGION_OVERRIDE} ]; then
-  REGION="${LEASED_RESOURCE}"
-else
-  REGION="${AWS_REGION_OVERRIDE}"
-fi
+REGION="${LEASED_RESOURCE}"
 
 # BootstrapInstanceType gets its value from pkg/types/aws/defaults/platform.go
 architecture="amd64"
@@ -107,12 +101,19 @@ compute:
       type: ${COMPUTE_NODE_TYPE}
 EOF
 
-if [ ! -z ${AWS_RHCOS_AMI_OVERRIDE} ]; then
+# AMIs for China regions
+case "${REGION}" in
+cn-north-1) export RHCOS_AMI=ami-0965462adbf583cbc;;
+cn-northwest-1) export RHCOS_AMI=ami-035817c6481d7092c;;
+*) ;;
+esac
+
+if [ ! -z ${RHCOS_AMI} ]; then
   CONFIG_PATCH_AMI="${SHARED_DIR}/install-config-ami.yaml.patch"
   cat >> "${CONFIG_PATCH_AMI}" << EOF
 platform:
   aws:
-    amiID: ${AWS_RHCOS_AMI_OVERRIDE}
+    amiID: ${RHCOS_AMI}
 EOF
   /tmp/yq m -x -i "${CONFIG}" "${CONFIG_PATCH_AMI}"  
 fi

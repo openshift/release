@@ -6,12 +6,11 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-if [ "${AWS_REGION_OVERRIDE}" == "cn-north-1" ] || [ "${AWS_REGION_OVERRIDE}" == "cn-northwest-1" ]; then
-  # use inject credential
-  export AWS_SHARED_CREDENTIALS_FILE="/var/run/aws-china-credential/.awscred"
-else
-  export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-fi
+case "${CLUSTER_TYPE}" in
+aws|aws-arm64) export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred;;
+aws-china) export AWS_SHARED_CREDENTIALS_FILE=/var/run/aws-china-credential/.awscred;;
+*) ;;
+esac
 
 export AZURE_AUTH_LOCATION=$CLUSTER_PROFILE_DIR/osServicePrincipal.json
 export GOOGLE_CLOUD_KEYFILE_JSON=$CLUSTER_PROFILE_DIR/gce.json
