@@ -107,7 +107,7 @@ compute:
       type: ${COMPUTE_NODE_TYPE}
 EOF
 
-if [ -z ${AWS_RHCOS_AMI_OVERRIDE} ]; then
+if [ ! -z ${AWS_RHCOS_AMI_OVERRIDE} ]; then
   CONFIG_PATCH_AMI="${SHARED_DIR}/install-config-ami.yaml.patch"
   cat >> "${CONFIG_PATCH_AMI}" << EOF
 platform:
