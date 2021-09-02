@@ -23,7 +23,7 @@ elif [[ "${SIZE_VARIANT}" == "compact" ]]; then
 fi
 
 cat >> "${CONFIG}" << EOF
-baseDomain: ci.azure.devcluster.openshift.com
+baseDomain: ${BASE_DOMAIN}
 platform:
   azure:
     baseDomainResourceGroupName: os4-common
