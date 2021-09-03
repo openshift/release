@@ -1,4 +1,8 @@
 base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
   open-cluster-management_builder_go1.16-linux:
     name: builder
     namespace: open-cluster-management
@@ -14,7 +18,11 @@ build_root:
     tag: go1.16-linux
 images:
 - dockerfile_path: Dockerfile.prow
-  from: open-cluster-management_builder_go1.16-linux
+  from: base
+  inputs:
+    open-cluster-management_builder_go1.16-linux:
+      as:
+      - registry.ci.openshift.org/open-cluster-management/builder:go1.16-linux
   to: applifecycle-backend-e2e
 promotion:
   name: "2.4"
