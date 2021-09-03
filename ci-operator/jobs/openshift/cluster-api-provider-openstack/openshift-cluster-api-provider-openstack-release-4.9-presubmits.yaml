@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-openstack
     decorate: true
     labels:
@@ -71,7 +71,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-openstack-byon
     decorate: true
     labels:
@@ -133,11 +133,77 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-openstack-byon,?($|\s.*)
   - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.9$
+    - ^release-4\.9-
+    cluster: build01
+    context: ci/prow/e2e-openstack-operator
+    decorate: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-api-provider-openstack-release-4.9-e2e-openstack-operator
+    path_alias: sigs.k8s.io/cluster-api-provider-openstack
+    rerun_command: /test e2e-openstack-operator
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-openstack-operator-cluster-profile
+        - --target=e2e-openstack-operator
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-openstack-operator-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-openstack-vexxhost
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-openstack-operator,?($|\s.*)
+  - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-openstack-parallel
     decorate: true
     labels:
@@ -204,7 +270,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-upgrade
     decorate: true
     labels:
@@ -271,7 +337,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build02
+    cluster: build01
     context: ci/prow/gofmt
     decorate: true
     labels:
@@ -319,7 +385,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build02
+    cluster: build01
     context: ci/prow/golint
     decorate: true
     labels:
@@ -367,7 +433,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build02
+    cluster: build01
     context: ci/prow/govet
     decorate: true
     labels:
@@ -415,7 +481,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build02
+    cluster: build01
     context: ci/prow/images
     decorate: true
     labels:
@@ -463,7 +529,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build02
+    cluster: build01
     context: ci/prow/unit
     decorate: true
     labels:

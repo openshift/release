@@ -19,12 +19,6 @@
       'release-openshift-ocp-installer-e2e-gcp-rt-4.5': {
         receiver: 'kni-cnf',
       },
-      'release-openshift-ocp-installer-cluster-logging-operator-e2e-4.5': {
-        receiver: 'openshift-logging',
-      },
-      'release-openshift-ocp-installer-elasticsearch-operator-e2e-4.5': {
-        receiver: 'openshift-logging',
-      },
       'periodic-ci-operator-framework-operator-lifecycle-managment-master-rhoperator-metric-e2e-aws-olm-master-daily': {
         receiver: 'OLM-rh-operators',
       },

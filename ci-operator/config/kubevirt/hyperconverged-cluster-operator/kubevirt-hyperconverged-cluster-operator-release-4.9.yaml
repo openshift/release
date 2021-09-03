@@ -10,15 +10,15 @@ base_images:
   hco-index:
     name: hyperconverged-cluster-index
     namespace: ci
-    tag: 1.5.0-unstable
+    tag: 1.6.0-unstable
   hco-index-prev:
     name: hyperconverged-cluster-index
     namespace: ci
-    tag: 1.4.0-unstable
-  ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+    tag: 1.5.0-unstable
+  open-cluster-management_builder_go1.17-linux:
     name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.16-openshift-4.9
+    namespace: open-cluster-management
+    tag: go1.17-linux
 binary_build_commands: make install
 build_root:
   image_stream_tag:
@@ -42,11 +42,14 @@ images:
       - destination_dir: .
         source_path: /go/bin/hyperconverged-cluster-webhook
   to: hyperconverged-cluster-webhook
+- dockerfile_path: build/Dockerfile.artifacts
+  optional: true
+  to: virt-artifacts-server
 - dockerfile_path: build/Dockerfile.functest.ci
   inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+    open-cluster-management_builder_go1.17-linux:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
+      - registry.ci.openshift.org/open-cluster-management/builder:go1.17-linux
   to: hyperconverged-cluster-functest
 - dockerfile_path: deploy/Dockerfile.src.ci
   from: src
@@ -75,6 +78,8 @@ operator:
     with: hyperconverged-cluster-operator
   - pullspec: +WEBHOOK_IMAGE_TO_REPLACE+
     with: hyperconverged-cluster-webhook
+  - pullspec: +ARTIFACTS_SERVER_IMAGE_TO_REPLACE+
+    with: virt-artifacts-server
 promotion:
   additional_images:
     hyperconverged-cluster-operator-tests: src
@@ -94,7 +99,7 @@ tests:
   steps:
     cluster_profile: azure4
     env:
-      OO_CHANNEL: 1.5.0
+      OO_CHANNEL: 1.6.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
@@ -113,7 +118,7 @@ tests:
   steps:
     cluster_profile: azure4
     env:
-      OO_CHANNEL: 1.5.0
+      OO_CHANNEL: 1.6.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
@@ -132,7 +137,7 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      OO_CHANNEL: 1.5.0
+      OO_CHANNEL: 1.6.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
@@ -151,7 +156,7 @@ tests:
   steps:
     cluster_profile: gcp
     env:
-      OO_CHANNEL: 1.5.0
+      OO_CHANNEL: 1.6.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
@@ -170,7 +175,7 @@ tests:
   steps:
     cluster_profile: gcp
     env:
-      OO_CHANNEL: 1.5.0
+      OO_CHANNEL: 1.6.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
@@ -191,7 +196,7 @@ tests:
     dependencies:
       OO_INDEX: ci-index-hco-upgrade-bundle
     env:
-      OO_CHANNEL: 1.5.0
+      OO_CHANNEL: 1.6.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
@@ -210,7 +215,7 @@ tests:
     dependencies:
       OO_INDEX: ci-index-hco-upgrade-bundle
     env:
-      OO_CHANNEL: 1.5.0
+      OO_CHANNEL: 1.6.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
@@ -229,7 +234,7 @@ tests:
     dependencies:
       OO_INDEX: ci-index-hco-upgrade-prev-bundle
     env:
-      OO_CHANNEL: 1.4.0
+      OO_CHANNEL: 1.5.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
@@ -248,7 +253,7 @@ tests:
     dependencies:
       OO_INDEX: ci-index-hco-upgrade-prev-bundle
     env:
-      OO_CHANNEL: 1.4.0
+      OO_CHANNEL: 1.5.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'

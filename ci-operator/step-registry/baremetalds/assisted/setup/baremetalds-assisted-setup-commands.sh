@@ -38,7 +38,7 @@ timeout -s 9 175m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*
 
 set -xeuo pipefail
 
-yum install -y git sysstat sos
+yum install -y git sysstat sos jq
 systemctl start sysstat
 
 mkdir -p /tmp/artifacts
@@ -79,7 +79,7 @@ set -e
 
 if [ "${JOB_TYPE:-}" = "presubmit" ] && (( ! \${IS_REHEARSAL} )); then
   # We would like to keep running a stable version for PRs
-  echo "export OPENSHIFT_VERSION=4.7" >> /root/config
+  echo "export OPENSHIFT_VERSION=4.8" >> /root/config
 
   if [ "${REPO_NAME:-}" = "assisted-service" ]; then
     echo "export SERVICE_BRANCH=${PULL_PULL_SHA:-master}" >> /root/config
@@ -100,8 +100,7 @@ echo "export TEST_TEARDOWN=false" >> /root/config
 echo "export TEST_FUNC=test_install" >> /root/config
 echo "export INSTALLER_KUBECONFIG=\${REPO_DIR}/build/kubeconfig" >> /root/config
 
-if [[ -e /root/assisted-additional-config ]]
-then
+if [[ -e /root/assisted-additional-config ]]; then
   cat /root/assisted-additional-config >> /root/config
 fi
 
@@ -110,6 +109,12 @@ source /root/config
 make \${MAKEFILE_TARGET:-create_full_environment run test_parallel}
 
 EOF
+
+
+if [[ -n "${POST_INSTALL_COMMANDS:-}" ]]; then
+  echo "${POST_INSTALL_COMMANDS}" > "${SHARED_DIR}/assisted-post-install.sh"
+  scp "${SSHOPTS[@]}" "${SHARED_DIR}/assisted-post-install.sh" "root@${IP}:assisted-post-install.sh"
+fi
 
 # Post-installation commands
 ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths\{0,1\}".*/*** PULL_SECRET ***/g'
@@ -122,6 +127,8 @@ source /root/config
 echo "export KUBECONFIG=/home/assisted/build/kubeconfig" >> /root/.bashrc
 export KUBECONFIG=/home/assisted/build/kubeconfig
 
-eval \${POST_INSTALL_COMMAND:-}
+if [[ -e "/root/assisted-post-install.sh" ]]; then
+  source "/root/assisted-post-install.sh"
+fi
 
 EOF

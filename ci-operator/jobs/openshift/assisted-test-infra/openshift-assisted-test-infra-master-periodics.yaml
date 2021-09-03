@@ -19,11 +19,9 @@ periodics:
       job_states_to_report:
       - failure
       - error
-      report_template: '{{if eq .Status.State "success"}} :green_jenkins_circle: Job
-        *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
-        :green_jenkins_circle: {{else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended
-        with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :red_jenkins_circle:
-        {{end}}'
+      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
+        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs>'
   spec:
     containers:
     - args:
@@ -69,8 +67,6 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-packet
-        - configMap:
-            name: cluster-profile-packet
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -97,11 +93,9 @@ periodics:
       job_states_to_report:
       - failure
       - error
-      report_template: '{{if eq .Status.State "success"}} :green_jenkins_circle: Job
-        *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
-        :green_jenkins_circle: {{else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended
-        with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :red_jenkins_circle:
-        {{end}}'
+      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
+        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs>'
   spec:
     containers:
     - args:
@@ -147,8 +141,80 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-packet
-        - configMap:
-            name: cluster-profile-packet
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
+  cron: '@daily'
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: assisted-test-infra
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-multi-version-periodic
+  reporter_config:
+    slack:
+      channel: '#assisted-deployment-ci'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
+        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs>'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/usr/local/e2e-metal-assisted-multi-version-periodic-cluster-profile
+      - --target=e2e-metal-assisted-multi-version-periodic
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/e2e-metal-assisted-multi-version-periodic-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-packet
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -214,8 +280,6 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-packet
-        - configMap:
-            name: cluster-profile-packet
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -242,11 +306,9 @@ periodics:
       job_states_to_report:
       - failure
       - error
-      report_template: '{{if eq .Status.State "success"}} :green_jenkins_circle: Job
-        *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
-        :green_jenkins_circle: {{else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended
-        with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :red_jenkins_circle:
-        {{end}}'
+      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
+        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs>'
   spec:
     containers:
     - args:
@@ -292,8 +354,6 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-packet
-        - configMap:
-            name: cluster-profile-packet
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -320,11 +380,9 @@ periodics:
       job_states_to_report:
       - failure
       - error
-      report_template: '{{if eq .Status.State "success"}} :green_jenkins_circle: Job
-        *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
-        :green_jenkins_circle: {{else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended
-        with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :red_jenkins_circle:
-        {{end}}'
+      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
+        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs>'
   spec:
     containers:
     - args:
@@ -370,8 +428,6 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-packet
-        - configMap:
-            name: cluster-profile-packet
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -398,11 +454,9 @@ periodics:
       job_states_to_report:
       - failure
       - error
-      report_template: '{{if eq .Status.State "success"}} :green_jenkins_circle: Job
-        *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
-        :green_jenkins_circle: {{else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended
-        with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :red_jenkins_circle:
-        {{end}}'
+      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
+        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs>'
   spec:
     containers:
     - args:
@@ -448,8 +502,6 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-packet
-        - configMap:
-            name: cluster-profile-packet
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -476,11 +528,9 @@ periodics:
       job_states_to_report:
       - failure
       - error
-      report_template: '{{if eq .Status.State "success"}} :green_jenkins_circle: Job
-        *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
-        :green_jenkins_circle: {{else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended
-        with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :red_jenkins_circle:
-        {{end}}'
+      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
+        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs>'
   spec:
     containers:
     - args:
@@ -526,8 +576,6 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-packet
-        - configMap:
-            name: cluster-profile-packet
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -554,11 +602,9 @@ periodics:
       job_states_to_report:
       - failure
       - error
-      report_template: '{{if eq .Status.State "success"}} :green_jenkins_circle: Job
-        *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
-        :green_jenkins_circle: {{else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended
-        with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :red_jenkins_circle:
-        {{end}}'
+      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
+        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs>'
   spec:
     containers:
     - args:
@@ -604,8 +650,6 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-packet
-        - configMap:
-            name: cluster-profile-packet
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -626,17 +670,6 @@ periodics:
     ci-operator.openshift.io/prowgen-controlled: "true"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-test-infra-master-system-test-operator-periodic
-  reporter_config:
-    slack:
-      channel: '#assisted-deployment-ci'
-      job_states_to_report:
-      - failure
-      - error
-      report_template: '{{if eq .Status.State "success"}} :green_jenkins_circle: Job
-        *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
-        :green_jenkins_circle: {{else}} :red_jenkins_circle: Job *{{.Spec.Job}}* ended
-        with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :red_jenkins_circle:
-        {{end}}'
   spec:
     containers:
     - args:
@@ -682,8 +715,6 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-packet
-        - configMap:
-            name: cluster-profile-packet
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
