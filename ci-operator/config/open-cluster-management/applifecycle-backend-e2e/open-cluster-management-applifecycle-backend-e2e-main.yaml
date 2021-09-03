@@ -1,4 +1,8 @@
 base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
   open-cluster-management_builder_go1.16-linux:
     name: builder
     namespace: open-cluster-management
@@ -14,7 +18,11 @@ build_root:
     tag: go1.16-linux
 images:
 - dockerfile_path: Dockerfile.prow
-  from: open-cluster-management_builder_go1.16-linux
+  from: base
+  inputs:
+    open-cluster-management_builder_go1.16-linux:
+      as:
+      - registry.ci.openshift.org/open-cluster-management/builder:go1.16-linux
   to: applifecycle-backend-e2e
 promotion:
   name: "2.4"
@@ -57,6 +65,15 @@ tests:
   secrets:
   - mount_path: /etc/github
     name: acm-cicd-github
+- as: pr-merge-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: applifecycle-backend-e2e
+    env:
+      IMAGE_REPO: applifecycle-backend-e2e
+      REGISTRY_ORG: open-cluster-management
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
   branch: main
   org: open-cluster-management
