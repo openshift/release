@@ -50,7 +50,7 @@ This is done via `servicemonitors.monitoring.coreos.com`. See sinker as example:
 $ oc get servicemonitors.monitoring.coreos.com -n prow-monitoring sinker -o yaml
 ```
 
-The `svc` should be available on the UI `https://grafana-prow-monitoring.https://grafana-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/targets` after the new `servicemonitor` is created.
+The `svc` should be available [on the UI](https://grafana-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/targets) after the new `servicemonitor` is created.
 
 _Note_ that the serviemonitor has to have label `prow-app` as key (value could be an arbitrary string).
 
