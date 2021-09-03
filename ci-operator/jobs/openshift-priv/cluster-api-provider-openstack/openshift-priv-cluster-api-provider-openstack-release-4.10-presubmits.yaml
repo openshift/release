@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-openstack
     decorate: true
     hidden: true
@@ -79,7 +79,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-openstack-byon
     decorate: true
     hidden: true
@@ -153,7 +153,81 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build02
+    context: ci/prow/e2e-openstack-operator
+    decorate: true
+    hidden: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-cluster-api-provider-openstack-release-4.10-e2e-openstack-operator
+    path_alias: sigs.k8s.io/cluster-api-provider-openstack
+    rerun_command: /test e2e-openstack-operator
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-openstack-operator-cluster-profile
+        - --target=e2e-openstack-operator
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-openstack-operator-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-openstack-vexxhost
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-openstack-operator,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.10$
+    - ^release-4\.10-
+    cluster: build02
     context: ci/prow/e2e-openstack-parallel
     decorate: true
     hidden: true
@@ -227,7 +301,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-upgrade
     decorate: true
     hidden: true
@@ -301,7 +375,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build02
     context: ci/prow/gofmt
     decorate: true
     hidden: true
@@ -357,7 +431,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build02
     context: ci/prow/golint
     decorate: true
     hidden: true
@@ -413,7 +487,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build02
     context: ci/prow/govet
     decorate: true
     hidden: true
@@ -469,7 +543,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build02
     context: ci/prow/images
     decorate: true
     hidden: true
@@ -525,7 +599,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build02
     context: ci/prow/unit
     decorate: true
     hidden: true

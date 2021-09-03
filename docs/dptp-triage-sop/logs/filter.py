@@ -99,7 +99,7 @@ elif mode == "errors":
         ),
         # deck is spamming us for no good reason
         lambda message: "deck" in message.get("component", "") and
-        "error executing template pr-history.html" in message.get("msg", ""),
+        "error executing template" in message.get("msg", ""),
         # deck trying to talk to Tide, this fails when we bump. We have probes in Tide so we get alerted when it's down for longer time.
         lambda message: "deck" in message.get("component", "") and
         "Updating" in message.get("msg", "") and
@@ -110,7 +110,15 @@ elif mode == "errors":
             any(
                 s in message.get(m, "") for s in ["connect: connection refused", "i/o timeout"]
             ) for m in ["msg", "error"]
+        ),
+        # DPTP-2462
+        lambda message: "vault-secret-collection-manager" in message.get("component", "") and
+        "Failed to reconcile policies" in message.get("msg", "") and
+        "missing client token" in message.get("error", "") and
+        any(
+            err in message.get("error", "") for err in ("failed to get policy", "failed to list policies")
         )
+        ,
     ]
 else:
     print("Filter mode must be 'warnings' or 'errors', not " + mode)

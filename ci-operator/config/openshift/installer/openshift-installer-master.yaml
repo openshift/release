@@ -15,10 +15,10 @@ base_images:
     name: "4.9"
     namespace: ocp
     tag: cli
-  ocp_builder_rhel-8-golang-1.15-openshift-4.8:
+  ocp_builder_rhel-8-golang-1.16-openshift-4.8:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.15-openshift-4.8
+    tag: rhel-8-golang-1.16-openshift-4.8
   ocp_builder_rhel-8-golang-1.16-openshift-4.9:
     name: builder
     namespace: ocp
@@ -37,9 +37,6 @@ images:
 - dockerfile_path: images/installer/Dockerfile.ci
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.15-openshift-4.8:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
     ocp_builder_rhel-8-golang-1.16-openshift-4.9:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
@@ -47,9 +44,6 @@ images:
 - dockerfile_path: images/installer-artifacts/Dockerfile.rhel
   from: installer
   inputs:
-    ocp_builder_rhel-8-golang-1.15-openshift-4.8:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
     ocp_builder_rhel-8-golang-1.16-openshift-4.9:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
@@ -57,9 +51,9 @@ images:
 - dockerfile_path: images/libvirt/Dockerfile.ci
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.15-openshift-4.8:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.8:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
   to: libvirt-installer
 - dockerfile_path: images/installer/Dockerfile.upi.ci
   from: rhel-7
@@ -67,16 +61,16 @@ images:
     ocp_4.8_cli:
       as:
       - registry.ci.openshift.org/ocp/4.8:cli
-    ocp_builder_rhel-8-golang-1.15-openshift-4.8:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.8:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
   to: upi-installer
 - dockerfile_path: images/openstack/Dockerfile.ci
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.15-openshift-4.8:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.8:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
     origin_4.8_cli:
       as:
       - registry.ci.openshift.org/origin/4.8:cli
@@ -84,9 +78,6 @@ images:
 - dockerfile_path: images/baremetal/Dockerfile.ci
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.15-openshift-4.8:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
     ocp_builder_rhel-8-golang-1.16-openshift-4.9:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
@@ -94,9 +85,6 @@ images:
 - dockerfile_path: images/installer/Dockerfile.ci
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.15-openshift-4.8:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
     ocp_builder_rhel-8-golang-1.16-openshift-4.9:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
@@ -229,7 +217,15 @@ tests:
 - as: e2e-aws-workers-rhel7
   steps:
     cluster_profile: aws
-    workflow: openshift-e2e-aws-workers-rhel7
+    env:
+      PLATFORM_VERSION: "7.9"
+    workflow: openshift-e2e-aws-workers-rhel
+- as: e2e-aws-workers-rhel8
+  steps:
+    cluster_profile: aws
+    env:
+      PLATFORM_VERSION: "8.3"
+    workflow: openshift-e2e-aws-workers-rhel
 - as: e2e-aws-disruptive
   steps:
     cluster_profile: aws
@@ -247,6 +243,14 @@ tests:
         NETWORK_TYPE=OpenShiftSDN
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-ovn-ipv6
+  steps:
+    cluster_profile: packet
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        NETWORK_TYPE=OVNKubernetes
+    workflow: baremetalds-e2e
+- as: e2e-metal-ipi-ovn-ipv6-required
   steps:
     cluster_profile: packet
     env:
@@ -285,6 +289,22 @@ tests:
 - as: e2e-openstack-byon
   steps:
     cluster_profile: openstack-vexxhost
+    workflow: openshift-e2e-openstack-byon
+- as: e2e-openstack-provider-network
+  steps:
+    cluster_profile: openstack-vh-mecha-central
+    env:
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_TYPE: byon
+      OPENSTACK_PROVIDER_NETWORK: hostonly
+      TEST_SKIPS: Kubectl Port forwarding With a server listening on 0.0.0.0 should
+        support forwarding over websockets \| Kubectl client Simple pod should support
+        exec through kubectl proxy \| Kubectl client Simple pod should support exec
+        through an HTTP proxy \| Kubectl Port forwarding With a server listening on
+        localhost should support forwarding over websockets \| Pods should support
+        remote command execution over websockets \| Pods should support retrieving
+        logs from the container over websockets
+      TEST_SUITE: experimental/reliability/minimal
     workflow: openshift-e2e-openstack-byon
 - as: openstack-manifests
   steps:

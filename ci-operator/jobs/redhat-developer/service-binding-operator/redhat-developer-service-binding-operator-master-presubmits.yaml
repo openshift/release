@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build01
+    cluster: build02
     context: ci/prow/4.6-acceptance
     decorate: true
     decoration_config:
@@ -74,7 +74,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build01
+    cluster: build02
     context: ci/prow/4.7-acceptance
     decorate: true
     decoration_config:
@@ -143,7 +143,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build01
+    cluster: build02
     context: ci/prow/4.8-acceptance
     decorate: true
     decoration_config:
@@ -207,3 +207,72 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )4.8-acceptance,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build02
+    context: ci/prow/4.9-acceptance
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      ci-operator.openshift.io/variant: "4.9"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-redhat-developer-service-binding-operator-master-4.9-acceptance
+    rerun_command: /test 4.9-acceptance
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/acceptance-cluster-profile
+        - --target=acceptance
+        - --variant=4.9
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/acceptance-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.9-acceptance,?($|\s.*)

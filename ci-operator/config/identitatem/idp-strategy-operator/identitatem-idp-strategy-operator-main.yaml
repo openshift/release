@@ -37,9 +37,28 @@ tests:
   container:
     from: src
 - as: unit
-  commands: make test
+  commands: HOME=/tmp make test
   container:
     from: src
+- as: sonar-pre-submit
+  commands: |
+    export SELF="make -f /opt/build-harness/Makefile.prow"
+    make -f /opt/build-harness/Makefile.prow sonar/go/prow
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+- as: sonar-post-submit
+  commands: |
+    export SELF="make -f /opt/build-harness/Makefile.prow"
+    make -f /opt/build-harness/Makefile.prow sonar/go/prow
+  container:
+    from: src
+  postsubmit: true
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
 - as: fast-forward
   postsubmit: true
   steps:
@@ -61,6 +80,15 @@ tests:
       SOURCE_IMAGE_REF: idp-strategy-operator
     env:
       IMAGE_REPO: idp-strategy-operator
+      REGISTRY_ORG: identitatem
+    workflow: identitatem-ci-image-mirror
+- as: latest-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: idp-strategy-operator
+    env:
+      IMAGE_TAG: latest
       REGISTRY_ORG: identitatem
     workflow: identitatem-ci-image-mirror
 zz_generated_metadata:

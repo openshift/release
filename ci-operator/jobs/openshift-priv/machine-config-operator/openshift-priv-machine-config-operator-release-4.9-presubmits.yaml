@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build01
+    cluster: build02
     context: ci/prow/cluster-bootimages
     decorate: true
     hidden: true
@@ -79,7 +79,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-agnostic-upgrade
     decorate: true
     hidden: true
@@ -153,7 +153,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-aws
     decorate: true
     hidden: true
@@ -227,7 +227,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-aws-disruptive
     decorate: true
     hidden: true
@@ -301,7 +301,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-aws-proxy
     decorate: true
     hidden: true
@@ -375,7 +375,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-aws-serial
     decorate: true
     hidden: true
@@ -449,7 +449,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-aws-single-node
     decorate: true
     hidden: true
@@ -523,7 +523,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-aws-techpreview-featuregate
     decorate: true
     hidden: true
@@ -597,7 +597,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-aws-upgrade
     decorate: true
     hidden: true
@@ -671,7 +671,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-aws-upgrade-single-node
     decorate: true
     hidden: true
@@ -745,7 +745,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-aws-workers-rhel7
     decorate: true
     hidden: true
@@ -819,7 +819,81 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build01
+    cluster: build02
+    context: ci/prow/e2e-aws-workers-rhel8
+    decorate: true
+    hidden: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-machine-config-operator-release-4.9-e2e-aws-workers-rhel8
+    path_alias: github.com/openshift/machine-config-operator
+    rerun_command: /test e2e-aws-workers-rhel8
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-aws-workers-rhel8-cluster-profile
+        - --target=e2e-aws-workers-rhel8
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-aws-workers-rhel8-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-workers-rhel8,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.9$
+    - ^release-4\.9-
+    cluster: build02
     context: ci/prow/e2e-azure
     decorate: true
     hidden: true
@@ -893,7 +967,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-azure-upgrade
     decorate: true
     hidden: true
@@ -967,7 +1041,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-gcp-op
     decorate: true
     hidden: true
@@ -1043,7 +1117,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-gcp-op-single-node
     decorate: true
     hidden: true
@@ -1119,7 +1193,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-gcp-single-node
     decorate: true
     hidden: true
@@ -1195,7 +1269,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-gcp-upgrade
     decorate: true
     hidden: true
@@ -1271,7 +1345,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-metal-assisted
     decorate: true
     hidden: true
@@ -1330,8 +1404,6 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-packet
-          - configMap:
-              name: cluster-profile-packet
       - name: github-credentials-openshift-ci-robot-private-git-cloner
         secret:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
@@ -1347,7 +1419,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-metal-ipi
     decorate: true
     hidden: true
@@ -1406,8 +1478,6 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-packet
-          - configMap:
-              name: cluster-profile-packet
       - name: github-credentials-openshift-ci-robot-private-git-cloner
         secret:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
@@ -1423,7 +1493,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-metal-ipi-ovn-dualstack
     decorate: true
     hidden: true
@@ -1482,8 +1552,6 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-packet
-          - configMap:
-              name: cluster-profile-packet
       - name: github-credentials-openshift-ci-robot-private-git-cloner
         secret:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
@@ -1499,7 +1567,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-metal-ipi-ovn-ipv6
     decorate: true
     hidden: true
@@ -1558,8 +1626,6 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-packet
-          - configMap:
-              name: cluster-profile-packet
       - name: github-credentials-openshift-ci-robot-private-git-cloner
         secret:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
@@ -1575,7 +1641,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-openstack
     decorate: true
     hidden: true
@@ -1649,7 +1715,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-openstack-parallel
     decorate: true
     hidden: true
@@ -1723,7 +1789,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-ovirt
     decorate: true
     hidden: true
@@ -1795,11 +1861,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-ovirt,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-ovirt-upgrade
     decorate: true
     hidden: true
@@ -1875,7 +1941,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-ovn-step-registry
     decorate: true
     hidden: true
@@ -2171,7 +2237,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build01
+    cluster: build02
     context: ci/prow/images
     decorate: true
     hidden: true
@@ -2227,7 +2293,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build01
+    cluster: build02
     context: ci/prow/unit
     decorate: true
     hidden: true
@@ -2283,7 +2349,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build01
+    cluster: build02
     context: ci/prow/verify
     decorate: true
     hidden: true

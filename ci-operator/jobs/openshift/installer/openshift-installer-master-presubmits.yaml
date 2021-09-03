@@ -13,7 +13,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-master-e2e-aws
     rerun_command: /test e2e-aws
-    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(azure|baremetal|gcp|kubevirt|libvirt|openstack|ovirt|vsphere)/)
     spec:
       containers:
       - args:
@@ -146,7 +146,7 @@ presubmits:
     name: pull-ci-openshift-installer-master-e2e-aws-fips
     optional: true
     rerun_command: /test e2e-aws-fips
-    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(azure|baremetal|gcp|kubevirt|libvirt|openstack|ovirt|vsphere)/)
     spec:
       containers:
       - args:
@@ -529,7 +529,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-master-e2e-aws-upgrade
     rerun_command: /test e2e-aws-upgrade
-    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(azure|baremetal|gcp|kubevirt|libvirt|openstack|ovirt|vsphere)/)
     spec:
       containers:
       - args:
@@ -676,7 +676,7 @@ presubmits:
     name: pull-ci-openshift-installer-master-e2e-aws-workers-rhel7
     optional: true
     rerun_command: /test e2e-aws-workers-rhel7
-    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(azure|baremetal|gcp|kubevirt|libvirt|openstack|ovirt|vsphere)/)
     spec:
       containers:
       - args:
@@ -729,6 +729,72 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-workers-rhel7,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build01
+    context: ci/prow/e2e-aws-workers-rhel8
+    decorate: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-master-e2e-aws-workers-rhel8
+    optional: true
+    rerun_command: /test e2e-aws-workers-rhel8
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-aws-workers-rhel8-cluster-profile
+        - --target=e2e-aws-workers-rhel8
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-aws-workers-rhel8-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-workers-rhel8,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -1021,7 +1087,7 @@ presubmits:
     name: pull-ci-openshift-installer-master-e2e-crc
     optional: true
     rerun_command: /test e2e-crc
-    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(aws|azure|baremetal|gcp|kubevirt|openstack|ovirt|vsphere)/)
     spec:
       containers:
       - args:
@@ -1495,7 +1561,7 @@ presubmits:
     name: pull-ci-openshift-installer-master-e2e-libvirt
     optional: true
     rerun_command: /test e2e-libvirt
-    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(aws|azure|baremetal|gcp|kubevirt|openstack|ovirt|vsphere)/)
     spec:
       containers:
       - args:
@@ -1674,8 +1740,6 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-packet
-          - configMap:
-              name: cluster-profile-packet
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -1697,6 +1761,7 @@ presubmits:
     name: pull-ci-openshift-installer-master-e2e-metal-ipi
     optional: true
     rerun_command: /test e2e-metal-ipi
+    run_if_changed: (^(data/.*|pkg/.*|images)/baremetal/)|(^vendor/github.com/metal3-io/)
     spec:
       containers:
       - args:
@@ -1742,8 +1807,6 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-packet
-          - configMap:
-              name: cluster-profile-packet
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -1765,6 +1828,7 @@ presubmits:
     name: pull-ci-openshift-installer-master-e2e-metal-ipi-ovn-dualstack
     optional: true
     rerun_command: /test e2e-metal-ipi-ovn-dualstack
+    run_if_changed: (^(data/.*|pkg/.*|images)/baremetal/)|(^vendor/github.com/metal3-io/)
     spec:
       containers:
       - args:
@@ -1810,8 +1874,6 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-packet
-          - configMap:
-              name: cluster-profile-packet
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -1833,7 +1895,7 @@ presubmits:
     name: pull-ci-openshift-installer-master-e2e-metal-ipi-ovn-ipv6
     optional: true
     rerun_command: /test e2e-metal-ipi-ovn-ipv6
-    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(aws|azure|baremetal|gcp|kubevirt|libvirt|openstack|ovirt|vsphere)/)|(^vendor/github.com/metal3-io/)
     spec:
       containers:
       - args:
@@ -1879,8 +1941,6 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-packet
-          - configMap:
-              name: cluster-profile-packet
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -1888,6 +1948,72 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-metal-ipi-ovn-ipv6,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build01
+    context: ci/prow/e2e-metal-ipi-ovn-ipv6-required
+    decorate: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-master-e2e-metal-ipi-ovn-ipv6-required
+    rerun_command: /test e2e-metal-ipi-ovn-ipv6-required
+    run_if_changed: (^(data/.*|pkg/.*|images)/baremetal/)|(^vendor/github.com/metal3-io/)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-metal-ipi-ovn-ipv6-required-cluster-profile
+        - --target=e2e-metal-ipi-ovn-ipv6-required
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-metal-ipi-ovn-ipv6-required-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-packet
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-metal-ipi-ovn-ipv6-required,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -1902,6 +2028,7 @@ presubmits:
     name: pull-ci-openshift-installer-master-e2e-metal-ipi-virtualmedia
     optional: true
     rerun_command: /test e2e-metal-ipi-virtualmedia
+    run_if_changed: (^(data/.*|pkg/.*|images)/baremetal/)|(^vendor/github.com/metal3-io/)
     spec:
       containers:
       - args:
@@ -1947,8 +2074,6 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-packet
-          - configMap:
-              name: cluster-profile-packet
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -1970,7 +2095,7 @@ presubmits:
     name: pull-ci-openshift-installer-master-e2e-metal-single-node-live-iso
     optional: true
     rerun_command: /test e2e-metal-single-node-live-iso
-    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(aws|azure|gcp|kubevirt|libvirt|openstack|ovirt|vsphere)/)
     spec:
       containers:
       - args:
@@ -2016,8 +2141,6 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-packet
-          - configMap:
-              name: cluster-profile-packet
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -2039,7 +2162,7 @@ presubmits:
     name: pull-ci-openshift-installer-master-e2e-openstack
     optional: true
     rerun_command: /test e2e-openstack
-    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(aws|azure|baremetal|gcp|kubevirt|libvirt|ovirt|vsphere)/)
     spec:
       containers:
       - args:
@@ -2106,7 +2229,7 @@ presubmits:
     name: pull-ci-openshift-installer-master-e2e-openstack-byon
     optional: true
     rerun_command: /test e2e-openstack-byon
-    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(aws|azure|baremetal|gcp|kubevirt|libvirt|ovirt|vsphere)/)
     spec:
       containers:
       - args:
@@ -2173,7 +2296,7 @@ presubmits:
     name: pull-ci-openshift-installer-master-e2e-openstack-kuryr
     optional: true
     rerun_command: /test e2e-openstack-kuryr
-    skip_if_only_changed: (^docs|^upi|^hack)/
+    skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(aws|azure|baremetal|gcp|kubevirt|libvirt|ovirt|vsphere)/)
     spec:
       containers:
       - args:
@@ -2295,6 +2418,73 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
+    - ^master$
+    - ^master-
+    cluster: build01
+    context: ci/prow/e2e-openstack-provider-network
+    decorate: true
+    labels:
+      ci-operator.openshift.io/prowgen-controlled: "true"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-master-e2e-openstack-provider-network
+    optional: true
+    rerun_command: /test e2e-openstack-provider-network
+    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-openstack-provider-network-cluster-profile
+        - --target=e2e-openstack-provider-network
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-openstack-provider-network-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-openstack-vh-mecha-central
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-openstack-provider-network,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
     - master
     cluster: build01
     context: ci/prow/e2e-openstack-upi
@@ -2381,7 +2571,7 @@ presubmits:
     name: pull-ci-openshift-installer-master-e2e-ovirt
     optional: true
     rerun_command: /test e2e-ovirt
-    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(aws|azure|baremetal|gcp|kubevirt|libvirt|openstack|vsphere)/)
     spec:
       containers:
       - args:
@@ -2581,7 +2771,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-master-gofmt
     rerun_command: /test gofmt
-    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
     spec:
       containers:
       - args:
@@ -2629,7 +2819,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-master-golint
     rerun_command: /test golint
-    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
     spec:
       containers:
       - args:
@@ -2677,7 +2867,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-master-govet
     rerun_command: /test govet
-    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
     spec:
       containers:
       - args:
@@ -2725,7 +2915,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-master-images
     rerun_command: /test images
-    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
     spec:
       containers:
       - args:
@@ -3281,7 +3471,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-master-openstack-manifests
     rerun_command: /test openstack-manifests
-    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(aws|azure|baremetal|gcp|kubevirt|libvirt|ovirt|vsphere)/)
     spec:
       containers:
       - args:
@@ -3345,7 +3535,7 @@ presubmits:
       ci.openshift.io/manually-branched: "true"
     name: pull-ci-openshift-installer-master-shellcheck
     rerun_command: /test shellcheck
-    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
     spec:
       containers:
       - args:
@@ -3374,7 +3564,7 @@ presubmits:
     name: pull-ci-openshift-installer-master-tf-fmt
     optional: true
     rerun_command: /test tf-fmt
-    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
     spec:
       containers:
       - args:
@@ -3402,7 +3592,7 @@ presubmits:
       ci.openshift.io/manually-branched: "true"
     name: pull-ci-openshift-installer-master-tf-lint
     rerun_command: /test tf-lint
-    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
     spec:
       containers:
       - args:
@@ -3432,7 +3622,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-master-unit
     rerun_command: /test unit
-    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
     spec:
       containers:
       - args:
@@ -3527,7 +3717,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-master-verify-vendor
     rerun_command: /test verify-vendor
-    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
     spec:
       containers:
       - args:
@@ -3573,7 +3763,7 @@ presubmits:
       ci.openshift.io/manually-branched: "true"
     name: pull-ci-openshift-installer-master-yaml-lint
     rerun_command: /test yaml-lint
-    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
     spec:
       containers:
       - args:

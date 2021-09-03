@@ -7,7 +7,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.10
+    tag: golang-1.16
 canonical_go_repository: github.com/openshift/jenkins-sync-plugin
 images:
 - dockerfile_path: Dockerfile
@@ -37,6 +37,18 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-jenkins
+- as: e2e-aws-jenkins-sync-plugin
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: release-4.9
   org: openshift-priv

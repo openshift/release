@@ -11,6 +11,20 @@ echo "INFO Copying make file"
 echo "     MAKEFILE: $MAKEFILE"
 cp "$MAKEFILE" ./Makefile
 
+echo "INFO Setting location of oc and jq binarys for build harness"
+OC=$(which oc)
+JQ=$(which jq)
+export OC
+export JQ
+if [[ -z "$OC" ]]; then
+    echo "ERROR The oc command is not installed"
+    exit 1
+fi
+if [[ -z "$JQ" ]]; then
+    echo "ERROR The jq command is not installed"
+    exit 1
+fi
+
 echo "INFO Getting list of all clusterpools in json format"
 make clusterpool/list-clusterpools CLUSTERPOOL_LIST_ARGUMENTS=" -o json" > list.json
 echo "INFO Saving clusterpool json file to artifact directory"

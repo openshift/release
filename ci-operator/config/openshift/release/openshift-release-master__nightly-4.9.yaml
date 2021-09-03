@@ -240,12 +240,16 @@ tests:
   cron: 30 */6 * * *
   steps:
     cluster_profile: aws
-    workflow: openshift-e2e-aws-workers-rhel7
-- as: openshift-ipi-azure-arcconformance
-  cron: 0 4,10,16,22 * * *
+    env:
+      PLATFORM_VERSION: "7.9"
+    workflow: openshift-e2e-aws-workers-rhel
+- as: e2e-aws-workers-rhel8
+  cron: 30 */6 * * *
   steps:
-    cluster_profile: azure4
-    workflow: ipi-azure-arcconformance
+    cluster_profile: aws
+    env:
+      PLATFORM_VERSION: "8.3"
+    workflow: openshift-e2e-aws-workers-rhel
 - as: e2e-ovirt
   cron: 0 */6 * * *
   steps:
@@ -309,6 +313,11 @@ tests:
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
     workflow: openshift-e2e-gcp-csi
+- as: e2e-gcp-csi-migration
+  interval: 12h
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    workflow: openshift-e2e-gcp-csi-migration
 - as: e2e-azure-fips-serial
   interval: 48h
   steps:
@@ -380,16 +389,6 @@ tests:
       COMPUTE_NODE_TYPE: n1-standard-8
       RT_ENABLED: "true"
     workflow: openshift-e2e-gcp-realtime
-- as: e2e-aws-arm64
-  interval: 24h
-  steps:
-    cluster_profile: aws-arm64
-    env:
-      ARM64_RELEASE_OVERRIDE: registry.ci.openshift.org/ocp-arm64/release-arm64:4.9
-      BASE_DOMAIN: arm-ci.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: m6g.xlarge
-      TEST_ARGS: --from-repository quay.io/multi-arch/community-e2e-images
-    workflow: openshift-e2e-aws
 - as: e2e-aws-upgrade
   interval: 24h
   steps:
@@ -444,6 +443,11 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-csi
+- as: e2e-azure-csi-migration
+  interval: 12h
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-csi-migration
 - as: e2e-openstack-az
   interval: 48h
   steps:
@@ -455,7 +459,9 @@ tests:
         through an HTTP proxy \| Kubectl Port forwarding With a server listening on
         localhost should support forwarding over websockets \| Pods should support
         remote command execution over websockets \| Pods should support retrieving
-        logs from the container over websockets \| In-tree Volumes
+        logs from the container over websockets \| NetworkPolicy between server and
+        client should deny ingress access to updated pod \| Image append should create
+        images by appending them \| In-tree Volumes
       ZONES_COUNT: "1"
     workflow: openshift-e2e-openstack-byon
 zz_generated_metadata:

@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -18,7 +18,8 @@ periodics:
       channel: '#forum-kuryr'
       job_states_to_report:
       - failure
-      report_template: ':sponge: CI cleanup failed. <{{ .Status.URL }}|View logs>'
+      report_template: ':sponge: Kuryr cloud cleanup failed. <{{ .Status.URL }}|View
+        logs>'
   spec:
     containers:
     - args:
@@ -53,7 +54,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -68,7 +69,7 @@ periodics:
   name: periodic-ci-shiftstack-shiftstack-ci-main-cleanup-moc
   reporter_config:
     slack:
-      channel: '#forum-shiftstack'
+      channel: '#shiftstack-bot'
       job_states_to_report:
       - failure
       report_template: ':sponge: MOC cleanup failed. <{{ .Status.URL }}|View logs>'
@@ -106,7 +107,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -121,7 +122,7 @@ periodics:
   name: periodic-ci-shiftstack-shiftstack-ci-main-cleanup-vexxhost
   reporter_config:
     slack:
-      channel: '#forum-shiftstack'
+      channel: '#shiftstack-bot'
       job_states_to_report:
       - failure
       report_template: ':sponge: vexxhost-managed cleanup failed. <{{ .Status.URL
@@ -160,7 +161,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -172,20 +173,399 @@ periodics:
   labels:
     ci-operator.openshift.io/prowgen-controlled: "true"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-shiftstack-shiftstack-ci-main-cleanup-vh-mecha
+  name: periodic-ci-shiftstack-shiftstack-ci-main-cleanup-vh-mecha-az0
   reporter_config:
     slack:
-      channel: '#forum-shiftstack'
+      channel: '#shiftstack-bot'
       job_states_to_report:
       - failure
-      report_template: ':sponge: mecha cleanup failed. <{{ .Status.URL }}|View logs>'
+      report_template: ':sponge: mecha az0 cloud cleanup failed. <{{ .Status.URL }}|View
+        logs>'
   spec:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --report-credentials-file=/etc/report/credentials
-      - --target=cleanup-vh-mecha
+      - --target=cleanup-vh-mecha-az0
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: shiftstack
+    repo: shiftstack-ci
+  interval: 1h
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-shiftstack-shiftstack-ci-main-cleanup-vh-mecha-central
+  reporter_config:
+    slack:
+      channel: '#shiftstack-bot'
+      job_states_to_report:
+      - failure
+      report_template: ':sponge: mecha central cloud cleanup failed. <{{ .Status.URL
+        }}|View logs>'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --target=cleanup-vh-mecha-central
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: shiftstack
+    repo: shiftstack-ci
+  interval: 5m
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-shiftstack-shiftstack-ci-main-monitor-mecha-az0
+  reporter_config:
+    slack:
+      channel: '#shiftstack-bot'
+      job_states_to_report:
+      - failure
+      report_template: ':low-battery: VEXXHOST az0 quotas are low. <{{ .Status.URL
+        }}|View logs>'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --target=monitor-mecha-az0
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: shiftstack
+    repo: shiftstack-ci
+  interval: 5m
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-shiftstack-shiftstack-ci-main-monitor-mecha-central
+  reporter_config:
+    slack:
+      channel: '#shiftstack-bot'
+      job_states_to_report:
+      - failure
+      report_template: ':low-battery: VEXXHOST central quotas are low. <{{ .Status.URL
+        }}|View logs>'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --target=monitor-mecha-central
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: shiftstack
+    repo: shiftstack-ci
+  interval: 5m
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-shiftstack-shiftstack-ci-main-monitor-moc
+  reporter_config:
+    slack:
+      channel: '#shiftstack-bot'
+      job_states_to_report:
+      - failure
+      report_template: ':low-battery: MOC quotas are low. <{{ .Status.URL }}|View
+        logs>'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --target=monitor-moc
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: shiftstack
+    repo: shiftstack-ci
+  interval: 1h
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-shiftstack-shiftstack-ci-main-quotas-vexxhost
+  reporter_config:
+    slack:
+      channel: '#shiftstack-bot'
+      job_states_to_report:
+      - failure
+      report_template: ':low-battery: VEXXHOST managed quotas are low. <{{ .Status.URL
+        }}|View logs>'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --target=quotas-vexxhost
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: shiftstack
+    repo: shiftstack-ci
+  interval: 1h
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-shiftstack-shiftstack-ci-main-quotas-vh-mecha-az0
+  reporter_config:
+    slack:
+      channel: '#shiftstack-bot'
+      job_states_to_report:
+      - failure
+      report_template: ':low-battery: VEXXHOST az0 quotas are low. <{{ .Status.URL
+        }}|View logs>'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --target=quotas-vh-mecha-az0
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: shiftstack
+    repo: shiftstack-ci
+  interval: 1h
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-shiftstack-shiftstack-ci-main-quotas-vh-mecha-central
+  reporter_config:
+    slack:
+      channel: '#shiftstack-bot'
+      job_states_to_report:
+      - failure
+      report_template: ':low-battery: VEXXHOST central quotas are low. <{{ .Status.URL
+        }}|View logs>'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --target=quotas-vh-mecha-central
       command:
       - ci-operator
       image: ci-operator:latest

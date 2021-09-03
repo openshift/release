@@ -51,13 +51,13 @@ CONFIG = {
         'default': 7,
     },
     'openstack-vexxhost-quota-slice': {
-        'default': 13,
+        'default': 12,
     },
     'openstack-kuryr-quota-slice': {
         'default': 3,
     },
     'openstack-vh-mecha-central-quota-slice': {
-        'default': 12,
+        'default': 10,
     },
     'openstack-vh-mecha-az0-quota-slice': {
         'default': 6,
@@ -67,6 +67,9 @@ CONFIG = {
     'ovirt-upgrade-quota-slice': {},
     'packet-quota-slice': {
         'default': 60,
+    },
+    'packet-edge-quota-slice': {
+        'default': 50,
     },
     'kubevirt-quota-slice':{},
     'vsphere-quota-slice':{},
@@ -107,7 +110,7 @@ for i in range(2):
 for i in range(4):
     CONFIG['openstack-ppc64le-quota-slice']['openstack-ppc64le-{0:0>2}'.format(i)] = 1
 
-for i in range(10, 20):
+for i in range(10, 24):
     CONFIG['ovirt-quota-slice']['ovirt-{}'.format(i)] = 1
 
 for i in range(1, 7):

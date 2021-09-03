@@ -4,6 +4,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# TODO: move to image
+curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
+
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
@@ -47,15 +50,31 @@ MAX_ZONES_COUNT="${#ZONES[@]}"
 # Save max zones count information to ${SHARED_DIR} for use in other scenarios
 echo "${MAX_ZONES_COUNT}" >> "${SHARED_DIR}/maxzonescount"
 
+existing_zones_setting=$(/tmp/yq r "${CONFIG}" 'controlPlane.platform.aws.zones')
 
-ZONES_COUNT=${ZONES_COUNT:-2}
-ZONES=("${ZONES[@]:0:${ZONES_COUNT}}")
-ZONES_STR="[ "
-ZONES_STR+=$(join_by , "${ZONES[@]}")
-ZONES_STR+=" ]"
-echo "AWS region: ${REGION} (zones: ${ZONES_STR})"
+if [[ ${existing_zones_setting} == "" ]]; then
+  ZONES_COUNT=${ZONES_COUNT:-2}
+  ZONES=("${ZONES[@]:0:${ZONES_COUNT}}")
+  ZONES_STR="[ $(join_by , "${ZONES[@]}") ]"
+  echo "AWS region: ${REGION} (zones: ${ZONES_STR})"
+  PATCH="${SHARED_DIR}/install-config-zones.yaml.patch"
+  cat > "${PATCH}" << EOF
+controlPlane:
+  platform:
+    aws:
+      zones: ${ZONES_STR}
+compute:
+- platform:
+    aws:
+      zones: ${ZONES_STR}
+EOF
+  /tmp/yq m -x -i "${CONFIG}" "${PATCH}"
+else
+  echo "zones already set in install-config.yaml, skipped"
+fi
 
-cat >> "${CONFIG}" << EOF
+PATCH="${SHARED_DIR}/install-config-common.yaml.patch"
+cat > "${PATCH}" << EOF
 baseDomain: ${BASE_DOMAIN}
 platform:
   aws:
@@ -68,7 +87,6 @@ controlPlane:
   platform:
     aws:
       type: ${master_type}
-      zones: ${ZONES_STR}
 compute:
 - architecture: ${architecture}
   name: worker
@@ -76,5 +94,5 @@ compute:
   platform:
     aws:
       type: ${COMPUTE_NODE_TYPE}
-      zones: ${ZONES_STR}
 EOF
+/tmp/yq m -x -i "${CONFIG}" "${PATCH}"

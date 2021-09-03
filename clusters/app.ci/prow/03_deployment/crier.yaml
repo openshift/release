@@ -47,9 +47,9 @@ items:
         serviceAccountName: crier
         containers:
         - name: crier
-          image: gcr.io/k8s-prow/crier:v20210818-2656d2e511
+          image: gcr.io/k8s-prow/crier:v20210902-01e03305a2
           args:
-          - --github-workers=100
+          - --github-workers=250
           - --config-path=/etc/config/config.yaml
           - --supplemental-prow-config-dir=/etc/config
           - --job-config-path=/etc/job-config
@@ -63,10 +63,8 @@ items:
           - --slack-workers=5
           - --slack-token-file=/etc/slack/oauth
           - --projected-token-file=/var/sa-token/token
+          - --kubeconfig-dir=/etc/build-farm-credentials
           env:
-          # Multiple configs can only be passed via the env var and not via the flag
-          - name: KUBECONFIG
-            value: /etc/build-farm-credentials/build01.kubeconfig:/etc/build-farm-credentials/app.ci.kubeconfig:/etc/build-farm-credentials/build02.kubeconfig:/etc/build-farm-credentials/vsphere.kubeconfig:/etc/build-farm-credentials/arm01.kubeconfig
           - name: GITHUB_APP_ID
             valueFrom:
               secretKeyRef:
@@ -189,18 +187,7 @@ items:
             name: job-config-4.10
         - name: build-farm-credentials
           secret:
-            items:
-            - key: sa.crier.build01.config
-              path: build01.kubeconfig
-            - key: sa.crier.app.ci.config
-              path: app.ci.kubeconfig
-            - key: sa.crier.arm01.config
-              path: arm01.kubeconfig
-            - key: sa.crier.build02.config
-              path: build02.kubeconfig
-            - key: sa.crier.vsphere.config
-              path: vsphere.kubeconfig
-            secretName: build-farm-credentials
+            secretName: crier
         - name: service-account
           secret:
             secretName: gce-sa-credentials-gcs-crier-publisher

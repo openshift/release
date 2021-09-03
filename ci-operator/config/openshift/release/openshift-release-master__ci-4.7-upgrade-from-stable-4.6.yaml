@@ -61,7 +61,7 @@ tests:
     cluster_profile: vsphere
     workflow: openshift-upgrade-vsphere
 - as: e2e-ovirt-upgrade
-  interval: 72h
+  interval: 24h
   steps:
     cluster_profile: ovirt
     workflow: openshift-upgrade-ovirt-release-4.6-4.7
@@ -88,7 +88,7 @@ tests:
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-azure-ovn
 - as: e2e-openstack-upgrade
-  interval: 48h
+  interval: 72h
   steps:
     cluster_profile: openstack-vexxhost
     env:
@@ -103,6 +103,17 @@ tests:
       DELETE_MC: "false"
       TEST_TYPE: upgrade
       TEST_UPGRADE_OPTIONS: abort-at=99
+    workflow: openshift-upgrade-aws
+- as: e2e-aws-uwm
+  interval: 48h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+    pre:
+    - ref: ipi-install-hosted-loki
+    - ref: ipi-conf-user-workload-monitoring
+    - chain: ipi-aws-pre-stableinitial
     workflow: openshift-upgrade-aws
 zz_generated_metadata:
   branch: master
