@@ -72,7 +72,7 @@ while :; do
   sleep 10
 done
 
-openshift-tests run kubernetes/conformance --provider=none
+openshift-tests run --provider=none kubernetes/conformance
 
 EOF
 chmod +x "${HOME}"/run-smoke-tests.sh
@@ -161,6 +161,18 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   --recurse "${HOME}"/pull-secret rhel8user@"${INSTANCE_PREFIX}":~/pull-secret
+
+# scp openshift-test bin
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+  --quiet \
+  --project "${GOOGLE_PROJECT_ID}" \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  --recurse "${HOME}"/openshift-tests rhel8user@"${INSTANCE_PREFIX}":~/openshift-tests
+
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  rhel8user@"${INSTANCE_PREFIX}" \
+  --command 'sudo mv openshift-tests /usr/bin/'
 
 # start the test
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
