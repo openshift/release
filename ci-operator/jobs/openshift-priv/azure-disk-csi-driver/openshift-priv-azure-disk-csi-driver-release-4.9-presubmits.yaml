@@ -9,9 +9,7 @@ presubmits:
     context: ci/prow/e2e-azure
     decorate: true
     decoration_config:
-      oauth_token_secret:
-        key: oauth
-        name: github-credentials-openshift-ci-robot-private-git-cloner
+      skip_cloning: true
     hidden: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
@@ -68,6 +66,9 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-azure4
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -84,9 +85,7 @@ presubmits:
     context: ci/prow/e2e-azure-csi
     decorate: true
     decoration_config:
-      oauth_token_secret:
-        key: oauth
-        name: github-credentials-openshift-ci-robot-private-git-cloner
+      skip_cloning: true
     hidden: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
@@ -143,6 +142,9 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-azure4
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -159,9 +161,7 @@ presubmits:
     context: ci/prow/e2e-azure-csi-migration
     decorate: true
     decoration_config:
-      oauth_token_secret:
-        key: oauth
-        name: github-credentials-openshift-ci-robot-private-git-cloner
+      skip_cloning: true
     hidden: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
@@ -218,6 +218,9 @@ presubmits:
           sources:
           - secret:
               name: cluster-secrets-azure4
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -234,9 +237,7 @@ presubmits:
     context: ci/prow/images
     decorate: true
     decoration_config:
-      oauth_token_secret:
-        key: oauth
-        name: github-credentials-openshift-ci-robot-private-git-cloner
+      skip_cloning: true
     hidden: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
@@ -275,6 +276,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -287,20 +291,17 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build01
-    context: ci/prow/unit-skipped
+    context: ci/prow/unit
     decorate: true
     decoration_config:
-      oauth_token_secret:
-        key: oauth
-        name: github-credentials-openshift-ci-robot-private-git-cloner
+      skip_cloning: true
     hidden: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-azure-disk-csi-driver-release-4.9-unit-skipped
+    name: pull-ci-openshift-priv-azure-disk-csi-driver-release-4.9-unit
     path_alias: github.com/kubernetes-sigs/azuredisk-csi-driver
-    rerun_command: /test unit-skipped
+    rerun_command: /test unit
     spec:
       containers:
       - args:
@@ -308,7 +309,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
-        - --target=unit-skipped
+        - --target=unit
         command:
         - ci-operator
         image: ci-operator:latest
@@ -332,10 +333,13 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )unit-skipped,?($|\s.*)
+    trigger: (?m)^/test( | .* )unit,?($|\s.*)
