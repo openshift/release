@@ -8,7 +8,8 @@ base_images:
     namespace: ocp
     tag: rhel-8-golang-1.16-openshift-4.9
 build_root:
-  from_repository: true
+  project_image:
+    dockerfile_path: images/build-root/Dockerfile
 images:
 - dockerfile_path: Dockerfile.openshift
   from: base
@@ -44,6 +45,27 @@ tests:
     go mod vendor && go test -covermode=atomic $(go list ./... | grep -v internal/operator)
   container:
     from: src
+- as: e2e-aws
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export OLD_VERSION=v1.15.1
+        TEMPDIR=$(mktemp -d)
+        export PATH=$PATH:$TEMPDIR
+        ln -s $(which oc) "${TEMPDIR}/kubectl"
+        hack/operator-image-patch.sh ${OPERATOR_IMAGE}
+        make test-e2e
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: contour-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: openshift
