@@ -59,21 +59,26 @@ tests:
   commands: go fmt ./... && git diff --exit-code
   container:
     from: src
+  run_if_changed: \.go$
 - as: golangci-lint
   commands: |
     export GOLANGCI_LINT_CACHE=/tmp/.cache
     make lint
   container:
     from: src
+  run_if_changed: \.go$
 - as: unit
   commands: go test ./...
   container:
     from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: e2e-agnostic
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
 - as: e2e-agnostic-operator
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: azure4
     test:
@@ -86,6 +91,7 @@ tests:
           memory: 200Mi
     workflow: openshift-e2e-azure
 - as: e2e-agnostic-upgrade
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: azure4
     workflow: openshift-upgrade-azure

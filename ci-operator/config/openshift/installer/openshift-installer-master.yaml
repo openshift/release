@@ -141,28 +141,34 @@ tests:
   commands: go test ./pkg/...
   container:
     from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
 - as: gofmt
   commands: IS_CONTAINER=TRUE ./hack/go-fmt.sh .
   container:
     from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
 - as: govet
   commands: IS_CONTAINER=TRUE ./hack/go-vet.sh ./...
   container:
     from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
 - as: golint
   commands: IS_CONTAINER=TRUE ./hack/go-lint.sh -min_confidence 0.3 $(go list -f '{{
     .ImportPath }}' ./...)
   container:
     from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
 - as: verify-vendor
   commands: IS_CONTAINER=TRUE ./hack/verify-vendor.sh
   container:
     from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
 - as: verify-codegen
   commands: IS_CONTAINER=TRUE ./hack/verify-codegen.sh
   container:
     from: src
 - as: e2e-aws
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(azure|baremetal|gcp|kubevirt|libvirt|openstack|ovirt|vsphere)/)
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
@@ -202,6 +208,7 @@ tests:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-resourcegroup
 - as: e2e-aws-upgrade
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(azure|baremetal|gcp|kubevirt|libvirt|openstack|ovirt|vsphere)/)
   steps:
     cluster_profile: aws
     workflow: openshift-upgrade-aws-latestinstaller
@@ -227,6 +234,7 @@ tests:
   optional: true
 - as: e2e-aws-workers-rhel7
   optional: true
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(azure|baremetal|gcp|kubevirt|libvirt|openstack|ovirt|vsphere)/)
   steps:
     cluster_profile: aws
     env:
@@ -250,6 +258,7 @@ tests:
     workflow: openshift-upgrade-gcp-latestinstaller
 - as: e2e-metal-ipi
   optional: true
+  run_if_changed: (^(data/.*|pkg/.*|images)/baremetal/)|(^vendor/github.com/metal3-io/)
   steps:
     cluster_profile: packet
     env:
@@ -259,6 +268,7 @@ tests:
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-ovn-ipv6
   optional: true
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(aws|azure|baremetal|gcp|kubevirt|libvirt|openstack|ovirt|vsphere)/)|(^vendor/github.com/metal3-io/)
   steps:
     cluster_profile: packet
     env:
@@ -267,6 +277,7 @@ tests:
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-ovn-ipv6-required
+  run_if_changed: (^(data/.*|pkg/.*|images)/baremetal/)|(^vendor/github.com/metal3-io/)
   steps:
     cluster_profile: packet
     env:
@@ -276,6 +287,7 @@ tests:
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-ovn-dualstack
   optional: true
+  run_if_changed: (^(data/.*|pkg/.*|images)/baremetal/)|(^vendor/github.com/metal3-io/)
   steps:
     cluster_profile: packet
     env:
@@ -285,11 +297,13 @@ tests:
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-virtualmedia
   optional: true
+  run_if_changed: (^(data/.*|pkg/.*|images)/baremetal/)|(^vendor/github.com/metal3-io/)
   steps:
     cluster_profile: packet
     workflow: baremetalds-e2e-virtualmedia
 - as: e2e-openstack
   optional: true
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(aws|azure|baremetal|gcp|kubevirt|libvirt|ovirt|vsphere)/)
   steps:
     cluster_profile: openstack-vexxhost
     env:
@@ -308,10 +322,12 @@ tests:
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-openstack-byon
   optional: true
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(aws|azure|baremetal|gcp|kubevirt|libvirt|ovirt|vsphere)/)
   steps:
     cluster_profile: openstack-vexxhost
     workflow: openshift-e2e-openstack-byon
 - as: e2e-openstack-provider-network
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(aws|azure|baremetal|gcp|kubevirt|libvirt|ovirt|vsphere)/)
   steps:
     cluster_profile: openstack-vh-mecha-central
     env:
@@ -329,10 +345,12 @@ tests:
     workflow: openshift-e2e-openstack-byon
 - as: e2e-openstack-proxy
   optional: true
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(aws|azure|baremetal|gcp|kubevirt|libvirt|ovirt|vsphere)/)
   steps:
     cluster_profile: openstack-vh-mecha-central
     workflow: openshift-e2e-openstack-proxy
 - as: openstack-manifests
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(aws|azure|baremetal|gcp|kubevirt|libvirt|ovirt|vsphere)/)
   steps:
     cluster_profile: openstack-vexxhost
     workflow: openshift-manifests-openstack
@@ -348,11 +366,13 @@ tests:
     workflow: openshift-e2e-vsphere-upi
 - as: e2e-crc
   optional: true
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(aws|azure|baremetal|gcp|kubevirt|openstack|ovirt|vsphere)/)
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-crc
 - as: e2e-libvirt
   optional: true
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(aws|azure|baremetal|gcp|kubevirt|openstack|ovirt|vsphere)/)
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-libvirt
@@ -363,6 +383,7 @@ tests:
     workflow: baremetalds-assisted
 - as: e2e-ovirt
   optional: true
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(aws|azure|baremetal|gcp|kubevirt|libvirt|openstack|vsphere)/)
   steps:
     cluster_profile: ovirt
     workflow: openshift-e2e-ovirt-minimal
@@ -378,11 +399,13 @@ tests:
     workflow: openshift-e2e-aws-single-node
 - as: e2e-metal-single-node-live-iso
   optional: true
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(aws|azure|gcp|kubevirt|libvirt|openstack|ovirt|vsphere)/)
   steps:
     cluster_profile: packet
     workflow: baremetalds-sno
 - as: e2e-aws-fips
   optional: true
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(azure|baremetal|gcp|kubevirt|libvirt|openstack|ovirt|vsphere)/)
   steps:
     cluster_profile: aws
     env:
@@ -396,6 +419,7 @@ tests:
     workflow: ipi-aws
 - as: e2e-openstack-kuryr
   optional: true
+  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(aws|azure|baremetal|gcp|kubevirt|libvirt|ovirt|vsphere)/)
   steps:
     cluster_profile: openstack-kuryr
     env:
