@@ -33,13 +33,11 @@ images:
   to: linux-amd64-4.7.0-0.microshift
 - dockerfile_literal: |
     FROM os
+    WORKDIR /go/src/github.com/openshift/origin/
     RUN dnf install git make -y
-    RUN git clone https://github.com/openshift/origin.git && \
-        cd origin && \
+    RUN git clone https://github.com/openshift/origin.git . && \
         git checkout release-4.7
     RUN make
-    RUN chmod ug+x openshift-tests && \
-        mv openshift-tests /usr/bin/
   from: ocp_builder_rhel-8-golang-1.15-openshift-4.7
   to: openshift-test-bin
 - dockerfile_literal: |
@@ -73,7 +71,7 @@ images:
     openshift-test-bin:
       paths:
       - destination_dir: .
-        source_path: /usr/bin/openshift-tests
+        source_path: /go/src/github.com/openshift/origin/openshift-tests
     src:
       paths:
       - destination_dir: .
