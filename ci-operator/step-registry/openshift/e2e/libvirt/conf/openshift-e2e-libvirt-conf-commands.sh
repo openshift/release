@@ -15,7 +15,7 @@ if [ "${TEST_TYPE}" != "conformance-parallel" ]; then
 fi
 
 # DNS query is blocked on s390x yellow zone
-if [ "${BRANCH}" == "4.9" ] && [ "${ARCH}" == "s390x" ]; then
+if [ "${BRANCH}" == "4.9" ]; then
     cat > "${SHARED_DIR}/excluded_tests" << EOF
 "[sig-network] Networking should provide Internet connection for containers [Feature:Networking-IPv4] [Skipped:Disconnected] [Skipped:azure] [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-network] NetworkPolicyLegacy [LinuxOnly] NetworkPolicy between server and client should allow egress access on one named port [Feature:NetworkPolicy] [Skipped:Network/OVNKubernetes] [Skipped:Network/OpenShiftSDN/Multitenant] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]"
