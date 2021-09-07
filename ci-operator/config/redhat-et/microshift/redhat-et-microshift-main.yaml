@@ -24,6 +24,7 @@ build_root:
     name: release
     namespace: openshift
     tag: golang-1.15
+  use_build_cache: true
 images:
 - dockerfile_path: images/build/Dockerfile
   inputs:
@@ -32,15 +33,19 @@ images:
       - registry.access.redhat.com/ubi8/go-toolset
   to: linux-amd64-4.7.0-0.microshift
 - dockerfile_literal: |
-    FROM os as openshift-tests-build
+    FROM registry.access.redhat.com/ubi8/go-toolset
     WORKDIR /go/src/github.com/openshift/origin/
     RUN dnf install git make -y
     RUN git clone https://github.com/openshift/origin.git . && \
         git checkout release-4.7
     RUN make
-    FROM os
+    FROM centos8
     COPY --from=openshift-tests-build /go/src/github.com/openshift/origin/openshift-tests /usr/bin/openshift-tests
-  from: ocp_builder_rhel-8-golang-1.15-openshift-4.7
+  from: os
+  inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+      as:
+      - registry.access.redhat.com/ubi8/go-toolset
   to: openshift-test-bin
 - dockerfile_literal: |
     FROM os
