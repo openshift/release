@@ -4,7 +4,7 @@ base_images:
     namespace: ocp-kni
     tag: assisted-test-infra
   base:
-    name: "4.9"
+    name: "4.10"
     namespace: ocp
     tag: base
   dev-scripts:
@@ -27,7 +27,7 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
   to: cluster-etcd-operator
 promotion:
-  name: "4.9"
+  name: "4.10"
   namespace: ocp
 resources:
   '*':
@@ -35,7 +35,7 @@ resources:
       cpu: "3"
       memory: 1Gi
 tag_specification:
-  name: "4.9"
+  name: "4.10"
   namespace: ocp
 test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
 tests:
@@ -116,6 +116,22 @@ tests:
 - as: e2e-metal-ipi
   steps:
     cluster_profile: packet
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OpenShiftSDN
+    workflow: baremetalds-e2e
+- as: e2e-metal-ipi-serial-ipv4
+  steps:
+    cluster_profile: packet
+    workflow: baremetalds-e2e-serial-ipv4
+- as: e2e-metal-ipi-ovn-ipv6
+  steps:
+    cluster_profile: packet
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
 - as: e2e-metal-assisted
   steps:

@@ -8,7 +8,10 @@ base_images:
     namespace: ocp
     tag: rhel-8-golang-1.16-openshift-4.9
 build_root:
-  from_repository: true
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.16-openshift-4.9
 canonical_go_repository: github.com/kubernetes-sigs/azuredisk-csi-driver
 images:
 - dockerfile_path: Dockerfile.openshift.rhel7
@@ -19,7 +22,6 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
   to: azure-disk-csi-driver
 promotion:
-  disabled: true
   name: "4.9"
   namespace: ocp
 resources:
@@ -33,8 +35,8 @@ tag_specification:
   name: "4.9"
   namespace: ocp
 tests:
-- as: unit-skipped
-  commands: "true"
+- as: unit
+  commands: unset KUBERNETES_SERVICE_HOST; make unit-test
   container:
     from: src
 - as: e2e-azure
