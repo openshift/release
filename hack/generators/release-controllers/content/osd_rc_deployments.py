@@ -92,6 +92,7 @@ def _add_osd_rc_service(gendoc):
         }
     })
 
+
 def _add_osd_rc_servicemonitor(gendoc):
     annotations = {}
     context = gendoc.context
@@ -120,6 +121,7 @@ def _add_osd_rc_servicemonitor(gendoc):
             }
         }
     })
+
 
 def _get_osd_rc_deployment_sidecars(context):
     sidecars = list()
@@ -173,6 +175,11 @@ def _add_osd_rc_deployment(gendoc):
     if not context.suffix:
         # The main x86_64 release controller also monitors origin
         extra_rc_args.append('--publish-namespace=origin')
+
+    # Creating Cluster Groups for the AMD64 jobs...
+    if context.arch == 'x86_64':
+        extra_rc_args.append('--cluster-group build01,build02')
+        extra_rc_args.append('--cluster-group vsphere')
 
     gendoc.append({
         'apiVersion': 'apps/v1',
