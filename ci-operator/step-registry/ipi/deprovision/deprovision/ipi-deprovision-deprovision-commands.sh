@@ -28,6 +28,7 @@ if [[ "${CLUSTER_TYPE}" == "ovirt" ]]; then
   set -e
 fi
 
+OPENSHIFT_INSTALL_REPORT_QUOTA_FOOTPRINT="true"; export OPENSHIFT_INSTALL_REPORT_QUOTA_FOOTPRINT
 openshift-install --dir /tmp/installer destroy cluster &
 
 set +e
