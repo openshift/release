@@ -90,6 +90,11 @@ def add_rpm_mirror_service(gendoc, clone_dir, major_minor):
                                     'readOnly': True
                                 },
                                 {
+                                    "mountPath": "/tmp/mirror-enterprise-basic-auth",
+                                    "name": "mirror-enterprise-basic-auth",
+                                    "readOnly": True
+                                },
+                                {
                                     'mountPath': '/tmp/cache',
                                     'name': 'cache'
                                 }],
@@ -115,6 +120,13 @@ def add_rpm_mirror_service(gendoc, clone_dir, major_minor):
                                 'name': 'key',
                                 'secret': {
                                     'secretName': 'mirror.openshift.com'
+                                }
+                            },
+                            {
+                                "name": "mirror-enterprise-basic-auth",
+                                "secret": {
+                                    "defaultMode": 420,
+                                    "secretName": "mirror-enterprise-basic-auth"
                                 }
                             },
                             {
