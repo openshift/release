@@ -435,6 +435,30 @@ presubmits:
     always_run: true
     branches:
     - master
+    cluster: build02
+    context: ci/prow/clusterimageset-updater
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-clusterimageset-updater
+    rerun_command: /test clusterimageset-updater
+    spec:
+      containers:
+      - args:
+        - ./
+        command:
+        - hack/validate-clusterimagesets.sh
+        image: clusterimageset-updater:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: ((?m)^/test clusterimageset-updater,?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
     cluster: app.ci
     context: ci/prow/config
     decorate: true
