@@ -31,6 +31,12 @@ CONFIG = {
         'eastus2': 8,
         'westus': 8
     },
+    'azure-2-quota-slice': {
+        'centralus': 33,
+        'eastus': 8,
+        'eastus2': 8,
+        'westus': 8
+    },
     'azurestack-quota-slice': {
         'ppe3': 2
     },
