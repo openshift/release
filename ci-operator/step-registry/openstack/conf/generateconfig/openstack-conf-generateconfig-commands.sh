@@ -38,6 +38,13 @@ if [[ ${ZONES_COUNT} -gt ${MAX_ZONES_COUNT} ]]; then
   exit 1
 fi
 
+MASTER_REPLICAS=3
+if [[ "${SIZE_VARIANT}" == "compact" ]]; then 
+  WORKER_REPLICAS=0
+else
+  WORKER_REPLICAS=3
+fi
+
 if [[ "${ZONES_COUNT}" == "0" ]]; then
   ZONES_STR="[]"
 elif [[ "${ZONES_COUNT}" == "1" ]]; then
@@ -92,7 +99,6 @@ fi
 cat >> "${CONFIG}" << EOF
 compute:
 - name: worker
-  replicas: 3
   platform:
     openstack:
       type: ${OPENSTACK_COMPUTE_FLAVOR}
@@ -113,15 +119,15 @@ EOF
 EOF
     done
 fi
-
 cat >> "${CONFIG}" << EOF
+  replicas: ${WORKER_REPLICAS}
 controlPlane:
   name: master
   platform:
     openstack:
       type: ${OPENSTACK_CONTROLPLANE_FLAVOR}
       zones: ${ZONES_STR}
-  replicas: 3
+  replicas: ${MASTER_REPLICAS}
 pullSecret: >
   ${PULL_SECRET}
 sshKey: |
