@@ -136,24 +136,30 @@ tests:
   commands: go test ./pkg/...
   container:
     from: src
+  skip_if_only_changed: ^docs/
 - as: gofmt
   commands: IS_CONTAINER=TRUE ./hack/go-fmt.sh .
   container:
     from: src
+  skip_if_only_changed: ^docs/
 - as: govet
   commands: IS_CONTAINER=TRUE ./hack/go-vet.sh ./...
   container:
     from: src
+  skip_if_only_changed: ^docs/
 - as: golint
   commands: IS_CONTAINER=TRUE ./hack/go-lint.sh -min_confidence 0.3 $(go list -f '{{
     .ImportPath }}' ./...)
   container:
     from: src
+  skip_if_only_changed: ^docs/
 - as: verify-vendor
   commands: IS_CONTAINER=TRUE ./hack/verify-vendor.sh
   container:
     from: src
+  skip_if_only_changed: ^docs/
 - as: e2e-aws
+  skip_if_only_changed: ^docs/
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
@@ -168,6 +174,7 @@ tests:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
 - as: e2e-aws-upgrade
+  skip_if_only_changed: ^docs/
   steps:
     cluster_profile: aws
     workflow: openshift-upgrade-aws-latestinstaller
@@ -203,6 +210,7 @@ tests:
     workflow: openshift-e2e-vsphere-upi
 - as: e2e-metal-ipi
   optional: true
+  run_if_changed: .*baremetal.*
   steps:
     cluster_profile: packet
     workflow: baremetalds-e2e
@@ -213,6 +221,7 @@ tests:
     workflow: openshift-e2e-vsphere
 - as: e2e-ovirt
   optional: true
+  skip_if_only_changed: ^docs/
   steps:
     cluster_profile: ovirt
     workflow: openshift-e2e-ovirt-minimal-release-4.4-4.5

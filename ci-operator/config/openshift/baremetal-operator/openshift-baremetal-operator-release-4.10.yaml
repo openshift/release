@@ -39,10 +39,12 @@ tests:
   commands: make unit
   container:
     from: src
+  skip_if_only_changed: (^(docs|examples|config)/)|(\.md$)|((^|/)OWNERS$)
 - as: lint
   commands: export GOLANGCI_LINT_CACHE=/tmp/.cache make linters
   container:
     from: src
+  skip_if_only_changed: (^(docs|examples)/)|(\.md$)|((^|/)OWNERS$)
 - as: e2e-metal-ipi
   optional: true
   steps:
@@ -53,10 +55,12 @@ tests:
         NETWORK_TYPE=OpenShiftSDN
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-serial-ipv4
+  skip_if_only_changed: (^(docs|examples)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: packet
     workflow: baremetalds-e2e-serial-ipv4
 - as: e2e-metal-ipi-ovn-ipv6
+  skip_if_only_changed: (^(docs|examples)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: packet
     env:
