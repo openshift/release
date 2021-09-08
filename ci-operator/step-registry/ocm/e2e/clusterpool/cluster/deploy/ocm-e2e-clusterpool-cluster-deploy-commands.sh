@@ -749,6 +749,49 @@ deploy() {
         logf "$_log" "WARN Deploy $_cluster: Current MCH status is $_mch_status. Will retry (${_elapsed}/${_timeout}s)"
     done
 
+    # Apply YAML files in DEPLOY_HUB_ADDITIONAL_YAML environment variable
+    logf "$_log" "Deploy $_cluster: Checking DEPLOY_HUB_ADDITIONAL_YAML environment variable"
+    echo "CHECK_ADDITIONAL_YAML" > "${_status}"
+    if [[ -z "$DEPLOY_HUB_ADDITIONAL_YAML" ]]; then
+        logf "$_log" "Deploy $_cluster: .... DEPLOY_HUB_ADDITIONAL_YAML is empty."
+    else
+        logf "$_log" "Deploy $_cluster: .... decoding DEPLOY_HUB_ADDITIONAL_YAML"
+        echo "DECODE_ADDITIONAL_YAML" > "${_status}"
+        cat <<<"$DEPLOY_HUB_ADDITIONAL_YAML" | base64 -d > additional.yaml 2> >(tee -a "$_log") || {
+            logf "$_log" "ERROR Deploy $_cluster: Unable to decode contents of DEPLOY_HUB_ADDITIONAL_YAML variable"
+            echo "ERROR DECODE_ADDITIONAL_YAML" > "${_status}"
+            return 1
+        }
+        logf "$_log" "Deploy $_cluster: Wait up to 5 minutes to apply YAML files from DEPLOY_HUB_ADDITIONAL_YAML environment variable"
+        echo "WAIT_APPLY_ADDITIONAL_YAML" > "${_status}"
+        local _timeout=300 _elapsed='' _step=15
+        local _mch_name='' _mch_status=''
+        while true; do
+            # Wait for _step seconds, except for first iteration.
+            if [[ -z "$_elapsed" ]]; then
+                _elapsed=0
+            else
+                sleep $_step
+                _elapsed=$(( _elapsed + _step ))
+            fi
+    
+            KUBECONFIG="$_kc" oc -n $NAMESPACE apply additional.yaml \
+                > >(tee -a "$_log") 2>&1 && {
+                logf "$_log" "Deploy $_cluster: Additional YAML files applied after ${_elapsed}s"
+                break
+            }
+    
+            # Check timeout
+            if (( _elapsed > _timeout )); then
+                    logf "$_log" "ERROR Deploy $_cluster: Timeout (${_timeout}s) waiting to apply additional YAML files"
+                    echo "ERROR WAIT_APPLY_ADDITIONAL_YAML" > "${_status}"
+                    return 1
+            fi
+    
+            logf "$_log" "WARN Deploy $_cluster: Unable to apply additional YAML files. Will retry (${_elapsed}/${_timeout}s)"
+        done
+    fi
+
     # Done
     logf "$_log" "Deploy $_cluster: Deployment complete."
     echo "OK" > "${_status}"
