@@ -54,6 +54,8 @@ systemctl disable --now firewalld
 
 export KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig
 
+ln -s /usr/bin/oc /usr/bin/kubectl
+
 systemctl enable --now microshift.service
 start=$(date '+%s')
 to=300
