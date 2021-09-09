@@ -54,10 +54,10 @@ CONFIG = {
         'default': 12,
     },
     'openstack-kuryr-quota-slice': {
-        'default': 3,
+        'default': 2,
     },
     'openstack-vh-mecha-central-quota-slice': {
-        'default': 10,
+        'default': 8,
     },
     'openstack-vh-mecha-az0-quota-slice': {
         'default': 6,
