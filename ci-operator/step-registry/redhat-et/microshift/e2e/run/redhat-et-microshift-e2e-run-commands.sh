@@ -63,7 +63,7 @@ while :; do
   sleep 10
 done
 
-cat suite.txt | openshift-tests run --provider=none -f -
+cat suite.txt | openshift-tests run --provider=none --run -
 
 EOF
 chmod +x "${HOME}"/run-smoke-tests.sh
