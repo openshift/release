@@ -37,5 +37,8 @@ ret="$?"
 set -e
 
 cp /tmp/installer/.openshift_install.log "${ARTIFACT_DIR}"
+if [[ -s /tmp/installer/quota.json ]]; then
+	cp /tmp/installer/quota.json "${ARTIFACT_DIR}"
+fi
 
 exit "$ret"
