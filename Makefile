@@ -96,10 +96,6 @@ validate-step-registry:
 	$(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/ci-operator-configresolver:latest
 	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR)/core-services/prow/02_config:/prow:z" -v "$(CURDIR)/ci-operator/config:/config:z" -v "$(CURDIR)/ci-operator/step-registry:/step-registry:z" registry.ci.openshift.org/ci/ci-operator-configresolver:latest --config /config --registry /step-registry --prow-config /prow/_config.yaml --validate-only
 
-clusterimagesets:
-	$(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/clusterimageset-updater:latest
-	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR)/clusters/hive/pools:/pools:z" registry.ci.openshift.org/ci/clusterimageset-updater:latest --pools "/pools" --imagesets "/pools"
-
 # LEGACY TARGETS
 # You should not need to add new targets here.
 
