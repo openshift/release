@@ -35,7 +35,7 @@ images:
 - dockerfile_literal: |
     FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8 as openshift-tests-builder
     WORKDIR /go/src/github.com/openshift/origin/
-    RUN dnf install git make -y
+    RUN dnf install -y git make
     RUN git clone https://github.com/openshift/origin.git . && \
         git checkout release-4.7
     RUN make
@@ -44,32 +44,16 @@ images:
   from: os
   to: openshift-test-bin
 - dockerfile_literal: |
-    FROM os
-    COPY mock-nss.sh /usr/bin/mock-nss.sh
-    COPY google-cloud-sdk.repo /etc/yum.repos.d/google-cloud-sdk.repo
-    RUN dnf install -y nss_wrapper && \
-        dnf clean all && \
-        rm -rf /var/cache/dnf/*
-  from: os
-  inputs:
-    libvirt-installer:
-      paths:
-      - destination_dir: .
-        source_path: /bin/mock-nss.sh
-      - destination_dir: .
-        source_path: /etc/yum.repos.d/google-cloud-sdk.repo
-  to: mock-nss-setup
-- dockerfile_literal: |
-    FROM mock-nss-setup
+    FROM libvirt-installer
     COPY microshift /usr/bin/
     COPY oc /usr/bin/oc
     COPY install.sh /usr/bin/install.sh
     COPY openshift-tests /usr/bin/openshift-tests
     RUN  dnf update -y && \
          dnf --enablerepo=powertools install --setopt=tsflags=nodocs -y \
-         glib2-devel glibc-devel glibc-static gpgme-devel libassuan-devel \
+         glib2-devel glibc-devel glibc-static gpgme-devel libassuan-devel && \
          dnf clean all && rm -rf /var/cache/dnf/*
-  from: mock-nss-setup
+  from: libvirt-installer
   inputs:
     cli:
       paths:
