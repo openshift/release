@@ -46,38 +46,7 @@ EOF
 
 # smoke-tests script to scp to gcp instance
 # TODO: edit this file to launch microshift and run tests
-cat  > "${HOME}"/run-smoke-tests.sh << 'EOF'
-#!/bin/bash
-set -xeuo pipefail
 
-systemctl disable --now firewalld
-
-export KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig
-
-ln -s /usr/bin/oc /usr/bin/kubectl
-
-systemctl enable --now microshift.service
-start=$(date '+%s')
-to=300
-while :; do
-  if [ $(( $(date '+%s') - start )) -ge $to ]; then
-    echo "timed out waiting for node to start ($to seconds)" >&2
-    exit 1
-  fi
-  echo "waiting for node response" >&2
-  # get the condation where type == Ready, where condition.statusx == True.
-  node="$(oc get nodes -o jsonpath='{.items[*].status.conditions}' | jq '.[] | select(.type == "Ready") | select(.status == "True")')" || echo ''
-  if [ "$node" ]; then
-    echo "node posted ready status" >&2
-    break
-  fi
-  sleep 10
-done
-
-openshift-tests run --provider=none openshift/conformance
-
-EOF
-chmod +x "${HOME}"/run-smoke-tests.sh
 
 set -x
 
@@ -163,21 +132,9 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJE
   rhel8user@"${INSTANCE_PREFIX}" \
   --command 'sudo HOSTNAME=$(hostname -A) CONFIG_ENV_ONLY=true ./install.sh'
 
-# scp smoke test script and pull secret
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
-  --quiet \
-  --project "${GOOGLE_PROJECT_ID}" \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  --recurse "${HOME}"/run-smoke-tests.sh rhel8user@"${INSTANCE_PREFIX}":~/run-smoke-tests.sh
-
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \
   --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   --recurse "${HOME}"/pull-secret rhel8user@"${INSTANCE_PREFIX}":~/pull-secret
 
-# start the test
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  rhel8user@"${INSTANCE_PREFIX}" \
-  --command 'sudo ./run-smoke-tests.sh'

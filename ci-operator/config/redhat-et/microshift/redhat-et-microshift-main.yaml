@@ -47,6 +47,20 @@ images:
     FROM os
     COPY mock-nss.sh /usr/bin/mock-nss.sh
     COPY google-cloud-sdk.repo /etc/yum.repos.d/google-cloud-sdk.repo
+    RUN dnf install -y nss_wrapper && \
+        dnf clean all && \
+        rm -rf /var/cache/dnf/*
+  from: os
+  inputs:
+    libvirt-installer:
+      paths:
+      - destination_dir: .
+        source_path: /bin/mock-nss.sh
+      - destination_dir: .
+        source_path: /etc/yum.repos.d/google-cloud-sdk.repo
+  to: mock-nss-setup
+- dockerfile_literal: |
+    FROM mock-nss-setup
     COPY microshift /usr/bin/
     COPY oc /usr/bin/oc
     COPY install.sh /usr/bin/install.sh
@@ -54,20 +68,13 @@ images:
     RUN  dnf update -y && \
          dnf --enablerepo=powertools install --setopt=tsflags=nodocs -y \
          glib2-devel glibc-devel glibc-static gpgme-devel libassuan-devel \
-         google-cloud-sdk nss_wrapper openssh-clients && \
          dnf clean all && rm -rf /var/cache/dnf/*
-  from: os
+  from: mock-nss-setup
   inputs:
     cli:
       paths:
       - destination_dir: .
         source_path: /usr/bin/oc
-    libvirt-installer:
-      paths:
-      - destination_dir: .
-        source_path: /bin/mock-nss.sh
-      - destination_dir: .
-        source_path: /etc/yum.repos.d/google-cloud-sdk.repo
     linux-amd64-4.7.0-0.microshift:
       paths:
       - destination_dir: .
@@ -100,10 +107,10 @@ tests:
   commands: make test-unit
   container:
     from: src
-- as: e2e-microshift
+- as: e2e-microshift-openshift-conformance
   steps:
     cluster_profile: gcp
-    workflow: redhat-et-microshift-e2e
+    workflow: redhat-et-microshift-e2e-openshift-conformance
 zz_generated_metadata:
   branch: main
   org: redhat-et
