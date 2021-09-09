@@ -27,7 +27,7 @@ declare -A compute_azs=(
 	)
 
 declare -A bastion_flavor=(
-	['openstack-kuryr']=''
+	['openstack-kuryr']='m1.small'
 	['openstack-vexxhost']='1vcpu_2gb'
 	['openstack-vh-mecha-central']='m1.small'
 	['openstack-vh-mecha-az0']='m1.small'
