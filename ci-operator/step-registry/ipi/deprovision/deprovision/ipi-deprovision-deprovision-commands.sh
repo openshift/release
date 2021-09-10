@@ -29,7 +29,7 @@ if [[ "${CLUSTER_TYPE}" == "ovirt" ]]; then
 fi
 
 OPENSHIFT_INSTALL_REPORT_QUOTA_FOOTPRINT="true"; export OPENSHIFT_INSTALL_REPORT_QUOTA_FOOTPRINT
-openshift-install --dir /tmp/installer destroy cluster &
+OPENSHIFT_INSTALL_REPORT_QUOTA_FOOTPRINT="true" openshift-install --dir /tmp/installer destroy cluster &
 
 set +e
 wait "$!"
@@ -37,6 +37,7 @@ ret="$?"
 set -e
 
 cp /tmp/installer/.openshift_install.log "${ARTIFACT_DIR}"
+ls -lah /tmp/installer
 if [[ -s /tmp/installer/quota.json ]]; then
 	cp /tmp/installer/quota.json "${ARTIFACT_DIR}"
 fi
