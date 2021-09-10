@@ -25,6 +25,10 @@ CONFIG = {
         'us-west-1': 35,
         'us-west-2': 40,
     },
+    'aws-china-quota-slice': {
+        'cn-north-1': 1,
+        'cn-northwest-1': 1,
+    },
     'azure4-quota-slice': {
         'centralus': 33,
         'eastus': 8,
