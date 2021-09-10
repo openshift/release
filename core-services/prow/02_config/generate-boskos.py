@@ -72,7 +72,7 @@ CONFIG = {
     'ovirt-quota-slice': {},
     'ovirt-upgrade-quota-slice': {},
     'packet-quota-slice': {
-        'default': 60,
+        'default': 30,
     },
     'packet-edge-quota-slice': {
         'default': 50,
