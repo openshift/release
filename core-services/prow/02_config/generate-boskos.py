@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+cd #!/usr/bin/env python3
 
 import yaml
 
@@ -24,6 +25,10 @@ CONFIG = {
         'us-east-2': 40,
         'us-west-1': 35,
         'us-west-2': 40,
+    },
+    'aws-china-quota-slice': {
+        'cn-north-1': 1,
+        'cn-northwest-1': 1,
     },
     'azure4-quota-slice': {
         'centralus': 33,
