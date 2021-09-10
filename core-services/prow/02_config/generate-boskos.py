@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-cd #!/usr/bin/env python3
 
 import yaml
 
