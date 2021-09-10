@@ -73,16 +73,6 @@ raw_steps:
 - rpm_image_injection_step:
     from: base
     to: oc-base-with-rpms
-releases:
-  initial:
-    integration:
-      name: 4.4-priv
-      namespace: ocp-private
-  latest:
-    integration:
-      include_built_images: true
-      name: 4.4-priv
-      namespace: ocp-private
 resources:
   '*':
     requests:
@@ -101,6 +91,9 @@ rpm_build_commands: |-
   cp "${TMPDIR}/openshift-clients-0.0.1.tar.gz" "${RPMBUILD_DIR}/SOURCES/"
   rpmbuild -ba --nodeps --define "_topdir $( pwd )/${RPMBUILD_DIR}" ${RPMBUILD_DIR}/SPECS/oc.spec --define 'os_git_vars ignore'
 rpm_build_location: _rpmbuild/RPMS/
+tag_specification:
+  name: 4.4-priv
+  namespace: ocp-private
 test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
 tests:
 - as: build-rpms-from-tar
