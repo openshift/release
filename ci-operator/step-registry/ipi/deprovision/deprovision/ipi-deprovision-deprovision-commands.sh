@@ -6,11 +6,7 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-case "${CLUSTER_TYPE}" in
-aws-china) export AWS_SHARED_CREDENTIALS_FILE=/var/run/aws-china-credential/.awscred;;
-*) export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred;;
-esac
-
+export AWS_SHARED_CREDENTIALS_FILE=$CLUSTER_PROFILE_DIR/.awscred
 export AZURE_AUTH_LOCATION=$CLUSTER_PROFILE_DIR/osServicePrincipal.json
 export GOOGLE_CLOUD_KEYFILE_JSON=$CLUSTER_PROFILE_DIR/gce.json
 export OS_CLIENT_CONFIG_FILE=${SHARED_DIR}/clouds.yaml

@@ -7,10 +7,7 @@ set -o pipefail
 # TODO: move to image
 curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
 
-case "${CLUSTER_TYPE}" in
-aws-china) export AWS_SHARED_CREDENTIALS_FILE=/var/run/aws-china-credential/.awscred;;
-*) export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred";;
-esac
+export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
@@ -101,8 +98,8 @@ EOF
 
 # AMIs for China regions
 case "${REGION}" in
-cn-north-1) export RHCOS_AMI=ami-0965462adbf583cbc;;
-cn-northwest-1) export RHCOS_AMI=ami-035817c6481d7092c;;
+cn-north-1) RHCOS_AMI=ami-0965462adbf583cbc;;
+cn-northwest-1) RHCOS_AMI=ami-035817c6481d7092c;;
 *) ;;
 esac
 
