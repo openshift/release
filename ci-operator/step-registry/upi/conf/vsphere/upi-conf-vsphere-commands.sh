@@ -69,6 +69,7 @@ vsphere_datacenter="SDDC-Datacenter"
 vsphere_datastore="WorkloadDatastore"
 vsphere_cluster="Cluster-1"
 vsphere_url="vcenter.sddc-44-236-21-251.vmwarevmc.com"
+dns_server="10.0.0.2"
 vsphere_resource_pool=""
 TFVARS_PATH=/var/run/vault/vsphere/secret.auto.tfvars
 
@@ -79,6 +80,7 @@ if [ $((${LEASED_RESOURCE//[!0-9]/})) -ge 88 ]; then
   vsphere_url="ibmvcenter.vmc-ci.devcluster.openshift.com"
   vsphere_datacenter="IBMCloud"
   vsphere_cluster="vcs-ci-workload"
+  dns_server="10.38.76.172"
   vsphere_resource_pool="/IBMCloud/host/vcs-ci-workload/Resources"
   vsphere_datastore="vsanDatastore"
 fi
@@ -135,7 +137,7 @@ ssh_public_key_path = "${ssh_pub_key_path}"
 compute_memory = "16384"
 compute_num_cpus = "4"
 vm_network = "${LEASED_RESOURCE}"
-vm_dns_addresses = ["10.0.0.2"]
+vm_dns_addresses = ["${dns_server}"]
 bootstrap_ip_address = "192.168.${third_octet}.3"
 lb_ip_address = "192.168.${third_octet}.2"
 compute_ip_addresses = ["192.168.${third_octet}.7","192.168.${third_octet}.8","192.168.${third_octet}.9"]
