@@ -96,7 +96,8 @@ compute:
       type: ${COMPUTE_NODE_TYPE}
 EOF
 
-# AMIs for China regions
+# custom rhcos ami
+RHCOS_AMI=
 case "${REGION}" in
 cn-north-1) RHCOS_AMI=ami-0965462adbf583cbc;;
 cn-northwest-1) RHCOS_AMI=ami-035817c6481d7092c;;
