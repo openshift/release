@@ -17,7 +17,7 @@ while read -r claim; do
     json_output="${SHARED_DIR}/${cluster}.json"
 
     # Get cluster claim namespace
-    oc_command="get clusterclaim.hive $claim -o jsonpath='{.spec.namespace}'"
+    oc_command="get clusterclaim.hive $claim -n $CLUSTERPOOL_HOST_NAMESPACE -o jsonpath='{.spec.namespace}'"
     if ! make -s oc/command OC_COMMAND="$oc_command" > namespace; then
         echo "Error getting hive namespace for cluster claim $claim"
         exit 1
