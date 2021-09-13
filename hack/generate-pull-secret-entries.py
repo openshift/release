@@ -54,11 +54,6 @@ def config_for_cluster(cluster):
                 },
                 {
                     "item": "build_farm",
-                    "registry_url": "registry.svc.ci.openshift.org",
-                    "auth_field": "token_image-puller_ci_reg_auth_value.txt",
-                },
-                {
-                    "item": "build_farm",
                     "registry_url": "registry.ci.openshift.org",
                     "auth_field": "token_image-puller_app.ci_reg_auth_value.txt",
                 },
