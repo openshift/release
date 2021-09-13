@@ -75,6 +75,9 @@ CONFIG = {
     'openstack-ppc64le-quota-slice': {},
     'ovirt-quota-slice': {},
     'ovirt-upgrade-quota-slice': {},
+    'ovirt-clusterbot-quota-slice': {
+        'default': 3,
+    },
     'packet-quota-slice': {
         'default': 60,
     },
