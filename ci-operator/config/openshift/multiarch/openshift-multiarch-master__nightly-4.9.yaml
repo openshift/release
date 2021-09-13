@@ -155,6 +155,26 @@ tests:
     - chain: ipi-aws-post
     pre:
     - chain: ipi-aws-ovn-fips-pre
+- as: ocp-installer-e2e-aws-private-arm64
+  interval: 24h
+  steps:
+    cluster_profile: aws-arm64
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: arm-ci.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+    post:
+    - chain: gather
+    - ref: gather-proxy
+    - ref: ipi-deprovision-deprovision
+    - ref: ipi-deprovision-proxy
+    - ref: ipi-deprovision-aws-sharednetwork
+    pre:
+    - chain: ipi-conf-aws-sharednetwork
+    - ref: ipi-conf-aws-proxy-internal
+    - ref: ipi-conf-private
+    - chain: ipi-install
 - as: ocp-e2e-remote-libvirt-s390x
   cluster: build01
   cron: 0 8,20 * * *
