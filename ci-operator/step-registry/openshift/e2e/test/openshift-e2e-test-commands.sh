@@ -163,6 +163,14 @@ function upgrade() {
     set +x
 }
 
+# upgrade_conformance runs the upgrade and the parallel tests, and exits with an error if either fails.
+function upgrade_conformance() {
+    local exit_code=0
+    upgrade || exit_code=$?
+    TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/conformance/parallel suite || exit_code=$?
+    exit $exit_code
+}
+
 function upgrade_paused() {
     set -x
     unset TEST_SUITE
@@ -233,8 +241,7 @@ trap 'echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"' EXIT
 
 case "${TEST_TYPE}" in
 upgrade-conformance)
-    upgrade
-    TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/conformance/parallel suite
+    upgrade_conformance
     ;;
 upgrade)
     upgrade
