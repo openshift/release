@@ -9,19 +9,13 @@ cluster_name=$(<"${SHARED_DIR}"/clustername.txt)
 
 echo "$(date -u --rfc-3339=seconds) - Collecting vCenter performance data and alerts"
 
-vsphere_datacenter="SDDC-Datacenter"
-vsphere_datastore="WorkloadDatastore"
-vsphere_url="vcenter.sddc-44-236-21-251.vmwarevmc.com"
-TFVARS_PATH=/var/run/vault/vsphere/secret.auto.tfvars
-
-# **testing** for IBM cloud, only run specific jobs on specific lease numbers
-if [ $((${LEASED_RESOURCE//[!0-9]/})) -ge 88 ]; then     
-  echo Scheduling job on IBM Cloud instance
-  TFVARS_PATH=/var/run/vault/ibmcloud/secret.auto.tfvars
-  vsphere_url="ibmvcenter.vmc-ci.devcluster.openshift.com"
-  vsphere_datacenter="IBMCloud"
-  vsphere_datastore="vsanDatastore"
-fi
+echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..."
+# shellcheck source=/dev/null
+declare vsphere_datacenter
+declare vsphere_datastore
+declare cloud_where_run
+declare vsphere_url
+source "${SHARED_DIR}/vsphere_context.sh"
 
 vsphere_user=$(grep -oP 'vsphere_user\s*=\s*"\K[^"]+' ${TFVARS_PATH})
 vsphere_password=$(grep -oP 'vsphere_password\s*=\s*"\K[^"]+' ${TFVARS_PATH})
@@ -37,13 +31,13 @@ export GOVC_DATASTORE="${vsphere_datastore}"
 EOF
 
 function collect_diagnostic_data {
-  set +e
-  # shellcheck source=/dev/null
+  set +e  
   source "${SHARED_DIR}/govc.sh"
   vm_path="/${GOVC_DATACENTER}/vm/${cluster_name}"
   vcenter_state=${ARTIFACT_DIR}/vcenter_state
   mkdir ${vcenter_state}
 
+  
   govc object.collect "/${GOVC_DATACENTER}/host" triggeredAlarmState &> ${vcenter_state}/host_alarms.log  
   clustervms=$(govc ls "${vm_path}-*")
   for vm in $clustervms; do    
@@ -56,6 +50,9 @@ function collect_diagnostic_data {
     echo "$(date -u --rfc-3339=seconds) - capture console image from $vm"    
     govc vm.console -vm.ipath="$vm" -capture "${vcenter_state}/${vmname}.png"
   done
+  first_vm=$(echo ${clustervms} | cut -d" " -f1)
+  target_hw_version=$(govc vm.info -json=true "${first_vm}" | jq -r .VirtualMachines[0].Config.Version)
+  echo "{\"hw_version\":  \"${target_hw_version}\", \"cloud\": \"${cloud_where_run}\"}" > "${ARTIFACT_DIR}/runtime-config.json"
   set -e
 }
 
