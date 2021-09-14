@@ -3,7 +3,7 @@
 set -Eeuo pipefail
 
 BUGZILLA_API_KEY="$(</var/run/bugzilla/api-key)"
-SLACK_HOOK="$(</var/run/slack/hook_forum-shiftstack)"
+SLACK_HOOK="$(</var/run/slack-hooks/forum-shiftstack)"
 TEAM_MEMBERS="$(</var/run/team/team.json)"
 
 export BUGZILLA_API_KEY
