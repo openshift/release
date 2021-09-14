@@ -557,7 +557,7 @@ deploy() {
                 _elapsed=$(( _elapsed + _step ))
             fi
     
-            KUBECONFIG="$_kc" oc -n $NAMESPACE apply additional.yaml \
+            KUBECONFIG="$_kc" oc -n $NAMESPACE apply -f additional.yaml \
                 > >(tee -a "$_log") 2>&1 && {
                 logf "$_log" "Deploy $_cluster: Additional YAML files applied after ${_elapsed}s"
                 break
