@@ -31,20 +31,24 @@ resources:
 tests:
 - as: e2e
   steps:
-    cluster_profile: aws
+    dependencies:
+      COMPONENT_IMAGE_REF: search-collector
+    env:
+      CLUSTERPOOL_GROUP_NAME: Search
+      CLUSTERPOOL_HOST_NAMESPACE: acm-observability-usa
+      CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-obs-usa-clusterpool
+      CLUSTERPOOL_LIST_INCLUSION_FILTER: prow
     test:
-    - as: run-e2e
-    cli: latest
+    - as: e2e
       commands: |
-      export COMPONENT_IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:search-collector}
         export SELF="make -f Makefile.prow"
         make -f Makefile.prow test-e2e
-      from: src
+      from: search-collector
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: openshift-e2e-aws
+    workflow: ocm-e2e-clusterpool
 - as: backplane-fast-forward
   postsubmit: true
   steps:
