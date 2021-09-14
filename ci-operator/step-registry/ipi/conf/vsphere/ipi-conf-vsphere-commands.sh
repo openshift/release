@@ -10,31 +10,23 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   exit 1
 fi
 
-vsphere_datacenter="SDDC-Datacenter"
-vsphere_datastore="WorkloadDatastore"
-vsphere_cluster="Cluster-1"
-vsphere_url="vcenter.sddc-44-236-21-251.vmwarevmc.com"
-TFVARS_PATH=/var/run/vault/vsphere/secret.auto.tfvars
+echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..."
+# shellcheck source=/dev/null
+declare vsphere_datacenter
+declare vsphere_datastore
+declare vsphere_url
+declare vsphere_cluster
+declare TFVARS_PATH
+source "${SHARED_DIR}/vsphere_context.sh"
 
 declare -a vips
 mapfile -t vips < "${SHARED_DIR}/vips.txt"
-
-# **testing** for IBM cloud, only run specific jobs on specific lease numbers
-if [ $((${LEASED_RESOURCE//[!0-9]/})) -ge 88 ]; then     
-  echo Scheduling job on IBM Cloud instance
-  TFVARS_PATH=/var/run/vault/ibmcloud/secret.auto.tfvars
-  vsphere_url="ibmvcenter.vmc-ci.devcluster.openshift.com"
-  vsphere_datacenter="IBMCloud"
-  vsphere_cluster="vcs-ci-workload"
-  vsphere_datastore="vsanDatastore"
-fi
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 vsphere_user=$(grep -oP 'vsphere_user\s*=\s*"\K[^"]+' ${TFVARS_PATH})
 vsphere_password=$(grep -oP 'vsphere_password\s*=\s*"\K[^"]+' ${TFVARS_PATH})
 base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
 machine_cidr=$(<"${SHARED_DIR}"/machinecidr.txt)
-
 
 cat >> "${CONFIG}" << EOF
 baseDomain: $base_domain

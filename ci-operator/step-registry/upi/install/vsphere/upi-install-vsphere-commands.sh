@@ -13,12 +13,8 @@ export OPENSHIFT_INSTALL_INVOKER=openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD_
 export AWS_SHARED_CREDENTIALS_FILE=/var/run/vault/vsphere-aws/.awscred
 export AWS_DEFAULT_REGION=us-east-1
 
-tfvars_path=/var/run/vault/vsphere/secret.auto.tfvars
-
-if [ $((${LEASED_RESOURCE//[!0-9]/})) -ge 88 ]; then     
-  echo Applying credentials for IBM Cloud
-  tfvars_path=/var/run/vault/ibmcloud/secret.auto.tfvars
-fi
+echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..."
+source "${SHARED_DIR}/vsphere_context.sh"
 
 cluster_name=$(<"${SHARED_DIR}"/clustername.txt)
 installer_dir=/tmp/installer
@@ -46,7 +42,7 @@ cp -rt "${installer_dir}" \
 
 # Copy secrets to terraform path
 cp -t "${installer_dir}" \
-    ${tfvars_path}
+    ${TFVARS_PATH}
 
 export KUBECONFIG="${installer_dir}/auth/kubeconfig"
 
