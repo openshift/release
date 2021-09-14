@@ -44,43 +44,11 @@ User=root
 WantedBy=multi-user.target
 EOF
 
-# smoke-tests script to scp to gcp instance
-# TODO: edit this file to launch microshift and run tests
-cat  > "${HOME}"/run-smoke-tests.sh << 'EOF'
-#!/bin/bash
-set -xeuo pipefail
-
-systemctl disable --now firewalld
-
-export KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig
-
-systemctl enable --now microshift.service
-start=$(date '+%s')
-to=300
-while :; do
-  if [ $(( $(date '+%s') - start )) -ge $to ]; then
-    echo "timed out waiting for node to start ($to seconds)" >&2
-    exit 1
-  fi
-  echo "waiting for node response" >&2
-  # get the condation where type == Ready, where condition.statusx == True.
-  node="$(oc get nodes -o jsonpath='{.items[*].status.conditions}' | jq '.[] | select(.type == "Ready") | select(.status == "True")')" || echo ''
-  if [ "$node" ]; then
-    echo "node posted ready status" >&2
-    break
-  fi
-  sleep 10
-done
-EOF
-chmod +x "${HOME}"/run-smoke-tests.sh
-
-set -x
-
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
   --command 'sudo dnf install subscription-manager -y'
-  
+
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
@@ -134,6 +102,23 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJE
   rhel8user@"${INSTANCE_PREFIX}" \
   --command 'sudo mv oc /usr/bin/oc'
 
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  rhel8user@"${INSTANCE_PREFIX}" \
+  --command 'sudo ln -s /usr/bin/oc /usr/bin/kubectl '
+
+# scp openshift-test bin
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+  --quiet \
+  --project "${GOOGLE_PROJECT_ID}" \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  --recurse /usr/bin/openshift-tests rhel8user@"${INSTANCE_PREFIX}":~/openshift-tests
+
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  rhel8user@"${INSTANCE_PREFIX}" \
+  --command 'sudo mv openshift-tests /usr/bin/openshift-tests'
+
 # scp and run install.sh
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \
@@ -144,14 +129,12 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
-  --command 'sudo HOSTNAME=$(hostname -A) CONFIG_ENV_ONLY=true ./install.sh'
+  --command 'sudo systemctl disable --now firewalld'
 
-# scp smoke test script and pull secret
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
-  --quiet \
-  --project "${GOOGLE_PROJECT_ID}" \
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
-  --recurse "${HOME}"/run-smoke-tests.sh rhel8user@"${INSTANCE_PREFIX}":~/run-smoke-tests.sh
+  rhel8user@"${INSTANCE_PREFIX}" \
+  --command 'sudo HOSTNAME=$(hostname -A) CONFIG_ENV_ONLY=true ./install.sh'
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \
@@ -159,8 +142,3 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   --recurse "${HOME}"/pull-secret rhel8user@"${INSTANCE_PREFIX}":~/pull-secret
 
-# start the test
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  rhel8user@"${INSTANCE_PREFIX}" \
-  --command 'sudo ./run-smoke-tests.sh'
