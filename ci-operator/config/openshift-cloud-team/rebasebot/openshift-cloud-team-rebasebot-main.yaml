@@ -47,6 +47,59 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+- as: cloud-provider-ibm
+  cron: 10 12 * * Mon,Thu
+  steps:
+    test:
+    - as: cloud-provider-ibm
+      commands: |
+        export BRANCH_NAME=release-1.22
+        rebasebot --source https://github.com/IBM-Cloud/cloud-provider-ibm:${BRANCH_NAME} \
+                  --dest openshift/cloud-provider-ibm:master \
+                  --rebase openshift-cloud-team/cloud-provider-ibm:rebase-bot-master \
+                  --update-go-modules --with-merge \
+                  --slack-webhook /secrets/rebasebot/slack-webhook \
+                  --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
+                  --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
+                  --git-username cloud-team-rebase-bot \
+                  --git-email cloud-team-rebase-bot@redhat.com
+      credentials:
+      - mount_path: /secrets/rebasebot
+        name: rebase-bot-creds
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: cloud-provider-vpc-controller
+  cron: 20 12 * * Mon,Thu
+  steps:
+    test:
+    - as: cloud-provider-vpc-controller
+      commands: |
+        rebasebot --source https://github.com/IBM-Cloud/cloud-provider-vpc-controller:opensource \
+                  --dest openshift/cloud-provider-vpc-controller:master \
+                  --rebase openshift-cloud-team/cloud-provider-vpc-controller:rebase-bot-master \
+                  --update-go-modules \
+                  --slack-webhook /secrets/rebasebot/slack-webhook \
+                  --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
+                  --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
+                  --git-username cloud-team-rebase-bot \
+                  --git-email cloud-team-rebase-bot@redhat.com
+      credentials:
+      - mount_path: /secrets/rebasebot
+        name: rebase-bot-creds
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: unit
   commands: make unittests
   container:
