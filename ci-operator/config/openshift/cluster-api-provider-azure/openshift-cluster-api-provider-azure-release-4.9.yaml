@@ -23,17 +23,23 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
   to: azure-machine-controllers
 promotion:
-  disabled: true
   name: "4.9"
   namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.9"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.9"
+      namespace: ocp
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: "4.9"
-  namespace: ocp
 tests:
 - as: goimports
   commands: IS_CONTAINER=TRUE make goimports
@@ -62,6 +68,7 @@ tests:
   container:
     from: src
 - as: e2e-azure
+  optional: true
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
@@ -78,6 +85,7 @@ tests:
           cpu: 100m
     workflow: ipi-azure
 - as: e2e-upgrade
+  optional: true
   steps:
     cluster_profile: azure4
     workflow: openshift-upgrade-azure

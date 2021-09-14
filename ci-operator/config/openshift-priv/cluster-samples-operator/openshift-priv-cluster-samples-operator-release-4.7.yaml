@@ -23,14 +23,21 @@ images:
 promotion:
   name: 4.7-priv
   namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.7-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.7-priv
+      namespace: ocp-private
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: 4.7-priv
-  namespace: ocp-private
 tests:
 - as: unit
   commands: make test-unit
@@ -53,10 +60,12 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-aws-builds
+  run_if_changed: ^(tmp/build)
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-builds
 - as: e2e-aws-jenkins
+  run_if_changed: ^(tmp/build)
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-jenkins

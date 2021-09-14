@@ -22,9 +22,18 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
   to: csi-driver-shared-resource-operator
 promotion:
-  disabled: true
   name: 4.9-priv
   namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.9-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.9-priv
+      namespace: ocp-private
 resources:
   '*':
     limits:
@@ -32,20 +41,19 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: 4.9-priv
-  namespace: ocp-private
 tests:
 - as: test
   commands: |
     make test
   container:
     from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: verify
   commands: |
     make verify
   container:
     from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: e2e-aws-csi-driver
   steps:
     cluster_profile: aws

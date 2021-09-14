@@ -25,6 +25,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --secret-dir=/usr/local/cluster-bootimages-cluster-profile
         - --target=cluster-bootimages
         command:
@@ -38,6 +39,9 @@ presubmits:
         volumeMounts:
         - mountPath: /etc/boskos
           name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
           readOnly: true
         - mountPath: /usr/local/cluster-bootimages-cluster-profile
           name: cluster-profile
@@ -61,6 +65,9 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -101,6 +108,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --secret-dir=/usr/local/e2e-agnostic-upgrade-cluster-profile
         - --target=e2e-agnostic-upgrade
         command:
@@ -114,6 +122,9 @@ presubmits:
         volumeMounts:
         - mountPath: /etc/boskos
           name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
           readOnly: true
         - mountPath: /usr/local/e2e-agnostic-upgrade-cluster-profile
           name: cluster-profile
@@ -137,6 +148,9 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -155,7 +169,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-agnostic-upgrade,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.6$
     - ^release-4\.6-
@@ -171,6 +185,7 @@ presubmits:
     name: pull-ci-openshift-priv-machine-config-operator-release-4.6-e2e-aws
     path_alias: github.com/openshift/machine-config-operator
     rerun_command: /test e2e-aws
+    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
     spec:
       containers:
       - args:
@@ -179,6 +194,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --secret-dir=/usr/local/e2e-aws-cluster-profile
         - --target=e2e-aws
         command:
@@ -192,6 +208,9 @@ presubmits:
         volumeMounts:
         - mountPath: /etc/boskos
           name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
           readOnly: true
         - mountPath: /usr/local/e2e-aws-cluster-profile
           name: cluster-profile
@@ -215,6 +234,9 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -245,6 +267,7 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-machine-config-operator-release-4.6-e2e-aws-disruptive
+    optional: true
     path_alias: github.com/openshift/machine-config-operator
     rerun_command: /test e2e-aws-disruptive
     spec:
@@ -255,6 +278,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --secret-dir=/usr/local/e2e-aws-disruptive-cluster-profile
         - --target=e2e-aws-disruptive
         command:
@@ -268,6 +292,9 @@ presubmits:
         volumeMounts:
         - mountPath: /etc/boskos
           name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
           readOnly: true
         - mountPath: /usr/local/e2e-aws-disruptive-cluster-profile
           name: cluster-profile
@@ -291,6 +318,9 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -321,6 +351,7 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-machine-config-operator-release-4.6-e2e-aws-proxy
+    optional: true
     path_alias: github.com/openshift/machine-config-operator
     rerun_command: /test e2e-aws-proxy
     spec:
@@ -331,6 +362,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --secret-dir=/usr/local/e2e-aws-proxy-cluster-profile
         - --target=e2e-aws-proxy
         command:
@@ -344,6 +376,9 @@ presubmits:
         volumeMounts:
         - mountPath: /etc/boskos
           name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
           readOnly: true
         - mountPath: /usr/local/e2e-aws-proxy-cluster-profile
           name: cluster-profile
@@ -367,6 +402,9 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -397,6 +435,7 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-machine-config-operator-release-4.6-e2e-aws-workers-rhel7
+    optional: true
     path_alias: github.com/openshift/machine-config-operator
     rerun_command: /test e2e-aws-workers-rhel7
     spec:
@@ -407,6 +446,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --secret-dir=/usr/local/e2e-aws-workers-rhel7-cluster-profile
         - --target=e2e-aws-workers-rhel7
         command:
@@ -420,6 +460,9 @@ presubmits:
         volumeMounts:
         - mountPath: /etc/boskos
           name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
           readOnly: true
         - mountPath: /usr/local/e2e-aws-workers-rhel7-cluster-profile
           name: cluster-profile
@@ -443,6 +486,9 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -473,6 +519,7 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-machine-config-operator-release-4.6-e2e-azure
+    optional: true
     path_alias: github.com/openshift/machine-config-operator
     rerun_command: /test e2e-azure
     spec:
@@ -483,6 +530,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --secret-dir=/usr/local/e2e-azure-cluster-profile
         - --target=e2e-azure
         command:
@@ -496,6 +544,9 @@ presubmits:
         volumeMounts:
         - mountPath: /etc/boskos
           name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
           readOnly: true
         - mountPath: /usr/local/e2e-azure-cluster-profile
           name: cluster-profile
@@ -519,6 +570,9 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -535,7 +589,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-azure,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.6$
     - ^release-4\.6-
@@ -551,6 +605,7 @@ presubmits:
     name: pull-ci-openshift-priv-machine-config-operator-release-4.6-e2e-gcp-op
     path_alias: github.com/openshift/machine-config-operator
     rerun_command: /test e2e-gcp-op
+    run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
     spec:
       containers:
       - args:
@@ -559,6 +614,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --secret-dir=/usr/local/e2e-gcp-op-cluster-profile
         - --target=e2e-gcp-op
         command:
@@ -572,6 +628,9 @@ presubmits:
         volumeMounts:
         - mountPath: /etc/boskos
           name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
           readOnly: true
         - mountPath: /usr/local/e2e-gcp-op-cluster-profile
           name: cluster-profile
@@ -595,6 +654,9 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -627,6 +689,7 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-machine-config-operator-release-4.6-e2e-metal-ipi
+    optional: true
     path_alias: github.com/openshift/machine-config-operator
     rerun_command: /test e2e-metal-ipi
     spec:
@@ -637,6 +700,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --secret-dir=/usr/local/e2e-metal-ipi-cluster-profile
         - --target=e2e-metal-ipi
         command:
@@ -650,6 +714,9 @@ presubmits:
         volumeMounts:
         - mountPath: /etc/boskos
           name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
           readOnly: true
         - mountPath: /usr/local/e2e-metal-ipi-cluster-profile
           name: cluster-profile
@@ -673,6 +740,9 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -689,7 +759,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-metal-ipi,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.6$
     - ^release-4\.6-
@@ -703,8 +773,10 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-machine-config-operator-release-4.6-e2e-openstack
+    optional: true
     path_alias: github.com/openshift/machine-config-operator
     rerun_command: /test e2e-openstack
+    run_if_changed: .*/on-prem/.*|.*openstack.*
     spec:
       containers:
       - args:
@@ -713,6 +785,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --secret-dir=/usr/local/e2e-openstack-cluster-profile
         - --target=e2e-openstack
         command:
@@ -726,6 +799,9 @@ presubmits:
         volumeMounts:
         - mountPath: /etc/boskos
           name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
           readOnly: true
         - mountPath: /usr/local/e2e-openstack-cluster-profile
           name: cluster-profile
@@ -749,6 +825,9 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -779,6 +858,7 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-machine-config-operator-release-4.6-e2e-ovirt
+    optional: true
     path_alias: github.com/openshift/machine-config-operator
     rerun_command: /test e2e-ovirt
     spec:
@@ -789,6 +869,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --secret-dir=/usr/local/e2e-ovirt-cluster-profile
         - --target=e2e-ovirt
         command:
@@ -802,6 +883,9 @@ presubmits:
         volumeMounts:
         - mountPath: /etc/boskos
           name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
           readOnly: true
         - mountPath: /usr/local/e2e-ovirt-cluster-profile
           name: cluster-profile
@@ -825,6 +909,9 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -857,6 +944,7 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-machine-config-operator-release-4.6-e2e-ovn-step-registry
+    optional: true
     path_alias: github.com/openshift/machine-config-operator
     rerun_command: /test e2e-ovn-step-registry
     spec:
@@ -867,6 +955,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --secret-dir=/usr/local/e2e-ovn-step-registry-cluster-profile
         - --target=e2e-ovn-step-registry
         command:
@@ -880,6 +969,9 @@ presubmits:
         volumeMounts:
         - mountPath: /etc/boskos
           name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
           readOnly: true
         - mountPath: /usr/local/e2e-ovn-step-registry-cluster-profile
           name: cluster-profile
@@ -903,6 +995,9 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -933,6 +1028,7 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-machine-config-operator-release-4.6-e2e-vsphere
+    optional: true
     path_alias: github.com/openshift/machine-config-operator
     rerun_command: /test e2e-vsphere
     spec:
@@ -943,6 +1039,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --secret-dir=/usr/local/e2e-vsphere-cluster-profile
         - --target=e2e-vsphere
         command:
@@ -956,6 +1053,9 @@ presubmits:
         volumeMounts:
         - mountPath: /etc/boskos
           name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
           readOnly: true
         - mountPath: /usr/local/e2e-vsphere-cluster-profile
           name: cluster-profile
@@ -979,6 +1079,9 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -1009,6 +1112,7 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-machine-config-operator-release-4.6-e2e-vsphere-upgrade
+    optional: true
     path_alias: github.com/openshift/machine-config-operator
     rerun_command: /test e2e-vsphere-upgrade
     spec:
@@ -1019,6 +1123,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --secret-dir=/usr/local/e2e-vsphere-upgrade-cluster-profile
         - --target=e2e-vsphere-upgrade
         command:
@@ -1032,6 +1137,9 @@ presubmits:
         volumeMounts:
         - mountPath: /etc/boskos
           name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
           readOnly: true
         - mountPath: /usr/local/e2e-vsphere-upgrade-cluster-profile
           name: cluster-profile
@@ -1055,6 +1163,9 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -1085,6 +1196,7 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-machine-config-operator-release-4.6-e2e-vsphere-upi
+    optional: true
     path_alias: github.com/openshift/machine-config-operator
     rerun_command: /test e2e-vsphere-upi
     spec:
@@ -1095,6 +1207,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --secret-dir=/usr/local/e2e-vsphere-upi-cluster-profile
         - --target=e2e-vsphere-upi
         command:
@@ -1108,6 +1221,9 @@ presubmits:
         volumeMounts:
         - mountPath: /etc/boskos
           name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
           readOnly: true
         - mountPath: /usr/local/e2e-vsphere-upi-cluster-profile
           name: cluster-profile
@@ -1131,6 +1247,9 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: cluster-profile
         projected:
           sources:

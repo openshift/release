@@ -13,14 +13,21 @@ canonical_go_repository: github.com/openshift/library-go
 promotion:
   name: 4.2-priv
   namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.2-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.2-priv
+      namespace: ocp-private
 resources:
   '*':
     requests:
       cpu: "3"
       memory: 8Gi
-tag_specification:
-  name: 4.2-priv
-  namespace: ocp-private
 test_binary_build_commands: make build GOFLAGS='-race' --warn-undefined-variables
 tests:
 - as: verify
@@ -34,6 +41,7 @@ tests:
     make verify-deps -k --warn-undefined-variables
   container:
     from: src
+  optional: true
 - as: verify-alpha-build-machinery
   commands: |
     HOME=$( mktemp -d )

@@ -81,7 +81,6 @@ images:
 promotion:
   additional_images:
     artifacts: artifacts
-  disabled: true
   excluded_images:
   - machine-os-content
   name: 4.9-priv
@@ -123,6 +122,16 @@ raw_steps:
 - rpm_image_injection_step:
     from: base-machine
     to: base-machine-with-rpms
+releases:
+  initial:
+    integration:
+      name: 4.9-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.9-priv
+      namespace: ocp-private
 resources:
   '*':
     requests:
@@ -177,9 +186,6 @@ resources:
       cpu: "3"
       memory: 8Gi
 rpm_build_commands: openshift-hack/build-rpms.sh
-tag_specification:
-  name: 4.9-priv
-  namespace: ocp-private
 tests:
 - as: unit
   commands: ARTIFACTS="${ARTIFACT_DIR}" TMPDIR=/tmp/volume openshift-hack/test-go.sh
@@ -224,6 +230,7 @@ tests:
     cluster_profile: aws
     workflow: openshift-kubernetes-e2e-aws-serial
 - as: e2e-aws
+  optional: true
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-loki
@@ -232,20 +239,24 @@ tests:
     cluster_profile: gcp-openshift-gce-devel-ci-2
     workflow: openshift-e2e-gcp-loki
 - as: e2e-aws-ovn
+  optional: true
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-ovn
 - as: e2e-azure
+  optional: true
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
 - as: e2e-agnostic-cmd
+  optional: true
   steps:
     cluster_profile: azure4
     env:
       TEST_SUITE: openshift/test-cmd
     workflow: openshift-e2e-azure
 - as: e2e-aws-disruptive
+  optional: true
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-disruption
@@ -258,14 +269,17 @@ tests:
     cluster_profile: gcp-openshift-gce-devel-ci-2
     workflow: openshift-upgrade-gcp
 - as: e2e-aws-upgrade
+  run_if_changed: ^(openshift-hack/images/hyperkube/.*|)$
   steps:
     cluster_profile: aws
     workflow: openshift-upgrade-aws
 - as: e2e-azure-upgrade
+  run_if_changed: ^(openshift-hack/images/hyperkube/.*|)$
   steps:
     cluster_profile: azure4
     workflow: openshift-upgrade-azure
 - as: e2e-aws-downgrade
+  run_if_changed: ^(openshift-hack/images/hyperkube/.*|)$
   steps:
     cluster_profile: aws
     dependencies:
@@ -277,10 +291,12 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws-serial
 - as: e2e-aws-csi
+  optional: true
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-csi
 - as: e2e-vsphere
+  optional: true
   steps:
     cluster_profile: vsphere
     env:
@@ -299,10 +315,12 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-aws-multitenant
+  optional: true
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-sdn-multi
 - as: e2e-metal-ipi
+  optional: true
   steps:
     cluster_profile: packet
     env:
@@ -311,6 +329,7 @@ tests:
         NETWORK_TYPE=OpenShiftSDN
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-ovn-ipv6
+  optional: true
   steps:
     cluster_profile: packet
     env:
@@ -319,6 +338,7 @@ tests:
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-ovn-dualstack
+  optional: true
   steps:
     cluster_profile: packet
     env:
@@ -343,14 +363,17 @@ tests:
     - ref: openshift-e2e-test
     workflow: ipi-aws
 - as: e2e-aws-single-node
+  optional: true
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-single-node
 - as: e2e-aws-csi-migration
+  optional: true
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-csi-migration
 - as: e2e-openstack
+  optional: true
   steps:
     cluster_profile: openstack-vexxhost
     env:

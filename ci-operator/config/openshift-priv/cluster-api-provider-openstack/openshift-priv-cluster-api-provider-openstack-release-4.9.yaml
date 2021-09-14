@@ -20,17 +20,23 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
   to: openstack-machine-controllers
 promotion:
-  disabled: true
   name: 4.9-priv
   namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.9-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.9-priv
+      namespace: ocp-private
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: 4.9-priv
-  namespace: ocp-private
 tests:
 - as: unit
   commands: make test
@@ -49,6 +55,7 @@ tests:
   container:
     from: src
 - as: e2e-upgrade
+  optional: true
   steps:
     cluster_profile: openstack-vexxhost
     workflow: openshift-upgrade-openstack-loki
@@ -61,6 +68,7 @@ tests:
       TEST_SUITE: experimental/reliability/minimal
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-openstack-parallel
+  optional: true
   steps:
     cluster_profile: openstack-vexxhost
     env:

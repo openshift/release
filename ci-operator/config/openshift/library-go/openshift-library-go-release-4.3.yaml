@@ -12,14 +12,21 @@ build_root:
 promotion:
   name: "4.3"
   namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.3"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.3"
+      namespace: ocp
 resources:
   '*':
     requests:
       cpu: "3"
       memory: 8Gi
-tag_specification:
-  name: "4.3"
-  namespace: ocp
 test_binary_build_commands: make build GOFLAGS='-race' --warn-undefined-variables
 tests:
 - as: verify
@@ -33,6 +40,7 @@ tests:
     make verify-deps -k --warn-undefined-variables
   container:
     from: src
+  optional: true
 - as: verify-alpha-build-machinery
   commands: |
     HOME=$( mktemp -d )
@@ -45,6 +53,7 @@ tests:
   container:
     from: test-bin
 - as: e2e-aws-encryption
+  run_if_changed: ^(pkg/operator/encryption)|^(test/e2e-encryption)
   steps:
     cluster_profile: aws
     test:

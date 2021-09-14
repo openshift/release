@@ -72,6 +72,16 @@ raw_steps:
 - rpm_image_injection_step:
     from: base
     to: oc-base-with-rpms
+releases:
+  initial:
+    integration:
+      name: "4.4"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.4"
+      namespace: ocp
 resources:
   '*':
     requests:
@@ -90,9 +100,6 @@ rpm_build_commands: |-
   cp "${TMPDIR}/openshift-clients-0.0.1.tar.gz" "${RPMBUILD_DIR}/SOURCES/"
   rpmbuild -ba --nodeps --define "_topdir $( pwd )/${RPMBUILD_DIR}" ${RPMBUILD_DIR}/SPECS/oc.spec --define 'os_git_vars ignore'
 rpm_build_location: _rpmbuild/RPMS/
-tag_specification:
-  name: "4.4"
-  namespace: ocp
 test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
 tests:
 - as: build-rpms-from-tar
@@ -132,6 +139,7 @@ tests:
     cluster_profile: aws
     workflow: openshift-upgrade-aws
 - as: e2e-aws-builds
+  run_if_changed: ^(pkg/.*build.*)|^(pkg/.*newapp.*)
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-builds

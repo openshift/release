@@ -25,6 +25,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --secret-dir=/usr/local/e2e-aws-csi-driver-cluster-profile
         - --target=e2e-aws-csi-driver
         command:
@@ -38,6 +39,9 @@ presubmits:
         volumeMounts:
         - mountPath: /etc/boskos
           name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
           readOnly: true
         - mountPath: /usr/local/e2e-aws-csi-driver-cluster-profile
           name: cluster-profile
@@ -61,6 +65,9 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -135,7 +142,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
@@ -151,6 +158,7 @@ presubmits:
     name: pull-ci-openshift-priv-csi-driver-shared-resource-operator-release-4.10-test
     path_alias: github.com/openshift/csi-driver-shared-resource-operator
     rerun_command: /test test
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -193,7 +201,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )test,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
@@ -209,6 +217,7 @@ presubmits:
     name: pull-ci-openshift-priv-csi-driver-shared-resource-operator-release-4.10-verify
     path_alias: github.com/openshift/csi-driver-shared-resource-operator
     rerun_command: /test verify
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:

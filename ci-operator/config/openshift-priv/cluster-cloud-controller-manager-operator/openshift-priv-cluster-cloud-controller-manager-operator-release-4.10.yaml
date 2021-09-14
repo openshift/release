@@ -28,8 +28,19 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
   to: cluster-cloud-controller-manager-operator-src
 promotion:
+  disabled: true
   name: 4.10-priv
   namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.10-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.10-priv
+      namespace: ocp-private
 resources:
   '*':
     limits:
@@ -37,9 +48,6 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: 4.10-priv
-  namespace: ocp-private
 tests:
 - as: verify
   commands: make test
@@ -50,38 +58,48 @@ tests:
   container:
     from: src
 - as: e2e-aws
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
 - as: e2e-aws-upgrade
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
     workflow: openshift-upgrade-aws
 - as: e2e-aws-ccm
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-ccm
 - as: e2e-aws-ccm-install
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-ccm-install
 - as: e2e-azure
+  optional: true
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
 - as: e2e-azure-upgrade
+  optional: true
   steps:
     cluster_profile: azure4
     workflow: openshift-upgrade-azure
 - as: e2e-azure-ccm
+  optional: true
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-ccm
 - as: e2e-azure-ccm-install
+  optional: true
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-ccm-install
 - as: e2e-openstack-ccm
+  optional: true
   steps:
     cluster_profile: openstack-vh-mecha-central
     env:

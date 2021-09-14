@@ -64,6 +64,9 @@ operator:
   - pullspec: quay.io/ocpmetal/postgresql-12-centos7:latest
     with: postgresql-12-centos7
 promotion:
+  additional_images:
+    assisted-service-index: ci-index
+    assisted-service-operator-bundle: ci-bundle0
   name: assisted
   namespace: ocp-kni
 releases:
@@ -71,14 +74,20 @@ releases:
     release:
       channel: candidate
       version: "4.8"
+  initial:
+    integration:
+      name: "4.9"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.9"
+      namespace: ocp
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: "4.9"
-  namespace: ocp
 test_binary_build_commands: |
   make build-openshift-ci-test-bin
   go mod vendor
@@ -97,6 +106,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.8"
+  run_if_changed: ^(cmd/.*|data/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     test:
     - as: subsystem-deploy-and-run
@@ -154,6 +164,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.8"
+  run_if_changed: ^(cmd/.*|data/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     test:
     - as: subsystem-deploy-and-run
@@ -208,8 +219,10 @@ tests:
           memory: 200Mi
     workflow: generic-claim
 - as: e2e-metal-assisted-operator-disconnected
+  optional: true
+  run_if_changed: ^(data/.*)$
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     dependencies:
       ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
@@ -226,7 +239,7 @@ tests:
 - as: e2e-metal-assisted-operator-disconnected-periodic
   cron: '@daily'
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       DEVSCRIPTS_CONFIG: |
         EXTRA_WORKER_VCPU=8
@@ -238,8 +251,9 @@ tests:
       NUM_EXTRA_WORKERS: "1"
     workflow: baremetalds-assisted-operator-ztp
 - as: e2e-metal-assisted-operator-ztp
+  run_if_changed: ^(cmd/.*|data/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     dependencies:
       ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
@@ -257,7 +271,7 @@ tests:
 - as: e2e-metal-assisted-operator-ztp-multinode-spoke-periodic
   cron: '@daily'
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     dependencies:
       ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
@@ -275,8 +289,9 @@ tests:
       NUM_EXTRA_WORKERS: "3"
     workflow: baremetalds-assisted-operator-ztp
 - as: e2e-metal-assisted-operator-ztp-multinode-spoke
+  optional: true
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     dependencies:
       ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
@@ -296,7 +311,7 @@ tests:
 - as: e2e-metal-assisted-operator-ztp-periodic
   cron: '@daily'
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       DEVSCRIPTS_CONFIG: |
         EXTRA_WORKER_VCPU=8
@@ -309,32 +324,46 @@ tests:
       NUM_EXTRA_WORKERS: "1"
     workflow: baremetalds-assisted-operator-ztp
 - as: e2e-metal-assisted-ipv6
+  optional: true
+  run_if_changed: ^(data/.*)$
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         IPv6=yes
       TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-none
+  optional: true
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         PLATFORM=none
       TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-single-node
+  optional: true
+  run_if_changed: ^(data/.*)$
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
       TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
-- as: e2e-metal-assisted-kube-api
+- as: e2e-metal-assisted-static-ip
   steps:
     cluster_profile: packet
+    env:
+      ASSISTED_CONFIG: |
+        STATIC_IPS=yes
+      TEST_SUITE: minimal
+    workflow: baremetalds-assisted-install
+- as: e2e-metal-assisted-kube-api
+  run_if_changed: ^(cmd/.*|data/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
+  steps:
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
@@ -350,22 +379,26 @@ tests:
       TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted
+  run_if_changed: ^(cmd/.*|data/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-multi-version
+  run_if_changed: ^(data/.*)$
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=""
       TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-olm
+  optional: true
+  run_if_changed: ^(data/.*|internal/operators/.*)$
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         TEST_FUNC=test_olm_operator

@@ -7,10 +7,10 @@ base_images:
     name: builder
     namespace: open-cluster-management
     tag: go1.16-linux
-  open-cluster-management_builder_go1.16-linux-amd64:
+  open-cluster-management_builder_go1.17-linux:
     name: builder
     namespace: open-cluster-management
-    tag: go1.16-linux-amd64
+    tag: go1.17-linux
 build_root:
   image_stream_tag:
     name: builder
@@ -20,48 +20,58 @@ images:
 - dockerfile_path: operators/multiclusterobservability/Dockerfile
   from: base
   inputs:
-    open-cluster-management_builder_go1.16-linux:
+    open-cluster-management_builder_go1.17-linux:
       as:
-      - registry.ci.openshift.org/open-cluster-management/builder:go1.16-linux
+      - registry.ci.openshift.org/open-cluster-management/builder:go1.17-linux
   to: multicluster-observability-operator
 - dockerfile_path: proxy/Dockerfile
   from: base
   inputs:
-    open-cluster-management_builder_go1.16-linux-amd64:
+    open-cluster-management_builder_go1.17-linux:
       as:
-      - registry.ci.openshift.org/open-cluster-management/builder:go1.16-linux-amd64
+      - registry.ci.openshift.org/open-cluster-management/builder:go1.17-linux
   to: rbac-query-proxy
 - dockerfile_path: operators/endpointmetrics/Dockerfile
   from: base
   inputs:
-    open-cluster-management_builder_go1.16-linux:
+    open-cluster-management_builder_go1.17-linux:
       as:
-      - registry.ci.openshift.org/open-cluster-management/builder:go1.16-linux
+      - registry.ci.openshift.org/open-cluster-management/builder:go1.17-linux
   to: endpoint-monitoring-operator
 - dockerfile_path: tests/Dockerfile
   from: base
   inputs:
-    open-cluster-management_builder_go1.16-linux:
+    open-cluster-management_builder_go1.17-linux:
       as:
-      - registry.ci.openshift.org/open-cluster-management/builder:go1.16-linux
+      - registry.ci.openshift.org/open-cluster-management/builder:go1.17-linux
   to: observability-e2e-test
 - dockerfile_path: collectors/metrics/Dockerfile
   from: base
   inputs:
-    open-cluster-management_builder_go1.16-linux:
+    open-cluster-management_builder_go1.17-linux:
       as:
-      - registry.ci.openshift.org/open-cluster-management/builder:go1.16-linux
+      - registry.ci.openshift.org/open-cluster-management/builder:go1.17-linux
   to: metrics-collector
 - dockerfile_path: loaders/dashboards/Dockerfile
   from: base
   inputs:
-    open-cluster-management_builder_go1.16-linux:
+    open-cluster-management_builder_go1.17-linux:
       as:
-      - registry.ci.openshift.org/open-cluster-management/builder:go1.16-linux
+      - registry.ci.openshift.org/open-cluster-management/builder:go1.17-linux
   to: grafana-dashboard-loader
 promotion:
   name: "2.4"
   namespace: open-cluster-management
+releases:
+  initial:
+    integration:
+      name: "4.7"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.7"
+      namespace: ocp
 resources:
   '*':
     limits:
@@ -69,9 +79,6 @@ resources:
     requests:
       cpu: 100m
       memory: 1Gi
-tag_specification:
-  name: "4.7"
-  namespace: ocp
 test_binary_build_commands: "true"
 tests:
 - as: test-unit
@@ -120,6 +127,7 @@ tests:
           memory: 200Mi
     workflow: ocm-e2e-kind
 - as: test-e2e
+  skip_if_only_changed: ^docs/|hack/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.md$|OWNERS|PROJECT|LICENSE|DCO)$
   steps:
     dependencies:
       COMPONENT_IMAGE_REF: multicluster-observability-operator
@@ -127,8 +135,23 @@ tests:
       CLUSTERPOOL_GROUP_NAME: Core-Services
       CLUSTERPOOL_HOST_NAMESPACE: acm-observability-china
       CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-obs-china-clusterpool
+      CLUSTERPOOL_LIFETIME: 1h
       CLUSTERPOOL_LIST_INCLUSION_FILTER: prow
       COMPONENT_NAME: multicluster-observability-operator
+      DEPLOY_HUB_ADDITIONAL_YAML: |
+        LS0tCmFwaVZlcnNpb246IHJiYWMuYXV0aG9yaXphdGlvbi5rOHMuaW8vdjEKa2luZDogQ2x1c3Rl
+        clJvbGUKbWV0YWRhdGE6CiAgY3JlYXRpb25UaW1lc3RhbXA6IG51bGwKICBuYW1lOiBtdWx0aWNs
+        dXN0ZXItb2JzZXJ2YWJpbGl0eS1vcGVyYXRvci1lMmUtdGVzdGluZwpydWxlczoKICAtIGFkbWlz
+        c2lvbnJlZ2lzdHJhdGlvbi5rOHMuaW8KICByZXNvdXJjZXM6CiAgLSBtdXRhdGluZ3dlYmhvb2tj
+        b25maWd1cmF0aW9ucwogIC0gdmFsaWRhdGluZ3dlYmhvb2tjb25maWd1cmF0aW9ucwogIHZlcmJz
+        OgogIC0gY3JlYXRlCiAgLSBkZWxldGUKICAtIGdldAogIC0gbGlzdAogIC0gcGF0Y2gKICAtIHVw
+        ZGF0ZQogIC0gd2F0Y2gKLS0tCmtpbmQ6IENsdXN0ZXJSb2xlQmluZGluZwphcGlWZXJzaW9uOiBy
+        YmFjLmF1dGhvcml6YXRpb24uazhzLmlvL3YxCm1ldGFkYXRhOgogIG5hbWU6IG11bHRpY2x1c3Rl
+        ci1vYnNlcnZhYmlsaXR5LW9wZXJhdG9yLWUyZS10ZXN0aW5nCnJvbGVSZWY6CiAgYXBpR3JvdXA6
+        IHJiYWMuYXV0aG9yaXphdGlvbi5rOHMuaW8KICBraW5kOiBDbHVzdGVyUm9sZQogIG5hbWU6IG11
+        bHRpY2x1c3Rlci1vYnNlcnZhYmlsaXR5LW9wZXJhdG9yLWUyZS10ZXN0aW5nCnN1YmplY3RzOgot
+        IGtpbmQ6IFNlcnZpY2VBY2NvdW50CiAgbmFtZTogbXVsdGljbHVzdGVyLW9ic2VydmFiaWxpdHkt
+        b3BlcmF0b3IKICBuYW1lc3BhY2U6IG9wZW4tY2x1c3Rlci1tYW5hZ2VtZW50Ci0tLQo=
     test:
     - as: e2e
       commands: |

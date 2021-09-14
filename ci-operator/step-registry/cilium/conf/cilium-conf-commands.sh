@@ -4,8 +4,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-cilium_olm_rev=bdf0e8fd6c5e82708fe9c95adb0d3142e21fabe1
-cilium_version=1.9.5
+cilium_olm_rev=1d160219524be7d23c947ccfa6441b385f73c2c5
+cilium_version=1.10.3
 
 cat > "${SHARED_DIR}/manifest_cluster-network-03-config.yml" << EOF
 apiVersion: operator.openshift.io/v1

@@ -35,31 +35,52 @@ images:
 promotion:
   name: assisted-test
   namespace: ocp-kni
+releases:
+  initial:
+    integration:
+      name: "4.9"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.9"
+      namespace: ocp
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: "4.9"
-  namespace: ocp
 tests:
-- as: e2e-metal-assisted
+- as: assisted-packet-check
+  cron: 0 */2 * * *
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
+    test:
+    - ref: baremetalds-packet-check
+- as: sno-packet-check
+  cron: 0 */2 * * *
+  steps:
+    cluster_profile: packet-sno
+    test:
+    - ref: baremetalds-packet-check
+- as: e2e-metal-assisted
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE|Jenkinsfile.*)$
+  steps:
+    cluster_profile: packet-assisted
     env:
       TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-periodic
   cron: '@daily'
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       TEST_SUITE: full
     workflow: baremetalds-assisted
 - as: e2e-metal-assisted-multi-version
+  optional: true
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=""
@@ -68,15 +89,17 @@ tests:
 - as: e2e-metal-assisted-multi-version-periodic
   cron: '@daily'
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=""
       TEST_SUITE: full
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-olm
+  optional: true
+  run_if_changed: .*operator.*
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         TEST_FUNC=test_olm_operator
@@ -85,15 +108,16 @@ tests:
 - as: e2e-metal-assisted-olm-periodic
   cron: '@daily'
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         TEST_FUNC=test_olm_operator
       TEST_SUITE: full
     workflow: baremetalds-assisted
 - as: system-test-operator
+  optional: true
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       POST_INSTALL_COMMANDS: |
         export TEST=./discovery-infra/tests/test_kube_api.py
@@ -105,7 +129,7 @@ tests:
 - as: system-test-operator-periodic
   cron: '@daily'
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       POST_INSTALL_COMMANDS: |
         export TEST=./discovery-infra/tests/test_kube_api.py
@@ -115,8 +139,9 @@ tests:
       TEST_SUITE: full
     workflow: baremetalds-assisted
 - as: e2e-metal-assisted-ipv6
+  optional: true
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         IPv6=true
@@ -125,15 +150,34 @@ tests:
 - as: e2e-metal-assisted-ipv6-periodic
   cron: '@daily'
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         IPv6=true
       TEST_SUITE: full
     workflow: baremetalds-assisted
-- as: e2e-metal-assisted-none
+- as: e2e-metal-assisted-static-ip
   steps:
     cluster_profile: packet
+    env:
+      ASSISTED_CONFIG: |
+        STATIC_IPS=yes
+      TEST_SUITE: minimal
+    workflow: baremetalds-assisted-install
+- as: e2e-metal-assisted-static-ip-periodic
+  cron: '@daily'
+  steps:
+    cluster_profile: packet
+    env:
+      ASSISTED_CONFIG: |
+        STATIC_IPS=yes
+      TEST_SUITE: full
+    workflow: baremetalds-assisted-install
+- as: e2e-metal-assisted-none
+  optional: true
+  run_if_changed: ^(terraform_files/.*|.*/controllers/.*)$
+  steps:
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         PLATFORM=none
@@ -142,15 +186,16 @@ tests:
 - as: e2e-metal-assisted-none-periodic
   cron: '@daily'
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         PLATFORM=none
       TEST_SUITE: full
     workflow: baremetalds-assisted
 - as: e2e-metal-assisted-none-ipv6
+  optional: true
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         IPv6=yes
@@ -163,7 +208,7 @@ tests:
 - as: e2e-metal-assisted-none-ipv6-periodic
   cron: '@daily'
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         IPv6=yes
@@ -174,8 +219,9 @@ tests:
       TEST_SUITE: full
     workflow: baremetalds-assisted
 - as: e2e-metal-assisted-single-node
+  optional: true
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
@@ -184,15 +230,16 @@ tests:
 - as: e2e-metal-assisted-single-node-periodic
   cron: '@daily'
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
       TEST_SUITE: full
     workflow: baremetalds-assisted
 - as: e2e-metal-assisted-kube-api
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE|Jenkinsfile.*)$
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
@@ -210,7 +257,7 @@ tests:
 - as: e2e-metal-assisted-kube-api-periodic
   cron: '@daily'
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
@@ -226,13 +273,14 @@ tests:
       TEST_SUITE: full
     workflow: baremetalds-assisted
 - as: e2e-metal-single-node-live-iso
+  optional: true
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-sno
     workflow: baremetalds-sno
 - as: e2e-metal-single-node-live-iso-periodic
   cron: '@daily'
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-sno
     workflow: baremetalds-sno
 zz_generated_metadata:
   branch: master

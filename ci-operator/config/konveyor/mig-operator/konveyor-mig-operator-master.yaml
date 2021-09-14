@@ -31,6 +31,27 @@ resources:
       memory: 200Mi
 tests:
 - as: operator-e2e
+  skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      OO_CHANNEL: development
+      OO_INSTALL_NAMESPACE: openshift-migration
+      OO_PACKAGE: crane-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: e2e
+      commands: molecule test -s openshift
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-aws
+- as: operator-e2e-periodic-slack
+  cron: 0 4 * * *
   steps:
     cluster_profile: aws
     dependencies:

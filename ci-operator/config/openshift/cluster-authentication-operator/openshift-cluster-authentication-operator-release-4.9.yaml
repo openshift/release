@@ -23,17 +23,23 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
   to: cluster-authentication-operator
 promotion:
-  disabled: true
   name: "4.9"
   namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.9"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.9"
+      namespace: ocp
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: "4.9"
-  namespace: ocp
 tests:
 - as: verify
   commands: |
@@ -55,6 +61,7 @@ tests:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
 - as: e2e-agnostic-ipv6
+  optional: true
   steps:
     cluster_profile: packet
     env:
@@ -92,6 +99,7 @@ tests:
           cpu: 100m
     workflow: ipi-gcp
 - as: e2e-operator-encryption
+  run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption)|^(test/library/encryption)
   steps:
     cluster_profile: gcp
     test:
@@ -106,6 +114,7 @@ tests:
       timeout: 4h0m0s
     workflow: ipi-gcp
 - as: e2e-gcp-operator-encryption-rotation
+  run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-rotation)|^(test/library/encryption)
   steps:
     cluster_profile: gcp
     test:
@@ -120,6 +129,7 @@ tests:
       timeout: 4h0m0s
     workflow: ipi-gcp
 - as: e2e-gcp-operator-encryption-perf
+  run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-perf)|^(test/library/encryption)
   steps:
     cluster_profile: gcp
     test:
@@ -133,6 +143,7 @@ tests:
           cpu: 100m
     workflow: ipi-gcp
 - as: e2e-aws-single-node
+  optional: true
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-single-node

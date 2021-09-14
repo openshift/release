@@ -99,6 +99,16 @@ raw_steps:
 - rpm_image_injection_step:
     from: base-machine
     to: base-machine-with-rpms
+releases:
+  initial:
+    integration:
+      name: 4.4-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.4-priv
+      namespace: ocp-private
 resources:
   '*':
     requests:
@@ -153,9 +163,6 @@ resources:
       cpu: "3"
       memory: 8Gi
 rpm_build_commands: make build-rpms
-tag_specification:
-  name: 4.4-priv
-  namespace: ocp-private
 tests:
 - as: unit
   commands: TMPDIR=/tmp/volume GOTEST_FLAGS='-p 8' TIMEOUT=360s JUNIT_REPORT=1 TEST_KUBE=true
@@ -177,14 +184,17 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws
 - as: e2e-azure
+  optional: true
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
 - as: e2e-agnostic-cmd
+  optional: true
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-cmd
 - as: e2e-gcp-builds
+  run_if_changed: ^(pkg/oc/cli/startbuild/startbuild.go)|^(pkg/build)|^(staging/src/.*/pkg/.*build)|^(pkg/cmd/infra/builder)|^(test/extended/builds)|^(test/extended/testdata/builds)|^(test/extended/util)|^(vendor/github.com/openshift/source-to-image)|^(vendor/github.com/openshift/imagebuilder)
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-builds
@@ -193,15 +203,18 @@ tests:
     run-tests
   openshift_installer:
     cluster_profile: aws
+  optional: true
 - as: e2e-aws-jenkins
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-jenkins
 - as: e2e-gcp-image-ecosystem
+  run_if_changed: ^(test/extended/image_ecosystem)|^(examples/db-templates)|^(examples/quickstarts)|^(examples/image-streams)|^(examples/jenkins)|^(vendor/github.com/openshift/source-to-image)|^(vendor/github.com/openshift/imagebuilder)
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-image-ecosystem
 - as: e2e-aws-image-registry
+  run_if_changed: ^(pkg/image)|^(test/extended/registry)|^(test/extended/images)|^(test/extended/imageapis)|^(vendor/github.com/docker/distribution)
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-image-registry
@@ -214,10 +227,12 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws-serial
 - as: e2e-aws-csi
+  optional: true
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-csi-install
 - as: e2e-vsphere
+  optional: true
   steps:
     cluster_profile: vsphere
     env:
@@ -236,6 +251,7 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-aws-fips
+  optional: true
   steps:
     cluster_profile: aws
     env:
@@ -248,6 +264,7 @@ tests:
     - ref: openshift-e2e-test
     workflow: ipi-aws
 - as: e2e-aws-multitenant
+  optional: true
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-sdn-multi

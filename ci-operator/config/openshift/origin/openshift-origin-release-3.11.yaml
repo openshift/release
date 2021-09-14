@@ -100,6 +100,16 @@ raw_steps:
 - rpm_image_injection_step:
     from: base
     to: base-with-rpms
+releases:
+  initial:
+    integration:
+      name: origin-v3.11
+      namespace: openshift
+  latest:
+    integration:
+      include_built_images: true
+      name: origin-v3.11
+      namespace: openshift
 resources:
   '*':
     requests:
@@ -130,9 +140,6 @@ resources:
       cpu: "2"
       memory: 6Gi
 rpm_build_commands: make build-rpms
-tag_specification:
-  name: origin-v3.11
-  namespace: openshift
 tests:
 - as: unit
   commands: JUNIT_REPORT=1 TEST_KUBE=true KUBERNETES_SERVICE_HOST= hack/test-go.sh
@@ -158,6 +165,8 @@ tests:
     run-tests
   openshift_ansible:
     cluster_profile: gcp-crio
+  optional: true
+  run_if_changed: ^(vendor/k8s.io/kubernetes/pkg/kubelet)
 zz_generated_metadata:
   branch: release-3.11
   org: openshift

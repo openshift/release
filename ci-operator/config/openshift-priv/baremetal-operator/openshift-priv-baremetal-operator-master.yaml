@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: 4.9-priv
+    name: 4.10-priv
     namespace: ocp-private
     tag: base
   dev-scripts:
@@ -23,26 +23,36 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
   to: baremetal-operator
 promotion:
-  name: 4.9-priv
+  name: 4.10-priv
   namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.10-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.10-priv
+      namespace: ocp-private
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: 4.9-priv
-  namespace: ocp-private
 tests:
 - as: unit
   commands: make unit
   container:
     from: src
+  skip_if_only_changed: (^(docs|examples|config)/)|(\.md$)|((^|/)OWNERS$)
 - as: lint
   commands: export GOLANGCI_LINT_CACHE=/tmp/.cache make linters
   container:
     from: src
+  skip_if_only_changed: (^(docs|examples)/)|(\.md$)|((^|/)OWNERS$)
 - as: e2e-metal-ipi
+  optional: true
   steps:
     cluster_profile: packet
     env:
@@ -51,10 +61,12 @@ tests:
         NETWORK_TYPE=OpenShiftSDN
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-serial-ipv4
+  skip_if_only_changed: (^(docs|examples)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: packet
     workflow: baremetalds-e2e-serial-ipv4
 - as: e2e-metal-ipi-ovn-ipv6
+  skip_if_only_changed: (^(docs|examples)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: packet
     env:
@@ -63,6 +75,7 @@ tests:
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-ovn-dualstack
+  optional: true
   steps:
     cluster_profile: packet
     env:

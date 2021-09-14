@@ -81,6 +81,16 @@ images:
 promotion:
   name: 4.2-priv
   namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.2-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.2-priv
+      namespace: ocp-private
 resources:
   '*':
     requests:
@@ -114,9 +124,6 @@ resources:
     requests:
       cpu: "3"
       memory: 5Gi
-tag_specification:
-  name: 4.2-priv
-  namespace: ocp-private
 tests:
 - as: unit
   commands: go test ./pkg/...
@@ -140,6 +147,7 @@ tests:
   container:
     from: src
 - as: e2e-aws
+  skip_if_only_changed: ^docs/
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
@@ -159,12 +167,15 @@ tests:
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer_upi:
     cluster_profile: aws
+  optional: true
 - as: e2e-aws-disruptive
   commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_SUITE=openshift/conformance/parallel
     run-tests
   openshift_installer:
     cluster_profile: aws
+  optional: true
 - as: e2e-vsphere
+  optional: true
   steps:
     cluster_profile: vsphere
     env:

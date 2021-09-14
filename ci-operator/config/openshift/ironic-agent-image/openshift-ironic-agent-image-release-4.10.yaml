@@ -17,18 +17,27 @@ images:
   from: ocp_builder_rhel-8-base-openshift-4.9
   to: ironic-agent
 promotion:
+  disabled: true
   name: "4.10"
   namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.10"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.10"
+      namespace: ocp
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: "4.10"
-  namespace: ocp
 tests:
 - as: e2e-metal-ipi
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS)$
   steps:
     cluster_profile: packet
     env:
@@ -37,6 +46,7 @@ tests:
         NETWORK_TYPE=OpenShiftSDN
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-virtualmedia
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS)$
   steps:
     cluster_profile: packet
     workflow: baremetalds-e2e-virtualmedia

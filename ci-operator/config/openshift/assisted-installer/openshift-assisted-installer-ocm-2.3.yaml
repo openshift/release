@@ -44,14 +44,21 @@ images:
 promotion:
   name: ocm-2.3
   namespace: openshift
+releases:
+  initial:
+    integration:
+      name: "4.8"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.8"
+      namespace: ocp
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: "4.8"
-  namespace: ocp
 test_binary_build_commands: |
   go mod vendor
   mkdir /.cache && chmod 775 -R /.cache ${GOPATH}
@@ -73,7 +80,7 @@ tests:
     from: test-bin
 - as: e2e-metal-assisted
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     dependencies:
       ASSISTED_CONTROLLER_IMAGE: pipeline:assisted-installer-controller
       ASSISTED_INSTALLER_IMAGE: pipeline:assisted-installer
@@ -84,7 +91,7 @@ tests:
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-ipv6
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     dependencies:
       ASSISTED_CONTROLLER_IMAGE: pipeline:assisted-installer-controller
       ASSISTED_INSTALLER_IMAGE: pipeline:assisted-installer

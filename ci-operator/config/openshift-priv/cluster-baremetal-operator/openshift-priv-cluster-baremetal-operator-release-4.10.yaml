@@ -42,8 +42,19 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
   to: cluster-baremetal-operator
 promotion:
+  disabled: true
   name: 4.10-priv
   namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.10-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.10-priv
+      namespace: ocp-private
 resources:
   '*':
     limits:
@@ -51,35 +62,39 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: 4.10-priv
-  namespace: ocp-private
 tests:
 - as: unit
   commands: ./hack/ci-test.sh
   container:
     from: src
+  skip_if_only_changed: (^manifests/)|(\.md$)|((^|/)OWNERS$)
 - as: lint
   commands: make lint
   container:
     from: src
+  skip_if_only_changed: (^manifests/)|(\.md$)|((^|/)OWNERS$)
 - as: gofmt
   commands: make fmt
   container:
     from: src
+  skip_if_only_changed: (^manifests/)|(\.md$)|((^|/)OWNERS$)
 - as: govet
   commands: make vet
   container:
     from: src
+  skip_if_only_changed: (^manifests/)|(\.md$)|((^|/)OWNERS$)
 - as: generate-check
   commands: make generate-check
   container:
     from: src
+  skip_if_only_changed: (\.md$)|((^|/)OWNERS$)
 - as: e2e-agnostic
+  skip_if_only_changed: (^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
 - as: e2e-metal-ipi
+  skip_if_only_changed: (^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: packet
     env:
@@ -88,10 +103,12 @@ tests:
         NETWORK_TYPE=OpenShiftSDN
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-serial-ipv4
+  skip_if_only_changed: (^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: packet
     workflow: baremetalds-e2e-serial-ipv4
 - as: e2e-metal-ipi-upgrade
+  optional: true
   steps:
     cluster_profile: packet
     env:
@@ -103,6 +120,7 @@ tests:
       TEST_TYPE: upgrade
     workflow: baremetalds-e2e-upgrade
 - as: e2e-metal-ipi-ovn-ipv6
+  skip_if_only_changed: (^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: packet
     env:
@@ -111,6 +129,7 @@ tests:
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-ovn-dualstack
+  optional: true
   steps:
     cluster_profile: packet
     env:
@@ -119,14 +138,17 @@ tests:
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-virtualmedia
+  optional: true
   steps:
     cluster_profile: packet
     workflow: baremetalds-e2e-virtualmedia
 - as: e2e-metal-assisted
+  optional: true
   steps:
     cluster_profile: packet
     workflow: baremetalds-assisted
 - as: e2e-aws
+  optional: true
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws

@@ -83,18 +83,27 @@ operator:
 promotion:
   additional_images:
     hyperconverged-cluster-operator-tests: src
+  disabled: true
   name: "4.10"
   namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.10"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.10"
+      namespace: ocp
 resources:
   '*':
     requests:
       cpu: 500m
       memory: 1Gi
-tag_specification:
-  name: "4.10"
-  namespace: ocp
 tests:
 - as: hco-e2e-image-index-azure
+  run_if_changed: ^(build/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
   steps:
     cluster_profile: azure4
     env:
@@ -103,10 +112,20 @@ tests:
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
     test:
-    - as: e2e-test
+    - as: deploy-cr
       commands: |
         make deploy_cr
+      from: hco-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    - as: e2e-test
+      commands: |
         make functest
+      dependencies:
+      - env: FUNCTEST_IMAGE
+        name: hyperconverged-cluster-functest
       from: hco-oc-bin-image
       resources:
         requests:
@@ -114,6 +133,7 @@ tests:
           memory: 1Gi
     workflow: optional-operators-ci-azure
 - as: hco-e2e-kv-smoke-azure
+  run_if_changed: ^(build/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
   steps:
     cluster_profile: azure4
     env:
@@ -133,6 +153,7 @@ tests:
           memory: 1Gi
     workflow: optional-operators-ci-azure
 - as: hco-e2e-image-index-aws
+  run_if_changed: ^(build/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
   steps:
     cluster_profile: aws
     env:
@@ -141,10 +162,20 @@ tests:
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
     test:
-    - as: e2e-test
+    - as: deploy-cr
       commands: |
         KVM_EMULATION=true make deploy_cr
+      from: hco-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    - as: e2e-test
+      commands: |
         make functest
+      dependencies:
+      - env: FUNCTEST_IMAGE
+        name: hyperconverged-cluster-functest
       from: hco-oc-bin-image
       resources:
         requests:
@@ -152,6 +183,7 @@ tests:
           memory: 1Gi
     workflow: optional-operators-ci-aws
 - as: hco-e2e-image-index-gcp
+  run_if_changed: ^(build/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
   steps:
     cluster_profile: gcp
     env:
@@ -160,10 +192,20 @@ tests:
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
     test:
-    - as: e2e-test
+    - as: deploy-cr
       commands: |
         make deploy_cr
+      from: hco-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    - as: e2e-test
+      commands: |
         make functest
+      dependencies:
+      - env: FUNCTEST_IMAGE
+        name: hyperconverged-cluster-functest
       from: hco-oc-bin-image
       resources:
         requests:
@@ -171,6 +213,7 @@ tests:
           memory: 1Gi
     workflow: optional-operators-ci-gcp
 - as: hco-e2e-kv-smoke-gcp
+  run_if_changed: ^(build/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
   steps:
     cluster_profile: gcp
     env:
@@ -190,6 +233,7 @@ tests:
           memory: 1Gi
     workflow: optional-operators-ci-gcp
 - as: hco-e2e-upgrade-index-aws
+  run_if_changed: ^(build/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|Makefile|go\.mod|go\.sum)$
   steps:
     cluster_profile: aws
     dependencies:
@@ -209,6 +253,7 @@ tests:
           memory: 1Gi
     workflow: optional-operators-ci-aws
 - as: hco-e2e-upgrade-index-azure
+  run_if_changed: ^(build/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|Makefile|go\.mod|go\.sum)$
   steps:
     cluster_profile: azure4
     dependencies:
@@ -228,6 +273,7 @@ tests:
           memory: 1Gi
     workflow: optional-operators-ci-azure
 - as: hco-e2e-upgrade-prev-index-aws
+  run_if_changed: ^(build/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|Makefile|go\.mod|go\.sum)$
   steps:
     cluster_profile: aws
     dependencies:
@@ -247,6 +293,7 @@ tests:
           memory: 1Gi
     workflow: optional-operators-ci-aws
 - as: hco-e2e-upgrade-prev-index-azure
+  run_if_changed: ^(build/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|Makefile|go\.mod|go\.sum)$
   steps:
     cluster_profile: azure4
     dependencies:

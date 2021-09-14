@@ -1,13 +1,17 @@
 presubmits:
   openshift-priv/windows-machine-config-bootstrapper:
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
     cluster: build02
     context: ci/prow/build
     decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
@@ -15,6 +19,7 @@ presubmits:
     name: pull-ci-openshift-priv-windows-machine-config-bootstrapper-release-4.10-build
     path_alias: github.com/openshift/windows-machine-config-bootstrapper
     rerun_command: /test build
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -46,9 +51,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -57,13 +59,17 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )build,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
     cluster: build02
     context: ci/prow/e2e-wmcb
     decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
@@ -71,6 +77,7 @@ presubmits:
     name: pull-ci-openshift-priv-windows-machine-config-bootstrapper-release-4.10-e2e-wmcb
     path_alias: github.com/openshift/windows-machine-config-bootstrapper
     rerun_command: /test e2e-wmcb
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -79,6 +86,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --secret-dir=/usr/local/e2e-wmcb-cluster-profile
         - --target=e2e-wmcb
         command:
@@ -92,6 +100,9 @@ presubmits:
         volumeMounts:
         - mountPath: /etc/boskos
           name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
           readOnly: true
         - mountPath: /usr/local/e2e-wmcb-cluster-profile
           name: cluster-profile
@@ -115,14 +126,14 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: cluster-profile
         projected:
           sources:
           - secret:
               name: cluster-secrets-aws
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -138,6 +149,10 @@ presubmits:
     cluster: build02
     context: ci/prow/images
     decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
@@ -176,9 +191,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -187,13 +199,17 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
     cluster: build02
     context: ci/prow/verify
     decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
@@ -201,6 +217,7 @@ presubmits:
     name: pull-ci-openshift-priv-windows-machine-config-bootstrapper-release-4.10-verify
     path_alias: github.com/openshift/windows-machine-config-bootstrapper
     rerun_command: /test verify
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -232,9 +249,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials

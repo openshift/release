@@ -24,6 +24,16 @@ images:
 promotion:
   name: "2.4"
   namespace: open-cluster-management
+releases:
+  initial:
+    integration:
+      name: "4.6"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.6"
+      namespace: ocp
 resources:
   '*':
     limits:
@@ -31,9 +41,6 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: "4.6"
-  namespace: ocp
 test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
 tests:
 - as: build
@@ -52,6 +59,22 @@ tests:
     make test --warn-undefined-variables
   container:
     from: test-bin
+- as: e2e
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        KUBECTL=oc
+        EXAMPLE_IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:cluster-proxy-addon}
+        export KUBECTL EXAMPLE_IMAGE_NAME
+        make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: pr-merge-image-mirror
   postsubmit: true
   steps:

@@ -7,6 +7,10 @@ base_images:
     name: builder
     namespace: open-cluster-management
     tag: go1.16-linux
+  open-cluster-management_builder_go1.17-linux:
+    name: builder
+    namespace: open-cluster-management
+    tag: go1.17-linux
 build_root:
   image_stream_tag:
     name: builder
@@ -16,21 +20,28 @@ images:
 - dockerfile_path: Dockerfile.ocp
   from: base
   inputs:
-    open-cluster-management_builder_go1.16-linux:
+    open-cluster-management_builder_go1.17-linux:
       as:
-      - registry.ci.openshift.org/open-cluster-management/builder:go1.16-linux
+      - registry.ci.openshift.org/open-cluster-management/builder:go1.17-linux
   to: node-exporter
 promotion:
   name: "2.4"
   namespace: open-cluster-management
+releases:
+  initial:
+    integration:
+      name: "4.9"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.9"
+      namespace: ocp
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: "4.9"
-  namespace: ocp
 tests:
 - as: test-unit
   commands: make test

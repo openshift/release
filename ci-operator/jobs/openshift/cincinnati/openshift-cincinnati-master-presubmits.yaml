@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build01
     context: ci/prow/cargo-test
     decorate: true
     decoration_config:
@@ -21,6 +21,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --target=cargo-test
         command:
         - ci-operator
@@ -31,6 +32,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -42,6 +46,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -54,7 +61,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build01
     context: ci/prow/customrust-cargo-test
     decorate: true
     decoration_config:
@@ -71,6 +78,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --target=cargo-test
         - --variant=customrust
         command:
@@ -82,6 +90,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -93,6 +104,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -105,7 +119,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build01
     context: ci/prow/customrust-e2e
     decorate: true
     decoration_config:
@@ -123,6 +137,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --secret-dir=/usr/local/e2e-cluster-profile
         - --target=e2e
         - --variant=customrust
@@ -137,6 +152,9 @@ presubmits:
         volumeMounts:
         - mountPath: /etc/boskos
           name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
           readOnly: true
         - mountPath: /usr/local/e2e-cluster-profile
           name: cluster-profile
@@ -157,6 +175,9 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -174,7 +195,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build01
     context: ci/prow/customrust-images
     decorate: true
     decoration_config:
@@ -225,8 +246,8 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
-    context: ci/prow/customrust-rustfmt-1.49.0
+    cluster: build01
+    context: ci/prow/customrust-rustfmt-1.52.0
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -234,15 +255,15 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       ci-operator.openshift.io/variant: customrust
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cincinnati-master-customrust-rustfmt-1.49.0
-    rerun_command: /test customrust-rustfmt-1.49.0
+    name: pull-ci-openshift-cincinnati-master-customrust-rustfmt-1.52.0
+    rerun_command: /test customrust-rustfmt-1.52.0
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=rustfmt-1.49.0
+        - --target=rustfmt-1.52.0
         - --variant=customrust
         command:
         - ci-operator
@@ -270,14 +291,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )customrust-rustfmt-1.49.0,?($|\s.*)
+    trigger: (?m)^/test( | .* )customrust-rustfmt-1.52.0,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^master$
     - ^master-
-    cluster: build02
-    context: ci/prow/customrust-rustfmt-1.53.0
+    cluster: build01
+    context: ci/prow/customrust-rustfmt-1.55.0
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -285,15 +306,15 @@ presubmits:
       ci-operator.openshift.io/prowgen-controlled: "true"
       ci-operator.openshift.io/variant: customrust
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cincinnati-master-customrust-rustfmt-1.53.0
-    rerun_command: /test customrust-rustfmt-1.53.0
+    name: pull-ci-openshift-cincinnati-master-customrust-rustfmt-1.55.0
+    rerun_command: /test customrust-rustfmt-1.55.0
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=rustfmt-1.53.0
+        - --target=rustfmt-1.55.0
         - --variant=customrust
         command:
         - ci-operator
@@ -321,13 +342,13 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )customrust-rustfmt-1.53.0,?($|\s.*)
+    trigger: (?m)^/test( | .* )customrust-rustfmt-1.55.0,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build01
     context: ci/prow/customrust-yaml-lint
     decorate: true
     decoration_config:
@@ -378,7 +399,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e
     decorate: true
     decoration_config:
@@ -395,6 +416,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --secret-dir=/usr/local/e2e-cluster-profile
         - --target=e2e
         command:
@@ -408,6 +430,9 @@ presubmits:
         volumeMounts:
         - mountPath: /etc/boskos
           name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
           readOnly: true
         - mountPath: /usr/local/e2e-cluster-profile
           name: cluster-profile
@@ -428,6 +453,9 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -445,7 +473,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build01
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -494,23 +522,23 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
-    context: ci/prow/rustfmt-1.49.0
+    cluster: build01
+    context: ci/prow/rustfmt-1.52.0
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cincinnati-master-rustfmt-1.49.0
-    rerun_command: /test rustfmt-1.49.0
+    name: pull-ci-openshift-cincinnati-master-rustfmt-1.52.0
+    rerun_command: /test rustfmt-1.52.0
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=rustfmt-1.49.0
+        - --target=rustfmt-1.52.0
         command:
         - ci-operator
         image: ci-operator:latest
@@ -537,29 +565,29 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rustfmt-1.49.0,?($|\s.*)
+    trigger: (?m)^/test( | .* )rustfmt-1.52.0,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^master$
     - ^master-
-    cluster: build02
-    context: ci/prow/rustfmt-1.53.0
+    cluster: build01
+    context: ci/prow/rustfmt-1.55.0
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cincinnati-master-rustfmt-1.53.0
-    rerun_command: /test rustfmt-1.53.0
+    name: pull-ci-openshift-cincinnati-master-rustfmt-1.55.0
+    rerun_command: /test rustfmt-1.55.0
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=rustfmt-1.53.0
+        - --target=rustfmt-1.55.0
         command:
         - ci-operator
         image: ci-operator:latest
@@ -586,13 +614,13 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rustfmt-1.53.0,?($|\s.*)
+    trigger: (?m)^/test( | .* )rustfmt-1.55.0,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build01
     context: ci/prow/yaml-lint
     decorate: true
     decoration_config:

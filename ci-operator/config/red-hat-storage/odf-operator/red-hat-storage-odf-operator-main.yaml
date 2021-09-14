@@ -21,16 +21,23 @@ operator:
   - pullspec: quay.io/ocs-dev/odf-operator:latest
     with: pipeline:odf-operator
 promotion:
-  name: odf-4.9
+  name: odf-latest
   namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.9"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.9"
+      namespace: ocp
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: "4.8"
-  namespace: ocp
 tests:
 - as: unit-tests
   commands: |
@@ -38,6 +45,7 @@ tests:
   container:
     from: src
 - as: odf-operator-bundle-e2e-aws
+  optional: true
   steps:
     cluster_profile: aws
     dependencies:

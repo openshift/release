@@ -18,16 +18,24 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
   to: cluster-machine-approver
 promotion:
+  disabled: true
   name: "4.10"
   namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.10"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.10"
+      namespace: ocp
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: "4.10"
-  namespace: ocp
 tests:
 - as: unit
   commands: make test
@@ -50,6 +58,7 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-azure-operator
+  optional: true
   steps:
     cluster_profile: azure4
     test:
@@ -62,6 +71,7 @@ tests:
           cpu: 100m
     workflow: ipi-azure
 - as: e2e-gcp-operator
+  optional: true
   steps:
     cluster_profile: gcp
     test:
@@ -78,6 +88,7 @@ tests:
     cluster_profile: aws
     workflow: openshift-upgrade-aws
 - as: e2e-aws-disruptive
+  optional: true
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-disruption

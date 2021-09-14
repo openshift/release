@@ -14,9 +14,28 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/openshift/addon-operator/config/docker/passwd
   to: addon-operator-manager
+- dockerfile_path: config/docker/addon-operator-webhook.Dockerfile
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/addon-operator/bin/linux_amd64/addon-operator-webhook
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/addon-operator/config/docker/passwd
+  to: addon-operator-webhook
 promotion:
   name: addon-operator-manager
   namespace: addon-operator
+releases:
+  initial:
+    integration:
+      name: "4.8"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.8"
+      namespace: ocp
 resources:
   '*':
     limits:
@@ -24,9 +43,6 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: "4.8"
-  namespace: ocp
 tests:
 - as: unit
   commands: make test-unit
@@ -45,6 +61,8 @@ tests:
       dependencies:
       - env: ADDON_OPERATOR_MANAGER_IMAGE
         name: addon-operator-manager
+      - env: ADDON_OPERATOR_WEBHOOK_IMAGE
+        name: addon-operator-webhook
       from: src
       resources:
         requests:

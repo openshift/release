@@ -13,8 +13,19 @@ images:
 promotion:
   additional_images:
     console-tests: src
+  disabled: true
   name: 4.10-priv
   namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.10-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.10-priv
+      namespace: ocp-private
 resources:
   '*':
     requests:
@@ -36,9 +47,6 @@ resources:
     requests:
       cpu: "1"
       memory: 10Gi
-tag_specification:
-  name: 4.10-priv
-  namespace: ocp-private
 test_binary_build_commands: ./build.sh
 tests:
 - as: backend
@@ -67,6 +75,7 @@ tests:
       timeout: 2h30m0s
     workflow: ipi-gcp
 - as: kubevirt-plugin
+  run_if_changed: frontend/packages/kubevirt-plugin
   steps:
     cluster_profile: azure4
     test:
@@ -85,6 +94,7 @@ tests:
           cpu: 100m
     workflow: ipi-azure
 - as: ceph-storage-plugin
+  run_if_changed: frontend/packages/ceph-storage-plugin
   steps:
     cluster_profile: aws
     env:

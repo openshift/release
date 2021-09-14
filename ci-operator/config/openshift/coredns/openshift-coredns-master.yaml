@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: "4.9"
+    name: "4.10"
     namespace: ocp
     tag: base
   dev-scripts:
@@ -23,8 +23,18 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
   to: coredns
 promotion:
-  name: "4.9"
+  name: "4.10"
   namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.10"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.10"
+      namespace: ocp
 resources:
   '*':
     requests:
@@ -36,9 +46,6 @@ resources:
   unit:
     requests:
       memory: 4Gi
-tag_specification:
-  name: "4.9"
-  namespace: ocp
 tests:
 - as: unit
   commands: make test
@@ -57,10 +64,12 @@ tests:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-serial
 - as: e2e-metal-ipi
+  optional: true
   steps:
     cluster_profile: packet
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-dualstack
+  optional: true
   steps:
     cluster_profile: packet
     env:

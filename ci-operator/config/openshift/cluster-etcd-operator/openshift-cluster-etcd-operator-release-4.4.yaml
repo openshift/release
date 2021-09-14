@@ -28,14 +28,21 @@ images:
 promotion:
   name: "4.4"
   namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.4"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.4"
+      namespace: ocp
 resources:
   '*':
     requests:
       cpu: "3"
       memory: 1Gi
-tag_specification:
-  name: "4.4"
-  namespace: ocp
 test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
 tests:
 - as: verify
@@ -62,6 +69,7 @@ tests:
     cluster_profile: gcp
     workflow: openshift-upgrade-gcp
 - as: e2e-azure
+  optional: true
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
@@ -74,7 +82,9 @@ tests:
     run-tests
   openshift_installer:
     cluster_profile: aws
+  optional: true
 - as: e2e-metal-ipi
+  optional: true
   steps:
     cluster_profile: packet
     workflow: baremetalds-e2e

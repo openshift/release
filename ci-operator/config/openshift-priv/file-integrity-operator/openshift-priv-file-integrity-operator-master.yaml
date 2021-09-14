@@ -17,16 +17,23 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
   to: file-integrity-operator
 promotion:
-  name: 4.9-priv
+  name: 4.10-priv
   namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.10-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.10-priv
+      namespace: ocp-private
 resources:
   '*':
     requests:
       cpu: 200m
       memory: 400Mi
-tag_specification:
-  name: 4.9-priv
-  namespace: ocp-private
 tests:
 - as: go-build
   commands: make
@@ -47,6 +54,9 @@ tests:
     - as: test
       cli: latest
       commands: make e2e
+      dependencies:
+      - env: IMAGE_FROM_CI
+        name: file-integrity-operator
       from: src
       resources:
         requests:

@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   cron: 0 30 4 ? * SUN
   decorate: true
   decoration_config:
@@ -20,6 +20,7 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/sanity-ovn-cluster-profile
       - --target=sanity-ovn
       command:
@@ -33,6 +34,9 @@ periodics:
       volumeMounts:
       - mountPath: /etc/boskos
         name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /usr/local/sanity-ovn-cluster-profile
         name: cluster-profile
@@ -53,6 +57,9 @@ periodics:
         - key: credentials
           path: credentials
         secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -65,7 +72,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   cron: 0 30 6 ? * SUN
   decorate: true
   decoration_config:
@@ -85,6 +92,7 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/sanity-sdn-cluster-profile
       - --target=sanity-sdn
       command:
@@ -98,6 +106,9 @@ periodics:
       volumeMounts:
       - mountPath: /etc/boskos
         name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /usr/local/sanity-sdn-cluster-profile
         name: cluster-profile
@@ -118,6 +129,9 @@ periodics:
         - key: credentials
           path: credentials
         secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: cluster-profile
       projected:
         sources:

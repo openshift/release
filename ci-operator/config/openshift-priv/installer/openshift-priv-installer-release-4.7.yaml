@@ -100,6 +100,16 @@ images:
 promotion:
   name: 4.7-priv
   namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.7-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.7-priv
+      namespace: ocp-private
 resources:
   '*':
     requests:
@@ -141,64 +151,74 @@ resources:
     requests:
       cpu: "3"
       memory: 5Gi
-tag_specification:
-  name: 4.7-priv
-  namespace: ocp-private
 tests:
 - as: unit
   commands: go test ./pkg/...
   container:
     from: src
+  skip_if_only_changed: ^docs/
 - as: gofmt
   commands: IS_CONTAINER=TRUE ./hack/go-fmt.sh .
   container:
     from: src
+  skip_if_only_changed: ^docs/
 - as: govet
   commands: IS_CONTAINER=TRUE ./hack/go-vet.sh ./...
   container:
     from: src
+  skip_if_only_changed: ^docs/
 - as: golint
   commands: IS_CONTAINER=TRUE ./hack/go-lint.sh -min_confidence 0.3 $(go list -f '{{
     .ImportPath }}' ./...)
   container:
     from: src
+  skip_if_only_changed: ^docs/
 - as: verify-vendor
   commands: IS_CONTAINER=TRUE ./hack/verify-vendor.sh
   container:
     from: src
+  skip_if_only_changed: ^docs/
 - as: verify-codegen
   commands: IS_CONTAINER=TRUE ./hack/verify-codegen.sh
   container:
     from: src
 - as: e2e-aws
+  skip_if_only_changed: ^docs/
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
 - as: e2e-aws-proxy
+  optional: true
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-proxy
 - as: e2e-aws-shared-vpc
+  optional: true
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-sharednetwork
 - as: e2e-gcp
+  optional: true
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
 - as: e2e-gcp-shared-vpc
+  optional: true
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-sharednetwork
 - as: e2e-azure
+  optional: true
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
 - as: e2e-azure-shared-vpc
+  optional: true
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-sharednetwork
 - as: e2e-aws-upgrade
+  skip_if_only_changed: ^docs/
   steps:
     cluster_profile: aws
     workflow: openshift-upgrade-aws-latestinstaller
@@ -206,11 +226,14 @@ tests:
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer_upi:
     cluster_profile: aws
+  optional: true
 - as: e2e-gcp-upi
+  optional: true
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-upi
 - as: e2e-gcp-upi-xpn
+  optional: true
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-upi-xpn
@@ -219,12 +242,15 @@ tests:
   openshift_installer_upi:
     cluster_profile: azure4
 - as: e2e-aws-workers-rhel7
+  optional: true
+  skip_if_only_changed: ^docs/
   steps:
     cluster_profile: aws
     env:
       PLATFORM_VERSION: "7.9"
     workflow: openshift-e2e-aws-workers-rhel
 - as: e2e-aws-disruptive
+  optional: true
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-disruption
@@ -241,6 +267,7 @@ tests:
         NETWORK_TYPE=OpenShiftSDN
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-ovn-ipv6
+  skip_if_only_changed: ^docs/
   steps:
     cluster_profile: packet
     env:
@@ -261,6 +288,8 @@ tests:
     cluster_profile: packet
     workflow: baremetalds-e2e-virtualmedia
 - as: e2e-openstack
+  optional: true
+  skip_if_only_changed: ^docs/
   steps:
     cluster_profile: openstack-vexxhost
     env:
@@ -269,10 +298,12 @@ tests:
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
 - as: openstack-manifests
+  skip_if_only_changed: ^docs/
   steps:
     cluster_profile: openstack-vexxhost
     workflow: openshift-manifests-openstack
 - as: e2e-vsphere
+  optional: true
   steps:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere
@@ -281,10 +312,14 @@ tests:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere-upi
 - as: e2e-crc
+  optional: true
+  skip_if_only_changed: ^docs/
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-crc
 - as: e2e-libvirt
+  optional: true
+  skip_if_only_changed: ^docs/
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-libvirt
@@ -293,6 +328,8 @@ tests:
     cluster_profile: packet
     workflow: baremetalds-assisted
 - as: e2e-ovirt
+  optional: true
+  skip_if_only_changed: ^docs/
   steps:
     cluster_profile: ovirt
     workflow: openshift-e2e-ovirt-minimal-release-4.6-4.7
@@ -301,6 +338,8 @@ tests:
     cluster_profile: kubevirt
     workflow: openshift-e2e-kubevirt
 - as: e2e-aws-fips
+  optional: true
+  skip_if_only_changed: ^docs/
   steps:
     cluster_profile: aws
     env:
@@ -313,6 +352,8 @@ tests:
     - ref: openshift-e2e-test
     workflow: ipi-aws
 - as: e2e-openstack-kuryr
+  optional: true
+  skip_if_only_changed: (^docs|^upi|^hack)/
   steps:
     cluster_profile: openstack-kuryr
     env:

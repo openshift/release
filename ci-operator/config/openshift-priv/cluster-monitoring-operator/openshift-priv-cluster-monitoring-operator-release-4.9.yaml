@@ -23,17 +23,23 @@ images:
   from: src
   to: cluster-monitoring-operator-src
 promotion:
-  disabled: true
   name: 4.9-priv
   namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.9-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.9-priv
+      namespace: ocp-private
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: 4.9-priv
-  namespace: ocp-private
 tests:
 - as: generate
   commands: make generate --always-make && git diff --exit-code
@@ -68,6 +74,7 @@ tests:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
 - as: e2e-aws-single-node
+  optional: true
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-single-node

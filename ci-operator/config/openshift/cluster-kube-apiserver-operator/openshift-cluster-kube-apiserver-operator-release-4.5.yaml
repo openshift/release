@@ -26,14 +26,21 @@ promotion:
     kao-tests: src
   name: "4.5"
   namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.5"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.5"
+      namespace: ocp
 resources:
   '*':
     requests:
       cpu: "3"
       memory: 3Gi
-tag_specification:
-  name: "4.5"
-  namespace: ocp
 test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
 tests:
 - as: verify
@@ -69,6 +76,7 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-aws-operator-encryption
+  run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption)|^(test/library/encryption)
   steps:
     cluster_profile: aws
     test:
@@ -86,6 +94,7 @@ tests:
     cluster_profile: aws
     workflow: openshift-upgrade-aws
 - as: e2e-aws-operator-encryption-perf
+  run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-perf)|^(test/library/encryption)
   steps:
     cluster_profile: aws
     test:

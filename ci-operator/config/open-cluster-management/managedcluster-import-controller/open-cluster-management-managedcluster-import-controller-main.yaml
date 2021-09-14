@@ -24,6 +24,16 @@ images:
 promotion:
   name: "2.4"
   namespace: open-cluster-management
+releases:
+  initial:
+    integration:
+      name: "4.8"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.8"
+      namespace: ocp
 resources:
   '*':
     limits:
@@ -31,10 +41,13 @@ resources:
     requests:
       cpu: 80m
       memory: 200Mi
-tag_specification:
-  name: "4.8"
-  namespace: ocp
 tests:
+- as: backplane-fast-forward
+  postsubmit: true
+  steps:
+    env:
+      DESTINATION_BRANCH: backplane-1.0
+    workflow: ocm-ci-fastforward
 - as: sonarcloud
   commands: |
     export SELF="make -f /opt/build-harness/Makefile.prow"

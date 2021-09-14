@@ -31,17 +31,25 @@ raw_steps:
 - rpm_image_injection_step:
     from: base-machine
     to: base-machine-with-rpms
+releases:
+  initial:
+    integration:
+      name: "4.2"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.2"
+      namespace: ocp
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 4Gi
 rpm_build_commands: hack/build-rpms.sh
-tag_specification:
-  name: "4.2"
-  namespace: ocp
 tests:
 - as: e2e-aws
+  run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws

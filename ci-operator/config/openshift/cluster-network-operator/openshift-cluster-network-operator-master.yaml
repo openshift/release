@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: "4.9"
+    name: "4.10"
     namespace: ocp
     tag: base
   dev-scripts:
@@ -23,16 +23,23 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
   to: cluster-network-operator
 promotion:
-  name: "4.9"
+  name: "4.10"
   namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.10"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.10"
+      namespace: ocp
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: "4.9"
-  namespace: ocp
 tests:
 - as: unit
   commands: hack/test-go.sh
@@ -51,6 +58,7 @@ tests:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
 - as: e2e-gcp-ovn-upgrade
+  optional: true
   steps:
     cluster_profile: gcp
     workflow: openshift-upgrade-gcp-ovn
@@ -63,14 +71,17 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws-sdn-multi
 - as: e2e-ovn-step-registry
+  optional: true
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-ovn
 - as: e2e-ovn-hybrid-step-registry
+  optional: true
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-ovn-hybrid
 - as: e2e-ovn-ipsec-step-registry
+  optional: true
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-ovn-ipsec
@@ -83,6 +94,7 @@ tests:
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-ovn-ipv6-ipsec
+  optional: true
   steps:
     cluster_profile: packet
     env:
@@ -97,14 +109,17 @@ tests:
     - ref: windows-e2e-operator-test
     workflow: ipi-aws-ovn-hybrid
 - as: e2e-vsphere-ovn
+  optional: true
   steps:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere-ovn
 - as: e2e-azure-ovn
+  optional: true
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-ovn
 - as: e2e-azure-ovn-dualstack
+  optional: true
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-ovn-dualstack
@@ -113,12 +128,14 @@ tests:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-ovn
 - as: e2e-vsphere-windows
+  optional: true
   steps:
     cluster_profile: vsphere
     test:
     - ref: windows-e2e-operator-test-with-custom-vxlan-port
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
 - as: e2e-openstack-kuryr
+  optional: true
   steps:
     cluster_profile: openstack-kuryr
     env:
@@ -129,6 +146,7 @@ tests:
     - ref: openstack-noop
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-openstack
+  optional: true
   steps:
     cluster_profile: openstack-vexxhost
     env:
@@ -137,6 +155,7 @@ tests:
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-openstack-ovn
+  optional: true
   steps:
     cluster_profile: openstack-vexxhost
     env:
@@ -145,6 +164,29 @@ tests:
       NETWORK_TYPE: OVNKubernetes
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
+- as: e2e-network-migration
+  steps:
+    cluster_profile: aws
+    env:
+      TEST_SKIPS: Alerts shouldn't report any alerts in firing or pending state\|
+        Prometheus when installed on the cluster shouldn't report any alerts in firing
+        state apart from Watchdog and AlertmanagerReceiversNotConfigured
+    test:
+    - ref: ovn-sdn-migration
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws
+- as: e2e-network-migration-rollback
+  steps:
+    cluster_profile: aws
+    env:
+      TEST_SKIPS: Alerts shouldn't report any alerts in firing or pending state\|
+        Prometheus when installed on the cluster shouldn't report any alerts in firing
+        state apart from Watchdog and AlertmanagerReceiversNotConfigured
+    test:
+    - ref: ovn-sdn-migration
+    - ref: ovn-sdn-migration-rollback
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: master
   org: openshift

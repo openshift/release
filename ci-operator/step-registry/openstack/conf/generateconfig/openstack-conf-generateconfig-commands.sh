@@ -21,7 +21,7 @@ SSH_PUB_KEY=$(<"${CLUSTER_PROFILE_DIR}"/ssh-publickey)
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
 case "$CONFIG_TYPE" in
-  minimal|byon)
+  minimal|byon|proxy)
     ;;
   *)
     echo "No valid install config type specified. Please check CONFIG_TYPE"
@@ -61,10 +61,10 @@ metadata:
 networking:
   networkType: ${NETWORK_TYPE}
 EOF
-if [[ "${CONFIG_TYPE}" == "byon" ]]; then
+if [[ "${CONFIG_TYPE}" == "byon" || "${CONFIG_TYPE}" == "proxy" ]]; then
 cat >> "${CONFIG}" << EOF
   machineNetwork:
-  - cidr: $(<"${SHARED_DIR}"/MACHINESSUBNET_SUBNET_RANGE)
+  - cidr: $(<"${SHARED_DIR}"/MACHINES_SUBNET_RANGE)
 EOF
 fi
 cat >> "${CONFIG}" << EOF
@@ -82,9 +82,9 @@ cat >> "${CONFIG}" << EOF
     ingressFloatingIP: ${INGRESS_IP}
     externalNetwork:   ${OPENSTACK_EXTERNAL_NETWORK}
 EOF
-elif [[ "${CONFIG_TYPE}" == "byon" ]]; then
+elif [[ "${CONFIG_TYPE}" == "byon" || "${CONFIG_TYPE}" == "proxy" ]]; then
 cat >> "${CONFIG}" << EOF
-    machinesSubnet:    $(<"${SHARED_DIR}"/MACHINESSUBNET_SUBNET_ID)
+    machinesSubnet:    $(<"${SHARED_DIR}"/MACHINES_SUBNET_ID)
     apiVIP:            ${API_IP}
     ingressVIP:        ${INGRESS_IP}
 EOF
@@ -109,6 +109,17 @@ pullSecret: >
 sshKey: |
   ${SSH_PUB_KEY}
 EOF
+if [[ "${CONFIG_TYPE}" == "proxy" ]]; then
+  PROXY_INTERFACE=$(<"${SHARED_DIR}"/PROXY_INTERFACE)
+  SQUID_AUTH=$(<"${SHARED_DIR}"/SQUID_AUTH)
+cat >> "${CONFIG}" << EOF
+proxy:
+  httpProxy: http://${SQUID_AUTH}@${PROXY_INTERFACE}:3128/
+  httpsProxy: https://${SQUID_AUTH}@${PROXY_INTERFACE}:3130/
+additionalTrustBundle: |
+$(cat "${SHARED_DIR}"/domain.crt | awk '{print "  "$0}')
+EOF
+fi
 
 if [ ${FIPS_ENABLED} = "true" ]; then
   echo "Adding 'fips: true' to install-config.yaml"
@@ -127,9 +138,9 @@ data = yaml.safe_load(open(sys.argv[1]))' "${SHARED_DIR}/install-config.yaml"
 if [[ ${OPENSTACK_PROVIDER_NETWORK} != "" ]]; then
   echo "Provider network detected, will clean-up reserved ports"
   for p in api ingress; do
-    if openstack port show ${CLUSTER_NAME}-${p} >/dev/null; then
-      echo "Port exists for $p: removing it"
-      openstack port delete ${CLUSTER_NAME}-${p}
+    if openstack port show ${CLUSTER_NAME}-${CONFIG_TYPE}-${p} >/dev/null; then
+      echo "Port exists for ${CLUSTER_NAME}-${CONFIG_TYPE}-${p}: removing it"
+      openstack port delete ${CLUSTER_NAME}-${CONFIG_TYPE}-${p}
     fi
   done
 fi

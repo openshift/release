@@ -7,16 +7,25 @@ build_root:
   project_image:
     context_dir: features/
     dockerfile_path: Dockefile.buildimage
+releases:
+  initial:
+    integration:
+      name: "4.3"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.3"
+      namespace: ocp
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: "4.3"
-  namespace: ocp
 tests:
 - as: sctp-e2e-aws
+  optional: true
+  run_if_changed: features/sctp/.*
   steps:
     cluster_profile: aws
     test:
@@ -29,6 +38,8 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: performance-e2e-aws
+  optional: true
+  run_if_changed: features/performance/.*
   steps:
     cluster_profile: aws
     test:
@@ -45,6 +56,7 @@ tests:
   commands: cd features && make unittests
   container:
     from: src
+  run_if_changed: features/.*
 - as: e2e-aws
   cron: 0 */8 * * *
   steps:

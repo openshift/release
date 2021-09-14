@@ -18,6 +18,16 @@ images:
 promotion:
   name: 4.6-priv
   namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.6-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.6-priv
+      namespace: ocp-private
 resources:
   '*':
     limits:
@@ -37,35 +47,38 @@ resources:
     requests:
       cpu: 100m
       memory: 10Gi
-tag_specification:
-  name: 4.6-priv
-  namespace: ocp-private
 tests:
 - as: lint
   commands: make lint
   container:
     from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: build
   commands: make build
   container:
     from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: unit
   commands: make unit
   container:
     from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: aws-e2e-operator
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-aws-ovn-hybrid
 - as: azure-e2e-operator
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: azure4
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-azure-ovn-hybrid
 - as: vsphere-e2e-operator
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: vsphere
     test:

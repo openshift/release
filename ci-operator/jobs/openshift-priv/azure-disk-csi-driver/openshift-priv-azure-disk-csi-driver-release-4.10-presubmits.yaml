@@ -8,6 +8,8 @@ presubmits:
     cluster: build02
     context: ci/prow/e2e-azure
     decorate: true
+    decoration_config:
+      skip_cloning: true
     hidden: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
@@ -23,6 +25,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --secret-dir=/usr/local/e2e-azure-cluster-profile
         - --target=e2e-azure
         command:
@@ -36,6 +39,9 @@ presubmits:
         volumeMounts:
         - mountPath: /etc/boskos
           name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
           readOnly: true
         - mountPath: /usr/local/e2e-azure-cluster-profile
           name: cluster-profile
@@ -59,6 +65,9 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -82,11 +91,14 @@ presubmits:
     cluster: build02
     context: ci/prow/e2e-azure-csi
     decorate: true
+    decoration_config:
+      skip_cloning: true
     hidden: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-azure-disk-csi-driver-release-4.10-e2e-azure-csi
+    optional: true
     path_alias: github.com/kubernetes-sigs/azuredisk-csi-driver
     rerun_command: /test e2e-azure-csi
     spec:
@@ -97,6 +109,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --secret-dir=/usr/local/e2e-azure-csi-cluster-profile
         - --target=e2e-azure-csi
         command:
@@ -110,6 +123,9 @@ presubmits:
         volumeMounts:
         - mountPath: /etc/boskos
           name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
           readOnly: true
         - mountPath: /usr/local/e2e-azure-csi-cluster-profile
           name: cluster-profile
@@ -133,6 +149,9 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -156,11 +175,14 @@ presubmits:
     cluster: build02
     context: ci/prow/e2e-azure-csi-migration
     decorate: true
+    decoration_config:
+      skip_cloning: true
     hidden: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-azure-disk-csi-driver-release-4.10-e2e-azure-csi-migration
+    optional: true
     path_alias: github.com/kubernetes-sigs/azuredisk-csi-driver
     rerun_command: /test e2e-azure-csi-migration
     spec:
@@ -171,6 +193,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --secret-dir=/usr/local/e2e-azure-csi-migration-cluster-profile
         - --target=e2e-azure-csi-migration
         command:
@@ -184,6 +207,9 @@ presubmits:
         volumeMounts:
         - mountPath: /etc/boskos
           name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
           readOnly: true
         - mountPath: /usr/local/e2e-azure-csi-migration-cluster-profile
           name: cluster-profile
@@ -207,6 +233,9 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -230,6 +259,8 @@ presubmits:
     cluster: build02
     context: ci/prow/images
     decorate: true
+    decoration_config:
+      skip_cloning: true
     hidden: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
@@ -284,15 +315,17 @@ presubmits:
     - ^release-4\.10$
     - ^release-4\.10-
     cluster: build02
-    context: ci/prow/unit-skipped
+    context: ci/prow/unit
     decorate: true
+    decoration_config:
+      skip_cloning: true
     hidden: true
     labels:
       ci-operator.openshift.io/prowgen-controlled: "true"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-azure-disk-csi-driver-release-4.10-unit-skipped
+    name: pull-ci-openshift-priv-azure-disk-csi-driver-release-4.10-unit
     path_alias: github.com/kubernetes-sigs/azuredisk-csi-driver
-    rerun_command: /test unit-skipped
+    rerun_command: /test unit
     spec:
       containers:
       - args:
@@ -300,7 +333,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
-        - --target=unit-skipped
+        - --target=unit
         command:
         - ci-operator
         image: ci-operator:latest
@@ -333,4 +366,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )unit-skipped,?($|\s.*)
+    trigger: (?m)^/test( | .* )unit,?($|\s.*)

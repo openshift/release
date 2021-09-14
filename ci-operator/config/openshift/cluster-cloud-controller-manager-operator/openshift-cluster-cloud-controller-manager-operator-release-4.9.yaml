@@ -27,9 +27,18 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
   to: cluster-cloud-controller-manager-operator-src
 promotion:
-  disabled: true
   name: "4.9"
   namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.9"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.9"
+      namespace: ocp
 resources:
   '*':
     limits:
@@ -37,9 +46,6 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: "4.9"
-  namespace: ocp
 tests:
 - as: verify
   commands: make test
@@ -58,10 +64,12 @@ tests:
     cluster_profile: aws
     workflow: openshift-upgrade-aws
 - as: e2e-aws-ccm
+  optional: true
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-ccm
 - as: e2e-aws-ccm-install
+  optional: true
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-ccm-install

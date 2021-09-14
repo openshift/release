@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: 4.9-priv
+    name: 4.10-priv
     namespace: ocp-private
     tag: base
   ocp_builder_rhel-8-golang-1.16-openshift-4.9:
@@ -23,16 +23,23 @@ images:
   from: src
   to: cluster-monitoring-operator-src
 promotion:
-  name: 4.9-priv
+  name: 4.10-priv
   namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.10-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.10-priv
+      namespace: ocp-private
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: 4.9-priv
-  namespace: ocp-private
 tests:
 - as: generate
   commands: make generate --always-make && git diff --exit-code
@@ -54,6 +61,7 @@ tests:
   commands: INTERACTIVE=false make versions && git diff --exit-code
   container:
     from: src
+  optional: true
 - as: shellcheck
   commands: make shellcheck
   container:
@@ -67,6 +75,7 @@ tests:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
 - as: e2e-aws-single-node
+  optional: true
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-single-node

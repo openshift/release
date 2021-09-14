@@ -88,6 +88,16 @@ images:
 promotion:
   name: 4.4-priv
   namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.4-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.4-priv
+      namespace: ocp-private
 resources:
   '*':
     requests:
@@ -129,9 +139,6 @@ resources:
     requests:
       cpu: "3"
       memory: 5Gi
-tag_specification:
-  name: 4.4-priv
-  namespace: ocp-private
 tests:
 - as: unit
   commands: go test ./pkg/...
@@ -155,14 +162,17 @@ tests:
   container:
     from: src
 - as: e2e-aws
+  skip_if_only_changed: ^docs/
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
 - as: e2e-gcp
+  optional: true
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
 - as: e2e-azure
+  optional: true
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
@@ -174,7 +184,9 @@ tests:
   commands: TEST_SUITE=openshift/conformance/parallel run-tests
   openshift_installer_upi:
     cluster_profile: aws
+  optional: true
 - as: e2e-gcp-upi
+  optional: true
   steps:
     cluster_profile: gcp
     env:
@@ -185,23 +197,30 @@ tests:
     run-tests
   openshift_installer:
     cluster_profile: aws
+  optional: true
 - as: e2e-gcp-upgrade
   steps:
     cluster_profile: gcp
     workflow: openshift-upgrade-gcp-latestinstaller
 - as: e2e-vsphere
+  optional: true
   steps:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere-upi
 - as: e2e-metal-ipi
+  optional: true
+  run_if_changed: .*baremetal.*
   steps:
     cluster_profile: packet
     workflow: baremetalds-e2e
 - as: e2e-ovirt
+  optional: true
+  skip_if_only_changed: ^docs/
   steps:
     cluster_profile: ovirt
     workflow: openshift-e2e-ovirt-minimal-release-4.4-4.5
 - as: e2e-aws-fips
+  optional: true
   steps:
     cluster_profile: aws
     env:

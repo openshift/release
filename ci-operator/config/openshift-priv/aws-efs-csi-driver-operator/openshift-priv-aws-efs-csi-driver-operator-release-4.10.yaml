@@ -74,8 +74,19 @@ operator:
   - pullspec: quay.io/openshift/origin-aws-efs-csi-driver-operator:latest
     with: pipeline:aws-efs-csi-driver-operator
 promotion:
+  disabled: true
   name: 4.10-priv
   namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.10-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.10-priv
+      namespace: ocp-private
 resources:
   '*':
     limits:
@@ -83,9 +94,6 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: 4.10-priv
-  namespace: ocp-private
 tests:
 - as: unit
   commands: make test
@@ -96,6 +104,7 @@ tests:
   container:
     from: src
 - as: operator-e2e
+  optional: true
   steps:
     cluster_profile: aws
     dependencies:

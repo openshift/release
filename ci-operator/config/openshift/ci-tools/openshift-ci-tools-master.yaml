@@ -482,6 +482,19 @@ images:
   to: vault-secret-collection-manager
 - dockerfile_literal: |-
     FROM centos:8
+    ADD bugzilla-config-manager /usr/bin/bugzilla-config-manager
+    ADD prcreator /usr/bin/prcreator
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/bugzilla-config-manager
+      - destination_dir: .
+        source_path: /go/bin/prcreator
+  to: bugzilla-config-manager
+- dockerfile_literal: |-
+    FROM centos:8
     RUN  dnf install -y git && dnf clean all && rm -rf /var/cache/dnf
     ADD ci-operator-yaml-creator /usr/bin/ci-operator-yaml-creator
     ENTRYPOINT ["ci-operator-yaml-creator"]
@@ -492,6 +505,14 @@ images:
       - destination_dir: .
         source_path: /go/bin/ci-operator-yaml-creator
   to: ci-operator-yaml-creator
+- context_dir: images/clusterimageset-updater
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/clusterimageset-updater
+  to: clusterimageset-updater
 promotion:
   namespace: ci
   tag: latest
@@ -549,6 +570,7 @@ tests:
           cpu: 100m
           memory: 200Mi
 - as: e2e-oo
+  run_if_changed: pkg/steps/(index|bundle).*.go
   steps:
     test:
     - as: e2e-oo
@@ -607,6 +629,7 @@ tests:
   commands: make check-breaking-changes
   container:
     from: test-bin
+  optional: true
 - as: checkconfig
   commands: make validate-checkconfig
   container:

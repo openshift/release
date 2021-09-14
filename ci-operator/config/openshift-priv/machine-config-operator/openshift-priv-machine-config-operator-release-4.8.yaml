@@ -48,20 +48,28 @@ images:
 promotion:
   name: 4.8-priv
   namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.8-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.8-priv
+      namespace: ocp-private
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: 4.8-priv
-  namespace: ocp-private
 tests:
 - as: unit
   commands: make test-unit
   container:
     from: src
 - as: e2e-aws
+  run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
@@ -70,6 +78,7 @@ tests:
     cluster_profile: aws
     workflow: openshift-upgrade-aws
 - as: e2e-aws-serial
+  optional: true
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-serial
@@ -83,6 +92,7 @@ tests:
     cluster_profile: gcp
     workflow: openshift-upgrade-gcp
 - as: e2e-gcp-op
+  run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
   steps:
     cluster_profile: gcp
     test:
@@ -99,12 +109,14 @@ tests:
     cluster_profile: azure4
     workflow: openshift-upgrade-azure
 - as: e2e-aws-workers-rhel7
+  optional: true
   steps:
     cluster_profile: aws
     env:
       PLATFORM_VERSION: "7.9"
     workflow: openshift-e2e-aws-workers-rhel
 - as: e2e-aws-disruptive
+  optional: true
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-disruption
@@ -121,10 +133,12 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-vsphere-upi
+  optional: true
   steps:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere-upi
 - as: e2e-metal-ipi
+  optional: true
   steps:
     cluster_profile: packet
     env:
@@ -141,6 +155,7 @@ tests:
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-ovn-dualstack
+  optional: true
   steps:
     cluster_profile: packet
     env:
@@ -149,6 +164,7 @@ tests:
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
 - as: e2e-azure
+  optional: true
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
@@ -157,26 +173,32 @@ tests:
     cluster_profile: azure4
     workflow: openshift-upgrade-azure
 - as: e2e-aws-proxy
+  optional: true
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-proxy
 - as: e2e-vsphere
+  optional: true
   steps:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere
 - as: e2e-vsphere-upgrade
+  optional: true
   steps:
     cluster_profile: vsphere
     workflow: openshift-upgrade-vsphere
 - as: e2e-ovn-step-registry
+  optional: true
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-ovn
 - as: e2e-metal-assisted
+  optional: true
   steps:
     cluster_profile: packet
     workflow: baremetalds-assisted
 - as: e2e-ovirt
+  optional: true
   steps:
     cluster_profile: ovirt
     workflow: openshift-e2e-ovirt-minimal
@@ -185,14 +207,18 @@ tests:
     cluster_profile: ovirt
     workflow: openshift-upgrade-ovirt
 - as: e2e-aws-single-node
+  optional: true
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-single-node
 - as: e2e-gcp-single-node
+  optional: true
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-single-node
 - as: e2e-gcp-op-single-node
+  optional: true
+  run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
   steps:
     cluster_profile: gcp
     test:
@@ -205,6 +231,8 @@ tests:
           cpu: 100m
     workflow: openshift-e2e-gcp-single-node
 - as: e2e-openstack
+  optional: true
+  run_if_changed: .*/on-prem/.*|.*openstack.*
   steps:
     cluster_profile: openstack-vexxhost
     env:
@@ -213,6 +241,7 @@ tests:
       TEST_SUITE: experimental/reliability/minimal
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-openstack-parallel
+  optional: true
   steps:
     cluster_profile: openstack-vexxhost
     env:

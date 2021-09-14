@@ -103,6 +103,16 @@ images:
 promotion:
   name: "4.6"
   namespace: origin
+releases:
+  initial:
+    integration:
+      name: "4.6"
+      namespace: origin
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.6"
+      namespace: origin
 resources:
   '*':
     requests:
@@ -144,9 +154,6 @@ resources:
     requests:
       cpu: "3"
       memory: 5Gi
-tag_specification:
-  name: "4.6"
-  namespace: origin
 tests:
 - as: unit
   commands: go test ./pkg/...
@@ -174,6 +181,7 @@ tests:
   container:
     from: src
 - as: e2e-gcp
+  optional: true
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
@@ -182,12 +190,14 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws
 - as: e2e-vsphere-upi
+  optional: true
   steps:
     cluster_profile: vsphere
     env:
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-vsphere-upi
 - as: e2e-vsphere
+  optional: true
   steps:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere

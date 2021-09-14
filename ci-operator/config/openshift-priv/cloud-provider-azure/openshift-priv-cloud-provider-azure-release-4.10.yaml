@@ -30,8 +30,19 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
   to: azure-cloud-node-manager
 promotion:
+  disabled: true
   name: 4.10-priv
   namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.10-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.10-priv
+      namespace: ocp-private
 resources:
   '*':
     limits:
@@ -39,9 +50,6 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: 4.10-priv
-  namespace: ocp-private
 tests:
 - as: verify-git-history
   commands: make verify-history
@@ -66,10 +74,12 @@ tests:
     cluster_profile: azure4
     workflow: openshift-upgrade-azure
 - as: e2e-azure-ccm
+  optional: true
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-ccm
 - as: openshift-e2e-azure-ccm-install
+  optional: true
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-ccm-install

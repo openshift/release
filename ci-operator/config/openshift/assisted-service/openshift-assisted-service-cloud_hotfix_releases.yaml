@@ -40,14 +40,21 @@ images:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.16
   to: assisted-service
+releases:
+  initial:
+    integration:
+      name: "4.8"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.8"
+      namespace: ocp
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: "4.8"
-  namespace: ocp
 test_binary_build_commands: |
   make build-openshift-ci-test-bin
   curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.36.0
@@ -89,7 +96,7 @@ tests:
     workflow: generic-claim
 - as: e2e-metal-assisted-single-node
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.8
@@ -98,7 +105,7 @@ tests:
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=""
@@ -106,7 +113,7 @@ tests:
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-olm
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         TEST_FUNC=test_olm_operator

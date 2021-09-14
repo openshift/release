@@ -23,7 +23,6 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
   to: baremetal-runtimecfg
 promotion:
-  disabled: true
   name: 4.9-priv
   namespace: ocp-private
 raw_steps:
@@ -33,14 +32,21 @@ raw_steps:
       curl http://base-4-6-rhel8.ocp.svc > /etc/yum.repos.d/base-4-6-rhel8.repo
     from: ubi8
     to: base-os
+releases:
+  initial:
+    integration:
+      name: 4.9-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.9-priv
+      namespace: ocp-private
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: 4.9-priv
-  namespace: ocp-private
 tests:
 - as: gofmt
   commands: make fmt
@@ -55,6 +61,7 @@ tests:
   container:
     from: src
 - as: e2e-metal-ipi
+  optional: true
   steps:
     cluster_profile: packet
     env:
@@ -71,6 +78,7 @@ tests:
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-ovn-dualstack
+  optional: true
   steps:
     cluster_profile: packet
     env:
@@ -79,6 +87,7 @@ tests:
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
 - as: e2e-openstack
+  optional: true
   steps:
     cluster_profile: openstack-vexxhost
     env:

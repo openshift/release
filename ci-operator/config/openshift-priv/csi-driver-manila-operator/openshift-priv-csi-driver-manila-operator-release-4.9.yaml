@@ -23,9 +23,18 @@ images:
   from: src
   to: manila-csi-driver-operator-test
 promotion:
-  disabled: true
   name: 4.9-priv
   namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.9-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.9-priv
+      namespace: ocp-private
 resources:
   '*':
     limits:
@@ -33,9 +42,6 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: 4.9-priv
-  namespace: ocp-private
 tests:
 - as: verify
   commands: |
@@ -48,10 +54,12 @@ tests:
   container:
     from: src
 - as: e2e-openstack-csi
+  optional: true
   steps:
     cluster_profile: openstack-vh-mecha-central
     workflow: openshift-e2e-openstack-csi-manila
 - as: e2e-openstack
+  optional: true
   steps:
     cluster_profile: openstack-vexxhost
     workflow: openshift-e2e-openstack-ipi

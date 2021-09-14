@@ -29,7 +29,6 @@ images:
   from: rpm-os
   to: kuryr-controller
 promotion:
-  disabled: true
   name: "4.9"
   namespace: ocp
 raw_steps:
@@ -39,6 +38,16 @@ raw_steps:
       curl http://base-openstack-4-7.ocp.svc > /etc/yum.repos.d/base-openstack-4-7.repo
     from: rpm
     to: rpm-os
+releases:
+  initial:
+    integration:
+      name: "4.9"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.9"
+      namespace: ocp
 resources:
   '*':
     requests:
@@ -46,9 +55,6 @@ resources:
       memory: 200Mi
 rpm_build_commands: tools/build-rpm-rhel8.sh 4.7.0
 rpm_build_location: _output/RPMS/noarch
-tag_specification:
-  name: "4.9"
-  namespace: ocp
 tests:
 - as: unit
   commands: HOME=`dirname .` tox -e py3
@@ -59,6 +65,7 @@ tests:
   container:
     from: kuryr-tester
 - as: e2e-openstack-kuryr
+  optional: true
   steps:
     cluster_profile: openstack-kuryr
     env:

@@ -4,16 +4,18 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-if [[ "${CONFIG_TYPE}" != "byon" ]]; then
-    # For now, we only support the deployment of OCP into specific availability zones when pre-configuring
-    # the network (BYON), for known limitations that will be addressed in the future.
+case "$CONFIG_TYPE" in
+  byon|proxy)
+    ;;
+  *)
     if [[ "$ZONES_COUNT" != "0" ]]; then
-        echo "ZONES_COUNT was set to '${ZONES_COUNT}', although CONFIG_TYPE was not set to 'byon'."
-        exit 1
+      echo "ZONES_COUNT was set to '${ZONES_COUNT}', although CONFIG_TYPE was not set to 'byon'."
+      exit 1
     fi
-    echo "Skipping step due to CONFIG_TYPE not being byon."
+    echo "Skipping step due to CONFIG_TYPE not being byon or proxy."
     exit 0
-fi
+    ;;
+esac
 
 retry() {
     local retries=$1
@@ -36,6 +38,8 @@ retry() {
 export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
 WORK_DIR=${WORK_DIR:-$(mktemp -d -t shiftstack-ci-XXXXXXXXXX)}
 CLUSTER_NAME=$(<"${SHARED_DIR}"/CLUSTER_NAME)
+MACHINES_NET_ID=$(<"${SHARED_DIR}"/MACHINES_NET_ID)
+MACHINES_SUBNET_ID=$(<"${SHARED_DIR}"/MACHINES_SUBNET_ID)
 OPENSTACK_EXTERNAL_NETWORK="${OPENSTACK_EXTERNAL_NETWORK:-$(<"${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK")}"
 BASTION_FLAVOR="${BASTION_FLAVOR:-$(<"${SHARED_DIR}/BASTION_FLAVOR")}"
 BASTION_USER=${BASTION_USER:-centos}
@@ -43,12 +47,6 @@ ZONES=$(<"${SHARED_DIR}"/ZONES)
 
 mapfile -t ZONES < <(printf ${ZONES}) >/dev/null
 MAX_ZONES_COUNT=${#ZONES[@]}
-
-if [[ ! -f ${SHARED_DIR}"/BASTIONSUBNET_NET_ID" ]]; then
-    echo "Failed to find ${SHARED_DIR}/BASTIONSUBNET_NET_ID, bastion network was probably not created"
-    exit 1
-fi
-NET_ID=$(<"${SHARED_DIR}"/BASTIONSUBNET_NET_ID)
 
 if [[ ${ZONES_COUNT} -gt ${MAX_ZONES_COUNT} ]]; then
   echo "Too many zones were requested: ${ZONES_COUNT}; only ${MAX_ZONES_COUNT} are available: ${ZONES[*]}"
@@ -78,38 +76,31 @@ if ! openstack flavor show $BASTION_FLAVOR >/dev/null; then
 		exit 1
 fi
 
-if [[ ${OPENSTACK_PROVIDER_NETWORK} != "" ]]; then
-    echo "Provider network detected: ${OPENSTACK_PROVIDER_NETWORK}"
-    if ! openstack network show ${OPENSTACK_PROVIDER_NETWORK} >/dev/null; then
-        echo "ERROR: Provider network not found: ${OPENSTACK_PROVIDER_NETWORK}"
-        exit 1
-    fi
-    PROV_NET_ID=$(openstack network show -c id -f value "${OPENSTACK_PROVIDER_NETWORK}")
-    echo "Provider network ID: ${PROV_NET_ID}"
-    PROV_NET_ARGS="--network ${PROV_NET_ID} "
-else
-  PROV_NET_ARGS=""
-fi
+openstack keypair create --public-key ${CLUSTER_PROFILE_DIR}/ssh-publickey bastionproxy-${CLUSTER_NAME}-${CONFIG_TYPE} >/dev/null
+>&2 echo "Created keypair: bastionproxy-${CLUSTER_NAME}-${CONFIG_TYPE}"
 
-openstack keypair create --public-key ${CLUSTER_PROFILE_DIR}/ssh-publickey ${CLUSTER_NAME} >/dev/null
->&2 echo "Created keypair: ${CLUSTER_NAME}"
-
-sg_id="$(openstack security group create -f value -c id $CLUSTER_NAME)"
->&2 echo "Created security group for ${CLUSTER_NAME}: ${sg_id}"
+sg_id="$(openstack security group create -f value -c id bastionproxy-${CLUSTER_NAME}-${CONFIG_TYPE} \
+  --description "Bastion security group for $CLUSTER_NAME")"
+>&2 echo "Created bastion security group for ${CLUSTER_NAME}: ${sg_id}"
 openstack security group rule create --ingress --protocol tcp --dst-port 22 --description "${CLUSTER_NAME} SSH" "$sg_id" >/dev/null
+openstack security group rule create --ingress --protocol udp --dst-port 53 --description "${CLUSTER_NAME} DNS" "$sg_id" >/dev/null
 openstack security group rule create --ingress --protocol tcp --dst-port 3128 --remote-ip 0.0.0.0/0 --description "${CLUSTER_NAME} squid" "$sg_id" >/dev/null
 openstack security group rule create --ingress --protocol tcp --dst-port 3130 --remote-ip 0.0.0.0/0 --description "${CLUSTER_NAME} squid" "$sg_id" >/dev/null
->&2 echo "Security group rules created in ${sg_id} to allow SSH and squid access"
+>&2 echo "Created necessary security group rules in ${sg_id}"
 
-openstack server create --wait $ZONES_ARGS \
-		--image "$BASTION_IMAGE" \
-		--flavor "$BASTION_FLAVOR" \
-		--network "$NET_ID" $PROV_NET_ARGS \
-		--security-group "$sg_id" \
-		--key-name "$CLUSTER_NAME" \
-		"bastionproxy-$CLUSTER_NAME" >/dev/null
-server_id="$(openstack server show bastionproxy-${CLUSTER_NAME} -f value -c id)"
->&2 echo "Created nova server bastionproxy-${CLUSTER_NAME}: ${server_id}"
+server_params=" --image $BASTION_IMAGE --flavor $BASTION_FLAVOR $ZONES_ARGS \
+  --security-group $sg_id --key-name bastionproxy-${CLUSTER_NAME}-${CONFIG_TYPE}"
+
+if [[ -f ${SHARED_DIR}"/BASTION_NET_ID" ]]; then
+  BASTION_NET_ID=$(<"${SHARED_DIR}"/BASTION_NET_ID)
+  server_params+=" --network $BASTION_NET_ID"
+fi
+
+server_params+=" --network $MACHINES_NET_ID"
+
+server_id="$(openstack server create -f value -c id $server_params \
+		"bastionproxy-$CLUSTER_NAME-${CONFIG_TYPE}")"
+>&2 echo "Created nova server bastionproxy-${CLUSTER_NAME}-${CONFIG_TYPE}: ${server_id}"
 
 bastion_fip="$(openstack floating ip create -f value -c floating_ip_address \
 		--description "bastionproxy $CLUSTER_NAME FIP" \
@@ -139,27 +130,37 @@ if ! retry 60 5 $SSH_CMD uname -a; then
     openstack console log show ${server_id}
 		exit 1
 fi
-SQUID_IP=$bastion_fip
-
-echo "Deploying squid on $SQUID_IP"
 
 PASSWORD="$(uuidgen | sha256sum | cut -b -32)"
 SQUID_AUTH="${CLUSTER_NAME}:${PASSWORD}"
+echo ${SQUID_AUTH}>${SHARED_DIR}/SQUID_AUTH
+
+SQUID_IP=$bastion_fip
+if [[ "${CONFIG_TYPE}" == "proxy" ]]; then
+  # Right now we assume that the bastion will be connected to one machines network via a port.
+  # This command will have to be revisited if we want more ports on this machine.
+  PROXY_INTERFACE="$(openstack port list --network $MACHINES_NET_ID --server "$server_id" \
+    -c fixed_ips -f value |cut -d':' -f3 |cut -f1 -d '}' |sed -e "s/'//" -e "s/'$//")"
+  SQUID_IP=$PROXY_INTERFACE
+  echo ${PROXY_INTERFACE}>${SHARED_DIR}/PROXY_INTERFACE
+  openstack subnet set --no-dns-nameservers --dns-nameserver ${PROXY_INTERFACE} ${MACHINES_SUBNET_ID}
+  echo "Subnet ${MACHINES_SUBNET_ID} was updated to use ${SQUID_IP} as DNS server"
+fi
+
+echo "Deploying squid on $SQUID_IP"
 
 >&2 cat << EOF > $WORK_DIR/deploy_squid.sh
-sudo dnf install -y squid
+sudo dnf install -y squid dnsmasq
+
+sudo bash -c "cat << EOF >> /etc/dnsmasq.conf
+listen-address=${SQUID_IP}
+EOF"
+
 sudo bash -c "cat << EOF > /etc/squid/squid.conf
 acl localnet src 0.0.0.0/0
-acl SSL_ports port 443
-acl SSL_ports port 1025-65535
 acl Safe_ports port 80
 acl Safe_ports port 443
 acl Safe_ports port 1025-65535
-acl CONNECT method CONNECT
-http_access deny !Safe_ports
-http_access deny !SSL_ports
-http_access allow localnet
-http_access deny all
 http_port 3128
 https_port 3130 cert=/etc/squid/certs/domain.crt key=/etc/squid/certs/domain.key cafile=/etc/squid/certs/domain.crt
 # Leave coredumps in the first cache dir
@@ -169,7 +170,10 @@ auth_param basic children 5
 auth_param basic realm Squid Basic Authentication
 auth_param basic credentialsttl 2 hours
 acl auth_users proxy_auth REQUIRED
-http_access allow auth_users
+http_access deny !auth_users
+http_access deny !Safe_ports
+http_access allow localnet
+http_access deny all
 EOF"
 
 sudo mkdir -p /etc/squid/certs
@@ -182,10 +186,13 @@ sudo yum install -y httpd-tools
 sudo htpasswd -bBc /etc/squid/htpasswd $CLUSTER_NAME $PASSWORD
 
 sudo systemctl start squid
+sudo systemctl start dnsmasq
 EOF
+
 $SCP_CMD $WORK_DIR/deploy_squid.sh $BASTION_USER@$bastion_fip:/tmp
 $SSH_CMD chmod +x /tmp/deploy_squid.sh
 $SSH_CMD bash -c /tmp/deploy_squid.sh
+$SCP_CMD $BASTION_USER@$bastion_fip:/etc/squid/certs/domain.crt ${SHARED_DIR}/
 
 cat <<EOF> "${SHARED_DIR}/proxy-conf.sh"
 export HTTP_PROXY=http://$SQUID_AUTH@${bastion_fip}:3128/
@@ -196,5 +203,10 @@ export http_proxy=http://$SQUID_AUTH@${bastion_fip}:3128/
 export https_proxy=http://$SQUID_AUTH@${bastion_fip}:3128/
 export no_proxy="redhat.io,quay.io,redhat.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,localhost,127.0.0.1"
 EOF
+
+if [[ -f "${SHARED_DIR}/osp-ca.crt" ]]; then
+  printf "\n" >> "${SHARED_DIR}/osp-ca.crt"
+  cat "${SHARED_DIR}"/domain.crt >> "${SHARED_DIR}/osp-ca.crt"
+fi
 
 echo "Bastion proxy is ready!"

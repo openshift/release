@@ -63,6 +63,9 @@ operator:
   - pullspec: quay.io/ocpmetal/postgresql-12-centos7:latest
     with: postgresql-12-centos7
 promotion:
+  additional_images:
+    assisted-service-index: ci-index
+    assisted-service-operator-bundle: ci-bundle0
   name: ocm-2.3
   namespace: openshift
 releases:
@@ -70,14 +73,20 @@ releases:
     release:
       channel: candidate
       version: "4.8"
+  initial:
+    integration:
+      name: "4.8"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.8"
+      namespace: ocp
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: "4.8"
-  namespace: ocp
 test_binary_build_commands: |
   make build-openshift-ci-test-bin
   go mod vendor
@@ -96,6 +105,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.8"
+  run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     test:
     - as: subsystem-deploy-and-run
@@ -124,6 +134,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.8"
+  run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     test:
     - as: subsystem-deploy-and-run
@@ -147,8 +158,10 @@ tests:
           memory: 200Mi
     workflow: generic-claim
 - as: e2e-metal-assisted-operator-disconnected
+  optional: true
+  run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     dependencies:
       ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
@@ -163,8 +176,9 @@ tests:
       NUM_EXTRA_WORKERS: "1"
     workflow: baremetalds-assisted-operator-ztp
 - as: e2e-metal-assisted-operator-ztp
+  run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     dependencies:
       ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
@@ -182,7 +196,7 @@ tests:
 - as: e2e-metal-assisted-operator-ztp-periodic
   cron: 0 0 */2 * *
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     dependencies:
       ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
@@ -198,8 +212,9 @@ tests:
       NUM_EXTRA_WORKERS: "1"
     workflow: baremetalds-assisted-operator-ztp
 - as: e2e-metal-assisted-kube-api
+  run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=ocm-2.3

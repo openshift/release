@@ -6,35 +6,47 @@ build_root:
 images:
 - dockerfile_path: Dockerfiles/ocp4_content
   to: ocp4-content-ds
+releases:
+  initial:
+    integration:
+      name: "4.9"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.9"
+      namespace: ocp
 resources:
   '*':
     requests:
       cpu: 200m
       memory: 400Mi
-tag_specification:
-  name: "4.9"
-  namespace: ocp
 tests:
 - as: e2e-aws-rhcos4-e8
+  run_if_changed: ^(linux_os/guide/.*|products/rhcos4/.*|ocp-resources/.*|shared/(macros.*jinja|checks/.*|templates/.*)|Dockerfiles/ocp4_content|Dockerfiles/quay_publish)$
   steps:
     cluster_profile: aws
     test:
     - as: test
       cli: latest
       commands: |
+        set -x
         export PROFILE=e8
         export PRODUCT=rhcos4
         export component=ocp4-content-ds
-        export CONTENT_IMAGE=$(echo $IMAGE_FORMAT | envsubst)
         export ROOT_DIR=$PWD
         go get github.com/ComplianceAsCode/ocp4e2e
         go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
+      dependencies:
+      - env: CONTENT_IMAGE
+        name: ocp4-content-ds
       from: src
       resources:
         requests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-aws-ocp4-e8
+  run_if_changed: ^(applications/openshift/.*|products/ocp4/.*|ocp-resources/.*|shared/(macros.*jinja|checks/.*|templates/.*)|Dockerfiles/ocp4_content|Dockerfiles/quay_publish)$
   steps:
     cluster_profile: aws
     test:
@@ -44,16 +56,19 @@ tests:
         export PROFILE=e8
         export PRODUCT=ocp4
         export component=ocp4-content-ds
-        export CONTENT_IMAGE=$(echo $IMAGE_FORMAT | envsubst)
         export ROOT_DIR=$PWD
         go get github.com/ComplianceAsCode/ocp4e2e
         go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
+      dependencies:
+      - env: CONTENT_IMAGE
+        name: ocp4-content-ds
       from: src
       resources:
         requests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-aws-ocp4-moderate
+  run_if_changed: ^(applications/openshift/.*|products/ocp4/.*|ocp-resources/.*|shared/(macros.*jinja|checks/.*|templates/.*)|Dockerfiles/ocp4_content|Dockerfiles/quay_publish)$
   steps:
     cluster_profile: aws
     env:
@@ -65,16 +80,19 @@ tests:
         export PROFILE=moderate
         export PRODUCT=ocp4
         export component=ocp4-content-ds
-        export CONTENT_IMAGE=$(echo $IMAGE_FORMAT | envsubst)
         export ROOT_DIR=$PWD
         go get github.com/ComplianceAsCode/ocp4e2e
         go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
+      dependencies:
+      - env: CONTENT_IMAGE
+        name: ocp4-content-ds
       from: src
       resources:
         requests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-aws-ocp4-moderate-node
+  run_if_changed: ^(applications/openshift/.*|products/ocp4/.*|ocp-resources/.*|shared/(macros.*jinja|checks/.*|templates/.*)|Dockerfiles/ocp4_content|Dockerfiles/quay_publish)$
   steps:
     cluster_profile: aws
     env:
@@ -86,16 +104,19 @@ tests:
         export PROFILE=moderate-node
         export PRODUCT=ocp4
         export component=ocp4-content-ds
-        export CONTENT_IMAGE=$(echo $IMAGE_FORMAT | envsubst)
         export ROOT_DIR=$PWD
         go get github.com/ComplianceAsCode/ocp4e2e
         go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
+      dependencies:
+      - env: CONTENT_IMAGE
+        name: ocp4-content-ds
       from: src
       resources:
         requests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-aws-ocp4-cis
+  run_if_changed: ^(applications/openshift/.*|products/ocp4/.*|ocp-resources/.*|shared/(macros.*jinja|checks/.*|templates/.*)|Dockerfiles/ocp4_content|Dockerfiles/quay_publish)$
   steps:
     cluster_profile: aws
     test:
@@ -105,16 +126,19 @@ tests:
         export PROFILE=cis
         export PRODUCT=ocp4
         export component=ocp4-content-ds
-        export CONTENT_IMAGE=$(echo $IMAGE_FORMAT | envsubst)
         export ROOT_DIR=$PWD
         go get github.com/ComplianceAsCode/ocp4e2e
         go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
+      dependencies:
+      - env: CONTENT_IMAGE
+        name: ocp4-content-ds
       from: src
       resources:
         requests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-aws-ocp4-cis-node
+  run_if_changed: ^(applications/openshift/.*|products/ocp4/.*|ocp-resources/.*|shared/(macros.*jinja|checks/.*|templates/.*)|Dockerfiles/ocp4_content|Dockerfiles/quay_publish)$
   steps:
     cluster_profile: aws
     test:
@@ -124,16 +148,19 @@ tests:
         export PROFILE=cis-node
         export PRODUCT=ocp4
         export component=ocp4-content-ds
-        export CONTENT_IMAGE=$(echo $IMAGE_FORMAT | envsubst)
         export ROOT_DIR=$PWD
         go get github.com/ComplianceAsCode/ocp4e2e
         go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
+      dependencies:
+      - env: CONTENT_IMAGE
+        name: ocp4-content-ds
       from: src
       resources:
         requests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-aws-rhcos4-moderate
+  run_if_changed: ^(linux_os/guide/.*|products/rhcos4/.*|ocp-resources/.*|shared/(macros.*jinja|checks/.*|templates/.*)|Dockerfiles/ocp4_content|Dockerfiles/quay_publish)$
   steps:
     cluster_profile: aws
     env:
@@ -148,10 +175,12 @@ tests:
         export PROFILE=moderate
         export PRODUCT=rhcos4
         export component=ocp4-content-ds
-        export CONTENT_IMAGE=$(echo $IMAGE_FORMAT | envsubst)
         export ROOT_DIR=$PWD
         go get github.com/ComplianceAsCode/ocp4e2e
         go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
+      dependencies:
+      - env: CONTENT_IMAGE
+        name: ocp4-content-ds
       from: src
       resources:
         requests:

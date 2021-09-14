@@ -24,14 +24,21 @@ images:
 promotion:
   name: "4.5"
   namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.5"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.5"
+      namespace: ocp
 resources:
   '*':
     requests:
       cpu: "3"
       memory: 6Gi
-tag_specification:
-  name: "4.5"
-  namespace: ocp
 test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
 tests:
 - as: verify
@@ -53,10 +60,12 @@ tests:
     cluster_profile: aws
     workflow: openshift-upgrade-aws
 - as: e2e-aws-builds
+  run_if_changed: ^(pkg/build)
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-builds
 - as: e2e-aws-proxy
+  optional: true
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-builds

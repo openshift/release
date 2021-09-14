@@ -37,6 +37,16 @@ images:
 promotion:
   name: integreatly-operator
   namespace: integr8ly
+releases:
+  initial:
+    integration:
+      name: "4.7"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.7"
+      namespace: ocp
 resources:
   '*':
     requests:
@@ -46,9 +56,6 @@ resources:
     requests:
       cpu: 200m
       memory: 2Gi
-tag_specification:
-  name: "4.7"
-  namespace: ocp
 tests:
 - as: vendor
   commands: make vendor/check
@@ -66,11 +73,13 @@ tests:
   commands: make test-cases/lint
   container:
     from: src
+  run_if_changed: test-cases/.*
 - as: kubebuilder
   commands: make kubebuilder/check
   container:
     from: src
 - as: e2e
+  optional: true
   steps:
     cluster_profile: aws
     env:
@@ -85,6 +94,7 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: rhoam-e2e
+  optional: true
   steps:
     cluster_profile: aws
     env:
@@ -120,6 +130,7 @@ tests:
   commands: make versions/check
   container:
     from: src
+  run_if_changed: pkg/apis/integreatly/v1alpha1/rhmi_types.go
 zz_generated_metadata:
   branch: master
   org: integr8ly

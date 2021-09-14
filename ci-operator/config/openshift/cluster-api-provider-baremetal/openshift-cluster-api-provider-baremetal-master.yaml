@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: "4.9"
+    name: "4.10"
     namespace: ocp
     tag: base
   dev-scripts:
@@ -15,22 +15,32 @@ images:
   from: base
   to: baremetal-machine-controllers
 promotion:
-  name: "4.9"
+  name: "4.10"
   namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.10"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.10"
+      namespace: ocp
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: "4.9"
-  namespace: ocp
 tests:
 - as: unit
   commands: ./hack/ci-test.sh
   container:
     from: src
+  skip_if_only_changed: (^(docs|config)/)|(\.md$)|((^|/)OWNERS$)
 - as: e2e-metal-ipi
+  optional: true
+  skip_if_only_changed: (^docs/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: packet
     env:
@@ -39,6 +49,7 @@ tests:
         NETWORK_TYPE=OpenShiftSDN
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-ovn-ipv6
+  skip_if_only_changed: (^docs/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: packet
     env:
@@ -47,6 +58,8 @@ tests:
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-upgrade
+  optional: true
+  skip_if_only_changed: (^docs/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: packet
     env:
@@ -58,6 +71,8 @@ tests:
       TEST_TYPE: upgrade
     workflow: baremetalds-e2e-upgrade
 - as: e2e-metal-ipi-ovn-dualstack
+  optional: true
+  skip_if_only_changed: (^docs/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: packet
     env:
@@ -66,6 +81,8 @@ tests:
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-virtualmedia
+  optional: true
+  skip_if_only_changed: (^docs/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: packet
     workflow: baremetalds-e2e-virtualmedia
@@ -73,14 +90,17 @@ tests:
   commands: make fmt
   container:
     from: src
+  skip_if_only_changed: (^(docs|config)/)|(\.md$)|((^|/)OWNERS$)
 - as: govet
   commands: make vet
   container:
     from: src
+  skip_if_only_changed: (^(docs|config)/)|(\.md$)|((^|/)OWNERS$)
 - as: generate-check
   commands: make generate-check
   container:
     from: src
+  skip_if_only_changed: (^docs/)|(\.md$)|((^|/)OWNERS$)
 zz_generated_metadata:
   branch: master
   org: openshift

@@ -1,6 +1,78 @@
 periodics:
 - agent: kubernetes
   cluster: build01
+  cron: 0 */2 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: assisted-test-infra
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-assisted-test-infra-master-assisted-packet-check
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/assisted-packet-check-cluster-profile
+      - --target=assisted-packet-check
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/assisted-packet-check-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-packet-assisted
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
   cron: '@daily'
   decorate: true
   decoration_config:
@@ -29,6 +101,7 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-assisted-ipv6-periodic-cluster-profile
       - --target=e2e-metal-assisted-ipv6-periodic
       command:
@@ -42,6 +115,9 @@ periodics:
       volumeMounts:
       - mountPath: /etc/boskos
         name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /usr/local/e2e-metal-assisted-ipv6-periodic-cluster-profile
         name: cluster-profile
@@ -62,11 +138,14 @@ periodics:
         - key: credentials
           path: credentials
         secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: cluster-profile
       projected:
         sources:
         - secret:
-            name: cluster-secrets-packet
+            name: cluster-secrets-packet-assisted
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -103,6 +182,7 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-assisted-kube-api-periodic-cluster-profile
       - --target=e2e-metal-assisted-kube-api-periodic
       command:
@@ -116,6 +196,9 @@ periodics:
       volumeMounts:
       - mountPath: /etc/boskos
         name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /usr/local/e2e-metal-assisted-kube-api-periodic-cluster-profile
         name: cluster-profile
@@ -136,11 +219,14 @@ periodics:
         - key: credentials
           path: credentials
         secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: cluster-profile
       projected:
         sources:
         - secret:
-            name: cluster-secrets-packet
+            name: cluster-secrets-packet-assisted
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -177,6 +263,7 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-assisted-multi-version-periodic-cluster-profile
       - --target=e2e-metal-assisted-multi-version-periodic
       command:
@@ -190,6 +277,9 @@ periodics:
       volumeMounts:
       - mountPath: /etc/boskos
         name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /usr/local/e2e-metal-assisted-multi-version-periodic-cluster-profile
         name: cluster-profile
@@ -210,11 +300,14 @@ periodics:
         - key: credentials
           path: credentials
         secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: cluster-profile
       projected:
         sources:
         - secret:
-            name: cluster-secrets-packet
+            name: cluster-secrets-packet-assisted
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -242,6 +335,7 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-assisted-none-ipv6-periodic-cluster-profile
       - --target=e2e-metal-assisted-none-ipv6-periodic
       command:
@@ -255,6 +349,9 @@ periodics:
       volumeMounts:
       - mountPath: /etc/boskos
         name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /usr/local/e2e-metal-assisted-none-ipv6-periodic-cluster-profile
         name: cluster-profile
@@ -275,11 +372,14 @@ periodics:
         - key: credentials
           path: credentials
         secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: cluster-profile
       projected:
         sources:
         - secret:
-            name: cluster-secrets-packet
+            name: cluster-secrets-packet-assisted
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -316,6 +416,7 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-assisted-none-periodic-cluster-profile
       - --target=e2e-metal-assisted-none-periodic
       command:
@@ -329,6 +430,9 @@ periodics:
       volumeMounts:
       - mountPath: /etc/boskos
         name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /usr/local/e2e-metal-assisted-none-periodic-cluster-profile
         name: cluster-profile
@@ -349,11 +453,14 @@ periodics:
         - key: credentials
           path: credentials
         secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: cluster-profile
       projected:
         sources:
         - secret:
-            name: cluster-secrets-packet
+            name: cluster-secrets-packet-assisted
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -390,6 +497,7 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-assisted-olm-periodic-cluster-profile
       - --target=e2e-metal-assisted-olm-periodic
       command:
@@ -403,6 +511,9 @@ periodics:
       volumeMounts:
       - mountPath: /etc/boskos
         name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /usr/local/e2e-metal-assisted-olm-periodic-cluster-profile
         name: cluster-profile
@@ -423,11 +534,14 @@ periodics:
         - key: credentials
           path: credentials
         secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: cluster-profile
       projected:
         sources:
         - secret:
-            name: cluster-secrets-packet
+            name: cluster-secrets-packet-assisted
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -464,6 +578,7 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-assisted-periodic-cluster-profile
       - --target=e2e-metal-assisted-periodic
       command:
@@ -477,6 +592,9 @@ periodics:
       volumeMounts:
       - mountPath: /etc/boskos
         name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /usr/local/e2e-metal-assisted-periodic-cluster-profile
         name: cluster-profile
@@ -497,11 +615,14 @@ periodics:
         - key: credentials
           path: credentials
         secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: cluster-profile
       projected:
         sources:
         - secret:
-            name: cluster-secrets-packet
+            name: cluster-secrets-packet-assisted
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -538,6 +659,7 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-assisted-single-node-periodic-cluster-profile
       - --target=e2e-metal-assisted-single-node-periodic
       command:
@@ -551,6 +673,9 @@ periodics:
       volumeMounts:
       - mountPath: /etc/boskos
         name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /usr/local/e2e-metal-assisted-single-node-periodic-cluster-profile
         name: cluster-profile
@@ -571,6 +696,90 @@ periodics:
         - key: credentials
           path: credentials
         secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-packet-assisted
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
+  cron: '@daily'
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: assisted-test-infra
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-static-ip-periodic
+  reporter_config:
+    slack:
+      channel: '#assisted-deployment-ci'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
+        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs>'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-metal-assisted-static-ip-periodic-cluster-profile
+      - --target=e2e-metal-assisted-static-ip-periodic
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-metal-assisted-static-ip-periodic-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -612,6 +821,7 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-single-node-live-iso-periodic-cluster-profile
       - --target=e2e-metal-single-node-live-iso-periodic
       command:
@@ -625,6 +835,9 @@ periodics:
       volumeMounts:
       - mountPath: /etc/boskos
         name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /usr/local/e2e-metal-single-node-live-iso-periodic-cluster-profile
         name: cluster-profile
@@ -645,11 +858,86 @@ periodics:
         - key: credentials
           path: credentials
         secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: cluster-profile
       projected:
         sources:
         - secret:
-            name: cluster-secrets-packet
+            name: cluster-secrets-packet-sno
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
+  cron: 0 */2 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: assisted-test-infra
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-assisted-test-infra-master-sno-packet-check
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/sno-packet-check-cluster-profile
+      - --target=sno-packet-check
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/sno-packet-check-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-packet-sno
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -677,6 +965,7 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/system-test-operator-periodic-cluster-profile
       - --target=system-test-operator-periodic
       command:
@@ -690,6 +979,9 @@ periodics:
       volumeMounts:
       - mountPath: /etc/boskos
         name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /usr/local/system-test-operator-periodic-cluster-profile
         name: cluster-profile
@@ -710,11 +1002,14 @@ periodics:
         - key: credentials
           path: credentials
         secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: cluster-profile
       projected:
         sources:
         - secret:
-            name: cluster-secrets-packet
+            name: cluster-secrets-packet-assisted
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials

@@ -24,20 +24,28 @@ images:
 promotion:
   name: 4.2-priv
   namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.2-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.2-priv
+      namespace: ocp-private
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: 4.2-priv
-  namespace: ocp-private
 tests:
 - as: unit
   commands: make test-unit
   container:
     from: src
 - as: e2e-aws
+  run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
@@ -47,6 +55,7 @@ tests:
   container:
     from: src
 - as: e2e-gcp-op
+  run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
   steps:
     cluster_profile: gcp
     test:
@@ -67,6 +76,7 @@ tests:
     run-tests
   openshift_installer:
     cluster_profile: aws
+  optional: true
 zz_generated_metadata:
   branch: release-4.2
   org: openshift-priv

@@ -1,0 +1,39 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.16
+canonical_go_repository: github.com/openshift/image-customization-controller
+promotion:
+  name: 4.9-priv
+  namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.9-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.9-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: make unit
+  container:
+    from: src
+- as: lint
+  commands: make lint
+  container:
+    from: src
+zz_generated_metadata:
+  branch: main
+  org: openshift-priv
+  repo: image-customization-controller
