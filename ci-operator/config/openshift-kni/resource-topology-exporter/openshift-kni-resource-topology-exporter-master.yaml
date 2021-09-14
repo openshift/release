@@ -1,6 +1,10 @@
 base_images:
-  os-min8:
-    name: ubi-minimal
+  ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.16-openshift-4.9
+  os8:
+    name: ubi
     namespace: ocp
     tag: "8"
 binary_build_commands: make all
@@ -8,13 +12,16 @@ build_root:
   project_image:
     dockerfile_path: images/Dockerfile.tools
 images:
-- dockerfile_path: images/Dockerfile
-  from: os-min8
+- dockerfile_path: images/Dockerfile.openshift
+  from: os8
   inputs:
     bin:
       paths:
       - destination_dir: .
         source_path: /go/src/github.com/openshift-kni/resource-topology-exporter/_out
+    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+      as:
+      - openshift/origin-release:golang-1.16
   to: resource-topology-exporter
 promotion:
   name: resource-topology-exporter
