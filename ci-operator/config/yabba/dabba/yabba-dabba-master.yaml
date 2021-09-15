@@ -1,0 +1,44 @@
+binary_build_commands: go build ./cmd/...
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
+operator:
+  bundles:
+  - as: ci-index
+    context_dir: ./context-dir
+    dockerfile_path: ./Dockerfile.rhel
+  substitutions:
+  - pullspec: image.io/woop:latest
+    with: image1
+  - pullspec: registry.io/thisimage:4.1
+    with: image2
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: go test -c ./test/...
+tests:
+- as: unit1
+  steps:
+    env:
+      OO_CHANNEL: "4.1"
+      OO_INSTALL_NAMESPACE: '!install'
+      OO_PACKAGE: package
+      OO_TARGET_NAMESPACES: '!gogo'
+    test:
+    - as: unit1
+      commands: make e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: optional-operators-ci-aws
+zz_generated_metadata:
+  branch: master
+  org: yabba
+  repo: dabba
