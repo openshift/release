@@ -1,0 +1,76 @@
+# this is the Namespace in which your ServiceAccount will live
+apiVersion: v1
+kind: Namespace
+metadata:
+  annotations:
+    openshift.io/description: Experimental Single-Binary Openshift for Edge
+    openshift.io/display-name: Microshift
+  name: redhat-et-microshift
+---
+# this is the ServiceAccount whose credentials you will use
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: image-puller
+  namespace: redhat-et-microshift
+---
+# this grants your ServiceAccount rights to pull images
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: redhat-et-microshift-image-puller-binding
+  # the namespace from which you will pull images
+  namespace: redhat-et-microshift
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: system:image-puller
+subjects:
+  - kind: ServiceAccount
+    namespace: redhat-et-microshift
+    name: image-puller
+---
+# the Group of people who should be able to manage this ServiceAccount
+kind: Group
+apiVersion: v1
+metadata:
+  name: redhat-et-microshift-admins
+users:
+  # these names are GitHub usernames
+  - copejon
+  - rootfs
+  - oglok
+  - fzdarsky
+---
+# this adds the admins to the project.
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: redhat-et-microshift-viewer-binding
+  namespace: redhat-et-microshift
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: view
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: redhat-et-microshift-admins
+    namespace: redhat-et-microshift
+---
+# this grants the right to read the ServiceAccount's credentials and pull
+# images to the admins.
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: redhat-et-microshift-admins-binding
+  namespace: redhat-et-microshift
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: pull-secret-namespace-manager
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: redhat-et-microshift-admins
+    namespace: redhat-et-microshift
