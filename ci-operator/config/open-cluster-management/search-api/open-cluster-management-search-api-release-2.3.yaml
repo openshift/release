@@ -17,7 +17,6 @@ images:
       - registry.ci.openshift.org/open-cluster-management/builder:nodejs14-linux
   to: search-api
 promotion:
-  disabled: true
   name: "2.3"
   namespace: open-cluster-management
 resources:
@@ -26,6 +25,14 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: search-api
+    env:
+      IMAGE_REPO: search-api
+      REGISTRY_ORG: open-cluster-management
+    workflow: ocm-ci-image-mirror
 - as: unit-test-sonar-pre-submit
   commands: |
     export SELF="make -f Makefile.prow"
