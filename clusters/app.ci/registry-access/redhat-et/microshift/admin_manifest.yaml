@@ -5,36 +5,36 @@ metadata:
   annotations:
     openshift.io/description: Experimental Single-Binary Openshift for Edge
     openshift.io/display-name: Microshift
-  name: redhat-et-microshift
+  name: microshift
 ---
 # this is the ServiceAccount whose credentials you will use
 kind: ServiceAccount
 apiVersion: v1
 metadata:
   name: image-puller
-  namespace: redhat-et-microshift
+  namespace: microshift
 ---
 # this grants your ServiceAccount rights to pull images
 kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: redhat-et-microshift-image-puller-binding
+  name: microshift-image-puller-binding
   # the namespace from which you will pull images
-  namespace: redhat-et-microshift
+  namespace: microshift
 roleRef:
   kind: ClusterRole
   apiGroup: rbac.authorization.k8s.io
   name: system:image-puller
 subjects:
   - kind: ServiceAccount
-    namespace: redhat-et-microshift
+    namespace: microshift
     name: image-puller
 ---
 # the Group of people who should be able to manage this ServiceAccount
 kind: Group
 apiVersion: v1
 metadata:
-  name: redhat-et-microshift-admins
+  name: microshift-admins
 users:
   # these names are GitHub usernames
   - copejon
@@ -46,8 +46,8 @@ users:
 kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: redhat-et-microshift-viewer-binding
-  namespace: redhat-et-microshift
+  name: microshift-viewer-binding
+  namespace: microshift
 roleRef:
   kind: ClusterRole
   apiGroup: rbac.authorization.k8s.io
@@ -55,16 +55,16 @@ roleRef:
 subjects:
   - kind: Group
     apiGroup: rbac.authorization.k8s.io
-    name: redhat-et-microshift-admins
-    namespace: redhat-et-microshift
+    name: microshift-admins
+    namespace: microshift
 ---
 # this grants the right to read the ServiceAccount's credentials and pull
 # images to the admins.
 kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: redhat-et-microshift-admins-binding
-  namespace: redhat-et-microshift
+  name: microshift-admins-binding
+  namespace: microshift
 roleRef:
   kind: ClusterRole
   apiGroup: rbac.authorization.k8s.io
@@ -72,5 +72,5 @@ roleRef:
 subjects:
   - kind: Group
     apiGroup: rbac.authorization.k8s.io
-    name: redhat-et-microshift-admins
-    namespace: redhat-et-microshift
+    name: microshift-admins
+    namespace: microshift
