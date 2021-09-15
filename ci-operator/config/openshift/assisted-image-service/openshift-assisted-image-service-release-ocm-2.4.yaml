@@ -1,0 +1,66 @@
+base_images:
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.37.1
+  openshift_release_golang-1.16:
+    name: release
+    namespace: openshift
+    tag: golang-1.16
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.16
+images:
+- dockerfile_path: Dockerfile.image-service
+  from: root
+  inputs:
+    openshift_release_golang-1.16:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.16
+  to: assisted-image-service
+promotion:
+  name: "2.4"
+  namespace: open-cluster-management
+releases:
+  candidate:
+    release:
+      channel: candidate
+      version: "4.8"
+  initial:
+    integration:
+      name: "4.9"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.9"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: |
+  make build-openshift-ci-test-bin
+  go mod vendor
+tests:
+- as: lint
+  commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    make lint
+  container:
+    clone: true
+    from: golangci-lint
+- as: test
+  commands: |
+    make test
+  container:
+    from: test-bin
+zz_generated_metadata:
+  branch: release-ocm-2.4
+  org: openshift
+  repo: assisted-image-service
