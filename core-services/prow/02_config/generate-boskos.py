@@ -29,6 +29,10 @@ CONFIG = {
         'cn-north-1': 1,
         'cn-northwest-1': 1,
     },
+    'aws-usgov-quota-slice': {
+        'us-gov-west-1': 5,
+        'us-gov-east-1': 5,
+    },
     'azure4-quota-slice': {
         'centralus': 33,
         'eastus': 8,
