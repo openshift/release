@@ -7,6 +7,10 @@ base_images:
     name: builder
     namespace: open-cluster-management
     tag: go1.16-linux
+  placement:
+    name: "2.4"
+    namespace: open-cluster-management
+    tag: placement
   registration:
     name: "2.4"
     namespace: open-cluster-management
@@ -86,12 +90,18 @@ tests:
       commands: |
         curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar xvzf - oc
         KUBECTL=oc
-        IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:registration-operator}
-        REGISTRATION_IMAGE=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:registration}
-        WORK_IMAGE=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:work}
         PATH=.:$PATH
-        export KUBECTL OLM_NAMESPACE PATH IMAGE_NAME REGISTRATION_IMAGE WORK_IMAGE
+        export KUBECTL PATH
         make deploy-hub e2e-bootstrap-secret
+      dependencies:
+      - env: IMAGE_NAME
+        name: registration-operator
+      - env: REGISTRATION_IMAGE
+        name: registration
+      - env: WORK_IMAGE
+        name: work
+      - env: PLACEMENT_IMAGE
+        name: placement
       from: src
       resources:
         limits:
@@ -101,8 +111,10 @@ tests:
           memory: 200Mi
     - as: registration-e2e-test
       commands: |
-        export IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:registration}
         /e2e.test -test.v -ginkgo.v
+      dependencies:
+      - env: IMAGE_NAME
+        name: registration
       from: registration
       resources:
         requests:
@@ -110,9 +122,22 @@ tests:
           memory: 200Mi
     - as: work-e2e-test
       commands: |
-        export IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:work}
         /e2e.test -test.v -ginkgo.v
+      dependencies:
+      - env: IMAGE_NAME
+        name: work
       from: work
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: placement-e2e-test
+      commands: |
+        /e2e.test -test.v -ginkgo.v
+      dependencies:
+      - env: IMAGE_NAME
+        name: placement
+      from: placement
       resources:
         requests:
           cpu: 100m
@@ -121,12 +146,18 @@ tests:
       commands: |
         curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar xvzf - oc
         KUBECTL=oc
-        IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:registration-operator}
-        REGISTRATION_IMAGE=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:registration}
-        WORK_IMAGE=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:work}
         PATH=.:$PATH
-        export KUBECTL PATH IMAGE_NAME REGISTRATION_IMAGE WORK_IMAGE
+        export KUBECTL PATH
         make deploy-spoke-operator run-e2e
+      dependencies:
+      - env: IMAGE_NAME
+        name: registration-operator
+      - env: REGISTRATION_IMAGE
+        name: registration
+      - env: WORK_IMAGE
+        name: work
+      - env: PLACEMENT_IMAGE
+        name: placement
       from: src
       resources:
         requests:
