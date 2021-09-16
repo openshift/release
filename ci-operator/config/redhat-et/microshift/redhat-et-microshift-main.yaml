@@ -1,8 +1,4 @@
 base_images:
-  base:
-    name: "4.8"
-    namespace: ocp
-    tag: base
   cli:
     name: "4.7"
     namespace: ocp
@@ -11,78 +7,71 @@ base_images:
     name: "4.8"
     namespace: ocp
     tag: libvirt-installer
+  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.7
+  ocp_builder_rhel-8-golang-1.16-openshift-4.8:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.16-openshift-4.8
   os:
     name: centos
     namespace: origin
     tag: "8"
-binary_build_commands: make cross-build-linux-amd64 cross-build-linux-arm64
 build_root:
-  project_image:
-    dockerfile_literal: |
-      FROM registry.access.redhat.com/ubi8/go-toolset
-      USER root
-      ENV GOPATH=/go GOCACHE=/go/src/.cache GO111MODULE=on
-      RUN mkdir -p $GOCACHE && mkdir -p /root/.aws
-      WORKDIR $GOPATH/src/github.com/redhat-et/microshift
-      RUN yum install gpgme-devel glibc-static libassuan-devel -y
-    inputs:
-      ocp_builder_rhel-8-golang-1.15-openshift-4.7:
-        as:
-        - registry.access.redhat.com/ubi8/go-toolset
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.15
+  use_build_cache: true
 images:
-- dockerfile_literal: |
-    FROM base
-    ADD microshift /usr/bin/
-    ENTRYPOINT ["/usr/bin/microshift", "run"]
-  from: base
+- dockerfile_path: images/build/Dockerfile
   inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/redhat-et/microshift/_output/bin/linux_amd64/microshift
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+      as:
+      - registry.access.redhat.com/ubi8/go-toolset
   to: linux-amd64-4.7.0-0.microshift
 - dockerfile_literal: |
-    FROM base
-    ADD microshift /usr/bin/
-    ENTRYPOINT ["/usr/bin/microshift", "run"]
-  from: base
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/redhat-et/microshift/_output/bin/linux_arm64/microshift
-  to: linux-arm64-4.7.0-0.microshift
-- dockerfile_literal: |
+    FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8 as openshift-tests-builder
+    WORKDIR /go/src/github.com/openshift/origin/
+    RUN dnf install -y git make
+    RUN git clone https://github.com/openshift/origin.git . && \
+        git checkout release-4.7
+    RUN make
     FROM os
-    COPY mock-nss.sh /usr/bin/mock-nss.sh
-    COPY google-cloud-sdk.repo /etc/yum.repos.d/google-cloud-sdk.repo
-    COPY microshift /usr/bin/microshift
-    COPY oc /usr/bin/oc
-    COPY install.sh /usr/bin/install.sh
-    RUN  dnf update -y && \
-         dnf --enablerepo=powertools install --setopt=tsflags=nodocs -y \
-         glib2-devel glibc-devel glibc-static gpgme-devel libassuan-devel \
-         google-cloud-sdk nss_wrapper openssh-clients && \
-         dnf clean all && rm -rf /var/cache/dnf/*
+    COPY --from=openshift-tests-builder /go/src/github.com/openshift/origin/openshift-tests /usr/bin/openshift-tests
   from: os
   inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/redhat-et/microshift/_output/bin/linux_amd64/microshift
-      - destination_dir: .
-        source_path: /go/src/github.com/redhat-et/microshift/install.sh
+    ocp_builder_rhel-8-golang-1.16-openshift-4.8:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
+  to: openshift-test-bin
+- dockerfile_literal: |
+    FROM libvirt-installer
+    COPY microshift /usr/bin/
+    COPY oc /usr/bin/oc
+    COPY install.sh /usr/bin/install.sh
+    COPY openshift-tests /usr/bin/openshift-tests
+  from: libvirt-installer
+  inputs:
     cli:
       paths:
       - destination_dir: .
         source_path: /usr/bin/oc
-    libvirt-installer:
+    linux-amd64-4.7.0-0.microshift:
       paths:
       - destination_dir: .
-        source_path: /bin/mock-nss.sh
+        source_path: /usr/bin/microshift
+    openshift-test-bin:
+      paths:
       - destination_dir: .
-        source_path: /etc/yum.repos.d/google-cloud-sdk.repo
-  to: microshift-setup
+        source_path: /usr/bin/openshift-tests
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/redhat-et/microshift/install.sh
+  to: microshift-test-binaries
 resources:
   '*':
     limits:
@@ -102,10 +91,66 @@ tests:
   commands: make test-unit
   container:
     from: src
-- as: e2e-microshift
+- as: e2e-openshift-conformance-sig-api-machinery
+  optional: true
+  run_if_changed: ^(cmd/.*|pkg/.*|vendor/.*|go\.sum|go\.mod|Makefile)
   steps:
     cluster_profile: gcp
-    workflow: redhat-et-microshift-e2e
+    workflow: redhat-et-microshift-e2e-openshift-conformance-sig-api-machinery
+- as: e2e-openshift-conformance-sig-apps
+  optional: true
+  run_if_changed: ^(cmd/.*|pkg/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+  steps:
+    cluster_profile: gcp
+    workflow: redhat-et-microshift-e2e-openshift-conformance-sig-apps
+- as: e2e-openshift-conformance-sig-arch
+  optional: true
+  run_if_changed: ^(cmd/.*|pkg/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+  steps:
+    cluster_profile: gcp
+    workflow: redhat-et-microshift-e2e-openshift-conformance-sig-arch
+- as: e2e-openshift-conformance-sig-auth
+  optional: true
+  run_if_changed: ^(cmd/.*|pkg/.*|vendor/.*|go\.sum|go\.mod)|Makefile
+  steps:
+    cluster_profile: gcp
+    workflow: redhat-et-microshift-e2e-openshift-conformance-sig-auth
+- as: e2e-openshift-conformance-sig-cli
+  optional: true
+  run_if_changed: ^(cmd/.*|pkg/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+  steps:
+    cluster_profile: gcp
+    workflow: redhat-et-microshift-e2e-openshift-conformance-sig-cli
+- as: e2e-openshift-conformance-sig-instrumentation
+  optional: true
+  run_if_changed: ^(cmd/.*|pkg/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+  steps:
+    cluster_profile: gcp
+    workflow: redhat-et-microshift-e2e-openshift-conformance-sig-instrumentation
+- as: e2e-openshift-conformance-sig-network
+  optional: true
+  run_if_changed: ^(cmd/.*|pkg/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+  steps:
+    cluster_profile: gcp
+    workflow: redhat-et-microshift-e2e-openshift-conformance-sig-network
+- as: e2e-openshift-conformance-sig-node
+  optional: true
+  run_if_changed: ^(cmd/.*|pkg/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+  steps:
+    cluster_profile: gcp
+    workflow: redhat-et-microshift-e2e-openshift-conformance-sig-node
+- as: e2e-openshift-conformance-sig-scheduling
+  optional: true
+  run_if_changed: ^(cmd/.*|pkg/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+  steps:
+    cluster_profile: gcp
+    workflow: redhat-et-microshift-e2e-openshift-conformance-sig-scheduling
+- as: e2e-openshift-conformance-sig-storage
+  optional: true
+  run_if_changed: ^(cmd/.*|pkg/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+  steps:
+    cluster_profile: gcp
+    workflow: redhat-et-microshift-e2e-openshift-conformance-sig-storage
 zz_generated_metadata:
   branch: main
   org: redhat-et

@@ -3,10 +3,10 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  repo-brancher:
-    name: repo-brancher
-    namespace: ci
-    tag: latest
+  open-cluster-management_builder_go1.16-linux:
+    name: builder
+    namespace: open-cluster-management
+    tag: go1.16-linux
 build_root:
   image_stream_tag:
     name: builder
@@ -15,9 +15,13 @@ build_root:
 images:
 - dockerfile_path: Dockerfile
   from: base
+  inputs:
+    open-cluster-management_builder_go1.16-linux:
+      as:
+      - registry.ci.openshift.org/open-cluster-management/builder:go1.16-linux
   to: insights-metrics
 promotion:
-  name: "2.3"
+  name: "2.4"
   namespace: open-cluster-management
 resources:
   '*':
@@ -25,20 +29,31 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: fast-forward
-  commands: |
-    git clone -b master https://github.com/openshift/release.git /tmp/release
-    repo-brancher --fast-forward --confirm \
-        --config-dir=/tmp/release/ci-operator/config/open-cluster-management/insights-metrics/ \
-        --username=acm-cicd --token-path=/etc/github/token \
-        --current-promotion-namespace=open-cluster-management \
-        --current-release=2.3 --future-release=2.3
-  container:
-    from: repo-brancher
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: insights-metrics
+    env:
+      IMAGE_REPO: insights-metrics
+      REGISTRY_ORG: open-cluster-management
+    workflow: ocm-ci-image-mirror
+- as: backplane-fast-forward
   postsubmit: true
-  secrets:
-  - mount_path: /etc/github
-    name: acm-cicd-github
+  steps:
+    env:
+      DESTINATION_BRANCH: release-2.4
+    workflow: ocm-ci-fastforward
+- as: lint
+  commands: |
+    GOLANGCI_LINT_CACHE=/tmp/golangci-cache make -f Makefile.prow lint
+  container:
+    from: src
+- as: test-unit
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow unit-test
+  container:
+    from: src
 - as: sonar-pre-submit
   commands: |
     export SELF="make -f Makefile.prow"
@@ -48,12 +63,6 @@ tests:
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
-- as: unit
-  commands: |
-    export SELF="make -f Makefile.prow"
-    make -f Makefile.prow unit-tests
-  container:
-    from: src
 - as: sonar-post-submit
   commands: |
     export SELF="make -f Makefile.prow"

@@ -16,6 +16,16 @@ images:
 promotion:
   name: "2.3"
   namespace: open-cluster-management
+releases:
+  initial:
+    integration:
+      name: "4.7"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.7"
+      namespace: ocp
 resources:
   '*':
     limits:
@@ -23,9 +33,6 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: "4.7"
-  namespace: ocp
 test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
 tests:
 - as: build
@@ -60,9 +67,11 @@ tests:
       cli: latest
       commands: |
         KUBECTL=oc
-        IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:placement}
-        export KUBECTL IMAGE_NAME
+        export KUBECTL
         make test-e2e
+      dependencies:
+      - env: IMAGE_NAME
+        name: placement
       from: src
       resources:
         requests:

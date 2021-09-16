@@ -124,14 +124,21 @@ images:
 promotion:
   name: tektoncd-next-4.6
   namespace: openshift
+releases:
+  initial:
+    integration:
+      name: "4.6"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.6"
+      namespace: ocp
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: "4.6"
-  namespace: ocp
 tests:
 - as: e2e
   steps:
@@ -140,6 +147,25 @@ tests:
     - as: test
       cli: latest
       commands: make test-e2e
+      dependencies:
+      - env: TEKTONCD_PIPELINE_CONTROLLER
+        name: tektoncd-pipeline-controller
+      - env: TEKTONCD_PIPELINE_NOP
+        name: tektoncd-pipeline-nop
+      - env: TEKTONCD_PIPELINE_ENTRYPOINT
+        name: tektoncd-pipeline-entrypoint
+      - env: TEKTONCD_PIPELINE_GIT_INIT
+        name: tektoncd-pipeline-git-init
+      - env: TEKTONCD_PIPELINE_GSUTIL
+        name: tektoncd-pipeline-gsutil
+      - env: TEKTONCD_PIPELINE_IMAGEDIGEST_EXPORTER
+        name: tektoncd-pipeline-imagedigestexporter
+      - env: TEKTONCD_PIPELINE_PULLREQUEST_INIT
+        name: tektoncd-pipeline-pullrequest-init
+      - env: TEKTONCD_PIPELINE_KUBECONFIG_WRITER
+        name: tektoncd-pipeline-kubeconfigwriter
+      - env: TEKTONCD_PIPELINE_WEBHOOK
+        name: tektoncd-pipeline-webhook
       from: src
       resources:
         requests:
