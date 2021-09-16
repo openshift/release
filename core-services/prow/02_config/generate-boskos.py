@@ -87,6 +87,7 @@ CONFIG = {
     },
     'kubevirt-quota-slice':{},
     'vsphere-quota-slice':{},
+    'vsphere-discon-quota-slice':{},
     'osd-ephemeral-quota-slice': {
         'default': 15,
     },
@@ -135,6 +136,9 @@ for i in range(1, 3):
 
 for i in range(75,92):
     CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
+
+for i in range(60,62):
+    CONFIG['vsphere-discon-quota-slice']['qe-discon-segment-{}'.format(i)] = 1
 
 config = {
     'resources': [],
