@@ -55,14 +55,21 @@ images:
       - destination_dir: .
         source_path: /tmp/qemu-static/kata-static-qemu.tar.gz
   to: kata-installer
+releases:
+  initial:
+    integration:
+      name: "4.8"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.8"
+      namespace: ocp
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 2Gi
-tag_specification:
-  name: "4.8"
-  namespace: ocp
 tests:
 - as: e2e-tests
   cron: 2 7 * * *
@@ -126,6 +133,9 @@ tests:
         # Deploy the kata-webhook so that the tests ran on next step of the
         # workflow will use the kata runtime.
         .ci/openshift-ci/cluster/deploy_webhook.sh
+      dependencies:
+      - env: KATA_INSTALLER_IMG
+        name: kata-installer
       from: pipeline:bin
       resources:
         requests:

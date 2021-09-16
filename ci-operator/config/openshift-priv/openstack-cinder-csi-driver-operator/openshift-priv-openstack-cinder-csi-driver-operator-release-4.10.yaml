@@ -3,10 +3,10 @@ base_images:
     name: 4.10-priv
     namespace: ocp-private
     tag: base
-  ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+  ocp_builder_rhel-8-golang-1.16-openshift-4.10:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.16-openshift-4.9
+    tag: rhel-8-golang-1.16-openshift-4.10
 binary_build_commands: go build cmd/openstack-cinder-csi-driver-operator/main.go
 build_root:
   from_repository: true
@@ -15,9 +15,9 @@ images:
 - dockerfile_path: Dockerfile
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.10:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.10
   to: openstack-cinder-csi-driver-operator
 - dockerfile_path: Dockerfile.test
   from: src
@@ -26,6 +26,16 @@ promotion:
   disabled: true
   name: 4.10-priv
   namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.10-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.10-priv
+      namespace: ocp-private
 resources:
   '*':
     limits:
@@ -33,9 +43,6 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: 4.10-priv
-  namespace: ocp-private
 tests:
 - as: verify
   commands: make verify

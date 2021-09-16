@@ -7,6 +7,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.16-openshift-4.9
+  ocp_builder_rhel-8-golang-1.16-openshift-4.10:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.16-openshift-4.10
 build_root:
   from_repository: true
 canonical_go_repository: github.com/kubernetes-csi/external-snapshotter
@@ -17,6 +21,9 @@ images:
     ocp_builder_rhel-8-golang-1.16-openshift-4.9:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
+    ocp_builder_rhel-8-golang-1.16-openshift-4.10:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.10
   to: csi-external-snapshotter
 - dockerfile_path: Dockerfile.snapshot-controller.openshift.rhel7
   from: base
@@ -24,6 +31,9 @@ images:
     ocp_builder_rhel-8-golang-1.16-openshift-4.9:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
+    ocp_builder_rhel-8-golang-1.16-openshift-4.10:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.10
   to: csi-snapshot-controller
 - dockerfile_path: Dockerfile.webhook.openshift.rhel7
   from: base
@@ -36,14 +46,21 @@ promotion:
   disabled: true
   name: "4.10"
   namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.10"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.10"
+      namespace: ocp
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: "4.10"
-  namespace: ocp
 tests:
 - as: unit
   commands: make test

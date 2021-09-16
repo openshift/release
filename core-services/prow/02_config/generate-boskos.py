@@ -29,6 +29,10 @@ CONFIG = {
         'cn-north-1': 1,
         'cn-northwest-1': 1,
     },
+    'aws-usgov-quota-slice': {
+        'us-gov-west-1': 5,
+        'us-gov-east-1': 5,
+    },
     'azure4-quota-slice': {
         'centralus': 33,
         'eastus': 8,
@@ -64,10 +68,10 @@ CONFIG = {
         'default': 12,
     },
     'openstack-kuryr-quota-slice': {
-        'default': 3,
+        'default': 2,
     },
     'openstack-vh-mecha-central-quota-slice': {
-        'default': 10,
+        'default': 8,
     },
     'openstack-vh-mecha-az0-quota-slice': {
         'default': 6,
@@ -130,7 +134,7 @@ for i in range(1, 7):
 for i in range(1, 3):
     CONFIG['kubevirt-quota-slice']['tenant-cluster-{}'.format(i)] = 1
 
-for i in range(75,88):
+for i in range(75,92):
     CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 for i in range(60,62):

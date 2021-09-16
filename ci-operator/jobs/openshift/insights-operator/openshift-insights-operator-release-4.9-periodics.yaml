@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   cron: 0 0 * * *
   decorate: true
   extra_refs:
@@ -18,6 +18,7 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/insights-operator-e2e-tests-periodic-cluster-profile
       - --target=insights-operator-e2e-tests-periodic
       command:
@@ -31,6 +32,9 @@ periodics:
       volumeMounts:
       - mountPath: /etc/boskos
         name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /usr/local/insights-operator-e2e-tests-periodic-cluster-profile
         name: cluster-profile
@@ -51,6 +55,9 @@ periodics:
         - key: credentials
           path: credentials
         secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -65,7 +72,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   cron: 0 0 * * *
   decorate: true
   extra_refs:
@@ -83,6 +90,7 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/insights-operator-test-time-periodic-cluster-profile
       - --target=insights-operator-test-time-periodic
       command:
@@ -96,6 +104,9 @@ periodics:
       volumeMounts:
       - mountPath: /etc/boskos
         name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
         readOnly: true
       - mountPath: /usr/local/insights-operator-test-time-periodic-cluster-profile
         name: cluster-profile
@@ -116,6 +127,9 @@ periodics:
         - key: credentials
           path: credentials
         secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: cluster-profile
       projected:
         sources:

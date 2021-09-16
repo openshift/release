@@ -38,6 +38,16 @@ raw_steps:
         - destination_dir: .
           source_path: /opt/Dockerfile
     to: base
+releases:
+  initial:
+    integration:
+      name: 4.9-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.9-priv
+      namespace: ocp-private
 resources:
   '*':
     requests:
@@ -51,9 +61,6 @@ rpm_build_commands: tito tag --offline --accept-auto-changelog --use-release '99
   tito build --output="_output/local/releases" --rpm --test --offline --quiet; mkdir
   -p _output/local/releases/rpms; mv _output/local/releases/noarch/* _output/local/releases/rpms;
   createrepo _output/local/releases/rpms
-tag_specification:
-  name: 4.9-priv
-  namespace: ocp-private
 test_binary_build_commands: |
   set -eo pipefail
   yum install -y gcc libffi-devel python-devel openssl-devel python3

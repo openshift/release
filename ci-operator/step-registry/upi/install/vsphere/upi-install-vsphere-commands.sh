@@ -14,6 +14,12 @@ export AWS_SHARED_CREDENTIALS_FILE=/var/run/vault/vsphere-aws/.awscred
 export AWS_DEFAULT_REGION=us-east-1
 
 tfvars_path=/var/run/vault/vsphere/secret.auto.tfvars
+
+if [ $((${LEASED_RESOURCE//[!0-9]/})) -ge 88 ]; then     
+  echo Applying credentials for IBM Cloud
+  tfvars_path=/var/run/vault/ibmcloud/secret.auto.tfvars
+fi
+
 cluster_name=$(<"${SHARED_DIR}"/clustername.txt)
 installer_dir=/tmp/installer
 

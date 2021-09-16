@@ -18,6 +18,11 @@ installer_dir=/tmp/installer
 tfvars_path=/var/run/vault/vsphere/secret.auto.tfvars
 cluster_name=$(<"${SHARED_DIR}"/clustername.txt)
 
+if [ $((${LEASED_RESOURCE//[!0-9]/})) -ge 88 ]; then     
+  echo Applying credentials for IBM Cloud
+  tfvars_path=/var/run/vault/ibmcloud/secret.auto.tfvars
+fi
+
 echo Deprovisioning $cluster_name
 
 echo "$(date -u --rfc-3339=seconds) - Collecting vCenter performance data and alerts"

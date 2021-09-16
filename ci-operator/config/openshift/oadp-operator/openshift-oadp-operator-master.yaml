@@ -20,12 +20,20 @@ images:
       as:
       - quay.io/app-sre/boilerplate:image-v2.1.0
   to: oadp-operator
+- dockerfile_path: build/ci-Dockerfile
+  from: ocp_builder_rhel-8-golang-1.16-openshift-4.9
+  to: test-oadp-operator
 operator:
   bundles:
   - dockerfile_path: build/Dockerfile.bundle
   substitutions:
   - pullspec: quay.io/konveyor/oadp-operator:latest
     with: oadp-operator
+promotion:
+  excluded_images:
+  - oadp-operator
+  name: test-oadp-operator
+  namespace: openshift
 releases:
   latest:
     release:
@@ -39,6 +47,16 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: operator-unit-test
+  steps:
+    test:
+    - as: unit
+      commands: HOME=$(pwd) make test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: operator-e2e
   steps:
     cluster_profile: aws
@@ -46,17 +64,17 @@ tests:
       OO_INDEX: ci-index
     env:
       OO_CHANNEL: alpha
-      OO_INSTALL_NAMESPACE: oadp-operator
+      OO_INSTALL_NAMESPACE: oadp-operator-system
       OO_PACKAGE: oadp-operator
       OO_TARGET_NAMESPACES: '!install'
     test:
-    - as: unit
-      commands: make test
+    - as: e2e
+      commands: make test-e2e
       credentials:
       - mount_path: /var/run/oadp-credentials
         name: oadp-credentials
         namespace: test-credentials
-      from: src
+      from: test-oadp-operator
       resources:
         requests:
           cpu: 100m
@@ -70,17 +88,17 @@ tests:
       OO_INDEX: ci-index
     env:
       OO_CHANNEL: alpha
-      OO_INSTALL_NAMESPACE: oadp-operator
+      OO_INSTALL_NAMESPACE: oadp-operator-system
       OO_PACKAGE: oadp-operator
       OO_TARGET_NAMESPACES: '!install'
     test:
-    - as: unit
-      commands: make test
+    - as: e2e
+      commands: make test-e2e
       credentials:
       - mount_path: /var/run/oadp-credentials
         name: oadp-credentials
         namespace: test-credentials
-      from: src
+      from: test-oadp-operator
       resources:
         requests:
           cpu: 100m
@@ -94,17 +112,17 @@ tests:
       OO_INDEX: ci-index
     env:
       OO_CHANNEL: alpha
-      OO_INSTALL_NAMESPACE: oadp-operator
+      OO_INSTALL_NAMESPACE: oadp-operator-system
       OO_PACKAGE: oadp-operator
       OO_TARGET_NAMESPACES: '!install'
     test:
-    - as: unit
-      commands: make test
+    - as: e2e
+      commands: make test-e2e
       credentials:
       - mount_path: /var/run/oadp-credentials
         name: oadp-credentials
         namespace: test-credentials
-      from: src
+      from: test-oadp-operator
       resources:
         requests:
           cpu: 100m
@@ -118,17 +136,17 @@ tests:
       OO_INDEX: ci-index
     env:
       OO_CHANNEL: alpha
-      OO_INSTALL_NAMESPACE: oadp-operator
+      OO_INSTALL_NAMESPACE: oadp-operator-system
       OO_PACKAGE: oadp-operator
       OO_TARGET_NAMESPACES: '!install'
     test:
-    - as: unit
-      commands: make test
+    - as: e2e
+      commands: make test-e2e
       credentials:
       - mount_path: /var/run/oadp-credentials
         name: oadp-credentials
         namespace: test-credentials
-      from: src
+      from: test-oadp-operator
       resources:
         requests:
           cpu: 100m

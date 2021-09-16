@@ -1,8 +1,8 @@
 base_images:
-  coreos_coreos-assembler_latest:
+  coreos_coreos-assembler_4.9:
     name: coreos-assembler
     namespace: coreos
-    tag: latest
+    tag: "4.9"
 build_root:
   image_stream_tag:
     name: fcos-buildroot
@@ -11,7 +11,7 @@ build_root:
 images:
 - dockerfile_path: ci/Dockerfile
   inputs:
-    coreos_coreos-assembler_latest:
+    coreos_coreos-assembler_4.9:
       as:
       - registry.svc.ci.openshift.org/coreos/coreos-assembler:latest
   to: build-test-qemu-img
@@ -20,6 +20,16 @@ promotion:
   - '*'
   name: "4.9"
   namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.9"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.9"
+      namespace: ocp
 resources:
   '*':
     requests:
@@ -32,9 +42,6 @@ resources:
       cpu: 1000m
       devices.kubevirt.io/kvm: "1"
       memory: 3Gi
-tag_specification:
-  name: "4.9"
-  namespace: ocp
 tests:
 - as: validate
   commands: ./ci/validate.sh
