@@ -47,6 +47,9 @@ export INDEX_IMAGE="\$(dirname ${INDEX_IMAGE})/pipeline:ci-index"
 export PUBLIC_CONTAINER_REGISTRIES="\$(for image in \${images}; do echo \${image} | cut -d'/' -f1; done | sort -u | paste -sd ',' -)"
 export ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE="${ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE}"
 
+# Import hive image from CI registry
+export HIVE_IMAGE=${HIVE_IMAGE}
+
 # Fix for disconnected Hive
 export GO_REQUIRED_MIN_VERSION="1.14.4"
 VARS
