@@ -100,6 +100,32 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+- as: cloud-provider-azure
+  cron: 30 12 * * Mon,Thu
+  steps:
+    test:
+    - as: cloud-provider-azure
+      commands: |
+        rebasebot --source https://github.com/kubernetes-sigs/cloud-provider-azure:master \
+                  --dest openshift/cloud-provider-azure:master \
+                  --rebase openshift-cloud-team/cloud-provider-azure:rebase-bot-master \
+                  --update-go-modules \
+                  --slack-webhook /secrets/rebasebot/slack-webhook \
+                  --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
+                  --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
+                  --git-username cloud-team-rebase-bot \
+                  --git-email cloud-team-rebase-bot@redhat.com
+      credentials:
+      - mount_path: /secrets/rebasebot
+        name: rebase-bot-creds
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: unit
   commands: make unittests
   container:
