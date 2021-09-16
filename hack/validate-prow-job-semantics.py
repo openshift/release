@@ -138,7 +138,7 @@ def validate_names(path, data):
                     logger.info("%s: ci-operator job %s is ignored because of a label says so", path, job["name"])
                     continue
 
-                if ("labels" in job) and ("ci-operator.openshift.io/prowgen-controlled" in job["labels"]) and job["labels"]["ci-operator.openshift.io/prowgen-controlled"] == "true":
+                if ("labels" in job) and ("ci.openshift.io/generator" in job["labels"]) and job["labels"]["ci.openshift.io/generator"] == "prowgen":
                     logger.info("%s: ci-operator job %s is ignored because it's generated and assumed to be right", path, job["name"])
                     continue
 
