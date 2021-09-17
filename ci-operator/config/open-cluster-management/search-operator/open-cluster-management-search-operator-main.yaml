@@ -31,24 +31,34 @@ resources:
 tests:
 - as: e2e
   steps:
-    dependencies:
-      COMPONENT_IMAGE_REF: search-operator
     env:
-      CLUSTERPOOL_GROUP_NAME: Search
-      CLUSTERPOOL_HOST_NAMESPACE: acm-observability-usa
-      CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-obs-usa-clusterpool
-      CLUSTERPOOL_LIST_INCLUSION_FILTER: prow
+      AWS_CREDENTIALS_SECRET: ocm-cicd-aws-kind
+      AWS_INSTANCE_TYPE: t3.xlarge
+    post:
+    - ref: ocm-e2e-kind-destroy
+    pre:
+    - ref: ocm-ci-rbac
+    - ref: ocm-e2e-kind-create
     test:
     - as: e2e
       commands: |
-        export SELF="make -f Makefile.prow"
-        make -f Makefile.prow test-e2e
+        echo "COMPONENT_IMAGE_REF=$COMPONENT_IMAGE_REF"
+        echo "RBAC_QUERY_PROXY_IMAGE_REF=$RBAC_QUERY_PROXY_IMAGE_REF"
+        export SELF="make -f Makefile"
+        set -o pipefail
+        make e2e-tests
+        set +o pipefail
+      dependencies:
+      - env: COMPONENT_IMAGE_REF
+        name: search-operator
+      - env: RBAC_QUERY_PROXY_IMAGE_REF
+        name: rbac-query-proxy
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: ocm-e2e-clusterpool
+    workflow: ocm-e2e-kind
 - as: pr-image-mirror
   steps:
     dependencies:
