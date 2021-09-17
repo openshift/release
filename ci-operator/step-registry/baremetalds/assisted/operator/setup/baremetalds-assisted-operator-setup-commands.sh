@@ -42,7 +42,7 @@ export DISCONNECTED="${DISCONNECTED:-}"
 
 # TODO: remove this and support mirroring an index referenced by digest value
 # https://issues.redhat.com/browse/MGMT-6858
-export INDEX_IMAGE="\$(dirname ${INDEX_IMAGE})/pipeline:ci-index"
+export INDEX_IMAGE="\$(dirname ${INDEX_IMAGE})/pipeline:assisted-operator-index-ocm-2.3"
 
 export PUBLIC_CONTAINER_REGISTRIES="\$(for image in \${images}; do echo \${image} | cut -d'/' -f1; done | sort -u | paste -sd ',' -)"
 export ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE="${ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE}"
