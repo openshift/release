@@ -27,11 +27,22 @@ build_root:
   use_build_cache: true
 images:
 - dockerfile_path: images/build/Dockerfile
+  from: root
   inputs:
     ocp_builder_rhel-8-golang-1.15-openshift-4.7:
       as:
       - registry.access.redhat.com/ubi8/go-toolset
-  to: linux-amd64-4.7.0-0.microshift
+  to: linux-amd64-4.7.0-0.microshift-linux-amd64
+- build_args:
+  - name: ARCH
+    value: arm64
+  - name: MAKE_TARGET
+    value: cross-build-linux-arm64
+  dockerfile_path: images/build/Dockerfile
+  from: root
+  to: linux-amd64-4.7.0-0.microshift-linux-arm64
+- from: linux-amd64-4.7.0-0.microshift-linux-amd64
+  to: linux-amd64-4.7.0-0.microshift-nightly
 - dockerfile_literal: |
     FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8 as openshift-tests-builder
     WORKDIR /go/src/github.com/openshift/origin/
