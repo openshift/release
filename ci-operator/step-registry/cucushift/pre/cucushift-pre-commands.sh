@@ -11,17 +11,17 @@ htpass_file=/tmp/users.htpasswd
 for i in $(seq 1 15);
 do
     username="testuser-${i}"
-    password=`cat /dev/urandom | tr -dc 'a-z0-9' | fold -w 12 | head -n 1 || true`
+    password=$(< /dev/urandom tr -dc 'a-z0-9' | fold -w 12 | head -n 1 || true)
     users+="${username}:${password},"
     if [ -f "${htpass_file}" ]; then
-        htpasswd -B -b ${htpass_file} ${username} ${password}
+        htpasswd -B -b ${htpass_file} "${username}" "${password}"
     else
-        htpasswd -c -B -b ${htpass_file} ${username} ${password}
+        htpasswd -c -B -b ${htpass_file} "${username}" "${password}"
     fi
 done
 
 # current generation
-gen=`oc get deployment oauth-openshift -n openshift-authentication -o jsonpath='{.metadata.generation}'`
+gen=$(oc get deployment oauth-openshift -n openshift-authentication -o jsonpath='{.metadata.generation}')
 
 # add users to cluster
 oc create secret generic htpass-secret --from-file=htpasswd=${htpass_file} -n openshift-config
@@ -44,12 +44,12 @@ EOF
 
 # wait for oauth-openshift to rollout
 wait_auth=true
-expected_replicas=`oc get deployment oauth-openshift -n openshift-authentication -o jsonpath='{.spec.replicas}'`
+expected_replicas=$(oc get deployment oauth-openshift -n openshift-authentication -o jsonpath='{.spec.replicas}')
 while $wait_auth;
 do
-    available_replicas=`oc get deployment oauth-openshift -n openshift-authentication -o jsonpath='{.status.availableReplicas}'`
-    new_gen=`oc get deployment oauth-openshift -n openshift-authentication -o jsonpath='{.metadata.generation}'`
-    if [[ $expected_replicas == "$available_replicas" && $((${new_gen})) -gt $((${gen})) ]]; then
+    available_replicas=$(oc get deployment oauth-openshift -n openshift-authentication -o jsonpath='{.status.availableReplicas}')
+    new_gen=$(oc get deployment oauth-openshift -n openshift-authentication -o jsonpath='{.metadata.generation}')
+    if [[ $expected_replicas == "$available_replicas" && $((new_gen)) -gt $((gen)) ]]; then
         wait_auth=false
     else
         sleep 10
@@ -57,13 +57,13 @@ do
 done
 
 # configure cucushift runtime environment variables
-hosts=`grep server ${KUBECONFIG} | cut -d '/' -f 3 | cut -d ':' -f 1`
-ver_cli=`oc version --client | cut -d ' ' -f 3 | cut -d '.' -f1,2`
+hosts=$(grep server "${KUBECONFIG}" | cut -d '/' -f 3 | cut -d ':' -f 1)
+ver_cli=$(oc version --client | cut -d ' ' -f 3 | cut -d '.' -f1,2)
 users=${users::-1}
 
 runtime_env=${SHARED_DIR}/runtime_env
 
-cat <<EOF >>${runtime_env}
+cat <<EOF >>"${runtime_env}"
 # cucumber setting
 export CUCUMBER_PUBLISH_QUIET=true
 export DISABLE_WAIT_PRINT=true
