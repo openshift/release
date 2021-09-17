@@ -64,6 +64,18 @@ export TF_LOG_PATH=${ARTIFACT_DIR}/terraform.log
 
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
+echo "Creating ignition configs"
+mock-nss.sh openshift-install create ignition-configs --dir=${dir}
+
+VAR_LIB_ETCD_MOUNT=${VAR_LIB_ETCD_MOUNT:-/bin/false}
+echo "VAR_LIB_ETCD_MOUNT=${VAR_LIB_ETCD_MOUNT}"
+if ${VAR_LIB_ETCD_MOUNT}
+then
+  echo "Modifying etcd to mount as a ramdisk"
+  python3 -c 'import json, sys; j = json.load(sys.stdin); j[u"systemd"] = {}; j[u"systemd"][u"units"] = [{u"contents": "[Unit]\nDescription=Mount etcd as a ramdisk\nBefore=local-fs.target\n[Mount]\nWhat=none\nWhere=/var/lib/etcd\nType=tmpfs\nOptions=size=2G\n[Install]\nWantedBy=local-fs.target", u"enabled": True, u"name":u"var-lib-etcd.mount"}]; json.dump(j, sys.stdout)' < ${dir}/master.ign > ${dir}/master.ign.out
+  mv ${dir}/master.ign.out ${dir}/master.ign
+fi
+
 echo "Creating manifest"
 mock-nss.sh openshift-install create manifests --dir=${dir}
 sed -i '/^  channel:/d' ${dir}/manifests/cvo-overrides.yaml
