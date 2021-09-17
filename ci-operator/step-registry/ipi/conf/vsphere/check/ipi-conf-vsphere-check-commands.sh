@@ -12,15 +12,23 @@ fi
 
 vsphere_datacenter="SDDC-Datacenter"
 vsphere_datastore="WorkloadDatastore"
+vsphere_cluster="Cluster-1"
+cloud_where_run="VMC"
+dns_server="10.0.0.2"
+vsphere_resource_pool=""
 vsphere_url="vcenter.sddc-44-236-21-251.vmwarevmc.com"
 TFVARS_PATH=/var/run/vault/vsphere/secret.auto.tfvars
 
-# **testing** for IBM cloud, only run specific jobs on specific lease numbers
+# For leases >= than 88, run on the IBM Cloud
 if [ $((${LEASED_RESOURCE//[!0-9]/})) -ge 88 ]; then     
   echo Scheduling job on IBM Cloud instance
   TFVARS_PATH=/var/run/vault/ibmcloud/secret.auto.tfvars
   vsphere_url="ibmvcenter.vmc-ci.devcluster.openshift.com"
-  vsphere_datacenter="IBMCloud"
+  vsphere_datacenter="IBMCloud"  
+  cloud_where_run="IBM"
+  dns_server="10.38.76.172"
+  vsphere_resource_pool="/IBMCloud/host/vcs-ci-workload/Resources"
+  vsphere_cluster="vcs-ci-workload"
   vsphere_datastore="vsanDatastore"
 fi
 
@@ -35,6 +43,18 @@ export GOVC_PASSWORD="${vsphere_password}"
 export GOVC_INSECURE=1
 export GOVC_DATACENTER="${vsphere_datacenter}"
 export GOVC_DATASTORE="${vsphere_datastore}"
+EOF
+
+echo "$(date -u --rfc-3339=seconds) - Creating vsphere_context.sh file..."
+cat >> "${SHARED_DIR}/vsphere_context.sh" << EOF
+export TFVARS_PATH="${TFVARS_PATH}"
+export vsphere_url="${vsphere_url}"
+export vsphere_cluster="${vsphere_cluster}"
+export vsphere_resource_pool="${vsphere_resource_pool}"
+export dns_server="${dns_server}"
+export cloud_where_run="${cloud_where_run}"
+export vsphere_datacenter="${vsphere_datacenter}"  
+export vsphere_datastore="${vsphere_datastore}"
 EOF
 
 # shellcheck source=/dev/null
