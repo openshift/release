@@ -65,25 +65,17 @@ target_hw_version=${hw_versions[$selected_hw_version_index]}
 echo "$(date -u --rfc-3339=seconds) - Selected hardware version ${target_hw_version}"
 vm_template=${vm_template}-hw${target_hw_version}
 
-vsphere_datacenter="SDDC-Datacenter"
-vsphere_datastore="WorkloadDatastore"
-vsphere_cluster="Cluster-1"
-vsphere_url="vcenter.sddc-44-236-21-251.vmwarevmc.com"
-dns_server="10.0.0.2"
-vsphere_resource_pool=""
-TFVARS_PATH=/var/run/vault/vsphere/secret.auto.tfvars
-
-# **testing** for IBM cloud, only run specific jobs on specific lease numbers
-if [ $((${LEASED_RESOURCE//[!0-9]/})) -ge 88 ]; then     
-  echo Scheduling job on IBM Cloud instance
-  TFVARS_PATH=/var/run/vault/ibmcloud/secret.auto.tfvars
-  vsphere_url="ibmvcenter.vmc-ci.devcluster.openshift.com"
-  vsphere_datacenter="IBMCloud"
-  vsphere_cluster="vcs-ci-workload"
-  dns_server="10.38.76.172"
-  vsphere_resource_pool="/IBMCloud/host/vcs-ci-workload/Resources"
-  vsphere_datastore="vsanDatastore"
-fi
+echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..."
+echo "export target_hw_version=${target_hw_version}" >> ${SHARED_DIR}/vsphere_context.sh
+# shellcheck source=/dev/null
+declare vsphere_datacenter
+declare vsphere_datastore
+declare vsphere_cluster
+declare vsphere_resource_pool
+declare dns_server
+declare vsphere_url
+declare TFVARS_PATH
+source "${SHARED_DIR}/vsphere_context.sh"
 
 vsphere_user=$(grep -oP 'vsphere_user\s*=\s*"\K[^"]+' ${TFVARS_PATH})
 vsphere_password=$(grep -oP 'vsphere_password\s*=\s*"\K[^"]+' ${TFVARS_PATH})

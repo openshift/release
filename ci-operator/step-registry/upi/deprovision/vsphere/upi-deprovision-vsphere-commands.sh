@@ -15,20 +15,21 @@ export AWS_SHARED_CREDENTIALS_FILE=/var/run/vault/vsphere-aws/.awscred
 export AWS_DEFAULT_REGION=us-east-1
 
 installer_dir=/tmp/installer
-tfvars_path=/var/run/vault/vsphere/secret.auto.tfvars
 cluster_name=$(<"${SHARED_DIR}"/clustername.txt)
 
-if [ $((${LEASED_RESOURCE//[!0-9]/})) -ge 88 ]; then     
-  echo Applying credentials for IBM Cloud
-  tfvars_path=/var/run/vault/ibmcloud/secret.auto.tfvars
-fi
+echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..."
+# shellcheck source=/dev/null
+declare cloud_where_run
+declare target_hw_version
+source "${SHARED_DIR}/vsphere_context.sh"
 
 echo Deprovisioning $cluster_name
 
 echo "$(date -u --rfc-3339=seconds) - Collecting vCenter performance data and alerts"
 
+echo "{\"hw_version\":  \"vmx-${target_hw_version}\", \"cloud\": \"${cloud_where_run}\"}" > "${ARTIFACT_DIR}/runtime-config.json"
+
 set +e
-# shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
 vm_path="/${GOVC_DATACENTER}/vm/${cluster_name}"
 vcenter_state=${ARTIFACT_DIR}/vcenter_state
@@ -68,7 +69,7 @@ cp -rt "${installer_dir}" \
 
 # Copy secrets to terraform path
 cp -t "${installer_dir}" \
-    ${tfvars_path}
+    ${TFVARS_PATH}
 
 tar -xf "${SHARED_DIR}/terraform_state.tar.xz"
 
