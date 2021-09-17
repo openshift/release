@@ -9,8 +9,9 @@ cp -Lrvf "${KUBECONFIG}" /tmp/kubeconfig
 #shellcheck source=${SHARED_DIR}/runtime_env
 . .${SHARED_DIR}/runtime_env
 
-cd verification-tests
+export E2E_RUN_TAGS="${E2E_RUN_TAGS} and ${TAG_VERSION}"
 
+cd verification-tests
 # run normal tests
 export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/parallel/normal"
 parallel_cucumber -n "${PARALLEL}" --first-is-1 --type cucumber --serialize-stdout --combine-stderr --prefix-output-with-test-env-number --exec \

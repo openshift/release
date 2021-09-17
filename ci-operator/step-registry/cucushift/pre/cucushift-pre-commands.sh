@@ -64,15 +64,12 @@ users=${users::-1}
 runtime_env=${SHARED_DIR}/runtime_env
 
 cat <<EOF >>"${runtime_env}"
-# cucumber setting
+export USERS=${users}
+export TAG_VERSION="@${ver_cli}"
 export CUCUMBER_PUBLISH_QUIET=true
 export DISABLE_WAIT_PRINT=true
-
-# Export those parameters before running
 export BUSHSLICER_DEFAULT_ENVIRONMENT=ocp4
 export OPENSHIFT_ENV_OCP4_HOSTS="${hosts}:lb"
 export OPENSHIFT_ENV_OCP4_ADMIN_CREDS_SPEC=file:///tmp/kubeconfig
 export BUSHSLICER_CONFIG="{'environments': {'ocp4': {'version': '${ver_cli}'}}}"
-
-export USERS=${users}
 EOF
