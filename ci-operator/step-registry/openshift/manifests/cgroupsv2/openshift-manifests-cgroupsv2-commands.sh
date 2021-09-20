@@ -13,7 +13,9 @@ metadata:
   name: 99-master-cgroupsv2
 spec:
   kernelArguments:
-    - 'systemd.unified_cgroup_hierarchy=1'
+    - systemd.unified_cgroup_hierarchy=1
+    - cgroup_no_v1="all"
+    - psi=1
 EOF
 
 cat >> "${SHARED_DIR}/manifest_mc-worker-cgroupsv2.yml" << EOF
@@ -25,5 +27,7 @@ metadata:
   name: 99-worker-cgroupsv2
 spec:
   kernelArguments:
-    - 'systemd.unified_cgroup_hierarchy=1'
+    - systemd.unified_cgroup_hierarchy=1
+    - cgroup_no_v1="all"
+    - psi=1
 EOF
