@@ -7,10 +7,6 @@ base_images:
     name: builder
     namespace: open-cluster-management
     tag: go1.17-linux
-  repo-brancher:
-    name: repo-brancher
-    namespace: ci
-    tag: latest
 binary_build_commands: make build
 build_root:
   image_stream_tag:
@@ -54,7 +50,7 @@ tests:
     make -f Makefile.prow unit-tests
   container:
     from: src
-- as: sonarcloud
+- as: sonar-pre-submit
   commands: |
     export SELF="make -f Makefile.prow"
     make -f Makefile.prow sonar/go/prow
@@ -63,24 +59,22 @@ tests:
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
-- as: fast-forward
+- as: sonar-post-submit
   commands: |
-    git clone -b master https://github.com/openshift/release.git /tmp/release
-    repo-brancher \
-        --fast-forward \
-        --confirm \
-        --config-dir=/tmp/release/ci-operator/config/open-cluster-management/discovery/ \
-        --username=acm-cicd \
-        --token-path=/etc/github/token \
-        --current-promotion-namespace=open-cluster-management \
-        --current-release=2.4 \
-        --future-release=2.4
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow sonar/go/prow
   container:
-    from: repo-brancher
+    from: src
   postsubmit: true
   secrets:
-  - mount_path: /etc/github
-    name: acm-cicd-github
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+- as: fast-forward
+  postsubmit: true
+  steps:
+    env:
+      DESTINATION_BRANCH: release-2.4
+    workflow: ocm-ci-fastforward
 zz_generated_metadata:
   branch: main
   org: open-cluster-management
