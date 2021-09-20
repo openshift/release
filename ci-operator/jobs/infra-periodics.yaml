@@ -1790,6 +1790,7 @@ periodics:
       - '^openshift/origin-v3.11:'
       - --ignored-image-stream-tags
       - '^origin/4.([6-9]|\d\d+):'
+      - --kubeconfig-dir=/etc/build-farm-credentials
       - --dry-run=false
       image: registry.ci.openshift.org/ci/promoted-image-governor:latest
       imagePullPolicy: Always
@@ -1797,4 +1798,12 @@ periodics:
       resources:
         requests:
           cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/build-farm-credentials
+        name: build-farm-credentials
+        readOnly: true
     serviceAccountName: promoted-image-governor
+    volumes:
+    - name: build-farm-credentials
+      secret:
+        secretName: promoted-image-governor
