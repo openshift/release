@@ -17,6 +17,7 @@ sudo dnf install -y podman firewalld
 # Setup squid proxy for accessing cluster
 cat <<SQUID>\$HOME/squid.conf
 acl cluster dstdomain .metalkube.org
+acl cluster srcdomain .ci.openshift.org
 http_access allow cluster
 http_access deny all
 http_port 8213
