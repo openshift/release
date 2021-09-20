@@ -18,6 +18,12 @@ if [[ ! -s "${SHARED_DIR}/metadata.json" ]]; then
   exit
 fi
 
+echo ${SHARED_DIR}/metadata.json
+
+if [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
+  export AZURE_AUTH_LOCATION=$SHARED_DIR/osServicePrincipal.json
+fi
+
 cp -ar "${SHARED_DIR}" /tmp/installer
 
 # TODO: remove once BZ#1926093 is done and backported
