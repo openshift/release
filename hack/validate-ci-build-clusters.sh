@@ -1,5 +1,9 @@
 #!/bin/bash
 
+set -o errexit
+set -o nounset
+set -o pipefail
+
 workdir="$( mktemp -d )"
 trap 'rm -rf "${workdir}"' EXIT
 
@@ -10,7 +14,7 @@ if [[ ! -d "${base_dir}" ]]; then
   exit 1
 fi
 
-cp -r "${base_dir}"* "${workdir}"
+cp -r "${base_dir}/"* "${workdir}"
 
 cluster-init -release-repo="${workdir}" -create-pr=false -update=true
 
@@ -24,11 +28,11 @@ declare -a files=(
 exitCode=0
 for i in "${files[@]}"
 do
-  if ! diff -Naupr "${base_dir}$i" "${workdir}$i" > "${workdir}$i/diff"; then
+  if ! diff -Naupr "${base_dir}$i" "${workdir}$i" > "${workdir}/diff"; then
     echo ERROR: The configuration in "$i" does not match the expected generated configuration, diff:
-    cat "${workdir}$i/diff" #TODO: why is this printing the diff twice???
+    cat "${workdir}/diff"
     exitCode=1
   fi
 done
 
-exit $exitCode
+exit "$exitCode"
