@@ -7,14 +7,6 @@ base_images:
     name: builder
     namespace: open-cluster-management
     tag: go1.17-linux
-  open-cluster-management_builder_go1.16-linux:
-    name: builder
-    namespace: open-cluster-management
-    tag: go1.16-linux
-  open-cluster-management_builder_go1.17-linux:
-    name: builder
-    namespace: open-cluster-management
-    tag: go1.17-linux
 binary_build_commands: make build
 build_root:
   image_stream_tag:
@@ -25,7 +17,7 @@ images:
 - dockerfile_path: build/Dockerfile.prow
   from: base
   inputs:
-    open-cluster-management_builder_go1.17-linux:
+    builder-go1.17:
       as:
       - registry.ci.openshift.org/open-cluster-management/builder:go1.17-linux
   to: multiclusterhub-operator
@@ -48,7 +40,7 @@ tests:
     make -f Makefile.prow unit-tests
   container:
     from: src
-- as: sonar-post-submit
+- as: sonar-pre-submit
   commands: |
     export SELF="make -f Makefile.prow"
     make -f Makefile.prow sonar/go/prow
@@ -57,6 +49,16 @@ tests:
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
+- as: sonar-post-submit
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow sonar/go/prow
+  container:
+    from: src
+  postsubmit: true
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-tokenv
 - as: publish
   postsubmit: true
   steps:
@@ -82,17 +84,18 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ocm-ci-image-mirror
-- as: publish-test
+- as: publish-tests
   postsubmit: true
   steps:
     dependencies:
       SOURCE_IMAGE_REF: multiclusterhub-operator-tests
     env:
-      IMAGE_REPO: multiclusterhub-operator
+      IMAGE_REPO: multiclusterhub-operator-tests
       REGISTRY_ORG: open-cluster-management
     test:
     - as: publish
       commands: |-
+        export OSCI_COMPONENT_NAME="multiclusterhub-operator-tests"
         export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/open-cluster-management"
         export OSCI_PUBLISH_DELAY="0"
         export SELF="make -f Makefile.prow"
