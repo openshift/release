@@ -257,10 +257,6 @@ secrets:
 serviceaccount-secret-rotation:
 	make job JOB=periodic-rotate-serviceaccount-secrets
 
-ci-secret-bootstrap-config:
-	hack/generate-pull-secret-entries.py core-services/ci-secret-bootstrap/_config.yaml
-.PHONY: ci-secret-bootstrap-config
-
 # generate the manifets for cluster pools admins
 # example: make TEAM=hypershift OWNERS=dmace,petr new-pool-admins
 new-pool-admins:
