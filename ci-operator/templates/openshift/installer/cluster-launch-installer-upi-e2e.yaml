@@ -12,9 +12,7 @@ parameters:
   required: true
 - name: IMAGE_FORMAT
 - name: IMAGE_TESTS
-  required: true
 - name: IMAGE_UPI_INSTALLER
-  required: true
 - name: CLUSTER_TYPE
   required: true
 - name: TEST_COMMAND
@@ -161,7 +159,7 @@ objects:
 
     # Once the cluster is up, executes shared tests
     - name: test
-      image: ${IMAGE_TESTS}
+      image: registry.ci.openshift.org/ocp/release:4.10-tests
       terminationMessagePolicy: FallbackToLogsOnError
       resources:
         requests:
@@ -295,7 +293,7 @@ objects:
 
     # Runs an install
     - name: setup
-      image: ${IMAGE_UPI_INSTALLER}
+      image: upi-installer
       terminationMessagePolicy: FallbackToLogsOnError
       volumeMounts:
       - name: shared-tmp
@@ -347,6 +345,10 @@ objects:
         value: /tmp
       - name: INSTALL_INITIAL_RELEASE
       - name: RELEASE_IMAGE_INITIAL
+      - name: IMAGE_UPI_INSTALLER
+        value: upi-installer
+      - name: IMAGE_TESTS
+        value: ${INSTALL_INITIAL_RELEASE}:tests
       command:
       - /bin/sh
       - -c
@@ -2229,7 +2231,7 @@ objects:
 
     # Performs cleanup of all created resources
     - name: teardown
-      image: ${IMAGE_UPI_INSTALLER}
+      image: upi-installer
       terminationMessagePolicy: FallbackToLogsOnError
       volumeMounts:
       - name: shared-tmp
