@@ -112,7 +112,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210920-bd8073b837
+      image: gcr.io/k8s-prow/commenter:v20210921-ce880de448
       imagePullPolicy: Always
       name: ""
       resources:
@@ -186,7 +186,7 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210920-bd8073b837
+      image: gcr.io/k8s-prow/commenter:v20210921-ce880de448
       imagePullPolicy: Always
       name: ""
       resources:
@@ -226,7 +226,7 @@ periodics:
       - --random
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210920-bd8073b837
+      image: gcr.io/k8s-prow/commenter:v20210921-ce880de448
       imagePullPolicy: Always
       name: ""
       resources:
@@ -272,7 +272,52 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210920-bd8073b837
+      image: gcr.io/k8s-prow/commenter:v20210921-ce880de448
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/oauth
+        name: token
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-bot
+- agent: kubernetes
+  cluster: app.ci
+  decorate: true
+  interval: 6h
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-enhancements-close
+  spec:
+    containers:
+    - args:
+      - |-
+        --query=repo:openshift/enhancements
+        -label:lifecycle/frozen
+        -label:tide/merge-blocker
+        label:lifecycle/rotten
+      - --updated=168h
+      - --token=/etc/oauth/oauth
+      - |-
+        --comment=Rotten enhancement proposals close after 7d of inactivity.
+
+        See https://github.com/openshift/enhancements#life-cycle for details.
+
+        Reopen the proposal by commenting `/reopen`.
+        Mark the proposal as fresh by commenting `/remove-lifecycle rotten`.
+        Exclude this proposal from closing again by commenting `/lifecycle frozen`.
+
+        /close
+      - --template
+      - --ceiling=10
+      - --confirm
+      command:
+      - /app/robots/commenter/app.binary
+      image: gcr.io/k8s-prow/commenter:v20210921-ce880de448
       imagePullPolicy: Always
       name: ""
       resources:
@@ -322,7 +367,56 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210920-bd8073b837
+      image: gcr.io/k8s-prow/commenter:v20210921-ce880de448
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/oauth
+        name: token
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-bot
+- agent: kubernetes
+  cluster: app.ci
+  decorate: true
+  interval: 6h
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-enhancements-rotten
+  spec:
+    containers:
+    - args:
+      - |-
+        --query=repo:openshift/enhancements
+        -label:tide/merge-blocker
+        -label:lifecycle/frozen
+        label:lifecycle/stale
+        -label:lifecycle/rotten
+      - --updated=168h
+      - --token=/etc/oauth/oauth
+      - |-
+        --comment=Stale enhancement proposals rot after 7d of inactivity.
+
+        See https://github.com/openshift/enhancements#life-cycle for details.
+
+        Mark the proposal as fresh by commenting `/remove-lifecycle rotten`.
+        Rotten proposals close after an additional 30d of inactivity.
+        Exclude this proposal from closing by commenting `/lifecycle frozen`.
+
+        If this proposal is safe to close now please do so with `/close`.
+
+        /lifecycle rotten
+        /remove-lifecycle stale
+      - --template
+      - --ceiling=10
+      - --confirm
+      command:
+      - /app/robots/commenter/app.binary
+      image: gcr.io/k8s-prow/commenter:v20210921-ce880de448
       imagePullPolicy: Always
       name: ""
       resources:
@@ -371,7 +465,55 @@ periodics:
       - --confirm
       command:
       - /app/robots/commenter/app.binary
-      image: gcr.io/k8s-prow/commenter:v20210920-bd8073b837
+      image: gcr.io/k8s-prow/commenter:v20210921-ce880de448
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/oauth
+        name: token
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-bot
+- agent: kubernetes
+  cluster: app.ci
+  decorate: true
+  interval: 6h
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-enhancements-stale
+  spec:
+    containers:
+    - args:
+      - |-
+        --query=repo:openshift/enhancements
+        -label:lifecycle/frozen
+        -label:lifecycle/stale
+        -label:lifecycle/rotten
+        -label:tide/merge-blocker
+      - --updated=672h
+      - --token=/etc/oauth/oauth
+      - |-
+        --comment=Inactive enhancement proposals go stale after 28d of inactivity.
+
+        See https://github.com/openshift/enhancements#life-cycle for details.
+
+        Mark the proposal as fresh by commenting `/remove-lifecycle stale`.
+        Stale proposals rot after an additional 30d of inactivity and eventually close.
+        Exclude this proposal from closing by commenting `/lifecycle frozen`.
+
+        If this proposal is safe to close now please do so with `/close`.
+
+        /lifecycle stale
+      - --template
+      - --ceiling=10
+      - --confirm
+      command:
+      - /app/robots/commenter/app.binary
+      image: gcr.io/k8s-prow/commenter:v20210921-ce880de448
       imagePullPolicy: Always
       name: ""
       resources:
@@ -405,7 +547,7 @@ periodics:
       - --debug
       command:
       - /app/label_sync/app.binary
-      image: gcr.io/k8s-prow/label_sync:v20210920-f234f533b3
+      image: gcr.io/k8s-prow/label_sync:v20210921-ce880de448
       imagePullPolicy: Always
       name: ""
       resources:
@@ -656,7 +798,7 @@ periodics:
       - --config=core-services/prow/02_config/_bumper.yaml
       command:
       - /app/prow/cmd/generic-autobumper/app.binary
-      image: gcr.io/k8s-prow/generic-autobumper:v20210920-f234f533b3
+      image: gcr.io/k8s-prow/generic-autobumper:v20210921-ce880de448
       imagePullPolicy: IfNotPresent
       name: autobump
       resources:
@@ -911,7 +1053,7 @@ periodics:
       - --github-enabled-org=openshift
       command:
       - /app/prow/cmd/branchprotector/app.binary
-      image: gcr.io/k8s-prow/branchprotector:v20210920-f234f533b3
+      image: gcr.io/k8s-prow/branchprotector:v20210921-ce880de448
       imagePullPolicy: Always
       name: ""
       resources:
@@ -959,7 +1101,7 @@ periodics:
           secretKeyRef:
             key: appid
             name: openshift-prow-github-app
-      image: gcr.io/k8s-prow/branchprotector:v20210920-f234f533b3
+      image: gcr.io/k8s-prow/branchprotector:v20210921-ce880de448
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1008,7 +1150,7 @@ periodics:
       - --github-allowed-burst=600
       command:
       - /app/prow/cmd/peribolos/app.binary
-      image: gcr.io/k8s-prow/peribolos:v20210920-f234f533b3
+      image: gcr.io/k8s-prow/peribolos:v20210921-ce880de448
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1087,7 +1229,7 @@ periodics:
       - --kubeconfig-dir=/etc/build-farm-credentials
       command:
       - /app/prow/cmd/config-bootstrapper/app.binary
-      image: gcr.io/k8s-prow/config-bootstrapper:v20210920-f234f533b3
+      image: gcr.io/k8s-prow/config-bootstrapper:v20210921-ce880de448
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1461,8 +1603,8 @@ periodics:
       - --bw-allow-unused=dptp/aos-team-dp-testplatform@redhat.com mailing list
       - --bw-allow-unused=dptp/AWS ci-longlivedcluster-bot
       - --bw-allow-unused=dptp/bugzilla.redhat.com
-      - --bw-allow-unused=dptp/build_farm_build01
-      - --bw-allow-unused=dptp/build_farm_build02
+      - --bw-allow-unused=dptp/build_farm_01_cluster
+      - --bw-allow-unused=dptp/build_farm_02_cluster
       - --bw-allow-unused=dptp/kata-jenkins-ci.westus2.cloudapp.azure.com
       - --bw-allow-unused=dptp/quay.io
       - --bw-allow-unused=dptp/quay.io/multi-arch
@@ -1689,7 +1831,7 @@ periodics:
       - --dry-run=false
       command:
       - /app/prow/cmd/invitations-accepter/app.binary
-      image: gcr.io/k8s-prow/invitations-accepter:v20210920-f234f533b3
+      image: gcr.io/k8s-prow/invitations-accepter:v20210921-ce880de448
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1721,7 +1863,7 @@ periodics:
       - --dry-run=false
       command:
       - /app/prow/cmd/invitations-accepter/app.binary
-      image: gcr.io/k8s-prow/invitations-accepter:v20210920-f234f533b3
+      image: gcr.io/k8s-prow/invitations-accepter:v20210921-ce880de448
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1753,7 +1895,7 @@ periodics:
       - --dry-run=false
       command:
       - /app/prow/cmd/invitations-accepter/app.binary
-      image: gcr.io/k8s-prow/invitations-accepter:v20210920-f234f533b3
+      image: gcr.io/k8s-prow/invitations-accepter:v20210921-ce880de448
       imagePullPolicy: Always
       name: ""
       resources:
