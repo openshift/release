@@ -286,6 +286,47 @@ tests:
       IP_STACK: v4v6
       NUM_EXTRA_WORKERS: "1"
     workflow: baremetalds-assisted-operator-ztp
+- as: e2e-metal-assisted-operator-ztp-multinode-spoke-day2-periodic
+  cron: '@daily'
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
+    env:
+      ASSISTED_ZTP_CONFIG: |
+        SPOKE_CONTROLPLANE_AGENTS=3
+        SPOKE_NAMESPACE=assisted-spoke-cluster
+        ASSISTED_INFRAENV_NAME=assisted-infra-env
+      DEVSCRIPTS_CONFIG: |
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=32768
+        EXTRA_WORKER_DISK=120
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      DISCONNECTED: "false"
+      IP_STACK: v4
+      NUM_EXTRA_WORKERS: "3"
+      REMOTE_NODES_CONFIG: |
+        APPLY_REMOTE_NODES="false"
+        CLUSTER_NAME=ostest
+        REMOTE_BAREMETALHOSTS_FILE=/opt/dev-scripts/ostest/remote_baremetalhosts.json
+        REMOTE_CLUSTER_NUM_MASTERS=0
+        REMOTE_CLUSTER_NUM_WORKERS=1
+        REMOTE_WORKER_VCPU=8
+        REMOTE_WORKER_MEMORY=32768
+        REMOTE_WORKER_DISK=120
+        REMOTE_VM_EXTRADISKS=true
+        REMOTE_VM_EXTRADISKS_LIST="vbz"
+        REMOTE_VM_EXTRADISKS_SIZE="10G"
+    post:
+    - ref: baremetalds-assisted-operator-gather
+    - chain: baremetalds-ipi-post
+    pre:
+    - chain: baremetalds-assisted-operator
+    - ref: baremetalds-assisted-operator-ztp
+    - ref: baremetalds-assisted-devscripts-remotenodes
+    - ref: baremetalds-assisted-operator-ztp-day2
 - as: e2e-metal-assisted-operator-ztp-multinode-spoke-periodic
   cron: '@daily'
   steps:
