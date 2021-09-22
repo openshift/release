@@ -3,6 +3,14 @@ base_images:
     name: "4.8"
     namespace: ocp
     tag: base
+  latest-hypershift:
+    name: hypershift
+    namespace: hypershift
+    tag: latest
+  main-e2e:
+    name: e2e-bin
+    namespace: hypershift
+    tag: latest
   openshift_release_golang-1.16:
     name: release
     namespace: openshift
@@ -67,8 +75,8 @@ tests:
       commands: bin/hypershift install --hypershift-image "${HYPERSHIFT_RELEASE_LATEST}"
       dependencies:
       - env: HYPERSHIFT_RELEASE_LATEST
-        name: hypershift
-      from: bin
+        name: latest-hypershift
+      from: latest-hypershift
       grace_period: 1m0s
       resources:
         requests:
@@ -84,12 +92,15 @@ tests:
           --e2e.pull-secret-file=${CLUSTER_PROFILE_DIR}/pull-secret \
           --e2e.latest-release-image=${OCP_IMAGE_LATEST} \
           --e2e.previous-release-image=${OCP_IMAGE_PREVIOUS} \
+          --e2e.control-plane-operator-image=${HYPERSHIFT_IMAGE_UNDER_TEST}
       dependencies:
       - env: OCP_IMAGE_LATEST
         name: release:hosted-ocp-latest
       - env: OCP_IMAGE_PREVIOUS
         name: release:hosted-ocp-previous
-      from: test-bin
+      - env: HYPERSHIFT_IMAGE_UNDER_TEST
+        name: hypershift
+      from: main-e2e
       grace_period: 15m0s
       resources:
         requests:
@@ -112,8 +123,8 @@ tests:
       commands: bin/hypershift install --hypershift-image "${HYPERSHIFT_RELEASE_LATEST}"
       dependencies:
       - env: HYPERSHIFT_RELEASE_LATEST
-        name: hypershift
-      from: bin
+        name: latest-hypershift
+      from: latest-hypershift
       grace_period: 1m0s
       resources:
         requests:
@@ -131,6 +142,7 @@ tests:
           --e2e.base-domain=ci.hypershift.devcluster.openshift.com \
           --e2e.latest-release-image=${OCP_IMAGE_LATEST} \
           --e2e.previous-release-image=${OCP_IMAGE_PREVIOUS} \
+          --e2e.control-plane-operator-image=${HYPERSHIFT_IMAGE_UNDER_TEST}
       credentials:
       - mount_path: /etc/hypershift-pool-aws-credentials
         name: hypershift-pool-aws-credentials
@@ -143,7 +155,9 @@ tests:
         name: release:hosted-ocp-latest
       - env: OCP_IMAGE_PREVIOUS
         name: release:hosted-ocp-previous
-      from: test-bin
+      - env: HYPERSHIFT_IMAGE_UNDER_TEST
+        name: hypershift
+      from: main-e2e
       grace_period: 15m0s
       resources:
         requests:
