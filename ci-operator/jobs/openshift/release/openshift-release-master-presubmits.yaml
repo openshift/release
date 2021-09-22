@@ -180,6 +180,30 @@ presubmits:
     always_run: true
     branches:
     - master
+    cluster: build02
+    context: ci/prow/build-clusters
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-build-clusters
+    rerun_command: /test build-clusters
+    spec:
+      containers:
+      - args:
+        - ./
+        command:
+        - hack/validate-ci-build-clusters.sh
+        image: registry.ci.openshift.org/ci/cluster-init:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: ((?m)^/test build-clusters,?(\s+|$))
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
     cluster: app.ci
     context: ci/build-farm/build01-dry
     decorate: true
@@ -379,30 +403,6 @@ presubmits:
           requests:
             cpu: 10m
     trigger: (?m)^/test( | .* )ci-operator-registry,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - master
-    cluster: build02
-    context: ci/prow/ci-secret-generator-config
-    decorate: true
-    labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-release-master-ci-secret-generator-config
-    rerun_command: /test ci-secret-generator-config
-    spec:
-      containers:
-      - args:
-        - ./
-        command:
-        - hack/validate-ci-secret-bootstrap-config.sh
-        image: registry.ci.openshift.org/ci/python-validation
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-    trigger: (?m)^/test( | .* )ci-secret-generator-config,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:

@@ -21,7 +21,7 @@ install-dptp-managed-cluster:
 	@echo "installing dptp-managed cluster with version $(ocp_version) ..."
 	./_install/install_cluster.sh $(ocp_version)
 
-#Saved in BW build_farm_01_cluster
+#Saved in BW build_farm_build01
 client_id := "change_me"
 client_secret := "change_me"
 
