@@ -35,4 +35,9 @@ do
   fi
 done
 
+if [ "$exitCode" = 1 ]; then
+  echo ERROR: Run the following command to update the build cluster configs:
+  echo ERROR: $ make update-ci-build-clusters
+fi
+
 exit "$exitCode"

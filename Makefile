@@ -236,6 +236,11 @@ build_farm_credentials_folder:
 	oc --context app.ci -n ci extract secret/config-updater --to=$(build_farm_credentials_folder) --confirm
 .PHONY: build_farm_credentials_folder
 
+update-ci-build-clusters:
+	$(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/cluster-init:latest
+	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR):/release:z" registry.ci.openshift.org/ci/cluster-init:latest -release-repo=/release -create-pr=false -update=true
+.PHONY: update-ci-build-clusters
+
 verify-app-ci:
 	true
 
