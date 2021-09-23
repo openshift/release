@@ -7,6 +7,10 @@ base_images:
     name: release
     namespace: openshift
     tag: golang-1.15
+  ubi_minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
 build_root:
   image_stream_tag:
     name: release
@@ -44,6 +48,10 @@ images:
   dockerfile_path: build/wait-for-vmi-status/Dockerfile
   from: openshift_release_golang-1.15
   to: tekton-task-wait-for-vmi-status
+- context_dir: modules/modify-vm-template/
+  dockerfile_path: build/modify-vm-template/Dockerfile
+  from: ubi_minimal
+  to: tekton-task-modify-vm-template
 releases:
   initial:
     integration:
@@ -117,6 +125,8 @@ tests:
         name: tekton-task-disk-virt-sysprep
       - env: WAIT_FOR_VMI_STATUS_IMAGE
         name: tekton-task-wait-for-vmi-status
+      - env: MODIFY_VM_TEMPLATE_IMAGE
+        name: tekton-task-modify-vm-template
       from: test-bin
       resources:
         requests:
@@ -157,6 +167,8 @@ tests:
         name: tekton-task-disk-virt-sysprep
       - env: WAIT_FOR_VMI_STATUS_IMAGE
         name: tekton-task-wait-for-vmi-status
+      - env: MODIFY_VM_TEMPLATE_IMAGE
+        name: tekton-task-modify-vm-template
       from: test-bin
       resources:
         requests:
