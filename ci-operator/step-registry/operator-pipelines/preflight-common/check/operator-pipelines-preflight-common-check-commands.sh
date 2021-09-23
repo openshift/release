@@ -15,8 +15,8 @@
 #    PFLT_LOGLEVEL          The log verbosity. One of "info", "error", "debug",
 #                           "trace".
 #    PFLT_ARTIFACTS         Where Preflight will write artifacts.
-#    PUBLISH_ARTIFACTS      Whether to publish preflight artifacts/*, results.json, and 
-#                           preflight.log to this job's log on prow.ci.openshift.org.
+#    PUBLISH_ARTIFACTS      Whether to publish preflight's plaintext artifacts/*, results.json, 
+#                           and preflight.log to this job's log on prow.ci.openshift.org.
 #                           Options: true, false
 
 # Check for the expected asset types, or otherwise fail.
@@ -39,6 +39,8 @@ if [ "${PUBLISH_ARTIFACTS}" == "true" ]; then
     cp -a preflight.log "${ARTIFACT_DIR}"/    
     cp -a "${WORKDIR}/preflight.stdout" "${ARTIFACT_DIR}"/
 fi
+
+tar czvf "${SHARED_DIR}/preflight.tar.gz" "$PFLT_ARTIFACTS" preflight.log "${WORKDIR}/preflight.stdout"
 
 echo "Ending preflight."
 exit 0
