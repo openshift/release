@@ -23,36 +23,11 @@ tests:
       IMAGE_REPO: search-e2e-test
       REGISTRY_ORG: open-cluster-management
     workflow: ocm-ci-image-mirror
-- as: lint
+- as: lint-unittest-sonarcloud
   commands: |
     export SELF="make -f Makefile.prow"
     make -f Makefile.prow install
     make -f Makefile.prow lint
-    make -f Makefile.prow check
-  container:
-    from: src
-- as: backplane-fast-forward
-  postsubmit: true
-  steps:
-    env:
-      DESTINATION_BRANCH: release-2.4
-    workflow: ocm-ci-fastforward
-- as: unit-test-sonar-pre-submit
-  commands: |
-    export SELF="make -f Makefile.prow"
-    make -f Makefile.prow install
-    make -f Makefile.prow sonar/js/jest-init
-    make -f Makefile.prow unit-test
-    make -f Makefile.prow sonar/js/prow
-  container:
-    from: src
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
-- as: unit-test-sonar-post-submit
-  commands: |
-    export SELF="make -f Makefile.prow"
-    make -f Makefile.prow install
     make -f Makefile.prow sonar/js/jest-init
     make -f Makefile.prow unit-test
     make -f Makefile.prow sonar/js/prow
