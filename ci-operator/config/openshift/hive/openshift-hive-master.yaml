@@ -37,6 +37,10 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+  integration:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
   unit:
     requests:
       cpu: 1000m
@@ -72,6 +76,13 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: hive-codecov-token
+- as: integration
+  commands: |
+    export HOME=$(mktemp -d)
+    make test-integration
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: e2e
   cluster_claim:
     architecture: amd64
