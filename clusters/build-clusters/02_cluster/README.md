@@ -2,7 +2,7 @@
 
 [02-Cluster](https://console-openshift-console.apps.build02.gcp.ci.openshift.org) is an OpenShift-cluster managed by DPTP-team. It is one of the clusters for running Prow job pods.
 
-The secrets have been uploaded to BitWarden item `build_farm_02_cluster`:
+The secrets have been uploaded to BitWarden item `build_farm_build02`:
 
 * the key file for the service account `ocp-cluster-installer`
 * the SSH key pair (`id_rsa` and `id_rsa.pub`)
