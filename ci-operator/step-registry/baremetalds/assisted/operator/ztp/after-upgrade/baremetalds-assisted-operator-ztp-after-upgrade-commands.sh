@@ -10,21 +10,21 @@ echo "************ baremetalds assisted operator ztp command ************"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
 
-# ZTP scripts have a lot of default values for the spoke cluster configuration. Adding this so that they can be changed.
-if [[ -n "${ASSISTED_ZTP_CONFIG:-}" ]]; then
-  readarray -t config <<< "${ASSISTED_ZTP_CONFIG}"
-  for var in "${config[@]}"; do
-    if [[ ! -z "${var}" ]]; then
-      echo "export ${var}" >> "${SHARED_DIR}/assisted-ztp-config"
-    fi
-  done
-fi
+# # ZTP scripts have a lot of default values for the spoke cluster configuration. Adding this so that they can be changed.
+# if [[ -n "${ASSISTED_ZTP_CONFIG:-}" ]]; then
+#   readarray -t config <<< "${ASSISTED_ZTP_CONFIG}"
+#   for var in "${config[@]}"; do
+#     if [[ ! -z "${var}" ]]; then
+#       echo "export ${var}" >> "${SHARED_DIR}/assisted-ztp-config"
+#     fi
+#   done
+# fi
 
-# Copy configuration for ZTP vars if present
-if [[ -e "${SHARED_DIR}/assisted-ztp-config" ]]
-then
-  scp "${SSHOPTS[@]}" "${SHARED_DIR}/assisted-ztp-config" "root@${IP}:assisted-ztp-config"
-fi
+# # Copy configuration for ZTP vars if present
+# if [[ -e "${SHARED_DIR}/assisted-ztp-config" ]]
+# then
+#   scp "${SSHOPTS[@]}" "${SHARED_DIR}/assisted-ztp-config" "root@${IP}:assisted-ztp-config"
+# fi
 
 tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/assisted-service.tar.gz"
 
@@ -55,16 +55,15 @@ export EXTRA_BAREMETALHOSTS_FILE="/root/dev-scripts/\${EXTRA_BAREMETALHOSTS_FILE
 
 source /root/config
 
-# Inject job configuration for ZTP, if available
-if [[ -e /root/assisted-ztp-config ]]
-then
-  source /root/assisted-ztp-config
-fi
+# # Inject job configuration for ZTP, if available
+# if [[ -e /root/assisted-ztp-config ]]
+# then
+#   source /root/assisted-ztp-config
+# fi
 
 # TODO(ppinjark): Fix after_upgrade.sh file to use override variables
 # source upgrade/after_upgrade.sh
 
-export ASSISTED_OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE="${ASSISTED_OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"
 export ASSISTED_UPGRADE_OPERATOR="${ASSISTED_UPGRADE_OPERATOR_OVERRIDE}"
 export ASSISTED_STOP_AFTER_AGENT_DISCOVERY="${ASSISTED_STOP_AFTER_AGENT_DISCOVERY_OVERRIDE}"
 export ASSISTED_CLUSTER_NAME="${ASSISTED_CLUSTER_NAME}"
