@@ -54,7 +54,7 @@ release-controllers:
 	./hack/generators/release-controllers/generate-release-controllers.py .
 
 checkconfig:
-	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR):/release:z" gcr.io/k8s-prow/checkconfig:v20210923-a4eeeab24f --config-path /release/core-services/prow/02_config/_config.yaml --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
+	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR):/release:z" gcr.io/k8s-prow/checkconfig:v20210924-4699cdce8b --config-path /release/core-services/prow/02_config/_config.yaml --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
 
 jobs: ci-operator-checkconfig
 	$(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/ci-operator-prowgen:latest
@@ -236,6 +236,11 @@ build_farm_credentials_folder:
 	oc --context app.ci -n ci extract secret/config-updater --to=$(build_farm_credentials_folder) --confirm
 .PHONY: build_farm_credentials_folder
 
+update-ci-build-clusters:
+	$(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/cluster-init:latest
+	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR):/release:z" registry.ci.openshift.org/ci/cluster-init:latest -release-repo=/release -create-pr=false -update=true
+.PHONY: update-ci-build-clusters
+
 verify-app-ci:
 	true
 
@@ -256,10 +261,6 @@ secrets:
 
 serviceaccount-secret-rotation:
 	make job JOB=periodic-rotate-serviceaccount-secrets
-
-ci-secret-bootstrap-config:
-	hack/generate-pull-secret-entries.py core-services/ci-secret-bootstrap/_config.yaml
-.PHONY: ci-secret-bootstrap-config
 
 # generate the manifets for cluster pools admins
 # example: make TEAM=hypershift OWNERS=dmace,petr new-pool-admins
