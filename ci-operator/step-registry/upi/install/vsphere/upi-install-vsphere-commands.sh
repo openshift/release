@@ -153,10 +153,6 @@ wait "$!"
 # in a secret
 tar -Jcf "${SHARED_DIR}/terraform_state.tar.xz" terraform.tfstate
 
-# To ease debugging of ip address use
-cluster_domain=$(<"${SHARED_DIR}"/clusterdomain.txt)
-host -t A "api.${cluster_domain}"
-
 ## Monitor for `bootstrap-complete`
 echo "$(date -u --rfc-3339=seconds) - Monitoring for bootstrap to complete"
 openshift-install --dir="${installer_dir}" wait-for bootstrap-complete &
