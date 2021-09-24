@@ -10,21 +10,21 @@ echo "************ baremetalds assisted operator ztp before upgrade command ****
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
 
-# ZTP scripts have a lot of default values for the spoke cluster configuration. Adding this so that they can be changed.
-if [[ -n "${ASSISTED_ZTP_CONFIG:-}" ]]; then
-  readarray -t config <<< "${ASSISTED_ZTP_CONFIG}"
-  for var in "${config[@]}"; do
-    if [[ ! -z "${var}" ]]; then
-      echo "export ${var}" >> "${SHARED_DIR}/assisted-ztp-config"
-    fi
-  done
-fi
+# # ZTP scripts have a lot of default values for the spoke cluster configuration. Adding this so that they can be changed.
+# if [[ -n "${ASSISTED_ZTP_CONFIG:-}" ]]; then
+#   readarray -t config <<< "${ASSISTED_ZTP_CONFIG}"
+#   for var in "${config[@]}"; do
+#     if [[ ! -z "${var}" ]]; then
+#       echo "export ${var}" >> "${SHARED_DIR}/assisted-ztp-config"
+#     fi
+#   done
+# fi
 
-# Copy configuration for ZTP vars if present
-if [[ -e "${SHARED_DIR}/assisted-ztp-config" ]]
-then
-  scp "${SSHOPTS[@]}" "${SHARED_DIR}/assisted-ztp-config" "root@${IP}:assisted-ztp-config"
-fi
+# # Copy configuration for ZTP vars if present
+# if [[ -e "${SHARED_DIR}/assisted-ztp-config" ]]
+# then
+#   scp "${SSHOPTS[@]}" "${SHARED_DIR}/assisted-ztp-config" "root@${IP}:assisted-ztp-config"
+# fi
 
 tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/assisted-service.tar.gz"
 
@@ -55,11 +55,11 @@ export ASSISTED_STOP_AFTER_AGENT_DISCOVERY="${ASSISTED_STOP_AFTER_AGENT_DISCOVER
 
 source /root/config
 
-# Inject job configuration for ZTP, if available
-if [[ -e /root/assisted-ztp-config ]]
-then
-  source /root/assisted-ztp-config
-fi
+# # Inject job configuration for ZTP, if available
+# if [[ -e /root/assisted-ztp-config ]]
+# then
+#   source /root/assisted-ztp-config
+# fi
 
 source upgrade/before_upgrade.sh
 
