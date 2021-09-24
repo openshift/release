@@ -27,20 +27,27 @@ rc=$([ "${ASSET_TYPE}" == "container" ] || [ "${ASSET_TYPE}" == "operator" ]; ec
 WORKDIR=$(mktemp -d)
 cd "${WORKDIR}" || exit 2
 
-echo "Starting preflight."
+preflight_targz_file="${SHARED_DIR}/preflight.tar.gz"
+preflight_stdout_file="${WORKDIR}/preflight.stdout"
+preflight_stderr_file="${WORKDIR}/preflight.stderr"
+
 export PFLT_ARTIFACTS
 export PFLT_INDEXIMAGE
 export PFLT_LOGLEVEL
 
-preflight check "${ASSET_TYPE}" "${TEST_ASSET}" > "${WORKDIR}/preflight.stdout"
+echo "Running Preflight."
+preflight check "${ASSET_TYPE}" "${TEST_ASSET}" > "${preflight_stdout_file}" 2> "${preflight_stderr_file}"
 
 if [ "${PUBLISH_ARTIFACTS}" == "true" ]; then 
+    echo "PUBLIC_ARTIFACTS is set to true. Publishing all artifacts."
     cp -a "${PFLT_ARTIFACTS}" "${ARTIFACT_DIR}"/
     cp -a preflight.log "${ARTIFACT_DIR}"/    
-    cp -a "${WORKDIR}/preflight.stdout" "${ARTIFACT_DIR}"/
+    cp -a "${preflight_stdout_file}" "${ARTIFACT_DIR}"/
+    cp -a "${preflight_stderr_file}" "${ARTIFACT_DIR}"/
 fi
 
-tar czvf "${SHARED_DIR}/preflight.tar.gz" "$PFLT_ARTIFACTS" preflight.log "${WORKDIR}/preflight.stdout"
+echo "Placing assets into ${preflight_targz_file} for any future CI tasks."
+tar czvf "${preflight_targz_file}" "$PFLT_ARTIFACTS" preflight.log "${preflight_stdout_file}" "${preflight_stderr_file}"
 
-echo "Ending preflight."
+echo "Preflight execution completed."
 exit 0
