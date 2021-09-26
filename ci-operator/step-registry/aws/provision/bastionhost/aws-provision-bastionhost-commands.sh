@@ -427,6 +427,8 @@ BASTION_HOST_PUBLIC_DNS="$(aws --region "${REGION}" cloudformation describe-stac
   --query 'Stacks[].Outputs[?OutputKey == `PublicDnsName`].OutputValue' --output text)"
 
 echo "${BASTION_HOST_PUBLIC_DNS}" > "${SHARED_DIR}/bastion_dns"
+echo "${BASTION_HOST_PUBLIC_DNS}:5000" > "${SHARED_DIR}/mirrorregistryhost"
+
 PROXY_URL="http://${BASTION_NAME}:${PROXY_PASSWORD}@${BASTION_HOST_PUBLIC_DNS}:3128"
 echo "${PROXY_URL}" > "${SHARED_DIR}/proxy_url"
 
@@ -435,7 +437,6 @@ export http_proxy=${PROXY_URL}
 export https_proxy=${PROXY_URL}
 export no_proxy="localhost,127.0.0.1"
 EOF
-
 
 # save files to ARTIFACT_DIR for debugging
 cp "${SHARED_DIR}/proxy-conf.sh" "${ARTIFACT_DIR}/"
