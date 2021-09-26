@@ -14,6 +14,12 @@ then
 	exit 0
 fi
 
+# while gathering logs from a private cluster, proxy setting is required for connecting cluster
+if test -f "${SHARED_DIR}/proxy-conf.sh"
+then
+	source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 if test -f "${KUBECONFIG}"
 then
 	oc --request-timeout=5s get nodes -o jsonpath --template '{range .items[*]}{.spec.providerID}{"\n"}{end}' | sed 's|.*/||' > "${TMPDIR}/node-provider-IDs.txt" &
