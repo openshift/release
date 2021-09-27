@@ -94,6 +94,29 @@ tests:
   commands: make test-unit
   container:
     from: src
+- as: unit-test-coverage
+  postsubmit: true
+  steps:
+    test:
+    - as: unit-coverage
+      # download the codecov uploader and verify its integrity against the sha256sum 
+      # upload the coverage data from the go tests 
+      # requires the CODECOV_TOKEN global variable to be set
+      commands: |
+        curl https://keybase.io/codecovsecurity/pgp_keys.asc | gpg --no-default-keyring --keyring trustedkeys.gpg --import 
+        curl -Os https://uploader.codecov.io/latest/linux/codecov
+        curl -Os https://uploader.codecov.io/latest/linux/codecov.SHA256SUM
+        curl -Os https://uploader.codecov.io/latest/linux/codecov.SHA256SUM.sig
+        gpgv codecov.SHA256SUM.sig codecov.SHA256SUM
+        shasum -a 256 -c codecov.SHA256SUM
+
+        chmod +x codecov
+        ./codecov -t ${CODECOV_TOKEN}
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: e2e-openshift-conformance-sig-api-machinery
   optional: true
   run_if_changed: ^(cmd/.*|pkg/.*|vendor/.*|go\.sum|go\.mod|Makefile)
