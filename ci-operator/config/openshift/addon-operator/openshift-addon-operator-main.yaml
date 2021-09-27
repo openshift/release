@@ -23,6 +23,9 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/openshift/addon-operator/config/docker/passwd
   to: addon-operator-webhook
+- dockerfile_path: config/docker/Dockerfile.src.ci
+  from: src
+  to: addon-operator-tooling
 promotion:
   name: addon-operator-manager
   namespace: addon-operator
@@ -52,6 +55,10 @@ tests:
   commands: make lint
   container:
     from: src
+- as: precommit-check
+  commands: pre-commit run --all-files --show-diff-on-failure
+  container:
+    from: addon-operator-tooling
 - as: e2e
   steps:
     cluster_profile: aws
