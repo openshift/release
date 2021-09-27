@@ -24,13 +24,31 @@ tests:
       IMAGE_REPO: search-e2e-test
       REGISTRY_ORG: open-cluster-management
     workflow: ocm-ci-image-mirror
-- as: lint-unittest-sonarcloud
+- as: e2e
+  steps:
+    dependencies:
+      COMPONENT_IMAGE_REF: search-e2e-test
+    env:
+      CLUSTERPOOL_GROUP_NAME: Search
+      CLUSTERPOOL_HOST_NAMESPACE: acm-observability-usa
+      CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-obs-usa-clusterpool
+      CLUSTERPOOL_LIFETIME: 2h
+      CLUSTERPOOL_LIST_INCLUSION_FILTER: prow
+    test:
+    - as: e2e
+      commands: |
+        echo "COMPONENT_IMAGE_REF=$COMPONENT_IMAGE_REF"
+        export SELF="make -f Makefile.prow"
+        make -f Makefile.prow test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-e2e-clusterpool
+- as: sonar-pre-submit
   commands: |
     export SELF="make -f Makefile.prow"
-    make -f Makefile.prow install
-    make -f Makefile.prow lint
-    make -f Makefile.prow sonar/js/jest-init
-    make -f Makefile.prow unit-test
     make -f Makefile.prow sonar/js/prow
   container:
     from: src
