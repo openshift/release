@@ -11,15 +11,22 @@ export HOME
 
 echo "$(date -u --rfc-3339=seconds) - Locating RHCOS image for release..."
 
-openshift_install_path="/var/lib/openshift-install"
-image_json_file="${openshift_install_path}/rhcos.json"
-fcos_json_file="${openshift_install_path}/fcos.json"
-
-if [[ -f "$fcos_json_file" ]]; then
-    image_json_file=$fcos_json_file
+# https://github.com/openshift/installer/blob/master/docs/user/overview.md#coreos-bootimages
+# This code needs to handle pre-4.8 installers though too.
+if openshift-install coreos print-stream-json 2>/tmp/err.txt >${SHARED_DIR}/coreos.json; then
+   echo "Using stream metadata"
+   ova_url=$(jq -r '.architectures.x86_64.artifacts.vmware.formats.ova.disk.location' < ${SHARED_DIR}/coreos.json)
+else
+  if ! grep -qF 'unknown command \"coreos\"' /tmp/err.txt; then
+    echo "Unhandled error from openshift-install" 1>&2
+    cat /tmp/err.txt
+    exit 1
+  fi
+  legacy_installer_json=/var/lib/openshift-install/rhcos.json
+  echo "Falling back to parsing ${legacy_installer_json}"
+  ova_url="$(jq -r '.baseURI + .images["vmware"].path' ${legacy_installer_json})"
 fi
-
-ova_url="$(jq -r '.baseURI + .images["vmware"].path' $image_json_file)"
+rm -f /tmp/err.txt
 vm_template="${ova_url##*/}"
 
 # Troubleshooting UPI OVA import issue
