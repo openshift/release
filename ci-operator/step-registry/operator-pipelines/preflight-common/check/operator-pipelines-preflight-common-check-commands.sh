@@ -47,7 +47,8 @@ if [ "${PUBLISH_ARTIFACTS}" == "true" ]; then
 fi
 
 echo "Placing assets into ${preflight_targz_file} for any future CI tasks."
-tar czvf "${preflight_targz_file}" "$PFLT_ARTIFACTS" preflight.log "${preflight_stdout_file}" "${preflight_stderr_file}"
+# assumes we're in WORKDIR and strips full paths where appropriate.
+tar czvf "${preflight_targz_file}" "$PFLT_ARTIFACTS" preflight.log "$(basename "${preflight_stdout_file}")"  "$(basename "${preflight_stderr_file}")"
 
 echo "Preflight execution completed."
 exit 0
