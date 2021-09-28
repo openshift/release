@@ -170,10 +170,16 @@ function upgrade() {
 
 # upgrade_conformance runs the upgrade and the parallel tests, and exits with an error if either fails.
 function upgrade_conformance() {
-    local exit_code=0
-    upgrade || exit_code=$?
-    TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/conformance/parallel suite || exit_code=$?
-    exit $exit_code
+    local exit_code=0 &&
+    upgrade || exit_code=$? &&
+    PROGRESSING="$(oc get -o jsonpath='{.status.conditions[?(@.type == "Progressing")].status}' clusterversion version)" &&
+    if test False = "${PROGRESSING}"
+    then
+        TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/conformance/parallel suite || exit_code=$?
+    else
+        echo "Skipping conformance suite because post-update ClusterVersion Progressing=${PROGRESSING}"
+    fi &&
+    return $exit_code
 }
 
 function upgrade_paused() {
