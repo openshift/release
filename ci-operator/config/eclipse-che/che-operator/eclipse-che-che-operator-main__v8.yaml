@@ -118,7 +118,7 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: openshift-e2e-aws-proxy
-- as: all-namespaces-deployment
+- as: e2e-all-namespaces-deployment
   steps:
     cluster_profile: gcp
     env:
@@ -127,11 +127,13 @@ tests:
       OO_PACKAGE: eclipse-che-preview-openshift
       OO_TARGET_NAMESPACES: '!install'
     test:
-    - as: single-host-next-deployment
+    - as: single-host-deployment
       cli: latest
       commands: |
-        echo -e "[INFO] Test script content"
-        oc get po -n openshift-operators
+        echo -e "[INFO] Test script content:"
+        cat .ci/oci-single-host.sh
+
+        /bin/bash .ci/oci-single-host.sh
       dependencies:
       - env: CI_CHE_OPERATOR_IMAGE
         name: che-operator-image
@@ -145,6 +147,7 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+    workflow: optional-operators-ci-gcp
 zz_generated_metadata:
   branch: main
   org: eclipse-che
