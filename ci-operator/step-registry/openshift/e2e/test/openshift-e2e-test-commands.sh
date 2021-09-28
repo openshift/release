@@ -150,20 +150,21 @@ if [[ "${CLUSTER_TYPE}" == gcp ]]; then
     popd
 fi
 
+# Preserve the && chaining in this function, because it is called from and AND-OR list so it doesn't get errexit.
 function upgrade() {
-    set -x
-    TARGET_RELEASES="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:-}"
+    set -x &&
+    TARGET_RELEASES="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:-}" &&
     if [[ -f "${SHARED_DIR}/override-upgrade" ]]; then
-        TARGET_RELEASES="$(< "${SHARED_DIR}/override-upgrade")"
+        TARGET_RELEASES="$(< "${SHARED_DIR}/override-upgrade")" &&
         echo "Overriding upgrade target to ${TARGET_RELEASES}"
-    fi
+    fi &&
     openshift-tests run-upgrade "${TEST_UPGRADE_SUITE}" \
         --to-image "${TARGET_RELEASES}" \
         --options "${TEST_UPGRADE_OPTIONS-}" \
         --provider "${TEST_PROVIDER}" \
         -o "${ARTIFACT_DIR}/e2e.log" \
         --junit-dir "${ARTIFACT_DIR}/junit" &
-    wait "$!"
+    wait "$!" &&
     set +x
 }
 
@@ -222,21 +223,23 @@ function upgrade_paused() {
     set +x
 }
 
+
+# Preserve the && chaining in this function, because it is called from and AND-OR list so it doesn't get errexit.
 function suite() {
     if [[ -n "${TEST_SKIPS}" ]]; then
-        TESTS="$(openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")"
-        echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests
-        echo "Skipping tests:"
-        echo "${TESTS}" | grep "${TEST_SKIPS}" || { exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS regex:'; echo "$TEST_SKIPS"; return $exit_code; }
+        TESTS="$(openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")" &&
+        echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests &&
+        echo "Skipping tests:" &&
+        echo "${TESTS}" | grep "${TEST_SKIPS}" || { exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS regex:'; echo "$TEST_SKIPS"; return $exit_code; } &&
         TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
-    fi
+    fi &&
 
-    set -x
+    set -x &&
     openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-} \
         --provider "${TEST_PROVIDER}" \
         -o "${ARTIFACT_DIR}/e2e.log" \
         --junit-dir "${ARTIFACT_DIR}/junit" &
-    wait "$!"
+    wait "$!" &&
     set +x
 }
 
