@@ -252,6 +252,8 @@ function suite() {
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_START"
 trap 'echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"' EXIT
 
+oc -n openshift-config patch cm admin-acks --patch '{"data":{"ack-4.8-kube-1.22-api-removals-in-4.9":"true"}}' --type=merge || echo 'failed to ack the 4.9 Kube v1beta1 removals; possibly API-server issue, or a pre-4.8 release image'
+
 case "${TEST_TYPE}" in
 upgrade-conformance)
     upgrade_conformance
