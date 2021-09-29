@@ -2,6 +2,8 @@
 
 set -Eeuo pipefail
 
+CLUSTER_TYPE="${CLUSTER_TYPE_OVERRIDE:-$CLUSTER_TYPE}"
+
 declare -A external_network=(
 	['openstack-kuryr']='external'
 	['openstack-vexxhost']='public'
