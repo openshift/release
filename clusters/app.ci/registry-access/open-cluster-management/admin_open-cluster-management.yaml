@@ -9,7 +9,7 @@ metadata:
 kind: ServiceAccount
 apiVersion: v1
 metadata:
-  name: image-pusher
+  name: ocm-image-pusher
   namespace: open-cluster-management
 ---
 kind: Group
@@ -72,22 +72,182 @@ subjects:
 - kind: ServiceAccount
   name: ci-operator
   namespace: ci
-- kind: ServiceAccount
-  name: image-pusher
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: registry-editor
   namespace: open-cluster-management
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  - serviceaccounts
+  verbs:
+  - create
+  - delete
+  - deletecollection
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  - image.openshift.io
+  resources:
+  - imagestreamimages
+  - imagestreammappings
+  - imagestreams
+  - imagestreams/secrets
+  - imagestreamtags
+  verbs:
+  - create
+  - delete
+  - deletecollection
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  - image.openshift.io
+  resources:
+  - imagestreamimports
+  verbs:
+  - create
+- apiGroups:
+  - ""
+  - image.openshift.io
+  resources:
+  - imagestreams/layers
+  verbs:
+  - get
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - get
+- apiGroups:
+  - ""
+  - project.openshift.io
+  resources:
+  - projects
+  verbs:
+  - get
+- apiGroups:
+  - ""
+  resources:
+  - imagetags
+  verbs:
+  - create
+- apiGroups:
+  - ""
+  resources:
+  - imagetags
+  verbs:
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - imagetags
+  verbs:
+  - deletecollection
+- apiGroups:
+  - ""
+  resources:
+  - imagetags
+  verbs:
+  - get
+- apiGroups:
+  - ""
+  resources:
+  - imagetags
+  verbs:
+  - list
+- apiGroups:
+  - ""
+  resources:
+  - imagetags
+  verbs:
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - imagetags
+  verbs:
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - imagetags
+  verbs:
+  - watch
+- apiGroups:
+  - image.openshift.io
+  resources:
+  - imagetags
+  verbs:
+  - create
+- apiGroups:
+  - image.openshift.io
+  resources:
+  - imagetags
+  verbs:
+  - delete
+- apiGroups:
+  - image.openshift.io
+  resources:
+  - imagetags
+  verbs:
+  - deletecollection
+- apiGroups:
+  - image.openshift.io
+  resources:
+  - imagetags
+  verbs:
+  - get
+- apiGroups:
+  - image.openshift.io
+  resources:
+  - imagetags
+  verbs:
+  - list
+- apiGroups:
+  - image.openshift.io
+  resources:
+  - imagetags
+  verbs:
+  - patch
+- apiGroups:
+  - image.openshift.io
+  resources:
+  - imagetags
+  verbs:
+  - update
+- apiGroups:
+  - image.openshift.io
+  resources:
+  - imagetags
+  verbs:
+  - watch
 ---
 kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: ocm-image-pusher
+  name: ocm-image-pusher-binding
   namespace: open-cluster-management
 roleRef:
   kind: Role
-  name: "system:image-builder"
+  name: registry-editor
   apiGroup: rbac.authorization.k8s.io
 subjects:
 - kind: ServiceAccount
-  name: image-pusher
+  name: ocm-image-pusher
   namespace: open-cluster-management
 ---
 kind: RoleBinding
