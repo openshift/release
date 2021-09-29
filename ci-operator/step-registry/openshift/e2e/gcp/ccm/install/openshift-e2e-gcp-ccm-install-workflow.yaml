@@ -1,0 +1,21 @@
+workflow:
+  as: openshift-e2e-gcp-ccm-install
+  steps:
+    pre:
+    - chain: ipi-conf-gcp
+    - ref: ccm-conf-pre-create-feature-gate
+    - chain: ipi-install
+    - ref: storage-conf-csi-gcp-pd
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - chain: gather-core-dump
+    - chain: ipi-gcp-post
+    env:
+      TEST_CSI_DRIVER_MANIFEST: manifest-gcp-pd.yaml
+      TEST_SKIPS: >-
+        Managed cluster should start all core operators\|
+        Alerts shouldn't report any alerts in firing or pending state\|
+        Prometheus when installed on the cluster shouldn't report any alerts in firing state apart from Watchdog and AlertmanagerReceiversNotConfigured
+  documentation: |-
+    The Openshift E2E GCP CCM install workflow executes the common end-to-end test suite on GCP with a cluster configuration including CCM pods
