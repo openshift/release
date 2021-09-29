@@ -16,7 +16,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-default
+- as: e2e-compute
   cron: 0 2 * * *
   steps:
     cluster_profile: azure4
@@ -45,7 +45,49 @@ tests:
       cli: latest
       commands: |
         export DOCKER_PREFIX='quay.io/kubevirt'
-        export KUBEVIRT_E2E_FOCUS='\[rfe_id:273\]\[crit:high\]'
+        export KUBEVIRT_E2E_FOCUS='\[sig-compute\]'
+        export KUBEVIRT_E2E_SKIP='QUARANTINE'
+        export TEST_TIMEOUT="6h50m"
+        curl -L "https://raw.githubusercontent.com/dhiller/kubevirt-testing/main/hack/kubevirt-testing.sh" | \
+          bash -s test_nightly
+      from: base
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 7h0m0s
+    workflow: ipi-azure
+  timeout: 8h0m0s
+- as: e2e-storage
+  cron: 15 3 * * *
+  steps:
+    cluster_profile: azure4
+    test:
+    - as: enable-cpu-manager
+      cli: latest
+      commands: |
+        curl -L "https://raw.githubusercontent.com/dhiller/kubevirt-testing/main/hack/kubevirt-testing.sh" | \
+          bash -s enable_cpu_manager
+      from: base
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: deploy-kubevirt
+      cli: latest
+      commands: |
+        curl -L "https://raw.githubusercontent.com/dhiller/kubevirt-testing/main/hack/kubevirt-testing.sh" | \
+          bash -s deploy_nightly_test_setup
+      from: base
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: test
+      cli: latest
+      commands: |
+        export DOCKER_PREFIX='quay.io/kubevirt'
+        export KUBEVIRT_E2E_FOCUS='\[sig-storage\]'
         export KUBEVIRT_E2E_SKIP='QUARANTINE'
         curl -L "https://raw.githubusercontent.com/dhiller/kubevirt-testing/main/hack/kubevirt-testing.sh" | \
           bash -s test_nightly
@@ -54,9 +96,50 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-      timeout: 2h0m0s
+      timeout: 4h0m0s
     workflow: ipi-azure
-  timeout: 4h0m0s
+  timeout: 8h0m0s
+- as: e2e-network
+  cron: 30 4 * * *
+  steps:
+    cluster_profile: azure4
+    test:
+    - as: enable-cpu-manager
+      cli: latest
+      commands: |
+        curl -L "https://raw.githubusercontent.com/dhiller/kubevirt-testing/main/hack/kubevirt-testing.sh" | \
+          bash -s enable_cpu_manager
+      from: base
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: deploy-kubevirt
+      cli: latest
+      commands: |
+        curl -L "https://raw.githubusercontent.com/dhiller/kubevirt-testing/main/hack/kubevirt-testing.sh" | \
+          bash -s deploy_nightly_test_setup
+      from: base
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: test
+      cli: latest
+      commands: |
+        export DOCKER_PREFIX='quay.io/kubevirt'
+        export KUBEVIRT_E2E_FOCUS='\[sig-network\]'
+        export KUBEVIRT_E2E_SKIP='QUARANTINE'
+        curl -L "https://raw.githubusercontent.com/dhiller/kubevirt-testing/main/hack/kubevirt-testing.sh" | \
+          bash -s test_nightly
+      from: base
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 4h0m0s
+    workflow: ipi-azure
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
   org: kubevirt
