@@ -102,6 +102,7 @@ cd /root/dev-scripts
 source common.sh
 source ocp_install_env.sh
 
+set +x
 echo "export DS_OPENSHIFT_VERSION=\$(openshift_version)" >> /tmp/ds-vars.conf
 echo "export DS_REGISTRY=\$LOCAL_REGISTRY_DNS_NAME:\$LOCAL_REGISTRY_PORT" >> /tmp/ds-vars.conf
 echo "export DS_WORKING_DIR=\$WORKING_DIR" >> /tmp/ds-vars.conf
@@ -109,3 +110,12 @@ echo "export DS_IP_STACK=\$IP_STACK" >> /tmp/ds-vars.conf
 EOF
 
 scp "${SSHOPTS[@]}" "root@${IP}:/tmp/ds-vars.conf" "${SHARED_DIR}/"
+
+
+# Add required configurations ci-chat-bot need
+ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
+echo "https://\$(oc -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > /tmp/console.url
+EOF
+
+# Save console URL in `console.url` file so that ci-chat-bot could report success
+scp "${SSHOPTS[@]}" "root@${IP}:/tmp/console.url" "${SHARED_DIR}/"
