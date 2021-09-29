@@ -150,29 +150,36 @@ if [[ "${CLUSTER_TYPE}" == gcp ]]; then
     popd
 fi
 
+# Preserve the && chaining in this function, because it is called from and AND-OR list so it doesn't get errexit.
 function upgrade() {
-    set -x
-    TARGET_RELEASES="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:-}"
+    set -x &&
+    TARGET_RELEASES="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:-}" &&
     if [[ -f "${SHARED_DIR}/override-upgrade" ]]; then
-        TARGET_RELEASES="$(< "${SHARED_DIR}/override-upgrade")"
+        TARGET_RELEASES="$(< "${SHARED_DIR}/override-upgrade")" &&
         echo "Overriding upgrade target to ${TARGET_RELEASES}"
-    fi
+    fi &&
     openshift-tests run-upgrade "${TEST_UPGRADE_SUITE}" \
         --to-image "${TARGET_RELEASES}" \
         --options "${TEST_UPGRADE_OPTIONS-}" \
         --provider "${TEST_PROVIDER}" \
         -o "${ARTIFACT_DIR}/e2e.log" \
         --junit-dir "${ARTIFACT_DIR}/junit" &
-    wait "$!"
+    wait "$!" &&
     set +x
 }
 
 # upgrade_conformance runs the upgrade and the parallel tests, and exits with an error if either fails.
 function upgrade_conformance() {
-    local exit_code=0
-    upgrade || exit_code=$?
-    TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/conformance/parallel suite || exit_code=$?
-    exit $exit_code
+    local exit_code=0 &&
+    upgrade || exit_code=$? &&
+    PROGRESSING="$(oc get -o jsonpath='{.status.conditions[?(@.type == "Progressing")].status}' clusterversion version)" &&
+    if test False = "${PROGRESSING}"
+    then
+        TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/conformance/parallel suite || exit_code=$?
+    else
+        echo "Skipping conformance suite because post-update ClusterVersion Progressing=${PROGRESSING}"
+    fi &&
+    return $exit_code
 }
 
 function upgrade_paused() {
@@ -222,21 +229,23 @@ function upgrade_paused() {
     set +x
 }
 
+
+# Preserve the && chaining in this function, because it is called from and AND-OR list so it doesn't get errexit.
 function suite() {
     if [[ -n "${TEST_SKIPS}" ]]; then
-        TESTS="$(openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")"
-        echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests
-        echo "Skipping tests:"
-        echo "${TESTS}" | grep "${TEST_SKIPS}" || { exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS regex:'; echo "$TEST_SKIPS"; return $exit_code; }
+        TESTS="$(openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")" &&
+        echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests &&
+        echo "Skipping tests:" &&
+        echo "${TESTS}" | grep "${TEST_SKIPS}" || { exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS regex:'; echo "$TEST_SKIPS"; return $exit_code; } &&
         TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
-    fi
+    fi &&
 
-    set -x
+    set -x &&
     openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-} \
         --provider "${TEST_PROVIDER}" \
         -o "${ARTIFACT_DIR}/e2e.log" \
         --junit-dir "${ARTIFACT_DIR}/junit" &
-    wait "$!"
+    wait "$!" &&
     set +x
 }
 
