@@ -16,6 +16,7 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   exit 1
 fi
 
+openshift_install_path="/var/lib/openshift-install"
 third_octet=$(grep -oP 'ci-segment-\K[[:digit:]]+' <(echo "${LEASED_RESOURCE}"))
 
 export HOME=/tmp
@@ -39,6 +40,13 @@ cluster_domain=$(<"${SHARED_DIR}"/clusterdomain.txt)
 ssh_pub_key_path="${CLUSTER_PROFILE_DIR}/ssh-publickey"
 install_config="${SHARED_DIR}/install-config.yaml"
 
+legacy_installer_json="${openshift_install_path}/rhcos.json"
+fcos_json_file="${openshift_install_path}/fcos.json"
+
+if [[ -f "$fcos_json_file" ]]; then
+    legacy_installer_json=$fcos_json_file
+fi
+
 # https://github.com/openshift/installer/blob/master/docs/user/overview.md#coreos-bootimages
 # This code needs to handle pre-4.8 installers though too.
 if openshift-install coreos print-stream-json 2>/tmp/err.txt >${SHARED_DIR}/coreos.json; then
@@ -55,7 +63,12 @@ else
   ova_url="$(jq -r '.baseURI + .images["vmware"].path' ${legacy_installer_json})"
 fi
 rm -f /tmp/err.txt
+
+echo "${ova_url}" > "${SHARED_DIR}"/ova_url.txt
+ova_url=$(<"${SHARED_DIR}"/ova_url.txt)
+
 vm_template="${ova_url##*/}"
+
 
 # select a hardware version for testing
 hw_versions=(13 15 17)
