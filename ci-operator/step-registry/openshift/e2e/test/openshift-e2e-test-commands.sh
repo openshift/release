@@ -254,6 +254,12 @@ trap 'echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"' EXIT
 
 oc -n openshift-config patch cm admin-acks --patch '{"data":{"ack-4.8-kube-1.22-api-removals-in-4.9":"true"}}' --type=merge || echo 'failed to ack the 4.9 Kube v1beta1 removals; possibly API-server issue, or a pre-4.8 release image'
 
+# wait for all clusteroperators to reach progressing=false to ensure that we achieved the configuration specified at installation
+# time before we run our e2e tests.
+echo "$(date) - waiting for clusteroperators to finish progressing..."
+oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
+echo "$(date) - all clusteroperators are done progressing."
+
 case "${TEST_TYPE}" in
 upgrade-conformance)
     upgrade_conformance
