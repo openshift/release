@@ -3,10 +3,6 @@ base_images:
     name: "4.10"
     namespace: origin
     tag: base
-  ocp_4.8_cli:
-    name: "4.10"
-    namespace: origin
-    tag: cli
   ocp_builder_rhel-8-golang-1.16-openshift-4.8:
     name: builder
     namespace: ocp
@@ -15,7 +11,7 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.16-openshift-4.10
-  origin_4.8_cli:
+  origin_cli:
     name: "4.10"
     namespace: origin
     tag: cli
@@ -62,12 +58,12 @@ images:
   dockerfile_path: images/installer/Dockerfile.upi.ci
   from: rhel-7
   inputs:
-    ocp_4.8_cli:
-      as:
-      - registry.ci.openshift.org/ocp/4.8:cli
     ocp_builder_rhel-8-golang-1.16-openshift-4.8:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
+    origin_cli:
+      as:
+      - registry.ci.openshift.org/ocp/4.8:cli
   to: upi-installer
 - build_args:
   - name: TAGS
@@ -78,7 +74,7 @@ images:
     ocp_builder_rhel-8-golang-1.16-openshift-4.8:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
-    origin_4.8_cli:
+    origin_cli:
       as:
       - registry.ci.openshift.org/origin/4.8:cli
   to: openstack-installer
@@ -162,11 +158,13 @@ tests:
   commands: go test ./pkg/...
   container:
     from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
 - as: verify-codegen
   commands: IS_CONTAINER=TRUE ./hack/verify-codegen.sh
   container:
     from: src
 - as: e2e-aws
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(azure|baremetal|gcp|kubevirt|libvirt|openstack|ovirt|vsphere)/)
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
@@ -175,6 +173,7 @@ tests:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
 - as: e2e-aws-upgrade
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(azure|baremetal|gcp|kubevirt|libvirt|openstack|ovirt|vsphere)/)
   steps:
     cluster_profile: aws
     workflow: openshift-upgrade-aws
