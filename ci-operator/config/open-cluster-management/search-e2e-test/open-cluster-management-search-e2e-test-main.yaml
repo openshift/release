@@ -26,21 +26,29 @@ tests:
     workflow: ocm-ci-image-mirror
 - as: e2e
   steps:
-    dependencies:
-      COMPONENT_IMAGE_REF: search-e2e-test
     env:
-      CLUSTERPOOL_GROUP_NAME: Search
-      CLUSTERPOOL_HOST_NAMESPACE: acm-observability-usa
-      CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-obs-usa-clusterpool
-      CLUSTERPOOL_LIFETIME: 2h
-      CLUSTERPOOL_LIST_INCLUSION_FILTER: prow
+      AWS_CREDENTIALS_SECRET: ocm-obs-usa-aws-kind
+      AWS_INSTANCE_TYPE: t3.xlarge
+    post:
+    - ref: ocm-e2e-kind-destroy
+    pre:
+    - ref: ocm-ci-rbac
+    - ref: ocm-e2e-kind-create
     test:
     - as: e2e
       commands: |
+        echo "COMPONENT_IMAGE_REF=$COMPONENT_IMAGE_REF"
         echo $(ls -ltr)
         echo $(pwd)
         export SELF="make -f Makefile.prow"
         make -f Makefile.prow test-e2e
+      credentials:
+      - mount_path: /etc/secret
+        name: ocm-obs-usa-acmcreds
+        namespace: test-credentials
+      dependencies:
+      - env: COMPONENT_IMAGE_REF
+        name: search-e2e-test
       from: src
       resources:
         requests:
