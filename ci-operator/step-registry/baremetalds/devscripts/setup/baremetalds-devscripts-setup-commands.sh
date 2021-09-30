@@ -119,3 +119,5 @@ EOF
 
 # Save console URL in `console.url` file so that ci-chat-bot could report success
 scp "${SSHOPTS[@]}" "root@${IP}:/tmp/console.url" "${SHARED_DIR}/"
+# Save kubeadmin-password so that ci-chat-bot report success
+scp "${SSHOPTS[@]}" "root@${IP}:/root/dev-scripts/ocp/ostest/auth/kubeadmin-password" "${SHARED_DIR}/"
