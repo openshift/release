@@ -84,25 +84,12 @@ echo "export target_hw_version=${target_hw_version}" >> ${SHARED_DIR}/vsphere_co
 declare vsphere_datacenter
 declare vsphere_datastore
 declare vsphere_cluster
-declare vsphere_resource_pool
 declare dns_server
 declare vsphere_url
-declare TFVARS_PATH
 source "${SHARED_DIR}/vsphere_context.sh"
 
-vsphere_user=$(grep -oP 'vsphere_user\s*=\s*"\K[^"]+' ${TFVARS_PATH})
-vsphere_password=$(grep -oP 'vsphere_password\s*=\s*"\K[^"]+' ${TFVARS_PATH})
-
-echo "$(date -u --rfc-3339=seconds) - Creating govc.sh file..."
-cat >> "${SHARED_DIR}/govc.sh" << EOF
-export GOVC_URL="${vsphere_url}"
-export GOVC_USERNAME="${vsphere_user}"
-export GOVC_PASSWORD="${vsphere_password}"
-export GOVC_INSECURE=1
-export GOVC_RESOURCE_POOL=${vsphere_resource_pool}
-export GOVC_DATACENTER="${vsphere_datacenter}"
-export GOVC_DATASTORE="${vsphere_datastore}"
-EOF
+# shellcheck source=/dev/null
+source "${SHARED_DIR}/govc.sh"
 
 echo "$(date -u --rfc-3339=seconds) - Extend install-config.yaml ..."
 
@@ -121,8 +108,8 @@ platform:
     defaultDatastore: "${vsphere_datastore}"
     cluster: "${vsphere_cluster}"
     network: "${LEASED_RESOURCE}"
-    password: "${vsphere_password}"
-    username: "${vsphere_user}"
+    password: "${GOVC_PASSWORD}"
+    username: "${GOVC_USERNAME}"
     folder: "/${vsphere_datacenter}/vm/${cluster_name}"
 EOF
 
@@ -147,6 +134,13 @@ bootstrap_ip_address = "192.168.${third_octet}.3"
 lb_ip_address = "192.168.${third_octet}.2"
 compute_ip_addresses = ["192.168.${third_octet}.7","192.168.${third_octet}.8","192.168.${third_octet}.9"]
 control_plane_ip_addresses = ["192.168.${third_octet}.4","192.168.${third_octet}.5","192.168.${third_octet}.6"]
+EOF
+
+echo "$(date -u --rfc-3339=seconds) - Create secrets.auto.tfvars..."
+cat > "${SHARED_DIR}/secrets.auto.tfvars" <<-EOF
+vsphere_password="${GOVC_PASSWORD}"
+vsphere_user="${GOVC_USERNAME}"
+ipam_token=""
 EOF
 
 dir=/tmp/installer
