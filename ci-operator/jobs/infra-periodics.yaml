@@ -2129,3 +2129,46 @@ periodics:
     - name: token
       secret:
         secretName: github-credentials-openshift-merge-robot
+- agent: kubernetes
+  cluster: app.ci
+  decorate: true
+  decoration_config:
+    gcs_configuration:
+      bucket: origin-ci-private
+      job_url_prefix: https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
+      mediaTypes:
+        log: text/plain
+    gcs_credentials_secret: gce-sa-credentials-gcs-private
+  hidden: true
+  interval: 24h
+  labels:
+    ci.openshift.io/role: infra-internal
+  name: periodic-github-ldap-user-group-creator
+  spec:
+    containers:
+    - command:
+      - /usr/bin/github-ldap-user-group-creator
+      - --kubeconfig-dir=/tmp/build-farm-credentials
+      - --mapping-file=/etc/github-ldap-mapping/mapping.yaml
+      - --log-level=debug
+      - --dry-run=true
+      image: registry.ci.openshift.org/ci/github-ldap-user-group-creator:latest
+      imagePullPolicy: Always
+      name: github-ldap-user-group-creator
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github-ldap-mapping
+        name: github-ldap-mapping
+      - mountPath: /tmp/build-farm-credentials
+        name: build-farm-credentials
+        readOnly: true
+    serviceAccountName: github-ldap-user-group-creator
+    volumes:
+    - configMap:
+        name: github-ldap-mapping
+      name: github-ldap-mapping
+    - name: build-farm-credentials
+      secret:
+        secretName: github-ldap-user-group-creator
