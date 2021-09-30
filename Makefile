@@ -288,3 +288,15 @@ config_updater_vault_secret:
 	oc --context "$(cluster)" sa create-kubeconfig -n ci config-updater > "$(build_farm_credentials_folder)/sa.config-updater.$(cluster).config"
 	make ci-secret-generator
 .PHONY: config_updater_vault_secret
+
+# Need to run inside Red Had network
+update_github_ldap_mapping_config_map:
+	ldapsearch -LLL -x -h ldap.corp.redhat.com -b ou=users,dc=redhat,dc=com '(rhatSocialURL=GitHub*)' rhatSocialURL uid 2>&1 | tee /tmp/out
+	$(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/ldap-users-from-github-owners-files:latest
+	$(CONTAINER_ENGINE) run --rm \
+		-v "/tmp:/tmp:z" \
+		registry.ci.openshift.org/ci/ldap-users-from-github-owners-files:latest \
+		-ldap-file /tmp/out \
+		-mapping-file /tmp/mapping.yaml
+	oc --context app.ci -n ci create configmap github-ldap-mapping --from-file=mapping=/tmp/mapping.yaml --dry-run=client -o yaml | oc --context app.ci -n ci apply -f -
+.PHONY: update_github_ldap_mapping_config_map
