@@ -260,6 +260,28 @@ echo "$(date) - waiting for clusteroperators to finish progressing..."
 oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
 echo "$(date) - all clusteroperators are done progressing."
 
+# this works around a problem where tests fail because imagestreams aren't imported.  We see this happen for exec session.
+echo "$(date) - waiting for non-samples imagesteams to import..."
+count=0
+while :
+do
+  non_imported_imagestreams=$(oc -n openshift get is -o go-template='{{range .items}}{{$namespace := .metadata.namespace}}{{$name := .metadata.name}}{{range .status.tags}}{{if not .items}}{{$namespace}}/{{$name}}:{{.tag}}{{"\n"}}{{end}}{{end}}{{end}}')
+  if [ -z "${non_imported_imagestreams}" ]
+  then
+    break
+  fi
+  echo "${non_imported_imagestreams}"
+
+  count=$((count+1))
+  if (( count > 10 )); then
+    echo "Failed while waiting on imagestream import"
+    exit 1
+  fi
+
+  sleep 60
+done
+echo "$(date) - all imagestreams are imported."
+
 case "${TEST_TYPE}" in
 upgrade-conformance)
     upgrade_conformance
