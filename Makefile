@@ -298,5 +298,5 @@ update_github_ldap_mapping_config_map:
 		registry.ci.openshift.org/ci/ldap-users-from-github-owners-files:latest \
 		-ldap-file /tmp/out \
 		-mapping-file /tmp/mapping.yaml
-	oc --context app.ci -n ci create configmap github-ldap-mapping --from-file=mapping=/tmp/mapping.yaml --dry-run=client -o yaml | oc --context app.ci -n ci apply -f -
+	oc --context app.ci -n ci create configmap github-ldap-mapping --from-file=mapping.yaml=/tmp/mapping.yaml --dry-run=client -o yaml | oc --context app.ci -n ci apply -f -
 .PHONY: update_github_ldap_mapping_config_map
