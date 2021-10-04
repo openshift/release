@@ -32,5 +32,7 @@ The steps to investigate the issue are as follows:
 
 **Step 3**: There should be a folder named `cvp-common-aws` under which are all steps in the workflow itself together with some other folders like `gather-extra`, `gather-must-gather` etc. , you can check *optional-operators-** folders one by one and check for **build-log.txt** and **finished.json** to see what happened.
 
-**Step 4**: If the issue is still unclear, you need to go to *artifacts/cvp-common-aws/gather-must-gather/artifacts/event-filter.html*. Try to search for words in messages like “Failed”, “Error” or the one that you found in the first **build-log.txt** file.
+**Step 4**: In case of message like "Timed out waiting for the catalog source <catalogsource name> to become ready after 10 minutes." We can assume that there is a problem initializing catalogsource timeout. Check the Operator index.
+
+**Step 5**: If the issue is still unclear, you need to go to *artifacts/cvp-common-aws/gather-must-gather/artifacts/event-filter.html*. Try to search for words in messages like “Failed”, “Error” or the one that you found in the first **build-log.txt** file.
 Individual parts of the workflow can be found in the artifacts folder. There is also a folder that contains events for the whole process : *artifacts/cvp-common-aws/gather-extra/artifacts/*, you can search here in advance to see what went wrong.
