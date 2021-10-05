@@ -135,6 +135,7 @@ PASSWORD="$(uuidgen | sha256sum | cut -b -32)"
 SQUID_AUTH="${CLUSTER_NAME}:${PASSWORD}"
 echo ${SQUID_AUTH}>${SHARED_DIR}/SQUID_AUTH
 
+MACHINES_GATEWAY_IP=""
 SQUID_IP=$bastion_fip
 if [[ "${CONFIG_TYPE}" == "proxy" ]]; then
   # Right now we assume that the bastion will be connected to one machines network via a port.
@@ -145,6 +146,10 @@ if [[ "${CONFIG_TYPE}" == "proxy" ]]; then
   echo ${PROXY_INTERFACE}>${SHARED_DIR}/PROXY_INTERFACE
   openstack subnet set --no-dns-nameservers --dns-nameserver ${PROXY_INTERFACE} ${MACHINES_SUBNET_ID}
   echo "Subnet ${MACHINES_SUBNET_ID} was updated to use ${SQUID_IP} as DNS server"
+  if [[ "${NETWORK_TYPE}" == "Kuryr" ]]; then
+    MACHINES_GATEWAY_IP="$(openstack subnet show -c gateway_ip -f value $MACHINES_SUBNET_ID)"
+    echo "Subnet ${MACHINES_SUBNET_ID} has ${MACHINES_GATEWAY_IP} as gateway"
+  fi
 fi
 
 echo "Deploying squid on $SQUID_IP"
@@ -157,7 +162,7 @@ listen-address=${SQUID_IP}
 EOF"
 
 sudo bash -c "cat << EOF > /etc/squid/squid.conf
-acl localnet src 0.0.0.0/0
+acl localnet src all
 acl Safe_ports port 80
 acl Safe_ports port 443
 acl Safe_ports port 1025-65535
@@ -188,6 +193,14 @@ sudo htpasswd -bBc /etc/squid/htpasswd $CLUSTER_NAME $PASSWORD
 sudo systemctl start squid
 sudo systemctl start dnsmasq
 EOF
+
+if [[ $MACHINES_GATEWAY_IP != "" ]]; then
+  cat >> $WORK_DIR/deploy_squid.sh <<EOL
+#To reach the Pods Network it needs to go through the internal Router.
+#The 10.128.0.0/14 is the default Pods subnet pool CIDR.
+sudo ip route add 10.128.0.0/14 via $MACHINES_GATEWAY_IP
+EOL
+fi
 
 $SCP_CMD $WORK_DIR/deploy_squid.sh $BASTION_USER@$bastion_fip:/tmp
 $SSH_CMD chmod +x /tmp/deploy_squid.sh

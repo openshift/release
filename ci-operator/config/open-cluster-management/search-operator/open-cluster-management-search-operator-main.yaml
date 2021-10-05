@@ -42,11 +42,18 @@ tests:
     test:
     - as: e2e
       commands: |
+        echo $(ls -ltr /etc/secret)
+        echo $(pwd)
+        export QUAY_TOKEN=$(cat /etc/secret/credentials)
         echo "COMPONENT_IMAGE_REF=$COMPONENT_IMAGE_REF"
         export SELF="make -f Makefile.prow"
         set -o pipefail
         make -f Makefile.prow test-e2e
         set +o pipefail
+      credentials:
+      - mount_path: /etc/secret
+        name: ocm-obs-usa-quaytoken
+        namespace: test-credentials
       dependencies:
       - env: COMPONENT_IMAGE_REF
         name: search-operator

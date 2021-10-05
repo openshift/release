@@ -1,15 +1,15 @@
 base_images:
   assisted-installer:
-    name: assisted
-    namespace: ocp-kni
+    name: "2.4"
+    namespace: open-cluster-management
     tag: assisted-installer
   assisted-installer-agent:
-    name: assisted
-    namespace: ocp-kni
+    name: "2.4"
+    namespace: open-cluster-management
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: assisted
-    namespace: ocp-kni
+    name: "2.4"
+    namespace: open-cluster-management
     tag: assisted-installer-controller
   assisted-test-infra:
     name: assisted-test
@@ -53,13 +53,13 @@ operator:
   bundles:
   - dockerfile_path: deploy/olm-catalog/bundle.Dockerfile
   substitutions:
-  - pullspec: quay.io/ocpmetal/assisted-service:latest
+  - pullspec: quay.io/edge-infrastructure/assisted-service:ocm-2.4
     with: assisted-service
-  - pullspec: quay.io/ocpmetal/assisted-installer:latest
+  - pullspec: quay.io/edge-infrastructure/assisted-installer:ocm-2.4
     with: assisted-installer
-  - pullspec: quay.io/ocpmetal/assisted-installer-agent:latest
+  - pullspec: quay.io/edge-infrastructure/assisted-installer-agent:ocm-2.4
     with: assisted-installer-agent
-  - pullspec: quay.io/ocpmetal/assisted-installer-controller:latest
+  - pullspec: quay.io/edge-infrastructure/assisted-installer-controller:ocm-2.4
     with: assisted-installer-controller
   - pullspec: quay.io/ocpmetal/postgresql-12-centos7:latest
     with: postgresql-12-centos7
@@ -268,14 +268,31 @@ tests:
       IP_STACK: v4
       NUM_EXTRA_WORKERS: "1"
     workflow: baremetalds-assisted-operator-ztp
-- as: e2e-metal-assisted-operator-ztp-dualstack
+- as: e2e-ai-operator-ztp-ipv4v6-sno-ocp-48
   optional: true
-  run_if_changed: ^(cmd/.*|data/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
       ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
+    env:
+      DEVSCRIPTS_CONFIG: |
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=32768
+        EXTRA_WORKER_DISK=120
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      DISCONNECTED: "false"
+      IP_STACK: v4v6
+      NUM_EXTRA_WORKERS: "1"
+    workflow: baremetalds-assisted-operator-ztp
+- as: e2e-ai-operator-ztp-ipv4v6-sno-ocp-49
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       DEVSCRIPTS_CONFIG: |
         EXTRA_WORKER_VCPU=8
@@ -307,6 +324,46 @@ tests:
       IP_STACK: v4
       NUM_EXTRA_WORKERS: "3"
     workflow: baremetalds-assisted-operator-ztp
+- as: e2e-ai-operator-ztp-ipv4v6-3masters-periodic-ocp-49
+  cron: '@daily'
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      ASSISTED_ZTP_CONFIG: |
+        SPOKE_CONTROLPLANE_AGENTS=3
+      DEVSCRIPTS_CONFIG: |
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=32768
+        EXTRA_WORKER_DISK=120
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      DISCONNECTED: "false"
+      IP_STACK: v4v6
+      NUM_EXTRA_WORKERS: "3"
+    workflow: baremetalds-assisted-operator-ztp
+- as: e2e-ai-operator-ztp-ipv4v6-3masters-periodic-ocp-48
+  cron: '@daily'
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
+    env:
+      ASSISTED_ZTP_CONFIG: |
+        SPOKE_CONTROLPLANE_AGENTS=3
+      DEVSCRIPTS_CONFIG: |
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=32768
+        EXTRA_WORKER_DISK=120
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      DISCONNECTED: "false"
+      IP_STACK: v4v6
+      NUM_EXTRA_WORKERS: "3"
+    workflow: baremetalds-assisted-operator-ztp
 - as: e2e-metal-assisted-operator-ztp-multinode-spoke
   optional: true
   steps:
@@ -327,14 +384,33 @@ tests:
       IP_STACK: v4
       NUM_EXTRA_WORKERS: "3"
     workflow: baremetalds-assisted-operator-ztp
-- as: e2e-metal-assisted-operator-ztp-dualstack-multinode-spoke
+- as: e2e-ai-operator-ztp-ipv4v6-3masters-ocp-48
   optional: true
-  run_if_changed: ^(cmd/.*|data/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
       ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
+    env:
+      ASSISTED_ZTP_CONFIG: |
+        SPOKE_CONTROLPLANE_AGENTS=3
+      DEVSCRIPTS_CONFIG: |
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=32768
+        EXTRA_WORKER_DISK=120
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      DISCONNECTED: "false"
+      IP_STACK: v4v6
+      NUM_EXTRA_WORKERS: "3"
+    workflow: baremetalds-assisted-operator-ztp
+- as: e2e-ai-operator-ztp-ipv4v6-3masters-ocp-49
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       ASSISTED_ZTP_CONFIG: |
         SPOKE_CONTROLPLANE_AGENTS=3
@@ -361,6 +437,62 @@ tests:
         REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
       DISCONNECTED: "false"
       IP_STACK: v4
+      NUM_EXTRA_WORKERS: "1"
+    workflow: baremetalds-assisted-operator-ztp
+- as: e2e-metal-assisted-operator-ztp-periodic-upgrade
+  cron: '@daily'
+  steps:
+    cluster_profile: packet
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
+    env:
+      ASSISTED_STOP_AFTER_AGENT_DISCOVERY: "false"
+      ASSISTED_STOP_AFTER_AGENT_DISCOVERY_OVERRIDE: "true"
+      ASSISTED_UPGRADE_OPERATOR: "true"
+      ASSISTED_UPGRADE_OPERATOR_OVERRIDE: "false"
+      CATALOG_SOURCE_NAME: community-operators
+      CHANNEL_INSTALL_OVERRIDE: ocm-2.3
+      CHANNEL_UPGRADE_OVERRIDE: alpha
+      DEVSCRIPTS_CONFIG: |
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=32768
+        EXTRA_WORKER_DISK=120
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      IP_STACK: v4
+      NUM_EXTRA_WORKERS: "1"
+    workflow: baremetalds-assisted-operator-ztp-upgrade
+- as: e2e-ai-operator-ztp-ipv4v6-sno-periodic-ocp-48
+  cron: '@daily'
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      DEVSCRIPTS_CONFIG: |
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=32768
+        EXTRA_WORKER_DISK=120
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      DISCONNECTED: "false"
+      IP_STACK: v4v6
+      NUM_EXTRA_WORKERS: "1"
+    workflow: baremetalds-assisted-operator-ztp
+- as: e2e-ai-operator-ztp-ipv4v6-sno-periodic-ocp-49
+  cron: '@daily'
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      DEVSCRIPTS_CONFIG: |
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=32768
+        EXTRA_WORKER_DISK=120
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      DISCONNECTED: "false"
+      IP_STACK: v4v6
       NUM_EXTRA_WORKERS: "1"
     workflow: baremetalds-assisted-operator-ztp
 - as: e2e-metal-assisted-ipv6
@@ -442,6 +574,30 @@ tests:
     env:
       ASSISTED_CONFIG: |
         TEST_FUNC=test_olm_operator
+      TEST_SUITE: minimal
+    workflow: baremetalds-assisted-install
+- as: e2e-metal-assisted-kube-api-late-binding-single-node
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      POST_INSTALL_COMMANDS: |
+        export TEST=./discovery-infra/tests/test_kube_api.py
+        export TEST_FUNC=test_kube_api_late_binding_ipv4_single_node
+        export KUBECONFIG=$(find ${KUBECONFIG} -type f)
+        make deploy_assisted_operator test_parallel
+      TEST_SUITE: minimal
+    workflow: baremetalds-assisted-install
+- as: e2e-metal-assisted-kube-api-late-binding-single-node-periodic
+  cron: '@daily'
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      POST_INSTALL_COMMANDS: |
+        export TEST=./discovery-infra/tests/test_kube_api.py
+        export TEST_FUNC=test_kube_api_late_binding_ipv4_single_node
+        export KUBECONFIG=$(find ${KUBECONFIG} -type f)
+        make deploy_assisted_operator test_parallel
       TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
 zz_generated_metadata:

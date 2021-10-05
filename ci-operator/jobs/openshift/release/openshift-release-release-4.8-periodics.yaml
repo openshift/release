@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 15m
   labels:
@@ -167,7 +167,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 15m
   labels:
@@ -231,7 +231,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 15m
   labels:
@@ -291,251 +291,6 @@ periodics:
         name: release-pull-secret
     serviceAccountName: ci-operator
     volumes:
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-- agent: kubernetes
-  cluster: build01
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: okd-machine-os
-    workdir: true
-  interval: 8h
-  labels:
-    job-release: "4.8"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: promote-release-openshift-okd-machine-os-content-e2e-aws-4.8
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME)
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --promote
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/usr/local/e2e-aws-cluster-profile
-      - --target=e2e-aws
-      command:
-      - ci-operator
-      env:
-      - name: UNRESOLVED_CONFIG
-        value: |
-          base_images:
-            base:
-              name: "4.8"
-              namespace: "origin"
-              tag: base
-          build_root:
-            image_stream_tag:
-              name: release
-              namespace: openshift
-              tag: golang-1.15
-          images:
-          - dockerfile_path: Dockerfile.ci
-            to: cosa-build
-          - inputs:
-              cosa-build:
-                paths:
-                - destination_dir: .
-                  source_path: /tmp/Dockerfile
-                - destination_dir: .
-                  source_path: /go/src/github.com/openshift/okd-machine-os/manifests/
-                - destination_dir: .
-                  source_path: /go/src/github.com/openshift/okd-machine-os/bootstrap/
-                - destination_dir: .
-                  source_path: /go/src/github.com/openshift/okd-machine-os/extensions/
-            to: machine-os-content
-          promotion:
-            name: "4.8"
-            namespace: "origin"
-          resources:
-            '*':
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tag_specification:
-            name: "4.8"
-            namespace: "origin"
-          tests:
-          - as: e2e-aws
-            steps:
-              cluster_profile: aws
-              workflow: openshift-e2e-aws
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/e2e-aws-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/push-secret
-        name: push-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-aws
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: push-secret
-      secret:
-        secretName: registry-push-credentials-ci-central
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build01
-  decorate: true
-  interval: 48h
-  labels:
-    job-release: "4.8"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: release-openshift-origin-installer-old-rhcos-e2e-aws-4.8
-  spec:
-    containers:
-    - args:
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
-      - --target=e2e-$(CLUSTER_TYPE)-upgrade
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      command:
-      - /bin/bash
-      - -c
-      - |
-        #!/bin/bash
-        set -exuo pipefail
-
-        # prow doesn't allow init containers or a second container
-        export PATH=$PATH:/tmp/bin
-        export HOME=/tmp
-        mkdir $HOME/.docker/
-        cp /usr/local/pull-secret/.dockerconfigjson $HOME/.docker/config.json
-        mkdir $HOME/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/stable/openshift-client-linux.tar.gz | tar xvzf - -C /tmp/bin/ oc
-        chmod ug+x $HOME/bin/oc
-
-        # create namespace and craft a release image without the machine operator
-        namespace="ci-op-$( echo "${JOB_NAME}-${BUILD_ID}" | md5sum -t | cut -c 1-8 )"
-        oc registry login
-        oc new-project ${namespace}
-        oc create is --lookup-local -n "${namespace}" release
-        oc create is --lookup-local -n "${namespace}" stable-initial
-        RELEASE_REPO=$( oc get is -n "${namespace}" release -o 'jsonpath={.status.publicDockerImageRepository}' )
-        INITIAL_REPO=$( oc get is -n "${namespace}" stable-initial -o 'jsonpath={.status.publicDockerImageRepository}' )
-        export RELEASE_IMAGE_INITIAL=registry.ci.openshift.org/ocp/release:$(FROM_BRANCH)
-        export RELEASE_IMAGE_LATEST=${RELEASE_REPO}:upgrade
-        export IMAGE_TESTS=${INITIAL_REPO}:tests # use the older version of the payload
-        oc policy add-role-to-group system:image-puller -n ${namespace} system:unauthenticated system:authenticated
-        oc adm release new --from-release=registry.ci.openshift.org/ocp/release:$(BRANCH) \
-          --to-image=${RELEASE_IMAGE_LATEST} \
-          --exclude=machine-config-operator
-
-        # execute the test
-        ci-operator $@ --namespace=${namespace}
-      - ""
-      env:
-      - name: FROM_BRANCH
-        value: "4.7"
-      - name: BRANCH
-        value: 4.8-ci
-      - name: CLUSTER_TYPE
-        value: aws
-      - name: CONFIG_SPEC
-        value: |
-          tag_specification:
-            name: "none" # don't import anything to avoid a race between 4.7 latest and the chosen version
-            namespace: ocp
-          build_root:
-            image_stream_tag:
-              name: release
-              namespace: openshift
-              tag: golang-1.12
-          resources:
-            '*':
-              limits:
-                memory: 6Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tests:
-          - as: e2e-$(CLUSTER_TYPE)-upgrade
-            commands: |
-              TEST_SUITE=all run-upgrade-tests
-              TEST_SUITE=openshift/conformance/parallel TEST_UNSUPPORTED_ALLOW_VERSION_SKEW=1 run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: true
-      - name: JOB_NAME_SAFE
-        value: e2e-aws-upgrade
-      - name: TEST_COMMAND
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-aws
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
@@ -730,7 +485,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 48h
   labels:
@@ -830,7 +585,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 48h
   labels:
@@ -932,7 +687,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 48h
   labels:
@@ -1045,7 +800,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 48h
   labels:
@@ -1158,7 +913,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 48h
   labels:
@@ -1269,7 +1024,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 48h
   labels:
@@ -1369,7 +1124,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 48h
   labels:
@@ -1469,7 +1224,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   decoration_config:
     timeout: 8h0m0s
@@ -1607,7 +1362,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 48h
   labels:
@@ -1707,7 +1462,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 48h
   labels:
@@ -1907,7 +1662,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 24h
   labels:
@@ -2006,7 +1761,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   extra_refs:
   - base_ref: main
@@ -2057,7 +1812,7 @@ periodics:
       secret:
         secretName: osde2e-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   extra_refs:
   - base_ref: main

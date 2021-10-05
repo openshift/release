@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 30m
   labels:
@@ -158,7 +158,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 8h
   labels:
@@ -279,7 +279,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 8h
   labels:
@@ -400,7 +400,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -673,132 +673,6 @@ periodics:
   labels:
     job-release: "4.4"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: release-openshift-origin-installer-old-rhcos-e2e-aws-4.4
-  spec:
-    containers:
-    - args:
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
-      - --target=e2e-$(CLUSTER_TYPE)-upgrade
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      command:
-      - /bin/bash
-      - -c
-      - |
-        #!/bin/bash
-        set -exuo pipefail
-
-        # prow doesn't allow init containers or a second container
-        export PATH=$PATH:/tmp/bin
-        export HOME=/tmp
-        mkdir $HOME/.docker/
-        cp /usr/local/pull-secret/.dockerconfigjson $HOME/.docker/config.json
-        mkdir $HOME/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/stable/openshift-client-linux.tar.gz | tar xvzf - -C /tmp/bin/ oc
-        chmod ug+x $HOME/bin/oc
-
-        # create namespace and craft a release image without the machine operator
-        namespace="ci-op-$( echo "${JOB_NAME}-${BUILD_ID}" | md5sum -t | cut -c 1-8 )"
-        oc registry login
-        oc new-project ${namespace}
-        oc create is --lookup-local -n "${namespace}" release
-        oc create is --lookup-local -n "${namespace}" stable-initial
-        RELEASE_REPO=$( oc get is -n "${namespace}" release -o 'jsonpath={.status.publicDockerImageRepository}' )
-        INITIAL_REPO=$( oc get is -n "${namespace}" stable-initial -o 'jsonpath={.status.publicDockerImageRepository}' )
-        export RELEASE_IMAGE_INITIAL=registry.ci.openshift.org/ocp/release:$(FROM_BRANCH)
-        export RELEASE_IMAGE_LATEST=${RELEASE_REPO}:upgrade
-        export IMAGE_TESTS=${INITIAL_REPO}:tests # use the older version of the payload
-        oc policy add-role-to-group system:image-puller -n ${namespace} system:unauthenticated system:authenticated
-        oc adm release new --from-release=registry.ci.openshift.org/ocp/release:$(BRANCH) \
-          --to-image=${RELEASE_IMAGE_LATEST} \
-          --exclude=machine-config-operator
-
-        # execute the test
-        ci-operator $@ --namespace=${namespace}
-      - ""
-      env:
-      - name: FROM_BRANCH
-        value: "4.4"
-      - name: BRANCH
-        value: 4.4-ci
-      - name: CLUSTER_TYPE
-        value: aws
-      - name: CONFIG_SPEC
-        value: |
-          tag_specification:
-            name: "none" # don't import anything to avoid a race between 4.4 latest and the chosen version
-            namespace: ocp
-          build_root:
-            image_stream_tag:
-              name: release
-              namespace: openshift
-              tag: golang-1.12
-          resources:
-            '*':
-              limits:
-                memory: 4Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tests:
-          - as: e2e-$(CLUSTER_TYPE)-upgrade
-            commands: |
-              TEST_SUITE=all run-upgrade-tests
-              TEST_SUITE=openshift/conformance/parallel TEST_UNSUPPORTED_ALLOW_VERSION_SKEW=1 run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: true
-      - name: JOB_NAME_SAFE
-        value: e2e-aws-upgrade
-      - name: TEST_COMMAND
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-aws
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-- agent: kubernetes
-  cluster: build01
-  decorate: true
-  interval: 24h
-  labels:
-    job-release: "4.4"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: release-openshift-ocp-installer-e2e-metal-4.4
   spec:
     containers:
@@ -983,7 +857,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 24h
   labels:
@@ -1083,7 +957,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 24h
   labels:
@@ -1185,7 +1059,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 24h
   labels:
@@ -1298,7 +1172,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 24h
   labels:
@@ -1411,7 +1285,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 24h
   labels:
@@ -1524,7 +1398,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 24h
   labels:
@@ -1635,7 +1509,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 24h
   labels:
@@ -1735,7 +1609,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 24h
   labels:
@@ -1833,7 +1707,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 24h
   labels:
@@ -1933,7 +1807,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 24h
   labels:
@@ -2045,7 +1919,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 24h
   labels:
@@ -2145,7 +2019,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 24h
   labels:
@@ -2281,7 +2155,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 24h
   labels:
@@ -2381,7 +2255,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   extra_refs:
   - base_ref: release-4.4
@@ -2461,7 +2335,7 @@ periodics:
       secret:
         secretName: registry-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 24h
   labels:

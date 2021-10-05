@@ -28,6 +28,7 @@ cp -t "${installer_dir}" \
     "${SHARED_DIR}/install-config.yaml" \
     "${SHARED_DIR}/metadata.json" \
     "${SHARED_DIR}/terraform.tfvars" \
+    "${SHARED_DIR}/secrets.auto.tfvars" \
     "${SHARED_DIR}/bootstrap.ign" \
     "${SHARED_DIR}/worker.ign" \
     "${SHARED_DIR}/master.ign"
@@ -39,10 +40,6 @@ cp -t "${installer_dir}/auth" \
 # Copy sample UPI files
 cp -rt "${installer_dir}" \
     /var/lib/openshift-install/upi/"${CLUSTER_TYPE}"/*
-
-# Copy secrets to terraform path
-cp -t "${installer_dir}" \
-    ${TFVARS_PATH}
 
 export KUBECONFIG="${installer_dir}/auth/kubeconfig"
 
@@ -110,7 +107,7 @@ function update_image_registry() {
 }
 
 function setE2eMirror() {
-  
+
   oc create -f - <<EOF
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfig
@@ -152,10 +149,6 @@ wait "$!"
 # The terraform state could be larger than the maximum 1mb
 # in a secret
 tar -Jcf "${SHARED_DIR}/terraform_state.tar.xz" terraform.tfstate
-
-# To ease debugging of ip address use
-cluster_domain=$(<"${SHARED_DIR}"/clusterdomain.txt)
-host -t A "api.${cluster_domain}"
 
 ## Monitor for `bootstrap-complete`
 echo "$(date -u --rfc-3339=seconds) - Monitoring for bootstrap to complete"
