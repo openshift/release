@@ -88,6 +88,15 @@ tests:
       BASE_DOMAIN: aws-2.ci.openshift.org
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-aws
+- as: e2e-aws-ovn-upgrade
+  cluster: build01
+  interval: 24h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      TEST_TYPE: upgrade-conformance
+    workflow: openshift-upgrade-aws-ovn
 - as: e2e-aws-compact-upgrade
   interval: 48h
   steps:
@@ -123,61 +132,85 @@ tests:
 - as: e2e-azure
   interval: 24h
   steps:
-    cluster_profile: azure4
+    cluster_profile: azure-2
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
     workflow: openshift-e2e-azure
 - as: e2e-azure-techpreview
   interval: 48h
   steps:
-    cluster_profile: azure4
+    cluster_profile: azure-2
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
     workflow: openshift-e2e-azure-techpreview
 - as: e2e-azure-compact
   interval: 48h
   steps:
-    cluster_profile: azure4
+    cluster_profile: azure-2
     env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
       SIZE_VARIANT: compact
     workflow: openshift-e2e-azure
 - as: e2e-azure-serial
   interval: 24h
   steps:
-    cluster_profile: azure4
+    cluster_profile: azure-2
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
     workflow: openshift-e2e-azure-serial
 - as: e2e-azure-techpreview-serial
   interval: 48h
   steps:
-    cluster_profile: azure4
+    cluster_profile: azure-2
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
     workflow: openshift-e2e-azure-techpreview-serial
 - as: e2e-azure-compact-serial
   interval: 48h
   steps:
-    cluster_profile: azure4
+    cluster_profile: azure-2
     env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
       SIZE_VARIANT: compact
     workflow: openshift-e2e-azure-serial
 - as: e2e-azure-upgrade
   interval: 24h
   steps:
-    cluster_profile: azure4
+    cluster_profile: azure-2
     env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-azure
+- as: e2e-azure-ovn-upgrade
+  interval: 24h
+  steps:
+    cluster_profile: azure-2
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+      TEST_TYPE: upgrade-conformance
+    workflow: openshift-upgrade-azure-ovn
 - as: e2e-azure-compact-upgrade
   interval: 48h
   steps:
-    cluster_profile: azure4
+    cluster_profile: azure-2
     env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
       SIZE_VARIANT: compact
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-azure
 - as: e2e-azure-cilium
   interval: 48h
   steps:
-    cluster_profile: azure4
+    cluster_profile: azure-2
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
     workflow: openshift-e2e-azure-cilium
 - as: e2e-azure-ovn
   interval: 24h
   steps:
-    cluster_profile: azure4
+    cluster_profile: azure-2
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
     workflow: openshift-e2e-azure-ovn
 - as: e2e-gcp
   interval: 24h
@@ -253,7 +286,9 @@ tests:
 - as: e2e-azure-upgrade-single-node
   interval: 24h
   steps:
-    cluster_profile: azure4
+    cluster_profile: azure-2
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
     workflow: openshift-upgrade-azure-single-node
 - as: e2e-aws-hypershift
   interval: 24h
@@ -330,11 +365,15 @@ tests:
     cluster_profile: openstack-kuryr
     env:
       NETWORK_TYPE: Kuryr
-    test:
-    - ref: openstack-noop
+      TEST_SKIPS: NodePort \| session affinity \| Services should be able to change
+        the type from ExternalName to ClusterIP \| Pods should delete a collection
+        of pods \| Kubectl client Guestbook application should create and stop a working
+        application \| Services should serve multiport endpoints from pods \| Services
+        should serve a basic endpoint from pods
+      TEST_SUITE: kubernetes/conformance
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-aws-cgroupsv2
-  interval: 24h
+  interval: 3h
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-cgroupsv2

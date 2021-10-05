@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 15m
   labels:
@@ -167,7 +167,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 15m
   labels:
@@ -231,7 +231,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 15m
   labels:
@@ -295,366 +295,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: release-4.9
-    org: openshift
-    repo: origin
-    workdir: true
-  interval: 2h
-  labels:
-    job-release: "4.9"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: promote-release-openshift-okd-machine-os-content-e2e-aws-4.9
-  spec:
-    containers:
-    - args:
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID) --input-hash=$(JOB_NAME)
-      - --secret-dir=/usr/local/e2e-aws-cluster-profile
-      - --secret-dir=/usr/local/pull-secret
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      command:
-      - /bin/bash
-      - -c
-      - |
-        #!/bin/bash
-        set -euo pipefail
-
-        # fetch binaries and configure working env, prow doesn't allow init containers or a second container
-        dir=$(ARTIFACTS)/ostree
-        mkdir -p "${dir}"
-        export PATH=$PATH:/tmp/bin
-        export HOME=/tmp
-        mkdir $HOME/.docker/
-        cp /usr/local/pull-secret/.dockerconfigjson $HOME/.docker/config.json
-        mkdir $HOME/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/stable/openshift-client-linux.tar.gz | tar xvzf - -C /tmp/bin/ oc
-        curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 2>/dev/null >/tmp/bin/jq
-        chmod ug+x $HOME/bin/oc $HOME/bin/jq
-
-        # guard against starting if no okd stream exists yet
-        if ! oc get istag -n ${TAG_NS} ${BRANCH}:${TAG}; then
-          echo "No build possible, no image stream"
-          exit 0
-        fi
-
-        # populate the base_sha in job spec so we don't build something different
-        origin_artifacts_id="$( oc get istag -n ${TAG_NS} ${BRANCH}:artifacts --template '{{ .image.metadata.name }}' )"
-        origin_machine_config_operator_id="$( oc get istag -n ${TAG_NS} ${BRANCH}:machine-config-operator --template '{{ .image.metadata.name }}' )"
-        # export JOB_SPEC="$( echo "${JOB_SPEC}" | jq -r ".extra_refs[0].base_sha = \"${origin_commit_id}\"" )"
-
-        # fetch fcos release info and check whether we've already built this image
-        build_url="https://builds.coreos.fedoraproject.org/prod/streams/${STREAM}/builds"
-        curl "${build_url}/builds.json" 2>/dev/null >${dir}/builds.json
-        build_id="$( <"${dir}/builds.json" jq -r '.builds[0].id' )"
-        base_url="${build_url}/${build_id}/x86_64"
-        curl "${base_url}/meta.json" 2>/dev/null >${dir}/meta.json
-        tar_url="${base_url}/$( <${dir}/meta.json jq -r .images.ostree.path )"
-        commit_id="$( <${dir}/meta.json jq -r '."ostree-commit"' )"
-        ostree_ref="fedora/x86_64/coreos/${STREAM}"
-
-        # Build a semantic version as best we can from the build id, dropping any other
-        # segments. Each version of machine-os-content is responsible for setting a
-        # semver and this is only a workaround for now.
-        if [[ ! "${build_id}" =~ ^(([0-9]+)\.)(([0-9]+)\.)?(([0-9]+)($|\.))? ]]; then
-          echo "Build ID did not contain at least one major version"
-          exit 1
-        fi
-        build_semver="${BASH_REMATCH[1]}"
-        if [[ -n ${BASH_REMATCH[4]} ]]; then
-          build_semver+="${BASH_REMATCH[3]}"
-        else
-          build_semver+="0."
-        fi
-        if [[ -n "${BASH_REMATCH[6]}" ]]; then
-          build_semver+="${BASH_REMATCH[6]}"
-        else
-          build_semver+="0"
-        fi
-
-        # compare the latest image we have built against the potential candidate
-        latest="$( oc get istag -n ${TAG_NS} ${BRANCH}:${TAG} --template '{{ index .image.dockerImageMetadata.Config.Labels "version" }} {{ index .image.dockerImageMetadata.Config.Labels "id-artifacts" }} {{ index .image.dockerImageMetadata.Config.Labels "id-machine-config-operator-rpms" }}' )"
-        candidate="${build_id} ${origin_artifacts_id} ${origin_machine_config_operator_id}"
-        echo "Comparing existing '$latest' against latest '$candidate'"
-        if [[ "${latest}" == "${candidate}" ]]; then
-          echo "No build necessary, content is up to date"
-          exit 0
-        fi
-
-        # create namespace and craft a release image without the machine-os-content
-        namespace="ci-op-$( echo "${JOB_NAME}-${BUILD_ID}" | md5sum -t | cut -c 1-8 )"
-        oc registry login > /dev/null
-        oc new-project ${namespace} > /dev/null
-        oc policy add-role-to-group system:image-puller -n ${namespace} system:unauthenticated system:authenticated
-
-        # initial import
-        ci-operator $@ --target=[images] --namespace=${namespace}
-
-        # force build from https://github.com/openshift/okd-machine-os master
-        function build {
-          oc -n ${namespace} create -f $1 >/dev/null
-          while true; do
-            oc -n ${namespace} logs -f build/$2 || true
-            phase=$( oc -n ${namespace} get build/$2 -o 'jsonpath={.status.phase}' )
-            if [[ "${phase}" == "Failed" || "${phase}" == "Cancelled" || "${phase}" == "Error" ]]; then
-              oc -n ${namespace} describe build/$2
-              exit 1
-            fi
-            if [[ "${phase}" == "Complete" ]]; then
-              break
-            fi
-            sleep 5
-          done
-        }
-
-        cat <<EOF > ${dir}/build.yaml
-        kind: Build
-        apiVersion: build.openshift.io/v1
-        metadata:
-          name: machine-os-content
-        spec:
-          output:
-            to:
-              kind: ImageStreamTag
-              name: pipeline:machine-os-content
-            imageLabels:
-              - name: "version"
-                value: "${build_id}"
-              - name: "id-artifacts"
-                value: "${origin_artifacts_id}"
-              - name: "id-machine-config-operator-rpms"
-                value: "${origin_machine_config_operator_id}"
-              - name: "io.openshift.build.versions"
-                value: "machine-os=${build_semver}"
-              - name: "io.openshift.build.version-display-names"
-                value: "machine-os=Fedora CoreOS"
-          source:
-            type: Git
-            git:
-              uri: 'https://github.com/openshift/okd-machine-os'
-              ref: master
-          strategy:
-            dockerStrategy:
-            type: Docker
-        EOF
-        oc -n ${namespace} create is machine-os-content >/dev/null
-        build ${dir}/build.yaml machine-os-content
-
-        # debug output
-        oc describe -n ${namespace} istag/pipeline:machine-os-content
-
-        # run promotion test
-        ci-operator $@ --promote --namespace=${namespace}
-      env:
-      - name: TAG_NS
-        value: origin
-      - name: TAG
-        value: machine-os-content
-      - name: BRANCH
-        value: "4.9"
-      - name: STREAM
-        value: next-devel
-      - name: TAG_SOURCE
-        value: $(TAG):$(BRANCH)
-      - name: UNRESOLVED_CONFIG
-        value: |
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: origin
-          promotion:
-            name: "$(BRANCH)"
-            namespace: origin
-            additional_images:
-              $(TAG): $(TAG)
-          build_root:
-            image_stream_tag:
-              name: release
-              namespace: openshift
-              tag: golang-1.13
-          resources:
-            '*':
-              limits:
-                memory: 6Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tests:
-          - as: e2e-aws
-            steps:
-              cluster_profile: aws
-              workflow: openshift-e2e-aws
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/e2e-aws-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-aws
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-- agent: kubernetes
-  cluster: build01
-  decorate: true
-  interval: 48h
-  labels:
-    job-release: "4.9"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: release-openshift-origin-installer-old-rhcos-e2e-aws-4.9
-  spec:
-    containers:
-    - args:
-      - --secret-dir=/usr/local/pull-secret
-      - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
-      - --target=e2e-$(CLUSTER_TYPE)-upgrade
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      command:
-      - /bin/bash
-      - -c
-      - |
-        #!/bin/bash
-        set -exuo pipefail
-
-        # prow doesn't allow init containers or a second container
-        export PATH=$PATH:/tmp/bin
-        export HOME=/tmp
-        mkdir $HOME/.docker/
-        cp /usr/local/pull-secret/.dockerconfigjson $HOME/.docker/config.json
-        mkdir $HOME/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/stable/openshift-client-linux.tar.gz | tar xvzf - -C /tmp/bin/ oc
-        chmod ug+x $HOME/bin/oc
-
-        # create namespace and craft a release image without the machine operator
-        namespace="ci-op-$( echo "${JOB_NAME}-${BUILD_ID}" | md5sum -t | cut -c 1-8 )"
-        oc registry login
-        oc new-project ${namespace}
-        oc create is --lookup-local -n "${namespace}" release
-        oc create is --lookup-local -n "${namespace}" stable-initial
-        RELEASE_REPO=$( oc get is -n "${namespace}" release -o 'jsonpath={.status.publicDockerImageRepository}' )
-        INITIAL_REPO=$( oc get is -n "${namespace}" stable-initial -o 'jsonpath={.status.publicDockerImageRepository}' )
-        export RELEASE_IMAGE_INITIAL=registry.ci.openshift.org/ocp/release:$(FROM_BRANCH)
-        export RELEASE_IMAGE_LATEST=${RELEASE_REPO}:upgrade
-        export IMAGE_TESTS=${INITIAL_REPO}:tests # use the older version of the payload
-        oc policy add-role-to-group system:image-puller -n ${namespace} system:unauthenticated system:authenticated
-        oc adm release new --from-release=registry.ci.openshift.org/ocp/release:$(BRANCH) \
-          --to-image=${RELEASE_IMAGE_LATEST} \
-          --exclude=machine-config-operator
-
-        # execute the test
-        ci-operator $@ --namespace=${namespace}
-      - ""
-      env:
-      - name: FROM_BRANCH
-        value: "4.8"
-      - name: BRANCH
-        value: 4.9-ci
-      - name: CLUSTER_TYPE
-        value: aws
-      - name: CONFIG_SPEC
-        value: |
-          tag_specification:
-            name: "none" # don't import anything to avoid a race between 4.8 latest and the chosen version
-            namespace: ocp
-          build_root:
-            image_stream_tag:
-              name: release
-              namespace: openshift
-              tag: golang-1.12
-          resources:
-            '*':
-              limits:
-                memory: 6Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tests:
-          - as: e2e-$(CLUSTER_TYPE)-upgrade
-            commands: |
-              TEST_SUITE=all run-upgrade-tests
-              TEST_SUITE=openshift/conformance/parallel TEST_UNSUPPORTED_ALLOW_VERSION_SKEW=1 run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: true
-      - name: JOB_NAME_SAFE
-        value: e2e-aws-upgrade
-      - name: TEST_COMMAND
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-aws
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-- agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 48h
   labels:
@@ -749,7 +390,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 48h
   labels:
@@ -844,7 +485,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 48h
   labels:
@@ -944,7 +585,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 48h
   labels:
@@ -1046,7 +687,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 48h
   labels:
@@ -1159,7 +800,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 48h
   labels:
@@ -1272,7 +913,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 48h
   labels:
@@ -1383,7 +1024,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 24h
   labels:
@@ -1483,7 +1124,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 48h
   labels:
@@ -1583,7 +1224,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   decoration_config:
     timeout: 8h0m0s
@@ -1721,7 +1362,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 48h
   labels:
@@ -1821,7 +1462,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 48h
   labels:
@@ -1923,7 +1564,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 48h
   labels:
@@ -2021,7 +1662,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   interval: 24h
   labels:
@@ -2120,7 +1761,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   extra_refs:
   - base_ref: main
@@ -2171,7 +1812,7 @@ periodics:
       secret:
         secretName: osde2e-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   extra_refs:
   - base_ref: main

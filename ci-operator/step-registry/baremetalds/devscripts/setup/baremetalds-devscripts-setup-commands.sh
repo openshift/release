@@ -21,7 +21,13 @@ finished()
   # Get dev-scripts logs
   echo "dev-scripts setup completed, fetching logs"
   ssh "${SSHOPTS[@]}" "root@${IP}" tar -czf - /root/dev-scripts/logs | tar -C "${ARTIFACT_DIR}" -xzf -
-  sed -i -e 's/.*auths.*/*** PULL_SECRET ***/g' "${ARTIFACT_DIR}"/root/dev-scripts/logs/*
+  echo "Removing REDACTED info from log..."
+  sed -i '
+    s/.*auths.*/*** PULL_SECRET ***/g/;
+    s/password: .*/password: REDACTED/;
+    s/X-Auth-Token.*/X-Auth-Token REDACTED/;
+    s/UserData:.*,/UserData: REDACTED,/;
+    ' "${ARTIFACT_DIR}"/root/dev-scripts/logs/*
 }
 trap finished EXIT TERM
 
@@ -78,6 +84,7 @@ cp /root/pull-secret /root/dev-scripts/pull_secret.json
 echo "export OPENSHIFT_RELEASE_IMAGE=${OPENSHIFT_INSTALL_RELEASE_IMAGE}" >> /root/dev-scripts/config_root.sh
 echo "export ADDN_DNS=\$(awk '/nameserver/ { print \$2;exit; }' /etc/resolv.conf)" >> /root/dev-scripts/config_root.sh
 echo "export OPENSHIFT_CI=true" >> /root/dev-scripts/config_root.sh
+echo "export NUM_WORKERS=3" >> /root/dev-scripts/config_root.sh
 echo "export WORKER_MEMORY=16384" >> /root/dev-scripts/config_root.sh
 echo "export ENABLE_LOCAL_REGISTRY=true" >> /root/dev-scripts/config_root.sh
 
@@ -102,6 +109,7 @@ cd /root/dev-scripts
 source common.sh
 source ocp_install_env.sh
 
+set +x
 echo "export DS_OPENSHIFT_VERSION=\$(openshift_version)" >> /tmp/ds-vars.conf
 echo "export DS_REGISTRY=\$LOCAL_REGISTRY_DNS_NAME:\$LOCAL_REGISTRY_PORT" >> /tmp/ds-vars.conf
 echo "export DS_WORKING_DIR=\$WORKING_DIR" >> /tmp/ds-vars.conf
@@ -109,3 +117,12 @@ echo "export DS_IP_STACK=\$IP_STACK" >> /tmp/ds-vars.conf
 EOF
 
 scp "${SSHOPTS[@]}" "root@${IP}:/tmp/ds-vars.conf" "${SHARED_DIR}/"
+
+
+# Add required configurations ci-chat-bot need
+ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
+echo "https://\$(oc -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > /tmp/console.url
+EOF
+
+# Save console URL in `console.url` file so that ci-chat-bot could report success
+scp "${SSHOPTS[@]}" "root@${IP}:/tmp/console.url" "${SHARED_DIR}/"

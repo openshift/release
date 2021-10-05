@@ -64,7 +64,7 @@ postsubmits:
       - args:
         - -f
         - /opt/build-harness/Makefile.prow
-        - pipeline-manifest/update
+        - osci/publish
         command:
         - make
         env:
@@ -72,7 +72,7 @@ postsubmits:
           value: work
         - name: OSCI_COMPONENT_VERSION
           value: 0.0.2
-        - name: PIPELINE_MANIFEST_REMOTE_REPO
+        - name: OSCI_IMAGE_REMOTE_REPO_SRC
           value: registry.ci.openshift.org/open-cluster-management
         - name: SELF
           value: make -f /opt/build-harness/Makefile.prow
@@ -86,8 +86,23 @@ postsubmits:
         - mountPath: /etc/github
           name: acm-cicd-github
           readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
       serviceAccountName: ci-operator
       volumes:
       - name: acm-cicd-github
         secret:
           secretName: acm-cicd-github
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator

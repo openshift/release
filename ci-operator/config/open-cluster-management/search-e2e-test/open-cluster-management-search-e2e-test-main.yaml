@@ -1,3 +1,4 @@
+binary_build_commands: make build
 build_root:
   image_stream_tag:
     name: builder
@@ -23,45 +24,33 @@ tests:
       IMAGE_REPO: search-e2e-test
       REGISTRY_ORG: open-cluster-management
     workflow: ocm-ci-image-mirror
-- as: lint
-  commands: |
-    export SELF="make -f Makefile.prow"
-    make -f Makefile.prow install
-    make -f Makefile.prow lint
-    make -f Makefile.prow check
-  container:
-    from: src
-- as: backplane-fast-forward
-  postsubmit: true
+- as: e2e
   steps:
+    dependencies:
+      COMPONENT_IMAGE_REF: search-e2e-test
     env:
-      DESTINATION_BRANCH: release-2.4
-    workflow: ocm-ci-fastforward
-- as: unit-test-sonar-pre-submit
-  commands: |
-    export SELF="make -f Makefile.prow"
-    make -f Makefile.prow install
-    make -f Makefile.prow sonar/js/jest-init
-    make -f Makefile.prow unit-test
-    make -f Makefile.prow sonar/js/prow
-  container:
-    from: src
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
-- as: unit-test-sonar-post-submit
-  commands: |
-    export SELF="make -f Makefile.prow"
-    make -f Makefile.prow install
-    make -f Makefile.prow sonar/js/jest-init
-    make -f Makefile.prow unit-test
-    make -f Makefile.prow sonar/js/prow
-  container:
-    from: src
-  postsubmit: true
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
+      CLUSTER_NAMES: obs-e2e-hub
+      CLUSTERPOOL_GROUP_NAME: Search
+      CLUSTERPOOL_HOST_NAMESPACE: acm-observability-usa
+      CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-obs-usa-clusterpool
+    test:
+    - as: e2e
+      commands: |
+        echo "COMPONENT_IMAGE_REF=$COMPONENT_IMAGE_REF"
+        echo $(ls -ltr)
+        echo $(pwd)
+        export SELF="make -f Makefile.prow"
+        make -f Makefile.prow test-e2e
+      credentials:
+      - mount_path: /etc/secret
+        name: ocm-obs-usa-acmcreds
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-e2e-clusterpool
 zz_generated_metadata:
   branch: main
   org: open-cluster-management
