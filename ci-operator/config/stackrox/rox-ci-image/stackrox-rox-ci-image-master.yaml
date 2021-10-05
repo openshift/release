@@ -1,0 +1,32 @@
+base_images:
+  os:
+    name: ubuntu
+    namespace: ci
+    tag: "20.04"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.15
+images:
+- context_dir: images
+  dockerfile_path: Dockerfile.rox
+  from: os
+  to: rox-ci
+promotion:
+  name: rox-ci
+  namespace: stackrox
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: placeholder
+  commands: go version && uname -a
+  container:
+    from: src
+zz_generated_metadata:
+  branch: master
+  org: stackrox
+  repo: rox-ci-image
