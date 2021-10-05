@@ -23,7 +23,7 @@ finished()
   ssh "${SSHOPTS[@]}" "root@${IP}" tar -czf - /root/dev-scripts/logs | tar -C "${ARTIFACT_DIR}" -xzf -
   echo "Removing REDACTED info from log..."
   sed -i '
-    s/.*auths.*/*** PULL_SECRET ***/g/;
+    s/.*auths.*/*** PULL_SECRET ***/g;
     s/password: .*/password: REDACTED/;
     s/X-Auth-Token.*/X-Auth-Token REDACTED/;
     s/UserData:.*,/UserData: REDACTED,/;
