@@ -21,7 +21,13 @@ finished()
   # Get dev-scripts logs
   echo "dev-scripts setup completed, fetching logs"
   ssh "${SSHOPTS[@]}" "root@${IP}" tar -czf - /root/dev-scripts/logs | tar -C "${ARTIFACT_DIR}" -xzf -
-  sed -i -e 's/.*auths.*/*** PULL_SECRET ***/g' "${ARTIFACT_DIR}"/root/dev-scripts/logs/*
+  echo "Removing REDACTED info from log..."
+  sed -i '
+    s/.*auths.*/*** PULL_SECRET ***/g/;
+    s/password: .*/password: REDACTED/;
+    s/X-Auth-Token.*/X-Auth-Token REDACTED/;
+    s/UserData:.*,/UserData: REDACTED,/;
+    ' "${ARTIFACT_DIR}"/root/dev-scripts/logs/*
 }
 trap finished EXIT TERM
 
