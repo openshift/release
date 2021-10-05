@@ -93,9 +93,8 @@ function suite() {
         echo "Skipping tests:" &&
         echo "${TESTS}" | grep "${TEST_SKIPS}" || { exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS regex:'; echo "$TEST_SKIPS"; return $exit_code; } &&
         TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
+        scp "${SSHOPTS[@]}" /tmp/tests "root@${IP}:/tmp/tests"
     fi
-
-    scp "${SSHOPTS[@]}" /tmp/tests "root@${IP}:/tmp/tests"
 
     set -x
     ssh "${SSHOPTS[@]}" "root@${IP}" \
