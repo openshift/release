@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# This is to satisfy shellcheck SC2153
+export RELEASE_REPO=${RELEASE_REPO}
+
 export HOME=/tmp/home
 mkdir -p "$HOME/.docker"
 cd "$HOME" || exit 1
@@ -48,6 +51,11 @@ git clone "$release_url" "$release_dir" || {
 # Determine current release branch
 branch="${PULL_BASE_REF}"
 log "INFO The base branch is $branch"
+
+if [[ -z "$RELEASE_REF" ]]; then
+    log "INFO RELEASE_REF variable is set. Using $RELEASE_REF as branch."
+    branch="${RELEASE_REF}"
+fi
 
 if [[ "$branch" == "main" || "$branch" == "master" ]]; then
     log "INFO Base branch is either main or master."
