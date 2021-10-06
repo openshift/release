@@ -50,7 +50,7 @@ elif [[ "${master_type}" == null && "${COMPUTE_NODE_TYPE}" == null  ]]; then ## 
 elif [[ "${master_type}" == null || "${COMPUTE_NODE_TYPE}" == null ]]; then ## one null region
   if [[ "${BOOTSTRAP_NODE_TYPE}" == "${COMPUTE_NODE_TYPE}" || "${BOOTSTRAP_NODE_TYPE}" == "${master_type}" || "${master_type}" == "${COMPUTE_NODE_TYPE}" ]]; then ## "one null region and duplicates"
     mapfile -t INSTANCE_ZONES < <(aws --region "${REGION}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${master_type}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 1 ' | awk '{print $2}')
-  elif [[ "${BOOTSTRAP_NODE_TYPE}" != "${COMPUTE_NODE_TYPE}" || "${BOOTSTRAP_NODE_TYPE}" != "${master_type}" || "${master_type}" != "${COMPUTE_NODE_TYPE}" ]]; then ## "one null region and no duplicates"
+  else ## "one null region and no duplicates"
     mapfile -t INSTANCE_ZONES < <(aws --region "${REGION}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${master_type}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 2 ' | awk '{print $2}')
   fi 
 elif [[ "${BOOTSTRAP_NODE_TYPE}" == "${COMPUTE_NODE_TYPE}" || "${BOOTSTRAP_NODE_TYPE}" == "${master_type}" || "${master_type}" == "${COMPUTE_NODE_TYPE}" ]]; then ## duplicates regions with no null region
