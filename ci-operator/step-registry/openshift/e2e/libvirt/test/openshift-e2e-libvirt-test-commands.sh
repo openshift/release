@@ -265,6 +265,61 @@ function prometheus_GRPCRequestsSlow_loop() {
 	done
 }
 
+function prometheus_network_monitoring_loop() {
+	local SLEEP_TIME="10m"
+
+	log_to_file "${ARTIFACT_DIR}/prometheus-network-monitoring.log"
+
+	NNRBEL_DATA='instance:node_network_receive_bytes_excluding_lo'
+	NNRBEL_EDATA=$(urlencode "${NNRBEL_DATA}")
+
+	NNTBEL_DATA='instance:node_network_transmit_bytes_excluding_lo'
+	NNTBEL_EDATA=$(urlencode "${NNTBEL_DATA}")
+
+	while true
+	do
+		echo "8<----------8<---------- $(date +%s) 8<----------8<----------"
+		echo "${NNRBEL_DATA}"
+
+		RESPONSE=$(curl --silent --insecure --header "Authorization: Bearer ${TOKEN}" "https://${HOSTNAME}/api/v1/query?query=${NNRBEL_EDATA}")
+		RC=$?
+		if [[ ${RC} -gt 0 ]]
+		then
+			echo "Error: ${URL} returned ${RC}"
+			exit 1
+		fi
+		STATUS=$(echo "${RESPONSE}" | jq -r '.status')
+		if [[ "${STATUS}" != "success" ]]
+		then
+			echo "Error: Status is not success (${STATUS})"
+			exit 1
+		fi
+
+		echo "${RESPONSE}" | jq -r '.data.result[]'
+
+		echo "8<----------8<----------"
+		echo "${NNTBEL_DATA}"
+
+		RESPONSE=$(curl --silent --insecure --header "Authorization: Bearer ${TOKEN}" "https://${HOSTNAME}/api/v1/query?query=${NNTBEL_EDATA}")
+		RC=$?
+		if [[ ${RC} -gt 0 ]]
+		then
+			echo "Error: ${URL} returned ${RC}"
+			exit 1
+		fi
+		STATUS=$(echo "${RESPONSE}" | jq -r '.status')
+		if [[ "${STATUS}" != "success" ]]
+		then
+			echo "Error: Status is not success (${STATUS})"
+			exit 1
+		fi
+
+		echo "${RESPONSE}" | jq -r '.data.result[]'
+
+		sleep ${SLEEP_TIME}
+	done
+}
+
 function oc_adm_top_nodes_loop() {
 	log_to_file "${ARTIFACT_DIR}/oc-adm-top-nodes.log"
 
@@ -345,6 +400,9 @@ prometheus_kaebb_loop &
 WATCHERS+=( "$!" )
 
 prometheus_GRPCRequestsSlow_loop &
+WATCHERS+=( "$!" )
+
+prometheus_network_monitoring_loop &
 WATCHERS+=( "$!" )
 
 oc_adm_top_nodes_loop &
