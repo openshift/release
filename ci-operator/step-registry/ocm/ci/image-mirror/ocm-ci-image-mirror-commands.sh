@@ -52,7 +52,7 @@ git clone "$release_url" "$release_dir" || {
 branch="${PULL_BASE_REF}"
 log "INFO The base branch is $branch"
 
-if [[ -z "$RELEASE_REF" ]]; then
+if [[ -n "$RELEASE_REF" ]]; then
     log "INFO RELEASE_REF variable is set. Using $RELEASE_REF as branch."
     branch="${RELEASE_REF}"
 fi
