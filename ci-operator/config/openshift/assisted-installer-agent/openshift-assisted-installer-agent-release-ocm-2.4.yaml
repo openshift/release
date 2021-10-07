@@ -23,6 +23,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  ocm-image-builder-golang-1.17:
+    name: builder
+    namespace: open-cluster-management
+    tag: go1.17-linux
   openshift_release_golang-1.16:
     name: release
     namespace: openshift
@@ -60,6 +64,33 @@ test_binary_build_commands: |
   go mod vendor
   mkdir /.cache && chmod 775 -R /.cache ${GOPATH}
 tests:
+- as: ocm-publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-installer-agent
+    env:
+      IMAGE_REPO: assisted-installer-agent
+      REGISTRY_ORG: open-cluster-management
+      RELEASE_REF: release-2.4
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_COMPONENT_BRANCH=release-2.4
+        export OSCI_IMAGE_REMOTE_REPO_SRC=registry.ci.openshift.org/open-cluster-management
+        export OSCI_PUBLISH_DELAY=0
+        cd /opt/build-harness/build-harness-extensions/modules/osci/
+        make osci/publish BUILD_HARNESS_EXTENSIONS_PATH=/opt/build-harness/build-harness-extensions
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: ocm-image-builder-golang-1.17
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 - as: lint
   commands: |
     export GOLANGCI_LINT_CACHE=/tmp/.cache
