@@ -1,13 +1,20 @@
-binary_build_commands: go build -o openstack-test ./cmd/openshift-tests
+binary_build_commands: go build -o /bin/openstack-test ./cmd/openshift-tests
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: golang-1.16
-images:
-- dockerfile_path: Containerfile
-  from: src
-  to: openstack-tester
+promotion:
+  additional_images:
+    openstack-tests: bin
+  name: "4.10"
+  namespace: ocp
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.10"
+      namespace: ocp
 resources:
   '*':
     limits:
@@ -16,10 +23,10 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: no-op
-  commands: echo 'This is a placeholder.'
+- as: build
+  commands: openstack-test --help
   container:
-    from: openstack-tester
+    from: bin
 zz_generated_metadata:
   branch: main
   org: openshift
