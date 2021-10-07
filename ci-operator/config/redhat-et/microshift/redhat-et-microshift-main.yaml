@@ -16,13 +16,27 @@ base_images:
     namespace: origin
     tag: "8"
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.15
-  use_build_cache: true
+  project_image:
+    dockerfile_literal: |
+      FROM quay.io/centos/centos:8
+      RUN dnf update -y && \
+          dnf --enablerepo=powertools install --setopt=tsflags=nodocs -y \
+          git \
+          rpm-build \
+          golang \
+          which \
+          make \
+          glibc-static \
+          gcc \
+          selinux-policy-devel \
+          util-linux && \
+          dnf clean all && \
+          rm -rf /var/cache/yum/*
+      WORKDIR /go/src/github.com/redhat-et/microshift
+      RUN /bin/bash -c 'chmod -R 775 /go'
+      ENV GOPATH=/go
 images:
-- dockerfile_path: packaging/images/microshift/Dockerfile
+- dockerfile_path: images/build/Dockerfile
   to: linux-amd64-4.7.0-0.microshift
 - dockerfile_literal: |
     FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8 as openshift-tests-builder
@@ -64,6 +78,40 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/redhat-et/microshift/install.sh
   to: microshift-test-binaries
+- dockerfile_literal: |
+    FROM src as builder
+    RUN /bin/bash -c 'cd /go/src/github.com/redhat-et/microshift; \
+        go version; \
+        make GO_REQUIRED_MIN_VERSION=1.15 rpm; \
+        mv packaging/rpm/_rpmbuild/RPMS/x86_64 .; \
+        mv packaging/rpm/_rpmbuild/RPMS/noarch .; \
+        ls -al /go/src/github.com/redhat-et/microshift/x86_64; \
+        ls -al /go/src/github.com/redhat-et/microshift/noarch'
+
+    FROM libvirt-installer
+    WORKDIR /go/src/github.com/redhat-et/microshift
+    COPY --from=builder /go/src/github.com/redhat-et/microshift/x86_64 /go/src/github.com/redhat-et/microshift/microshift-rpm/.
+    COPY --from=builder /go/src/github.com/redhat-et/microshift/noarch /go/src/github.com/redhat-et/microshift/selinux-rpm/.
+    COPY openshift-tests /usr/bin/openshift-tests
+    COPY oc /usr/bin/oc
+    RUN /bin/bash -c 'ls -al; ls /go/src/github.com/redhat-et/microshift/selinux-rpm; ls /go/src/github.com/redhat-et/microshift/microshift-rpm; pwd'
+  from: libvirt-installer
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+    libvirt-installer:
+      as:
+      - libvirt-installer
+    openshift-test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/openshift-tests
+    src:
+      as:
+      - src
+  to: microshift-test-rpm
 promotion:
   name: microshift
   namespace: microshift
@@ -86,11 +134,12 @@ tests:
   commands: make test-unit
   container:
     from: src
-- as: test-srpm
-  commands: make srpm
-  container:
-    from: src
-  run_if_changed: ^(rpm/*|Makefile)
+- as: e2e-rpm-install
+  optional: true
+  run_if_changed: ^(cmd/.*|pkg/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+  steps:
+    cluster_profile: gcp
+    workflow: redhat-et-microshift-e2e-rpm-install
 - as: e2e-openshift-conformance-sig-api-machinery
   optional: true
   run_if_changed: ^(cmd/.*|pkg/.*|vendor/.*|go\.sum|go\.mod|Makefile)
