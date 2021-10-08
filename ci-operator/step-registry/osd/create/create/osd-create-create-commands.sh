@@ -36,6 +36,17 @@ mkdir -p "${HOME}"
 echo "Logging into ${OCM_LOGIN_URL} SSO"
 ocm login --url "${OCM_LOGIN_URL}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
 
+versions=$(ocm list versions)
+echo -e "Available cluster versions:\n${versions}"
+CLUSTER_VERSION=$(echo "$versions" | grep ${CLUSTER_VERSION} | tail -1)
+
+if [[ -z "$CLUSTER_VERSION" ]]; then
+  echo "Requested cluster version not available!"
+  exit 1
+fi
+
+echo "Cluster version: $CLUSTER_VERSION"
+
 OLD_CLUSTER_ID=$(ocm list clusters --columns=id --parameter search="name is '${CLUSTER_NAME}'" | tail -n 1)
 if [[ "$OLD_CLUSTER_ID" != ID* ]]; then
   # A cluster id was returned; not just the ID column heading.
