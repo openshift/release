@@ -38,7 +38,13 @@ ocm login --url "${OCM_LOGIN_URL}" --client-id "${SSO_CLIENT_ID}" --client-secre
 
 versions=$(ocm list versions)
 echo -e "Available cluster versions:\n${versions}"
-CLUSTER_VERSION=$(echo "$versions" | grep ${CLUSTER_VERSION} | tail -1)
+
+if [[ $CLUSTER_VERSION =~ ^[0-9]+\.[0-9]+$ ]]; then
+  CLUSTER_VERSION=$(echo "$versions" | grep ${CLUSTER_VERSION} | tail -1)
+else
+  # Match the whole line
+  CLUSTER_VERSION=$(echo "$versions" | grep -x ${CLUSTER_VERSION})
+fi
 
 if [[ -z "$CLUSTER_VERSION" ]]; then
   echo "Requested cluster version not available!"
