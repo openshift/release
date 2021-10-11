@@ -104,6 +104,22 @@ tests:
   steps:
     cluster_profile: aws
     test:
+    - as: setup-monitoring
+      commands: |-
+        bin/test-setup monitoring \
+          --remote-write-url=$(cat /etc/grafana-prom-push/url) \
+          --remote-write-username-file=/etc/grafana-prom-push/username \
+          --remote-write-password-file=/etc/grafana-prom-push/password
+      credentials:
+      - mount_path: /etc/grafana-prom-push
+        name: hypershift-grafana-prom-push
+        namespace: test-credentials
+      from: test-bin
+      grace_period: 1m0s
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 2m0s
     - as: install-hypershift
       cli: latest
       commands: bin/hypershift install --hypershift-image "${HYPERSHIFT_RELEASE_LATEST}"
@@ -150,6 +166,22 @@ tests:
   skip_if_only_changed: (^(docs|examples|enhancements)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     test:
+    - as: setup-monitoring
+      commands: |-
+        bin/test-setup monitoring \
+          --remote-write-url=$(cat /etc/grafana-prom-push/url) \
+          --remote-write-username-file=/etc/grafana-prom-push/username \
+          --remote-write-password-file=/etc/grafana-prom-push/password
+      credentials:
+      - mount_path: /etc/grafana-prom-push
+        name: hypershift-grafana-prom-push
+        namespace: test-credentials
+      from: test-bin
+      grace_period: 1m0s
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 2m0s
     - as: install-hypershift
       cli: latest
       commands: bin/hypershift install --hypershift-image "${HYPERSHIFT_RELEASE_LATEST}"
