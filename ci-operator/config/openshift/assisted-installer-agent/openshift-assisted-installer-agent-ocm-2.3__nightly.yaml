@@ -38,9 +38,6 @@ images:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.15
   to: assisted-installer-agent
-promotion:
-  name: ocm-2.3
-  namespace: openshift
 releases:
   initial:
     integration:
@@ -56,22 +53,9 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-test_binary_build_commands: |
-  go mod vendor
-  mkdir /.cache && chmod 775 -R /.cache ${GOPATH}
 tests:
-- as: lint
-  commands: |
-    export GOLANGCI_LINT_CACHE=/tmp/.cache
-    export GOPROXY=https://proxy.golang.org
-    make lint
-  container:
-    from: test-bin
-- as: unit-test
-  commands: make REPORTS=${ARTIFACT_DIR} unit-test
-  container:
-    from: test-bin
 - as: e2e-metal-assisted
+  cron: '@daily'
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -82,6 +66,7 @@ tests:
       TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-ipv6
+  cron: '@daily'
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -98,3 +83,4 @@ zz_generated_metadata:
   branch: ocm-2.3
   org: openshift
   repo: assisted-installer-agent
+  variant: nightly

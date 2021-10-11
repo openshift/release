@@ -62,12 +62,6 @@ operator:
     with: assisted-installer-controller
   - pullspec: quay.io/ocpmetal/postgresql-12-centos7:latest
     with: postgresql-12-centos7
-promotion:
-  additional_images:
-    assisted-service-index: ci-index
-    assisted-service-operator-bundle: ci-bundle0
-  name: ocm-2.3
-  namespace: openshift
 releases:
   candidate:
     release:
@@ -92,11 +86,6 @@ test_binary_build_commands: |
   go mod vendor
   mkdir /.cache && chmod 775 -R /.cache && chmod 775 -R $GOPATH
 tests:
-- as: lint
-  commands: export GOLANGCI_LINT_CACHE=/tmp/.cache && export GOPROXY=https://proxy.golang.org
-    && make lint
-  container:
-    from: test-bin
 - as: subsystem-aws
   cluster_claim:
     architecture: amd64
@@ -105,7 +94,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.8"
-  run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
+  cron: '@daily'
   steps:
     test:
     - as: subsystem-deploy-and-run
@@ -126,7 +115,7 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
-- as: subsystem-kubeapi-aws
+- as: subsystem-kubeapi-aws-periodic
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -134,7 +123,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.8"
-  run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
+  cron: '@daily'
   steps:
     test:
     - as: subsystem-deploy-and-run
@@ -157,26 +146,8 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
-- as: e2e-metal-assisted-operator-disconnected
-  optional: true
-  run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
-    env:
-      DEVSCRIPTS_CONFIG: |
-        EXTRA_WORKER_VCPU=8
-        EXTRA_WORKER_MEMORY=32768
-        EXTRA_WORKER_DISK=120
-        PROVISIONING_NETWORK_PROFILE=Disabled
-        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
-      DISCONNECTED: "true"
-      NUM_EXTRA_WORKERS: "1"
-    workflow: baremetalds-assisted-operator-ztp
 - as: e2e-metal-assisted-operator-ztp
-  run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
+  cron: '@daily'
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -193,8 +164,25 @@ tests:
       IP_STACK: v4
       NUM_EXTRA_WORKERS: "1"
     workflow: baremetalds-assisted-operator-ztp
+- as: e2e-metal-assisted-operator-disconnected
+  cron: '@daily'
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
+    env:
+      DEVSCRIPTS_CONFIG: |
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=32768
+        EXTRA_WORKER_DISK=120
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      DISCONNECTED: "true"
+      NUM_EXTRA_WORKERS: "1"
+    workflow: baremetalds-assisted-operator-ztp
 - as: e2e-metal-assisted-kube-api
-  run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
+  cron: '@daily'
   steps:
     cluster_profile: packet-assisted
     env:
@@ -217,3 +205,4 @@ zz_generated_metadata:
   branch: ocm-2.3
   org: openshift
   repo: assisted-service
+  variant: nightly

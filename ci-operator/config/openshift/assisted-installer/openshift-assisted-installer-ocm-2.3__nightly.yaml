@@ -1,12 +1,8 @@
 base_images:
-  assisted-installer:
+  assisted-installer-agent:
     name: ocm-2.3
     namespace: openshift
-    tag: assisted-installer
-  assisted-installer-controller:
-    name: ocm-2.3
-    namespace: openshift
-    tag: assisted-installer-controller
+    tag: assisted-installer-agent
   assisted-service:
     name: ocm-2.3
     namespace: openshift
@@ -15,10 +11,6 @@ base_images:
     name: ocm-2.3
     namespace: edge-infrastructure
     tag: assisted-test-infra
-  base:
-    name: "4.8"
-    namespace: ocp
-    tag: base
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -27,20 +19,28 @@ base_images:
     name: release
     namespace: openshift
     tag: golang-1.15
+  openshift_release_golang-1.16:
+    name: release
+    namespace: openshift
+    tag: golang-1.16
 build_root:
   project_image:
-    dockerfile_path: Dockerfile.assisted_installer_agent-build
+    dockerfile_path: Dockerfile.assisted-installer-build
 images:
-- dockerfile_path: Dockerfile.assisted_installer_agent
-  from: base
+- dockerfile_path: Dockerfile.assisted-installer
+  from: openshift_release_golang-1.16
   inputs:
     openshift_release_golang-1.15:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.15
-  to: assisted-installer-agent
-promotion:
-  name: ocm-2.3
-  namespace: openshift
+  to: assisted-installer
+- dockerfile_path: Dockerfile.assisted-installer-controller
+  from: openshift_release_golang-1.16
+  inputs:
+    openshift_release_golang-1.15:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.15
+  to: assisted-installer-controller
 releases:
   initial:
     integration:
@@ -60,32 +60,25 @@ test_binary_build_commands: |
   go mod vendor
   mkdir /.cache && chmod 775 -R /.cache ${GOPATH}
 tests:
-- as: lint
-  commands: |
-    export GOLANGCI_LINT_CACHE=/tmp/.cache
-    export GOPROXY=https://proxy.golang.org
-    make lint
-  container:
-    from: test-bin
-- as: unit-test
-  commands: make REPORTS=${ARTIFACT_DIR} unit-test
-  container:
-    from: test-bin
 - as: e2e-metal-assisted
+  cron: '@daily'
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      ASSISTED_AGENT_IMAGE: pipeline:assisted-installer-agent
+      ASSISTED_CONTROLLER_IMAGE: pipeline:assisted-installer-controller
+      ASSISTED_INSTALLER_IMAGE: pipeline:assisted-installer
     env:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=ocm-2.3
       TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-ipv6
+  cron: '@daily'
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      ASSISTED_AGENT_IMAGE: pipeline:assisted-installer-agent
+      ASSISTED_CONTROLLER_IMAGE: pipeline:assisted-installer-controller
+      ASSISTED_INSTALLER_IMAGE: pipeline:assisted-installer
     env:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=ocm-2.3
@@ -97,4 +90,5 @@ tests:
 zz_generated_metadata:
   branch: ocm-2.3
   org: openshift
-  repo: assisted-installer-agent
+  repo: assisted-installer
+  variant: nightly
