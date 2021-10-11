@@ -77,12 +77,14 @@ set +e
 IS_REHEARSAL=\$(expr "${REPO_OWNER:-}" = "openshift" "&" "${REPO_NAME:-}" = "release")
 set -e
 
-if [ "${JOB_TYPE:-}" = "presubmit" ] && (( ! \${IS_REHEARSAL} )); then
+if [ "${JOB_TYPE:-}" = "presubmit" ]; then
   # We would like to keep running a stable version for PRs
   echo "export OPENSHIFT_VERSION=4.8" >> /root/config
 
   if [ "${REPO_NAME:-}" = "assisted-service" ]; then
     echo "export SERVICE_BRANCH=${PULL_PULL_SHA:-master}" >> /root/config
+    echo "${PULL_PULL_SHA:-not-defined}
+    (cd assisted-service && git remote -v && git branch)
   fi
 else
   # Periodics run against latest release
