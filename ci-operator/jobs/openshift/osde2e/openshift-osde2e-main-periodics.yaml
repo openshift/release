@@ -1918,6 +1918,61 @@ periodics:
         secretName: osde2e-common
 - agent: kubernetes
   cluster: build01
+  cron: 0 */12 * * *
+  decorate: true
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: osde2e
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "false"
+  name: osde2e-stage-aws-addon-dbaas-operator
+  spec:
+    containers:
+    - args:
+      - test
+      - --secret-locations
+      - $(SECRET_LOCATIONS)
+      - --configs
+      - $(CONFIGS)
+      command:
+      - /osde2e
+      env:
+      - name: ADDON_IDS
+        value: dbaas-operator
+      - name: ADDON_TEST_HARNESSES
+        value: quay.io/ecosystem-appeng/dbaas-e2e-test-harness
+      - name: CHANNEL
+        value: stable
+      - name: CONFIGS
+        value: aws,stage,addon-suite
+      - name: OCM_CCS
+        value: "true"
+      - name: SECRET_LOCATIONS
+        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials
+      image: quay.io/app-sre/osde2e
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/osde2e-common
+        name: osde2e-common
+        readOnly: true
+      - mountPath: /usr/local/osde2e-credentials
+        name: osde2e-credentials
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: osde2e-common
+      secret:
+        secretName: osde2e-common
+    - name: osde2e-credentials
+      secret:
+        secretName: osde2e-credentials
+- agent: kubernetes
+  cluster: build01
   cron: 0 22 * * 1-4
   decorate: true
   extra_refs:
@@ -3795,58 +3850,3 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
-- agent: kubernetes
-  cluster: build01
-  cron: 0 */12 * * *
-  decorate: true
-  extra_refs:
-    - base_ref: main
-      org: openshift
-      repo: osde2e
-  labels:
-    pj-rehearse.openshift.io/can-be-rehearsed: "false"
-  name: osde2e-stage-aws-addon-dbaas-operator
-  spec:
-    containers:
-      - args:
-          - test
-          - --secret-locations
-          - $(SECRET_LOCATIONS)
-          - --configs
-          - $(CONFIGS)
-        command:
-          - /osde2e
-        env:
-          - name: ADDON_IDS
-            value: dbaas-operator
-          - name: ADDON_TEST_HARNESSES
-            value: quay.io/ecosystem-appeng/dbaas-e2e-test-harness
-          - name: CHANNEL
-            value: stable
-          - name: CONFIGS
-            value: aws,stage,addon-suite
-          - name: OCM_CCS
-            value: "true"
-          - name: SECRET_LOCATIONS
-            value: /usr/local/osde2e-common,/usr/local/osde2e-credentials
-        image: quay.io/app-sre/osde2e
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-          - mountPath: /usr/local/osde2e-common
-            name: osde2e-common
-            readOnly: true
-          - mountPath: /usr/local/osde2e-credentials
-            name: osde2e-credentials
-            readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-      - name: osde2e-common
-        secret:
-          secretName: osde2e-common
-      - name: osde2e-credentials
-        secret:
-          secretName: osde2e-credentials
