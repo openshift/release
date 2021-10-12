@@ -1,20 +1,34 @@
+base_images:
+  base:
+    name: "4.10"
+    namespace: ocp
+    tag: base
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp_builder_rhel-8-golang-1.16-openshift-4.10:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.16-openshift-4.10
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.16
-promotion:
-  name: "4.9"
-  namespace: ocp
+  from_repository: true
+images:
+- from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.10:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.10
+  to: image-customization-controller
 releases:
   initial:
     integration:
-      name: "4.9"
+      name: "4.10"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.9"
+      name: "4.10"
       namespace: ocp
 resources:
   '*':
@@ -28,10 +42,16 @@ tests:
   commands: make unit
   container:
     from: src
+  skip_if_only_changed: (^manifests/)|(\.md$)|((^|/)OWNERS$)
 - as: lint
   commands: make lint
   container:
     from: src
+- as: e2e-metal-ipi
+  skip_if_only_changed: (^[A-Z]+\.md$)|((^|/)OWNERS$)
+  steps:
+    cluster_profile: packet
+    workflow: baremetalds-e2e-ipv4
 zz_generated_metadata:
   branch: main
   org: openshift
