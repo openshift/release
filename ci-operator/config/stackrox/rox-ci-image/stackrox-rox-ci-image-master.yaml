@@ -22,10 +22,21 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: placeholder
-  commands: go version && uname -a
-  container:
-    from: rox-ci
+- as: test-secret
+  steps:
+    test:
+    - as: test-secret
+      commands: |
+        cat /test-secret
+      credentials:
+      - mount_path: /test-secret
+        name: stackrox-test-secret
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 zz_generated_metadata:
   branch: master
   org: stackrox
