@@ -15,8 +15,12 @@ finished()
 {
   set +e
 
-  echo "Fetching kubeconfig..."
+  echo "Fetching kubeconfig, other credentials..."
   scp "${SSHOPTS[@]}" "root@${IP}:/root/dev-scripts/ocp/ostest/auth/kubeconfig" "${SHARED_DIR}/"
+  scp "${SSHOPTS[@]}" "root@${IP}:/root/dev-scripts/ocp/ostest/auth/kubeadmin-password" "${SHARED_DIR}/"
+
+  echo "Adding proxy-url in kubeconfig"
+  sed -i "/- cluster/ a\    proxy-url: http://$IP:8213/" "${SHARED_DIR}"/kubeconfig
 
   # Get dev-scripts logs
   echo "dev-scripts setup completed, fetching logs"
