@@ -28,11 +28,17 @@ data:
 EOF
 fi
 
+# On top of setting up persistant storage for the platform Prometheus, we are
+# also annotating the PVCs so that the cluster-monitoring-operator can delete
+# the PVC if needed to prevent single point of failure. This is required to
+# prevent the operator from reporting Upgradeable=false.
 cat >> "${PATCH}" << EOF
 prometheusK8s:
   volumeClaimTemplate:
     metadata:
       name: prometheus-data
+      annotations:
+        openshift.io/cluster-monitoring-drop-pvc: "yes"
     spec:
       resources:
         requests:
