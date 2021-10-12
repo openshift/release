@@ -20,7 +20,7 @@ if [[ ! -s "${SHARED_DIR}/metadata.json" ]]; then
   echo "Skipping: ${SHARED_DIR}/metadata.json not found."
   exit
 fi
-BASE_DOMAIN='origin-ci-int-gce.dev.openshift.com'
+BASE_DOMAIN="$(cat ${CLUSTER_PROFILE_DIR}/public_hosted_zone)"
 CLUSTER_NAME="$(jq -r .clusterName "${SHARED_DIR}/metadata.json")"
 INFRA_ID="$(jq -r .infraID "${SHARED_DIR}/metadata.json")"
 
