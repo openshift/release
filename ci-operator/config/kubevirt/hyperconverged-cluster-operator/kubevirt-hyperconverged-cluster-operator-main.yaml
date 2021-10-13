@@ -131,7 +131,7 @@ tests:
           cpu: 500m
           memory: 1Gi
     workflow: optional-operators-ci-azure
-- as: hco-e2e-image-index-azure-sno
+- as: hco-e2e-image-index-sno-azure
   optional: true
   run_if_changed: ^(build/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
   steps:
@@ -162,7 +162,7 @@ tests:
           cpu: 500m
           memory: 1Gi
     workflow: optional-operators-ci-azure-sno
-- as: hco-e2e-upgrade-index-azure-sno
+- as: hco-e2e-upgrade-index-sno-azure
   optional: true
   run_if_changed: ^(build/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|Makefile|go\.mod|go\.sum)$
   steps:
@@ -182,8 +182,8 @@ tests:
         requests:
           cpu: 500m
           memory: 1Gi
-    workflow: optional-operators-ci-azure
-- as: hco-e2e-upgrade-prev-index-azure-sno
+    workflow: optional-operators-ci-azure-sno
+- as: hco-e2e-upgrade-prev-index-sno-azure
   optional: true
   run_if_changed: ^(build/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|Makefile|go\.mod|go\.sum)$
   steps:
@@ -204,6 +204,79 @@ tests:
           cpu: 500m
           memory: 1Gi
     workflow: optional-operators-ci-azure-sno
+- as: hco-e2e-image-index-sno-aws
+  optional: true
+  run_if_changed: ^(build/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
+  steps:
+    cluster_profile: aws
+    env:
+      OO_CHANNEL: 1.6.0
+      OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
+      OO_PACKAGE: community-kubevirt-hyperconverged
+      OO_TARGET_NAMESPACES: '!all'
+    test:
+    - as: deploy-cr
+      commands: |
+        KVM_EMULATION=true make deploy_cr
+      from: hco-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    - as: e2e-test
+      commands: |
+        make functest
+      dependencies:
+      - env: FUNCTEST_IMAGE
+        name: hyperconverged-cluster-functest
+      from: hco-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-aws-sno
+- as: hco-e2e-upgrade-index-sno-aws
+  optional: true
+  run_if_changed: ^(build/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|Makefile|go\.mod|go\.sum)$
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-hco-upgrade-bundle
+    env:
+      OO_CHANNEL: 1.6.0
+      OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
+      OO_PACKAGE: community-kubevirt-hyperconverged
+      OO_TARGET_NAMESPACES: '!all'
+    test:
+    - as: e2e-index-image-upgrade-aws
+      commands: RELEASE_DELTA=1 KVM_EMULATION=true make upgrade-test-index-image
+      from: hco-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-aws-sno
+- as: hco-e2e-upgrade-prev-index-sno-aws
+  optional: true
+  run_if_changed: ^(build/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|Makefile|go\.mod|go\.sum)$
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-hco-upgrade-prev-bundle
+    env:
+      OO_CHANNEL: 1.5.0
+      OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
+      OO_PACKAGE: community-kubevirt-hyperconverged
+      OO_TARGET_NAMESPACES: '!all'
+    test:
+    - as: e2e-upgrade-test
+      commands: RELEASE_DELTA=2 KVM_EMULATION=true make upgrade-test-index-image
+      from: hco-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-aws-sno
 - as: hco-e2e-kv-smoke-azure
   run_if_changed: ^(build/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
   steps:
