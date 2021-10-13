@@ -1187,7 +1187,9 @@ objects:
           done < /tmp/containers
 
           echo "Snapshotting prometheus (may take 15s) ..."
-          queue ${ARTIFACT_DIR}/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring prometheus-k8s-0 -- tar cvzf - -C /prometheus .
+          # Snapshot the prometheus data from the replica that has the oldest PVC
+          prometheus=${$(oc get pvc -n openshift-monitoring -l app.kubernetes.io/name=prometheus --sort-by=.metadata.creationTimestamp  -o jsonpath='{.items[0].metadata.name}')#prometheus-k8s-db-}
+          queue ${ARTIFACT_DIR}/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring ${prometheus} -- tar cvzf - -C /prometheus .
 
           # move private key to ~/.ssh/ so that installer can use it to gather logs
           mkdir -p ~/.ssh
