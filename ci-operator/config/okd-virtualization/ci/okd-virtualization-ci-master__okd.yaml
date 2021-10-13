@@ -26,7 +26,7 @@ resources:
       cpu: 100m
       memory: 600Mi
 tests:
-- as: pres-e2e-deploy
+- as: pres-e2e-deploy-gcp
   steps:
     cluster_profile: gcp
     test:
@@ -44,7 +44,7 @@ tests:
           cpu: 100m
           memory: 600Mi
     workflow: ipi-gcp
-- as: e2e-deploy
+- as: e2e-deploy-gcp
   interval: 12h
   steps:
     cluster_profile: gcp
@@ -63,6 +63,43 @@ tests:
           cpu: 100m
           memory: 600Mi
     workflow: ipi-gcp
+- as: pres-e2e-deploy-azure
+  steps:
+    cluster_profile: azure4
+    test:
+    - as: test
+      cli: latest
+      commands: make deploy_test
+      env:
+      - default: kubevirt-hyperconverged
+        name: TARGET_NAMESPACE
+      - default: 1.6.0
+        name: HCO_RELEASE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 600Mi
+    workflow: ipi-azure
+- as: e2e-deploy-azure
+  interval: 12h
+  steps:
+    cluster_profile: azure4
+    test:
+    - as: test
+      cli: latest
+      commands: make deploy_test
+      env:
+      - default: kubevirt-hyperconverged
+        name: TARGET_NAMESPACE
+      - default: 1.6.0
+        name: HCO_RELEASE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 600Mi
+    workflow: ipi-azure
 zz_generated_metadata:
   branch: master
   org: okd-virtualization
