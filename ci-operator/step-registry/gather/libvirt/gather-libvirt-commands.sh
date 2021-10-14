@@ -149,11 +149,13 @@ done < /tmp/containers
 
 echo "Snapshotting prometheus (may take 15s) ..."
 # Snapshot the prometheus data from the replica that has the oldest
-# PVC. If persistent storage isn't enabled, it uses prometheus-k8s-0.
-prometheus="prometheus-k8s-0"
-if [[ -n $(oc get pvc -n openshift-monitoring -l app.kubernetes.io/name=prometheus --ignore-not-found=true) ]]; then
-    pvc=$(oc get pvc -n openshift-monitoring -l app.kubernetes.io/name=prometheus --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[0].metadata.name}')
-    prometheus=${pvc#prometheus-k8s-db-}
+# PVC. If persistent storage isn't enabled, it uses the last
+# prometheus instances by default to catch issues that occur when the
+# first prometheus pod upgrades.
+prometheus="$( oc --insecure-skip-tls-verify get pods -n openshift-monitoring -l app.kubernetes.io/name=prometheus | tail -1 )"
+if [[ -n "$( oc --insecure-skip-tls-verify get pvc -n openshift-monitoring -l app.kubernetes.io/name=prometheus --ignore-not-found=true )" ]]; then
+  pvc="$( oc --insecure-skip-tls-verify get pvc -n openshift-monitoring -l app.kubernetes.io/name=prometheus --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[0].metadata.name}' )"
+  prometheus="${pvc##prometheus-data-}"
 fi
 queue ${ARTIFACT_DIR}/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prometheus}" -- tar cvzf - -C /prometheus .
 
@@ -166,11 +168,11 @@ document.getElementById("wrapper").append(a);
 </script>
 EOF
 
-FILTER=gzip queue ${ARTIFACT_DIR}/metrics/prometheus-target-metadata.json.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${monitoring_pod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/targets/metadata --data-urlencode 'match_target={instance!=\"\"}'"
-FILTER=gzip queue ${ARTIFACT_DIR}/metrics/prometheus-config.json.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${monitoring_pod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/config"
-queue ${ARTIFACT_DIR}/metrics/prometheus-tsdb-status.json oc --insecure-skip-tls-verify exec -n openshift-monitoring "${monitoring_pod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/tsdb"
-queue ${ARTIFACT_DIR}/metrics/prometheus-runtimeinfo.json oc --insecure-skip-tls-verify exec -n openshift-monitoring "${monitoring_pod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/runtimeinfo"
-queue ${ARTIFACT_DIR}/metrics/prometheus-targets.json oc --insecure-skip-tls-verify exec -n openshift-monitoring "${monitoring_pod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/targets"
+FILTER=gzip queue ${ARTIFACT_DIR}/metrics/prometheus-target-metadata.json.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prometheus}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/targets/metadata --data-urlencode 'match_target={instance!=\"\"}'"
+FILTER=gzip queue ${ARTIFACT_DIR}/metrics/prometheus-config.json.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prometheus}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/config"
+queue ${ARTIFACT_DIR}/metrics/prometheus-tsdb-status.json oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prometheus}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/tsdb"
+queue ${ARTIFACT_DIR}/metrics/prometheus-runtimeinfo.json oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prometheus}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/runtimeinfo"
+queue ${ARTIFACT_DIR}/metrics/prometheus-targets.json oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prometheus}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/targets"
 
 # Calculate metrics suitable for apples-to-apples comparison across CI runs.
 # Load whatever timestamps we can, generate the metrics script, and then send it to the
