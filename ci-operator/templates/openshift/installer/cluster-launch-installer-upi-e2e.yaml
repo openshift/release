@@ -2383,8 +2383,13 @@ objects:
           done < /tmp/containers
 
           echo "Snapshotting prometheus (may take 15s) ..."
-          # Snapshot the prometheus data from the replica that has the oldest PVC
-          prometheus=${$(oc get pvc -n openshift-monitoring -l app.kubernetes.io/name=prometheus --sort-by=.metadata.creationTimestamp  -o jsonpath='{.items[0].metadata.name}')#prometheus-k8s-db-}
+          # Snapshot the prometheus data from the replica that has the oldest
+          # PVC. If persistent storage isn't enabled, it uses prometheus-k8s-0.
+          prometheus="prometheus-k8s-0"
+          if [[ -n $(oc get pvc -n openshift-monitoring -l app.kubernetes.io/name=prometheus --ignore-not-found=true) ]]; then
+            pvc=$(oc get pvc -n openshift-monitoring -l app.kubernetes.io/name=prometheus --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[0].metadata.name}')
+            prometheus=${pvc#prometheus-k8s-db-}
+          fi
           queue ${ARTIFACT_DIR}/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring ${prometheus} -- tar cvzf - -C /prometheus .
 
           echo "Running must-gather..."
