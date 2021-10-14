@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# This is to satisfy shellcheck SC2153
+export RELEASE_REPO=${RELEASE_REPO}
+
 export HOME=/tmp/home
 mkdir -p "$HOME/.docker"
 cd "$HOME" || exit 1
@@ -26,7 +29,6 @@ if [[ ! -r "${GITHUB_TOKEN_FILE}" ]]; then
     exit 1
 fi
 GITHUB_TOKEN=$(cat "$GITHUB_TOKEN_FILE")
-COMPONENT_REPO="github.com/${REPO_OWNER}/${REPO_NAME}"
 {
     echo "https://${GITHUB_USER}:${GITHUB_TOKEN}@${RELEASE_REPO}.git"
 } >> ghcreds
@@ -79,5 +81,5 @@ log "INFO Z-stream version is $release"
 export OSCI_COMPONENT_NAME=${$OSCI_COMPONENT_NAME:-$REPO_NAME}
 
 # Run manifest update
-cd /opt/build-harness/build-harness-extensions/modules/osci/
+cd /opt/build-harness/build-harness-extensions/modules/osci/ || exit
 make osci/publish BUILD_HARNESS_EXTENSIONS_PATH=/opt/build-harness/build-harness-extensions
