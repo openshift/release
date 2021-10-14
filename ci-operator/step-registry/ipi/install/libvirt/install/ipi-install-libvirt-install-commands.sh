@@ -34,6 +34,54 @@ function prepare_next_steps() {
       "${dir}/metadata.json"
 }
 
+function init_bootstrap() {
+	local DIR=$1
+	local CLUSTER_DOMAIN
+	declare -g BOOTSTRAP_HOSTNAME
+	declare -g RESOURCE_ID
+	declare -ag BASTION_SSH_PORTS
+
+	while [ ! -f "${DIR}/terraform.tfvars.json" ]
+	do
+		echo "init_bootstrap: waiting for ${DIR}/terraform.tfvars.json"
+		sleep 3m
+	done
+	CLUSTER_DOMAIN=$(sed -n -r -e 's,^ *"cluster_domain": "([^"]*).*$,\1,p' "${DIR}/terraform.tfvars.json")
+	BOOTSTRAP_HOSTNAME="bootstrap.${CLUSTER_DOMAIN}"
+	RESOURCE_ID=$(echo "${CLUSTER_DOMAIN}" | cut -d- -f4)
+	BASTION_SSH_PORTS=( 1023 1033 1043 1053 1063 1073 )
+}
+
+function collect_bootstrap() {
+	local ID=$1
+	local FROM
+	local TO
+
+	echo "collect_bootstrap: ssh ${BOOTSTRAP_HOSTNAME}:${BASTION_SSH_PORTS[${RESOURCE_ID}]}"
+	set +e
+	ssh \
+		-o 'ConnectTimeout=1' \
+		-o 'StrictHostKeyChecking=no' \
+		-i ${CLUSTER_PROFILE_DIR}/ssh-privatekey \
+		-l core \
+		-p ${BASTION_SSH_PORTS[${RESOURCE_ID}]} \
+		${BOOTSTRAP_HOSTNAME} \
+		/usr/local/bin/installer-gather.sh --id ${ID}
+	if [ $? -eq 0 ]
+	then
+		FROM="/var/home/core/log-bundle-${ID}.tar.gz"
+		TO="/logs/artifacts/bootstrap-log-bundle-${ID}.tar.gz"
+		echo "collect_bootstrap: scp ${BOOTSTRAP_HOSTNAME}:${BASTION_SSH_PORTS[${RESOURCE_ID}]}"
+		scp \
+			-o 'ConnectTimeout=1' \
+			-o 'StrictHostKeyChecking=no' \
+			-i ${CLUSTER_PROFILE_DIR}/ssh-privatekey \
+			-P ${BASTION_SSH_PORTS[${RESOURCE_ID}]} \
+			core@${BOOTSTRAP_HOSTNAME}:${FROM} ${TO}
+	fi
+	set -e
+}
+
 trap 'prepare_next_steps' EXIT TERM
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
@@ -92,7 +140,25 @@ done <   <( find "${SHARED_DIR}" -name "manifest_*.yml" -print0)
 
 echo "Installing cluster"
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
-mock-nss.sh openshift-install create cluster --dir="${dir}" --log-level=debug 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
+
+[ -z "${GATHER_BOOTSTRAP_LOGS+x}" ] && GATHER_BOOTSTRAP_LOGS=false
+echo "GATHER_BOOTSTRAP_LOGS=${GATHER_BOOTSTRAP_LOGS}"
+if ${GATHER_BOOTSTRAP_LOGS}
+then
+	declare -gx OPENSHIFT_INSTALL_PRESERVE_BOOTSTRAP
+	OPENSHIFT_INSTALL_PRESERVE_BOOTSTRAP=1
+else
+	declare -g OPENSHIFT_INSTALL_PRESERVE_BOOTSTRAP
+	OPENSHIFT_INSTALL_PRESERVE_BOOTSTRAP=""
+fi
+
+RCFILE=$(mktemp)
+{
+	set +e
+	mock-nss.sh openshift-install create cluster --dir="${dir}" --log-level=debug 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:'
+	# We need to save the individual return codes for the pipes
+	printf "RC0=%s\nRC1=%s\n" "${PIPESTATUS[0]}" "${PIPESTATUS[1]}" > ${RCFILE};
+} &
 openshift_install="$!"
 
 # While openshift-install is running...
@@ -103,7 +169,7 @@ if [ "${BRANCH}" == "4.7" ] || [ "${BRANCH}" == "4.6" ]; then
   CLUSTER_NAME=$(read_shared_dir 'CLUSTER_NAME')
 
   i=0
-  while kill -0 $openshift_install 2> /dev/null; do
+  while kill -0 ${openshift_install} 2> /dev/null; do
     sleep 60
     echo "Polling libvirt for network, attempt #$((++i))"
     LIBVIRT_NETWORK=$(mock-nss.sh virsh --connect "${REMOTE_LIBVIRT_URI}" net-list --name | grep "${CLUSTER_NAME::21}" || true)
@@ -114,14 +180,58 @@ if [ "${BRANCH}" == "4.7" ] || [ "${BRANCH}" == "4.6" ]; then
     fi
   done
 fi
+
+init_bootstrap ${dir}
+
 wait "${openshift_install}"
 
-# Add a step to wait for installation to complete, in case the cluster takes longer to create than the default time of 30 minutes.
-mock-nss.sh openshift-install --dir=${dir} --log-level=debug wait-for install-complete 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
-wait "$!"
-ret="$?"
+# shellcheck source=/dev/null
+source ${RCFILE}
+echo "RC0=${RC0}"
+echo "RC1=${RC1}"
+rm ${RCFILE}
+ret=${RC0}
+
+if [ ${ret} -gt 0 ] || [ -n "${OPENSHIFT_INSTALL_PRESERVE_BOOTSTRAP}" ]
+then
+	collect_bootstrap 1
+fi
+
+if [ ${ret} -gt 0 ]
+then
+	# Add a step to wait for installation to complete, in case the cluster takes longer to create than the default time of 30 minutes.
+	RCFILE=$(mktemp)
+	{
+		set +e
+		mock-nss.sh openshift-install --dir=${dir} --log-level=debug wait-for install-complete 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:'
+		# We need to save the individual return codes for the pipes
+		printf "RC0=%s\nRC1=%s\n" "${PIPESTATUS[0]}" "${PIPESTATUS[1]}" > ${RCFILE}
+	} &
+	wait "$!"
+
+	# shellcheck source=/dev/null
+	source ${RCFILE}
+	echo "RC0=${RC0}"
+	echo "RC1=${RC1}"
+	rm ${RCFILE}
+	ret=${RC0}
+
+	if [ ${ret} -gt 0 ] || [ -n "${OPENSHIFT_INSTALL_PRESERVE_BOOTSTRAP}" ]
+	then
+		collect_bootstrap 2
+	fi
+fi
+
+if [ -n "${OPENSHIFT_INSTALL_PRESERVE_BOOTSTRAP}" ]
+then
+	{
+		set +e
+		mock-nss.sh openshift-install --dir=${dir} --log-level=debug destroy bootstrap
+		echo "destroy bootstrap: RC=$?"
+	}
+fi
 
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_END"
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 
-exit "$ret"
+exit "${ret}"
