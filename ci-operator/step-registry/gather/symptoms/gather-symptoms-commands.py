@@ -4,7 +4,9 @@ import subprocess
 import xml.etree.cElementTree as ET
 
 ARTIFACT_DIR = os.environ["ARTIFACT_DIR"]
-JUNIT_FILE = os.path.join(ARTIFACT_DIR, "junit", "junit_symptoms.xml")
+JUNIT_DIR = os.path.join(ARTIFACT_DIR, "junit")
+os.mkdir(JUNIT_DIR)
+JUNIT_FILE = os.path.join(JUNIT_DIR, "junit_symptoms.xml")
 TEST_FAILURES = []
 
 class Symptom:
@@ -13,10 +15,10 @@ class Symptom:
   test_name = None
   message = None
 
-def __init__(self, search_string, location, test_name):
-  self.search_string = search_string
-  self.location = location
-  self.test_name = test_name
+  def __init__(self, search_string, location, test_name):
+    self.search_string = search_string
+    self.location = location
+    self.test_name = test_name
 
 SYMPTOMS = (
   Symptom(
@@ -37,12 +39,17 @@ SYMPTOMS = (
 )
 
 for symptom in SYMPTOMS:
-  print(f"Looking for {symptom.search_string} in {symptom.location}")
+  print(f"Looking for '{symptom.search_string}' in '{symptom.location}'")
 
-  cmd = ["zgrep", "-E", symptom.search_string, os.join(ARTIFACT_DIR, symptom.location)]
-  output = subprocess.check_output(cmd, stdout=subprocess.PIPE).stdout.decode('utf-8')
+  cmd = ["zgrep", "-E", symptom.search_string, os.path.join(ARTIFACT_DIR, symptom.location)]
+  output = None
+  try:
+    output = subprocess.check_output(cmd, stderr=subprocess.STDOUT).decode('utf-8')
+  except subprocess.CalledProcessError:
+    continue
   if not output:
     continue
+  print(f'  {output}')
   # Copy symptom and set error message
   error = copy(symptom)
   error.message = output
@@ -55,11 +62,11 @@ xml_testsuite = ET.SubElement(
   root,
   "testsuite",
   name="Symptom Detection",
-  tests=len(SYMPTOMS),
-  errors=0,
-  failures=len(TEST_FAILURES),
-  skipped=0,
-  time=0,
+  tests=str(len(SYMPTOMS)),
+  errors="0",
+  failures=str(len(TEST_FAILURES)),
+  skipped="0",
+  time="0",
   timestamp="0001-01-01T00:00:00Z",
   package="symptom")
 
