@@ -4,10 +4,16 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if [ -f "${SHARED_DIR}/kubeconfig" ] ; then
+    export KUBECONFIG=${SHARED_DIR}/kubeconfig
+fi
 cp -Lrvf "${KUBECONFIG}" /tmp/kubeconfig
 
 #shellcheck source=${SHARED_DIR}/runtime_env
-. .${SHARED_DIR}/runtime_env
+source "${SHARED_DIR}/runtime_env"
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
 
 export E2E_RUN_TAGS="${E2E_RUN_TAGS} and ${TAG_VERSION}"
 
