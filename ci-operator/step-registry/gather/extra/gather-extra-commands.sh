@@ -133,9 +133,14 @@ while IFS= read -r i; do
 done < /tmp/containers
 
 echo "Snapshotting prometheus (may take 15s) ..."
-# Use logs and data the "last" monitoring pod in order to catch issues that occur when the first prometheus pod upgrades
-monitoring_pod="$( oc --insecure-skip-tls-verify get pods -n openshift-monitoring -o name | grep prometheus-k8s- | tail -1 )"
-queue ${ARTIFACT_DIR}/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${monitoring_pod}" -- tar cvzf - -C /prometheus .
+# Snapshot the prometheus data from the replica that has the oldest
+# PVC. If persistent storage isn't enabled, it uses prometheus-k8s-0.
+prometheus="prometheus-k8s-0"
+if [[ -n $(oc get pvc -n openshift-monitoring -l app.kubernetes.io/name=prometheus --ignore-not-found=true) ]]; then
+    pvc=$(oc get pvc -n openshift-monitoring -l app.kubernetes.io/name=prometheus --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[0].metadata.name}')
+    prometheus=${pvc#prometheus-k8s-db-}
+fi
+queue ${ARTIFACT_DIR}/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prometheus}" -- tar cvzf - -C /prometheus .
 
 cat >> ${SHARED_DIR}/custom-links.txt << EOF
 <script>
