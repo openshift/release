@@ -30,6 +30,18 @@ objects:
           component: boskos
         namespace: ${namespace}
       spec:
+        affinity:
+          podAntiAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                  - key: component
+                    operator: In
+                    values:
+                    - boskos
+                topologyKey: "kubernetes.io/hostname"
         serviceAccountName: boskos
         terminationGracePeriodSeconds: 30
         containers:
@@ -127,6 +139,7 @@ objects:
     selector:
       app: prow
       component: boskos
+      boskos-leader: "true"
     ports:
     - name: https
       port: 8082
