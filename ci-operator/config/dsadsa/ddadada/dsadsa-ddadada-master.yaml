@@ -1,0 +1,79 @@
+base_images:
+  image1:
+    name: image1
+    namespace: namespace
+    tag: tag
+  image2:
+    name: image2
+    namespace: namespace23ds
+    tag: dsadsa
+binary_build_commands: go build ./cmd/...
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
+canonical_go_repository: k8s.io/cool-repo
+images:
+- dockerfile_path: Dockerfile.rhel
+  from: src
+  inputs:
+    otherthing:
+      as:
+      - otherthing
+    test:
+      as:
+      - test
+      - test
+  to: cont-img
+operator:
+  bundles:
+  - as: ci-index
+    base_index: test
+    context_dir: ./context-dir
+    dockerfile_path: ./Dockerfile.bundle
+  substitutions:
+  - pullspec: registry.io/thisimage:4.1
+    with: image1
+  - pullspec: image.io/woop:latest
+    with: image2
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: stable
+      version: "4.10"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: go test -c ./test/...
+tests:
+- as: unit-test
+  commands: make unit
+  container:
+    from: src
+- as: e2e-operator
+  steps:
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      OO_CHANNEL: "4.12"
+      OO_INSTALL_NAMESPACE: '!create'
+      OO_PACKAGE: package-name
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: e2e-operator
+      commands: make e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: optional-operators-ci-aws
+zz_generated_metadata:
+  branch: master
+  org: dsadsa
+  repo: ddadada
