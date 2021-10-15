@@ -37,10 +37,18 @@ operator-sdk scorecard --config "${SCORECARD_CONFIG}" \
 
 if [ -f "${OPERATOR_DIR}/tests/scorecard/config.yaml" ]; then
   echo "CUSTOM SCORECARD TESTS DETECTED"
+
+  CUSTOM_SERVICE_ACCOUNT=$(/usr/local/bin/yq r "${OPERATOR_DIR}/tests/scorecard/config.yaml" 'serviceaccount')
+  if [ "${CUSTOM_SERVICE_ACCOUNT}" != "" ] && [ "${CUSTOM_SERVICE_ACCOUNT}" != "null" ]; then
+    echo "Creating service account ${CUSTOM_SERVICE_ACCOUNT} for usage wih the custom scorecard"
+    oc create serviceaccount "${CUSTOM_SERVICE_ACCOUNT}" -n "${NAMESPACE}"
+    oc create clusterrolebinding default-sa-crb --clusterrole=cluster-admin --serviceaccount="${NAMESPACE}":"${CUSTOM_SERVICE_ACCOUNT}"
+  fi
+
   echo "Running the operator-sdk scorecard test using the custom, bundle-provided configuration, json output and storing it in the artifacts directory"
   operator-sdk scorecard \
-    --namespace=${NAMESPACE} \
-    --kubeconfig ${KUBECONFIG} \
+    --namespace="${NAMESPACE}" \
+    --kubeconfig "${KUBECONFIG}" \
     --output json \
     "${OPERATOR_DIR}" > "${ARTIFACT_DIR}"/scorecard-output-custom.json || true
 fi
