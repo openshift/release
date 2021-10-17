@@ -65,6 +65,8 @@ log "INFO The base branch is $branch"
 if [[ -n "$RELEASE_REF" ]]; then
     log "INFO RELEASE_REF variable is set. Using $RELEASE_REF for OSCI_COMPONENT_BRANCH."
     export OSCI_COMPONENT_BRANCH=${RELEASE_REF}
+    log "INFO RELEASE_REF variable is set. Using $RELEASE_REF as branch."
+    branch="${RELEASE_REF}"
 fi
 
 # Get current Z-stream version and set to OSCI_COMPONENT_VERSION
@@ -81,5 +83,5 @@ log "INFO Z-stream version is $release"
 export OSCI_COMPONENT_NAME=${$OSCI_COMPONENT_NAME:-$REPO_NAME}
 
 # Run manifest update
-cd /opt/build-harness/build-harness-extensions/modules/osci/ || exit
+cd /opt/build-harness/build-harness-extensions/modules/osci/ || exit 1
 make osci/publish BUILD_HARNESS_EXTENSIONS_PATH=/opt/build-harness/build-harness-extensions
