@@ -38,6 +38,30 @@ resources:
       memory: 200Mi
 test_binary_build_commands: OS_GOFLAGS='-race' make build
 tests:
+- as: oc-adm-info
+  steps:
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        echo "== oc registry login"
+        oc registry login
+        # echo "== oc adm policy"
+        # oc adm policy add-role-to-group system:image-puller system:authenticated --namespace "${NAMESPACE}"
+        # echo "== oc adm policy"
+        # oc adm policy add-role-to-group system:image-puller system:unauthenticated --namespace "${NAMESPACE}"
+        echo "== oc image info $RELEASE_IMAGE_LATEST"
+        oc image info $RELEASE_IMAGE_LATEST
+        echo "== or adm release info"
+        oc adm release info $RELEASE_IMAGE_LATEST
+      dependencies:
+      - env: RELEASE_IMAGE_LATEST
+        name: release:latest
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: unit
   commands: JUNIT_REPORT=1 hack/test-go.sh
   container:
