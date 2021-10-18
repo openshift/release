@@ -1,16 +1,20 @@
 base_images:
   assisted-installer-agent:
-    name: assisted
-    namespace: ocp-kni
+    name: ocm-2.5
+    namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-service:
-    name: assisted
-    namespace: ocp-kni
+    name: ocm-2.5
+    namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
     name: assisted-test
     namespace: ocp-kni
     tag: assisted-test-infra
+  coreos-centos-stream8:
+    name: stream8
+    namespace: coreos
+    tag: "8"
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -24,22 +28,22 @@ build_root:
     dockerfile_path: Dockerfile.assisted-installer-build
 images:
 - dockerfile_path: Dockerfile.assisted-installer
-  from: openshift_release_golang-1.16
+  from: coreos-centos-stream8
   inputs:
     openshift_release_golang-1.16:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.16
   to: assisted-installer
 - dockerfile_path: Dockerfile.assisted-installer-controller
-  from: openshift_release_golang-1.16
+  from: coreos-centos-stream8
   inputs:
     openshift_release_golang-1.16:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.16
   to: assisted-installer-controller
 promotion:
-  name: assisted
-  namespace: ocp-kni
+  name: ocm-2.5
+  namespace: edge-infrastructure
 releases:
   initial:
     integration:
@@ -86,6 +90,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         IPv6=yes
+        IPv4=no
       TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-single-node

@@ -1,19 +1,19 @@
 base_images:
   assisted-installer:
-    name: assisted
-    namespace: ocp-kni
+    name: "2.4"
+    namespace: open-cluster-management
     tag: assisted-installer
   assisted-installer-agent:
-    name: assisted
-    namespace: ocp-kni
+    name: "2.4"
+    namespace: open-cluster-management
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: assisted
-    namespace: ocp-kni
+    name: "2.4"
+    namespace: open-cluster-management
     tag: assisted-installer-controller
   assisted-test-infra:
-    name: assisted-test
-    namespace: ocp-kni
+    name: ocm-2.4
+    namespace: edge-infrastructure
     tag: assisted-test-infra
   coreos_centos_stream8:
     name: stream8
@@ -53,13 +53,13 @@ operator:
   bundles:
   - dockerfile_path: deploy/olm-catalog/bundle.Dockerfile
   substitutions:
-  - pullspec: quay.io/ocpmetal/assisted-service:latest
+  - pullspec: quay.io/edge-infrastructure/assisted-service:ocm-2.4
     with: assisted-service
-  - pullspec: quay.io/ocpmetal/assisted-installer:latest
+  - pullspec: quay.io/edge-infrastructure/assisted-installer:ocm-2.4
     with: assisted-installer
-  - pullspec: quay.io/ocpmetal/assisted-installer-agent:latest
+  - pullspec: quay.io/edge-infrastructure/assisted-installer-agent:ocm-2.4
     with: assisted-installer-agent
-  - pullspec: quay.io/ocpmetal/assisted-installer-controller:latest
+  - pullspec: quay.io/edge-infrastructure/assisted-installer-controller:ocm-2.4
     with: assisted-installer-controller
   - pullspec: quay.io/ocpmetal/postgresql-12-centos7:latest
     with: postgresql-12-centos7
@@ -93,6 +93,18 @@ test_binary_build_commands: |
   go mod vendor
   mkdir /.cache && chmod 775 -R /.cache && chmod 775 -R $GOPATH
 tests:
+- as: ocm-publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-service
+    env:
+      IMAGE_REPO: assisted-service
+      OSCI_ENV_CONFIG: |
+        OSCI_PUBLISH_DELAY=0
+      REGISTRY_ORG: open-cluster-management
+      RELEASE_REF: release-2.4
+    workflow: ocm-ci-manifest-update
 - as: lint
   commands: export GOLANGCI_LINT_CACHE=/tmp/.cache && export GOPROXY=https://proxy.golang.org
     && make lint
@@ -268,14 +280,31 @@ tests:
       IP_STACK: v4
       NUM_EXTRA_WORKERS: "1"
     workflow: baremetalds-assisted-operator-ztp
-- as: e2e-metal-assisted-operator-ztp-dualstack
+- as: e2e-ai-operator-ztp-ipv4v6-sno-ocp-48
   optional: true
-  run_if_changed: ^(cmd/.*|data/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
       ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
+    env:
+      DEVSCRIPTS_CONFIG: |
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=32768
+        EXTRA_WORKER_DISK=120
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      DISCONNECTED: "false"
+      IP_STACK: v4v6
+      NUM_EXTRA_WORKERS: "1"
+    workflow: baremetalds-assisted-operator-ztp
+- as: e2e-ai-operator-ztp-ipv4v6-sno-ocp-49
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       DEVSCRIPTS_CONFIG: |
         EXTRA_WORKER_VCPU=8
@@ -307,7 +336,27 @@ tests:
       IP_STACK: v4
       NUM_EXTRA_WORKERS: "3"
     workflow: baremetalds-assisted-operator-ztp
-- as: e2e-metal-assisted-operator-ztp-dualstack-multinode-spoke-periodic
+- as: e2e-ai-operator-ztp-ipv4v6-3masters-periodic-ocp-49
+  cron: '@daily'
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      ASSISTED_ZTP_CONFIG: |
+        SPOKE_CONTROLPLANE_AGENTS=3
+      DEVSCRIPTS_CONFIG: |
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=32768
+        EXTRA_WORKER_DISK=120
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      DISCONNECTED: "false"
+      IP_STACK: v4v6
+      NUM_EXTRA_WORKERS: "3"
+    workflow: baremetalds-assisted-operator-ztp
+- as: e2e-ai-operator-ztp-ipv4v6-3masters-periodic-ocp-48
   cron: '@daily'
   steps:
     cluster_profile: packet-assisted
@@ -347,14 +396,33 @@ tests:
       IP_STACK: v4
       NUM_EXTRA_WORKERS: "3"
     workflow: baremetalds-assisted-operator-ztp
-- as: e2e-metal-assisted-operator-ztp-dualstack-multinode-spoke
+- as: e2e-ai-operator-ztp-ipv4v6-3masters-ocp-48
   optional: true
-  run_if_changed: ^(cmd/.*|data/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
       ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
+    env:
+      ASSISTED_ZTP_CONFIG: |
+        SPOKE_CONTROLPLANE_AGENTS=3
+      DEVSCRIPTS_CONFIG: |
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=32768
+        EXTRA_WORKER_DISK=120
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      DISCONNECTED: "false"
+      IP_STACK: v4v6
+      NUM_EXTRA_WORKERS: "3"
+    workflow: baremetalds-assisted-operator-ztp
+- as: e2e-ai-operator-ztp-ipv4v6-3masters-ocp-49
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       ASSISTED_ZTP_CONFIG: |
         SPOKE_CONTROLPLANE_AGENTS=3
@@ -406,10 +474,28 @@ tests:
       IP_STACK: v4
       NUM_EXTRA_WORKERS: "1"
     workflow: baremetalds-assisted-operator-ztp-upgrade
-- as: e2e-metal-assisted-operator-ztp-dualstack-periodic
+- as: e2e-ai-operator-ztp-ipv4v6-sno-periodic-ocp-48
   cron: '@daily'
   steps:
     cluster_profile: packet-assisted
+    env:
+      DEVSCRIPTS_CONFIG: |
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=32768
+        EXTRA_WORKER_DISK=120
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      DISCONNECTED: "false"
+      IP_STACK: v4v6
+      NUM_EXTRA_WORKERS: "1"
+    workflow: baremetalds-assisted-operator-ztp
+- as: e2e-ai-operator-ztp-ipv4v6-sno-periodic-ocp-49
+  cron: '@daily'
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       DEVSCRIPTS_CONFIG: |
         EXTRA_WORKER_VCPU=8
@@ -428,6 +514,7 @@ tests:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=release-ocm-2.4
         IPv6=yes
       TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
@@ -437,6 +524,7 @@ tests:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=release-ocm-2.4
         PLATFORM=none
       TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
@@ -447,6 +535,7 @@ tests:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=release-ocm-2.4
         NUM_MASTERS=1
       TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
@@ -455,6 +544,7 @@ tests:
     cluster_profile: packet
     env:
       ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=release-ocm-2.4
         STATIC_IPS=yes
       TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
@@ -464,6 +554,7 @@ tests:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=release-ocm-2.4
         NUM_MASTERS=1
         NUM_WORKERS=0
         IPv6=yes
@@ -481,6 +572,8 @@ tests:
   steps:
     cluster_profile: packet-assisted
     env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=release-ocm-2.4
       TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-multi-version
@@ -489,6 +582,7 @@ tests:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=release-ocm-2.4
         OPENSHIFT_VERSION=""
       TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
@@ -499,7 +593,37 @@ tests:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=release-ocm-2.4
+        OPENSHIFT_VERSION=""
         TEST_FUNC=test_olm_operator
+      TEST_SUITE: minimal
+    workflow: baremetalds-assisted-install
+- as: e2e-metal-assisted-kube-api-late-binding-single-node
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=release-ocm-2.4
+      POST_INSTALL_COMMANDS: |
+        export TEST=./discovery-infra/tests/test_kube_api.py
+        export TEST_FUNC=test_kube_api_late_binding_ipv4_single_node
+        export KUBECONFIG=$(find ${KUBECONFIG} -type f)
+        make deploy_assisted_operator test_parallel
+      TEST_SUITE: minimal
+    workflow: baremetalds-assisted-install
+- as: e2e-metal-assisted-kube-api-late-binding-single-node-periodic
+  cron: '@daily'
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=release-ocm-2.4
+      POST_INSTALL_COMMANDS: |
+        export TEST=./discovery-infra/tests/test_kube_api.py
+        export TEST_FUNC=test_kube_api_late_binding_ipv4_single_node
+        export KUBECONFIG=$(find ${KUBECONFIG} -type f)
+        make deploy_assisted_operator test_parallel
       TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
 zz_generated_metadata:

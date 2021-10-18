@@ -7,6 +7,10 @@ base_images:
     name: release
     namespace: openshift
     tag: golang-1.16
+  ubi-minimal-8:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
 build_root:
   image_stream_tag:
     name: release
@@ -14,7 +18,7 @@ build_root:
     tag: golang-1.16
 images:
 - dockerfile_path: Dockerfile.image-service
-  from: root
+  from: ubi-minimal-8
   inputs:
     openshift_release_golang-1.16:
       as:
@@ -46,6 +50,18 @@ test_binary_build_commands: |
   make build-openshift-ci-test-bin
   go mod vendor
 tests:
+- as: ocm-publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-image-service
+    env:
+      IMAGE_REPO: assisted-image-service
+      OSCI_ENV_CONFIG: |
+        OSCI_PUBLISH_DELAY=0
+      REGISTRY_ORG: open-cluster-management
+      RELEASE_REF: release-2.4
+    workflow: ocm-ci-manifest-update
 - as: lint
   commands: |
     export GOCACHE=/tmp/

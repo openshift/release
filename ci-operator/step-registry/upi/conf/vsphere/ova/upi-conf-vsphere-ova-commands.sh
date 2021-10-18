@@ -11,15 +11,7 @@ export HOME
 
 echo "$(date -u --rfc-3339=seconds) - Locating RHCOS image for release..."
 
-openshift_install_path="/var/lib/openshift-install"
-image_json_file="${openshift_install_path}/rhcos.json"
-fcos_json_file="${openshift_install_path}/fcos.json"
-
-if [[ -f "$fcos_json_file" ]]; then
-    image_json_file=$fcos_json_file
-fi
-
-ova_url="$(jq -r '.baseURI + .images["vmware"].path' $image_json_file)"
+ova_url=$(<"${SHARED_DIR}"/ova_url.txt)
 vm_template="${ova_url##*/}"
 
 # Troubleshooting UPI OVA import issue
@@ -58,11 +50,11 @@ then
 fi
 
 hw_versions=(13 15 17)
-for hw_version in "${hw_versions[@]}"; do 
+for hw_version in "${hw_versions[@]}"; do
     if [[ "$(govc vm.info "${vm_template}-hw${hw_version}" | wc -c)" -eq 0 ]]
     then
         echo "$(date -u --rfc-3339=seconds) - Cloning and upgrading ${vm_template} to hw version ${hw_version}..."
         govc vm.clone -on=false -vm="${vm_template}" "${vm_template}-hw${hw_version}"
-        govc vm.upgrade -vm="${vm_template}-hw${hw_version}" -version=${hw_version}        
+        govc vm.upgrade -vm="${vm_template}-hw${hw_version}" -version=${hw_version}
     fi
 done
