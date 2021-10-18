@@ -10,8 +10,6 @@ export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
 export HOME=/tmp/home
 export PATH=/usr/libexec/origin:$PATH
 
-[[ -f ${SHARED_DIR}/nested_kubeconfig ]] && export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig" && echo "Using kubeconfig from ${SHARED_DIR}/nested_kubeconfig"
-
 # HACK: HyperShift clusters use their own profile type, but the cluster type
 # underneath is actually AWS and the type identifier is derived from the profile
 # type. For now, just treat the `hypershift` type the same as `aws` until
@@ -123,7 +121,7 @@ aws|aws-arm64)
     export KUBE_SSH_USER=core
     ;;
 azure4) export TEST_PROVIDER=azure;;
-azurestack)
+azurestack) 
     export TEST_PROVIDER=azure
     export AZURE_AUTH_LOCATION=${SHARED_DIR}/osServicePrincipal.json
     ;;
