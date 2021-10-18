@@ -275,8 +275,11 @@ tests:
           --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
           --name="$(echo -n $PROW_JOB_ID|cut -d- -f-2)" \
           --region=us-east-1 \
-          --base-domain=ci.hypershift.devcluster.openshift.com &&
-        bin/hypershift create kubeconfig --namespace=clusters --name=${PROW_JOB_ID} >${SHARED_DIR}/nested_kubeconfig
+          --base-domain=ci.hypershift.devcluster.openshift.com
+        echo "Waiting for cluster to become available"
+        oc wait --timeout=10m --for=condition=Available --namespace=clusters hostedcluster/$(echo -n $PROW_JOB_ID|cut -d- -f-2)
+        echo "Cluster became available, creating kubeconfig"
+        bin/hypershift create kubeconfig --namespace=clusters --name=$(echo -n $PROW_JOB_ID|cut -d- -f-2) >${SHARED_DIR}/nested_kubeconfig
       credentials:
       - mount_path: /etc/hypershift-pool-aws-credentials
         name: hypershift-pool-aws-credentials
