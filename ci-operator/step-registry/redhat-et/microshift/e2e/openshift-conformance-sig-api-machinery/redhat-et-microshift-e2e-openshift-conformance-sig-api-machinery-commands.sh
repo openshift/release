@@ -131,7 +131,6 @@ cat <<'EOF' > "${HOME}"/suite.txt
 "[sig-api-machinery] Secrets should fail to create secret due to empty secret key [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
 "[sig-api-machinery] Secrets should patch a secret [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
 "[sig-api-machinery] Server request timeout default timeout should be used if the specified timeout in the request URL is 0s [Suite:openshift/conformance/parallel] [Suite:k8s]"
-"[sig-api-machinery] Server request timeout should return HTTP status code 400 if the user specifies an invalid timeout in the request URL [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-api-machinery] Server request timeout the request should be served with a default timeout if the specified timeout in the request URL exceeds maximum allowed [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-api-machinery] Servers with support for API chunking should return chunks of results for list calls [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-api-machinery] Servers with support for Table transformation should return a 406 for a backend which does not implement metadata [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"

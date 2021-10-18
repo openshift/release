@@ -16,6 +16,7 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   exit 1
 fi
 
+openshift_install_path="/var/lib/openshift-install"
 third_octet=$(grep -oP 'ci-segment-\K[[:digit:]]+' <(echo "${LEASED_RESOURCE}"))
 
 export HOME=/tmp
@@ -39,6 +40,13 @@ cluster_domain=$(<"${SHARED_DIR}"/clusterdomain.txt)
 ssh_pub_key_path="${CLUSTER_PROFILE_DIR}/ssh-publickey"
 install_config="${SHARED_DIR}/install-config.yaml"
 
+legacy_installer_json="${openshift_install_path}/rhcos.json"
+fcos_json_file="${openshift_install_path}/fcos.json"
+
+if [[ -f "$fcos_json_file" ]]; then
+    legacy_installer_json=$fcos_json_file
+fi
+
 # https://github.com/openshift/installer/blob/master/docs/user/overview.md#coreos-bootimages
 # This code needs to handle pre-4.8 installers though too.
 if openshift-install coreos print-stream-json 2>/tmp/err.txt >${SHARED_DIR}/coreos.json; then
@@ -55,7 +63,12 @@ else
   ova_url="$(jq -r '.baseURI + .images["vmware"].path' ${legacy_installer_json})"
 fi
 rm -f /tmp/err.txt
+
+echo "${ova_url}" > "${SHARED_DIR}"/ova_url.txt
+ova_url=$(<"${SHARED_DIR}"/ova_url.txt)
+
 vm_template="${ova_url##*/}"
+
 
 # select a hardware version for testing
 hw_versions=(13 15 17)
@@ -71,25 +84,12 @@ echo "export target_hw_version=${target_hw_version}" >> ${SHARED_DIR}/vsphere_co
 declare vsphere_datacenter
 declare vsphere_datastore
 declare vsphere_cluster
-declare vsphere_resource_pool
 declare dns_server
 declare vsphere_url
-declare TFVARS_PATH
 source "${SHARED_DIR}/vsphere_context.sh"
 
-vsphere_user=$(grep -oP 'vsphere_user\s*=\s*"\K[^"]+' ${TFVARS_PATH})
-vsphere_password=$(grep -oP 'vsphere_password\s*=\s*"\K[^"]+' ${TFVARS_PATH})
-
-echo "$(date -u --rfc-3339=seconds) - Creating govc.sh file..."
-cat >> "${SHARED_DIR}/govc.sh" << EOF
-export GOVC_URL="${vsphere_url}"
-export GOVC_USERNAME="${vsphere_user}"
-export GOVC_PASSWORD="${vsphere_password}"
-export GOVC_INSECURE=1
-export GOVC_RESOURCE_POOL=${vsphere_resource_pool}
-export GOVC_DATACENTER="${vsphere_datacenter}"
-export GOVC_DATASTORE="${vsphere_datastore}"
-EOF
+# shellcheck source=/dev/null
+source "${SHARED_DIR}/govc.sh"
 
 echo "$(date -u --rfc-3339=seconds) - Extend install-config.yaml ..."
 
@@ -108,8 +108,8 @@ platform:
     defaultDatastore: "${vsphere_datastore}"
     cluster: "${vsphere_cluster}"
     network: "${LEASED_RESOURCE}"
-    password: "${vsphere_password}"
-    username: "${vsphere_user}"
+    password: "${GOVC_PASSWORD}"
+    username: "${GOVC_USERNAME}"
     folder: "/${vsphere_datacenter}/vm/${cluster_name}"
 EOF
 
@@ -134,6 +134,13 @@ bootstrap_ip_address = "192.168.${third_octet}.3"
 lb_ip_address = "192.168.${third_octet}.2"
 compute_ip_addresses = ["192.168.${third_octet}.7","192.168.${third_octet}.8","192.168.${third_octet}.9"]
 control_plane_ip_addresses = ["192.168.${third_octet}.4","192.168.${third_octet}.5","192.168.${third_octet}.6"]
+EOF
+
+echo "$(date -u --rfc-3339=seconds) - Create secrets.auto.tfvars..."
+cat > "${SHARED_DIR}/secrets.auto.tfvars" <<-EOF
+vsphere_password="${GOVC_PASSWORD}"
+vsphere_user="${GOVC_USERNAME}"
+ipam_token=""
 EOF
 
 dir=/tmp/installer

@@ -32,7 +32,6 @@ tests:
       CLUSTERPOOL_GROUP_NAME: Search
       CLUSTERPOOL_HOST_NAMESPACE: acm-observability-usa
       CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-obs-usa-clusterpool
-      CLUSTERPOOL_LIFETIME: 2h
       CLUSTERPOOL_LIST_INCLUSION_FILTER: prow
     test:
     - as: e2e
@@ -41,21 +40,16 @@ tests:
         echo $(pwd)
         export SELF="make -f Makefile.prow"
         make -f Makefile.prow test-e2e
+      credentials:
+      - mount_path: /etc/secret
+        name: ocm-obs-usa-acmcreds
+        namespace: test-credentials
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
     workflow: ocm-e2e-clusterpool
-- as: sonar-pre-submit
-  commands: |
-    export SELF="make -f Makefile.prow"
-    make -f Makefile.prow sonar/js/prow
-  container:
-    from: src
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
 zz_generated_metadata:
   branch: main
   org: open-cluster-management

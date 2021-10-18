@@ -105,6 +105,27 @@ EOF
 
 echo "CatalogSource name is \"$CATSRC\""
 
+IS_CATSRC_CREATED=false
+# Wait for 10 minutes until the Catalog source state is 'READY'
+for i in $(seq 1 120); do
+    CATSRC_STATE=$(oc get catalogsources/"$CATSRC" -n "$OO_INSTALL_NAMESPACE" -o jsonpath='{.status.connectionState.lastObservedState}')
+    echo $CATSRC_STATE
+    if [ "$CATSRC_STATE" = "READY" ] ; then
+        echo "Catalogsource created successfully after waiting $((5*i)) seconds"
+        echo "current state of cataloguesource is \"$CATSRC\""
+        IS_CATSRC_CREATED=true
+        break
+    fi
+    sleep 5
+done
+
+if [ $IS_CATSRC_CREATED = false ] ; then
+    echo "Timed out waiting for the catalog source $CATSRC to become ready after 10 minutes."
+    echo "Catalogsource state at timeout is \"$CATSRC_STATE\""
+    echo "Catalogsource image used is \"$OO_INDEX\""
+    exit 1
+fi
+
 DEPLOYMENT_START_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 echo "Set the deployment start time: ${DEPLOYMENT_START_TIME}"
 

@@ -16,15 +16,14 @@ declare vsphere_datacenter
 declare vsphere_datastore
 declare vsphere_url
 declare vsphere_cluster
-declare TFVARS_PATH
 source "${SHARED_DIR}/vsphere_context.sh"
+# shellcheck source=/dev/null
+source "${SHARED_DIR}/govc.sh"
 
 declare -a vips
 mapfile -t vips < "${SHARED_DIR}/vips.txt"
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
-vsphere_user=$(grep -oP 'vsphere_user\s*=\s*"\K[^"]+' ${TFVARS_PATH})
-vsphere_password=$(grep -oP 'vsphere_password\s*=\s*"\K[^"]+' ${TFVARS_PATH})
 base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
 machine_cidr=$(<"${SHARED_DIR}"/machinecidr.txt)
 
@@ -54,8 +53,8 @@ platform:
     defaultDatastore: "${vsphere_datastore}"
     cluster: "${vsphere_cluster}"
     network: "${LEASED_RESOURCE}"
-    password: "${vsphere_password}"
-    username: "${vsphere_user}"
+    password: "${GOVC_PASSWORD}"
+    username: "${GOVC_USERNAME}"
     apiVIP: "${vips[0]}"
     ingressVIP: "${vips[1]}"
 networking:

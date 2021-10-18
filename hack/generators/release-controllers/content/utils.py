@@ -12,8 +12,18 @@ def get_rc_volume_mounts(context):
             'readOnly': True
         },
         {
-            'mountPath': '/etc/job-config/master',
-            'name': 'job-config-master',
+            'mountPath': '/etc/job-config/master-periodics',
+            'name': 'job-config-master-periodics',
+            'readOnly': True
+        },
+        {
+            'mountPath': '/etc/job-config/master-postsubmits',
+            'name': 'job-config-master-postsubmits',
+            'readOnly': True
+        },
+        {
+            'mountPath': '/etc/job-config/master-presubmits',
+            'name': 'job-config-master-presubmits',
             'readOnly': True
         },
         {
@@ -67,9 +77,23 @@ def get_rc_volumes(context, namespace=None):
         {
             'configMap': {
                 'defaultMode': 420,
-                'name': 'job-config-master'
+                'name': 'job-config-master-periodics'
             },
-            'name': 'job-config-master'
+            'name': 'job-config-master-periodics'
+        },
+        {
+            'configMap': {
+                'defaultMode': 420,
+                'name': 'job-config-master-postsubmits'
+            },
+            'name': 'job-config-master-postsubmits'
+        },
+        {
+            'configMap': {
+                'defaultMode': 420,
+                'name': 'job-config-master-presubmits'
+            },
+            'name': 'job-config-master-presubmits'
         },
         {
             'configMap': {

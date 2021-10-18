@@ -7,7 +7,7 @@ export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
 MIN_PERCENTAGE=${MIN_PERCENTAGE:-15}
 
 message() {
-	echo 'Quotas are low on '"$OS_CLOUD"'.\n```'
+	echo 'Quotas are low on '"$CLOUD_NAME"'.\n```'
 	cat "${ARTIFACT_DIR}/output.txt"
 	echo '```'
 }

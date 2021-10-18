@@ -11,7 +11,7 @@ build_root:
 images:
 - dockerfile_literal: |-
     FROM src
-    RUN dnf -y install python3-openstackclient jq && dnf clean all
+    RUN ./hack/dnf_safe -y install python3-openstackclient python3-octaviaclient jq && dnf clean all
     ADD openshift-install /usr/bin/openshift-install
   from: src
   inputs:
@@ -62,6 +62,13 @@ tests:
     env:
       CLUSTER_TYPE_OVERRIDE: openstack-kuryr
     workflow: shiftstack-cleanup
+- as: quotas-moc
+  interval: 1h
+  steps:
+    env:
+      CLOUD_NAME: MOC
+      CLUSTER_TYPE_OVERRIDE: openstack
+    workflow: shiftstack-quotas
 - as: quotas-vexxhost
   interval: 1h
   steps:
@@ -83,11 +90,24 @@ tests:
       CLOUD_NAME: mecha az0
       CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-az0
     workflow: shiftstack-quotas
+- as: quotas-vh-mecha-kuryr
+  interval: 1h
+  steps:
+    env:
+      CLOUD_NAME: mecha kuryr
+      CLUSTER_TYPE_OVERRIDE: openstack-kuryr
+    workflow: shiftstack-quotas
 - as: monitor-moc
   interval: 5m
   steps:
     env:
       CLUSTER_TYPE_OVERRIDE: openstack
+    workflow: shiftstack-monitor
+- as: monitor-vexxhost
+  interval: 5m
+  steps:
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-vexxhost
     workflow: shiftstack-monitor
 - as: monitor-mecha-central
   interval: 5m
@@ -101,6 +121,18 @@ tests:
     env:
       CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-az0
     workflow: shiftstack-monitor
+- as: monitor-mecha-kuryr
+  interval: 5m
+  steps:
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-kuryr
+    workflow: shiftstack-monitor
+- as: liveliness-mecha-central
+  interval: 1h
+  steps:
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-central
+    workflow: shiftstack-liveliness
 zz_generated_metadata:
   branch: main
   org: shiftstack

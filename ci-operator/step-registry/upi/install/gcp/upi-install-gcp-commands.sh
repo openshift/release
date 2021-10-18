@@ -66,7 +66,7 @@ date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 
 ## Export variables to be used in examples below.
 echo "$(date -u --rfc-3339=seconds) - Exporting variables..."
-BASE_DOMAIN='origin-ci-int-gce.dev.openshift.com'
+BASE_DOMAIN="$(cat ${CLUSTER_PROFILE_DIR}/public_hosted_zone)"
 BASE_DOMAIN_ZONE_NAME="$(gcloud dns managed-zones list --filter "DNS_NAME=${BASE_DOMAIN}." --format json | jq -r .[0].name)"
 NETWORK_CIDR='10.0.0.0/16'
 MASTER_SUBNET_CIDR='10.0.0.0/19'

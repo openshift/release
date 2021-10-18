@@ -233,6 +233,7 @@ def _add_osd_rc_deployment(gendoc):
                                         '--github-throttle=250',
                                         '--bugzilla-endpoint=https://bugzilla.redhat.com',
                                         '--bugzilla-api-key-path=/etc/bugzilla/api',
+                                        '--bugzilla-auth-method=bearer',
                                         '--plugin-config=/etc/plugins/plugins.yaml',
                                         '--supplemental-plugin-config-dir=/etc/plugins',
                                         '--verify-bugzilla',

@@ -1,24 +1,24 @@
 base_images:
   assisted-installer:
-    name: assisted
-    namespace: ocp-kni
+    name: "2.4"
+    namespace: open-cluster-management
     tag: assisted-installer
   assisted-installer-controller:
-    name: assisted
-    namespace: ocp-kni
+    name: "2.4"
+    namespace: open-cluster-management
     tag: assisted-installer-controller
   assisted-service:
-    name: assisted
-    namespace: ocp-kni
+    name: "2.4"
+    namespace: open-cluster-management
     tag: assisted-service
   assisted-test-infra:
     name: assisted-test
     namespace: ocp-kni
     tag: assisted-test-infra
-  base:
-    name: "4.8"
-    namespace: ocp
-    tag: base
+  coreos-centos-centos8:
+    name: centos8
+    namespace: coreos
+    tag: "8"
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -32,7 +32,7 @@ build_root:
     dockerfile_path: Dockerfile.assisted_installer_agent-build
 images:
 - dockerfile_path: Dockerfile.assisted_installer_agent
-  from: base
+  from: coreos-centos-centos8
   inputs:
     openshift_release_golang-1.16:
       as:
@@ -60,6 +60,18 @@ test_binary_build_commands: |
   go mod vendor
   mkdir /.cache && chmod 775 -R /.cache ${GOPATH}
 tests:
+- as: ocm-publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-installer-agent
+    env:
+      IMAGE_REPO: assisted-installer-agent
+      OSCI_ENV_CONFIG: |
+        OSCI_PUBLISH_DELAY=0
+      REGISTRY_ORG: open-cluster-management
+      RELEASE_REF: release-2.4
+    workflow: ocm-ci-manifest-update
 - as: lint
   commands: |
     export GOLANGCI_LINT_CACHE=/tmp/.cache
@@ -75,6 +87,10 @@ tests:
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=release-ocm-2.4
+      TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-ipv6
   optional: true
@@ -82,6 +98,7 @@ tests:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=release-ocm-2.4
         IPv6=yes
       TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
@@ -91,6 +108,7 @@ tests:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=release-ocm-2.4
         NUM_MASTERS=1
       TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
@@ -100,6 +118,7 @@ tests:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=release-ocm-2.4
         TEST_FUNC=test_olm_operator
       TEST_SUITE: minimal
     workflow: baremetalds-assisted-install

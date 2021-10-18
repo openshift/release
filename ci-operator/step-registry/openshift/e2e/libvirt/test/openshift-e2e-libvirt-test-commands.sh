@@ -177,6 +177,94 @@ function prometheus_cmrss_loop() {
 	done
 }
 
+function prometheus_GRPCRequestsSlow_loop() {
+	local EDWFDSB_DATA
+	local EDWFDSB_EDATA
+	local GSHSB_DATA
+	local GSHSB_EDATA
+	local ENPRTTSB_DATA
+	local ENPRTTSB_EDATA
+	local SLEEP_TIME="10m"
+
+	# historgram_quantile:sum:rate:etcd_disk_wal_fsync_duration_seconds_bucket topk(1, histogram_quantile(0.99, rate(etcd_disk_wal_fsync_duration_seconds_bucket{job=~".*etcd.*"}[5m])))
+	EDWFDSB_DATA='histogram_quantile(0.99, rate(etcd_disk_wal_fsync_duration_seconds_bucket{job=~".*etcd.*"}['${SLEEP_TIME}']))'
+	EDWFDSB_EDATA=$(urlencode "${EDWFDSB_DATA}")
+	# historgram_quantile:sum:rate:grpc_server_handling_seconds_bucket topk(1,histogram_quantile(0.99, sum(rate(grpc_server_handling_seconds_bucket{job=~".*etcd.*", grpc_type="unary"}[5m])) without(grpc_type)))
+	GSHSB_DATA='histogram_quantile(0.99, sum(rate(grpc_server_handling_seconds_bucket{job=~".*etcd.*", grpc_type="unary"}['${SLEEP_TIME}'])) without(grpc_type)) >= 0'
+	GSHSB_EDATA=$(urlencode "${GSHSB_DATA}")
+	# historgram_quantile:sum:rate:etcd_network_peer_round_trip_time_seconds_bucket topk(1, histogram_quantile(0.99, rate(etcd_network_peer_round_trip_time_seconds_bucket{job=~".*etcd.*"}[5m])))
+	ENPRTTSB_DATA='histogram_quantile(0.99, rate(etcd_network_peer_round_trip_time_seconds_bucket{job=~".*etcd.*"}['${SLEEP_TIME}']))'
+	ENPRTTSB_EDATA=$(urlencode "${ENPRTTSB_DATA}")
+
+	log_to_file "${ARTIFACT_DIR}/prometheus-GRPCRequestsSlow.log"
+
+	while true
+	do
+		echo "8<----------8<---------- $(date +%s) 8<----------8<----------"
+		echo "${EDWFDSB_DATA}"
+
+		RESPONSE=$(curl --silent --insecure --header "Authorization: Bearer ${TOKEN}" "https://${HOSTNAME}/api/v1/query?query=${EDWFDSB_EDATA}")
+		RC=$?
+		if [[ ${RC} -gt 0 ]]
+		then
+			echo "Error: ${URL} returned ${RC}"
+			exit 1
+		fi
+		STATUS=$(echo "${RESPONSE}" | jq -r '.status')
+		if [[ "${STATUS}" != "success" ]]
+		then
+			echo "Error: Status is not success (${STATUS})"
+			exit 1
+		fi
+
+		echo "${RESPONSE}" | jq -r '.data.result[] | [ .metric.pod , .value[1] ]'
+
+		echo "8<----------8<----------"
+		echo "${GSHSB_DATA}"
+
+		RESPONSE=$(curl --silent --insecure --header "Authorization: Bearer ${TOKEN}" "https://${HOSTNAME}/api/v1/query?query=${GSHSB_EDATA}")
+		RC=$?
+		if [[ ${RC} -gt 0 ]]
+		then
+			echo "Error: ${URL} returned ${RC}"
+			exit 1
+		fi
+		STATUS=$(echo "${RESPONSE}" | jq -r '.status')
+		if [[ "${STATUS}" != "success" ]]
+		then
+			echo "Error: Status is not success (${STATUS})"
+			exit 1
+		fi
+
+		echo "${RESPONSE}" | jq -r '.data.result'
+
+		echo "8<----------8<----------"
+		echo "${ENPRTTSB_DATA}"
+
+		RESPONSE=$(curl --silent --insecure --header "Authorization: Bearer ${TOKEN}" "https://${HOSTNAME}/api/v1/query?query=${ENPRTTSB_EDATA}")
+		RC=$?
+		if [[ ${RC} -gt 0 ]]
+		then
+			echo "Error: ${URL} returned ${RC}"
+			exit 1
+		fi
+		STATUS=$(echo "${RESPONSE}" | jq -r '.status')
+		if [[ "${STATUS}" != "success" ]]
+		then
+			echo "Error: Status is not success (${STATUS})"
+			exit 1
+		fi
+
+		echo "${RESPONSE}" | jq -r '.data.result'
+
+		echo "8<----------8<----------"
+
+		prometheus_alert "etcdGRPCRequestsSlow"
+
+		sleep ${SLEEP_TIME}
+	done
+}
+
 function oc_adm_top_nodes_loop() {
 	log_to_file "${ARTIFACT_DIR}/oc-adm-top-nodes.log"
 
@@ -254,6 +342,9 @@ prometheus_cmrss_loop &
 WATCHERS+=( "$!" )
 
 prometheus_kaebb_loop &
+WATCHERS+=( "$!" )
+
+prometheus_GRPCRequestsSlow_loop &
 WATCHERS+=( "$!" )
 
 oc_adm_top_nodes_loop &

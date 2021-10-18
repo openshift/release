@@ -55,6 +55,7 @@ cp -t "${installer_dir}" \
     "${SHARED_DIR}/install-config.yaml" \
     "${SHARED_DIR}/metadata.json" \
     "${SHARED_DIR}/terraform.tfvars" \
+    "${SHARED_DIR}/secrets.auto.tfvars" \
     "${SHARED_DIR}/bootstrap.ign" \
     "${SHARED_DIR}/worker.ign" \
     "${SHARED_DIR}/master.ign"
@@ -66,10 +67,6 @@ cp -t "${installer_dir}/auth" \
 # Copy sample UPI files
 cp -rt "${installer_dir}" \
     /var/lib/openshift-install/upi/"${CLUSTER_TYPE}"/*
-
-# Copy secrets to terraform path
-cp -t "${installer_dir}" \
-    ${TFVARS_PATH}
 
 tar -xf "${SHARED_DIR}/terraform_state.tar.xz"
 
