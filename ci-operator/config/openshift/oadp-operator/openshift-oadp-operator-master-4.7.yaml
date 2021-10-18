@@ -25,11 +25,16 @@ operator:
   substitutions:
   - pullspec: quay.io/konveyor/oadp-operator:latest
     with: oadp-operator
+promotion:
+  excluded_images:
+  - oadp-operator
+  name: test-oadp-operator
+  namespace: openshift
 releases:
   latest:
     release:
-      channel: candidate
-      version: "4.9"
+      channel: stable
+      version: "4.7"
 resources:
   '*':
     limits:
@@ -38,6 +43,27 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: operator-unit-test
+  steps:
+    test:
+    - as: unit
+      commands: HOME=$(pwd) make test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: operator-unit-test-coverage
+  postsubmit: true
+  steps:
+    test:
+    - as: unit-coverage
+      commands: HOME=$(pwd) make test submit-coverage
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: operator-e2e
   steps:
     cluster_profile: aws
@@ -61,29 +87,6 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: optional-operators-ci-aws
-- as: provision-test-cluster49-2hours
-  steps:
-    cluster_profile: aws
-    dependencies:
-      OO_INDEX: ci-index
-    env:
-      OO_CHANNEL: beta
-      OO_INSTALL_NAMESPACE: openshift-adp
-      OO_PACKAGE: oadp-operator
-      OO_TARGET_NAMESPACES: '!install'
-    test:
-    - as: e2e
-      commands: sleep 12600
-      credentials:
-      - mount_path: /var/run/oadp-credentials
-        name: oadp-credentials
-        namespace: test-credentials
-      from: test-oadp-operator
-      resources:
-        requests:
-          cpu: 1000m
-          memory: 512Mi
-    workflow: optional-operators-ci-aws
 - as: operator-e2e-aws-periodic-slack
   cron: 0 4 * * *
   steps:
@@ -105,8 +108,8 @@ tests:
       from: test-oadp-operator
       resources:
         requests:
-          cpu: 100m
-          memory: 200Mi
+          cpu: 1000m
+          memory: 512Mi
     workflow: optional-operators-ci-aws
 - as: operator-e2e-gcp-periodic-slack
   cron: 0 4 * * *
@@ -129,8 +132,8 @@ tests:
       from: test-oadp-operator
       resources:
         requests:
-          cpu: 100m
-          memory: 200Mi
+          cpu: 1000m
+          memory: 512Mi
     workflow: optional-operators-ci-gcp
 - as: operator-e2e-azure-periodic-slack
   cron: 0 4 * * *
@@ -153,11 +156,10 @@ tests:
       from: test-oadp-operator
       resources:
         requests:
-          cpu: 100m
-          memory: 200Mi
+          cpu: 1000m
+          memory: 512Mi
     workflow: optional-operators-ci-azure
 zz_generated_metadata:
   branch: master
   org: openshift
   repo: oadp-operator
-  variant: nightly-4.9
