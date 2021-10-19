@@ -1,8 +1,4 @@
 base_images:
-  centos8:
-    name: centos
-    namespace: origin
-    tag: "8"
   ubi8:
     name: ubi
     namespace: ocp
@@ -10,31 +6,13 @@ base_images:
 binary_build_commands: ./scripts/ci/jobs/build.sh
 build_root:
   image_stream_tag:
-    name: rox-ci
+    name: rox-ci-main-builder
     namespace: stackrox
-    tag: rox-ci
+    tag: latest
 images:
-- context_dir: build
-  dockerfile_path: Dockerfile_rhel
-  from: centos8
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/stackrox/rox-openshift-ci-mirror
-  to: main-builder
-- context_dir: build
-  dockerfile_path: Dockerfile_build
-  from: main-builder
-  inputs:
-    main-builder:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/stackrox/rox-openshift-ci-mirror
-  to: main-build
 - context_dir: image/rhel
   dockerfile_path: Dockerfile
-  from: main-build
+  from: ubi8
   inputs:
     bin:
       paths:
