@@ -328,6 +328,53 @@ presubmits:
     always_run: true
     branches:
     - master
+    cluster: app.ci
+    context: ci/build-farm/build03-dry
+    decorate: true
+    labels:
+      ci.openshift.io/cluster: build03
+      ci.openshift.io/generator: cluster-init
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-build03-dry
+    rerun_command: /test build03-dry
+    spec:
+      containers:
+      - args:
+        - --config-dir=clusters/build-clusters/build03
+        - --as=
+        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+        command:
+        - applyconfig
+        env:
+        - name: HOME
+          value: /tmp
+        image: registry.ci.openshift.org/ci/applyconfig:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+        - mountPath: /tmp
+          name: tmp
+      serviceAccountName: config-updater
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.build03.config
+            path: kubeconfig
+          secretName: config-updater
+      - emptyDir: {}
+        name: tmp
+    trigger: (?m)^/test( | .* )build03-dry,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
     cluster: build02
     context: ci/prow/ci-operator-config
     decorate: true
