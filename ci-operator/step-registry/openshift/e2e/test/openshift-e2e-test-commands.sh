@@ -218,6 +218,9 @@ function upgrade_paused() {
 
     echo "Starting worker upgrade to ${OPENSHIFT_UPGRADE1_RELEASE_IMAGE_OVERRIDE}"
     oc patch mcp/worker --type merge --patch '{"spec":{"paused":false}}'
+    oc wait mcp/worker --for condition=Updated &
+    wait "$!"
+    echo "Workers upgraded to ${OPENSHIFT_UPGRADE1_RELEASE_IMAGE_OVERRIDE}; starting post-update conformance tests"
     openshift-tests run-upgrade all \
         --to-image "${OPENSHIFT_UPGRADE1_RELEASE_IMAGE_OVERRIDE}" \
         --options "${TEST_UPGRADE_OPTIONS-}" \
