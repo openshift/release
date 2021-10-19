@@ -1,28 +1,32 @@
 base_images:
   base:
-    name: "4.10"
-    namespace: origin
+    name: "4.9"
+    namespace: ocp
     tag: base
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
   ocp_4.8_cli:
-    name: "4.10"
+    name: "4.9"
     namespace: origin
     tag: cli
   ocp_builder_rhel-8-golang-1.16-openshift-4.8:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.16-openshift-4.8
-  ocp_builder_rhel-8-golang-1.16-openshift-4.10:
+  ocp_builder_rhel-8-golang-1.16-openshift-4.9:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.16-openshift-4.10
+    tag: rhel-8-golang-1.16-openshift-4.9
   origin_4.8_cli:
-    name: "4.10"
+    name: "4.8"
     namespace: origin
     tag: cli
   rhel-7:
     name: builder
     namespace: ocp
-    tag: rhel-7-golang-1.16-openshift-4.10
+    tag: rhel-7-golang-1.16-openshift-4.9
 build_root:
   from_repository: true
 images:
@@ -32,9 +36,9 @@ images:
   dockerfile_path: images/installer/Dockerfile.ci
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.10:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.10
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
   to: installer
 - build_args:
   - name: TAGS
@@ -42,9 +46,9 @@ images:
   dockerfile_path: images/installer-artifacts/Dockerfile.rhel
   from: installer
   inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.10:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.10
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
   to: installer-artifacts
 - build_args:
   - name: TAGS
@@ -84,13 +88,13 @@ images:
   to: openstack-installer
 - build_args:
   - name: TAGS
-    value: baremetal libvirt okd
+    value: libvirt baremetal okd
   dockerfile_path: images/baremetal/Dockerfile.ci
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.10:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.10
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
   to: baremetal-installer
 - build_args:
   - name: TAGS
@@ -98,22 +102,22 @@ images:
   dockerfile_path: images/installer/Dockerfile.ci
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.10:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.10
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
   to: ovirt-installer
 promotion:
-  name: "4.10"
+  name: "4.9"
   namespace: origin
 releases:
   initial:
     integration:
-      name: "4.10"
+      name: "4.9"
       namespace: origin
   latest:
     integration:
       include_built_images: true
-      name: "4.10"
+      name: "4.9"
       namespace: origin
 resources:
   '*':
@@ -186,7 +190,7 @@ tests:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere
 zz_generated_metadata:
-  branch: master
+  branch: release-4.9
   org: openshift
   repo: installer
   variant: okd
