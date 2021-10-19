@@ -15,6 +15,12 @@ images:
       as:
       - quay.io/centos/centos:stream8
   to: assisted-installer-deployment-build
+- dockerfile_path: Dockerfile.assisted-installer-deployment
+  inputs:
+    coreos_centos_stream8:
+      as:
+      - quay.io/centos/centos:stream8
+  to: assisted-installer-deployment
 resources:
   '*':
     limits:
@@ -34,6 +40,11 @@ tests:
     clone: true
     from: assisted-installer-deployment-build
   postsubmit: true
+- as: triage-status-report
+  cron: 0 7 * * 0-5
+  steps:
+    test:
+    - ref: baremetalds-assisted-tools-report
 zz_generated_metadata:
   branch: master
   org: openshift-assisted

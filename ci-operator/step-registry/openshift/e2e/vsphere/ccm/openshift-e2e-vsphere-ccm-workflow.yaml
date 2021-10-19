@@ -1,0 +1,30 @@
+workflow:
+  as: openshift-e2e-vsphere-ccm
+  steps:
+    pre:
+    - ref: ipi-conf
+    - ref: ipi-conf-vsphere
+    # TODO: add - ref: ipi-install-monitoringpvc
+    # We do not include monitoring PVC introduced in https://github.com/openshift/release/pull/15040
+    # as functionality of this PVC depends on successfull migration to CSI we are currently unable to
+    # fully determine. 
+    - chain: ipi-install
+    - ref: ccm-conf-apply-feature-gate
+    - ref: storage-conf-csi-vsphere
+    - ref: storage-conf-wait-for-csi-migration
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - chain: gather-core-dump
+    - ref: ccm-must-gather
+    - chain: ipi-vsphere-post
+    env:
+      TEST_INSTALL_CSI_DRIVERS: vsphere
+      TEST_CSI_DRIVER_MANIFEST: manifest-vsphere.yaml
+      TEST_SKIPS: >-
+        Managed cluster should start all core operators\|
+        Alerts shouldn't report any alerts in firing or pending state\|
+        Prometheus when installed on the cluster shouldn't report any alerts in firing state apart from Watchdog and AlertmanagerReceiversNotConfigured
+  documentation: |-
+    The Openshift E2E vSphere workflow using CCM as a primary mean to initialize nodes and create external LoadBalancers.
+    Executes the common end-to-end test suite on vSphere to test updated cluster configuration.
