@@ -1,5 +1,9 @@
 base_images:
-  os:
+  centos:
+    name: centos
+    namespace: origin
+    tag: "8"
+  ubuntu:
     name: ubuntu
     namespace: ci
     tag: "20.04"
@@ -11,8 +15,12 @@ build_root:
 images:
 - context_dir: images
   dockerfile_path: Dockerfile.rox
-  from: os
+  from: ubuntu
   to: rox-ci
+- context_dir: images
+  dockerfile_path: Dockerfile.rox-main-builder
+  from: centos
+  to: rox-ci-main-builder
 promotion:
   namespace: stackrox
   tag: latest
@@ -21,28 +29,6 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-tests:
-- as: test-secret
-  steps:
-    test:
-    - as: test-secret
-      commands: |
-        set -x
-        echo "$ROX_CI_IMAGE"
-        ls -lR /test-secret
-        grep test123 /test-secret/secret
-      credentials:
-      - mount_path: /test-secret
-        name: stackrox-test-secret
-        namespace: test-credentials
-      dependencies:
-      - env: ROX_CI_IMAGE
-        name: rox-ci
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
 zz_generated_metadata:
   branch: master
   org: stackrox
