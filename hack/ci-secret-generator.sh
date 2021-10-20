@@ -14,7 +14,9 @@ echo "BUILD_FARM_CREDENTIALS_FOLDER=${BUILD_FARM_CREDENTIALS_FOLDER}"
 
 BASE_DIR="$( cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/.."
 echo "BASE_DIR=${BASE_DIR}"
-cluster="${cluster:-}"
+dry_run="${dry_run:-true}"
+
+set -x
 
 $CONTAINER_ENGINE pull registry.ci.openshift.org/ci/ci-secret-generator:latest
 $CONTAINER_ENGINE run --rm \
