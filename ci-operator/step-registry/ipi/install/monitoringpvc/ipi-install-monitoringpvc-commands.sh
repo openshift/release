@@ -8,13 +8,29 @@ set -o pipefail
 # if certain instance types are used that cannot access persistent volumes.
 
 # Use yq to create cluster monitoring config, as other steps may adjust it
-curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
+YQ_URI=https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64
+YQ_HASH=e70e482e7ddb9cf83b52f5e83b694a19e3aaf36acf6b82512cbe66e41d569201
+echo "${YQ_HASH} -" > /tmp/sum.txt
+if ! curl -Ls "${YQ_URI}" | tee /tmp/yq | sha256sum -c /tmp/sum.txt >/dev/null 2>/dev/null; then
+  echo "Expected file at ${YQ_URI} to have checksum ${YQ_HASH} but instead got $(sha256sum </tmp/yq | cut -d' ' -f1)"
+  cat /tmp/yq
+  exit 1
+fi
+echo "Downloaded yq; sha256 checksum matches expected ${YQ_HASH}."
+chmod +x /tmp/yq
 
 CONFIG="${SHARED_DIR}/manifest_cluster-monitoring-config.yaml"
 PATCH="${SHARED_DIR}/cluster-monitoring-config.yaml.patch"
 
-# Create config if empty
-touch "${CONFIG}"
+if test -e "${CONFIG}"
+then
+  echo "initial configuration:"
+  cat "${CONFIG}"
+else
+  # Create config if empty
+  touch "${CONFIG}"
+fi
+
 CONFIG_CONTENTS="$(/tmp/yq r ${CONFIG} 'data."config.yaml"')"
 if [ -z "${CONFIG_CONTENTS}" ]; then
   cat >> "${CONFIG}" << EOF

@@ -54,7 +54,7 @@ release-controllers:
 	./hack/generators/release-controllers/generate-release-controllers.py .
 
 checkconfig:
-	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR):/release:z" gcr.io/k8s-prow/checkconfig:v20211013-f0462bffd3 --config-path /release/core-services/prow/02_config/_config.yaml --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
+	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR):/release:z" gcr.io/k8s-prow/checkconfig:v20211019-5763223177 --config-path /release/core-services/prow/02_config/_config.yaml --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
 
 jobs: ci-operator-checkconfig
 	$(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/ci-operator-prowgen:latest
@@ -226,7 +226,7 @@ ci-secret-bootstrap:
 .PHONY: ci-secret-bootstrap
 
 ci-secret-generator: build_farm_credentials_folder
-	BUILD_FARM_CREDENTIALS_FOLDER=$(build_farm_credentials_folder) ./hack/ci-secret-generator.sh
+	BUILD_FARM_CREDENTIALS_FOLDER=$(build_farm_credentials_folder) dry_run=false ./hack/ci-secret-generator.sh
 .PHONY: ci-secret-generator
 
 build_farm_credentials_folder ?= /tmp/build-farm-credentials

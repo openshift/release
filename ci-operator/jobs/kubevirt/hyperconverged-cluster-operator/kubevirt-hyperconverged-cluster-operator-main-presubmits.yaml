@@ -306,82 +306,6 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build01
-    context: ci/prow/hco-e2e-image-index-azure-sno
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-kubevirt-hyperconverged-cluster-operator-main-hco-e2e-image-index-azure-sno
-    optional: true
-    rerun_command: /test hco-e2e-image-index-azure-sno
-    run_if_changed: ^(build/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/hco-e2e-image-index-azure-sno-cluster-profile
-        - --target=hco-e2e-image-index-azure-sno
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/hco-e2e-image-index-azure-sno-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-azure4
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )hco-e2e-image-index-azure-sno,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build01
     context: ci/prow/hco-e2e-image-index-gcp
     decorate: true
     decoration_config:
@@ -453,6 +377,158 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )hco-e2e-image-index-gcp,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build01
+    context: ci/prow/hco-e2e-image-index-sno-aws
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-kubevirt-hyperconverged-cluster-operator-main-hco-e2e-image-index-sno-aws
+    optional: true
+    rerun_command: /test hco-e2e-image-index-sno-aws
+    run_if_changed: ^(build/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/hco-e2e-image-index-sno-aws-cluster-profile
+        - --target=hco-e2e-image-index-sno-aws
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/hco-e2e-image-index-sno-aws-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )hco-e2e-image-index-sno-aws,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build01
+    context: ci/prow/hco-e2e-image-index-sno-azure
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-kubevirt-hyperconverged-cluster-operator-main-hco-e2e-image-index-sno-azure
+    optional: true
+    rerun_command: /test hco-e2e-image-index-sno-azure
+    run_if_changed: ^(build/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/hco-e2e-image-index-sno-azure-cluster-profile
+        - --target=hco-e2e-image-index-sno-azure
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/hco-e2e-image-index-sno-azure-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-azure4
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )hco-e2e-image-index-sno-azure,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -761,16 +837,16 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build01
-    context: ci/prow/hco-e2e-upgrade-index-azure-sno
+    context: ci/prow/hco-e2e-upgrade-index-sno-aws
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-kubevirt-hyperconverged-cluster-operator-main-hco-e2e-upgrade-index-azure-sno
+    name: pull-ci-kubevirt-hyperconverged-cluster-operator-main-hco-e2e-upgrade-index-sno-aws
     optional: true
-    rerun_command: /test hco-e2e-upgrade-index-azure-sno
+    rerun_command: /test hco-e2e-upgrade-index-sno-aws
     run_if_changed: ^(build/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|Makefile|go\.mod|go\.sum)$
     spec:
       containers:
@@ -780,8 +856,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/hco-e2e-upgrade-index-azure-sno-cluster-profile
-        - --target=hco-e2e-upgrade-index-azure-sno
+        - --secret-dir=/usr/local/hco-e2e-upgrade-index-sno-aws-cluster-profile
+        - --target=hco-e2e-upgrade-index-sno-aws
         command:
         - ci-operator
         image: ci-operator:latest
@@ -797,7 +873,83 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/hco-e2e-upgrade-index-azure-sno-cluster-profile
+        - mountPath: /usr/local/hco-e2e-upgrade-index-sno-aws-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )hco-e2e-upgrade-index-sno-aws,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build01
+    context: ci/prow/hco-e2e-upgrade-index-sno-azure
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-kubevirt-hyperconverged-cluster-operator-main-hco-e2e-upgrade-index-sno-azure
+    optional: true
+    rerun_command: /test hco-e2e-upgrade-index-sno-azure
+    run_if_changed: ^(build/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|Makefile|go\.mod|go\.sum)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/hco-e2e-upgrade-index-sno-azure-cluster-profile
+        - --target=hco-e2e-upgrade-index-sno-azure
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/hco-e2e-upgrade-index-sno-azure-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -830,7 +982,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )hco-e2e-upgrade-index-azure-sno,?($|\s.*)
+    trigger: (?m)^/test( | .* )hco-e2e-upgrade-index-sno-azure,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -987,16 +1139,16 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build01
-    context: ci/prow/hco-e2e-upgrade-prev-index-azure-sno
+    context: ci/prow/hco-e2e-upgrade-prev-index-sno-aws
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-kubevirt-hyperconverged-cluster-operator-main-hco-e2e-upgrade-prev-index-azure-sno
+    name: pull-ci-kubevirt-hyperconverged-cluster-operator-main-hco-e2e-upgrade-prev-index-sno-aws
     optional: true
-    rerun_command: /test hco-e2e-upgrade-prev-index-azure-sno
+    rerun_command: /test hco-e2e-upgrade-prev-index-sno-aws
     run_if_changed: ^(build/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|Makefile|go\.mod|go\.sum)$
     spec:
       containers:
@@ -1006,8 +1158,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/hco-e2e-upgrade-prev-index-azure-sno-cluster-profile
-        - --target=hco-e2e-upgrade-prev-index-azure-sno
+        - --secret-dir=/usr/local/hco-e2e-upgrade-prev-index-sno-aws-cluster-profile
+        - --target=hco-e2e-upgrade-prev-index-sno-aws
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1023,7 +1175,83 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/hco-e2e-upgrade-prev-index-azure-sno-cluster-profile
+        - mountPath: /usr/local/hco-e2e-upgrade-prev-index-sno-aws-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )hco-e2e-upgrade-prev-index-sno-aws,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build01
+    context: ci/prow/hco-e2e-upgrade-prev-index-sno-azure
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-kubevirt-hyperconverged-cluster-operator-main-hco-e2e-upgrade-prev-index-sno-azure
+    optional: true
+    rerun_command: /test hco-e2e-upgrade-prev-index-sno-azure
+    run_if_changed: ^(build/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|Makefile|go\.mod|go\.sum)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/hco-e2e-upgrade-prev-index-sno-azure-cluster-profile
+        - --target=hco-e2e-upgrade-prev-index-sno-azure
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/hco-e2e-upgrade-prev-index-sno-azure-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -1056,7 +1284,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )hco-e2e-upgrade-prev-index-azure-sno,?($|\s.*)
+    trigger: (?m)^/test( | .* )hco-e2e-upgrade-prev-index-sno-azure,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
