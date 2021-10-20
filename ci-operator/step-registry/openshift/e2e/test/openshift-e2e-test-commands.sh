@@ -121,7 +121,7 @@ aws|aws-arm64)
     export KUBE_SSH_USER=core
     ;;
 azure4) export TEST_PROVIDER=azure;;
-azurestack) 
+azurestack)
     export TEST_PROVIDER=azure
     export AZURE_AUTH_LOCATION=${SHARED_DIR}/osServicePrincipal.json
     ;;
@@ -262,6 +262,12 @@ oc wait --for=condition=Progressing=False --timeout=2m clusterversion/version
 echo "$(date) - waiting for clusteroperators to finish progressing..."
 oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
 echo "$(date) - all clusteroperators are done progressing."
+
+# wait for all nodes to reach Ready=true to ensure that all machines and nodes came up, before we run
+# any e2e tests that might require specific workload capacity.
+echo "$(date) - waiting for nodes to be ready..."
+oc wait nodes --all --for=condition=Ready=true --timeout=10m
+echo "$(date) - all nodes are ready"
 
 # this works around a problem where tests fail because imagestreams aren't imported.  We see this happen for exec session.
 echo "$(date) - waiting for non-samples imagesteams to import..."
