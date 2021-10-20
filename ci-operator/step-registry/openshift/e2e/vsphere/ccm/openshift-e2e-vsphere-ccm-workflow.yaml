@@ -2,15 +2,10 @@ workflow:
   as: openshift-e2e-vsphere-ccm
   steps:
     pre:
-    - ref: ipi-conf
-    - ref: ipi-conf-vsphere
-    # TODO: add - ref: ipi-install-monitoringpvc
-    # We do not include monitoring PVC introduced in https://github.com/openshift/release/pull/15040
-    # as functionality of this PVC depends on successfull migration to CSI we are currently unable to
-    # fully determine. 
-    - chain: ipi-install
+    - chain: ipi-vsphere-pre
     - ref: ccm-conf-apply-feature-gate
     - ref: storage-conf-csi-vsphere
+    - ref: storage-conf-wait-for-csi-driver
     - ref: storage-conf-wait-for-csi-migration
     test:
     - ref: openshift-e2e-test
@@ -19,6 +14,9 @@ workflow:
     - ref: ccm-must-gather
     - chain: ipi-vsphere-post
     env:
+      # for storage-conf-wait-for-csi-driver
+      CLUSTERCSIDRIVER: csi.vsphere.vmware.com
+      TRUECONDITIONS: VMwareVSphereDriverControllerServiceControllerAvailable VMwareVSphereDriverNodeServiceControllerAvailable VMwareVSphereDriverStorageClassControllerAvailable
       TEST_INSTALL_CSI_DRIVERS: vsphere
       TEST_CSI_DRIVER_MANIFEST: manifest-vsphere.yaml
       TEST_SKIPS: >-
