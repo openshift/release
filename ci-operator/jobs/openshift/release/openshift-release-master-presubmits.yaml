@@ -1234,3 +1234,22 @@ presubmits:
           requests:
             cpu: "1"
     trigger: (?m)^/test( | .* )yamllint,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - master
+    cluster: build03
+    context: ci/prow/join-cluster-job
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-join-cluster-job
+    rerun_command: /test join-cluster-job
+    spec:
+      containers:
+      - image: docker.io/hello-world
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: ((?m)^/test join-cluster-job,?(\s+|$))
