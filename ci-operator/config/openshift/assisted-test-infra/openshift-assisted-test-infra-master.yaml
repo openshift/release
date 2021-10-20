@@ -15,6 +15,10 @@ base_images:
     name: ocm-2.5
     namespace: edge-infrastructure
     tag: assisted-service
+  coreos_centos_stream8:
+    name: stream8
+    namespace: coreos
+    tag: "8"
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -22,12 +26,58 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.test-infra
+- dockerfile_literal: |
+    FROM quay.io/ocpmetal/assisted-service:latest AS service
+
+    FROM quay.io/centos/centos:8.3.2011
+
+    COPY <EOF /etc/yum.repos.d/CentOS-Linux-AppStream.repo
+    [appstream]
+    name=CentOS Linux $releasever - AppStream
+    mirrorlist=http://mirrorlist.centos.org/?release=$releasever&arch=$basearch&repo=AppStream&infra=$infra
+    gpgcheck=1
+    enabled=1
+    gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-centosofficial
+    EOF
+
+    RUN yum -y install --setopt=skip_missing_names_on_install=False \
+      make \
+      gcc \
+      unzip \
+      wget \
+      curl \
+      git \
+      podman \
+      httpd-tools \
+      jq \
+      nss_wrapper \
+      python39 \
+      python39-devel \
+      libvirt-client \
+      libvirt-devel \
+      libguestfs-tools \
+        && yum clean all
+
+    RUN ls -la /usr/bin/python3.9
+
+    RUN curl -Lo terraform.zip https://releases.hashicorp.com/terraform/0.14.11/terraform_0.14.11_linux_amd64.zip && unzip terraform.zip -d /usr/bin/ && rm -rf terraform.zip
+
+    COPY requirements.txt /tmp/
+    COPY --from=service /clients/assisted-service-client-*.tar.gz /build/pip/
+    RUN pip3 install --upgrade pip && \
+          pip3 install --no-cache-dir -I -r /tmp/requirements.txt && \
+          pip3 install --upgrade /build/pip/*
+
+    # setting pre-commit env
+    ENV PRE_COMMIT_HOME build
   from: src
   inputs:
     assisted-service:
       as:
       - quay.io/ocpmetal/assisted-service:latest
+    coreos_centos_stream8:
+      as:
+      - quay.io/centos/centos:8.3.2011
   to: assisted-test-infra
 promotion:
   name: assisted-test
