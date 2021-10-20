@@ -226,7 +226,7 @@ ci-secret-bootstrap:
 .PHONY: ci-secret-bootstrap
 
 ci-secret-generator: build_farm_credentials_folder
-	BUILD_FARM_CREDENTIALS_FOLDER=$(build_farm_credentials_folder) ./hack/ci-secret-generator.sh
+	BUILD_FARM_CREDENTIALS_FOLDER=$(build_farm_credentials_folder) dry_run=false ./hack/ci-secret-generator.sh
 .PHONY: ci-secret-generator
 
 build_farm_credentials_folder ?= /tmp/build-farm-credentials
