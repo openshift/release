@@ -91,7 +91,6 @@ CONFIG = {
     'packet-edge-quota-slice': {
         'default': 50,
     },
-    'kubevirt-quota-slice':{},
     'vsphere-quota-slice':{},
     'vsphere-discon-quota-slice':{},
     'vsphere-clusterbot-quota-slice':{},
@@ -137,9 +136,6 @@ for i in range(10, 24):
 
 for i in range(1, 7):
     CONFIG['ovirt-upgrade-quota-slice']['ovirt-upgrade-{}'.format(i)] = 1
-
-for i in range(1, 3):
-    CONFIG['kubevirt-quota-slice']['tenant-cluster-{}'.format(i)] = 1
 
 for i in range(75,94):
     CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
