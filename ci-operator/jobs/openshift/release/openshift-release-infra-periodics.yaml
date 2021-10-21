@@ -2327,12 +2327,21 @@ periodics:
           tests:
           - as: launch
             steps:
-              cluster_profile: openstack-vexxhost
+              cluster_profile: openstack-mecha-central
               env:
                 CLUSTER_DURATION: $(CLUSTER_DURATION)
-              workflow: openshift-e2e-openstack-ipi
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-ipi
               test:
               - ref: clusterbot-wait
+          - as: launch-ovn
+            steps:
+              cluster_profile: openstack-mecha-central
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                NETWORK_TYPE: OVNKubernetes
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-ipi
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -2437,7 +2446,7 @@ periodics:
                 CLUSTER_DURATION: $(CLUSTER_DURATION)
                 CONFIG_TYPE: minimal
                 NETWORK_TYPE: Kuryr
-              workflow: openshift-e2e-openstack-ipi
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-ipi
               test:
               - ref: clusterbot-wait
       image: ci-operator:latest
