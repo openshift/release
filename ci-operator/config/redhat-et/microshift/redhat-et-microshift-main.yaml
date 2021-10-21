@@ -16,27 +16,12 @@ base_images:
     namespace: origin
     tag: "8"
 build_root:
-  project_image:
-    dockerfile_literal: |
-      FROM quay.io/centos/centos:8
-      RUN dnf update -y && \
-          dnf --enablerepo=powertools install --setopt=tsflags=nodocs -y \
-          git \
-          rpm-build \
-          golang \
-          which \
-          make \
-          glibc-static \
-          gcc \
-          selinux-policy-devel \
-          util-linux && \
-          dnf clean all && \
-          rm -rf /var/cache/yum/*
-      WORKDIR /go/src/github.com/redhat-et/microshift
-      RUN /bin/bash -c 'chmod -R 775 /go'
-      ENV GOPATH=/go
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.16-openshift-4.10
 images:
-- dockerfile_path: images/build/Dockerfile
+- dockerfile_path: packaging/images/microshift/Dockerfile
   to: linux-amd64-4.7.0-0.microshift
 - dockerfile_literal: |
     FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8 as openshift-tests-builder
@@ -80,9 +65,14 @@ images:
   to: microshift-test-binaries
 - dockerfile_literal: |
     FROM src as builder
+    RUN dnf update -y && \
+        dnf install --setopt=tsflags=nodocs -y \
+        rpm-build glibc-static gcc selinux-policy-devel util-linux && \
+        dnf clean all && \
+        rm -rf /var/cache/dnf/*
     RUN /bin/bash -c 'cd /go/src/github.com/redhat-et/microshift; \
         go version; \
-        make GO_REQUIRED_MIN_VERSION=1.15 rpm; \
+        make rpm; \
         mv packaging/rpm/_rpmbuild/RPMS/x86_64 .; \
         mv packaging/rpm/_rpmbuild/RPMS/noarch .; \
         ls -al /go/src/github.com/redhat-et/microshift/x86_64; \
@@ -134,6 +124,11 @@ tests:
   commands: make test-unit
   container:
     from: src
+- as: test-srpm
+  commands: make srpm
+  container:
+    from: src
+  run_if_changed: ^(rpm/*|Makefile)
 - as: e2e-rpm-install
   optional: true
   run_if_changed: ^(cmd/.*|pkg/.*|vendor/.*|go\.sum|go\.mod|Makefile)
