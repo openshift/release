@@ -30,7 +30,14 @@ tests:
     test:
     - as: e2e-basic
       cli: latest
-      commands: make test
+      commands: |
+        # Make kubectl available by creating a symlink to oc.
+        pushd "$CLI_DIR"
+        if [ ! -f kubectl ]; then
+            ln -s oc kubectl
+        fi
+        popd
+        make test
       from: src
       resources:
         requests:
