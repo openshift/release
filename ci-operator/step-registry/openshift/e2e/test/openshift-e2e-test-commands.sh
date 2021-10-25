@@ -263,6 +263,26 @@ echo "$(date) - waiting for clusteroperators to finish progressing..."
 oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
 echo "$(date) - all clusteroperators are done progressing."
 
+# wait up to 10m for the number of nodes to match the number of machines
+i=0
+while true
+do
+  MACHINECOUNT="$(kubectl get machines -A --no-headers | wc -l)"
+  NODECOUNT="$(kubectl get nodes --no-headers | wc -l)"
+  if [ "${MACHINECOUNT}" -le "${NODECOUNT}" ]
+  then
+    echo "$(date) - node count ($NODECOUNT) now matches or exceeds machine count ($MACHINECOUNT)"
+    break
+  fi
+  echo "$(date) - $MACHINECOUNT Machines - $NODECOUNT Nodes"
+  sleep 30
+  ((i++))
+  if [ $i -gt 20 ]; then
+    echo "Timed out waiting for node count ($NODECOUNT) to equal or exceed machine count ($MACHINECOUNT)."
+    exit 1
+  fi
+done
+
 # wait for all nodes to reach Ready=true to ensure that all machines and nodes came up, before we run
 # any e2e tests that might require specific workload capacity.
 echo "$(date) - waiting for nodes to be ready..."
