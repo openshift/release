@@ -122,7 +122,7 @@ aws|aws-arm64)
     ;;
 azure4) export TEST_PROVIDER=azure;;
 azurestack)
-    export TEST_PROVIDER=azure
+    export TEST_PROVIDER="none"
     export AZURE_AUTH_LOCATION=${SHARED_DIR}/osServicePrincipal.json
     ;;
 vsphere) export TEST_PROVIDER=vsphere;;
