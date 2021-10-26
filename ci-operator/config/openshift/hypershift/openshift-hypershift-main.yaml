@@ -268,11 +268,14 @@ tests:
         oc wait --timeout=10m --for=condition=Available --namespace=clusters hostedcluster/$(echo -n $PROW_JOB_ID|cut -d- -f-2)
         echo "Cluster became available, creating kubeconfig"
         bin/hypershift create kubeconfig --namespace=clusters --name=$(echo -n $PROW_JOB_ID|cut -d- -f-2) >${SHARED_DIR}/nested_kubeconfig
-        echo "Waiting for nodes to be ready"
+        echo "Waiting for clusteroperators to be ready"
         export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
-        until [[ $(oc get node|grep -v NotReady|grep Ready|wc -l ) -eq 2 ]]; do
-          echo "Nodes not yet ready"
-          sleep 1s
+        until \
+          oc wait --all=true clusteroperator --for='condition=Available=True' >/dev/null && \
+          oc wait --all=true clusteroperator --for='condition=Progressing=False' >/dev/null && \
+          oc wait --all=true clusteroperator --for='condition=Degraded=False' >/dev/null;  do
+            echo "$(date --rfc-3339=seconds) Clusteroperators not yet ready"
+            sleep 1s
         done
       credentials:
       - mount_path: /etc/hypershift-pool-aws-credentials
@@ -286,7 +289,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-      timeout: 15m0s
+      timeout: 25m0s
     - as: conformance-tests
       commands: |-
         export AWS_SHARED_CREDENTIALS_FILE=/etc/hypershift-pool-aws-credentials/credential
