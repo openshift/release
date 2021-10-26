@@ -300,3 +300,22 @@ update_github_ldap_mapping_config_map:
 		-mapping-file /tmp/mapping.yaml
 	oc --context app.ci -n ci create configmap github-ldap-mapping --from-file=mapping.yaml=/tmp/mapping.yaml --dry-run=client -o yaml | oc --context app.ci -n ci apply -f -
 .PHONY: update_github_ldap_mapping_config_map
+
+download_dp_crd:
+	curl -o clusters/build-clusters/common/testimagestreamtagimport.yaml https://raw.githubusercontent.com/openshift/ci-tools/master/pkg/api/testimagestreamtagimport/v1/ci.openshift.io_testimagestreamtagimports.yaml
+	curl -o clusters/app.ci/prow/01_crd/pullrequestpayloadqualificationruns.yaml https://raw.githubusercontent.com/openshift/ci-tools/master/pkg/api/pullrequestpayloadqualification/v1/ci.openshift.io_pullrequestpayloadqualificationruns.yaml
+.PHONY: download_dp_crd
+
+sed_cmd := sed
+uname_out := $(shell uname -s)
+ifeq ($(uname_out),Darwin)
+sed_cmd := gsed
+endif
+
+crds = 'clusters/build-clusters/common/testimagestreamtagimport.yaml' 'clusters/app.ci/prow/01_crd/pullrequestpayloadqualificationruns.yaml'
+
+$(crds):
+	@#remove the empty lines at the beginning of the file. We do this the pass the yaml lint
+	$(sed_cmd) -i '/./,$$!d' $@
+
+update_dp_crd: download_dp_crd $(crds)
