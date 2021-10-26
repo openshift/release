@@ -37,20 +37,10 @@ gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 cat <<'EOF' > "${HOME}"/suite.txt
 "[sig-auth] Certificates API [Privileged:ClusterAdmin] should support building a client with a CSR [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-auth] Certificates API [Privileged:ClusterAdmin] should support CSR API operations [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-"[sig-auth] [Feature:NodeAuthenticator] The kubelet can delegate ServiceAccount tokens to the API server [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-"[sig-auth] [Feature:NodeAuthenticator] The kubelet's main port 10250 should reject requests with no credentials [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-"[sig-auth] [Feature:NodeAuthorizer] A node shouldn't be able to create another node [Suite:openshift/conformance/parallel] [Suite:k8s]"
-"[sig-auth] [Feature:NodeAuthorizer] A node shouldn't be able to delete another node [Suite:openshift/conformance/parallel] [Suite:k8s]"
-"[sig-auth] [Feature:NodeAuthorizer] Getting an existing configmap should exit with the Forbidden error [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-"[sig-auth] [Feature:NodeAuthorizer] Getting an existing secret should exit with the Forbidden error [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-"[sig-auth] [Feature:NodeAuthorizer] Getting a non-existent configmap should exit with the Forbidden error, not a NotFound error [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-"[sig-auth] [Feature:NodeAuthorizer] Getting a non-existent secret should exit with the Forbidden error, not a NotFound error [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-"[sig-auth] [Feature:NodeAuthorizer] Getting a secret for a workload the node has access to should succeed [Skipped:ibmcloud] [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-auth] ServiceAccounts should allow opting out of API token automount  [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
 "[sig-auth] ServiceAccounts should guarantee kube-root-ca.crt exist in any namespace [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-auth] ServiceAccounts should mount projected service account token [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
 "[sig-auth] ServiceAccounts should run through the lifecycle of a ServiceAccount [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-"[sig-auth] ServiceAccounts should set ownership and permission when RunAsUser or FsGroup is present [LinuxOnly] [NodeFeature:FSGroup] [Suite:openshift/conformance/parallel] [Suite:k8s]"
 EOF
 chmod +r "${HOME}"/suite.txt
 
