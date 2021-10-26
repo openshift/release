@@ -8,7 +8,7 @@ echo "************ baremetalds assisted operator publish command ************"
 
 # Check for postsubmit job type
 if [[ ! ("$JOB_TYPE" = "postsubmit" ) ]]; then
-    log "ERROR Cannot update the manifest from a $JOB_TYPE job"
+    echo "ERROR Cannot update the manifest from a $JOB_TYPE job"
     exit 1
 fi
 
@@ -25,9 +25,9 @@ echo "   changes detected in deploy/olm-catalog"
 
 # Setup GitHub credentials
 GITHUB_TOKEN_FILE="$SECRETS_PATH/$GITHUB_SECRET/$GITHUB_SECRET_FILE"
-log "Setting up git credentials."
+echo "## Setting up git credentials."
 if [[ ! -r "${GITHUB_TOKEN_FILE}" ]]; then
-    log "ERROR GitHub token file missing or not readable: $GITHUB_TOKEN_FILE"
+    echo "   ERROR GitHub token file missing or not readable: $GITHUB_TOKEN_FILE"
     exit 1
 fi
 GITHUB_TOKEN=$(cat "$GITHUB_TOKEN_FILE")
