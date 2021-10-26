@@ -69,13 +69,19 @@ ova_url=$(<"${SHARED_DIR}"/ova_url.txt)
 
 vm_template="${ova_url##*/}"
 
+target_hw_version_path="${SHARED_DIR}/target_hw_version"
+if [ -f ${target_hw_version_path} ]; then
+  target_hw_version=$(cat ${target_hw_version_path})
+  echo "$(date -u --rfc-3339=seconds) - Hardware version ${target_hw_version} selected from configuration"
+else
+  # select a hardware version for testing
+  hw_versions=(13 15 17 19)
+  hw_available_versions=${#hw_versions[@]}
+  selected_hw_version_index=$((RANDOM % ${hw_available_versions}))
+  target_hw_version=${hw_versions[$selected_hw_version_index]}
+  echo "$(date -u --rfc-3339=seconds) - Selected hardware version ${target_hw_version}"
+fi
 
-# select a hardware version for testing
-hw_versions=(13 15 17 19)
-hw_available_versions=${#hw_versions[@]}
-selected_hw_version_index=$((RANDOM % ${hw_available_versions}))
-target_hw_version=${hw_versions[$selected_hw_version_index]}
-echo "$(date -u --rfc-3339=seconds) - Selected hardware version ${target_hw_version}"
 vm_template=${vm_template}-hw${target_hw_version}
 
 echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..."
