@@ -23,7 +23,7 @@ scp "${SSHOPTS[@]}" "${CLUSTER_PROFILE_DIR}/pull-secret" "root@${IP}:pull-secret
 if [[ -n "${ASSISTED_CONFIG:-}" ]]; then
   readarray -t config <<< "${ASSISTED_CONFIG}"
   for var in "${config[@]}"; do
-    if [[ ! -z "${var}" ]]; then
+    if [[ -n "${var}" ]]; then
       echo "export ${var}" >> "${SHARED_DIR}/assisted-additional-config"
     fi
   done
@@ -53,7 +53,19 @@ then
   mount "\${NVME_DEVICE}" "\${REPO_DIR}"
 fi
 
-tar -xzvf assisted.tar.gz -C "\${REPO_DIR}"
+# If we are running against a PR in assisted-service we need the latest code changes from that PR.
+# The assisted-test-infra container is built with the HEAD of the branch it is ran against. (aka SERVICE_BRANCH)
+# This is fine for all cases except when we are running in an assisted-service PR.
+if [ "${JOB_TYPE}" = "presubmit" ] && [ "${REPO_NAME}" = "assisted-service" ]; then
+  echo "Running in an assisted-service PR. Cloning the PR ${PULL_NUMBER} from assisted-service."
+  git clone http://github.com/openshift/assisted-service "\${REPO_DIR}"
+  cd "\${REPO_DIR}"
+  git fetch pull/${PULL_NUMBER}/head:assisted-service-pr-${PULL_NUMBER}
+  git checkout assisted-service-pr-${PULL_NUMBER}
+else
+  tar -xzvf assisted.tar.gz -C "\${REPO_DIR}"
+fi
+
 chown -R root:root "\${REPO_DIR}"
 
 cd "\${REPO_DIR}"
