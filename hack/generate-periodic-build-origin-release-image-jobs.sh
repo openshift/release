@@ -4,7 +4,7 @@ set -euo pipefail
 DIR=$(realpath "$(dirname "${BASH_SOURCE}")/..")
 readonly DIR
 
-JOB_FILE_PATH=${DIR}/ci-operator/jobs/infra-origin-release-images.yaml
+JOB_FILE_PATH=${DIR}/ci-operator/jobs/infra-periodics-origin-release-images.yaml
 
 
 echo "#Do NOT Modify: Generate BY hack/generate-periodic-build-origin-release-image-jobs.sh" > "${JOB_FILE_PATH}"
