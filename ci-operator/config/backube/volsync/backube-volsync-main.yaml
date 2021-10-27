@@ -116,8 +116,8 @@ tests:
         cp $(echo "${KUBECONFIG}") /go/src/github.com/backube/volsync/test-kuttl/kubeconfig
         helm repo add bitnami https://charts.bitnami.com/bitnami
         helm repo update
-        helm install --create-namespace -n minio --set accessKey.password=access --set secretKey.password=password --set defaultBuckets=mybucket --set containerSecurityContext.enabled=false --set podSecurityContext.enabled=false --version 7.3.0 minio bitnami/minio
-        oc -n minio wait --for=condition=available --timeout=300s deployment/minio
+        # minio version should be kept in sync with https://github.com/backube/volsync/blob/main/hack/run-minio.sh
+        helm install --create-namespace -n minio --set accessKey.password=access --set secretKey.password=password --set defaultBuckets=mybucket --set containerSecurityContext.enabled=false --set podSecurityContext.enabled=false --version 9.0.5 --wait --timeout=300s minio bitnami/minio
         make test-e2e
       from: src-oc
       resources:
