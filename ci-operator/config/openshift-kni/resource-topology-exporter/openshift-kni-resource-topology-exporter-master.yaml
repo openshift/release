@@ -39,6 +39,20 @@ tests:
   commands: make test-unit
   container:
     from: src
+- as: e2e-gcp
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: e2e-test
+      commands: make build-e2e && make kube-update && RTE_NAMESPACE=rte-e2e make deploy
+        && E2E_NAMESPACE_NAME=rte-e2e E2E_TOPOLOGY_MANAGER_POLICY=single-numa-node
+        make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-gcp
 zz_generated_metadata:
   branch: master
   org: openshift-kni
