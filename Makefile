@@ -315,7 +315,7 @@ endif
 crds = 'clusters/build-clusters/common/testimagestreamtagimport.yaml' 'clusters/app.ci/prow/01_crd/pullrequestpayloadqualificationruns.yaml'
 
 $(crds):
-	@#remove the empty lines at the beginning of the file. We do this the pass the yaml lint
+	@#remove the empty lines at the beginning of the file. We do this to pass the yaml lint
 	$(sed_cmd) -i '/./,$$!d' $@
 
 update_dp_crd: download_dp_crd $(crds)
