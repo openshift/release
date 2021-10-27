@@ -33,40 +33,16 @@ gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
 gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
 gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
-cat > "${HOME}"/wait_for_node_ready.sh <<'EOF'
-#!/bin/bash
-set -xeuo pipefail
-
-export KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig
-
-systemctl enable --now microshift.service
-
-start=$(date '+%s')
-to=300
-while :; do
-  if [ $(( $(date '+%s') - start )) -ge $to ]; then
-    echo "timed out waiting for node to start ($to seconds)" >&2
-    exit 1
-  fi
-  echo "waiting for node response" >&2
-  # get the condation where type == Ready, where condition.statusx == True.
-  node="$(oc get nodes -o jsonpath='{.items[*].status.conditions}' | jq '.[] | select(.type == "Ready") | select(.status == "True")')" || echo ''
-  if [ "$node" ]; then
-    echo "node posted ready status" >&2
-    break
-  fi
-  sleep 10
-done
+# TODO: Add appropriate tests to run with rpm install cluster, for now copied sig-arch tests
+cat <<'EOF' > "${HOME}"/suite.txt
+"[sig-arch] Managed cluster should ensure control plane operators do not make themselves unevictable [Suite:openshift/conformance/parallel]"
+"[sig-arch] Managed cluster should ensure control plane pods do not run in best-effort QoS [Suite:openshift/conformance/parallel]"
+"[sig-arch] Managed cluster should have no crashlooping pods in core namespaces over four minutes [Suite:openshift/conformance/parallel]"
 EOF
-chmod +x "${HOME}"/wait_for_node_ready.sh
+chmod +r "${HOME}"/suite.txt
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \
   --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
-  --recurse "${HOME}"/wait_for_node_ready.sh rhel8user@"${INSTANCE_PREFIX}":~/wait_for_node_ready.sh
-
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  rhel8user@"${INSTANCE_PREFIX}" \
-  --command 'sudo ~/wait_for_node_ready.sh'
+  --recurse "${HOME}"/suite.txt rhel8user@"${INSTANCE_PREFIX}":~/suite.txt
