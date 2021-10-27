@@ -33,7 +33,7 @@ fi
 GITHUB_TOKEN=$(cat "$GITHUB_TOKEN_FILE")
 
 UNRELEASED_SEMVER="99.0.0-unreleased"
-PROJECT_ROOT="$(readlink -e "$(dirname "${BASH_SOURCE[0]}")"/../)"
+PROJECT_ROOT="$(readlink -e "$(dirname "$0")"/../)"
 OPERATOR_MANIFESTS="${PROJECT_ROOT}/deploy/olm-catalog/manifests"
 OPERATOR_METADATA="${PROJECT_ROOT}/deploy/olm-catalog/metadata"
 CSV="assisted-service-operator.clusterserviceversion.yaml"
@@ -57,7 +57,7 @@ git clone "${CO_FORK}" "${CO_DIR}"
 pushd "${CO_DIR}"
 git remote add upstream "${CO_GIT}"
 git fetch upstream main:upstream/main
-git checkout remotes/upstream/main
+git checkout upstream/main
 git config user.name "${GITHUB_NAME}"
 git config user.email "${GITHUB_EMAIL}"
 echo "   ${CO_PROJECT} cloned"
