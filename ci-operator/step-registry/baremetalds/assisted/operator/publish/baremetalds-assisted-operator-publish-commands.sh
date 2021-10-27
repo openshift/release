@@ -32,6 +32,9 @@ if [[ ! -r "${GITHUB_TOKEN_FILE}" ]]; then
 fi
 GITHUB_TOKEN=$(cat "$GITHUB_TOKEN_FILE")
 
+# Use yq to modify operator manifests
+curl -L https://github.com/mikefarah/yq/releases/download/v4.13.5/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
+
 UNRELEASED_SEMVER="99.0.0-unreleased"
 PROJECT_ROOT="$(readlink -e "$(dirname "$0")"/../)"
 OPERATOR_MANIFESTS="${PROJECT_ROOT}/deploy/olm-catalog/manifests"
@@ -64,21 +67,21 @@ echo "   ${CO_PROJECT} cloned"
 
 echo
 echo "## Collecting channels to be updated"
-BUNDLE_CHANNELS=$(yq eval '.annotations."operators.operatorframework.io.bundle.channels.v1"' "${OPERATOR_METADATA}/annotations.yaml")
+BUNDLE_CHANNELS=$(/tmp/yq eval '.annotations."operators.operatorframework.io.bundle.channels.v1"' "${OPERATOR_METADATA}/annotations.yaml")
 echo "   channels to be updated are: ${BUNDLE_CHANNELS}"
 
 echo
 echo "## Determing operator version"
 channel="${BUNDLE_CHANNELS%%,*}"
 echo "   using '${channel}' channel to determine previous operator version"
-PREV_OPERATOR_VERSION=$(c=${channel} yq eval --exit-status \
+PREV_OPERATOR_VERSION=$(c=${channel} /tmp/yq eval --exit-status \
     '.channels[] | select(.name == strenv(c)) | .currentCSV' "${CO_OPERATOR_PACKAGE}" | \
     sed -e "s/assisted-service-operator.v//")
 echo "   previous operator version: ${PREV_OPERATOR_VERSION}"
 
 
 for c in ${BUNDLE_CHANNELS//,/ }; do
-    package_exists=$(c=${c} yq eval '.channels[] | select(.name == strenv(c))' "${CO_OPERATOR_PACKAGE}")
+    package_exists=$(c=${c} /tmp/yq eval '.channels[] | select(.name == strenv(c))' "${CO_OPERATOR_PACKAGE}")
     if [ -z "${package_exists}" ]; then
         BUMP_MINOR="true"
     fi
@@ -111,7 +114,7 @@ if [[ "${BUNDLE_CHANNELS}" == *"alpha"* ]]; then
     done 
 else
     echo "   use previous version to determine the versions we skip"
-    OPERATOR_SKIPS=$(yq eval ".spec.skips | .[]" "${CO_OPERATOR_DIR}/${PREV_OPERATOR_VERSION}/${CSV}")
+    OPERATOR_SKIPS=$(/tmp/yq eval ".spec.skips | .[]" "${CO_OPERATOR_DIR}/${PREV_OPERATOR_VERSION}/${CSV}")
     OPERATOR_SKIPS="${OPERATOR_SKIPS} assisted-service-operator.v${PREV_OPERATOR_VERSION}"
 fi
 echo "   skipping these operator versions: "
@@ -127,7 +130,7 @@ CO_CSV="${CO_OPERATOR_DIR}/${OPERATOR_VERSION}/${CSV}"
 
 echo "   updating images to use digest"
 # Grab all of the images from the relatedImages and get their digest sha
-for full_image in $(yq eval '.spec.relatedImages[] | .image' "${CO_CSV}"); do
+for full_image in $(/tmp/yq eval '.spec.relatedImages[] | .image' "${CO_CSV}"); do
     tag=${full_image#*:}
     image=${full_image%:*}
     registry=${image%%/*}
@@ -151,27 +154,27 @@ sed -i "s/${UNRELEASED_SEMVER}/${OPERATOR_VERSION}/" "${CO_CSV}"
 
 echo "   adding replaces"
 v="assisted-service-operator.v${PREV_OPERATOR_VERSION}" \
-    yq eval --exit-status --inplace \
+    /tmp/yq eval --exit-status --inplace \
     '.spec.replaces |= strenv(v)' "${CO_CSV}"
 
 echo "   adding spec.skips"
 for version in ${OPERATOR_SKIPS}; do
     v="${version}" \
-        yq eval --exit-status --inplace \
+        /tmp/yq eval --exit-status --inplace \
         '.spec.skips |= . + [strenv(v)]' "${CO_CSV}"
 done
 
 echo "   update package versions"
 for c in ${BUNDLE_CHANNELS//,/ }; do
-    package_exists=$(c="${c}" yq eval '.channels[] | select(.name == strenv(c))' "${CO_OPERATOR_PACKAGE}")
+    package_exists=$(c="${c}" /tmp/yq eval '.channels[] | select(.name == strenv(c))' "${CO_OPERATOR_PACKAGE}")
     if [[ -z "${package_exists}" ]]; then
         c="${c}" v="assisted-service-operator.v${OPERATOR_VERSION}" \
-            yq eval --exit-status --inplace \
+            /tmp/yq eval --exit-status --inplace \
             '(.channels |= . + [{"currentCSV": strenv(v), "name": strenv(c)}]' \
             "${CO_OPERATOR_PACKAGE}"
     else
         c="${c}" v="assisted-service-operator.v${OPERATOR_VERSION}" \
-            yq eval --exit-status --inplace \
+            /tmp/yq eval --exit-status --inplace \
             '(.channels[] | select(.name == strenv(c)).currentCSV) |= strenv(v)' \
             "${CO_OPERATOR_PACKAGE}"
     fi
