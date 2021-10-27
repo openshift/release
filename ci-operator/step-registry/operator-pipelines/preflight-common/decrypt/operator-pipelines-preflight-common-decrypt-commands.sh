@@ -26,7 +26,8 @@ then
 
     echo "Decrypting artifacts"
     echo ${PFLT_DOCKERCONFIG}
-    echo ${PFLT_DOCKERCONFIG} | base64 -d | gpg -q --decrypt - 2> /dev/null 1> ${SHARED_DIR}/decrypted_config.json
+    echo ${PFLT_DOCKERCONFIG} | basenc -d --base16 | gpg -q --decrypt - 2> /dev/null 1> ${SHARED_DIR}/decrypted_config.json
+    cat ${SHARED_DIR}/decrypted_config.json
 
     echo "Artifacts decrypted and accessible"
     exit 0
