@@ -19,7 +19,7 @@ function monitor_cv() {
         version_full=$(oc get clusterversion/version -o json)
         image=$(echo "${version_full}" | jq -r '.status.history[0].image')
         state=$(echo "${version_full}" | jq -r '.status.history[0].state')
-        if [[ "${image}" != "${TARGET_RELEASE}" && "${state}" == "Completed" ]]; then
+        if [[ "${image}" != "${TARGET_RELEASE}" || "${state}" != "Completed" ]]; then
             echo "Waiting for clusterversion to become ${TARGET_RELEASE}"
             sleep "${INTERVAL}"
             CNT=$((CNT))-1
