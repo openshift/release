@@ -10,7 +10,7 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   exit 1
 fi
 
-third_octet=$(grep -oP 'ci-segment-\K[[:digit:]]+' <(echo "${LEASED_RESOURCE}"))
+third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${LEASED_RESOURCE}"))
 
 echo "192.168.${third_octet}.2" >> "${SHARED_DIR}"/vips.txt
 echo "192.168.${third_octet}.3" >> "${SHARED_DIR}"/vips.txt
