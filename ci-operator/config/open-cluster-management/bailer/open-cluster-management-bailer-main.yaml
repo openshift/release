@@ -26,19 +26,11 @@ resources:
       memory: 200Mi
 tests:
 - as: fast-forward
-  commands: |
-    git clone -b master https://github.com/openshift/release.git /tmp/release
-    repo-brancher --fast-forward --confirm \
-        --config-dir=/tmp/release/ci-operator/config/open-cluster-management/bailer/ \
-        --username=acm-cicd --token-path=/etc/github/token \
-        --current-promotion-namespace=open-cluster-management \
-        --current-release=2.3 --future-release=2.3
-  container:
-    from: repo-brancher
   postsubmit: true
-  secrets:
-  - mount_path: /etc/github
-    name: acm-cicd-github
+  steps:
+    env:
+      DESTINATION_BRANCH: release-2.4
+    workflow: ocm-ci-fastforward
 zz_generated_metadata:
   branch: main
   org: open-cluster-management
