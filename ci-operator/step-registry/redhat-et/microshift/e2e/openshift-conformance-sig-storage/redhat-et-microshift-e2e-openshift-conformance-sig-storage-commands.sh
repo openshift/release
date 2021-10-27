@@ -112,7 +112,6 @@ cat <<'EOF' > "${HOME}"/suite.txt
 "[sig-storage] PersistentVolumes-local  Pods sharing a single local PV [Serial] all pods should be running [Suite:openshift/conformance/serial] [Suite:k8s]"
 "[sig-storage] Projected combined should project all components that make up the projection API [Projection][NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
 "[sig-storage] Projected configMap optional updates should be reflected in volume [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-"[sig-storage] Projected configMap should be consumable from pods in volume as non-root [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
 "[sig-storage] Projected configMap should be consumable from pods in volume [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
 "[sig-storage] Projected configMap should be consumable from pods in volume with defaultMode set [LinuxOnly] [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
 "[sig-storage] Projected configMap should be consumable from pods in volume with mappings and Item mode set [LinuxOnly] [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
