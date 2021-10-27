@@ -65,7 +65,7 @@ CONFIG = {
         'default': 7,
     },
     'openstack-vexxhost-quota-slice': {
-        'default': 12,
+        'default': 18,
     },
     'openstack-kuryr-quota-slice': {
         'default': 2,
