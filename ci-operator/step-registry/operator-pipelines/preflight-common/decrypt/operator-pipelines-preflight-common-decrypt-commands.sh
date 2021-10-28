@@ -12,7 +12,6 @@ gpg_private_key_file=/var/run/operator-pipelines-gpg/private
 gpg_public_key_file=/var/run/operator-pipelines-gpg/public
 
 export PFLT_DOCKERCONFIG
-echo ${PFLT_DOCKERCONFIG}
 
 if [ -n "${PFLT_DOCKERCONFIG}" ]
 then
@@ -25,9 +24,7 @@ then
     echo "`gpg --list-keys|grep -B1 'Operator Pipelines'|awk 'NR==1 { print }'|tr -d '[:space:]'`":6: | gpg -q --import-ownertrust 1> /dev/null
 
     echo "Decrypting artifacts"
-    echo ${PFLT_DOCKERCONFIG}
     echo ${PFLT_DOCKERCONFIG} | basenc -d --base16 | gpg -q --decrypt - 2> /dev/null 1> ${SHARED_DIR}/decrypted_config.json
-    cat ${SHARED_DIR}/decrypted_config.json
 
     echo "Artifacts decrypted and accessible"
     exit 0
