@@ -42,9 +42,8 @@ curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /t
 echo "   jq installed"
 
 UNRELEASED_SEMVER="99.0.0-unreleased"
-PROJECT_ROOT="$(readlink -e "$(dirname "$0")"/../)"
-OPERATOR_MANIFESTS="${PROJECT_ROOT}/deploy/olm-catalog/manifests"
-OPERATOR_METADATA="${PROJECT_ROOT}/deploy/olm-catalog/metadata"
+OPERATOR_MANIFESTS="deploy/olm-catalog/manifests"
+OPERATOR_METADATA="deploy/olm-catalog/metadata"
 CSV="assisted-service-operator.clusterserviceversion.yaml"
 
 CO_PROJECT="community-operators-prod"
@@ -70,6 +69,7 @@ git checkout upstream/main
 git config user.name "${GITHUB_NAME}"
 git config user.email "${GITHUB_EMAIL}"
 echo "   ${CO_PROJECT} cloned"
+popd
 
 echo
 echo "## Collecting channels to be updated"
@@ -130,8 +130,9 @@ done
 
 echo
 echo "## Update operator manifests"
-git checkout -B "${OPERATOR_VERSION}"
 cp -r "${OPERATOR_MANIFESTS}" "${CO_OPERATOR_DIR}/${OPERATOR_VERSION}"
+pushd "${CO_DIR}"
+git checkout -B "${OPERATOR_VERSION}"
 CO_CSV="${CO_OPERATOR_DIR}/${OPERATOR_VERSION}/${CSV}"
 
 echo "   updating images to use digest"
@@ -196,17 +197,7 @@ git push --set-upstream --force origin HEAD
 echo "   submit PR"
 # Create PR
 curl "https://api.github.com/repos/${CO_REPO}/pulls" --user "${GITHUB_USER}:${GITHUB_TOKEN}" -X POST \
-    --data @<(cat <<EOF
-{
-    "title": "$(git log -1 --format=%s)",
-    "base": "main",
-    "body": "$(curl -sSLo - https://raw.githubusercontent.com/redhat-openshift-ecosystem/community-operators-prod/main/docs/pull_request_template.md | \
-        sed -r -n '/#+ Updates to existing Operators/,$p' | \
-        sed -r -e 's#\[\ \]#[x]#g' | awk '{printf "%s\\n", $0}')",
-    "head": "${GITHUB_USER}:${OPERATOR_VERSION}"
-}
-EOF
-)
+    --data '{"title": "'"$(git log -1 --format=%s)"'", "base": "main", "body": "An automated PR to update assisted-service-operator to v'"${OPERATOR_VERSION}"'", "head": "'"${GITHUB_USER}:${OPERATOR_VERSION}"'"}'
 popd
 
 echo "## Done ##"
