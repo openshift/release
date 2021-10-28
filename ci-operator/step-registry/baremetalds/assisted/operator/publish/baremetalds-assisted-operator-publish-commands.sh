@@ -32,8 +32,14 @@ if [[ ! -r "${GITHUB_TOKEN_FILE}" ]]; then
 fi
 GITHUB_TOKEN=$(cat "$GITHUB_TOKEN_FILE")
 
-# Use yq to modify operator manifests
+# Install tools
+echo "## Install yq"
 curl -L https://github.com/mikefarah/yq/releases/download/v4.13.5/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
+echo "   yq installed"
+
+echo "## Install jq"
+curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /tmp/jq && chmod +x /tmp/jq
+echo "   jq installed"
 
 UNRELEASED_SEMVER="99.0.0-unreleased"
 PROJECT_ROOT="$(readlink -e "$(dirname "$0")"/../)"
@@ -136,7 +142,7 @@ for full_image in $(/tmp/yq eval '.spec.relatedImages[] | .image' "${CO_CSV}"); 
     registry=${image%%/*}
     image_name=${image#*/}
     digest=$(curl -G "https://${registry}/api/v1/repository/${image_name}/tag/?specificTag=${tag}" | \
-        jq -e -r '
+        /tmp/jq -e -r '
             .tags[]
             | select((has("expiration") | not))
             | .manifest_digest')
