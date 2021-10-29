@@ -5,7 +5,7 @@ set -o errexit
 set -o pipefail
 
 CLUSTER_TYPE="${CLUSTER_TYPE_OVERRIDE:-$CLUSTER_TYPE}"
-OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
+export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
 
 cp "/var/run/cluster-secrets/${CLUSTER_TYPE}/clouds.yaml" "$OS_CLIENT_CONFIG_FILE"
 
