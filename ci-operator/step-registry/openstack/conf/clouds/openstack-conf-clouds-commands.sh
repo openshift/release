@@ -25,6 +25,7 @@ if [[ ! -z $APPLICATION_CREDENTIALS ]]; then
 			| del(.clouds.\"${OS_CLOUD}\".auth.username)
 			| del(.clouds.\"${OS_CLOUD}\".auth.password)
 			| del(.clouds.\"${OS_CLOUD}\".auth.user_domain_name)
+			| del(.clouds.\"${OS_CLOUD}\".auth.project_id)
 			| del(.clouds.\"${OS_CLOUD}\".auth.project_name)
 			| del(.clouds.\"${OS_CLOUD}\".auth.project_domain_name)
 			| .clouds.\"${OS_CLOUD}\".auth_type=\"v3applicationcredential\"
