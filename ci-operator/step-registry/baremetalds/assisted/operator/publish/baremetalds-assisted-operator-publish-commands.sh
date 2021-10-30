@@ -32,6 +32,21 @@ if [[ ! -r "${GITHUB_TOKEN_FILE}" ]]; then
 fi
 GITHUB_TOKEN=$(cat "$GITHUB_TOKEN_FILE")
 
+# Setup registry credentials
+REGISTRY_TOKEN_FILE="$SECRETS_PATH/$REGISTRY_SECRET/$REGISTRY_SECRET_FILE"
+echo "## Setting up registry credentials."
+config_file="$HOME/.docker/config.json"
+cat "$REGISTRY_TOKEN_FILE" > "$config_file" || {
+    echo "ERROR Could not read registry secret file"
+    echo "      From: $REGISTRY_TOKEN_FILE"
+    echo "      To  : $config_file"
+}
+if [[ ! -r "$REGISTRY_TOKEN_FILE" ]]; then
+    echo "ERROR Registry config file not found: $REGISTRY_TOKEN_FILE"
+    echo "      Is the docker/config.json in a different location?"
+    exit 1
+fi
+
 # Install tools
 echo "## Install yq"
 curl -L https://github.com/mikefarah/yq/releases/download/v4.13.5/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
@@ -149,6 +164,14 @@ for full_image in $(/tmp/yq eval '.spec.relatedImages[] | .image' "${CO_CSV}"); 
     # Fail if digest empty
     [[ -z ${digest} ]] && false
     sed -i "s,${full_image},${image}@${digest},g" "${CO_CSV}"
+
+    # Mirror image
+    mirror_image="${REGISTRY_HOST}/${REGISTRY_ORG}/${image_name#*}:${OPERATOR_VERSION}"
+    echo "   mirroring image ${full_image} -> ${mirror_image}"
+    oc image mirror "${full_image}" "${mirror_image}" || {
+        echo "ERROR Unable to mirror image"
+        exit 1
+    }
 done
 
 echo "   update createdAt time"
