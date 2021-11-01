@@ -77,6 +77,7 @@ items:
           - --github-graphql-endpoint=http://ghproxy/graphql
           - --github-app-id=$(GITHUB_APP_ID)
           - --github-app-private-key-path=/etc/github/cert
+          - --ci-op-config-dir=/etc/configs/master
           env:
           - name: GITHUB_APP_ID
             valueFrom:
@@ -92,6 +93,9 @@ items:
             readOnly: true
           - name: github-app-credentials
             mountPath: /etc/github
+            readOnly: true
+          - name: master
+            mountPath: /etc/configs/master
             readOnly: true
           - name: tmp
             mountPath: /tmp
@@ -117,5 +121,8 @@ items:
         - name: github-app-credentials
           secret:
             secretName: openshift-prow-github-app
+        - name: master
+          configMap:
+            name: ci-operator-master-configs
         - name: tmp
           emptyDir: {}
