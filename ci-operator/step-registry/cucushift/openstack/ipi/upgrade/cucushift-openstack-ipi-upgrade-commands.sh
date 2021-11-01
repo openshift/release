@@ -26,11 +26,11 @@ environments:
 "
 export OPENSHIFT_ENV_OCP4_USER_MANAGER=UpgradeUserManager
 export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS=${USERS}
-export UPGRADE_PRE_RUN_TAGS="${UPGRADE_PRE_RUN_TAGS} and ${TAG_VERSION}"
+export UPGRADE_AFTER_RUN_TAGS="${UPGRADE_AFTER_RUN_TAGS} and ${TAG_VERSION}"
 export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/upgrade-check"
 
 cd verification-tests
-cucumber --tags "${UPGRADE_PRE_RUN_TAGS} and ${UPGRADE_SKIP_TAGS}" -p junit || true
+cucumber --tags "${UPGRADE_AFTER_RUN_TAGS} and ${UPGRADE_SKIP_TAGS}" -p junit || true
 
 # only exit 0 if junit result has no failures
 echo "Summarizing test result..."
