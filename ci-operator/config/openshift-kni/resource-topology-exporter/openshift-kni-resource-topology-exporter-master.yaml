@@ -44,16 +44,11 @@ tests:
     cluster_profile: gcp
     test:
     - as: e2e-test
-      commands: make build-e2e && make kube-update && make deploy && make test-e2e
+      commands: E2E_TOPOLOGY_MANAGER_POLICY=single-numa-node E2E_NAMESPACE_NAME=rte-e2e
+        RTE_NAMESPACE=rte-e2e make build-e2e kube-update deploy test-e2e
       dependencies:
-      - env: RTE_NAMESPACE
-        name: rte-e2e
       - env: RTE_CONTAINER_IMAGE
         name: resource-topology-exporter
-      - env: E2E_NAMESPACE_NAME
-        name: rte-e2e
-      - env: E2E_TOPOLOGY_MANAGER_POLICY
-        name: single-numa-node
       from: src
       resources:
         requests:
