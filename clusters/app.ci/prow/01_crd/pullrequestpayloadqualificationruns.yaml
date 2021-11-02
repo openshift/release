@@ -239,19 +239,76 @@ spec:
                     prowJob:
                       description: ProwJob is a name of the submitted ProwJob resource
                       type: string
+                    status:
+                      description: ProwJobStatus provides runtime metadata, such as
+                        when it finished, whether it is running, etc.
+                      properties:
+                        build_id:
+                          description: BuildID is the build identifier vended either
+                            by tot or the snowflake library for this job and used
+                            as an identifier for grouping artifacts in GCS for views
+                            in TestGrid and Gubernator. Idenitifiers vended by tot
+                            are monotonically increasing whereas identifiers vended
+                            by the snowflake library are not.
+                          type: string
+                        completionTime:
+                          description: CompletionTime is the timestamp for when the
+                            job goes to a final state
+                          format: date-time
+                          type: string
+                        description:
+                          type: string
+                        jenkins_build_id:
+                          description: JenkinsBuildID applies only to ProwJobs fulfilled
+                            by the jenkins-operator. This field is the build identifier
+                            that Jenkins gave to the build for this ProwJob.
+                          type: string
+                        pendingTime:
+                          description: PendingTime is the timestamp for when the job
+                            moved from triggered to pending
+                          format: date-time
+                          type: string
+                        pod_name:
+                          description: PodName applies only to ProwJobs fulfilled
+                            by plank. This field should always be the same as the
+                            ProwJob.ObjectMeta.Name field.
+                          type: string
+                        prev_report_states:
+                          additionalProperties:
+                            description: ProwJobState specifies whether the job is
+                              running
+                            type: string
+                          description: PrevReportStates stores the previous reported
+                            prowjob state per reporter So crier won't make duplicated
+                            report attempt
+                          type: object
+                        startTime:
+                          description: StartTime is equal to the creation time of
+                            the ProwJob
+                          format: date-time
+                          type: string
+                        state:
+                          description: ProwJobState specifies whether the job is running
+                          enum:
+                          - triggered
+                          - pending
+                          - success
+                          - failure
+                          - aborted
+                          - error
+                          type: string
+                        url:
+                          type: string
+                      type: object
                   required:
                   - jobName
                   - prowJob
                   type: object
                 type: array
-            required:
-            - conditions
-            - jobs
             type: object
         required:
         - metadata
         - spec
-        - status
         type: object
     served: true
     storage: true
