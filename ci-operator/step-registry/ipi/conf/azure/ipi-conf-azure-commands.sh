@@ -40,3 +40,47 @@ compute:
     azure:
       type: ${COMPUTE_NODE_TYPE}
 EOF
+
+if [[ "${TEST_MTU_HACK}" == "1" ]]; then
+    echo "Hacking MTU..."
+
+    cat > "${SHARED_DIR}/manifest_master-mtu-hack.yaml" << EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: master
+  name: 50-mtu-hack
+spec:
+  config:
+    ignition:
+      version: 2.2.0
+    storage:
+      files:
+      - contents:
+          source: data:text/plain;base64,IyEvYmluL3NoCgpJRkFDRT0iJDEiClNUQVRVUz0iJDIiCmlmIFsgIiR7SUZBQ0V9IiA9ICJldGgwIiAtYSAiJHtTVEFUVVN9IiA9ICJ1cCIgXTsgdGhlbgogICAgZWNobyAiT3ZlcnJpZGluZyBkZWZhdWx0IE1UVSBvbiAke0lGQUNFfSIKICAgIGlwIGxpbmsgc2V0ICIke0lGQUNFfSIgbXR1IDE0MDAKZmkK
+        filesystem: root
+        mode: 0755
+        path: /etc/NetworkManager/dispatcher.d/30-override-azure-mtu
+EOF
+
+    cat > "${SHARED_DIR}/manifest_worker-mtu-hack.yaml" << EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: worker
+  name: 50-mtu-hack
+spec:
+  config:
+    ignition:
+      version: 2.2.0
+    storage:
+      files:
+      - contents:
+          source: data:text/plain;base64,IyEvYmluL3NoCgpJRkFDRT0iJDEiClNUQVRVUz0iJDIiCmlmIFsgIiR7SUZBQ0V9IiA9ICJldGgwIiAtYSAiJHtTVEFUVVN9IiA9ICJ1cCIgXTsgdGhlbgogICAgZWNobyAiT3ZlcnJpZGluZyBkZWZhdWx0IE1UVSBvbiAke0lGQUNFfSIKICAgIGlwIGxpbmsgc2V0ICIke0lGQUNFfSIgbXR1IDE0MDAKZmkK
+        filesystem: root
+        mode: 0755
+        path: /etc/NetworkManager/dispatcher.d/30-override-azure-mtu
+EOF
+fi
