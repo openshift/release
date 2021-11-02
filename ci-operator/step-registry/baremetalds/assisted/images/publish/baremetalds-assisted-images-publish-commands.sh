@@ -14,6 +14,9 @@ if [[ -z "$IMAGE_REPO" ]]; then
 fi
 echo "INFO Image repo is $IMAGE_REPO"
 
+current_date=$(date +%F)
+echo "INFO Current date is: $current_date"
+
 # Get IMAGE_TAG if not provided
 if [[ -z "$IMAGE_TAG" ]]; then
     case "$JOB_TYPE" in
@@ -24,6 +27,10 @@ if [[ -z "$IMAGE_TAG" ]]; then
         postsubmit)
             echo "INFO Building default image tag for a $JOB_TYPE job"
             IMAGE_TAG="${RELEASE_TAG_PREFIX}-${PULL_BASE_SHA}"
+            ;;
+        periodic)
+            echo "INFO Building default image tag for a $JOB_TYPE job"
+            IMAGE_TAG="${RELEASE_TAG_PREFIX}-${current_date}"
             ;;
         *)
             echo "ERROR Cannot publish an image from a $JOB_TYPE job"
