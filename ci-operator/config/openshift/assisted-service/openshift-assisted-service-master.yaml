@@ -99,13 +99,20 @@ test_binary_build_commands: |
   go mod vendor
   mkdir /.cache && chmod 775 -R /.cache && chmod 775 -R $GOPATH
 tests:
+- as: mirror-nightly-image
+  cron: '@daily'
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-service
+    test:
+    - ref: baremetalds-assisted-images-publish
 - as: mirror-vcsref-image
   postsubmit: true
   steps:
     dependencies:
       SOURCE_IMAGE_REF: assisted-service
     test:
-    - ref: baremetalds-assisted-images-vcsref
+    - ref: baremetalds-assisted-images-publish
 - as: operator-publish
   postsubmit: true
   steps:
