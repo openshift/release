@@ -36,7 +36,13 @@ tests:
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4
-    workflow: cucushift-baremetal-ipi
+      E2E_RUN_TAGS: '@baremetal-ipi'
+    post:
+    - chain: baremetalds-ipi-post
+    pre:
+    - chain: baremetalds-ipi-pre
+    - ref: cucushift-pre
+    workflow: cucushift-e2e
 - as: e2e-aws-cucushift-ipi
   interval: 6h
   steps:
@@ -51,12 +57,26 @@ tests:
   interval: 6h
   steps:
     cluster_profile: gcp
-    workflow: cucushift-gcp-ipi
+    env:
+      E2E_RUN_TAGS: '@gcp-ipi'
+    post:
+    - chain: ipi-gcp-post
+    pre:
+    - chain: ipi-gcp-pre
+    - ref: cucushift-pre
+    workflow: cucushift-e2e
 - as: e2e-gcp-cucushift-upi
   interval: 6h
   steps:
     cluster_profile: gcp
-    workflow: cucushift-gcp-upi
+    env:
+      E2E_RUN_TAGS: '@gcp-upi'
+    post:
+    - chain: upi-gcp-post
+    pre:
+    - chain: upi-gcp-pre
+    - ref: cucushift-pre
+    workflow: cucushift-e2e
 - as: e2e-vsphere-cucushift-ipi
   interval: 6h
   steps:
