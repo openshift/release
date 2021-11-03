@@ -88,8 +88,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
-    context: ci/prow/e2e-aws-operator
+    context: ci/prow/e2e-aws-jenkins-client-plugin
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -97,9 +96,9 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-jenkins-client-plugin-master-e2e-aws-operator
+    name: pull-ci-openshift-priv-jenkins-client-plugin-master-e2e-aws-jenkins-client-plugin
     path_alias: github.com/openshift/jenkins-client-plugin
-    rerun_command: /test e2e-aws-operator
+    rerun_command: /test e2e-aws-jenkins-client-plugin
     spec:
       containers:
       - args:
@@ -109,8 +108,8 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-aws-operator-cluster-profile
-        - --target=e2e-aws-operator
+        - --secret-dir=/usr/local/e2e-aws-jenkins-client-plugin-cluster-profile
+        - --target=e2e-aws-jenkins-client-plugin
         command:
         - ci-operator
         image: ci-operator:latest
@@ -126,7 +125,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-aws-operator-cluster-profile
+        - mountPath: /usr/local/e2e-aws-jenkins-client-plugin-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -165,7 +164,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-operator,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-jenkins-client-plugin,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -191,6 +190,7 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
+        - --target=src
         command:
         - ci-operator
         image: ci-operator:latest
