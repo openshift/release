@@ -19,6 +19,7 @@ spec:
     - CSIMigrationOpenStack
     - CSIMigrationAzureDisk
     - CSIDriverAzureDisk
+    - CSIMigrationGCE
     - CSIDriverVSphere
     - CSIMigrationvSphere
   featureSet: CustomNoUpgrade
