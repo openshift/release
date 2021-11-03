@@ -105,9 +105,15 @@ fi
 echo 'export KUBECONFIG=/root/dev-scripts/ocp/ostest/auth/kubeconfig' >> /root/.bashrc
 
 timeout -s 9 105m make
-# Sleep for 10 minutes to allow the kube-apiserver to settle down
-# Replace with a proper fix once we establish it helps or not
-sleep 10m
+
+export KUBECONFIG=/root/dev-scripts/ocp/ostest/auth/kubeconfig
+# We do this twice as the command checks each co sequentially
+# some operators can stop Progressing and pass the first pass,
+# only to start progressing again, if it was unneeded
+# then the second check will immediately return
+oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
+oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
+
 EOF
 
 # Copy dev-scripts variables to be shared with the test step
