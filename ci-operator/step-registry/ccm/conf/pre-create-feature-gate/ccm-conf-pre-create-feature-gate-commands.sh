@@ -20,6 +20,6 @@ spec:
     - CSIMigrationAzureDisk
     - CSIDriverAzureDisk
     - CSIDriverVSphere
-    - CSIMigrationVSphere
+    - CSIMigrationvSphere
   featureSet: CustomNoUpgrade
 EOF
