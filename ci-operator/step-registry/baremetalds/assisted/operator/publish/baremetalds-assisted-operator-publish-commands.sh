@@ -35,6 +35,7 @@ GITHUB_TOKEN=$(cat "$GITHUB_TOKEN_FILE")
 # Setup registry credentials
 REGISTRY_TOKEN_FILE="$SECRETS_PATH/$REGISTRY_SECRET/$REGISTRY_SECRET_FILE"
 echo "## Setting up registry credentials."
+mkdir -p "$HOME/.docker"
 config_file="$HOME/.docker/config.json"
 cat "$REGISTRY_TOKEN_FILE" > "$config_file" || {
     echo "ERROR Could not read registry secret file"
