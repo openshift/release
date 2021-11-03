@@ -556,7 +556,7 @@ periodics:
         secretName: osde2e-credentials
 - agent: kubernetes
   cluster: build02
-  cron: 0 */6 * * *
+  cron: 0 */4 * * *
   decorate: true
   extra_refs:
   - base_ref: main
@@ -579,7 +579,7 @@ periodics:
       - name: CONFIGS
         value: aws,prod,region-random,e2e-suite
       - name: PROVISION_SHARD_ID
-        value: e78ec522-04c3-11ec-b4f0-8c1645a911be
+        value: b26159a7-aaef-4303-89a0-6713ad9f1090
       - name: SECRET_LOCATIONS
         value: /usr/local/osde2e-common,/usr/local/osde2e-credentials
       image: quay.io/app-sre/osde2e
@@ -625,8 +625,6 @@ periodics:
       command:
       - /osde2e
       env:
-      - name: CHANNEL
-        value: stable
       - name: CONFIGS
         value: aws,prod,e2e-suite,use-middle-version
       - name: SECRET_LOCATIONS
@@ -654,7 +652,7 @@ periodics:
         secretName: osde2e-credentials
 - agent: kubernetes
   cluster: build02
-  cron: 0 */6 * * *
+  cron: 0 */4 * * *
   decorate: true
   extra_refs:
   - base_ref: main
@@ -723,8 +721,6 @@ periodics:
       command:
       - /osde2e
       env:
-      - name: CHANNEL
-        value: stable
       - name: CONFIGS
         value: aws,prod,e2e-suite,use-oldest-version
       - name: SECRET_LOCATIONS
@@ -1044,7 +1040,7 @@ periodics:
         secretName: osde2e-credentials
 - agent: kubernetes
   cluster: build02
-  cron: 0 */6 * * *
+  cron: 0 */4 * * *
   decorate: true
   extra_refs:
   - base_ref: main
@@ -1794,7 +1790,7 @@ periodics:
         secretName: osde2e-credentials
 - agent: kubernetes
   cluster: build02
-  cron: 0 */8 * * *
+  cron: 0 23 * * *
   decorate: true
   extra_refs:
   - base_ref: main
@@ -1803,12 +1799,6 @@ periodics:
   labels:
     pj-rehearse.openshift.io/can-be-rehearsed: "false"
   name: osde2e-stage-aws-addon-codeready-operator
-  reporter_config:
-    slack:
-      channel: '#forum-hosted-che'
-      job_states_to_report:
-      - failure
-      report_template: Job {{.Spec.Job}} failed.
   spec:
     containers:
     - args:
@@ -1922,131 +1912,6 @@ periodics:
         secretName: osde2e-common
 - agent: kubernetes
   cluster: build02
-  cron: 0 */12 * * *
-  decorate: true
-  extra_refs:
-  - base_ref: main
-    org: openshift
-    repo: osde2e
-  labels:
-    pj-rehearse.openshift.io/can-be-rehearsed: "false"
-  name: osde2e-stage-aws-addon-dbaas-operator
-  spec:
-    containers:
-    - args:
-      - test
-      - --secret-locations
-      - $(SECRET_LOCATIONS)
-      - --configs
-      - $(CONFIGS)
-      command:
-      - /osde2e
-      env:
-      - name: ADDON_IDS
-        value: dbaas-operator
-      - name: ADDON_TEST_HARNESSES
-        value: quay.io/ecosystem-appeng/dbaas-e2e-test-harness
-      - name: CHANNEL
-        value: stable
-      - name: CONFIGS
-        value: aws,stage,addon-suite
-      - name: OCM_CCS
-        value: "true"
-      - name: SECRET_LOCATIONS
-        value: /usr/local/osde2e-common,/usr/local/dbaas-osde2e-secret
-      image: quay.io/app-sre/osde2e
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /usr/local/dbaas-osde2e-secret
-        name: dbaas-osde2e-secret
-        readOnly: true
-      - mountPath: /usr/local/osde2e-common
-        name: osde2e-common
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: dbaas-osde2e-secret
-      secret:
-        secretName: dbaas-osde2e-secret
-    - name: osde2e-common
-      secret:
-        secretName: osde2e-common
-- agent: kubernetes
-  cluster: build02
-  cron: 0 */12 * * *
-  decorate: true
-  extra_refs:
-  - base_ref: main
-    org: openshift
-    repo: osde2e
-  labels:
-    pj-rehearse.openshift.io/can-be-rehearsed: "false"
-  name: osde2e-stage-aws-addon-gpu-operator
-  reporter_config:
-    slack:
-      channel: '#wg-gpu-ci'
-      job_states_to_report:
-      - failure
-      - success
-      - error
-      report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
-        {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :warning: {{end}}'
-  spec:
-    containers:
-    - args:
-      - test
-      - --secret-locations
-      - $(SECRET_LOCATIONS)
-      - --configs
-      - $(CONFIGS)
-      command:
-      - /osde2e
-      env:
-      - name: ADDON_IDS
-        value: gpu-operator-certified-addon
-      - name: ADDON_TEST_HARNESSES
-        value: quay.io/sdayan/gpu-addon-e2e
-      - name: CHANNEL
-        value: stable
-      - name: CONFIGS
-        value: aws,stage,addon-suite
-      - name: NUM_WORKER_NODES
-        value: "2"
-      - name: OCM_CCS
-        value: "true"
-      - name: OCM_COMPUTE_MACHINE_TYPE
-        value: g4dn.xlarge
-      - name: SECRET_LOCATIONS
-        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials
-      image: quay.io/app-sre/osde2e
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /usr/local/osde2e-common
-        name: osde2e-common
-        readOnly: true
-      - mountPath: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: osde2e-common
-      secret:
-        secretName: osde2e-common
-    - name: osde2e-credentials
-      secret:
-        secretName: modh-osde2e-secret
-- agent: kubernetes
-  cluster: build02
   cron: 0 22 * * 1-4
   decorate: true
   extra_refs:
@@ -2070,7 +1935,7 @@ periodics:
       - name: ADDON_IDS
         value: managed-api-service
       - name: ADDON_PARAMETERS
-        value: '{"managed-api-service":{"addon-managed-api-service": "10","addon-resource-required":
+        value: '{"managed-api-service":{"addon-managed-api-service": "1","addon-resource-required":
           "true", "cidr-range": "10.1.0.0/26"}}'
       - name: ADDON_POLLING_TIMEOUT
         value: "7400"
@@ -2083,11 +1948,11 @@ periodics:
       - name: CONFIGS
         value: aws,stage,addon-suite
       - name: NUM_WORKER_NODES
-        value: "6"
+        value: "3"
       - name: OCM_CCS
         value: "true"
       - name: OCM_COMPUTE_MACHINE_TYPE
-        value: m5.xlarge
+        value: c5.2xlarge
       - name: SECRET_LOCATIONS
         value: /usr/local/osde2e-common,/usr/local/integr8ly-ci-secrets
       image: quay.io/app-sre/osde2e
@@ -2206,12 +2071,8 @@ periodics:
         value: stable
       - name: CONFIGS
         value: aws,stage,addon-suite
-      - name: NUM_WORKER_NODES
-        value: "2"
       - name: OCM_CCS
         value: "true"
-      - name: OCM_COMPUTE_MACHINE_TYPE
-        value: m5.2xlarge
       - name: SECRET_LOCATIONS
         value: /usr/local/osde2e-common,/usr/local/osde2e-credentials
       image: quay.io/app-sre/osde2e
@@ -2314,7 +2175,7 @@ periodics:
     repo: osde2e
   labels:
     pj-rehearse.openshift.io/can-be-rehearsed: "false"
-  name: osde2e-stage-aws-addon-ocs-converged-qe
+  name: osde2e-stage-aws-addon-ocs-converged-dev
   reporter_config:
     slack:
       channel: '#forum-ocs-dedicated'
@@ -2333,9 +2194,9 @@ periodics:
       - /osde2e
       env:
       - name: ADDON_IDS
-        value: ocs-converged-qe
+        value: ocs-converged-dev
       - name: ADDON_PARAMETERS
-        value: '{"ocs-converged-qe":{"size": "1"}}'
+        value: '{"ocs-converged-dev":{"size": "1"}}'
       - name: ADDON_POLLING_TIMEOUT
         value: "14400"
       - name: ADDON_TEST_HARNESSES
@@ -2428,65 +2289,6 @@ periodics:
         secretName: osde2e-credentials
 - agent: kubernetes
   cluster: build02
-  cron: 0 */12 * * *
-  decorate: true
-  extra_refs:
-  - base_ref: main
-    org: openshift
-    repo: osde2e
-  labels:
-    pj-rehearse.openshift.io/can-be-rehearsed: "false"
-  name: osde2e-stage-aws-addon-reference-addon
-  reporter_config:
-    slack:
-      channel: '#sd-mt-sre-info'
-      job_states_to_report:
-      - failure
-      report_template: Job {{.Spec.Job}} failed.
-  spec:
-    containers:
-    - args:
-      - test
-      - --secret-locations
-      - $(SECRET_LOCATIONS)
-      - --configs
-      - $(CONFIGS)
-      command:
-      - /osde2e
-      env:
-      - name: ADDON_IDS
-        value: addon-operator,reference-addon
-      - name: ADDON_TEST_HARNESSES
-        value: quay.io/asnaraya/reference-addon-test-harness
-      - name: CONFIGS
-        value: aws,stage,addon-suite
-      - name: OCM_CCS
-        value: "true"
-      - name: SECRET_LOCATIONS
-        value: /usr/local/osde2e-common,/usr/local/reference-addon-creds
-      image: quay.io/app-sre/osde2e
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /usr/local/osde2e-common
-        name: osde2e-common
-        readOnly: true
-      - mountPath: /usr/local/reference-addon-creds
-        name: reference-addon-creds
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: osde2e-common
-      secret:
-        secretName: osde2e-common
-    - name: reference-addon-creds
-      secret:
-        secretName: reference-addon-creds
-- agent: kubernetes
-  cluster: build02
   cron: 0 8 * * *
   decorate: true
   extra_refs:
@@ -2534,7 +2336,7 @@ periodics:
         secretName: osde2e-credentials
 - agent: kubernetes
   cluster: build02
-  cron: 0 */6 * * *
+  cron: 0 */4 * * *
   decorate: true
   extra_refs:
   - base_ref: main
@@ -2601,8 +2403,6 @@ periodics:
       command:
       - /osde2e
       env:
-      - name: CHANNEL
-        value: stable
       - name: CONFIGS
         value: aws,stage,e2e-suite,use-middle-version
       - name: SECRET_LOCATIONS
@@ -2630,7 +2430,7 @@ periodics:
         secretName: osde2e-credentials
 - agent: kubernetes
   cluster: build02
-  cron: 0 */6 * * *
+  cron: 0 */4 * * *
   decorate: true
   extra_refs:
   - base_ref: main
@@ -2677,7 +2477,7 @@ periodics:
         secretName: osde2e-credentials
 - agent: kubernetes
   cluster: build02
-  cron: 0 */6 * * *
+  cron: 0 */4 * * *
   decorate: true
   extra_refs:
   - base_ref: main
@@ -2744,8 +2544,6 @@ periodics:
       command:
       - /osde2e
       env:
-      - name: CHANNEL
-        value: stable
       - name: CONFIGS
         value: aws,stage,e2e-suite,use-oldest-version
       - name: SECRET_LOCATIONS
@@ -2773,7 +2571,7 @@ periodics:
         secretName: osde2e-credentials
 - agent: kubernetes
   cluster: build02
-  cron: 0 */6 * * *
+  cron: 0 */4 * * *
   decorate: true
   extra_refs:
   - base_ref: main
@@ -2820,7 +2618,7 @@ periodics:
         secretName: osde2e-credentials
 - agent: kubernetes
   cluster: build02
-  cron: 0 */6 * * *
+  cron: 0 */4 * * *
   decorate: true
   extra_refs:
   - base_ref: main
@@ -3787,295 +3585,6 @@ periodics:
         secretName: osde2e-rosa-staging
 - agent: kubernetes
   cluster: build02
-  cron: 30 0,9,17 * * *
-  decorate: true
-  extra_refs:
-  - base_ref: main
-    org: openshift
-    repo: osde2e
-  labels:
-    pj-rehearse.openshift.io/can-be-rehearsed: "false"
-  name: osde2e-stage-rosa-sts-e2e-default
-  spec:
-    containers:
-    - args:
-      - test
-      - --secret-locations
-      - $(SECRET_LOCATIONS)
-      - --configs
-      - $(CONFIGS)
-      command:
-      - /osde2e
-      env:
-      - name: CONFIGS
-        value: rosa,e2e-suite,region-random
-      - name: ROSA_ENV
-        value: stage
-      - name: ROSA_STS
-        value: "true"
-      - name: SECRET_LOCATIONS
-        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-rosa-staging
-      image: quay.io/app-sre/osde2e
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /usr/local/osde2e-common
-        name: osde2e-common
-        readOnly: true
-      - mountPath: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        readOnly: true
-      - mountPath: /usr/local/osde2e-rosa-staging
-        name: osde2e-rosa-staging
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: osde2e-common
-      secret:
-        secretName: osde2e-common
-    - name: osde2e-credentials
-      secret:
-        secretName: osde2e-credentials
-    - name: osde2e-rosa-staging
-      secret:
-        secretName: osde2e-rosa-staging
-- agent: kubernetes
-  cluster: build02
-  cron: 30 1,10,18 * * *
-  decorate: true
-  extra_refs:
-  - base_ref: main
-    org: openshift
-    repo: osde2e
-  labels:
-    pj-rehearse.openshift.io/can-be-rehearsed: "false"
-  name: osde2e-stage-rosa-sts-e2e-next-y
-  spec:
-    containers:
-    - args:
-      - test
-      - --secret-locations
-      - $(SECRET_LOCATIONS)
-      - --configs
-      - $(CONFIGS)
-      command:
-      - /osde2e
-      env:
-      - name: CONFIGS
-        value: rosa,e2e-suite,region-random,latest-y-from-prod-default
-      - name: ROSA_ENV
-        value: stage
-      - name: ROSA_STS
-        value: "true"
-      - name: SECRET_LOCATIONS
-        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-rosa-staging
-      image: quay.io/app-sre/osde2e
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /usr/local/osde2e-common
-        name: osde2e-common
-        readOnly: true
-      - mountPath: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        readOnly: true
-      - mountPath: /usr/local/osde2e-rosa-staging
-        name: osde2e-rosa-staging
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: osde2e-common
-      secret:
-        secretName: osde2e-common
-    - name: osde2e-credentials
-      secret:
-        secretName: osde2e-credentials
-    - name: osde2e-rosa-staging
-      secret:
-        secretName: osde2e-rosa-staging
-- agent: kubernetes
-  cluster: build02
-  cron: 30 2,11,19 * * *
-  decorate: true
-  extra_refs:
-  - base_ref: main
-    org: openshift
-    repo: osde2e
-  labels:
-    pj-rehearse.openshift.io/can-be-rehearsed: "false"
-  name: osde2e-stage-rosa-sts-e2e-next-z
-  spec:
-    containers:
-    - args:
-      - test
-      - --secret-locations
-      - $(SECRET_LOCATIONS)
-      - --configs
-      - $(CONFIGS)
-      command:
-      - /osde2e
-      env:
-      - name: CONFIGS
-        value: rosa,e2e-suite,region-random,latest-z-from-prod-default
-      - name: ROSA_ENV
-        value: stage
-      - name: ROSA_STS
-        value: "true"
-      - name: SECRET_LOCATIONS
-        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-rosa-staging
-      image: quay.io/app-sre/osde2e
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /usr/local/osde2e-common
-        name: osde2e-common
-        readOnly: true
-      - mountPath: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        readOnly: true
-      - mountPath: /usr/local/osde2e-rosa-staging
-        name: osde2e-rosa-staging
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: osde2e-common
-      secret:
-        secretName: osde2e-common
-    - name: osde2e-credentials
-      secret:
-        secretName: osde2e-credentials
-    - name: osde2e-rosa-staging
-      secret:
-        secretName: osde2e-rosa-staging
-- agent: kubernetes
-  cluster: build02
-  cron: 30 3,12,20 * * *
-  decorate: true
-  extra_refs:
-  - base_ref: main
-    org: openshift
-    repo: osde2e
-  labels:
-    pj-rehearse.openshift.io/can-be-rehearsed: "false"
-  name: osde2e-stage-rosa-sts-e2e-upgrade-to-latest
-  spec:
-    containers:
-    - args:
-      - test
-      - --secret-locations
-      - $(SECRET_LOCATIONS)
-      - --configs
-      - $(CONFIGS)
-      command:
-      - /osde2e
-      env:
-      - name: CONFIGS
-        value: rosa,stage,e2e-suite,upgrade-to-latest,region-random
-      - name: ROSA_AWS_REGION
-        value: random
-      - name: ROSA_ENV
-        value: stage
-      - name: ROSA_STS
-        value: "true"
-      - name: SECRET_LOCATIONS
-        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-rosa-staging
-      image: quay.io/app-sre/osde2e
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /usr/local/osde2e-common
-        name: osde2e-common
-        readOnly: true
-      - mountPath: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        readOnly: true
-      - mountPath: /usr/local/osde2e-rosa-staging
-        name: osde2e-rosa-staging
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: osde2e-common
-      secret:
-        secretName: osde2e-common
-    - name: osde2e-credentials
-      secret:
-        secretName: osde2e-credentials
-    - name: osde2e-rosa-staging
-      secret:
-        secretName: osde2e-rosa-staging
-- agent: kubernetes
-  cluster: build02
-  cron: 30 4,13,21 * * *
-  decorate: true
-  extra_refs:
-  - base_ref: main
-    org: openshift
-    repo: osde2e
-  labels:
-    pj-rehearse.openshift.io/can-be-rehearsed: "false"
-  name: osde2e-stage-rosa-sts-e2e-upgrade-to-latest-y
-  spec:
-    containers:
-    - args:
-      - test
-      - --secret-locations
-      - $(SECRET_LOCATIONS)
-      - --configs
-      - $(CONFIGS)
-      command:
-      - /osde2e
-      env:
-      - name: CONFIGS
-        value: rosa,stage,e2e-suite,upgrade-to-latest-y,region-random
-      - name: ROSA_AWS_REGION
-        value: random
-      - name: ROSA_ENV
-        value: stage
-      - name: ROSA_STS
-        value: "true"
-      - name: SECRET_LOCATIONS
-        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-rosa-staging
-      image: quay.io/app-sre/osde2e
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /usr/local/osde2e-common
-        name: osde2e-common
-        readOnly: true
-      - mountPath: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        readOnly: true
-      - mountPath: /usr/local/osde2e-rosa-staging
-        name: osde2e-rosa-staging
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: osde2e-common
-      secret:
-        secretName: osde2e-common
-    - name: osde2e-credentials
-      secret:
-        secretName: osde2e-credentials
-    - name: osde2e-rosa-staging
-      secret:
-        secretName: osde2e-rosa-staging
-- agent: kubernetes
-  cluster: build02
   cron: 0 0 12 * * *
   decorate: true
   decoration_config:
@@ -4085,7 +3594,7 @@ periodics:
     org: openshift
     repo: osde2e
   labels:
-    ci.openshift.io/generator: prowgen
+    ci-operator.openshift.io/prowgen-controlled: "true"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-osde2e-main-osde2e-aro-e2e-latest-y
   reporter_config:
@@ -4138,7 +3647,7 @@ periodics:
     org: openshift
     repo: osde2e
   labels:
-    ci.openshift.io/generator: prowgen
+    ci-operator.openshift.io/prowgen-controlled: "true"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-osde2e-main-osde2e-aro-e2e-latest-z
   reporter_config:
@@ -4191,7 +3700,7 @@ periodics:
     org: openshift
     repo: osde2e
   labels:
-    ci.openshift.io/generator: prowgen
+    ci-operator.openshift.io/prowgen-controlled: "true"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-osde2e-main-osde2e-aro-nightly-cleanup
   spec:
@@ -4238,7 +3747,7 @@ periodics:
     org: openshift
     repo: osde2e
   labels:
-    ci.openshift.io/generator: prowgen
+    ci-operator.openshift.io/prowgen-controlled: "true"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-osde2e-main-osde2e-ocm-stage-adoption
   reporter_config:
