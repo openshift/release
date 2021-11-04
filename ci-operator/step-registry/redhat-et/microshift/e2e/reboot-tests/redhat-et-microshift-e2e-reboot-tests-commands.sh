@@ -41,22 +41,10 @@ export KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig
 
 kubectl create deployment nginx --image=nginx
 
-while :; do
-  if [ $(( $(date '+%s') - start )) -ge $to ]; then
-    echo "timed out waiting for deployment to start ($to seconds)" >&2
-    exit 1
-  fi
-  echo "waiting for deployment response" >&2
-  # get the condation where type == Ready, where condition.statusx == True.
-  deployment="$(oc get deployment nginx -o jsonpath='{.items[*].status.conditions}' | jq '.[] | select(.type == "Ready") | select(.status == "True")')" || echo ''
-  if [ "$deployment" ]; then
-    echo "deployment posted ready status" >&2
-    break
-  fi
-  sleep 10
-done
-
-reboot
+set +ex
+echo "waiting for deployment response" >&2
+oc wait --for=condition=available --timeout=120s deployment nginx
+echo "deployment posted ready status" >&2
 
 EOF
 chmod +x "${HOME}"/reboot-test.sh
@@ -71,3 +59,6 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJE
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
   --command 'sudo ~/reboot-test.sh'
+
+# now reboot the machine
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute instances stop "${INSTANCE_PREFIX}" --zone "${GOOGLE_COMPUTE_ZONE}"
