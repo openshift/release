@@ -128,6 +128,22 @@ tests:
         make deploy_assisted_operator test_parallel
       TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
+- as: system-test-operator-ipv6
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        IPv6=yes
+        IPv4=no
+        PROXY=yes
+      POST_INSTALL_COMMANDS: |
+        export TEST=./discovery-infra/tests/test_kube_api.py
+        export TEST_FUNC=test_kube_api_ipv6
+        export KUBECONFIG=$(find ${KUBECONFIG} -type f)
+        make deploy_assisted_operator test_parallel
+      TEST_SUITE: minimal
+    workflow: baremetalds-assisted-install
 - as: system-test-operator-periodic
   cron: '@daily'
   steps:
