@@ -102,7 +102,7 @@ PREV_OPERATOR_VERSION=$(c=${channel} /tmp/yq eval --exit-status \
     sed -e "s/assisted-service-operator.v//")
 echo "   previous operator version: ${PREV_OPERATOR_VERSION}"
 
-
+BUMP_MINOR="false"
 for c in ${BUNDLE_CHANNELS//,/ }; do
     package_exists=$(c=${c} /tmp/yq eval '.channels[] | select(.name == strenv(c))' "${CO_OPERATOR_PACKAGE}")
     if [ -z "${package_exists}" ]; then
