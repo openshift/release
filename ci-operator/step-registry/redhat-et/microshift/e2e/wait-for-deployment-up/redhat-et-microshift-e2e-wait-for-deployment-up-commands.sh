@@ -38,31 +38,14 @@ cat > "${HOME}"/wait_for_deployment_ready.sh <<'EOF'
 set -xeuo pipefail
 
 export KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig
-
-start=$(date '+%s')
-to=300
-while :; do
-  if [ $(( $(date '+%s') - start )) -ge $to ]; then
-    echo "timed out waiting for deployment to start ($to seconds)" >&2
-    exit 1
-  fi
-  echo "waiting for deployment response" >&2
-  # get the condation where type == Ready, where condition.statusx == True.
-  deployment="$(oc get deployment my-nginx -o jsonpath='{.items[*].status.conditions}' | jq '.[] | select(.type == "Ready") | select(.status == "True")')" || echo ''
-  if [ "$deployment" ]; then
-    echo "deployment posted ready status" >&2
-    break
-  fi
-  sleep 10
-  $(curl -s http://localhost | grep -q )
-  if [ $? -eq 0 ]; then
-    echo "app is ready and working fine" >&2
-    break
-  fi
-done
+echo "waiting for deployment response" >&2
+oc wait --for=condition=available --timeout=120s deployment nginx
+echo "deployment posted ready status" >&2
 EOF
 chmod +x "${HOME}"/wait_for_deployment_ready.sh
 
+# restart the VM
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute instances start "${INSTANCE_PREFIX}" --zone "${GOOGLE_COMPUTE_ZONE}"
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \
   --project "${GOOGLE_PROJECT_ID}" \
