@@ -64,6 +64,10 @@ set -x
 
 # Save Prow variables that might become handy inside the Packet server
 echo "export CI=true" >> /root/config
+echo "export OPENSHIFT_CI=true" >> /root/config
+echo "export REPO_NAME=${REPO_NAME:-}" >> /root/config
+echo "export JOB_TYPE=${JOB_TYPE:-}" >> /root/config
+echo "export PULL_NUMBER=${PULL_NUMBER:-}" >> /root/config
 echo "export RELEASE_IMAGE_LATEST=${RELEASE_IMAGE_LATEST}" >> /root/config
 
 # Override default images

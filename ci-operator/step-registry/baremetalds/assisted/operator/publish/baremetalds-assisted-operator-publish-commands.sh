@@ -32,6 +32,23 @@ if [[ ! -r "${GITHUB_TOKEN_FILE}" ]]; then
 fi
 GITHUB_TOKEN=$(cat "$GITHUB_TOKEN_FILE")
 
+# Setup registry credentials
+REGISTRY_TOKEN_FILE="$SECRETS_PATH/$REGISTRY_SECRET/$REGISTRY_SECRET_FILE"
+echo "## Setting up registry credentials."
+mkdir -p "$HOME/.docker"
+config_file="$HOME/.docker/config.json"
+cat "$REGISTRY_TOKEN_FILE" > "$config_file" || {
+    echo "ERROR Could not read registry secret file"
+    echo "      From: $REGISTRY_TOKEN_FILE"
+    echo "      To  : $config_file"
+}
+if [[ ! -r "$REGISTRY_TOKEN_FILE" ]]; then
+    echo "ERROR Registry config file not found: $REGISTRY_TOKEN_FILE"
+    echo "      Is the docker/config.json in a different location?"
+    exit 1
+fi
+oc registry login
+
 # Install tools
 echo "## Install yq"
 curl -L https://github.com/mikefarah/yq/releases/download/v4.13.5/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
@@ -85,7 +102,7 @@ PREV_OPERATOR_VERSION=$(c=${channel} /tmp/yq eval --exit-status \
     sed -e "s/assisted-service-operator.v//")
 echo "   previous operator version: ${PREV_OPERATOR_VERSION}"
 
-
+BUMP_MINOR="false"
 for c in ${BUNDLE_CHANNELS//,/ }; do
     package_exists=$(c=${c} /tmp/yq eval '.channels[] | select(.name == strenv(c))' "${CO_OPERATOR_PACKAGE}")
     if [ -z "${package_exists}" ]; then
@@ -138,18 +155,27 @@ CO_CSV="${CO_OPERATOR_DIR}/${OPERATOR_VERSION}/${CSV}"
 echo "   updating images to use digest"
 # Grab all of the images from the relatedImages and get their digest sha
 for full_image in $(/tmp/yq eval '.spec.relatedImages[] | .image' "${CO_CSV}"); do
-    tag=${full_image#*:}
     image=${full_image%:*}
-    registry=${image%%/*}
     image_name=${image#*/}
-    digest=$(curl -G "https://${registry}/api/v1/repository/${image_name}/tag/?specificTag=${tag}" | \
+
+    # Mirror image
+    mirror_image_name="${REGISTRY_ORG}/${image_name#*/}"
+    full_mirror_image="${REGISTRY_HOST}/${mirror_image_name}:${OPERATOR_VERSION}"
+    echo "   mirroring image ${full_image} -> ${full_mirror_image}"
+    oc image mirror "${full_image}" "${full_mirror_image}" || {
+        echo "ERROR Unable to mirror image"
+        exit 1
+    }
+
+    digest=$(curl -G "https://${REGISTRY_HOST}/api/v1/repository/${mirror_image_name}/tag/?specificTag=${OPERATOR_VERSION}" | \
         /tmp/jq -e -r '
             .tags[]
             | select((has("expiration") | not))
             | .manifest_digest')
+
     # Fail if digest empty
     [[ -z ${digest} ]] && false
-    sed -i "s,${full_image},${image}@${digest},g" "${CO_CSV}"
+    sed -i "s,${full_image},${REGISTRY_HOST}/${mirror_image_name}@${digest},g" "${CO_CSV}"
 done
 
 echo "   update createdAt time"

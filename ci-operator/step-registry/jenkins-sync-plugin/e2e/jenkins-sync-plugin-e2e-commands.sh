@@ -12,7 +12,7 @@ set -o pipefail
 
 echo "Starting step jenkins-sync-plugin-e2e."
 if ! [[ -f ${KUBECONFIG} ]]; then
-    echo "No kubeconfig found, skipping e2e test of csi-driver-shared-resource."
+    echo "No kubeconfig found, skipping e2e test of jenkins-sync-plugin."
     exit 0
 fi
 

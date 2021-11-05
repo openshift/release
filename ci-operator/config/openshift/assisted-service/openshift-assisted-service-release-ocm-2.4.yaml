@@ -67,7 +67,7 @@ operator:
     with: assisted-installer-controller
   - pullspec: quay.io/edge-infrastructure/assisted-image-service:ocm-2.4
     with: assisted-image-service
-  - pullspec: quay.io/ocpmetal/postgresql-12-centos7:latest
+  - pullspec: quay.io/edge-infrastructure/postgresql-12-centos7:latest
     with: postgresql-12-centos7
 promotion:
   additional_images:
@@ -99,6 +99,24 @@ test_binary_build_commands: |
   go mod vendor
   mkdir /.cache && chmod 775 -R /.cache && chmod 775 -R $GOPATH
 tests:
+- as: mirror-nightly-image
+  cron: '@daily'
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-service
+    env:
+      RELEASE_TAG_PREFIX: ocm-2.4
+    test:
+    - ref: baremetalds-assisted-images-publish
+- as: mirror-vcsref-image
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-service
+    env:
+      RELEASE_TAG_PREFIX: ocm-2.4
+    test:
+    - ref: baremetalds-assisted-images-publish
 - as: ocm-publish
   postsubmit: true
   steps:
