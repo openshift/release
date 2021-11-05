@@ -132,6 +132,10 @@ yq write --inplace ${dir}/openshift/99_openshift-cluster-api_worker-machineset-0
 # Bump the libvirt workers disk to to 30GB
 yq write --inplace ${dir}/openshift/99_openshift-cluster-api_worker-machineset-0.yaml spec.template.spec.providerSpec.value.volume[volumeSize] ${WORKER_DISK}
 
+if [ "${BRANCH}" == "4.9" ] || [ "${BRANCH}" == "4.10" ] && [ "${ARCH}" == "s390x" ]; then
+  yq write --inplace ${dir}/openshift/99_openshift-cluster-api_worker-machineset-0.yaml spec.template.spec.providerSpec.value[domainVcpu] 8
+fi
+
 while IFS= read -r -d '' item
 do
   manifest="$( basename "${item}" )"
