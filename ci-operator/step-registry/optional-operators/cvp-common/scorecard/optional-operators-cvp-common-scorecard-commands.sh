@@ -46,9 +46,12 @@ if [ -f "${OPERATOR_DIR}/tests/scorecard/config.yaml" ]; then
   fi
 
   echo "Running the operator-sdk scorecard test using the custom, bundle-provided configuration, json output and storing it in the artifacts directory"
+  # Runs the custom scorecard tests using the user-provided configuration
+  # The wait-time is set higher to allow for long/complex custom tests, should be kept under 1h to not exceed pipeline max time
   operator-sdk scorecard \
     --namespace="${NAMESPACE}" \
     --kubeconfig "${KUBECONFIG}" \
     --output json \
+    --wait-time 3000s \
     "${OPERATOR_DIR}" > "${ARTIFACT_DIR}"/scorecard-output-custom.json || true
 fi
