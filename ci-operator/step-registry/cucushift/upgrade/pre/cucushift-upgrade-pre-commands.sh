@@ -26,7 +26,6 @@ environments:
 "
 export OPENSHIFT_ENV_OCP4_USER_MANAGER=UpgradeUserManager
 export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS=${USERS}
-export UPGRADE_PRE_RUN_TAGS="${UPGRADE_PRE_RUN_TAGS} and ${TAG_VERSION}"
 export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/upgrade-prepare"
 
 cd verification-tests
