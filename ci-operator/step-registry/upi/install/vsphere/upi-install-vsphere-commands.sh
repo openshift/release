@@ -135,6 +135,12 @@ oc wait --for=condition=Updated mcp/worker --timeout=30m
 
 }
 
+# inject porxy information into haproxy.service if deploying with proxy configuration
+if proxy_info="$(cat install-config.yaml | grep -oP 'httpProxy\s*:\s*\K.*')" ; then
+  echo "$(date -u --rfc-3339=seconds) - inject proxy env into haproxy service..."
+  sed -i "/TimeoutStartSec=0/a Environment=HTTPS_PROXY=${proxy_info}" ./lb/haproxy.service
+fi
+
 date +%s > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
 echo "$(date -u --rfc-3339=seconds) - terraform init..."
