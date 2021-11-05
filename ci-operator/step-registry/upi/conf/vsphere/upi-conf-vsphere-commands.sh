@@ -17,7 +17,7 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
 fi
 
 openshift_install_path="/var/lib/openshift-install"
-third_octet=$(grep -oP 'ci-segment-\K[[:digit:]]+' <(echo "${LEASED_RESOURCE}"))
+third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${LEASED_RESOURCE}"))
 
 export HOME=/tmp
 export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${RELEASE_IMAGE_LATEST}
@@ -112,6 +112,15 @@ platform:
     username: "${GOVC_USERNAME}"
     folder: "/${vsphere_datacenter}/vm/${cluster_name}"
 EOF
+
+#set machine cidr if proxy is enabled
+if grep 'httpProxy' "${install_config}" ; then
+  cat >> "${install_config}" << EOF
+networking:
+  machineNetwork:
+  - cidr: "192.168.${third_octet}.0/25"
+EOF
+fi
 
 echo "$(date -u --rfc-3339=seconds) - Create terraform.tfvars ..."
 cat > "${SHARED_DIR}/terraform.tfvars" <<-EOF
