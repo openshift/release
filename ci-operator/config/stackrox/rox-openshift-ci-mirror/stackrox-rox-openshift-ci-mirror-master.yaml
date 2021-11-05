@@ -3,6 +3,10 @@ base_images:
     name: ubi
     namespace: ocp
     tag: "8"
+  rox-ci:
+    name: rox-ci
+    namespace: stackrox
+    tag: latest
 binary_build_commands: ./scripts/ci/jobs/build.sh
 build_root:
   image_stream_tag:
@@ -50,6 +54,26 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+- as: e2e-test
+  steps:
+    cluster_profile: aws
+    test:
+    - as: e2e-test
+      commands: |
+        ./scripts/ci/jobs/e2e-test.sh
+      credentials:
+      - mount_path: /test-secret
+        name: stackrox-test-secret
+        namespace: test-credentials
+      dependencies:
+      - env: MAIN_IMAGE
+        name: main
+      from: rox-ci
+      resources:
+        requests:
+          cpu: "4"
+          memory: 8Gi
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: stackrox
