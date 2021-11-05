@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: ci
+  name: job-trigger-controller-manager
+  labels:
+    app: prow
+    component: job-trigger-controller-manager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prow
+      component: job-trigger-controller-manager
+  template:
+    metadata:
+      labels:
+        app: prow
+        component: job-trigger-controller-manager
+    spec:
+      serviceAccount: job-trigger-controller-manager
+      containers:
+      - image: job-trigger-controller-manager:latest
+        name: job-trigger-controller-manager
+        command:
+        - job-trigger-controller-manager
+        args:
+        - --dry-run=false
+        - --namespace=ci
