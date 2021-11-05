@@ -119,6 +119,70 @@ function suite() {
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_START"
 trap 'echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"' EXIT
 
+oc -n openshift-config patch cm admin-acks --patch '{"data":{"ack-4.8-kube-1.22-api-removals-in-4.9":"true"}}' --type=merge || echo 'failed to ack the 4.9 Kube v1beta1 removals; possibly API-server issue, or a pre-4.8 release image'
+
+# wait for ClusterVersion to level, until https://bugzilla.redhat.com/show_bug.cgi?id=2009845 makes it back to all 4.9 releases being installed in CI
+oc wait --for=condition=Progressing=False --timeout=2m clusterversion/version
+
+# wait for all clusteroperators to reach progressing=false to ensure that we achieved the configuration specified at installation
+# time before we run our e2e tests.
+echo "$(date) - waiting for clusteroperators to finish progressing..."
+oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
+
+# additional check to ensure that all the co didn't switch back meanwhile
+oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
+
+echo "$(date) - all clusteroperators are done progressing."
+
+# wait up to 10m for the number of nodes to match the number of machines
+i=0
+while true
+do
+  MACHINECOUNT="$(kubectl get machines -A --no-headers | wc -l)"
+  NODECOUNT="$(kubectl get nodes --no-headers | wc -l)"
+  if [ "${MACHINECOUNT}" -le "${NODECOUNT}" ]
+  then
+    echo "$(date) - node count ($NODECOUNT) now matches or exceeds machine count ($MACHINECOUNT)"
+    break
+  fi
+  echo "$(date) - $MACHINECOUNT Machines - $NODECOUNT Nodes"
+  sleep 30
+  ((i++))
+  if [ $i -gt 20 ]; then
+    echo "Timed out waiting for node count ($NODECOUNT) to equal or exceed machine count ($MACHINECOUNT)."
+    exit 1
+  fi
+done
+
+# wait for all nodes to reach Ready=true to ensure that all machines and nodes came up, before we run
+# any e2e tests that might require specific workload capacity.
+echo "$(date) - waiting for nodes to be ready..."
+oc wait nodes --all --for=condition=Ready=true --timeout=10m
+echo "$(date) - all nodes are ready"
+
+# this works around a problem where tests fail because imagestreams aren't imported.  We see this happen for exec session.
+echo "$(date) - waiting for non-samples imagesteams to import..."
+count=0
+while :
+do
+  non_imported_imagestreams=$(oc -n openshift get is -o go-template='{{range .items}}{{$namespace := .metadata.namespace}}{{$name := .metadata.name}}{{range .status.tags}}{{if not .items}}{{$namespace}}/{{$name}}:{{.tag}}{{"\n"}}{{end}}{{end}}{{end}}')
+  if [ -z "${non_imported_imagestreams}" ]
+  then
+    break
+  fi
+  echo "The following image streams are yet to be imported (attempt #${count}):"
+  echo "${non_imported_imagestreams}"
+
+  count=$((count+1))
+  if (( count > 20 )); then
+    echo "Failed while waiting on imagestream import"
+    exit 1
+  fi
+
+  sleep 60
+done
+echo "$(date) - all imagestreams are imported."
+
 case "${TEST_TYPE}" in
 upgrade-conformance)
     upgrade
