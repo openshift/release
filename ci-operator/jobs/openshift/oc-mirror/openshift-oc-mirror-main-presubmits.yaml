@@ -2,6 +2,9 @@ presubmits:
   openshift/oc-mirror:
   - agent: kubernetes
     always_run: true
+    branches:
+    - ^main$
+    - ^main-
     cluster: build02
     decorate: true
     labels:
@@ -18,10 +21,11 @@ presubmits:
         command:
         - /usr/bin/rootlesskit
         image: moby/buildkit:master-rootless
-        name: buildkitd
         ports:
         - containerPort: 1234
-        resources: {}
+        resources:
+          requests:
+            cpu: 50m
         securityContext:
           runAsGroup: 1000
           runAsUser: 1000
@@ -32,18 +36,20 @@ presubmits:
         - serve
         - /etc/docker/registry/config.yml
         image: registry:2
-        name: connected-registry
         ports:
         - containerPort: 5000
-        resources: {}
+        resources:
+          requests:
+            cpu: 50m
       - args:
         - -c
         - make test-prow
         command:
         - /bin/sh
         image: quay.io/samwalke/gobuilder:latest
-        name: main
-        resources: {}
+        resources:
+          requests:
+            cpu: 50m
       shareProcessNamespace: true
     trigger: (?m)bundle test( please)?
   - agent: kubernetes
