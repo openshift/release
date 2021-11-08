@@ -1,8 +1,3 @@
-base_images:
-  upi-installer:
-    name: "4.9"
-    namespace: ocp
-    tag: upi-installer
 releases:
   initial:
     release:
@@ -25,7 +20,14 @@ tests:
     cluster_profile: aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
-    workflow: cucushift-aws-ipi-upgrade
+    env:
+      UPGRADE_CHECK_RUN_TAGS: '@aws-ipi and @4.10 and @upgrade-check'
+      UPGRADE_PRE_RUN_TAGS: '@aws-ipi and @4.9 and @upgrade-prepare'
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    workflow: cucushift-upgrade
 zz_generated_metadata:
   branch: master
   org: openshift

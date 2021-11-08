@@ -1240,27 +1240,15 @@ periodics:
           - as: e2e
             steps:
               cluster_profile: packet
-              env:
-                DEVSCRIPTS_CONFIG: |
-                  IP_STACK=v4
-                  NETWORK_TYPE=OpenShiftSDN
-              workflow: baremetalds-e2e
+              workflow: baremetalds-e2e-ipv4
           - as: e2e-dualstack
             steps:
               cluster_profile: packet
-              env:
-                DEVSCRIPTS_CONFIG: |
-                  IP_STACK=v4v6
-                  NETWORK_TYPE=OVNKubernetes
-              workflow: baremetalds-e2e
+              workflow: baremetalds-e2e-ovn-dualstack
           - as: e2e-ipv6
             steps:
               cluster_profile: packet
-              env:
-                DEVSCRIPTS_CONFIG: |
-                  IP_STACK=v6
-                  NETWORK_TYPE=OVNKubernetes
-              workflow: baremetalds-e2e
+              workflow: baremetalds-e2e-ovn-ipv6
           - as: launch
             steps:
               cluster_profile: packet
@@ -1268,6 +1256,23 @@ periodics:
                 DEVSCRIPTS_CONFIG: |
                   IP_STACK=v4
                   NETWORK_TYPE=OpenShiftSDN
+              post:
+                - chain: baremetalds-ipi-post
+              pre:
+                - ref: openshift-cluster-bot-rbac
+                - chain: baremetalds-ipi-pre
+              test:
+                - as: wait
+                  commands: sleep $(CLUSTER_DURATION) & wait
+                  from: cli
+                  resources: { requests: { cpu: 100m, memory: 100Mi } }
+          - as: launch-ovn
+            steps:
+              cluster_profile: packet
+              env:
+                DEVSCRIPTS_CONFIG: |
+                  IP_STACK=v6
+                  NETWORK_TYPE=OVNKubernetes
               post:
                 - chain: baremetalds-ipi-post
               pre:
