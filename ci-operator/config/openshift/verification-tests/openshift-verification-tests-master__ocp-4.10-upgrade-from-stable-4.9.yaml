@@ -1,3 +1,8 @@
+base_images:
+  openstack-installer:
+    name: "4.9"
+    namespace: ocp
+    tag: openstack-installer
 releases:
   initial:
     release:
@@ -27,6 +32,22 @@ tests:
     - chain: ipi-aws-post
     pre:
     - chain: ipi-aws-pre
+    workflow: cucushift-upgrade
+- as: upgrade-openstack-cucushift-ipi
+  interval: 24h
+  steps:
+    cluster_profile: openstack
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+    env:
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_TYPE: minimal
+      UPGRADE_CHECK_RUN_TAGS: '@openstack-ipi and @4.10 and @upgrade-check'
+      UPGRADE_PRE_RUN_TAGS: '@openstack-ipi and @4.9 and @upgrade-prepare'
+    post:
+    - chain: ipi-openstack-post
+    pre:
+    - chain: ipi-openstack-pre
     workflow: cucushift-upgrade
 zz_generated_metadata:
   branch: master
