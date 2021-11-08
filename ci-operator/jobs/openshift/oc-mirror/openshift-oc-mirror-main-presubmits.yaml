@@ -1,5 +1,49 @@
 presubmits:
   openshift/oc-mirror:
+  - always_run: true
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: oc-mirror-presubmit-test
+    rerun_command: bundle test
+    spec:
+      containers:
+      - args:
+        - buildkitd
+        - --addr
+        - tcp://127.0.0.1:1234
+        - --oci-worker-no-process-sandbox
+        command:
+        - /usr/bin/rootlesskit
+        image: moby/buildkit:master-rootless
+        name: buildkitd
+        ports:
+        - containerPort: 1234
+        resources: {}
+        securityContext:
+          runAsGroup: 1000
+          runAsUser: 1000
+          seLinuxOptions:
+            type: spc_t
+      - command:
+        - /bin/registry
+        - serve
+        - /etc/docker/registry/config.yml
+        image: registry:2
+        name: connected-registry
+        ports:
+        - containerPort: 5000
+        resources: {}
+      - args:
+        - -c
+        - make test-prow
+        command:
+        - /bin/sh
+        image: quay.io/samwalke/gobuilder:latest
+        name: main
+        resources: {}
+      shareProcessNamespace: true
+    trigger: (?m)bundle test( please)?
   - agent: kubernetes
     always_run: true
     branches:
@@ -47,44 +91,3 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )unit,?($|\s.*)
-  - name: oc-mirror-presubmit-test
-    always_run: true
-    decorate: true
-    trigger: "(?m)bundle test( please)?"
-    rerun_command: "bundle test"
-    labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    spec:
-      shareProcessNamespace: true
-      containers:
-      - name: main
-        image: quay.io/samwalke/gobuilder:latest
-        command:
-        - /bin/sh
-        args:
-        - -c
-        - make test-prow
-      - name: connected-registry
-        image: registry:2
-        command:
-        - /bin/registry
-        - serve
-        - /etc/docker/registry/config.yml
-        ports:
-        - containerPort: 5000
-      - name: buildkitd
-        image: moby/buildkit:master-rootless
-        command:
-        - "/usr/bin/rootlesskit"
-        args:
-        - buildkitd
-        - --addr
-        - tcp://127.0.0.1:1234
-        - --oci-worker-no-process-sandbox
-        ports:
-        - containerPort: 1234
-        securityContext:
-          runAsUser: 1000
-          runAsGroup: 1000
-          seLinuxOptions:
-            type: 'spc_t'
