@@ -4,7 +4,9 @@ export HOME=/tmp/home
 mkdir -p "$HOME/.docker"
 cd "$HOME" || exit 1
 
-echo "INFO The base branch is ${PULL_BASE_REF}."
+if [[ "$JOB_TYPE" != "periodic" ]]; then
+    echo "INFO The base branch is ${PULL_BASE_REF}."
+fi
 
 # Get IMAGE_REPO if not provided
 if [[ -z "$IMAGE_REPO" ]]; then

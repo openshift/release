@@ -29,6 +29,19 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: e2e-aws-cucushift-ipi
+  interval: 24h
+  steps:
+    cluster_profile: aws
+    env:
+      E2E_RUN_TAGS: '@aws-ipi'
+      TAG_VERSION: '@4.9'
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - ref: cucushift-pre
+    workflow: cucushift-e2e
 - as: e2e-baremetal-cucushift-ipi
   interval: 24h
   steps:
@@ -77,8 +90,8 @@ tests:
     env:
       BASE_DOMAIN: shiftstack.devcluster.openshift.com
       CONFIG_TYPE: minimal
-      E2E_RUN_TAGS: '@openstack-upi'
-      TAG_VERSION: '@4.10'
+      E2E_RUN_TAGS: '@openstack-ipi'
+      TAG_VERSION: '@4.9'
     post:
     - chain: ipi-openstack-post
     pre:
@@ -93,7 +106,7 @@ tests:
       BASE_DOMAIN: shiftstack.devcluster.openshift.com
       CONFIG_TYPE: minimal
       E2E_RUN_TAGS: '@openstack-upi'
-      TAG_VERSION: '@4.10'
+      TAG_VERSION: '@4.9'
     post:
     - chain: ipi-openstack-post
     pre:
@@ -104,12 +117,28 @@ tests:
   interval: 24h
   steps:
     cluster_profile: vsphere
-    workflow: cucushift-vsphere-ipi
+    env:
+      E2E_RUN_TAGS: '@vsphere-ipi'
+      TAG_VERSION: '@4.9'
+    post:
+    - chain: ipi-vsphere-post
+    pre:
+    - chain: ipi-vsphere-pre
+    - ref: cucushift-pre
+    workflow: cucushift-e2e
 - as: e2e-vsphere-cucushift-upi
   interval: 24h
   steps:
     cluster_profile: vsphere
-    workflow: cucushift-vsphere-upi
+    env:
+      E2E_RUN_TAGS: '@vsphere-upi'
+      TAG_VERSION: '@4.9'
+    post:
+    - chain: upi-vsphere-post
+    pre:
+    - chain: upi-vsphere-pre
+    - ref: cucushift-pre
+    workflow: cucushift-e2e
 zz_generated_metadata:
   branch: master
   org: openshift
