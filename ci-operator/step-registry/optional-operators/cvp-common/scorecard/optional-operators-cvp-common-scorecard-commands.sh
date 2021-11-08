@@ -39,19 +39,24 @@ if [ -f "${OPERATOR_DIR}/tests/scorecard/config.yaml" ]; then
   echo "CUSTOM SCORECARD TESTS DETECTED"
 
   CUSTOM_SERVICE_ACCOUNT=$(/usr/local/bin/yq r "${OPERATOR_DIR}/tests/scorecard/config.yaml" 'serviceaccount')
+  # Set the scorecard service account to the default value used by the command (`default`)
+  SCORECARD_SERVICE_ACCOUNT="default"
   if [ "${CUSTOM_SERVICE_ACCOUNT}" != "" ] && [ "${CUSTOM_SERVICE_ACCOUNT}" != "null" ]; then
     echo "Creating service account ${CUSTOM_SERVICE_ACCOUNT} for usage wih the custom scorecard"
     oc create serviceaccount "${CUSTOM_SERVICE_ACCOUNT}" -n "${NAMESPACE}"
     oc create clusterrolebinding default-sa-crb --clusterrole=cluster-admin --serviceaccount="${NAMESPACE}":"${CUSTOM_SERVICE_ACCOUNT}"
+    SCORECARD_SERVICE_ACCOUNT="${CUSTOM_SERVICE_ACCOUNT}"
   fi
 
   echo "Running the operator-sdk scorecard test using the custom, bundle-provided configuration, json output and storing it in the artifacts directory"
   # Runs the custom scorecard tests using the user-provided configuration
   # The wait-time is set higher to allow for long/complex custom tests, should be kept under 1h to not exceed pipeline max time
+  # If a custom service account is defined in the scorecard config, it will be set in the '--service-account' option
   operator-sdk scorecard \
     --namespace="${NAMESPACE}" \
     --kubeconfig "${KUBECONFIG}" \
     --output json \
     --wait-time 3000s \
+    --service-account "${SCORECARD_SERVICE_ACCOUNT}" \
     "${OPERATOR_DIR}" > "${ARTIFACT_DIR}"/scorecard-output-custom.json || true
 fi
