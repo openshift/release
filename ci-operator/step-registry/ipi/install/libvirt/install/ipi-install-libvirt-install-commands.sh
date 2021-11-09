@@ -49,7 +49,7 @@ function init_bootstrap() {
 	CLUSTER_DOMAIN=$(sed -n -r -e 's,^ *"cluster_domain": "([^"]*).*$,\1,p' "${DIR}/terraform.tfvars.json")
 	BOOTSTRAP_HOSTNAME="bootstrap.${CLUSTER_DOMAIN}"
 	RESOURCE_ID=$(echo "${CLUSTER_DOMAIN}" | cut -d- -f4)
-	BASTION_SSH_PORTS=( 1023 1033 1043 1053 1063 1073 )
+	BASTION_SSH_PORTS=( 1033 1043 1053 1063 1073 1083 )
 }
 
 function collect_bootstrap() {
