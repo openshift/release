@@ -40,11 +40,17 @@ resources:
       memory: 200Mi
 tests:
 - as: unit
-  commands: |
-    unset KUBERNETES_SERVICE_HOST
-    go test -vet=off -v -race ./pkg/... ./test/utils/credentials
-  container:
-    from: src
+  steps:
+    test:
+    - as: test
+      commands: |
+        unset KUBERNETES_SERVICE_HOST
+        make unit-test
+      from: src
+      resources:
+        requests:
+          cpu: 3500m
+          memory: 2Gi
 - as: e2e-azure-file-csi
   optional: true
   steps:
