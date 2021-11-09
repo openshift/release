@@ -32,6 +32,9 @@ build_root:
       RUN chmod -R 777 /go /.cache
       RUN curl -sSLo envtest-bins.tar.gz "https://storage.googleapis.com/kubebuilder-tools/kubebuilder-tools-1.19.2-$(go env GOOS)-$(go env GOARCH).tar.gz"
       RUN tar -C $GOPATH/src/github.com/backube/testbin --strip-components=1 -zvxf envtest-bins.tar.gz
+      # envtest DLs and saves its files to XDG_DATA_HOME, so we need to make sure there is someplace writable
+      RUN mkdir /.local && chmod 777 /.local
+      ENV XDG_DATA_HOME=/.local
       WORKDIR $GOPATH/src/github.com/backube/volsync
 images:
 - dockerfile_literal: |
