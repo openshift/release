@@ -53,7 +53,11 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJE
   --command "mkdir -p ~/selinux/ ~/microshift"
 
 SELINUX_RPM=$(ls /go/src/github.com/redhat-et/microshift/selinux-rpm)
+echo "DEBUG: SELINUX_RPM == $SELINUX_RPM"
+
 MICROSHIFT_RPM=$(ls /go/src/github.com/redhat-et/microshift/microshift-rpm)
+echo "DEBUG: MICROSHIFT_RPM == $MICROSHIFT_RPM"
+
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \
   --project "${GOOGLE_PROJECT_ID}" \
