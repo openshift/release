@@ -51,21 +51,17 @@ images:
         rpm-build glibc-static gcc selinux-policy-devel util-linux && \
         dnf clean all && \
         rm -rf /var/cache/dnf/*
-    RUN /bin/bash -c 'cd /go/src/github.com/redhat-et/microshift; \
-        go version; \
-        make rpm; \
-        mv packaging/rpm/_rpmbuild/RPMS/x86_64 .; \
-        mv packaging/rpm/_rpmbuild/RPMS/noarch .; \
-        ls -al /go/src/github.com/redhat-et/microshift/x86_64; \
-        ls -al /go/src/github.com/redhat-et/microshift/noarch'
+    RUN make rpm 
+    RUN ls -Al /go/src/github.com/redhat-et/microshift/x86_64/ 
+    RUN ls -Al /go/src/github.com/redhat-et/microshift/noarch/
 
     FROM libvirt-installer
-    WORKDIR /go/src/github.com/redhat-et/microshift
-    COPY --from=builder /go/src/github.com/redhat-et/microshift/x86_64 /go/src/github.com/redhat-et/microshift/microshift-rpm/.
-    COPY --from=builder /go/src/github.com/redhat-et/microshift/noarch/microshift-selinux* /go/src/github.com/redhat-et/microshift/selinux-rpm/.
     COPY openshift-tests /usr/bin/openshift-tests
     COPY oc /usr/bin/oc
-    RUN /bin/bash -c 'ls -al; ls /go/src/github.com/redhat-et/microshift/selinux-rpm; ls /go/src/github.com/redhat-et/microshift/microshift-rpm; pwd'
+    COPY --from=builder /go/src/github.com/redhat-et/microshift/x86_64/* /go/src/github.com/redhat-et/microshift/microshift-rpm/
+    COPY --from=builder /go/src/github.com/redhat-et/microshift/noarch/microshift-selinux* /go/src/github.com/redhat-et/microshift/selinux-rpm/
+    RUN ls -Al /go/src/github.com/redhat-et/microshift/selinux-rpm/
+    RUN ls -Al /go/src/github.com/redhat-et/microshift/microshift-rpm/
   from: libvirt-installer
   inputs:
     cli:
