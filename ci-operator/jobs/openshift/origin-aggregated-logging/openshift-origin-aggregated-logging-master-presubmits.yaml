@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build01
+    cluster: build02
     context: ci/prow/clo-functional-5-1
     decorate: true
     decoration_config:
@@ -81,7 +81,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build01
+    cluster: build02
     context: ci/prow/clo-functional-5-2
     decorate: true
     decoration_config:
@@ -157,7 +157,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build01
+    cluster: build02
     context: ci/prow/clo-functional-5-3
     decorate: true
     decoration_config:
@@ -233,7 +233,83 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build01
+    cluster: build02
+    context: ci/prow/clo-functional-5-4
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-origin-aggregated-logging-master-clo-functional-5-4
+    rerun_command: /test clo-functional-5-4
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/clo-functional-5-4-cluster-profile
+        - --target=clo-functional-5-4
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/clo-functional-5-4-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )clo-functional-5-4,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build02
     context: ci/prow/cluster-logging-operator-e2e-5-1
     decorate: true
     decoration_config:
@@ -309,7 +385,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build01
+    cluster: build02
     context: ci/prow/cluster-logging-operator-e2e-5-2
     decorate: true
     decoration_config:
@@ -385,7 +461,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build01
+    cluster: build02
     context: ci/prow/cluster-logging-operator-e2e-5-3
     decorate: true
     decoration_config:
@@ -461,7 +537,83 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build01
+    cluster: build02
+    context: ci/prow/cluster-logging-operator-e2e-5-4
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-origin-aggregated-logging-master-cluster-logging-operator-e2e-5-4
+    rerun_command: /test cluster-logging-operator-e2e-5-4
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/cluster-logging-operator-e2e-5-4-cluster-profile
+        - --target=cluster-logging-operator-e2e-5-4
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/cluster-logging-operator-e2e-5-4-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )cluster-logging-operator-e2e-5-4,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build02
     context: ci/prow/elastic-operator-e2e-5-1
     decorate: true
     decoration_config:
@@ -537,7 +689,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build01
+    cluster: build02
     context: ci/prow/elastic-operator-e2e-5-2
     decorate: true
     decoration_config:
@@ -613,7 +765,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build01
+    cluster: build02
     context: ci/prow/elastic-operator-e2e-5-3
     decorate: true
     decoration_config:
@@ -689,7 +841,83 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build01
+    cluster: build02
+    context: ci/prow/elastic-operator-e2e-5-4
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-origin-aggregated-logging-master-elastic-operator-e2e-5-4
+    rerun_command: /test elastic-operator-e2e-5-4
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/elastic-operator-e2e-5-4-cluster-profile
+        - --target=elastic-operator-e2e-5-4
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/elastic-operator-e2e-5-4-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )elastic-operator-e2e-5-4,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build02
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -739,7 +967,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build01
+    cluster: build02
     context: ci/prow/lint
     decorate: true
     decoration_config:
@@ -788,7 +1016,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build01
+    cluster: build02
     context: ci/prow/smoke-5-1
     decorate: true
     decoration_config:
@@ -864,7 +1092,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build01
+    cluster: build02
     context: ci/prow/smoke-5-2
     decorate: true
     decoration_config:
@@ -940,7 +1168,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build01
+    cluster: build02
     context: ci/prow/smoke-5-3
     decorate: true
     decoration_config:
@@ -1016,7 +1244,83 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build01
+    cluster: build02
+    context: ci/prow/smoke-5-4
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-origin-aggregated-logging-master-smoke-5-4
+    rerun_command: /test smoke-5-4
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/smoke-5-4-cluster-profile
+        - --target=smoke-5-4
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/smoke-5-4-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )smoke-5-4,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build02
     context: ci/prow/unit
     decorate: true
     decoration_config:

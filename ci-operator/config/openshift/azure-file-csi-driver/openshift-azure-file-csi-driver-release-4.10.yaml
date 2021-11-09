@@ -41,13 +41,11 @@ resources:
       memory: 200Mi
 tests:
 - as: unit
-  commands: unset KUBERNETES_SERVICE_HOST; make unit-test
+  commands: |
+    unset KUBERNETES_SERVICE_HOST
+    go test -vet=off -v -race ./pkg/... ./test/utils/credentials
   container:
-    from: bin
-- as: e2e-azure
-  steps:
-    cluster_profile: azure4
-    workflow: openshift-e2e-azure
+    from: src
 - as: e2e-azure-file-csi
   optional: true
   steps:
