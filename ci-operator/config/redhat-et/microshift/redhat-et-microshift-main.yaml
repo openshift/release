@@ -51,17 +51,16 @@ images:
         rpm-build glibc-static gcc selinux-policy-devel util-linux && \
         dnf clean all && \
         rm -rf /var/cache/dnf/*
-    RUN make rpm 
-    RUN ls -Al /go/src/github.com/redhat-et/microshift/x86_64/ 
-    RUN ls -Al /go/src/github.com/redhat-et/microshift/noarch/
+    WORKDIR /go/src/github.com/redhat-et/microshift
+    RUN make rpm
 
     FROM libvirt-installer
+    WORKDIR /opt/microshift-rpms
+    COPY --from=builder /go/src/github.com/redhat-et/microshift/packaging/rpm/_rpmbuild/RPMS/x86_64/* .
+    COPY --from=builder /go/src/github.com/redhat-et/microshift/packaging/rpm/_rpmbuild/RPMS/noarch/microshift-selinux-* .
     COPY openshift-tests /usr/bin/openshift-tests
     COPY oc /usr/bin/oc
-    COPY --from=builder /go/src/github.com/redhat-et/microshift/x86_64/* /go/src/github.com/redhat-et/microshift/microshift-rpm/
-    COPY --from=builder /go/src/github.com/redhat-et/microshift/noarch/microshift-selinux* /go/src/github.com/redhat-et/microshift/selinux-rpm/
-    RUN ls -Al /go/src/github.com/redhat-et/microshift/selinux-rpm/
-    RUN ls -Al /go/src/github.com/redhat-et/microshift/microshift-rpm/
+    RUN echo 'DEBUG RUNTIME CONTAINER: ' && ls -lA /opt/microshift-rpms
   from: libvirt-installer
   inputs:
     cli:
