@@ -47,8 +47,8 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJE
   rhel8user@"${INSTANCE_PREFIX}" \
   --command "sudo curl -L -o /etc/yum.repos.d/devel:kubic:libcontainers:stable.repo https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/$OS/devel:kubic:libcontainers:stable.repo && sudo curl -L -o /etc/yum.repos.d/devel:kubic:libcontainers:stable:cri-o:$VERSION.repo https://download.opensuse.org/repositories/devel:kubic:libcontainers:stable:cri-o:$VERSION/$OS/devel:kubic:libcontainers:stable:cri-o:$VERSION.repo"
 
-SELINUX_RPM=$(ls /go/src/github.com/redhat-et/microshift/selinux-rpm)
-MICROSHIFT_RPM=$(ls /go/src/github.com/redhat-et/microshift/microshift-rpm)
+SELINUX_RPM=$(readlink -f /go/src/github.com/redhat-et/microshift/selinux-rpm/*.rpm | head -n 1)
+MICROSHIFT_RPM=$(readlink -f /go/src/github.com/redhat-et/microshift/microshift-rpm/*.rpm | head -n 1)
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \
   --project "${GOOGLE_PROJECT_ID}" \
