@@ -8,17 +8,17 @@ cd "$HOME" || exit 1
 if [[ "$JOB_TYPE" == "periodic" ]]; then
     echo "INFO JOB_TYPE is: $JOB_TYPE populating repo metadata from JOB_SPEC"
 
-    REPO_OWNER=$(echo "${JOB_SPEC}" | jq '.extra_refs[].org')
-    REPO_NAME=$(echo "${JOB_SPEC}" | jq '.extra_refs[].repo')
-    PULL_BASE_REF=$(echo "${JOB_SPEC}" | jq '.extra_refs[].base_ref')
+    REPO_OWNER=$(echo ${JOB_SPEC} | jq -r '.extra_refs[].org')
+    REPO_NAME=$(echo ${JOB_SPEC} | jq -r '.extra_refs[].repo')
+    PULL_BASE_REF=$(echo ${JOB_SPEC} | jq -r '.extra_refs[].base_ref')
 fi
 
-# Uncomment the below to test JQ commands
-# REPO_OWNER_TEST=$(echo "${JOB_SPEC}" | jq '.extra_refs[].org')
-# REPO_NAME_TEST=$(echo "${JOB_SPEC}" | jq '.extra_refs[].repo')
-# PULL_BASE_REF_TEST=$(echo "${JOB_SPEC}" | jq '.extra_refs[].base_ref')
+#   Uncomment the below to test JQ commands
+# REPO_OWNER_TEST=$(echo ${JOB_SPEC} | jq -r '.extra_refs[].org')
+# REPO_NAME_TEST=$(echo ${JOB_SPEC} | jq -r '.extra_refs[].repo')
+# PULL_BASE_REF_TEST=$(echo ${JOB_SPEC} | jq -r '.extra_refs[].base_ref')
 # echo "JQ TEST: ${REPO_OWNER_TEST} ${REPO_NAME_TEST} ${PULL_BASE_REF_TEST}"
-# echo "${JOB_SPEC}"
+# echo ${JOB_SPEC}
 
 echo "INFO The repository owner is ${REPO_OWNER}."
 echo "INFO The repository name is ${REPO_NAME}."
