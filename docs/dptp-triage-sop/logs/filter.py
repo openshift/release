@@ -22,7 +22,9 @@ if mode == "warnings":
             any(s in message.get(m, "") for m in ["msg", "error"]) for s in [
                 "object doesn't exist",
                 "failed to read started.json",
-                "Error getting ProwJob name for source"
+                "Error getting ProwJob name for source",
+                "failed to get job history: invalid url /job-history/",
+                "error rendering spyglass page: error when resolving real path"
             ]
         ),
         lambda message: any(
