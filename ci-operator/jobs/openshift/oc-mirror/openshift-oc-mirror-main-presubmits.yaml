@@ -21,7 +21,7 @@ presubmits:
         command:
         - /usr/bin/rootlesskit
         image: moby/buildkit:master-rootless
-        name: "buildkitd"
+        name: buildkitd
         ports:
         - containerPort: 1234
         resources:
@@ -32,24 +32,24 @@ presubmits:
           runAsUser: 1000
           seLinuxOptions:
             type: spc_t
-      - command:
-        - /bin/registry
-        - serve
-        - /etc/docker/registry/config.yml
-        image: registry:2
-        name: "registry"
-        ports:
-        - containerPort: 5000
-        resources:
-          requests:
-            cpu: 50m
       - args:
         - -c
         - make test-prow
         command:
         - /bin/sh
         image: quay.io/samwalke/gobuilder:latest
-        name: "make"
+        name: make
+        resources:
+          requests:
+            cpu: 50m
+      - command:
+        - /bin/registry
+        - serve
+        - /etc/docker/registry/config.yml
+        image: registry:2
+        name: registry
+        ports:
+        - containerPort: 5000
         resources:
           requests:
             cpu: 50m
@@ -79,7 +79,7 @@ presubmits:
         - ci-operator
         image: ci-operator:latest
         imagePullPolicy: Always
-        name: "unit"
+        name: ""
         resources:
           requests:
             cpu: 10m
