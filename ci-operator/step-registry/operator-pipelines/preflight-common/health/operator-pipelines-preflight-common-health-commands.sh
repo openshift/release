@@ -12,7 +12,7 @@ export KUBECONFIG
 
 echo "Checking readyz endpoint"
 
-checkreadyz() {
+function checkreadyz() {
     for (( n=1; n<=10; n++ ))
     do
         api=$(oc get --raw='/readyz')
@@ -23,15 +23,17 @@ checkreadyz() {
             continue
 	else
             echo "Health check endpoint readyz ok"
-            return 0
+            isreadyz="ok"
+	    return
         fi
     done
 
-    return 1
+    isreadyz="nok"
 }
 
 checkreadyz
-if test $? -eq 1
+
+if test "${isreadyz}" != "ok"
 then
     echo "Health check endpoint readyz failed after 10 minutes; exiting"
     exit 1
@@ -39,28 +41,31 @@ fi
 
 echo "Checking cluster operators"
 
-checkoperators() {
+function checkoperators() {
     for op in $(oc get clusteroperators | awk 'NR>1 { print $3 $4 $5 }')
     do
         if test "${op}" == "TrueFalseFalse"
         then
 	    continue
 	else
-            return 1
+            iscop="nok"
+            return
         fi
     done
 
-    return 0
+    iscop="ok"
 }
 
 for (( n=1; n<=10; n++ ))
 do
     checkoperators
-    if test $? -eq 0
+
+    if test "${iscop}" == "ok"
     then
         echo "Cluster operators ready"
-        exit 0
+	exit 0
     fi
+
     echo "Cluster operators not ready; checking again in one minute"
     sleep 60
 done
