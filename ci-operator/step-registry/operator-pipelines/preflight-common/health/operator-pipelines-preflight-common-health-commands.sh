@@ -10,47 +10,60 @@ echo "Health endpoint and cluster operators check"
 export KUBECONFIG
 
 
-
 echo "Checking readyz endpoint"
 
-for (( n=1; n<=10; n++ ))
-do
-    api=$(oc get --raw='/readyz')
-    if test "${api}" == "ok"
-    then
-	echo "Health check endpoint readyz ok"
-	break
-    fi
-    echo "Health check endpoint readyz not ok; checking again in one minute"
-    sleep 60
-done
-
-
-
-echo "Checking cluster operators"
-
-for (( n=1; n<=10; n++ ))
-do
-    cops="false"
-    for op in $(oc get clusteroperators | awk 'NR>1 { print $3 $4 $5 }')
+checkreadyz() {
+    for (( n=1; n<=10; n++ ))
     do
-        if test "${op}" != "TrueFalseFalse"
+        api=$(oc get --raw='/readyz')
+        if test "${api}" != "ok"
         then
-	    break
+            echo "Health check endpoint readyz not ok; checking again in one minute"
+            sleep 60
+            continue
 	else
-            cops="true"
+            echo "Health check endpoint readyz ok"
+            return 0
         fi
     done
 
-    if test "${cops}" == "false"
+    return 1
+}
+
+checkreadyz
+if test $? -eq 1
+then
+    echo "Health check endpoint readyz failed after 10 minutes; exiting"
+    exit 1
+fi
+
+echo "Checking cluster operators"
+
+checkoperators() {
+    for op in $(oc get clusteroperators | awk 'NR>1 { print $3 $4 $5 }')
+    do
+        if test "${op}" == "TrueFalseFalse"
+        then
+	    continue
+	else
+            return 1
+        fi
+    done
+
+    return 0
+}
+
+for (( n=1; n<=10; n++ ))
+do
+    checkoperators
+    if test $? -eq 0
     then
-        echo "Some cluster operators not ready; checking again in one minute"
-	sleep 60
-    else
         echo "Cluster operators ready"
-	exit 0
+        exit 0
     fi
+    echo "Cluster operators not ready; checking again in one minute"
+    sleep 60
 done
 
-echo "Health checks failed"
+echo "Cluster operators not ready after 10 minutes; exiting"
 exit 1
