@@ -19,6 +19,7 @@ images:
 - dockerfile_path: Dockerfile.e2etest
   to: grc-ui-tests
 promotion:
+  disabled: true
   name: "2.5"
   namespace: open-cluster-management
 resources:
@@ -71,7 +72,7 @@ tests:
     - as: e2e
       commands: |
         export SELF="make -f Makefile.prow"
-        export VERSION_TAG=latest
+        export VERSION_TAG=latest-2.5
         ./build/run-e2e-tests.sh
       from: grc-ui-tests
       resources:
@@ -79,6 +80,20 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ocm-e2e-clusterpool
+- as: sonar-post-submit
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make install
+    make lint
+    make -f Makefile.prow sonar/js/jest-init
+    make unit-test
+    make -f Makefile.prow sonar/js/prow
+  container:
+    from: src
+  postsubmit: true
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
 - as: latest-image-mirror
   postsubmit: true
   steps:
@@ -86,7 +101,7 @@ tests:
       SOURCE_IMAGE_REF: grc-ui
     env:
       IMAGE_REPO: grc-ui
-      IMAGE_TAG: latest
+      IMAGE_TAG: latest-2.5
       REGISTRY_ORG: open-cluster-management
     workflow: ocm-ci-image-mirror
 - as: latest-test-image-mirror
@@ -96,10 +111,61 @@ tests:
       SOURCE_IMAGE_REF: grc-ui-tests
     env:
       IMAGE_REPO: grc-ui-tests
-      IMAGE_TAG: latest
+      IMAGE_TAG: latest-2.5
       REGISTRY_ORG: open-cluster-management
     workflow: ocm-ci-image-mirror
+- as: publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: grc-ui
+    env:
+      IMAGE_REPO: grc-ui
+      REGISTRY_ORG: open-cluster-management
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/open-cluster-management"
+        export OSCI_PUBLISH_DELAY="0"
+        export SELF="make -f Makefile.prow"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+- as: publish-tests
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: grc-ui-tests
+    env:
+      IMAGE_REPO: grc-ui-tests
+      REGISTRY_ORG: open-cluster-management
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_COMPONENT_NAME="grc-ui-tests"
+        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/open-cluster-management"
+        export OSCI_PUBLISH_DELAY="5"
+        export SELF="make -f Makefile.prow"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: main
+  branch: release-2.5
   org: open-cluster-management
   repo: grc-ui
