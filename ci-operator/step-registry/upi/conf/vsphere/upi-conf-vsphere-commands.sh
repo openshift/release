@@ -93,7 +93,16 @@ source "${SHARED_DIR}/govc.sh"
 
 echo "$(date -u --rfc-3339=seconds) - Extend install-config.yaml ..."
 
-cat >> "${install_config}" << EOF
+# If platform none is present in the install-config, extension is skipped.
+declare platform_none="none: {}"
+platform_required=true
+if grep -F "${platform_none}" "${install_config}"
+then
+        echo "platform none present, install-config will not be extended"
+        platform_required=false
+fi
+
+${platform_required} && cat >> "${install_config}" << EOF
 baseDomain: $base_domain
 controlPlane:
   name: "master"
