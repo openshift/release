@@ -18,7 +18,6 @@ images:
       - golang:1.16
   to: config-policy-controller
 promotion:
-  disabled: true
   name: "2.4"
   namespace: open-cluster-management
 resources:
@@ -45,6 +44,7 @@ tests:
   commands: |
     export SONAR_GO_TEST_ARGS="$(go list ./... | awk '!/test\/e2e/ {printf $0" "}')"
     export SELF="make -f Makefile.prow"
+    export HOME="/tmp"
     make -f Makefile.prow sonar/go/prow
   container:
     from: src
@@ -63,7 +63,9 @@ tests:
     workflow: ocm-ci-image-mirror
 - as: sonar-post-submit
   commands: |
+    export SONAR_GO_TEST_ARGS="$(go list ./... | awk '!/test\/e2e/ {printf $0" "}')"
     export SELF="make -f Makefile.prow"
+    export HOME="/tmp"
     make -f Makefile.prow sonar/go/prow
   container:
     from: src
