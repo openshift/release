@@ -236,8 +236,8 @@ def validate_pod_name(path, data):
                 if job["agent"] != "kubernetes":
                     continue
 
-                if job["spec"]["containers"][0]["name"] != "":
-                    logger.error("%s: ci-operator job %s should not set a pod name", path, job["name"])
+                if len(job["spec"]["containers"]) == 1 and job["spec"]["containers"][0]["name"] != "":
+                    logger.error("%s: ci-operator job %s should not set a container name", path, job["name"])
                     out = False
                     continue
 
