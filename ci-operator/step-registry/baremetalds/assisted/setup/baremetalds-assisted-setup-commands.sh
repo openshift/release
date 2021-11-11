@@ -114,6 +114,7 @@ make \${MAKEFILE_TARGET:-create_full_environment run test_parallel}
 
 EOF
 
+git fetch origin pull/1144/head && git checkout FETCH_HEAD
 
 if [[ -n "${POST_INSTALL_COMMANDS:-}" ]]; then
   echo "${POST_INSTALL_COMMANDS}" > "${SHARED_DIR}/assisted-post-install.sh"
