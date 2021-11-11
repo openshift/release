@@ -9,7 +9,7 @@ networking:
 EOF
 echo "install-config.yaml"
 echo "-------------------"
-cat ${SHARED_DIR}/install-config.yaml
+cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username"
 
 if [[ ! -z "${GATEWAY_MODE}" ]]; then
   echo "Overriding OVN gateway mode with \"${GATEWAY_MODE}\""
