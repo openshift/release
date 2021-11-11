@@ -3,7 +3,7 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  builder-go1.17:
+  open-cluster-management_builder_go1.17-linux:
     name: builder
     namespace: open-cluster-management
     tag: go1.17-linux
@@ -14,18 +14,30 @@ build_root:
     namespace: open-cluster-management
     tag: go1.17-linux
 images:
-- dockerfile_path: build/Dockerfile.prow
+- dockerfile_path: Dockerfile.prow
   from: base
   inputs:
-    builder-go1.17:
+    open-cluster-management_builder_go1.17-linux:
       as:
       - registry.ci.openshift.org/open-cluster-management/builder:go1.17-linux
-  to: multiclusterhub-operator
-- dockerfile_path: build/Dockerfile.test.prow
-  from: builder-go1.17
-  to: multiclusterhub-operator-tests
+  to: discovery-operator
+- dockerfile_path: Dockerfile.test.prow
+  from: base
+  inputs:
+    open-cluster-management_builder_go1.17-linux:
+      as:
+      - registry.ci.openshift.org/open-cluster-management/builder:go1.17-linux
+  to: discovery-operator-tests
+- dockerfile_path: Dockerfile.testserver.prow
+  from: base
+  inputs:
+    open-cluster-management_builder_go1.17-linux:
+      as:
+      - registry.ci.openshift.org/open-cluster-management/builder:go1.17-linux
+  to: discovery-testserver
 promotion:
-  name: "2.4"
+  disabled: true
+  name: "2.5"
   namespace: open-cluster-management
 resources:
   '*':
@@ -62,9 +74,9 @@ tests:
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: multiclusterhub-operator
+      SOURCE_IMAGE_REF: discovery-operator
     env:
-      IMAGE_REPO: multiclusterhub-operator
+      IMAGE_REPO: discovery-operator
       REGISTRY_ORG: open-cluster-management
     test:
     - as: publish
@@ -87,14 +99,40 @@ tests:
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: multiclusterhub-operator-tests
+      SOURCE_IMAGE_REF: discovery-operator-tests
     env:
-      IMAGE_REPO: multiclusterhub-operator-tests
+      IMAGE_REPO: discovery-operator-tests
       REGISTRY_ORG: open-cluster-management
     test:
     - as: publish
       commands: |-
-        export OSCI_COMPONENT_NAME="multiclusterhub-operator-tests"
+        export OSCI_COMPONENT_NAME="discovery-operator-tests"
+        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/open-cluster-management"
+        export OSCI_PUBLISH_DELAY="0"
+        export SELF="make -f Makefile.prow"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+- as: publish-testserver
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: discovery-testserver
+    env:
+      IMAGE_REPO: discovery-testserver
+      REGISTRY_ORG: open-cluster-management
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_COMPONENT_NAME="discovery-testserver"
         export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/open-cluster-management"
         export OSCI_PUBLISH_DELAY="0"
         export SELF="make -f Makefile.prow"
@@ -110,6 +148,6 @@ tests:
           memory: 200Mi
     workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: release-2.4
+  branch: release-2.5
   org: open-cluster-management
-  repo: multiclusterhub-operator
+  repo: discovery
