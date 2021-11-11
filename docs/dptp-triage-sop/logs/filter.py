@@ -24,7 +24,8 @@ if mode == "warnings":
                 "failed to read started.json",
                 "Error getting ProwJob name for source",
                 "failed to get job history: invalid url /job-history/",
-                "error rendering spyglass page: error when resolving real path"
+                "error rendering spyglass page: error when resolving real path",
+                "Cookie secret should be exactly 32 bytes. Consider truncating the existing cookie to that length" # https://issues.redhat.com/browse/DPTP-2615
             ]
         ),
         lambda message: any(
@@ -119,8 +120,10 @@ elif mode == "errors":
         "missing client token" in message.get("error", "") and
         any(
             err in message.get("error", "") for err in ("failed to get policy", "failed to list policies")
-        )
-        ,
+        ),
+        # This is due to rate limiting
+        lambda message: "hook" in message.get("component", "") and
+        "Failed to list collaborators while loading RepoOwners" in message.get("msg", "")
     ]
 else:
     print("Filter mode must be 'warnings' or 'errors', not " + mode)
