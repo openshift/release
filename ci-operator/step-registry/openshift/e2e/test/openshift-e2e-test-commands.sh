@@ -265,13 +265,9 @@ oc -n openshift-config patch cm admin-acks --patch '{"data":{"ack-4.8-kube-1.22-
 # wait for ClusterVersion to level, until https://bugzilla.redhat.com/show_bug.cgi?id=2009845 makes it back to all 4.9 releases being installed in CI
 oc wait --for=condition=Progressing=False --timeout=2m clusterversion/version
 
-# wait for all clusteroperators to reach progressing=false to ensure that we achieved the configuration specified at installation
-# time before we run our e2e tests.
-echo "$(date) - waiting for clusteroperators to finish progressing..."
-oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
-echo "$(date) - all clusteroperators are done progressing."
-
 # wait up to 10m for the number of nodes to match the number of machines
+# we do this before we wait for clusteroperators because some like DNS go progressing a second time after the nodes
+# are present.
 i=0
 while true
 do
@@ -285,6 +281,7 @@ do
   echo "$(date) - $MACHINECOUNT Machines - $NODECOUNT Nodes"
   sleep 30
   ((i++))
+  # TODO Help me bash experts!  I want to wait for up to 20 minutes on Azure and keep this at 10 minutes for everything else.
   if [ $i -gt 20 ]; then
     echo "Timed out waiting for node count ($NODECOUNT) to equal or exceed machine count ($MACHINECOUNT)."
     exit 1
@@ -296,6 +293,12 @@ done
 echo "$(date) - waiting for nodes to be ready..."
 oc wait nodes --all --for=condition=Ready=true --timeout=10m
 echo "$(date) - all nodes are ready"
+
+# wait for all clusteroperators to reach progressing=false to ensure that we achieved the configuration specified at installation
+# time before we run our e2e tests.
+echo "$(date) - waiting for clusteroperators to finish progressing..."
+oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
+echo "$(date) - all clusteroperators are done progressing."
 
 # this works around a problem where tests fail because imagestreams aren't imported.  We see this happen for exec session.
 echo "$(date) - waiting for non-samples imagesteams to import..."
