@@ -23,6 +23,15 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/stackrox/rox-openshift-ci-mirror
   to: main
+- context_dir: image
+  dockerfile_path: rox-ci.Dockerfile
+  from: rox-ci
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/stackrox/rox-openshift-ci-mirror
+  to: rox-ci-with-bin
 promotion:
   namespace: stackrox
   tag: latest
@@ -48,8 +57,8 @@ tests:
       commands: |
         ./scripts/ci/jobs/push-main-image.sh
       credentials:
-      - mount_path: /test-secret
-        name: stackrox-test-secret
+      - mount_path: /tmp/secret/stackrox-rox-ci
+        name: stackrox-rox-ci
         namespace: test-credentials
       dependencies:
       - env: MAIN_IMAGE
@@ -71,18 +80,19 @@ tests:
     test:
     - as: e2e-test
       commands: |
-        ls -l
-        ls -l /
-        env | sort
-        ls -l /got/src/github.com/stackrox || true
+        cd /go/src/github.com/stackrox/rox-openshift-ci-mirror
+        ./scripts/ci/jobs/e2e-test.sh
       credentials:
-      - mount_path: /test-secret
-        name: stackrox-test-secret
+      - mount_path: /tmp/secret/stackrox-rox-ci
+        name: stackrox-rox-ci
+        namespace: test-credentials
+      - mount_path: /tmp/secret/ci-pull-secret
+        name: ci-pull-credentials
         namespace: test-credentials
       dependencies:
       - env: MAIN_IMAGE
         name: main
-      from: rox-ci
+      from: rox-ci-with-bin
       resources:
         requests:
           cpu: "4"
