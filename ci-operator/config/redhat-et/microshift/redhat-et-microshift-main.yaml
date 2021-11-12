@@ -21,7 +21,9 @@ images:
   to: linux-amd64-4.8.0-0.microshift
 - dockerfile_literal: |
     FROM libvirt-installer
-    COPY microshift /usr/bin/
+    USER root
+    COPY microshift-containerized.service /tmp/microshift-containerized.service
+    COPY microshift-containerized /tmp/microshift-containerized
     COPY oc /usr/bin/oc
     COPY install.sh /usr/bin/install.sh
     COPY openshift-tests /usr/bin/openshift-tests
@@ -31,14 +33,14 @@ images:
       paths:
       - destination_dir: .
         source_path: /usr/bin/oc
-    linux-amd64-4.8.0-0.microshift:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/microshift
     src:
       paths:
       - destination_dir: .
         source_path: /go/src/github.com/redhat-et/microshift/install.sh
+      - destination_dir: .
+        source_path: /go/src/github.com/redhat-et/microshift/packaging/systemd/microshift-containerized
+      - destination_dir: .
+        source_path: /go/src/github.com/redhat-et/microshift/packaging/systemd/microshift-containerized.service
     test-bin:
       paths:
       - destination_dir: .
@@ -51,21 +53,17 @@ images:
         rpm-build glibc-static gcc selinux-policy-devel util-linux && \
         dnf clean all && \
         rm -rf /var/cache/dnf/*
-    RUN /bin/bash -c 'cd /go/src/github.com/redhat-et/microshift; \
-        go version; \
-        make rpm; \
-        mv packaging/rpm/_rpmbuild/RPMS/x86_64 .; \
-        mv packaging/rpm/_rpmbuild/RPMS/noarch .; \
-        ls -al /go/src/github.com/redhat-et/microshift/x86_64; \
-        ls -al /go/src/github.com/redhat-et/microshift/noarch'
-
-    FROM libvirt-installer
     WORKDIR /go/src/github.com/redhat-et/microshift
-    COPY --from=builder /go/src/github.com/redhat-et/microshift/x86_64 /go/src/github.com/redhat-et/microshift/microshift-rpm/.
-    COPY --from=builder /go/src/github.com/redhat-et/microshift/noarch /go/src/github.com/redhat-et/microshift/selinux-rpm/.
+    RUN make rpm
+    FROM libvirt-installer
+    WORKDIR /opt/microshift-rpms
+    USER root
+    RUN mkdir bin selinux
+    COPY --from=builder /go/src/github.com/redhat-et/microshift/packaging/rpm/_rpmbuild/RPMS/x86_64/microshift-* bin/
+    COPY --from=builder /go/src/github.com/redhat-et/microshift/packaging/rpm/_rpmbuild/RPMS/noarch/microshift-selinux-* selinux/
+    COPY microshift-containerized /tmp/microshift-containerized
     COPY openshift-tests /usr/bin/openshift-tests
     COPY oc /usr/bin/oc
-    RUN /bin/bash -c 'ls -al; ls /go/src/github.com/redhat-et/microshift/selinux-rpm; ls /go/src/github.com/redhat-et/microshift/microshift-rpm; pwd'
   from: libvirt-installer
   inputs:
     cli:
@@ -78,6 +76,9 @@ images:
     src:
       as:
       - src
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/redhat-et/microshift/packaging/systemd/microshift-containerized
     test-bin:
       paths:
       - destination_dir: .

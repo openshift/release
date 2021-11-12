@@ -37,9 +37,10 @@ cat > "${HOME}"/wait_for_node_ready.sh <<'EOF'
 #!/bin/bash
 set -xeuo pipefail
 
-export KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig
-
 systemctl enable --now microshift.service
+
+microshift-containerized
+source /etc/microshift-containerized/microshift-containerized.conf
 
 start=$(date '+%s')
 to=300
@@ -59,6 +60,7 @@ while :; do
 done
 EOF
 chmod +x "${HOME}"/wait_for_node_ready.sh
+
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \
