@@ -32,9 +32,9 @@ cd verification-tests
 cucumber --tags "${UPGRADE_PRE_RUN_TAGS} and ${UPGRADE_SKIP_TAGS}" -p junit || true
 
 echo "Summarizing test result..."
-failures=$(grep '<testsuite failures="[1-9].*"' "${BUSHSLICER_REPORT_DIR}" -r | wc -l || true)
+failures=$(grep '<testsuite failures="[1-9].*"' "${ARTIFACT_DIR}" -r | wc -l || true)
 if [ $((failures)) == 0 ]; then
-    echo "All upgrade-prepare have passed"
+    echo "All tests have passed"
 else
-    echo "There are ${failures} test failures in upgrade-prepare, please inspect these failures"
+    echo "${failures} failures in upgrade prepare" | tee -a "${SHARED_DIR}/upgrade_e2e_failures"
 fi
