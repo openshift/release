@@ -42,3 +42,7 @@ if [ -f "/var/run/cluster-secrets/${CLUSTER_TYPE}/osp-ca.crt" ]; then
 	cp "/var/run/cluster-secrets/${CLUSTER_TYPE}/osp-ca.crt" "${SHARED_DIR}/osp-ca.crt"
 	sed -i "s+cacert: .*+cacert: ${SHARED_DIR}/osp-ca.crt+" "${SHARED_DIR}/clouds.yaml"
 fi
+
+if [ -f "/var/run/cluster-secrets/${CLUSTER_TYPE}/squid-credentials.txt" ]; then
+	cp "/var/run/cluster-secrets/${CLUSTER_TYPE}/squid-credentials.txt" "${SHARED_DIR}/squid-credentials.txt"
+fi
