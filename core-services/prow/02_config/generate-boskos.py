@@ -70,6 +70,9 @@ CONFIG = {
     'openstack-kuryr-quota-slice': {
         'default': 2,
     },
+    'openstack-nfv-quota-slice': {
+        'default': 2,
+    },
     'openstack-vh-mecha-central-quota-slice': {
         'default': 5,
     },
