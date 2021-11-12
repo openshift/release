@@ -19,6 +19,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/codecov-token
       - --target=test-periodic
       command:
       - ci-operator
@@ -29,6 +30,9 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /secrets/codecov-token
+        name: codecov-token
+        readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -40,6 +44,9 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: codecov-token
+      secret:
+        secretName: codecov-token
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
