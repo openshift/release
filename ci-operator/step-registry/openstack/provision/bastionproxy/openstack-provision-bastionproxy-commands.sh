@@ -218,6 +218,7 @@ export no_proxy="redhat.io,quay.io,redhat.com,svc,github.com,githubusercontent.c
 EOF
 
 if [[ -f "${SHARED_DIR}/osp-ca.crt" ]]; then
+  cat ${SHARED_DIR}/osp-ca.crt
   printf "\n" >> "${SHARED_DIR}/osp-ca.crt"
   cat "${SHARED_DIR}"/domain.crt >> "${SHARED_DIR}/osp-ca.crt"
 fi
