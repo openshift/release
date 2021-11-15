@@ -10,8 +10,13 @@ echo "************ baremetalds assisted setup command ************"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
 
+git clone https://github.com/osherdp/assisted-test-infra --branch feature/testing-vtpm /tmp/assisted-test-infra
+cd /tmp/assisted-test-infra
+
 # Copy assisted source from current directory to the remote server
 tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/assisted.tar.gz"
+
+cd -
 
 # Prepare configuration and run
 scp "${SSHOPTS[@]}" "${CLUSTER_PROFILE_DIR}/pull-secret" "root@${IP}:pull-secret"
