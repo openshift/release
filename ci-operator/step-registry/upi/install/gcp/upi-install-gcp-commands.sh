@@ -110,6 +110,10 @@ if [[ -v IS_XPN ]]; then
   CLUSTER_NETWORK="${HOST_PROJECT_NETWORK}"
   COMPUTE_SUBNET="${HOST_PROJECT_COMPUTE_SUBNET}"
   CONTROL_SUBNET="${HOST_PROJECT_CONTROL_SUBNET}"
+  REGION=$(echo ${CONTROL_SUBNET} | cut -d "/" -f9)
+  ZONE_0="$(gcloud compute regions describe "${REGION}" --format=json | jq -r .zones[0] | cut -d "/" -f9)"
+  ZONE_1="$(gcloud compute regions describe "${REGION}" --format=json | jq -r .zones[1] | cut -d "/" -f9)"
+  ZONE_2="$(gcloud compute regions describe "${REGION}" --format=json | jq -r .zones[2] | cut -d "/" -f9)"
 else
   echo "Using project: ${HOST_PROJECT}"
   echo "Using region: ${REGION}"
@@ -128,14 +132,16 @@ resources:
     worker_subnet_cidr: '${WORKER_SUBNET_CIDR}'
 EOF
 
-  ## debug for sa role
+  ## Applying 'roles/deploymentmanager.editor' to the service-account, if not already...
   sa_email=$(jq -r .client_email ${GOOGLE_CLOUD_KEYFILE_JSON})
   echo "Checking the roles of the service-account ${sa_email}..."
-  gcloud projects get-iam-policy ${HOST_PROJECT} --flatten="bindings[].members" --format="table(bindings.role)" --filter="bindings.members:${sa_email}"
-  echo "Granting role 'roles/deploymentmanager.editor' to the service-account..."
-  backoff gcloud projects add-iam-policy-binding ${HOST_PROJECT} --member "serviceAccount:${sa_email}" --role "roles/deploymentmanager.editor"
-  echo "Re-Checking the roles of the service-account..."
-  gcloud projects get-iam-policy ${HOST_PROJECT} --flatten="bindings[].members" --format="table(bindings.role)" --filter="bindings.members:${sa_email}"
+  curr_roles=$(gcloud projects get-iam-policy ${HOST_PROJECT} --flatten="bindings[].members" --format="table(bindings.role)" --filter="bindings.members:${sa_email}" | grep 'roles/deploymentmanager.editor')
+  if [ -z ${curr_roles} ]; then
+    echo "Granting role 'roles/deploymentmanager.editor' to the service-account..."
+    backoff gcloud projects add-iam-policy-binding ${HOST_PROJECT} --member "serviceAccount:${sa_email}" --role "roles/deploymentmanager.editor"
+    echo "Re-Checking the roles of the service-account..."
+    gcloud projects get-iam-policy ${HOST_PROJECT} --flatten="bindings[].members" --format="table(bindings.role)" --filter="bindings.members:${sa_email}"
+  fi
   ##
 
   gcloud deployment-manager deployments create "${INFRA_ID}-vpc" --config 01_vpc.yaml
@@ -222,11 +228,6 @@ resources:
 EOF
 fi
 
-## debug for XPN subnet region issue
-control_subnet_name=$(echo ${CONTROL_SUBNET} | cut -d/ -f10)
-gcloud compute networks subnets list --filter "name=${control_subnet_name}"
-echo ">>${REGION}, ${ZONE_0}, ${ZONE_1}, ${ZONE_2}"
-##
 gcloud deployment-manager deployments create "${INFRA_ID}-infra" --config 02_infra.yaml
 
 ## Configure infra variables
