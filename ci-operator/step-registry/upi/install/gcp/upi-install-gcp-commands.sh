@@ -111,6 +111,9 @@ if [[ -v IS_XPN ]]; then
   COMPUTE_SUBNET="${HOST_PROJECT_COMPUTE_SUBNET}"
   CONTROL_SUBNET="${HOST_PROJECT_CONTROL_SUBNET}"
 else
+  echo "Using region: ${REGION}"
+  echo "Using master_subnet_cidr: ${MASTER_SUBNET_CIDR}"
+  echo "Using worker_subnet_cidr: ${WORKER_SUBNET_CIDR}"
   cat <<EOF > 01_vpc.yaml
 imports:
 - path: 01_vpc.py
@@ -123,6 +126,20 @@ resources:
     master_subnet_cidr: '${MASTER_SUBNET_CIDR}'
     worker_subnet_cidr: '${WORKER_SUBNET_CIDR}'
 EOF
+
+  ## debug for sa role
+  echo "Checking the roles of the service-account..."
+  cat <<EOF > gcloud_sa_roles.sh
+#!/usr/bin/env bash
+set -x
+
+for the_sa in "$@"; do
+  gcloud projects get-iam-policy openshift-qe --flatten="bindings[].members" --format="table(bindings.role)" --filter="bindings.members:${the_sa}"
+done  
+EOF
+  chmod +x gcloud_sa_roles.sh
+  gcloud iam service-accounts list | grep ci-provisioner | awk '{print $2}' | xargs gcloud_sa_roles.sh
+  ##
 
   gcloud deployment-manager deployments create "${INFRA_ID}-vpc" --config 01_vpc.yaml
 
