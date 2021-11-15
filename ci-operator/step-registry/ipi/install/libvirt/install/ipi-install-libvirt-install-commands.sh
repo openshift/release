@@ -123,7 +123,7 @@ for ((i=0; i<${MASTER_REPLICAS}; i++))
 do
   yq write --inplace ${dir}/openshift/99_openshift-cluster-api_master-machines-${i}.yaml spec.providerSpec.value[domainMemory] ${MASTER_MEMORY}
   yq write --inplace ${dir}/openshift/99_openshift-cluster-api_master-machines-${i}.yaml spec.providerSpec.value.volume[volumeSize] ${MASTER_DISK}
-  if [ "${BRANCH}" == "4.9" ] || [ "${BRANCH}" == "4.10" ]; then
+  if [ "${BRANCH}" == "4.9" ] || [ "${BRANCH}" == "4.10" ] && [ "${ARCH}" == "ppc64le" ]; then
     yq write --inplace ${dir}/openshift/99_openshift-cluster-api_master-machines-${i}.yaml spec.providerSpec.value[domainVcpu] 8
   fi
 done
