@@ -133,7 +133,7 @@ EOF
   echo "Checking the roles of the service-account ${sa_email}..."
   gcloud projects get-iam-policy ${HOST_PROJECT} --flatten="bindings[].members" --format="table(bindings.role)" --filter="bindings.members:${sa_email}"
   echo "Granting role 'roles/deploymentmanager.editor' to the service-account..."
-  gcloud projects add-iam-policy-binding ${HOST_PROJECT} --member "serviceAccount:${sa_email}" --role "roles/deploymentmanager.editor"
+  backoff gcloud projects add-iam-policy-binding ${HOST_PROJECT} --member "serviceAccount:${sa_email}" --role "roles/deploymentmanager.editor"
   echo "Re-Checking the roles of the service-account..."
   gcloud projects get-iam-policy ${HOST_PROJECT} --flatten="bindings[].members" --format="table(bindings.role)" --filter="bindings.members:${sa_email}"
   ##
