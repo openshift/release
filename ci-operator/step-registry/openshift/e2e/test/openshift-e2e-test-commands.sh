@@ -275,20 +275,40 @@ echo "$(date) - all clusteroperators are done progressing."
 i=0
 while true
 do
-  MACHINECOUNT="$(kubectl get machines -A --no-headers | wc -l)"
-  NODECOUNT="$(kubectl get nodes --no-headers | wc -l)"
-  if [ "${MACHINECOUNT}" -le "${NODECOUNT}" ]
-  then
-    echo "$(date) - node count ($NODECOUNT) now matches or exceeds machine count ($MACHINECOUNT)"
-    break
-  fi
-  echo "$(date) - $MACHINECOUNT Machines - $NODECOUNT Nodes"
-  sleep 30
-  i=$((i+1))
-  if [ $i -gt 20 ]; then
-    echo "Timed out waiting for node count ($NODECOUNT) to equal or exceed machine count ($MACHINECOUNT)."
-    exit 1
-  fi
+    MACHINECOUNT="$(kubectl get machines -A --no-headers | wc -l)"
+    NODECOUNT="$(kubectl get nodes --no-headers | wc -l)"
+    if [ "${MACHINECOUNT}" -le "${NODECOUNT}" ]
+    then
+        echo "$(date) - node count ($NODECOUNT) now matches or exceeds machine count ($MACHINECOUNT)"
+        break
+    fi
+    echo "$(date) - $MACHINECOUNT Machines - $NODECOUNT Nodes"
+    sleep 30
+    i=$((i+1))
+    if [ $i -gt 20 ]; then
+        echo "Timed out waiting for node count ($NODECOUNT) to equal or exceed machine count ($MACHINECOUNT)."
+        # If we enabled the ssh bastion pod, attempt to gather journal logs from each machine, regardless
+        # if it made it to a node or not.
+        # TODO: Temporary, move into the failure case block below before merging:
+        if [[ -n "${TEST_REQUIRES_SSH-}" ]]; then
+            echo "Attempting to gather system journal logs from each machine via ssh bastion pod"
+            mkdir -p "${ARTIFACT_DIR}/machine-journal-logs/"
+
+            # This returns each IP all on one line, separated by spaces:
+            machine_ips="$(oc --insecure-skip-tls-verify get machines -n openshift-machine-api -o 'jsonpath={.items[*].status.addresses[?(@.type=="InternalIP")].address}')"
+            echo "Found machine IPs: $machine_ips"
+            ingress_host="$(oc get service --all-namespaces -l run=ssh-bastion -o go-template='{{ with (index (index .items 0).status.loadBalancer.ingress 0) }}{{ or .hostname .ip }}{{end}}')"
+            echo "Ingress host: $ingress_host"
+
+            for ip in $machine_ips
+            do
+                echo "Gathering journalctl logs from ${ip}"
+                ssh -i "${KUBE_SSH_KEY_PATH}" -o StrictHostKeyChecking=no -o ProxyCommand="ssh -i ${KUBE_SSH_KEY_PATH} -A -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p core@${ingress_host}" core@$ip "sudo journalctl --no-pager" > "${ARTIFACT_DIR}/machine-journal-logs/${ip}-journal.log"
+            done
+        fi
+
+        exit 1
+    fi
 done
 
 # wait for all nodes to reach Ready=true to ensure that all machines and nodes came up, before we run
