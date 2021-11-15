@@ -129,10 +129,13 @@ resources:
 EOF
 
   ## debug for sa role
+  sa_email=$(jq -r .client_email ${GOOGLE_CLOUD_KEYFILE_JSON})
+  echo "Checking the roles of the service-account ${sa_email}..."
+  gcloud projects get-iam-policy ${HOST_PROJECT} --flatten="bindings[].members" --format="table(bindings.role)" --filter="bindings.members:${sa_email}"
   echo "Granting role 'roles/deploymentmanager.editor' to the service-account..."
-  gcloud projects add-iam-policy-binding ${HOST_PROJECT} --member "serviceAccount:ci-provisioner-2@${HOST_PROJECT}.iam.gserviceaccount.com}" --role "roles/deploymentmanager.editor"
-  echo "Checking the roles of the service-account..."
-  gcloud projects get-iam-policy ${HOST_PROJECT} --flatten="bindings[].members" --format="table(bindings.role)" --filter="bindings.members:ci-provisioner-2@${HOST_PROJECT}.iam.gserviceaccount.com"
+  gcloud projects add-iam-policy-binding ${HOST_PROJECT} --member "serviceAccount:${sa_email}" --role "roles/deploymentmanager.editor"
+  echo "Re-Checking the roles of the service-account..."
+  gcloud projects get-iam-policy ${HOST_PROJECT} --flatten="bindings[].members" --format="table(bindings.role)" --filter="bindings.members:${sa_email}"
   ##
 
   gcloud deployment-manager deployments create "${INFRA_ID}-vpc" --config 01_vpc.yaml
