@@ -123,8 +123,13 @@ for ((i=0; i<${MASTER_REPLICAS}; i++))
 do
   yq write --inplace ${dir}/openshift/99_openshift-cluster-api_master-machines-${i}.yaml spec.providerSpec.value[domainMemory] ${MASTER_MEMORY}
   yq write --inplace ${dir}/openshift/99_openshift-cluster-api_master-machines-${i}.yaml spec.providerSpec.value.volume[volumeSize] ${MASTER_DISK}
+<<<<<<< HEAD
   if [ "${BRANCH}" == "4.9" ] || [ "${BRANCH}" == "4.10" ]; then
     yq write --inplace ${dir}/openshift/99_openshift-cluster-api_master-machines-${i}.yaml spec.providerSpec.value[Vcpu] 8
+=======
+  if [ "${BRANCH}" == "4.9" ] || [ "${BRANCH}" == "4.10" ] && [ "${ARCH}" == "ppc64le" ]; then
+    yq write --inplace ${dir}/openshift/99_openshift-cluster-api_master-machines-${i}.yaml spec.providerSpec.value[domainVcpu] 8
+>>>>>>> 225932b72c... changes based on lpar observations
   fi
 done
 # Bump the libvirt workers memory to 16GB
