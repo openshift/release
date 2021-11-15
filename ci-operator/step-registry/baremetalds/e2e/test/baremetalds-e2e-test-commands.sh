@@ -116,6 +116,14 @@ function suite() {
     set +x
 }
 
+# wait for all clusteroperators to reach progressing=false to ensure that we achieved the configuration specified at installation
+# time before we run our e2e tests.
+function check_clusteroperators_status() {
+    echo "$(date) - waiting for clusteroperators to finish progressing..."
+    oc wait clusteroperators --all --for=condition=Progressing=false --timeout=15m
+    echo "$(date) - all clusteroperators are done progressing."
+}
+
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_START"
 trap 'echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"' EXIT
 
@@ -124,15 +132,7 @@ oc -n openshift-config patch cm admin-acks --patch '{"data":{"ack-4.8-kube-1.22-
 # wait for ClusterVersion to level, until https://bugzilla.redhat.com/show_bug.cgi?id=2009845 makes it back to all 4.9 releases being installed in CI
 oc wait --for=condition=Progressing=False --timeout=2m clusterversion/version
 
-# wait for all clusteroperators to reach progressing=false to ensure that we achieved the configuration specified at installation
-# time before we run our e2e tests.
-echo "$(date) - waiting for clusteroperators to finish progressing..."
-oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
-
-# additional check to ensure that all the co didn't switch back meanwhile
-oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
-
-echo "$(date) - all clusteroperators are done progressing."
+check_clusteroperators_status
 
 # wait up to 10m for the number of nodes to match the number of machines
 i=0
@@ -182,6 +182,13 @@ do
   sleep 60
 done
 echo "$(date) - all imagestreams are imported."
+
+# In some cases the cluster events are processed slowly by the kube-apiservers,
+# producing a late revision updates that could be missed by the previous co check.
+echo "$(date) - Waiting 10 minutes before checking again clusteroperators"
+sleep 10m
+
+check_clusteroperators_status
 
 case "${TEST_TYPE}" in
 upgrade-conformance)
