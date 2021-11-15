@@ -173,6 +173,24 @@ tests:
       COMPUTE_NODE_TYPE: m6g.xlarge
       TEST_ARGS: --from-repository quay.io/multi-arch/community-e2e-images
     workflow: openshift-e2e-aws-serial
+- as: ocp-e2e-aws-arm64-console
+  interval: 72h
+  steps:
+    cluster_profile: aws-arm64
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: arm-ci.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.large
+    test:
+    - as: test
+      cli: latest
+      commands: ./test-prow-e2e.sh e2e
+      from: stable:console-tests
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: ocp-e2e-remote-libvirt-s390x
   cluster: build01
   cron: 0 2,14 * * *
