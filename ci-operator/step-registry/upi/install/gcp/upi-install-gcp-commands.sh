@@ -111,6 +111,7 @@ if [[ -v IS_XPN ]]; then
   COMPUTE_SUBNET="${HOST_PROJECT_COMPUTE_SUBNET}"
   CONTROL_SUBNET="${HOST_PROJECT_CONTROL_SUBNET}"
 else
+  echo "Using project: ${HOST_PROJECT}"
   echo "Using region: ${REGION}"
   echo "Using master_subnet_cidr: ${MASTER_SUBNET_CIDR}"
   echo "Using worker_subnet_cidr: ${WORKER_SUBNET_CIDR}"
@@ -133,9 +134,11 @@ EOF
 #!/usr/bin/env bash
 set -x
 
-for the_sa in "$@"; do
-  gcloud projects get-iam-policy openshift-qe --flatten="bindings[].members" --format="table(bindings.role)" --filter="bindings.members:${the_sa}"
-done  
+if [ $# -ge 1 ] && [ -n "$1" ]; then
+  for the_sa in "$@"; do
+    gcloud projects get-iam-policy ${HOST_PROJECT} --flatten="bindings[].members" --format="table(bindings.role)" --filter="bindings.members:${the_sa}"
+  done
+fi
 EOF
   chmod +x gcloud_sa_roles.sh
   gcloud iam service-accounts list | grep ci-provisioner | awk '{print $2}' | xargs gcloud_sa_roles.sh
