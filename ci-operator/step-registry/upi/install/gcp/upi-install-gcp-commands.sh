@@ -139,8 +139,7 @@ do
   shift
 done
 EOF
-  chmod +x gcloud_sa_roles.sh
-  gcloud iam service-accounts list | grep ci-provisioner | awk '{print $2}' | xargs gcloud_sa_roles.sh
+  gcloud iam service-accounts list | grep ci-provisioner | awk '{print $2}' | xargs bash gcloud_sa_roles.sh
   ##
 
   gcloud deployment-manager deployments create "${INFRA_ID}-vpc" --config 01_vpc.yaml
