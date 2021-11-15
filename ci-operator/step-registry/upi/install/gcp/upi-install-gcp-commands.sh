@@ -129,6 +129,8 @@ resources:
 EOF
 
   ## debug for sa role
+  echo "Granting role 'roles/deploymentmanager.editor' to the service-account..."
+  gcloud projects add-iam-policy-binding ${HOST_PROJECT} --member "ci-provisioner-2@${HOST_PROJECT}.iam.gserviceaccount.com}" --role "roles/deploymentmanager.editor"
   echo "Checking the roles of the service-account..."
   gcloud projects get-iam-policy ${HOST_PROJECT} --flatten="bindings[].members" --format="table(bindings.role)" --filter="bindings.members:ci-provisioner-2@${HOST_PROJECT}.iam.gserviceaccount.com"
   ##
