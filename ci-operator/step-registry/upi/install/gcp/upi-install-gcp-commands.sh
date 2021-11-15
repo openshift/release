@@ -130,14 +130,13 @@ EOF
 
   ## debug for sa role
   echo "Checking the roles of the service-account..."
+  gcloud iam service-accounts list | grep ci-provisioner | awk '{print $2}'
   cat <<EOF > gcloud_sa_roles.sh
-#!/usr/bin/env bash
-
 while [ $# -ge 1 ] && [ -n "$1" ]
 do
-        echo ">>$1"
-        gcloud projects get-iam-policy openshift-qe --flatten="bindings[].members" --format="table(bindings.role)" --filter="bindings.members:$1"
-        shift
+  echo ">>$1"
+  gcloud projects get-iam-policy ${HOST_PROJECT} --flatten="bindings[].members" --format="table(bindings.role)" --filter="bindings.members:$1"
+  shift
 done
 EOF
   chmod +x gcloud_sa_roles.sh
