@@ -284,7 +284,7 @@ do
   fi
   echo "$(date) - $MACHINECOUNT Machines - $NODECOUNT Nodes"
   sleep 30
-  ((i++))
+  i=$((i+1))
   if [ $i -gt 20 ]; then
     echo "Timed out waiting for node count ($NODECOUNT) to equal or exceed machine count ($MACHINECOUNT)."
     exit 1
