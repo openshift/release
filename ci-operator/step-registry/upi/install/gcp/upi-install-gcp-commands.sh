@@ -222,6 +222,11 @@ resources:
 EOF
 fi
 
+## debug for XPN subnet region issue
+control_subnet_name = $(echo ${CONTROL_SUBNET} | cut -d/ -f10)
+gcloud compute networks subnets list --filter "name=${control_subnet_name}"
+echo ">>${REGION}, ${ZONE_0}, ${ZONE_1}, ${ZONE_2}"
+##
 gcloud deployment-manager deployments create "${INFRA_ID}-infra" --config 02_infra.yaml
 
 ## Configure infra variables
