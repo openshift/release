@@ -147,7 +147,7 @@ for i in range(75,94):
 for i in range(60,62):
     CONFIG['vsphere-discon-quota-slice']['qe-discon-segment-{}'.format(i)] = 1
 
-for i in range(71,75):
+for i in range(50,54):
     CONFIG['vsphere-clusterbot-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 config = {
