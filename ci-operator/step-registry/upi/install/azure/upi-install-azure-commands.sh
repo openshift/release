@@ -162,7 +162,7 @@ az storage container create --name files --account-name $ACCOUNT_NAME --public-a
 az storage blob upload --account-name "${INFRA_ID}sa" --account-key "$ACCOUNT_KEY" -c "files" -f "bootstrap.ign" -n "bootstrap.ign"
 
 echo "Creating private DNS zone"
-az network private-dns zone create -g $RESOURCE_GROUP -n ${CLUSTER_NAME}.${base_domain}
+az network private-dns zone create -g $RESOURCE_GROUP -n ${CLUSTER_NAME}.${BASE_DOMAIN}
 PRINCIPAL_ID=$(az identity show -g $RESOURCE_GROUP -n ${INFRA_ID}-identity --query principalId --out tsv)
 
 echo "Assigning 'Contributor' role to principal ID ${PRINCIPAL_ID}"
@@ -175,7 +175,7 @@ az deployment group create -g $RESOURCE_GROUP \
   --parameters baseName="$INFRA_ID"
 
 echo "Linking VNet to private DNS zone"
-az network private-dns link vnet create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${base_domain} -n ${INFRA_ID}-network-link -v "${INFRA_ID}-vnet" -e false
+az network private-dns link vnet create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n ${INFRA_ID}-network-link -v "${INFRA_ID}-vnet" -e false
           
 echo "Deploying 02_storage"
 VHD_BLOB_URL=$(az storage blob url --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY -c vhd -n "rhcos.vhd" -o tsv)
@@ -192,7 +192,7 @@ az deployment group create -g $RESOURCE_GROUP \
 PUBLIC_IP=$(az network public-ip list -g $RESOURCE_GROUP --query "[?name=='${INFRA_ID}-master-pip'] | [0].ipAddress" -o tsv)
 
 echo "Creating 'api' record in public zone for IP ${PUBLIC_IP}"
-az network dns record-set a add-record -g $BASE_DOMAIN_RESOURCE_GROUP -z ${base_domain} -n api.${CLUSTER_NAME} -a $PUBLIC_IP --ttl 60
+az network dns record-set a add-record -g $BASE_DOMAIN_RESOURCE_GROUP -z ${BASE_DOMAIN} -n api.${CLUSTER_NAME} -a $PUBLIC_IP --ttl 60
           
 echo "Deploying 04_bootstrap"
 BOOTSTRAP_URL=$(az storage blob url --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY -c "files" -n "bootstrap.ign" -o tsv)
@@ -213,7 +213,7 @@ az deployment group create -g $RESOURCE_GROUP \
   --template-file "05_masters.json" \
   --parameters masterIgnition="$MASTER_IGNITION" \
   --parameters sshKeyData="$SSH_PUB_KEY" \
-  --parameters privateDNSZoneName="${CLUSTER_NAME}.${base_domain}" \
+  --parameters privateDNSZoneName="${CLUSTER_NAME}.${BASE_DOMAIN}" \
   --parameters baseName="$INFRA_ID"
        
 MASTER0_IP=$(az network nic ip-config show -g $RESOURCE_GROUP --nic-name ${INFRA_ID}-master-0-nic --name pipConfig --query "privateIpAddress" -o tsv)
@@ -222,7 +222,7 @@ MASTER2_IP=$(az network nic ip-config show -g $RESOURCE_GROUP --nic-name ${INFRA
 GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --master ${MASTER0_IP} --master ${MASTER1_IP} --master ${MASTER2_IP}"
           
 echo "Deploying 06_workers"
-export WORKER_IGNITION=$(cat ${ARTIFACT_DIR}/installer/worker.ign | base64 -w0)
+WORKER_IGNITION=$(cat ${ARTIFACT_DIR}/installer/worker.ign | base64 -w0)
 az deployment group create -g $RESOURCE_GROUP \
   --template-file "06_workers.json" \
   --parameters workerIgnition="$WORKER_IGNITION" \
