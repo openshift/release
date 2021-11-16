@@ -265,12 +265,6 @@ oc -n openshift-config patch cm admin-acks --patch '{"data":{"ack-4.8-kube-1.22-
 # wait for ClusterVersion to level, until https://bugzilla.redhat.com/show_bug.cgi?id=2009845 makes it back to all 4.9 releases being installed in CI
 oc wait --for=condition=Progressing=False --timeout=2m clusterversion/version
 
-# wait for all clusteroperators to reach progressing=false to ensure that we achieved the configuration specified at installation
-# time before we run our e2e tests.
-echo "$(date) - waiting for clusteroperators to finish progressing..."
-oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
-echo "$(date) - all clusteroperators are done progressing."
-
 # wait up to 10m for the number of nodes to match the number of machines
 i=0
 while true
@@ -289,7 +283,6 @@ do
         echo "Timed out waiting for node count ($NODECOUNT) to equal or exceed machine count ($MACHINECOUNT)."
         # If we enabled the ssh bastion pod, attempt to gather journal logs from each machine, regardless
         # if it made it to a node or not.
-        # TODO: Temporary, move into the failure case block below before merging:
         if [[ -n "${TEST_REQUIRES_SSH-}" ]]; then
             echo "Attempting to gather system journal logs from each machine via ssh bastion pod"
             mkdir -p "${ARTIFACT_DIR}/machine-journal-logs/"
@@ -316,6 +309,12 @@ done
 echo "$(date) - waiting for nodes to be ready..."
 oc wait nodes --all --for=condition=Ready=true --timeout=10m
 echo "$(date) - all nodes are ready"
+
+# wait for all clusteroperators to reach progressing=false to ensure that we achieved the configuration specified at installation
+# time before we run our e2e tests.
+echo "$(date) - waiting for clusteroperators to finish progressing..."
+oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
+echo "$(date) - all clusteroperators are done progressing."
 
 # this works around a problem where tests fail because imagestreams aren't imported.  We see this happen for exec session.
 echo "$(date) - waiting for non-samples imagesteams to import..."
