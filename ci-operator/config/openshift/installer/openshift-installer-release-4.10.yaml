@@ -35,6 +35,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.17-openshift-4.10
+  openstack-tests:
+    name: "4.10"
+    namespace: ocp
+    tag: openstack-tests
   origin_4.10_cli:
     name: "4.10"
     namespace: origin
@@ -341,6 +345,9 @@ tests:
       BASE_DOMAIN: shiftstack.devcluster.openshift.com
       CONFIG_TYPE: minimal
       TEST_SUITE: experimental/reliability/minimal
+    test:
+    - ref: openshift-e2e-test
+    - ref: openstack-test-openstack
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-openstack-parallel
   optional: true
@@ -350,11 +357,17 @@ tests:
       BASE_DOMAIN: shiftstack.devcluster.openshift.com
       CONFIG_TYPE: minimal
       TEST_SUITE: openshift/conformance/parallel
+    test:
+    - ref: openshift-e2e-test
+    - ref: openstack-test-openstack
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-openstack-proxy
   optional: true
   steps:
     cluster_profile: openstack-vh-mecha-central
+    test:
+    - ref: openshift-e2e-test
+    - ref: openstack-test-openstack
     workflow: openshift-e2e-openstack-proxy
 - as: openstack-manifests
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(aws|azure|baremetal|gcp|kubevirt|libvirt|ovirt|vsphere)/)
@@ -436,7 +449,7 @@ tests:
       CONFIG_TYPE: minimal
       NETWORK_TYPE: Kuryr
     test:
-    - ref: openstack-noop
+    - ref: openstack-test-openstack
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-azurestack
   steps:

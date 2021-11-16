@@ -23,6 +23,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.16-openshift-4.9
+  openstack-tests:
+    name: "4.9"
+    namespace: ocp
+    tag: openstack-tests
   origin_4.8_cli:
     name: "4.8"
     namespace: origin
@@ -313,6 +317,9 @@ tests:
       BASE_DOMAIN: shiftstack.devcluster.openshift.com
       CONFIG_TYPE: minimal
       TEST_SUITE: experimental/reliability/minimal
+    test:
+    - ref: openshift-e2e-test
+    - ref: openstack-test-openstack
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-openstack-parallel
   optional: true
@@ -322,11 +329,17 @@ tests:
       BASE_DOMAIN: shiftstack.devcluster.openshift.com
       CONFIG_TYPE: minimal
       TEST_SUITE: openshift/conformance/parallel
+    test:
+    - ref: openshift-e2e-test
+    - ref: openstack-test-openstack
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-openstack-proxy
   optional: true
   steps:
     cluster_profile: openstack-vh-mecha-central
+    test:
+    - ref: openshift-e2e-test
+    - ref: openstack-test-openstack
     workflow: openshift-e2e-openstack-proxy
 - as: openstack-manifests
   skip_if_only_changed: ^docs/
@@ -406,7 +419,7 @@ tests:
       CONFIG_TYPE: minimal
       NETWORK_TYPE: Kuryr
     test:
-    - ref: openstack-noop
+    - ref: openstack-test-openstack
     workflow: openshift-e2e-openstack-ipi
 zz_generated_metadata:
   branch: release-4.9
