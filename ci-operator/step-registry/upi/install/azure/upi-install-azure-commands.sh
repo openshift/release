@@ -187,7 +187,7 @@ az deployment group create -g $RESOURCE_GROUP \
 echo "Deploying 03_infra"
 az deployment group create -g $RESOURCE_GROUP \
   --template-file "03_infra.json" \
-  --parameters privateDNSZoneName="${CLUSTER_NAME}.${base_domain}" \
+  --parameters privateDNSZoneName="${CLUSTER_NAME}.${BASE_DOMAIN}" \
   --parameters baseName="$INFRA_ID"
 PUBLIC_IP=$(az network public-ip list -g $RESOURCE_GROUP --query "[?name=='${INFRA_ID}-master-pip'] | [0].ipAddress" -o tsv)
 
