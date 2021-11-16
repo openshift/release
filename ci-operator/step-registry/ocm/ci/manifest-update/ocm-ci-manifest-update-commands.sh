@@ -94,6 +94,15 @@ log "INFO Z-stream version is $release"
 export OSCI_COMPONENT_NAME=${OSCI_COMPONENT_NAME:-$REPO_NAME}
 log "INFO OSCI_COMPONENT_NAME is ${OSCI_COMPONENT_NAME}."
 
+# Set defaults for OCM pipeline and repo if not set.
+export OSCI_PIPELINE_ORG=${OSCI_PIPELINE_ORG:-open-cluster-management}
+export OSCI_IMAGE_REMOTE_REPO=${OSCI_IMAGE_REMOTE_REPO:-quay.io/open-cluster-management}
+export OSCI_IMAGE_REMOTE_REPO_SRC=${OSCI_IMAGE_REMOTE_REPO_SRC:-registry.ci.openshift.org/open-cluster-management}
+
+# Debug information
+echo "INFO OSCI Environment variables are set to: "
+env | grep OSCI
+
 if [[ "$DRY_RUN" == "false" ]]; then
     # We check for postsubmit specifically because we need a new image published 
     # before running this step. Putting this check down here means that this step
