@@ -237,13 +237,19 @@ else # for workflow before internal load balancers
 fi
 CLUSTER_PUBLIC_IP="$(gcloud compute addresses describe "${INFRA_ID}-cluster-public-ip" "--region=${REGION}" --format json | jq -r .address)"
 
-echo ">>base domain: ${BASE_DOMAIN}, private zone name: ${PRIVATE_ZONE_NAME}, pub IP: ${CLUSTER_PUBLIC_IP}, priv IP: ${CLUSTER_IP}"
+echo ">>base domain zone name: ${BASE_DOMAIN_ZONE_NAME}, private zone name: ${PRIVATE_ZONE_NAME}, pub IP: ${CLUSTER_PUBLIC_IP}, priv IP: ${CLUSTER_IP}"
+gcloud --project="${HOST_PROJECT}" dns managed-zones list --filter "name=${BASE_DOMAIN_ZONE_NAME}"
+gcloud --project="${HOST_PROJECT}" dns managed-zones list --filter "name=${PRIVATE_ZONE_NAME}"
+
 ### Add external DNS entries (optional)
 echo "$(date -u --rfc-3339=seconds) - Adding external DNS entries..."
 if [ -f transaction.yaml ]; then rm transaction.yaml; fi
 gcloud --project="${HOST_PROJECT}" dns record-sets transaction start --zone "${BASE_DOMAIN_ZONE_NAME}"
+[ $? -ne 0 ] && echo "gcloud error 1" && exit 1
 gcloud --project="${HOST_PROJECT}" dns record-sets transaction add "${CLUSTER_PUBLIC_IP}" --name "api.${CLUSTER_NAME}.${BASE_DOMAIN}." --ttl 60 --type A --zone "${BASE_DOMAIN_ZONE_NAME}"
+[ $? -ne 0 ] && echo "gcloud error 2" && exit 1
 gcloud --project="${HOST_PROJECT}" dns record-sets transaction execute --zone "${BASE_DOMAIN_ZONE_NAME}"
+[ $? -ne 0 ] && echo "gcloud error 3" && exit 1
 
 ### Add internal DNS entries
 echo "$(date -u --rfc-3339=seconds) - Adding internal DNS entries..."
