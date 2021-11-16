@@ -14,6 +14,11 @@ function populate_artifact_dir() {
     s/X-Auth-Token.*/X-Auth-Token REDACTED/;
     s/UserData:.*,/UserData: REDACTED,/;
     ' "${dir}/.openshift_install.log" > "${ARTIFACT_DIR}/.openshift_install.log"
+  case "${CLUSTER_TYPE}" in
+    aws|aws-arm64)
+      grep -Po 'Instance ID: \Ki\-\w+' "${dir}/.openshift_install.log" > "${SHARED_DIR}/aws-instance-ids.txt";;
+  *) >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}' to collect machine IDs"
+  esac
 }
 
 function prepare_next_steps() {
