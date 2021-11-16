@@ -337,7 +337,9 @@ if [[ -f  03_security.yaml ]]; then
 fi
 
 ## Generate a service-account-key for signing the bootstrap.ign url
-gcloud --project="${HOST_PROJECT}" iam service-accounts keys create service-account-key.json "--iam-account=${MASTER_SERVICE_ACCOUNT}"
+res=$(gcloud iam service-accounts list --filter "email=${MASTER_SERVICE_ACCOUNT}")
+echo -e ">>SA info: \n${res}"
+gcloud iam service-accounts keys create service-account-key.json "--iam-account=${MASTER_SERVICE_ACCOUNT}" || echo "failed to create the SA key!"
 
 ## Create the cluster image.
 echo "$(date -u --rfc-3339=seconds) - Creating the cluster image..."
