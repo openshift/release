@@ -258,8 +258,8 @@ if [ $? -eq 0 ]; then
   echo "$(date -u --rfc-3339=seconds) - Adding internal DNS entries..."
   if [ -f transaction.yaml ]; then rm transaction.yaml; fi
   gcloud --project="${HOST_PROJECT}" dns record-sets transaction start --zone "${PRIVATE_ZONE_NAME}"
-  gcloud --project="${HOST_PROJECT}" dns record-sets transaction add "${CLUSTER_IP}" --name "api.${private_zone_dns_name}" --ttl 60 --type A --zone "${PRIVATE_ZONE_NAME}"
-  gcloud --project="${HOST_PROJECT}" dns record-sets transaction add "${CLUSTER_IP}" --name "api-int.${private_zone_dns_name}" --ttl 60 --type A --zone "${PRIVATE_ZONE_NAME}"
+  gcloud --project="${HOST_PROJECT}" dns record-sets transaction add "${CLUSTER_IP}" --name "api.${CLUSTER_NAME}.${private_zone_dns_name}" --ttl 60 --type A --zone "${PRIVATE_ZONE_NAME}"
+  gcloud --project="${HOST_PROJECT}" dns record-sets transaction add "${CLUSTER_IP}" --name "api-int.${CLUSTER_NAME}.${private_zone_dns_name}" --ttl 60 --type A --zone "${PRIVATE_ZONE_NAME}"
   gcloud --project="${HOST_PROJECT}" dns record-sets transaction execute --zone "${PRIVATE_ZONE_NAME}"
 else
   echo ">>private zone ${PRIVATE_ZONE_NAME} doesn't exist in project ${HOST_PROJECT}"
