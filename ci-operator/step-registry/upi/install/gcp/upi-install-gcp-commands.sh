@@ -340,8 +340,8 @@ fi
 sa_email=$(jq -r .client_email ${GOOGLE_CLOUD_KEYFILE_JSON})
 res=$(gcloud iam service-accounts list --filter "email=${MASTER_SERVICE_ACCOUNT}")
 echo -e ">>SA info: \n${res}\nsa_email: ${sa_email}, master sa: ${MASTER_SERVICE_ACCOUNT}"
-gcloud projects get-iam-policy ${HOST_PROJECT} --flatten="bindings[].members" --format="table(bindings.role)" --filter="bindings.members:${sa_email}"
-gcloud projects get-iam-policy ${HOST_PROJECT} --flatten="bindings[].members" --format="table(bindings.role)" --filter="bindings.members:${MASTER_SERVICE_ACCOUNT}"
+gcloud projects get-iam-policy ${PROJECT_NAME} --flatten="bindings[].members" --format="table(bindings.role)" --filter="bindings.members:${sa_email}" || echo "erro (1)"
+gcloud projects get-iam-policy ${PROJECT_NAME} --flatten="bindings[].members" --format="table(bindings.role)" --filter="bindings.members:${MASTER_SERVICE_ACCOUNT}" || echo "error (2)"
 gcloud iam service-accounts keys create service-account-key.json "--iam-account=${MASTER_SERVICE_ACCOUNT}" || echo "failed to create the SA key!"
 
 ## Create the cluster image.
