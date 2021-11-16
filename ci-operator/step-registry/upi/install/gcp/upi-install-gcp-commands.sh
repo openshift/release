@@ -131,8 +131,8 @@ EOF
   ## Applying 'roles/deploymentmanager.editor' to the service-account, if not already...
   sa_email=$(jq -r .client_email ${GOOGLE_CLOUD_KEYFILE_JSON})
   echo "Checking the roles of the service-account ${sa_email}..."
-  curr_roles=$(gcloud projects get-iam-policy ${HOST_PROJECT} --flatten="bindings[].members" --format="table(bindings.role)" --filter="bindings.members:${sa_email}" | grep 'roles/deploymentmanager.editor')
-  if [ -z ${curr_roles} ]; then
+  curr_roles=$(gcloud projects get-iam-policy ${HOST_PROJECT} --flatten="bindings[].members" --format="table(bindings.role)" --filter="bindings.members:${sa_email}" | grep 'roles/deploymentmanager.editor' || echo "NOT FOUND")
+  if [[ ${curr_roles} = "NOT FOUND" ]]; then
     echo "Granting role 'roles/deploymentmanager.editor' to the service-account..."
     backoff gcloud projects add-iam-policy-binding ${HOST_PROJECT} --member "serviceAccount:${sa_email}" --role "roles/deploymentmanager.editor"
     echo "Re-Checking the roles of the service-account..."
@@ -336,12 +336,18 @@ if [[ -f  03_security.yaml ]]; then
   backoff gcloud projects add-iam-policy-binding "${PROJECT_NAME}" --member "serviceAccount:${WORKER_SERVICE_ACCOUNT}" --role "roles/storage.admin"
 fi
 
-## Generate a service-account-key for signing the bootstrap.ign url
 sa_email=$(jq -r .client_email ${GOOGLE_CLOUD_KEYFILE_JSON})
-res=$(gcloud iam service-accounts list --filter "email=${MASTER_SERVICE_ACCOUNT}")
-echo -e ">>SA info: \n${res}\nsa_email: ${sa_email}, master sa: ${MASTER_SERVICE_ACCOUNT}"
-gcloud projects get-iam-policy ${PROJECT_NAME} --flatten="bindings[].members" --format="table(bindings.role)" --filter="bindings.members:${sa_email}" || echo "erro (1)"
-gcloud projects get-iam-policy ${PROJECT_NAME} --flatten="bindings[].members" --format="table(bindings.role)" --filter="bindings.members:${MASTER_SERVICE_ACCOUNT}" || echo "error (2)"
+echo "Checking if the service-account ${sa_email} has the role 'roles/iam.serviceAccountKeyAdmin'..."
+curr_roles=$(gcloud projects get-iam-policy ${PROJECT_NAME} --flatten="bindings[].members" --format="table(bindings.role)" --filter="bindings.members:${sa_email}" | grep 'roles/iam.serviceAccountKeyAdmin' || echo "NOT FOUND")
+if [[ ${curr_roles} = "NOT FOUND" ]]; then
+  echo "Granting role 'roles/iam.serviceAccountKeyAdmin' to the service-account..."
+  backoff gcloud projects add-iam-policy-binding ${PROJECT_NAME} --member "serviceAccount:${sa_email}" --role "roles/iam.serviceAccountKeyAdmin"
+  echo "Re-Checking the roles of the service-account..."
+  gcloud projects get-iam-policy ${PROJECT_NAME} --flatten="bindings[].members" --format="table(bindings.role)" --filter="bindings.members:${sa_email}"
+else
+  echo ">>The SA has the role 'roles/iam.serviceAccountKeyAdmin' already."
+fi
+## Generate a service-account-key for signing the bootstrap.ign url
 gcloud iam service-accounts keys create service-account-key.json "--iam-account=${MASTER_SERVICE_ACCOUNT}" || echo "failed to create the SA key!"
 
 ## Create the cluster image.
