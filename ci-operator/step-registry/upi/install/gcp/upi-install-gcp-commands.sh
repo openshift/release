@@ -115,10 +115,6 @@ if [[ -v IS_XPN ]]; then
   ZONE_1="$(gcloud compute regions describe "${REGION}" --format=json | jq -r .zones[1] | cut -d "/" -f9)"
   ZONE_2="$(gcloud compute regions describe "${REGION}" --format=json | jq -r .zones[2] | cut -d "/" -f9)"
 else
-  echo "Using project: ${HOST_PROJECT}"
-  echo "Using region: ${REGION}"
-  echo "Using master_subnet_cidr: ${MASTER_SUBNET_CIDR}"
-  echo "Using worker_subnet_cidr: ${WORKER_SUBNET_CIDR}"
   cat <<EOF > 01_vpc.yaml
 imports:
 - path: 01_vpc.py
@@ -141,6 +137,8 @@ EOF
     backoff gcloud projects add-iam-policy-binding ${HOST_PROJECT} --member "serviceAccount:${sa_email}" --role "roles/deploymentmanager.editor"
     echo "Re-Checking the roles of the service-account..."
     gcloud projects get-iam-policy ${HOST_PROJECT} --flatten="bindings[].members" --format="table(bindings.role)" --filter="bindings.members:${sa_email}"
+  else
+    echo ">>The SA has the role 'roles/deploymentmanager.editor' already."
   fi
   ##
 
@@ -239,13 +237,13 @@ else # for workflow before internal load balancers
 fi
 CLUSTER_PUBLIC_IP="$(gcloud compute addresses describe "${INFRA_ID}-cluster-public-ip" "--region=${REGION}" --format json | jq -r .address)"
 
-echo ">>base domain: ${BASE_DOMAIN_ZONE_NAME}, private zone name: ${PRIVATE_ZONE_NAME}, pub IP: ${CLUSTER_PUBLIC_IP}, priv IP: ${CLUSTER_IP}"
+echo ">>base domain: ${BASE_DOMAIN}, private zone name: ${PRIVATE_ZONE_NAME}, pub IP: ${CLUSTER_PUBLIC_IP}, priv IP: ${CLUSTER_IP}"
 ### Add external DNS entries (optional)
 echo "$(date -u --rfc-3339=seconds) - Adding external DNS entries..."
 if [ -f transaction.yaml ]; then rm transaction.yaml; fi
-gcloud dns record-sets transaction start --zone "${BASE_DOMAIN_ZONE_NAME}"
-gcloud dns record-sets transaction add "${CLUSTER_PUBLIC_IP}" --name "api.${CLUSTER_NAME}.${BASE_DOMAIN}." --ttl 60 --type A --zone "${BASE_DOMAIN_ZONE_NAME}"
-gcloud dns record-sets transaction execute --zone "${BASE_DOMAIN_ZONE_NAME}"
+gcloud --project="${HOST_PROJECT}" dns record-sets transaction start --zone "${BASE_DOMAIN_ZONE_NAME}"
+gcloud --project="${HOST_PROJECT}" dns record-sets transaction add "${CLUSTER_PUBLIC_IP}" --name "api.${CLUSTER_NAME}.${BASE_DOMAIN}." --ttl 60 --type A --zone "${BASE_DOMAIN_ZONE_NAME}"
+gcloud --project="${HOST_PROJECT}" dns record-sets transaction execute --zone "${BASE_DOMAIN_ZONE_NAME}"
 
 ### Add internal DNS entries
 echo "$(date -u --rfc-3339=seconds) - Adding internal DNS entries..."
