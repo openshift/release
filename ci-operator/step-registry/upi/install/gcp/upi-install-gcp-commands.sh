@@ -242,7 +242,7 @@ echo ">>base domain zone name: ${BASE_DOMAIN_ZONE_NAME}, private zone name: ${PR
 ### Add internal DNS entries
 echo "$(date -u --rfc-3339=seconds) - Adding internal DNS entries..."
 res=$(gcloud --project="${HOST_PROJECT}" dns managed-zones list --filter "name=${PRIVATE_ZONE_NAME}")
-echo ">>priv zone info: \n${res}"
+echo -e ">>priv zone info: \n${res}"
 if [[ -n $res ]]; then
   private_zone_dns_name=$(gcloud --project="${HOST_PROJECT}" dns managed-zones list --filter "name=${PRIVATE_ZONE_NAME}" | grep ${PRIVATE_ZONE_NAME} | awk '{print $2}')
   if [[ -v IS_XPN ]]; then
@@ -263,7 +263,7 @@ fi
 ### Add external DNS entries (optional)
 echo "$(date -u --rfc-3339=seconds) - Adding external DNS entries..."
 res=$(gcloud --project="${HOST_PROJECT}" dns managed-zones list --filter "name=${BASE_DOMAIN_ZONE_NAME}")
-echo ">>base domain zone info: \n${res}"
+echo -e ">>base domain zone info: \n${res}"
 if [[ -n $res ]]; then
   if [ -f transaction.yaml ]; then rm transaction.yaml; fi
   gcloud --project="${HOST_PROJECT}" dns record-sets transaction start --zone "${BASE_DOMAIN_ZONE_NAME}"
@@ -337,7 +337,7 @@ if [[ -f  03_security.yaml ]]; then
 fi
 
 ## Generate a service-account-key for signing the bootstrap.ign url
-gcloud iam service-accounts keys create service-account-key.json "--iam-account=${MASTER_SERVICE_ACCOUNT}"
+gcloud --project="${HOST_PROJECT}" iam service-accounts keys create service-account-key.json "--iam-account=${MASTER_SERVICE_ACCOUNT}"
 
 ## Create the cluster image.
 echo "$(date -u --rfc-3339=seconds) - Creating the cluster image..."
