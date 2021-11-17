@@ -296,7 +296,8 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/e2e-aws-rhel8
     decorate: true
@@ -1905,7 +1906,8 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/e2e-metal
     decorate: true
@@ -2335,6 +2337,80 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-metal-ipi-ovn-ipv6-required,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build01
+    context: ci/prow/e2e-metal-ipi-swapped-hosts
+    decorate: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-master-e2e-metal-ipi-swapped-hosts
+    optional: true
+    rerun_command: /test e2e-metal-ipi-swapped-hosts
+    run_if_changed: (^(data/.*|pkg/.*|images)/baremetal/)|(^vendor/github.com/metal3-io/)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-metal-ipi-swapped-hosts-cluster-profile
+        - --target=e2e-metal-ipi-swapped-hosts
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-metal-ipi-swapped-hosts-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-packet
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-metal-ipi-swapped-hosts,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -2780,7 +2856,8 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/e2e-openstack-upi
     decorate: true
@@ -3872,7 +3949,8 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/shellcheck
     decorate: true
@@ -3900,7 +3978,8 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/tf-fmt
     decorate: true
@@ -3929,7 +4008,8 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/tf-lint
     decorate: true
@@ -4100,7 +4180,8 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - master
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/yaml-lint
     decorate: true
