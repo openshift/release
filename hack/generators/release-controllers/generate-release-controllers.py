@@ -57,7 +57,7 @@ class Config:
         self.rc_deployment_domain = 'apps.ci.l2s4.p1.openshiftapps.com'
         self.rc_release_domain = 'svc.ci.openshift.org'
         self.rc_deployment_namespace = 'ci'
-        self.arches = ('x86_64', 's390x', 'ppc64le', 'arm64')
+        self.arches = ('x86_64', 's390x', 'ppc64le', 'arm64', 'multi')
         self.paths = RCPaths(git_clone_dir)
         self.releases = self._get_releases()
 
