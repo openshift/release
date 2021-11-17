@@ -302,9 +302,22 @@ gcloud iam service-accounts keys create service-account-key.json "--iam-account=
 
 ## Create the cluster image.
 echo "$(date -u --rfc-3339=seconds) - Creating the cluster image..."
-IMAGE_SOURCE="$(jq -r .gcp.url /var/lib/openshift-install/rhcos.json)"
-gcloud compute images create "${INFRA_ID}-rhcos-image" --source-uri="${IMAGE_SOURCE}"
-CLUSTER_IMAGE="$(gcloud compute images describe "${INFRA_ID}-rhcos-image" --format json | jq -r .selfLink)"
+imagename="${INFRA_ID}-rhcos-image"
+# https://github.com/openshift/installer/blob/master/docs/user/overview.md#coreos-bootimages
+# This code needs to handle pre-4.8 installers though too.
+if openshift-install coreos print-stream-json 2>/tmp/err.txt >coreos.json; then
+  jq '.architectures.'"$(uname -m)"'.images.gcp' < coreos.json > gcp.json
+  source_image="$(jq -r .name < gcp.json)"
+  source_project="$(jq -r .project < gcp.json)"
+  rm -f coreos.json gcp.json
+  echo "Creating image from ${source_image} in ${source_project}"
+  gcloud compute images create "${imagename}" --source-image="${source_image}" --source-image-project="${source_project}"
+else
+  IMAGE_SOURCE="$(jq -r .gcp.url /var/lib/openshift-install/rhcos.json)"
+  gcloud compute images create "${imagename}" --source-uri="${IMAGE_SOURCE}"
+fi
+CLUSTER_IMAGE="$(gcloud compute images describe "${imagename}" --format json | jq -r .selfLink)"
+echo "Using CLUSTER_IMAGE=${CLUSTER_IMAGE}"
 
 ## Upload the bootstrap.ign to a new bucket
 echo "$(date -u --rfc-3339=seconds) - Uploading the bootstrap.ign to a new bucket..."
