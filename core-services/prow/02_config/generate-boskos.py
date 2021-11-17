@@ -70,6 +70,9 @@ CONFIG = {
     'openstack-kuryr-quota-slice': {
         'default': 2,
     },
+    'openstack-nfv-quota-slice': {
+        'default': 2,
+    },
     'openstack-vh-mecha-central-quota-slice': {
         'default': 5,
     },
@@ -91,6 +94,7 @@ CONFIG = {
     'kubevirt-quota-slice':{},
     'vsphere-quota-slice':{},
     'vsphere-discon-quota-slice':{},
+    'vsphere-clusterbot-quota-slice':{},
     'osd-ephemeral-quota-slice': {
         'default': 15,
     },
@@ -142,6 +146,9 @@ for i in range(75,94):
 
 for i in range(60,62):
     CONFIG['vsphere-discon-quota-slice']['qe-discon-segment-{}'.format(i)] = 1
+
+for i in range(50,54):
+    CONFIG['vsphere-clusterbot-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 config = {
     'resources': [],
