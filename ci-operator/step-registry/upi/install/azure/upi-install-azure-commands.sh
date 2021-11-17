@@ -40,9 +40,9 @@ CLUSTER_NAME=$(python3 -c 'import yaml;data = yaml.full_load(open("install-confi
 AZURE_REGION=$(python3 -c 'import yaml;data = yaml.full_load(open("install-config.yaml"));print(data["platform"]["azure"]["region"])')
 SSH_KEY=$(python3 -c 'import yaml;data = yaml.full_load(open("install-config.yaml"));print(data["sshKey"])')
 BASE_DOMAIN=$(python3 -c 'import yaml;data = yaml.full_load(open("install-config.yaml"));print(data["baseDomain"])')
-AZURE_AUTH_TENANT_ID=$(jq -r .tenantId ${SHARED_DIR}/osServicePrincipal.json)
-AZURE_AUTH_CLIENT_SECRET=$(jq -r .clientSecret ${SHARED_DIR}/osServicePrincipal.json)
-AZURE_AUTH_CLIENT_ID=$(jq -r .clientId ${SHARED_DIR}/osServicePrincipal.json)
+AZURE_AUTH_TENANT_ID=$(jq -r .tenantId ${CLUSTER_PROFILE_DIR}/osServicePrincipal.json)
+AZURE_AUTH_CLIENT_SECRET=$(jq -r .clientSecret ${CLUSTER_PROFILE_DIR}/osServicePrincipal.json)
+AZURE_AUTH_CLIENT_ID=$(jq -r .clientId ${CLUSTER_PROFILE_DIR}/osServicePrincipal.json)
 
 export CLUSTER_NAME
 export AZURE_REGION
