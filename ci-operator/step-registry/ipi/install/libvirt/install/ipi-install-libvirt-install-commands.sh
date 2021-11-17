@@ -124,12 +124,17 @@ do
   yq write --inplace ${dir}/openshift/99_openshift-cluster-api_master-machines-${i}.yaml spec.providerSpec.value[domainMemory] ${MASTER_MEMORY}
   yq write --inplace ${dir}/openshift/99_openshift-cluster-api_master-machines-${i}.yaml spec.providerSpec.value.volume[volumeSize] ${MASTER_DISK}
 <<<<<<< HEAD
+<<<<<<< HEAD
   if [ "${BRANCH}" == "4.9" ] || [ "${BRANCH}" == "4.10" ]; then
     yq write --inplace ${dir}/openshift/99_openshift-cluster-api_master-machines-${i}.yaml spec.providerSpec.value[Vcpu] 8
 =======
   if [ "${BRANCH}" == "4.9" ] || [ "${BRANCH}" == "4.10" ] && [ "${ARCH}" == "ppc64le" ]; then
     yq write --inplace ${dir}/openshift/99_openshift-cluster-api_master-machines-${i}.yaml spec.providerSpec.value[domainVcpu] 8
 >>>>>>> 225932b72c... changes based on lpar observations
+=======
+  if [ "${BRANCH}" == "4.9" ] || [ "${BRANCH}" == "4.10" ] && [ "${ARCH}" == "ppc64le" ]; then
+    yq write --inplace ${dir}/openshift/99_openshift-cluster-api_master-machines-${i}.yaml spec.providerSpec.value[domainVcpu] 8
+>>>>>>> upstream/master
   fi
 done
 # Bump the libvirt workers memory to 16GB
