@@ -22,7 +22,8 @@ images:
       - registry.ci.openshift.org/open-cluster-management/builder:go1.16-linux
   to: multicloud-manager
 promotion:
-  name: "1.0"
+  disabled: true
+  name: "2.5"
   namespace: open-cluster-management
 releases:
   initial:
@@ -104,6 +105,16 @@ tests:
       IMAGE_REPO: multicloud-manager
       REGISTRY_ORG: open-cluster-management
     workflow: ocm-ci-image-mirror
+- as: pr-merge-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: multicloud-manager
+    env:
+      IMAGE_REPO: multicloud-manager
+      IMAGE_TAG: 0.6.0
+      REGISTRY_ORG: open-cluster-management
+    workflow: ocm-ci-image-mirror
 - as: publish
   postsubmit: true
   steps:
@@ -116,12 +127,10 @@ tests:
     - as: publish
       commands: |-
         export OSCI_COMPONENT_NAME=multicloud-manager
-        export OSCI_COMPONENT_VERSION=0.5.0
+        export OSCI_COMPONENT_VERSION=0.6.0
         export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/open-cluster-management"
-        export OSCI_PIPELINE_PRODUCT_PREFIX=backplane
-        export OSCI_PIPELINE_REPO=backplane-pipeline
-        export OSCI_PUBLISH_DELAY="0"
         export SELF="make -f /opt/build-harness/Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
         make -f /opt/build-harness/Makefile.prow osci/publish
       credentials:
       - mount_path: /etc/github
@@ -134,6 +143,6 @@ tests:
           memory: 200Mi
     workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: backplane-1.0
+  branch: release-2.5
   org: open-cluster-management
   repo: multicloud-operators-foundation
