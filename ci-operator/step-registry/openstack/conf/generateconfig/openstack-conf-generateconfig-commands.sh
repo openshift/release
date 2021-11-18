@@ -109,7 +109,7 @@ pullSecret: >
 sshKey: |
   ${SSH_PUB_KEY}
 EOF
-if [[ "${CONFIG_TYPE}" == "proxy" ]]; then
+if [[ "${CONFIG_TYPE}" == "proxy" && -f "${SHARED_DIR}"/PROXY_INTERFACE ]]; then
   PROXY_INTERFACE=$(<"${SHARED_DIR}"/PROXY_INTERFACE)
   SQUID_AUTH=$(<"${SHARED_DIR}"/SQUID_AUTH)
 cat >> "${CONFIG}" << EOF
