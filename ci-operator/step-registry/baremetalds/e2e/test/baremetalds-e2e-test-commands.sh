@@ -39,6 +39,27 @@ function set_test_provider() {
     fi
 }
 
+function mirror_release_image_for_disconnected_upgrade() {
+    # All IPv6 clusters are disconnected and
+    # release image should be mirrored for upgrades.
+    if [[ "${DS_IP_STACK}" == "v6" ]]; then
+      # shellcheck disable=SC2087
+      ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
+MIRRORED_RELEASE_IMAGE=${DS_REGISTRY}/localimages/local-release-image
+DIGEST=\$(oc adm release info --registry-config ${DS_WORKING_DIR}/pull_secret.json ${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE} --output=jsonpath="{.digest}")
+echo "Mirroring release images for disconnected environment"
+oc adm release mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --from=${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE} --to=\${MIRRORED_RELEASE_IMAGE} --apply-release-image-signature
+echo "OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE=\${MIRRORED_RELEASE_IMAGE}@\${DIGEST}" >> /tmp/disconnected_mirror.conf
+EOF
+
+      # shellcheck source=/dev/null
+      source <(ssh "${SSHOPTS[@]}" "root@${IP}" "cat /tmp/disconnected_mirror.conf")
+      echo "OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE is overridden to ${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"
+
+      TEST_UPGRADE_ARGS="--from-repository ${DS_REGISTRY}/localimages/local-test-image"
+    fi
+}
+
 function setup_proxy() {
     # For disconnected or otherwise unreachable environments, we want to
     # have steps use an HTTP(S) proxy to reach the API server. This proxy
@@ -89,10 +110,12 @@ ${TEST_SKIPS_PROXY}"
 esac
 
 function upgrade() {
+    mirror_release_image_for_disconnected_upgrade
     set -x
     openshift-tests run-upgrade all \
         --to-image "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}" \
         --provider "${TEST_PROVIDER:-}" \
+        ${TEST_UPGRADE_ARGS:-} \
         -o "${ARTIFACT_DIR}/e2e.log" \
         --junit-dir "${ARTIFACT_DIR}/junit"
     set +x
@@ -116,6 +139,14 @@ function suite() {
     set +x
 }
 
+# wait for all clusteroperators to reach progressing=false to ensure that we achieved the configuration specified at installation
+# time before we run our e2e tests.
+function check_clusteroperators_status() {
+    echo "$(date) - waiting for clusteroperators to finish progressing..."
+    oc wait clusteroperators --all --for=condition=Progressing=false --timeout=15m
+    echo "$(date) - all clusteroperators are done progressing."
+}
+
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_START"
 trap 'echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"' EXIT
 
@@ -124,15 +155,7 @@ oc -n openshift-config patch cm admin-acks --patch '{"data":{"ack-4.8-kube-1.22-
 # wait for ClusterVersion to level, until https://bugzilla.redhat.com/show_bug.cgi?id=2009845 makes it back to all 4.9 releases being installed in CI
 oc wait --for=condition=Progressing=False --timeout=2m clusterversion/version
 
-# wait for all clusteroperators to reach progressing=false to ensure that we achieved the configuration specified at installation
-# time before we run our e2e tests.
-echo "$(date) - waiting for clusteroperators to finish progressing..."
-oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
-
-# additional check to ensure that all the co didn't switch back meanwhile
-oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
-
-echo "$(date) - all clusteroperators are done progressing."
+check_clusteroperators_status
 
 # wait up to 10m for the number of nodes to match the number of machines
 i=0
@@ -182,6 +205,13 @@ do
   sleep 60
 done
 echo "$(date) - all imagestreams are imported."
+
+# In some cases the cluster events are processed slowly by the kube-apiservers,
+# producing a late revision updates that could be missed by the previous co check.
+echo "$(date) - Waiting 10 minutes before checking again clusteroperators"
+sleep 10m
+
+check_clusteroperators_status
 
 case "${TEST_TYPE}" in
 upgrade-conformance)
