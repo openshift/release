@@ -39,6 +39,27 @@ function set_test_provider() {
     fi
 }
 
+function mirror_release_image_for_disconnected_upgrade() {
+    # All IPv6 clusters are disconnected and
+    # release image should be mirrored for upgrades.
+    if [[ "${DS_IP_STACK}" == "v6" ]]; then
+      # shellcheck disable=SC2087
+      ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
+MIRRORED_RELEASE_IMAGE=${DS_REGISTRY}/localimages/local-release-image
+DIGEST=\$(oc adm release info --registry-config ${DS_WORKING_DIR}/pull_secret.json ${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE} --output=jsonpath="{.digest}")
+echo "Mirroring release images for disconnected environment"
+oc adm release mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --from=${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE} --to=\${MIRRORED_RELEASE_IMAGE} --apply-release-image-signature
+echo "OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE=\${MIRRORED_RELEASE_IMAGE}@\${DIGEST}" >> /tmp/disconnected_mirror.conf
+EOF
+
+      # shellcheck source=/dev/null
+      source <(ssh "${SSHOPTS[@]}" "root@${IP}" "cat /tmp/disconnected_mirror.conf")
+      echo "OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE is overridden to ${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"
+
+      TEST_UPGRADE_ARGS="--from-repository ${DS_REGISTRY}/localimages/local-test-image"
+    fi
+}
+
 function setup_proxy() {
     # For disconnected or otherwise unreachable environments, we want to
     # have steps use an HTTP(S) proxy to reach the API server. This proxy
@@ -89,10 +110,12 @@ ${TEST_SKIPS_PROXY}"
 esac
 
 function upgrade() {
+    mirror_release_image_for_disconnected_upgrade
     set -x
     openshift-tests run-upgrade all \
         --to-image "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}" \
         --provider "${TEST_PROVIDER:-}" \
+        ${TEST_UPGRADE_ARGS:-} \
         -o "${ARTIFACT_DIR}/e2e.log" \
         --junit-dir "${ARTIFACT_DIR}/junit"
     set +x

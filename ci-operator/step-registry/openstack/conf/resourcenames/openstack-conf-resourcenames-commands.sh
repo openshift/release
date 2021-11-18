@@ -9,7 +9,7 @@ declare -A external_network=(
 	['openstack-vexxhost']='public'
 	['openstack-vh-mecha-central']='external'
 	['openstack-vh-mecha-az0']='external'
-	['openstack-nfv']='external'
+	['openstack-nfv']='hostonly'
 	['openstack']='external'
 	)
 

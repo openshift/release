@@ -32,6 +32,7 @@ echo "Running the operator-sdk scorecard test using the basic configuration, jso
 operator-sdk scorecard --config "${SCORECARD_CONFIG}" \
                        --namespace "${NAMESPACE}" \
                        --kubeconfig "${KUBECONFIG}" \
+                       --verbose \
                        --output json \
                        "${OPERATOR_DIR}" > "${ARTIFACT_DIR}"/scorecard-output-basic.json || true
 
@@ -55,6 +56,7 @@ if [ -f "${OPERATOR_DIR}/tests/scorecard/config.yaml" ]; then
   operator-sdk scorecard \
     --namespace="${NAMESPACE}" \
     --kubeconfig "${KUBECONFIG}" \
+    --verbose \
     --output json \
     --wait-time 3000s \
     --service-account "${SCORECARD_SERVICE_ACCOUNT}" \
