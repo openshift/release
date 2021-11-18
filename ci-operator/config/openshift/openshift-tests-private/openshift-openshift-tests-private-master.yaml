@@ -79,83 +79,7 @@ tests:
   commands: make name-check
   container:
     from: src
-- as: e2e-aws
-  optional: true
-  skip_if_only_changed: frontend/
-  steps:
-    cluster_profile: aws
-    test:
-    - as: critical-test
-      cli: latest
-      commands: ./bin/extended-platform-tests run all --dry-run|grep -iv "VMonly"|grep
-        -E "OLM.*Critical"|./bin/extended-platform-tests run -f -
-      from: bin
-      resources:
-        limits:
-          memory: 4Gi
-        requests:
-          cpu: "2"
-          memory: 600Mi
-    - as: pr-test
-      cli: latest
-      commands: make pr-test
-      from: bin
-      resources:
-        limits:
-          memory: 4Gi
-        requests:
-          cpu: "2"
-          memory: 600Mi
-    workflow: ipi-aws
-- as: e2e-console
-  optional: true
-  run_if_changed: frontend/
-  steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
-    test:
-    - as: console-test
-      cli: latest
-      commands: cd frontend;./console-test-frontend.sh
-      from: tests-private-ui
-      resources:
-        requests:
-          cpu: "2"
-          memory: 600Mi
-      timeout: 1h0m0s
-    workflow: ipi-gcp
-- as: extended-aws-ipi
-  cron: 0 2 * * *
-  steps:
-    cluster_profile: aws
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-aws-pre
-    test:
-    - ref: openshift-extended-test
-- as: extended-azure-ipi
-  cron: 0 18 * * *
-  steps:
-    cluster_profile: azure-2
-    env:
-      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
-    post:
-    - chain: ipi-azure-post
-    pre:
-    - chain: ipi-azure-pre
-    test:
-    - ref: openshift-extended-test
-- as: extended-azure-upi
-  cron: 0 4 * * *
-  steps:
-    cluster_profile: azure4
-    post:
-    - chain: upi-azure-post
-    pre:
-    - chain: upi-azure-pre
-    test:
-    - ref: openshift-extended-test
-- as: extended-baremetal-ipi
+- as: extended-baremetal-ipi-parallel
   cron: 0 6 * * *
   steps:
     cluster_profile: equinix-ocp-metal
@@ -171,21 +95,14 @@ tests:
 - as: extended-gcp-ipi
   cron: 0 8 * * *
   steps:
-    cluster_profile: gcp
+    cluster_profile: aws
+    env:
+      TEST_SCENRAIOS: |
+        NODE|OTA|PerfScale|Windows_Containers|Cluster_Observability
     post:
-    - chain: ipi-gcp-post
+    - chain: ipi-aws-post
     pre:
-    - chain: ipi-gcp-pre
-    test:
-    - ref: openshift-extended-test
-- as: extended-gcp-upi
-  cron: 0 10 * * *
-  steps:
-    cluster_profile: gcp
-    post:
-    - chain: upi-gcp-post
-    pre:
-    - chain: upi-gcp-pre
+    - chain: ipi-aws-pre
     test:
     - ref: openshift-extended-test
 - as: extended-openstack-ipi
@@ -195,20 +112,26 @@ tests:
     env:
       BASE_DOMAIN: shiftstack.devcluster.openshift.com
       CONFIG_TYPE: minimal
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&
+      TEST_SCENRAIOS: STORAGE
     post:
     - chain: ipi-openstack-post
     pre:
     - chain: ipi-openstack-pre
     test:
     - ref: openshift-extended-test
-- as: extended-vsphere-ipi
-  cron: 0 14 * * *
+- as: extended-gcp-upi-parallel
+  cron: 0 */24 * * *
   steps:
-    cluster_profile: vsphere
+    cluster_profile: gcp
+    env:
+      TEST_PARALLEL: "2"
+      TEST_SCENRAIOS: |
+        Security_and_Compliance
     post:
-    - chain: ipi-vsphere-post
+    - chain: upi-gcp-post
     pre:
-    - chain: ipi-vsphere-pre
+    - chain: upi-gcp-pre
     test:
     - ref: openshift-extended-test
 - as: extended-vsphere-upi
@@ -219,18 +142,6 @@ tests:
     - chain: upi-vsphere-post
     pre:
     - chain: upi-vsphere-pre
-    test:
-    - ref: openshift-extended-test
-- as: extended-aws-ipi-disruptive
-  interval: 168h
-  steps:
-    cluster_profile: aws
-    env:
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;Serial&;~DisconnectedOnly&
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-aws-pre
     test:
     - ref: openshift-extended-test
 zz_generated_metadata:

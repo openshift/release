@@ -16,7 +16,18 @@ export REPORT_HANDLE_PATH="/usr/bin"
 # and they will fail, like some cvo cases, because /var/run/secrets/ci.openshift.io/cluster-profile/gce.json does not exist.
 export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
 
-# setup proxy
+# echo "ARTIFACT_DIR: ${ARTIFACT_DIR}"
+echo "KUBECONFIG: ${KUBECONFIG}"
+echo "OPENSHIFT_CI: ${OPENSHIFT_CI}"
+# echo "SHARED_DIR: ${SHARED_DIR}"
+# echo "CLUSTER_PROFILE_DIR: ${CLUSTER_PROFILE_DIR}"
+# echo "RELEASE_IMAGE_INITIAL: ${RELEASE_IMAGE_INITIAL}"
+echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST}"
+# echo "KUBEADMIN_PASSWORD_FILE: ${KUBEADMIN_PASSWORD_FILE}"
+# echo "IMAGE_FORMAT: ${IMAGE_FORMAT}"
+echo "CLUSTER_TYPE: ${CLUSTER_TYPE}"
+
+
 if test -f "${SHARED_DIR}/proxy-conf.sh"
 then
     source "${SHARED_DIR}/proxy-conf.sh"
@@ -30,11 +41,10 @@ if ! which kubectl; then
     export PATH=$PATH:$HOME
     ln -s "$(which oc)" ${HOME}/kubectl
 fi
-
-# configure go env
 export GOPATH=/tmp/goproject
 export GOCACHE=/tmp/gocache
 export GOROOT=/usr/local/go
+touch /tmp/goproject/tt.txt
 
 # compile extended-platform-tests if it does not exist.
 export DEFAULT_EXTENDED_BIN=1
@@ -104,10 +114,10 @@ openstack*)
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
 equinix-ocp-metal)
     export TEST_PROVIDER='{"type":"skeleton"}';;
+    # export TEST_PROVIDER="none"
 *) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"; exit 1;;
 esac
 
-# create execution directory
 mkdir -p /tmp/output
 cd /tmp/output
 
@@ -129,9 +139,17 @@ trap 'echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"' EXIT
 # check if the cluster is ready
 oc version --client
 oc wait nodes --all --for=condition=Ready=true --timeout=10m
-oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
+echo "$(date) - all nodes are ready"
 
-# execute the cases
+echo "$(date) - waiting for clusteroperators to finish progressing..."
+oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
+echo "$(date) - all clusteroperators are done progressing."
+
+# NODENMAE=$(oc get node -o=jsonpath="{.items[0].metadata.name}")
+# myout=$(oc --request-timeout=180s -n default debug node/"${NODENMAE}" -- cat /proc/cpuinfo || true)
+# echo "cpuinfo:\\n${myout}"
+
+
 function run {
     test_scenarios=""
     echo "TEST_SCENRAIOS: \"${TEST_SCENRAIOS:-}\""
