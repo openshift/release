@@ -9,8 +9,7 @@ postsubmits:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-open-cluster-management-registration-main-backplane-fast-forward
+    name: branch-ci-open-cluster-management-registration-main-fast-forward
     spec:
       containers:
       - args:
@@ -18,7 +17,7 @@ postsubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=backplane-fast-forward
+        - --target=fast-forward
         command:
         - ci-operator
         image: ci-operator:latest
@@ -51,44 +50,6 @@ postsubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-  - agent: kubernetes
-    branches:
-    - ^main$
-    cluster: build03
-    decorate: true
-    extra_refs:
-    - base_ref: master
-      org: openshift
-      repo: release
-    name: branch-ci-open-cluster-management-registration-main-fast-forward
-    spec:
-      containers:
-      - args:
-        - --config-dir=../../openshift/release/ci-operator/config/open-cluster-management/registration/
-        - --current-release=2.4
-        - --current-promotion-namespace=open-cluster-management
-        - --future-release=2.4
-        - --fast-forward
-        - --confirm
-        - --username=acm-cicd
-        - --token-path=/etc/github/token
-        command:
-        - repo-brancher
-        image: repo-brancher:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/github
-          name: acm-cicd-github
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: acm-cicd-github
-        secret:
-          secretName: acm-cicd-github
   - agent: kubernetes
     branches:
     - ^main$
