@@ -4,9 +4,25 @@ export HOME=/tmp/home
 mkdir -p "$HOME/.docker"
 cd "$HOME" || exit 1
 
-if [[ "$JOB_TYPE" != "periodic" ]]; then
-    echo "INFO The base branch is ${PULL_BASE_REF}."
+# If this is a periodic type job then we need to populate repo metadata from the JOB_SPEC
+if [[ "$JOB_TYPE" == "periodic" ]]; then
+    echo "INFO JOB_TYPE is: $JOB_TYPE populating repo metadata from JOB_SPEC"
+
+    REPO_OWNER=$(echo ${JOB_SPEC} | jq -r '.extra_refs[].org')
+    REPO_NAME=$(echo ${JOB_SPEC} | jq -r '.extra_refs[].repo')
+    PULL_BASE_REF=$(echo ${JOB_SPEC} | jq -r '.extra_refs[].base_ref')
 fi
+
+#   Uncomment the below to test JQ commands
+# REPO_OWNER_TEST=$(echo ${JOB_SPEC} | jq -r '.extra_refs[].org')
+# REPO_NAME_TEST=$(echo ${JOB_SPEC} | jq -r '.extra_refs[].repo')
+# PULL_BASE_REF_TEST=$(echo ${JOB_SPEC} | jq -r '.extra_refs[].base_ref')
+# echo "JQ TEST: ${REPO_OWNER_TEST} ${REPO_NAME_TEST} ${PULL_BASE_REF_TEST}"
+# echo ${JOB_SPEC}
+
+echo "INFO The repository owner is ${REPO_OWNER}."
+echo "INFO The repository name is ${REPO_NAME}."
+echo "INFO The base branch is ${PULL_BASE_REF}."
 
 # Get IMAGE_REPO if not provided
 if [[ -z "$IMAGE_REPO" ]]; then

@@ -15,15 +15,23 @@ log() {
     echo "$ts" "$@" | tee -a "$log_file"
 }
 
-# Check for postsubmit job type
-if [[ ! ("$JOB_TYPE" = "postsubmit" ) ]]; then
+# Note: REPO_NAME and REPO_OWNER are not available in periodic type jobs. Prow docs link below.
+# https://github.com/kubernetes/test-infra/blob/master/prow/jobs.md#job-environment-variables
+# We wouldn't have the infromation needed to do the business logic in a periodic run.
+if [[ "$JOB_TYPE" == "periodic" ]]; then
     log "ERROR Cannot update the manifest from a $JOB_TYPE job"
     exit 1
 fi
 
+# Check to see if running in openshift/release -> set DRY_RUN to true
+if [[ "$REPO_OWNER" == "openshift" && "$REPO_NAME" == "release" ]]; then
+    log "INFO Running in openshift/release, setting DRY_RUN to true"
+    DRY_RUN="true"
+fi
+
 # Setup GitHub credentials
 GITHUB_TOKEN_FILE="$SECRETS_PATH/$GITHUB_SECRET/$GITHUB_SECRET_FILE"
-log "Setting up git credentials."
+log "INFO Setting up git credentials."
 if [[ ! -r "${GITHUB_TOKEN_FILE}" ]]; then
     log "ERROR GitHub token file missing or not readable: $GITHUB_TOKEN_FILE"
     exit 1
@@ -40,6 +48,7 @@ release_url="https://${RELEASE_REPO}.git"
 # Clone repos
 release_dir="$HOME/release"
 
+log "INFO Cloning the RELEASE_REPO: ${RELEASE_REPO} into ${release_dir}"
 git clone "$release_url" "$release_dir" || {
     log "ERROR Could not clone release repo $release_url"
     exit 1
@@ -48,15 +57,17 @@ git clone "$release_url" "$release_dir" || {
 # There are alot of OSCI env variables to configure this is a way to configure 
 # without mapping all of them directly in the step registry.
 if [[ -n "${OSCI_ENV_CONFIG:-}" ]]; then
-  readarray -t config <<< "${OSCI_ENV_CONFIG}"
-  for var in "${config[@]}"; do
-    if [[ ! -z "${var}" ]]; then
-      echo "export ${var}" >> "${SHARED_DIR}/osci-env-config"
-    fi
-  done
-fi
+    readarray -t config <<< "${OSCI_ENV_CONFIG}"
+    for var in "${config[@]}"; do
+        if [[ -n "${var}" ]]; then
+            echo "export ${var}" >> "${SHARED_DIR}/osci-env-config"
+        fi
+    done
 
-source "${SHARED_DIR}/osci-env-config"
+    # We create this file above - Ignore SC1091
+    # shellcheck source=/dev/null
+    source "${SHARED_DIR}/osci-env-config"
+fi
 
 # Determine current release branch
 branch="${PULL_BASE_REF}"
@@ -72,7 +83,7 @@ fi
 # Get current Z-stream version and set to OSCI_COMPONENT_VERSION
 cd "$release_dir" || exit 1
 git checkout "$branch" || {
-    log "ERROR Could not checkout branch $branch in release repo"
+    log "ERROR Could not checkout branch $branch in OCM release repo"
     exit 1
 }
 release=$(cat "$release_dir/Z_RELEASE_VERSION")
@@ -80,8 +91,21 @@ export OCSI_COMPONENT_VERSION=${release}
 log "INFO Z-stream version is $release"
 
 # Set OSCI_COMPONENT_NAME to REPO_NAME if it is not provided
-export OSCI_COMPONENT_NAME=${$OSCI_COMPONENT_NAME:-$REPO_NAME}
+export OSCI_COMPONENT_NAME=${OSCI_COMPONENT_NAME:-$REPO_NAME}
+log "INFO OSCI_COMPONENT_NAME is ${OSCI_COMPONENT_NAME}."
 
-# Run manifest update
-cd /opt/build-harness/build-harness-extensions/modules/osci/ || exit 1
-make osci/publish BUILD_HARNESS_EXTENSIONS_PATH=/opt/build-harness/build-harness-extensions
+if [[ "$DRY_RUN" == "false" ]]; then
+    # We check for postsubmit specifically because we need a new image published 
+    # before running this step. Putting this check down here means that this step
+    # is rehearsable in openshift/release.
+    if [[ ! ("$JOB_TYPE" = "postsubmit" ) ]]; then
+        log "ERROR Cannot update the manifest from a $JOB_TYPE job"
+        exit 1
+    fi
+
+    # Run manifest update
+    cd /opt/build-harness/build-harness-extensions/modules/osci/ || exit 1
+    make osci/publish BUILD_HARNESS_EXTENSIONS_PATH=/opt/build-harness/build-harness-extensions
+else
+    log "INFO DRY_RUN is set to $DRY_RUN. Exiting without publishing changes to OCM manifest."
+fi

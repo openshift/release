@@ -57,8 +57,8 @@ tests:
       commands: |
         ./scripts/ci/jobs/push-main-image.sh
       credentials:
-      - mount_path: /test-secret
-        name: stackrox-test-secret
+      - mount_path: /tmp/secret/stackrox-rox-ci
+        name: stackrox-rox-ci
         namespace: test-credentials
       dependencies:
       - env: MAIN_IMAGE
@@ -74,7 +74,7 @@ tests:
     cloud: aws
     owner: openshift-ci
     product: ocp
-    timeout: 1h30m0s
+    timeout: 4h0m0s
     version: "4.8"
   steps:
     test:
@@ -83,8 +83,11 @@ tests:
         cd /go/src/github.com/stackrox/rox-openshift-ci-mirror
         ./scripts/ci/jobs/e2e-test.sh
       credentials:
-      - mount_path: /test-secret
-        name: stackrox-test-secret
+      - mount_path: /tmp/secret/stackrox-rox-ci
+        name: stackrox-rox-ci
+        namespace: test-credentials
+      - mount_path: /tmp/secret/ci-pull-secret
+        name: ci-pull-credentials
         namespace: test-credentials
       dependencies:
       - env: MAIN_IMAGE
