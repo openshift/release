@@ -339,6 +339,9 @@ do
 done
 echo "$(date) - all imagestreams are imported."
 
+# Make sure no tests interfere with $KUBECONFIG
+chattr +i $KUBECONFIG
+
 case "${TEST_TYPE}" in
 upgrade-conformance)
     upgrade_conformance

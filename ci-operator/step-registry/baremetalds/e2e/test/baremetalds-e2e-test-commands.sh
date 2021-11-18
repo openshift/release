@@ -213,6 +213,9 @@ sleep 10m
 
 check_clusteroperators_status
 
+# Make sure no tests interfere with $KUBECONFIG
+chattr +i $KUBECONFIG
+
 case "${TEST_TYPE}" in
 upgrade-conformance)
     upgrade
