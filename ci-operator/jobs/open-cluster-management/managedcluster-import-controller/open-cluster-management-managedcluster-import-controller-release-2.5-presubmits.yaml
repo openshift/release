@@ -1,23 +1,27 @@
-postsubmits:
+presubmits:
   open-cluster-management/managedcluster-import-controller:
   - agent: kubernetes
+    always_run: true
     branches:
-    - ^main$
-    cluster: build03
+    - ^release-2\.5$
+    - ^release-2\.5-
+    cluster: build01
+    context: ci/prow/check
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-    name: branch-ci-open-cluster-management-managedcluster-import-controller-main-fast-forward
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-open-cluster-management-managedcluster-import-controller-release-2.5-check
+    rerun_command: /test check
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=fast-forward
+        - --target=check
         command:
         - ci-operator
         image: ci-operator:latest
@@ -27,9 +31,6 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -41,34 +42,33 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )check,?($|\s.*)
   - agent: kubernetes
+    always_run: true
     branches:
-    - ^main$
-    cluster: build03
+    - ^release-2\.5$
+    - ^release-2\.5-
+    cluster: build01
+    context: ci/prow/images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/is-promotion: "true"
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-open-cluster-management-managedcluster-import-controller-main-images
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-open-cluster-management-managedcluster-import-controller-release-2.5-images
+    rerun_command: /test images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
-        - --promote
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
         command:
@@ -86,9 +86,6 @@ postsubmits:
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
-        - mountPath: /etc/push-secret
-          name: push-secret
-          readOnly: true
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
@@ -97,23 +94,25 @@ postsubmits:
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
-      - name: push-secret
-        secret:
-          secretName: registry-push-credentials-ci-central
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
+    always_run: true
     branches:
-    - ^main$
-    cluster: build03
+    - ^release-2\.5$
+    - ^release-2\.5-
+    cluster: build01
+    context: ci/prow/pr-image-mirror
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-open-cluster-management-managedcluster-import-controller-main-pr-merge-image-mirror
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-open-cluster-management-managedcluster-import-controller-release-2.5-pr-image-mirror
+    rerun_command: /test pr-image-mirror
     spec:
       containers:
       - args:
@@ -121,7 +120,7 @@ postsubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=pr-merge-image-mirror
+        - --target=pr-image-mirror
         command:
         - ci-operator
         image: ci-operator:latest
@@ -154,42 +153,109 @@ postsubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )pr-image-mirror,?($|\s.*)
   - agent: kubernetes
+    always_run: true
     branches:
-    - ^main$
-    cluster: build03
+    - ^release-2\.5$
+    - ^release-2\.5-
+    cluster: build01
+    context: ci/prow/sonarcloud
     decorate: true
+    decoration_config:
+      skip_cloning: true
     labels:
+      ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: branch-ci-open-cluster-management-managedcluster-import-controller-main-sonar
+    name: pull-ci-open-cluster-management-managedcluster-import-controller-release-2.5-sonarcloud
+    rerun_command: /test sonarcloud
     spec:
       containers:
       - args:
-        - -f
-        - /opt/build-harness/Makefile.prow
-        - sonar/go/prow
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/acm-sonarcloud-token
+        - --target=sonarcloud
         command:
-        - make
-        env:
-        - name: ARTIFACT_DIR
-          value: $(ARTIFACTS)
-        - name: GOPROXY
-          value: proxy.golang.org,direct
-        - name: SELF
-          value: make -f /opt/build-harness/Makefile.prow
-        image: registry.ci.openshift.org/open-cluster-management/builder:go1.17-linux
+        - ci-operator
+        image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
         resources:
           requests:
-            cpu: 100m
-            memory: 200Mi
+            cpu: 10m
         volumeMounts:
-        - mountPath: /etc/sonarcloud
+        - mountPath: /secrets/acm-sonarcloud-token
           name: acm-sonarcloud-token
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
       - name: acm-sonarcloud-token
         secret:
           secretName: acm-sonarcloud-token
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )sonarcloud,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-2\.5$
+    - ^release-2\.5-
+    cluster: build01
+    context: ci/prow/unit
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-open-cluster-management-managedcluster-import-controller-release-2.5-unit
+    rerun_command: /test unit
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=unit
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )unit,?($|\s.*)
