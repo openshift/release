@@ -1,166 +1,118 @@
 #!/bin/bash
 
-set -o nounset
-set -o errexit
-set -o pipefail
+# set -o nounset
+# set -o errexit
+# set -o pipefail
+
+# PROXY_CREDS_PATH=/var/run/vault/vsphere/proxycreds
+# ADDITIONAL_CA_PATH=/var/run/vault/vsphere/additional_ca
+
+# proxy_user=$(grep -oP 'user\s*:\s*\K.*' ${PROXY_CREDS_PATH})
+# proxy_password=$(grep -oP 'password\s*:\s*\K.*' ${PROXY_CREDS_PATH})
+# additional_ca=$(cat ${ADDITIONAL_CA_PATH})
+# unzip -P "$(cat /var/run/bundle-secret/secret.txt)"  /tmp/bundle.zip -d  /tmp
+
+# GRAFANACLOUND_USERNAME=$(cat /var/run/loki-grafanacloud-secret/client-id)
+# ls /var/run/rp-ocp-token/*
+# echo "WW$(cat /var/run/rp-ocp-token/ginkgo_rp_mmtoken)WW"
+# cat /var/run/rp-ocp-token/ginkgo_rp_operatortoken
+# cat /var/run/rp-ocp-token/ginkgo_rp_pmtoken
+# cat /var/run/rp-ocp-token/secretsync-vault-source-path
 
 export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
 export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
 export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
 export HOME=/tmp/home
-export PATH=/usr/local/go/bin:/usr/libexec/origin:/opt/OpenShift4-tools:$PATH
-export REPORT_HANDLE_PATH="/usr/bin"
-export ENABLE_PRINT_EVENT_STDOUT=true
+export PATH=/usr/libexec/origin:$PATH
 
-# although we set this env var, but it does not exist if the CLUSTER_TYPE is not gcp.
-# so, currently some cases need to access gcp service whether the cluster_type is gcp or not
-# and they will fail, like some cvo cases, because /var/run/secrets/ci.openshift.io/cluster-profile/gce.json does not exist.
-export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
+# echo "ARTIFACT_DIR: ${ARTIFACT_DIR}"
+# echo "KUBECONFIG: ${KUBECONFIG}"
+echo "OPENSHIFT_CI: ${OPENSHIFT_CI}"
+# echo "SHARED_DIR: ${SHARED_DIR}"
+# echo "CLUSTER_PROFILE_DIR: ${CLUSTER_PROFILE_DIR}"
+# echo "RELEASE_IMAGE_INITIAL: ${RELEASE_IMAGE_INITIAL}"
+echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST}"
+# echo "KUBEADMIN_PASSWORD_FILE: ${KUBEADMIN_PASSWORD_FILE}"
+# echo "IMAGE_FORMAT: ${IMAGE_FORMAT}"
+echo "JOB_NAME: ${JOB_NAME}"
+echo "JOB_TYPE: ${JOB_TYPE}"
+echo "BUILD_ID: ${BUILD_ID}"
+echo "PROW_JOB_ID: ${PROW_JOB_ID}"
+echo "------------------------------"
+sleep 3600
+curl -s -k -v https://dave.corp.redhat.com
+curl -s -k -v http://reportportal-openshift-preproc.apps.ocp-c1.prod.psi.redhat.com
+curl -s -k -v https://reportportal-openshift.apps.ocp-c1.prod.psi.redhat.com
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-# prepare for the future usage on the kubeconfig generation of different workflow
-test -n "${KUBECONFIG:-}" && echo "${KUBECONFIG}" || echo "no KUBECONFIG is defined"
-test -f "${KUBECONFIG}" && (ls -l "${KUBECONFIG}" || true) || echo "kubeconfig file does not exist"
-ls -l ${SHARED_DIR}/kubeconfig || echo "no kubeconfig in shared_dir"
+# if test -f "${SHARED_DIR}/proxy-conf.sh"
+# then
+#     source "${SHARED_DIR}/proxy-conf.sh"
+# fi
 
-# create link for oc to kubectl
-mkdir -p "${HOME}"
-if ! which kubectl; then
-    export PATH=$PATH:$HOME
-    ln -s "$(which oc)" ${HOME}/kubectl
-fi
+# trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-which extended-platform-tests
+# mkdir -p "${HOME}"
 
-# setup proxy
-if test -f "${SHARED_DIR}/proxy-conf.sh"
-then
-    source "${SHARED_DIR}/proxy-conf.sh"
-fi
+# case "${CLUSTER_TYPE}" in
+# gcp)
+#     export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
+#     export KUBE_SSH_USER=core
+#     mkdir -p ~/.ssh
+#     cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/google_compute_engine || true
+#     PROJECT="$(oc get -o jsonpath='{.status.platformStatus.gcp.projectID}' infrastructure cluster)"
+#     REGION="$(oc get -o jsonpath='{.status.platformStatus.gcp.region}' infrastructure cluster)"
+#     export TEST_PROVIDER="{\"type\":\"gce\",\"region\":\"${REGION}\",\"multizone\": true,\"multimaster\":true,\"projectid\":\"${PROJECT}\"}"
+#     ;;
+# aws)
+#     mkdir -p ~/.ssh
+#     cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/kube_aws_rsa || true
+#     export PROVIDER_ARGS="-provider=aws -gce-zone=us-east-1"
+#     REGION="$(oc get -o jsonpath='{.status.platformStatus.aws.region}' infrastructure cluster)"
+#     ZONE="$(oc get -o jsonpath='{.items[0].metadata.labels.failure-domain\.beta\.kubernetes\.io/zone}' nodes)"
+#     export TEST_PROVIDER="{\"type\":\"aws\",\"region\":\"${REGION}\",\"zone\":\"${ZONE}\",\"multizone\":true,\"multimaster\":true}"
+#     export KUBE_SSH_USER=core
+#     ;;
+# azure4) export TEST_PROVIDER=azure;;
+# azurestack)
+#     export TEST_PROVIDER="none"
+#     export AZURE_AUTH_LOCATION=${SHARED_DIR}/osServicePrincipal.json
+#     ;;
+# *) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"; exit 1;;
+# esac
 
-#setup bastion
-if test -f "${SHARED_DIR}/bastion_public_address"
-then
-    QE_BASTION_PUBLIC_ADDRESS=$(cat "${SHARED_DIR}/bastion_public_address")
-    export QE_BASTION_PUBLIC_ADDRESS
-fi
-if test -f "${SHARED_DIR}/bastion_private_address"
-then
-    QE_BASTION_PRIVATE_ADDRESS=$(cat "${SHARED_DIR}/bastion_private_address")
-    export QE_BASTION_PRIVATE_ADDRESS
-    if ! whoami &> /dev/null; then
-        if [[ -w /etc/passwd ]]; then
-            echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
-        fi
-    fi
-fi
-if test -f "${SHARED_DIR}/bastion_ssh_user"
-then
-    QE_BASTION_SSH_USER=$(cat "${SHARED_DIR}/bastion_ssh_user")
-fi
-mkdir -p ~/.ssh
-cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/ssh-privatekey || true
-chmod 0600 ~/.ssh/ssh-privatekey || true
-eval export SSH_CLOUD_PRIV_KEY="~/.ssh/ssh-privatekey"
+# mkdir -p /tmp/output
+# cd /tmp/output
 
-# configure enviroment for different cluster
-echo "CLUSTER_TYPE is ${CLUSTER_TYPE}"
-case "${CLUSTER_TYPE}" in
-gcp)
-    export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
-    export KUBE_SSH_USER=core
-    export SSH_CLOUD_PRIV_GCP_USER="${QE_BASTION_SSH_USER:-core}"
-    mkdir -p ~/.ssh
-    cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/google_compute_engine || true
-    PROJECT="$(oc get -o jsonpath='{.status.platformStatus.gcp.projectID}' infrastructure cluster)"
-    REGION="$(oc get -o jsonpath='{.status.platformStatus.gcp.region}' infrastructure cluster)"
-    export TEST_PROVIDER="{\"type\":\"gce\",\"region\":\"${REGION}\",\"multizone\": true,\"multimaster\":true,\"projectid\":\"${PROJECT}\"}"
-    ;;
-aws)
-    mkdir -p ~/.ssh
-    cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/kube_aws_rsa || true
-    export PROVIDER_ARGS="-provider=aws -gce-zone=us-east-1"
-    REGION="$(oc get -o jsonpath='{.status.platformStatus.aws.region}' infrastructure cluster)"
-    ZONE="$(oc get -o jsonpath='{.items[0].metadata.labels.failure-domain\.beta\.kubernetes\.io/zone}' nodes)"
-    export TEST_PROVIDER="{\"type\":\"aws\",\"region\":\"${REGION}\",\"zone\":\"${ZONE}\",\"multizone\":true,\"multimaster\":true}"
-    export KUBE_SSH_USER=core
-    export SSH_CLOUD_PRIV_AWS_USER="${QE_BASTION_SSH_USER:-core}"
-    ;;
-aws-usgov)
-    mkdir -p ~/.ssh
-    export SSH_CLOUD_PRIV_AWS_USER="${QE_BASTION_SSH_USER:-core}"
-    export KUBE_SSH_USER=core
-    export TEST_PROVIDER="none"
-    ;;
-azure4)
-    mkdir -p ~/.ssh
-    cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/kube_azure_rsa || true
-    export SSH_CLOUD_PRIV_AZURE_USER="${QE_BASTION_SSH_USER:-core}"
-    export TEST_PROVIDER=azure
-    ;;
-azurestack)
-    export TEST_PROVIDER="none"
-    export AZURE_AUTH_LOCATION=${SHARED_DIR}/osServicePrincipal.json
-    ;;
-vsphere)
-    # shellcheck disable=SC1090
-    source "${SHARED_DIR}/govc.sh"
-    export VSPHERE_CONF_FILE="${SHARED_DIR}/vsphere.conf"
-    oc -n openshift-config get cm/cloud-provider-config -o jsonpath='{.data.config}' > "$VSPHERE_CONF_FILE"
-    # The test suite requires a vSphere config file with explicit user and password fields.
-    sed -i "/secret-name \=/c user = \"${GOVC_USERNAME}\"" "$VSPHERE_CONF_FILE"
-    sed -i "/secret-namespace \=/c password = \"${GOVC_PASSWORD}\"" "$VSPHERE_CONF_FILE"
-    export TEST_PROVIDER=vsphere;;
-openstack*)
-    # shellcheck disable=SC1090
-    source "${SHARED_DIR}/cinder_credentials.sh"
-    export TEST_PROVIDER='{"type":"openstack"}';;
-ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
-equinix-ocp-metal)
-    export TEST_PROVIDER='{"type":"skeleton"}';;
-*)
-    echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"
-    if [ "W${FORCE_SUCCESS_EXIT}W" == "WnoW" ]; then
-        echo "do not force success exit"
-        exit 1
-    fi
-    echo "force success exit"
-    exit 0
-    ;;
-esac
+# if [[ "${CLUSTER_TYPE}" == gcp ]]; then
+#     pushd /tmp
+#     curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-256.0.0-linux-x86_64.tar.gz
+#     tar -xzf google-cloud-sdk-256.0.0-linux-x86_64.tar.gz
+#     export PATH=$PATH:/tmp/google-cloud-sdk/bin
+#     mkdir -p gcloudconfig
+#     export CLOUDSDK_CONFIG=/tmp/gcloudconfig
+#     gcloud auth activate-service-account --key-file="${GCP_SHARED_CREDENTIALS_FILE}"
+#     gcloud config set project "${PROJECT}"
+#     popd
+# fi
 
-# create execution directory
-mkdir -p /tmp/output
-cd /tmp/output
+# echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_START"
+# trap 'echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"' EXIT
 
-if [[ "${CLUSTER_TYPE}" == gcp ]]; then
-    pushd /tmp
-    curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-256.0.0-linux-x86_64.tar.gz
-    tar -xzf google-cloud-sdk-256.0.0-linux-x86_64.tar.gz
-    export PATH=$PATH:/tmp/google-cloud-sdk/bin
-    mkdir -p gcloudconfig
-    export CLOUDSDK_CONFIG=/tmp/gcloudconfig
-    gcloud auth activate-service-account --key-file="${GCP_SHARED_CREDENTIALS_FILE}"
-    gcloud config set project "${PROJECT}"
-    popd
-fi
+# echo "$(date) - waiting for nodes to be ready..."
+# oc wait nodes --all --for=condition=Ready=true --timeout=10m
+# echo "$(date) - all nodes are ready"
 
-echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_START"
-trap 'echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"' EXIT
+# echo "$(date) - waiting for clusteroperators to finish progressing..."
+# oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
+# echo "$(date) - all clusteroperators are done progressing."
 
-# check if the cluster is ready
-oc version --client
-oc wait nodes --all --for=condition=Ready=true --timeout=10m
-oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
 
-# execute the cases
 function run {
     test_scenarios=""
     echo "TEST_SCENRAIOS: \"${TEST_SCENRAIOS:-}\""
-    echo "TEST_ADDITIONAL: \"${TEST_ADDITIONAL:-}\""
     echo "TEST_IMPORTANCE: \"${TEST_IMPORTANCE}\""
-    echo "TEST_FILTERS: \"~NonUnifyCI&;~Flaky&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;${TEST_FILTERS}\""
+    echo "TEST_FILTERS: \"~Flaky&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;${TEST_FILTERS}\""
     echo "TEST_TIMEOUT: \"${TEST_TIMEOUT}\""
     if [[ -n "${TEST_SCENRAIOS:-}" ]]; then
         readarray -t scenarios <<< "${TEST_SCENRAIOS}"
@@ -176,75 +128,25 @@ function run {
         echo "fail to parse ${TEST_SCENRAIOS}"
         exit 1
     fi
-    echo "test scenarios: ${test_scenarios:1:-1}"
-    test_scenarios="${test_scenarios:1:-1}"
-
-    test_additional=""
-    if [[ -n "${TEST_ADDITIONAL:-}" ]]; then
-        readarray -t additionals <<< "${TEST_ADDITIONAL}"
-        for additional in "${additionals[@]}"; do
-            test_additional="${test_additional}|${additional}"
-        done
-    else
-        echo "there is no additional"
-    fi
-
-    if [ "W${test_additional}W" != "WW" ]; then
-        echo "test additional: ${test_additional:1:-1}"
-        test_scenarios="${test_scenarios}|${test_additional:1:-1}"
-    fi
-
-    echo "final scenarios: ${test_scenarios}"
+    echo "scenarios: ${test_scenarios:1:-1}"
     extended-platform-tests run all --dry-run | \
-        grep -E "${test_scenarios}" | grep -E "${TEST_IMPORTANCE}" > ./case_selected
+        grep -E "${test_scenarios:1:-1}" | grep -E "${TEST_IMPORTANCE}" > ./case_selected
 
     handle_filters "~Flaky&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;${TEST_FILTERS}"
     echo "------------------the case selected------------------"
-    selected_case_num=$(cat ./case_selected|wc -l)
-    if [ "W${selected_case_num}W" == "W0W" ]; then
-        echo "No Case Selected"
-        if [ "W${FORCE_SUCCESS_EXIT}W" == "WnoW" ]; then
-            echo "do not force success exit"
-            exit 1
-        fi
-        echo "force success exit"
-        exit 0
-    fi
-    echo ${selected_case_num}
+    cat ./case_selected|wc -l
     cat ./case_selected
     echo "-----------------------------------------------------"
 
-    ret_value=0
     set -x
-    if [ "W${TEST_PROVIDER}W" == "WnoneW" ]; then
-        extended-platform-tests run --max-parallel-tests ${TEST_PARALLEL} \
-        -o "${ARTIFACT_DIR}/extended.log" \
-        --timeout "${TEST_TIMEOUT}m" --junit-dir="${ARTIFACT_DIR}/junit" -f ./case_selected || ret_value=$?
-    else
-        extended-platform-tests run --max-parallel-tests ${TEST_PARALLEL} \
+    extended-platform-tests run --max-parallel-tests 4 \
         --provider "${TEST_PROVIDER}" -o "${ARTIFACT_DIR}/extended.log" \
-        --timeout "${TEST_TIMEOUT}m" --junit-dir="${ARTIFACT_DIR}/junit" -f ./case_selected || ret_value=$?
-    fi
+        --timeout "${TEST_TIMEOUT}m" --junit-dir="${ARTIFACT_DIR}" -f ./case_selected
     set +x
-    set +e
     rm -fr ./case_selected
-    echo "try to handle result"
-    handle_result
-    echo "done to handle result"
-    if [ "W${ret_value}W" == "W0W" ]; then
-        echo "success"
-        exit 0
-    fi
-    echo "fail"
-    # it ensure the the step after this step in test will be executed per https://docs.ci.openshift.org/docs/architecture/step-registry/#workflow
-    # please refer to the junit result for case result, not depends on step result.
-    if [ "W${FORCE_SUCCESS_EXIT}W" == "WnoW" ]; then
-        exit 1
-    fi
-    exit 0
+    send_result
 }
 
-# select the cases per FILTERS
 function handle_filters {
     filter_tmp="$1"
     if [ "W${filter_tmp}W" == "WW" ]; then
@@ -304,13 +206,10 @@ function handle_and_filter {
     action="$(echo $1 | grep -Eo '^[~]?')"
     value="$(echo $1 | grep -Eo '[a-zA-Z0-9]{1,}')"
 
-    ret=0
     if [ "W${action}W" == "WW" ]; then
-        cat ./case_selected | grep -E "${value}" > ./case_selected_and || ret=$?
-        check_case_selected "${ret}"
+        cat ./case_selected | grep -E "${value}" > ./case_selected_and
     else
-        cat ./case_selected | grep -v -E "${value}" > ./case_selected_and || ret=$?
-        check_case_selected "${ret}"
+        cat ./case_selected | grep -v -E "${value}" > ./case_selected_and
     fi
     if [[ -e ./case_selected_and ]]; then
         cp -fr ./case_selected_and ./case_selected && rm -fr ./case_selected_and
@@ -321,50 +220,51 @@ function handle_or_filter {
     action="$(echo $1 | grep -Eo '^[~]?')"
     value="$(echo $1 | grep -Eo '[a-zA-Z0-9]{1,}')"
 
-    ret=0
     if [ "W${action}W" == "WW" ]; then
-        cat ./case_selected | grep -E "${value}" >> ./case_selected_or || ret=$?
-        check_case_selected "${ret}"
+        cat ./case_selected | grep -E "${value}" >> ./case_selected_or
     else
-        cat ./case_selected | grep -v -E "${value}" >> ./case_selected_or || ret=$?
-        check_case_selected "${ret}"
+        cat ./case_selected | grep -v -E "${value}" >> ./case_selected_or
     fi
 }
-function handle_result {
-    resultfile=`ls -rt -1 ${ARTIFACT_DIR}/junit/junit_e2e_* 2>&1 || true`
+
+function send_result {
+    resultfile=`ls -rt -1 ${ARTIFACT_DIR}/junit_e2e_* 2>&1 || true`
     echo $resultfile
     if (echo $resultfile | grep -E "no matches found") || (echo $resultfile | grep -E "No such file or directory") ; then
         echo "there is no result file generated"
-        return
+        exit 0
     fi
     current_time=`date "+%Y-%m-%d-%H-%M-%S"`
-    newresultfile="${ARTIFACT_DIR}/junit/junit_e2e_${current_time}.xml"
-    replace_ret=0
-    python3 ${REPORT_HANDLE_PATH}/handleresult.py -a replace -i ${resultfile} -o ${newresultfile} || replace_ret=$?
-    if ! [ "W${replace_ret}W" == "W0W" ]; then
-        echo "replacing file is not ok"
-        rm -fr ${resultfile}
-        return
-    fi 
-    rm -fr ${resultfile}
-
+    newresultfile="junit_e2e_${current_time}.xml"
+    python3 /usr/bin/handleresult.py -a replace -i ${resultfile} -o ${newresultfile}
     echo ${newresultfile}
-    split_ret=0
-    python3 ${REPORT_HANDLE_PATH}/handleresult.py -a split -i ${newresultfile} || split_ret=$?
-    if ! [ "W${split_ret}W" == "W0W" ]; then
-        echo "splitting file is not ok"
-        rm -fr ${newresultfile}
-        return
+
+    if [ "W${TEST_PROFILE}W" == "WW" ]; then
+        TEST_PROFILE=${CLUSTER_TYPE}
     fi
-    cp -fr import-*.xml "${ARTIFACT_DIR}/junit/"
-    rm -fr ${newresultfile}
+
+    # LAUNCHID="$(date +"%Y%m%d-%H%M_%S")CI"
+    echo "get token"
+    mm_token=$(cat /var/run/rp-ocp-token/ginkgo_rp_mmtoken)
+    pm_token=$(cat /var/run/rp-ocp-token/ginkgo_rp_pmtoken)
+    LAUNCHID="CI20200825-2258"
+    rm -fr "*.zip" "import-*.xml"
+    python3 /usr/bin/handleresult.py -a split -i ${newresultfile}
+    for subteamfile in import-*.xml; do
+        [[ -e "$subteamfile" ]] || continue
+        subteam=${subteamfile:7:-4}
+        eval zip -r "${LAUNCHID}.zip" "${subteamfile}"
+        echo "log data ${subteamfile}"
+        ret=`python3 /usr/bin/unifycirp.py -a import -f "${LAUNCHID}.zip" -s "${subteam}" -v "${TEST_VERSION}" -pn "${TEST_PROFILE}"  -t "${mm_token}" -ta "${pm_token}"  2>&1 || true`
+        echo "done log data"
+        eval rm -fr  "${LAUNCHID}.zip"
+        result=`echo -e ${ret} | tail -1|xargs`
+        if ! [ "X${result}X" == "XSUCCESSX" ]; then
+            echo -e "the subteam ${subteam} result import fails\n"
+            echo -e ${ret}
+        fi
+    done
+    eval rm -fr "import-*.xml"
+
 }
-function check_case_selected {
-    found_ok=$1
-    if [ "W${found_ok}W" == "W0W" ]; then
-        echo "find case"
-    else
-        echo "do not find case"
-    fi
-}
-run
+# run
