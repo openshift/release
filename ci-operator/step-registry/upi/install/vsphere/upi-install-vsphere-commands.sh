@@ -194,6 +194,12 @@ date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 
 touch /tmp/install-complete
 
+if test "${ret}" -eq 0 ; then
+  touch  "${SHARED_DIR}/success"
+  # Save console URL in `console.url` file so that ci-chat-bot could report success
+  echo "https://$(env KUBECONFIG=${installer_dir}/auth/kubeconfig oc -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > "${SHARED_DIR}/console.url"
+fi
+
 sed 's/password: .*/password: REDACTED/' "${installer_dir}/.openshift_install.log" >>"${ARTIFACT_DIR}/.openshift_install.log"
 
 cp -t "${SHARED_DIR}" \
