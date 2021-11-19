@@ -289,6 +289,12 @@ config_updater_vault_secret:
 	make ci-secret-generator
 .PHONY: config_updater_vault_secret
 
+### one-off configuration on a build farm cluster
+build_farm_day2:
+	@[[ $$cluster ]] || (echo "ERROR: \$$cluster must be set"; exit 1)
+	hack/build_farm_day2_cluster_auto_scaler.sh $(cluster)
+.PHONY: build_farm_day2
+
 # Need to run inside Red Had network
 update_github_ldap_mapping_config_map:
 	ldapsearch -LLL -x -h ldap.corp.redhat.com -b ou=users,dc=redhat,dc=com '(rhatSocialURL=GitHub*)' rhatSocialURL uid 2>&1 | tee /tmp/out
