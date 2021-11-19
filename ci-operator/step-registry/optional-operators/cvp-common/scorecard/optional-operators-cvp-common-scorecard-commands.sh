@@ -5,6 +5,45 @@ set -o errexit
 set -o pipefail
 set -x
 
+run_scorecard() {
+        local retries_max=3
+        local attempt_num=1
+        until [[ $(jq . "$2") ]]
+        
+        do
+            "$1"
+            if (( attempt_num==retries_max ))
+            then
+                    echo "Retry attempt number: $attempt_num of $retries_max of scorecard tests failed. No more attempts. "
+                    return 1
+            else
+                    echo "Retry attempt number: $attempt_num of $retries_max failed. Retrying."
+                    sleep 5
+                    ((attempt_num++))
+            fi
+        done
+}
+
+basic_tests() {
+operator-sdk scorecard --config "${SCORECARD_CONFIG}" \
+                       --namespace "${NAMESPACE}" \
+                       --kubeconfig "${KUBECONFIG}" \
+                       --verbose \
+                       --output json \
+                       "${OPERATOR_DIR}" > "${ARTIFACT_DIR}"/scorecard-output-basic.json || true
+}
+
+custom_tests() {
+operator-sdk scorecard \
+    --namespace="${NAMESPACE}" \
+    --kubeconfig "${KUBECONFIG}" \
+    --verbose \
+    --output json \
+    --wait-time 3000s \
+    --service-account "${SCORECARD_SERVICE_ACCOUNT}" \
+    "${OPERATOR_DIR}" > "${ARTIFACT_DIR}"/scorecard-output-custom.json || true
+}
+
 OPENSHIFT_AUTH="${OPENSHIFT_AUTH:-/var/run/brew-pullsecret/.dockerconfigjson}"
 SCORECARD_CONFIG="${SCORECARD_CONFIG:-/tmp/config/scorecard-basic-config.yml}"
 
@@ -29,12 +68,7 @@ echo "Extracted the following bundle data:"
 tree "${OPERATOR_DIR}"
 
 echo "Running the operator-sdk scorecard test using the basic configuration, json output and storing it in the artifacts directory"
-operator-sdk scorecard --config "${SCORECARD_CONFIG}" \
-                       --namespace "${NAMESPACE}" \
-                       --kubeconfig "${KUBECONFIG}" \
-                       --verbose \
-                       --output json \
-                       "${OPERATOR_DIR}" > "${ARTIFACT_DIR}"/scorecard-output-basic.json || true
+run_scorecard basic_tests "${ARTIFACT_DIR}"/scorecard-output-basic.json
 
 if [ -f "${OPERATOR_DIR}/tests/scorecard/config.yaml" ]; then
   echo "CUSTOM SCORECARD TESTS DETECTED"
@@ -53,12 +87,5 @@ if [ -f "${OPERATOR_DIR}/tests/scorecard/config.yaml" ]; then
   # Runs the custom scorecard tests using the user-provided configuration
   # The wait-time is set higher to allow for long/complex custom tests, should be kept under 1h to not exceed pipeline max time
   # If a custom service account is defined in the scorecard config, it will be set in the '--service-account' option
-  operator-sdk scorecard \
-    --namespace="${NAMESPACE}" \
-    --kubeconfig "${KUBECONFIG}" \
-    --verbose \
-    --output json \
-    --wait-time 3000s \
-    --service-account "${SCORECARD_SERVICE_ACCOUNT}" \
-    "${OPERATOR_DIR}" > "${ARTIFACT_DIR}"/scorecard-output-custom.json || true
+  run_scorecard custom_tests "${ARTIFACT_DIR}"/scorecard-output-custom.json
 fi
