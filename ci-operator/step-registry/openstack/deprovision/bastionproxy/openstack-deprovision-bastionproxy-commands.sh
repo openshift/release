@@ -16,6 +16,11 @@ esac
 export OS_CLIENT_CONFIG_FILE=${SHARED_DIR}/clouds.yaml
 CLUSTER_NAME=$(<"${SHARED_DIR}"/CLUSTER_NAME)
 
+if [[ -f "${SHARED_DIR}/squid-credentials.txt" ]]; then
+    echo "Proxy is permanent, nothing to cleanup"
+    exit 0
+fi
+
 >&2 echo "Starting the server cleanup for cluster '$CLUSTER_NAME'"
 
 if [[ -f ${SHARED_DIR}"/BASTION_FIP" ]]; then 
