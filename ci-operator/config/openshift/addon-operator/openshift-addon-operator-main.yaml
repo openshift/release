@@ -1,4 +1,4 @@
- binary_build_commands: make
+binary_build_commands: make openshift-ci
 build_root:
   image_stream_tag:
     name: release
@@ -26,6 +26,12 @@ images:
 - dockerfile_path: config/docker/Dockerfile.src.ci
   from: src
   to: addon-operator-tooling
+operator:
+  bundles:
+  - dockerfile_path: addon-operator-bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/openshift/addon-operator:latest
+    with: addon-operator-manager            
 promotion:
   name: addon-operator-manager
   namespace: addon-operator
@@ -56,10 +62,6 @@ tests:
     run --all-files --show-diff-on-failure
   container:
     from: addon-operator-tooling
-- as: "e2e-test-olm-setup"
-  commands: make test-olm-install
-- as: "e2e-test-ao-setup"
-  commands: make test-ao-install     
 - as: e2e
   steps:
     cluster_profile: aws
