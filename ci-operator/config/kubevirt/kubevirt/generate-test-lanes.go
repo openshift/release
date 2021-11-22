@@ -116,7 +116,7 @@ type TestLaneSpec struct {
 	DeployFuncCall     string
 	DockerPrefix       string
 	TestLaneFileSuffix string
-	TestLaneVariants   []TestLaneVariant
+	TestLaneVariants   []*TestLaneVariant
 	ProwJobTimeout     string
 }
 
@@ -125,7 +125,7 @@ var logger *log.Logger
 var replaceWithDotRegex *regexp.Regexp
 
 func init() {
-	replaceWithDotRegex = regexp.MustCompile("[']")
+	replaceWithDotRegex = regexp.MustCompile("'")
 }
 
 func main() {
@@ -158,9 +158,9 @@ func main() {
 	checkErr(err)
 	for _, data := range kubeVirtVersionsToOpenShiftVersions {
 		for _, variant := range data.TestLaneVariants {
-			updateFocusRegExp(&variant)
+			updateFocusRegExp(variant)
 			_ = regexp.MustCompile(variant.FocusExpression)
-			updateSkipRegExp(&variant)
+			updateSkipRegExp(variant)
 			_ = regexp.MustCompile(variant.SkipExpression)
 		}
 		versionTemplate, err := template.New(fmt.Sprintf("versionTemplate[%s]", data.OcpVersionTemplate)).Parse(ocpVersionTemplates[data.OcpVersionTemplate])
