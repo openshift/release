@@ -10,6 +10,22 @@ echo "************ baremetalds assisted operator setup before upgrade command **
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
 
+# ZTP scripts have a lot of default values for the spoke cluster configuration. Adding this so that they can be changed.
+if [[ -n "${ASSISTED_ZTP_CONFIG:-}" ]]; then
+  readarray -t config <<< "${ASSISTED_ZTP_CONFIG}"
+  for var in "${config[@]}"; do
+    if [[ ! -z "${var}" ]]; then
+      echo "export ${var}" >> "${SHARED_DIR}/assisted-ztp-config"
+    fi
+  done
+fi
+
+# Copy configuration for ZTP vars if present
+if [[ -e "${SHARED_DIR}/assisted-ztp-config" ]]
+then
+  scp "${SSHOPTS[@]}" "${SHARED_DIR}/assisted-ztp-config" "root@${IP}:assisted-ztp-config"
+fi
+
 tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/assisted-service.tar.gz"
 
 # shellcheck disable=SC2087
@@ -44,17 +60,17 @@ export INDEX_IMAGE="${INDEX_IMAGE}"
 
 export PUBLIC_CONTAINER_REGISTRIES="\$(for image in \${images}; do echo \${image} | cut -d'/' -f1; done | sort -u | paste -sd ',' -)"
 
-export ASSISTED_OPENSHIFT_VERSION="${ASSISTED_OPENSHIFT_VERSION}"
-export ASSISTED_UPGRADE_OPERATOR="${ASSISTED_UPGRADE_OPERATOR}"
-export ASSISTED_STOP_AFTER_AGENT_DISCOVERY="${ASSISTED_STOP_AFTER_AGENT_DISCOVERY}"
-export ASSISTED_DEPLOYMENT_METHOD="${ASSISTED_DEPLOYMENT_METHOD}"
-export CHANNEL="${CHANNEL_INSTALL_OVERRIDE}"
-
 # Fix for disconnected Hive
 export GO_REQUIRED_MIN_VERSION="1.14.4"
 VARS
 
 source /root/config
+
+# Inject job configuration for ZTP, if available
+if [[ -e /root/assisted-ztp-config ]]
+then
+  source /root/assisted-ztp-config
+fi
 
 source deploy/operator/upgrade/before_upgrade.sh
 
