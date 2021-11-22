@@ -24,8 +24,20 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: ci
-  commands: make build verify
+- as: vendor
+  commands: make vendors && git diff --exit-code
+  container:
+    from: src
+- as: build
+  commands: make build
+  container:
+    from: src
+- as: lint
+  commands: make lint
+  container:
+    from: src
+- as: test
+  commands: make test
   container:
     from: src
 zz_generated_metadata:
