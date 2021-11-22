@@ -57,10 +57,14 @@ oc get machineset $ref_machineset_name -n openshift-machine-api -o json |
 # Scale machineset to expected number of replicas
 oc -n openshift-machine-api scale machineset/"${infra_machineset_name}" --replicas="${INFRA_NODE_REPLICAS}"
 
-# Wait for infra nodes to come up
+echo "Waiting for infra nodes to come up"
 while [[ $(oc -n openshift-machine-api get machineset/${infra_machineset_name} -o 'jsonpath={.status.readyReplicas}') != "${INFRA_NODE_REPLICAS}" ]]; do echo -n "." && sleep 5; done
 
-# Move router
+# Collect infra node names
+mapfile -t INFRA_NODE_NAMES < <(echo "$(oc get nodes -l node-role.kubernetes.io/infra -o name)" | sed 's;node\/;;g')
+echo "Infra nodes ${INFRA_NODE_NAMES[*]} are up"
+
+echo "Moving routers to infra nodes"
 oc apply -f - <<EOF
 apiVersion: operator.openshift.io/v1
 kind: IngressController
@@ -74,7 +78,24 @@ spec:
         node-role.kubernetes.io/infra: ""
 EOF
 
-# Move registry
+INGRESS_PODS_MOVED="false"
+for i in $(seq 0 60); do
+  echo "Checking ingress pods, attempt ${i}"
+  mapfile -t INGRESS_NODES < <(oc get pods -n openshift-ingress -o jsonpath='{.items[*].spec.nodeName}')
+  if [[ -z "$(echo "${INGRESS_NODES[@]}" "${INFRA_NODE_NAMES[@]}" | tr ' ' '\n' | sort | uniq -u)" ]]; then
+    INGRESS_PODS_MOVED="true"
+    echo "Ingress pods moved to infra nodes"
+    break
+  else
+    sleep 10
+  fi
+done
+if [[ "${INGRESS_PODS_MOVED}" == "false" ]]; then
+  echo "Ingress pods didn't move to infra nodes"
+  exit 1
+fi
+
+echo "Moving registry pods to infra nodes"
 oc apply -f - <<EOF
 apiVersion: imageregistry.operator.openshift.io/v1
 kind: Config
@@ -92,8 +113,24 @@ spec:
   nodeSelector:
     node-role.kubernetes.io/infra: ""
 EOF
+REGISTRY_PODS_MOVED="false"
+for i in $(seq 0 60); do
+  echo "Checking registry pods, attempt ${i}"
+  mapfile -t REGISTRY_NODES < <(oc get pods -n openshift-image-registry -l docker-registry=default -o jsonpath='{.items[*].spec.nodeName}')
+  if [[ -z "$(echo "${REGISTRY_NODES[@]}" "${INFRA_NODE_NAMES[@]}" | tr ' ' '\n' | sort | uniq -u)" ]]; then
+    REGISTRY_PODS_MOVED="true"
+    echo "Registry pods moved to infra nodes"
+    break
+  else
+    sleep 10
+  fi
+done
+if [[ "${REGISTRY_PODS_MOVED}" == "false" ]]; then
+  echo "Image registry pods didn't move to infra nodes"
+  exit 1
+fi
 
-# Move monitoring pods
+echo "Moving monitoring pods to infra nodes"
 oc apply -f - <<EOF
 apiVersion: v1
 kind: ConfigMap
@@ -131,6 +168,23 @@ data:
         node-role.kubernetes.io/infra: ""
 EOF
 
-# Wait for all pods to settle
+MONITORING_PODS_MOVED="false"
+for i in $(seq 0 60); do
+  echo "Checking monitoring pods, attempt ${i}"
+  mapfile -t MONITORING_NODES < <(oc get pods -n openshift-monitoring -o jsonpath='{.items[*].spec.nodeName}' -l app.kubernetes.io/component=alert-router)
+  if [[ -z "$(echo "${MONITORING_NODES[@]}" "${INFRA_NODE_NAMES[@]}" | tr ' ' '\n' | sort | uniq -u)" ]]; then
+    MONITORING_PODS_MOVED="true"
+    echo "Monitoring pods moved to infra nodes"
+    break
+  else
+    sleep 10
+  fi
+done
+if [[ "${MONITORING_PODS_MOVED}" == "false" ]]; then
+  echo "Monitoring pods didn't move to infra nodes"
+  exit 1
+fi
+
+echo "Waiting for all pods to settle"
 sleep 5
 while [[ $(oc get pods --no-headers -A | grep -Pv "(Completed|Running)" | wc -l) != "0" ]]; do echo -n "." && sleep 5; done
