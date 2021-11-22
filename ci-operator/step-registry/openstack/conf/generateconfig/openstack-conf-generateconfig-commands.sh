@@ -92,11 +92,29 @@ fi
 cat >> "${CONFIG}" << EOF
 compute:
 - name: worker
+  replicas: 3
   platform:
     openstack:
       type: ${OPENSTACK_COMPUTE_FLAVOR}
       zones: ${ZONES_STR}
-  replicas: 3
+EOF
+if [[ ${ADDITIONAL_WORKERS_NETWORKS} != "" ]]; then
+    cat >> "${CONFIG}" << EOF
+      additionalNetworkIDs:
+EOF
+    for network in $(echo "${ADDITIONAL_WORKERS_NETWORKS}" | tr " " "\n"); do
+        if ! openstack network show "${network}" > /dev/null 2>&1; then
+            echo "Network ${network} does not exist"
+            exit 1
+        fi
+        net_id=$(openstack network show -f value -c id "${network}")
+        cat >> "${CONFIG}" << EOF
+      - ${net_id}
+EOF
+    done
+fi
+
+cat >> "${CONFIG}" << EOF
 controlPlane:
   name: master
   platform:
