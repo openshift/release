@@ -54,7 +54,7 @@ release-controllers:
 	./hack/generators/release-controllers/generate-release-controllers.py .
 
 checkconfig:
-	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR):/release:z" gcr.io/k8s-prow/checkconfig:v20211118-04a9593fd9 --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
+	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR):/release:z" gcr.io/k8s-prow/checkconfig:v20211122-a44ef8b769 --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
 
 jobs: ci-operator-checkconfig
 	$(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/ci-operator-prowgen:latest
@@ -288,6 +288,13 @@ config_updater_vault_secret:
 	oc --context "$(cluster)" sa create-kubeconfig -n ci config-updater > "$(build_farm_credentials_folder)/sa.config-updater.$(cluster).config"
 	make ci-secret-generator
 .PHONY: config_updater_vault_secret
+
+### one-off configuration on a build farm cluster
+build_farm_day2:
+	@[[ $$cluster ]] || (echo "ERROR: \$$cluster must be set"; exit 1)
+	hack/build_farm_day2_cluster_auto_scaler.sh $(cluster)
+	hack/build_farm_day2_candidate_channel.sh $(cluster)
+.PHONY: build_farm_day2
 
 # Need to run inside Red Had network
 update_github_ldap_mapping_config_map:
