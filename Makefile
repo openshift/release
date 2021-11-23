@@ -220,13 +220,14 @@ export force ?= false
 export kubeconfig_path ?= $(HOME)/.kube/config
 
 # these are useful for dptp-team
-# make cluster=app.ci ci-secret-bootstrap
+# make cluster=app.ci secret_names=config-updater dry_run=false force=true ci-secret-bootstrap
 ci-secret-bootstrap:
-	@./hack/ci-secret-bootstrap.sh
+	BUILD_FARM_CREDENTIALS_FOLDER=$(build_farm_credentials_folder) ./hack/ci-secret-bootstrap.sh
 .PHONY: ci-secret-bootstrap
 
+# make dry_run=false ci-secret-generator
 ci-secret-generator: build_farm_credentials_folder
-	BUILD_FARM_CREDENTIALS_FOLDER=$(build_farm_credentials_folder) dry_run=false ./hack/ci-secret-generator.sh
+	BUILD_FARM_CREDENTIALS_FOLDER=$(build_farm_credentials_folder) ./hack/ci-secret-generator.sh
 .PHONY: ci-secret-generator
 
 build_farm_credentials_folder ?= /tmp/build-farm-credentials
@@ -286,7 +287,7 @@ config_updater_vault_secret:
 		--kubeconfig=/_kubeconfig
 	mkdir -p $(build_farm_credentials_folder)
 	oc --context "$(cluster)" sa create-kubeconfig -n ci config-updater > "$(build_farm_credentials_folder)/sa.config-updater.$(cluster).config"
-	make ci-secret-generator
+	make dry_run=false ci-secret-generator
 .PHONY: config_updater_vault_secret
 
 ### one-off configuration on a build farm cluster

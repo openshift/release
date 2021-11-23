@@ -23,9 +23,7 @@ $CONTAINER_ENGINE run --rm \
   -v "${BASE_DIR}/core-services/ci-secret-bootstrap/_config.yaml:/bootstrap/_config.yaml:z" \
   -v "${BASE_DIR}/core-services/ci-secret-generator/_config.yaml:/generator/_config.yaml:z" \
   -v "${BUILD_FARM_CREDENTIALS_FOLDER}:/tmp/build-farm-credentials:z" \
-  -v "$kubeconfig_path:/_kubeconfig:z" \
   -e VAULT_TOKEN="$VAULT_TOKEN" \
-  -e KUBECONFIG=/_kubeconfig \
   registry.ci.openshift.org/ci/ci-secret-generator:latest \
     --vault-addr=${VAULT_ADDR} \
     --config=/generator/_config.yaml \
