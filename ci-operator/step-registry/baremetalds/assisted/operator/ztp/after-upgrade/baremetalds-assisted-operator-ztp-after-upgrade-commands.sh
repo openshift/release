@@ -10,6 +10,22 @@ echo "************ baremetalds assisted operator ztp command ************"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
 
+# ZTP scripts have a lot of default values for the spoke cluster configuration. Adding this so that they can be changed.
+if [[ -n "${ASSISTED_ZTP_CONFIG:-}" ]]; then
+  readarray -t config <<< "${ASSISTED_ZTP_CONFIG}"
+  for var in "${config[@]}"; do
+    if [[ ! -z "${var}" ]]; then
+      echo "export ${var}" >> "${SHARED_DIR}/assisted-ztp-config"
+    fi
+  done
+fi
+
+# Copy configuration for ZTP vars if present
+if [[ -e "${SHARED_DIR}/assisted-ztp-config" ]]
+then
+  scp "${SSHOPTS[@]}" "${SHARED_DIR}/assisted-ztp-config" "root@${IP}:assisted-ztp-config"
+fi
+
 tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/assisted-service.tar.gz"
 
 # shellcheck disable=SC2087
@@ -40,16 +56,11 @@ export ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE=${ASSISTED_OPENSHIFT_UPGRADE_REL
 
 source /root/config
 
-export ASSISTED_OPENSHIFT_VERSION="${ASSISTED_OPENSHIFT_VERSION_OVERRIDE}"
-export ASSISTED_UPGRADE_OPERATOR="${ASSISTED_UPGRADE_OPERATOR_OVERRIDE}"
-export ASSISTED_STOP_AFTER_AGENT_DISCOVERY="${ASSISTED_STOP_AFTER_AGENT_DISCOVERY_OVERRIDE}"
-export ASSISTED_DEPLOYMENT_METHOD="${ASSISTED_DEPLOYMENT_METHOD}"
-export CHANNEL="${CHANNEL_UPGRADE_OVERRIDE}"
-export ASSISTED_CLUSTER_NAME="${ASSISTED_CLUSTER_NAME}"
-export ASSISTED_CLUSTER_DEPLOYMENT_NAME="${ASSISTED_CLUSTER_DEPLOYMENT_NAME}"
-export ASSISTED_AGENT_CLUSTER_INSTALL_NAME="${ASSISTED_AGENT_CLUSTER_INSTALL_NAME}"
-export ASSISTED_INFRAENV_NAME="${ASSISTED_INFRAENV_NAME}"
-
+# Inject job configuration for ZTP, if available
+if [[ -e /root/assisted-ztp-config ]]
+then
+  source /root/assisted-ztp-config
+fi
 source upgrade/after_upgrade.sh
 
 ./ztp/deploy_spoke_cluster.sh
