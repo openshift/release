@@ -399,4 +399,7 @@ cat >> ${REPORT} << EOF
 <link rel="stylesheet" href="https://code.getmdl.io/1.3.0/material.indigo-pink.min.css">
 <link rel="stylesheet" type="text/css" href="/static/spyglass/spyglass.css">
 EOF
-cat ${SHARED_DIR}/custom-links.txt >> ${REPORT}
+
+if [[ -f ${SHARED_DIR}/custom-links.txt ]]; then
+  cat ${SHARED_DIR}/custom-links.txt >> ${REPORT}
+fi
