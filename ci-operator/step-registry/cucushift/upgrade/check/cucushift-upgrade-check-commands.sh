@@ -27,6 +27,11 @@ environments:
 export OPENSHIFT_ENV_OCP4_USER_MANAGER=UpgradeUserManager
 export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS=${USERS}
 export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/upgrade-check"
+if [ -z "${UPGRADE_SKIP_TAGS}" ] ; then
+    export UPGRADE_SKIP_TAGS="not @customer and not @security"
+else
+    export UPGRADE_SKIP_TAGS="${UPGRADE_SKIP_TAGS} and not @customer and not @security"
+fi
 
 cd verification-tests
 cucumber --tags "${UPGRADE_CHECK_RUN_TAGS} and ${UPGRADE_SKIP_TAGS}" -p junit || true
