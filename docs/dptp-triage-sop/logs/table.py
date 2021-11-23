@@ -1,24 +1,25 @@
 #!/usr/bin/env python3
+import json
+import os
+import sys
 
 from tabulate import tabulate
-import sys
-import os
-import json
-
-data = {}
-
-with open(sys.argv[1]) as raw:
-	data = json.load(raw)
 
 headers = ["time", "level", "component", "message", "file", "func", "fields"]
 truncated_headers = ["time", "level", "component", "message"]
+ignored_fields = ["kubernetes", "severity", "source_type", "stream"]
+
+output_file = sys.argv[1] + ".table"
+output = open(output_file, "w+")
+truncated_output = sys.stdout
+data = json.load(open(sys.argv[1]))
 entries = []
 
 for item in data:
 	for field in item:
 		if field["field"] == "@message":
 			raw_entry = json.loads(field["value"])
-			for key in ["kubernetes", "severity", "source_type", "stream"]:
+			for key in ignored_fields:
 				raw_entry.pop(key, None)
 
 			entry = [
@@ -53,7 +54,7 @@ for item in largest:
 
 truncated_entries = []
 width -= 2 * (len(truncated_headers) - 1)
-width -= 7 # for the ellipsis
+width -= len("  ...  ")
 for entry in entries:
 	truncated_entry = []
 	for item in entry[:len(truncated_headers)]:
@@ -64,8 +65,6 @@ for entry in entries:
 			truncated_entry.append(item)
 	truncated_entries.append(truncated_entry)
 
-print(tabulate(truncated_entries, headers=headers))
-
-with open(sys.argv[1] + ".table", "w+") as raw:
-	raw.write(tabulate(entries, headers=headers))
-	print("Wrote full table to " + sys.argv[1] + ".table")
+output.write(tabulate(entries, headers=headers))
+truncated_output.write(tabulate(truncated_entries, headers=headers))
+truncated_output.write(f"\n\nWrote full table to {output_file}\n")
