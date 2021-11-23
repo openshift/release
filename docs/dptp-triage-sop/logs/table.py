@@ -11,6 +11,7 @@ with open(sys.argv[1]) as raw:
 	data = json.load(raw)
 
 headers = ["time", "level", "component", "message", "file", "func", "fields"]
+truncated_headers = ["time", "level", "component", "message"]
 entries = []
 
 for item in data:
@@ -41,22 +42,21 @@ for item in data:
 			entries.append(entry)
 
 width = os.get_terminal_size().columns
-largest = [0 for e in headers[:3]]
+largest = [0] * (len(truncated_headers) - 1)
 for entry in entries:
-	for i in range(len(entry[:3])):
+	for i in range(len(largest)):
 		if len(entry[i]) > largest[i]:
 			largest[i] = len(entry[i])
 
 for item in largest:
 	width -= item
 
-truncated_headers = ["time", "level", "component", "message"]
 truncated_entries = []
 width -= 2 * (len(truncated_headers) - 1)
 width -= 7 # for the ellipsis
 for entry in entries:
 	truncated_entry = []
-	for item in entry[:4]:
+	for item in entry[:len(truncated_headers)]:
 		if len(item) > width:
 			bound = int(width/2)
 			truncated_entry.append(item[0:bound] + " ... " + item[-bound:])
