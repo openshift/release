@@ -5,31 +5,46 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build03
     decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: oc-mirror-e2e-unit
     rerun_command: bundle test
     spec:
       containers:
-      - args:
-        - -c
-        - make test-prow
-        command:
-        - /bin/sh
-        image: quay.io/samwalke/gobuilder:latest
-        name: ""
+      - command:
+        - /bin/registry
+        - serve
+        - /etc/docker/registry/config.yml
+        image: quay.io/samwalke/oc-mirror-registry:latest
+        name: oc-mirror-registry
+        ports:
+        - containerPort: 5001
         resources:
           requests:
-            cpu: 50m
+            cpu: 100m
       - command:
         - /bin/registry
         - serve
         - /etc/docker/registry/config.yml
         image: registry:2
         name: registry
+        ports:
+        - containerPort: 5000
         resources:
           requests:
-            cpu: 50m
+            cpu: 100m
+      - args:
+        - -c
+        - make test-prow
+        command:
+        - /bin/sh
+        image: quay.io/samwalke/gobuilder:latest
+        name: test-prow
+        resources:
+          requests:
+            cpu: "1"
       shareProcessNamespace: true
     trigger: (?m)bundle test( please)?
   - agent: kubernetes
@@ -37,7 +52,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build02
     context: ci/prow/unit
     decorate: true
     labels:
