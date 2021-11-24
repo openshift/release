@@ -1,9 +1,9 @@
 binary_build_commands: ./build.sh
 build_root:
   image_stream_tag:
-    name: builder
-    namespace: open-cluster-management
-    tag: nodejs14-linux
+    name: release
+    namespace: openshift
+    tag: golang-1.16
 resources:
   '*':
     limits:
@@ -13,7 +13,23 @@ resources:
       memory: 200Mi
 tests:
 - as: test
-  commands: ./test.sh
+  commands: |
+    nodejs_version=v15.14.0
+    nodejs_platform=linux-x64
+    nodejs="node-${nodejs_version}-${nodejs_platform}"
+
+    cd /tmp
+    curl -LO "https://nodejs.org/download/release/${nodejs_version}/${nodejs}.tar.gz"
+    tar xf "${nodejs}.tar.gz"
+
+    export NODEJS_HOME="/tmp/${nodejs}"
+    export PATH=$PATH:$NODEJS_HOME/bin
+
+    HOME=/tmp npm install yarn
+    export PATH=$PATH:/tmp/node_modules/.bin
+    cd -
+
+    ./test.sh
   container:
     from: src
 zz_generated_metadata:
