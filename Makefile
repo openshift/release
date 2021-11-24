@@ -295,6 +295,7 @@ build_farm_day2:
 	@[[ $$cluster ]] || (echo "ERROR: \$$cluster must be set"; exit 1)
 	hack/build_farm_day2_cluster_auto_scaler.sh $(cluster)
 	hack/build_farm_day2_candidate_channel.sh $(cluster)
+	hack/build_farm_day2_image_registry.sh $(cluster)
 .PHONY: build_farm_day2
 
 # Need to run inside Red Had network
