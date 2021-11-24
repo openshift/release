@@ -30,4 +30,14 @@ fi
 mkdir -p "${ARTIFACT_DIR}/audit-logs"
 oc adm must-gather $MUST_GATHER_IMAGE --dest-dir="${ARTIFACT_DIR}/audit-logs" -- /usr/bin/gather_audit_logs
 tar -czC "${ARTIFACT_DIR}/audit-logs" -f "${ARTIFACT_DIR}/audit-logs.tar.gz" .
+
+PROMETHEUS_ADAPTER_LOG_FILE=${SHARED_DIR}/prometheus-adapter-audit.log
+find ${ARTIFACT_DIR}/audit-logs -type f | grep "audit_logs/monitoring/prometheus-adapter-" | while read filename; do
+	if [[ ${filename} =~ \.log$ ]]; then
+		cat ${filename} >>${PROMETHEUS_ADAPTER_LOG_FILE}
+	elif [[ ${filename} =~ \.gz$ ]]; then
+		zcat ${filename} >>${PROMETHEUS_ADAPTER_LOG_FILE}
+	fi
+done
+
 rm -rf "${ARTIFACT_DIR}/audit-logs"
