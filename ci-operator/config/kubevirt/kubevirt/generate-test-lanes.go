@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"text/template"
 )
@@ -38,7 +39,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:{{range .TestLaneVariants}}
-- as: e2e-{{.VariantName}}
+- as: e2e-{{.Name}}
   cron: {{.CronMinute}} {{.CronHour}} * * *
   steps:
     cluster_profile: azure4
@@ -67,8 +68,8 @@ tests:{{range .TestLaneVariants}}
       cli: latest
       commands: |
         export DOCKER_PREFIX='{{$.DockerPrefix}}'
-        export KUBEVIRT_E2E_FOCUS='{{.VariantFocusExpression}}'
-        export KUBEVIRT_E2E_SKIP='{{.VariantSkipExpression}}'{{if .TestTimeout}}
+        export KUBEVIRT_E2E_FOCUS='{{.FocusExpression}}'
+        export KUBEVIRT_E2E_SKIP='{{.SkipExpression}}'{{if .TestTimeout}}
         export TEST_TIMEOUT="{{.TestTimeout}}"{{end}}
         curl -L "https://raw.githubusercontent.com/dhiller/kubevirt-testing/main/hack/kubevirt-testing.sh" | \
           bash -s {{$.TestFuncCall}}
@@ -77,19 +78,35 @@ tests:{{range .TestLaneVariants}}
         requests:
           cpu: 100m
           memory: 200Mi
-      timeout: {{.VariantTimeout}}
+      timeout: {{.Timeout}}
     workflow: ipi-azure
   timeout: {{$.ProwJobTimeout}}{{end}}
 `
 
+type TestSpec struct {
+	TestIds []int
+	Tests   []string
+}
+
+type FocusSpec struct {
+	TestSpec
+}
+
+type SkipSpec struct {
+	TestSpec
+	Quarantine bool
+}
+
 type TestLaneVariant struct {
-	VariantName            string
-	VariantFocusExpression string
-	VariantSkipExpression  string
-	VariantTimeout         string
-	CronHour               string
-	CronMinute             string
-	TestTimeout            string
+	Name            string
+	FocusExpression string
+	SkipExpression  string
+	Focus           *FocusSpec
+	Skip            *SkipSpec
+	Timeout         string
+	CronHour        string
+	CronMinute      string
+	TestTimeout     string
 }
 
 type TestLaneSpec struct {
@@ -105,6 +122,11 @@ type TestLaneSpec struct {
 
 var configDir string
 var logger *log.Logger
+var replaceWithDotRegex *regexp.Regexp
+
+func init() {
+	replaceWithDotRegex = regexp.MustCompile("[']")
+}
 
 func main() {
 	logger = log.Default()
@@ -136,8 +158,10 @@ func main() {
 	checkErr(err)
 	for _, data := range kubeVirtVersionsToOpenShiftVersions {
 		for _, variant := range data.TestLaneVariants {
-			_ = regexp.MustCompile(variant.VariantFocusExpression)
-			_ = regexp.MustCompile(variant.VariantSkipExpression)
+			updateFocusRegExp(&variant)
+			_ = regexp.MustCompile(variant.FocusExpression)
+			updateSkipRegExp(&variant)
+			_ = regexp.MustCompile(variant.SkipExpression)
 		}
 		versionTemplate, err := template.New(fmt.Sprintf("versionTemplate[%s]", data.OcpVersionTemplate)).Parse(ocpVersionTemplates[data.OcpVersionTemplate])
 		if versionTemplate == nil {
@@ -158,6 +182,54 @@ func main() {
 		checkErr(err)
 		logger.Printf("Generated config %s from data %+v", targetFileName, data)
 	}
+}
+
+func updateSkipRegExp(variant *TestLaneVariant) {
+	var parts []string
+	if variant.Skip != nil {
+		if variant.Skip.Quarantine {
+			parts = append(parts, "QUARANTINE")
+		}
+		parts = appendTestIdsRegExpToParts(variant.Skip.TestIds, parts)
+		parts = appendTestsRegExpToParts(variant.Skip.Tests, parts)
+	}
+	if variant.SkipExpression != "" {
+		parts = append(parts, variant.SkipExpression)
+	}
+	variant.SkipExpression = replaceWithDotRegex.ReplaceAllString(strings.Join(parts, "|"), ".")
+}
+
+func updateFocusRegExp(variant *TestLaneVariant) {
+	var parts []string
+	if variant.Focus != nil {
+		parts = appendTestIdsRegExpToParts(variant.Focus.TestIds, parts)
+		parts = appendTestsRegExpToParts(variant.Focus.Tests, parts)
+	}
+	if variant.FocusExpression != "" {
+		parts = append(parts, variant.FocusExpression)
+	}
+	variant.FocusExpression = replaceWithDotRegex.ReplaceAllString(strings.Join(parts, "|"), ".")
+}
+
+func appendTestsRegExpToParts(tests []string, parts []string) []string {
+	if len(tests) > 0 {
+		for index, skipTest := range tests {
+			tests[index] = regexp.QuoteMeta(skipTest)
+		}
+		parts = append(parts, strings.Join(tests, "|"))
+	}
+	return parts
+}
+
+func appendTestIdsRegExpToParts(testIds []int, parts []string) []string {
+	if len(testIds) > 0 {
+		testIdStrings := make([]string, len(testIds))
+		for index, testId := range testIds {
+			testIdStrings[index] = strconv.Itoa(testId)
+		}
+		parts = append(parts, fmt.Sprintf("test_id:(%s)", strings.Join(testIdStrings, "|")))
+	}
+	return parts
 }
 
 func checkErr(err error) {
