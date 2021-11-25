@@ -8,6 +8,7 @@ export OS_CLIENT_CONFIG_FILE=${SHARED_DIR}/clouds.yaml
 
 CLUSTER_NAME=$(<"${SHARED_DIR}/CLUSTER_NAME")
 OPENSTACK_EXTERNAL_NETWORK="${OPENSTACK_EXTERNAL_NETWORK:-$(<"${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK")}"
+OPENSTACK_CONTROLPLANE_FLAVOR="${OPENSTACK_CONTROLPLANE_FLAVOR:-$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR")}"
 OPENSTACK_COMPUTE_FLAVOR="${OPENSTACK_COMPUTE_FLAVOR:-$(<"${SHARED_DIR}/OPENSTACK_COMPUTE_FLAVOR")}"
 ZONES="${ZONES:-$(<"${SHARED_DIR}/ZONES")}"
 ZONES_COUNT="${ZONES_COUNT:-0}"
@@ -71,7 +72,6 @@ cat >> "${CONFIG}" << EOF
 platform:
   openstack:
     cloud:             ${OS_CLOUD}
-    computeFlavor:     ${OPENSTACK_COMPUTE_FLAVOR}
 EOF
 if [[ "${CONFIG_TYPE}" == "minimal" ]]; then
 cat >> "${CONFIG}" << EOF
@@ -119,7 +119,7 @@ controlPlane:
   name: master
   platform:
     openstack:
-      type: ${OPENSTACK_COMPUTE_FLAVOR}
+      type: ${OPENSTACK_CONTROLPLANE_FLAVOR}
       zones: ${ZONES_STR}
   replicas: 3
 pullSecret: >
