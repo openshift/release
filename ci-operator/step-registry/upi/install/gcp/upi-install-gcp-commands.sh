@@ -349,6 +349,12 @@ if [[ -f  03_security.yaml ]]; then
 
   if [[ -v IS_XPN ]]; then
     sa_email=$(jq -r .client_email ${GOOGLE_CLOUD_KEYFILE_JSON})
+    ##
+    gcloud iam service-accounts list
+    gcloud --project="${HOST_PROJECT}" iam service-accounts list
+    gcloud projects get-iam-policy ${PROJECT_NAME} --flatten="bindings[].members" --format="table(bindings.role)" --filter="bindings.members:${sa_email}"
+    gcloud projects get-iam-policy ${HOST_PROJECT} --flatten="bindings[].members" --format="table(bindings.role)" --filter="bindings.members:${sa_email}"
+    ##
     echo "Checking if the service-account ${sa_email} has 'roles/iam.securityAdmin'..."
     curr_roles=$(gcloud projects get-iam-policy ${HOST_PROJECT} --flatten="bindings[].members" --format="table(bindings.role)" --filter="bindings.members:${sa_email}" | grep 'roles/iam.securityAdmin' || echo "NOT FOUND")
     if [[ ${curr_roles} = "NOT FOUND" ]]; then
