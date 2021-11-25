@@ -279,9 +279,9 @@ if [[ -v IS_XPN ]]; then
   MASTER_SERVICE_ACCOUNT="${HOST_PROJECT_CONTROL_SERVICE_ACCOUNT}"
   WORKER_SERVICE_ACCOUNT="${HOST_PROJECT_COMPUTE_SERVICE_ACCOUNT}"
   ret=$(gcloud iam service-accounts keys create service-account-key.json "--iam-account=${MASTER_SERVICE_ACCOUNT}" || echo "Failed to create the SA key!")
-  if [ $ret = "Failed to create the SA key!" ]; then
+  if [[ $ret = "Failed to create the SA key!" ]]; then
     echo "$(date -u --rfc-3339=seconds) - Problem on the pre-existing XPN service accounts, creating new service-accounts as a work-around..."
-  cat <<EOF >03_security.yaml
+    cat <<EOF >03_security.yaml
 imports:
 - path: 03_iam.py
 resources:
