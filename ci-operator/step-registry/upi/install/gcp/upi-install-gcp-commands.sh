@@ -347,6 +347,17 @@ if [[ -f  03_security.yaml ]]; then
   backoff gcloud projects add-iam-policy-binding "${PROJECT_NAME}" --member "serviceAccount:${WORKER_SERVICE_ACCOUNT}" --role "roles/storage.admin"
 
   if [[ -v IS_XPN ]]; then
+    sa_email=$(jq -r .client_email ${GOOGLE_CLOUD_KEYFILE_JSON})
+    echo "Checking if the service-account ${sa_email} has 'roles/iam.securityAdmin'..."
+    curr_roles=$(gcloud projects get-iam-policy ${PROJECT_NAME} --flatten="bindings[].members" --format="table(bindings.role)" --filter="bindings.members:${sa_email}" | grep 'roles/iam.securityAdmin' || echo "NOT FOUND")
+    if [[ ${curr_roles} = "NOT FOUND" ]]; then
+      echo "Granting role 'roles/iam.securityAdmin' to the service-account..."
+      backoff gcloud projects add-iam-policy-binding ${PROJECT_NAME} --member "serviceAccount:${sa_email}" --role "roles/iam.securityAdmin"
+      echo "Re-Checking the roles of the service-account..."
+      gcloud projects get-iam-policy ${PROJECT_NAME} --flatten="bindings[].members" --format="table(bindings.role)" --filter="bindings.members:${sa_email}"
+    else
+      echo ">>The SA has 'roles/iam.securityAdmin' already."
+    fi
     backoff gcloud --project=${HOST_PROJECT} projects add-iam-policy-binding ${HOST_PROJECT} --member "serviceAccount:${MASTER_SERVICE_ACCOUNT}" --role "roles/compute.networkViewer"
     backoff gcloud --project=${HOST_PROJECT} compute networks subnets add-iam-policy-binding "${HOST_PROJECT_CONTROL_SUBNET}" --member "serviceAccount:${MASTER_SERVICE_ACCOUNT}" --role "roles/compute.networkUser" --region ${REGION}
     backoff gcloud --project=${HOST_PROJECT} compute networks subnets add-iam-policy-binding "${HOST_PROJECT_CONTROL_SUBNET}" --member "serviceAccount:${WORKER_SERVICE_ACCOUNT}" --role "roles/compute.networkUser" --region ${REGION}
