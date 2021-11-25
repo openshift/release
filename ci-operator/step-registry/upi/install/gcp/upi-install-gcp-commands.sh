@@ -278,6 +278,19 @@ if [[ -v IS_XPN ]]; then
   echo "$(date -u --rfc-3339=seconds) - using pre-existing XPN service accounts..."
   MASTER_SERVICE_ACCOUNT="${HOST_PROJECT_CONTROL_SERVICE_ACCOUNT}"
   WORKER_SERVICE_ACCOUNT="${HOST_PROJECT_COMPUTE_SERVICE_ACCOUNT}"
+  ret=$(gcloud iam service-accounts keys create service-account-key.json "--iam-account=${MASTER_SERVICE_ACCOUNT}" || echo "Failed to create the SA key!")
+  if [ $ret = "Failed to create the SA key!" ]; then
+    echo "$(date -u --rfc-3339=seconds) - Problem on the pre-existing XPN service accounts, creating new service-accounts as a work-around..."
+  cat <<EOF >03_security.yaml
+imports:
+- path: 03_iam.py
+resources:
+- name: cluster-iam
+  type: 03_iam.py
+  properties:
+    infra_id: '${INFRA_ID}' 
+EOF
+  fi
 elif [ -f 03_firewall.py ]; then # for workflow using 03_iam.py and 03_firewall.py
   # https://github.com/openshift/installer/pull/2574
   cat <<EOF > 03_security.yaml
@@ -332,21 +345,20 @@ if [[ -f  03_security.yaml ]]; then
 
   backoff gcloud projects add-iam-policy-binding "${PROJECT_NAME}" --member "serviceAccount:${WORKER_SERVICE_ACCOUNT}" --role "roles/compute.viewer"
   backoff gcloud projects add-iam-policy-binding "${PROJECT_NAME}" --member "serviceAccount:${WORKER_SERVICE_ACCOUNT}" --role "roles/storage.admin"
+
+  if [[ -v IS_XPN ]]; then
+    gcloud --account=${HOST_PROJECT_ACCOUNT} --project=${HOST_PROJECT} projects add-iam-policy-binding ${HOST_PROJECT} --member "serviceAccount:${MASTER_SERVICE_ACCOUNT}" --role "roles/compute.networkViewer"
+    gcloud --account=${HOST_PROJECT_ACCOUNT} --project=${HOST_PROJECT} compute networks subnets add-iam-policy-binding "${HOST_PROJECT_CONTROL_SUBNET}" --member "serviceAccount:${MASTER_SERVICE_ACCOUNT}" --role "roles/compute.networkUser" --region ${REGION}
+    gcloud --account=${HOST_PROJECT_ACCOUNT} --project=${HOST_PROJECT} compute networks subnets add-iam-policy-binding "${HOST_PROJECT_CONTROL_SUBNET}" --member "serviceAccount:${WORKER_SERVICE_ACCOUNT}" --role "roles/compute.networkUser" --region ${REGION}
+    gcloud --account=${HOST_PROJECT_ACCOUNT} --project=${HOST_PROJECT} compute networks subnets add-iam-policy-binding "${HOST_PROJECT_COMPUTE_SUBNET}" --member "serviceAccount:${MASTER_SERVICE_ACCOUNT}" --role "roles/compute.networkUser" --region ${REGION}
+    gcloud --account=${HOST_PROJECT_ACCOUNT} --project=${HOST_PROJECT} compute networks subnets add-iam-policy-binding "${HOST_PROJECT_COMPUTE_SUBNET}" --member "serviceAccount:${WORKER_SERVICE_ACCOUNT}" --role "roles/compute.networkUser" --region ${REGION}
+  fi
 fi
 
-sa_email=$(jq -r .client_email ${GOOGLE_CLOUD_KEYFILE_JSON})
-echo "Checking if the service-account ${sa_email} has 'roles/iam.serviceAccountKeyAdmin'..."
-curr_roles=$(gcloud projects get-iam-policy ${PROJECT_NAME} --flatten="bindings[].members" --format="table(bindings.role)" --filter="bindings.members:${sa_email}" | grep 'roles/iam.serviceAccountKeyAdmin' || echo "NOT FOUND")
-if [[ ${curr_roles} = "NOT FOUND" ]]; then
-  echo "Granting role 'roles/iam.serviceAccountKeyAdmin' to the service-account..."
-  backoff gcloud projects add-iam-policy-binding ${PROJECT_NAME} --member "serviceAccount:${sa_email}" --role "roles/iam.serviceAccountKeyAdmin"
-  echo "Re-Checking the roles of the service-account..."
-  gcloud projects get-iam-policy ${PROJECT_NAME} --flatten="bindings[].members" --format="table(bindings.role)" --filter="bindings.members:${sa_email}"
-else
-  echo ">>The SA has 'roles/iam.serviceAccountKeyAdmin' already."
+if [ ! -f 'service-account-key.json' ]; then
+  ## Generate a service-account-key for signing the bootstrap.ign url
+  gcloud iam service-accounts keys create service-account-key.json "--iam-account=${MASTER_SERVICE_ACCOUNT}" || echo "Failed to create the SA key!"
 fi
-## Generate a service-account-key for signing the bootstrap.ign url
-gcloud iam service-accounts keys create service-account-key.json "--iam-account=${MASTER_SERVICE_ACCOUNT}" || echo "Failed to create the SA key!"
 
 ## Create the cluster image.
 echo "$(date -u --rfc-3339=seconds) - Creating the cluster image..."
