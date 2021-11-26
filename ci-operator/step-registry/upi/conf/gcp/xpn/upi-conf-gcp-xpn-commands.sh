@@ -31,6 +31,7 @@ COMPUTE_SUBNET="https://www.googleapis.com/compute/v1/projects/openshift-dev-ins
 COMPUTE_SERVICE_ACCOUNT="do-not-delete-ci-xpn@openshift-gce-devel-ci.iam.gserviceaccount.com"
 CONTROL_SERVICE_ACCOUNT="do-not-delete-ci-xpn@openshift-gce-devel-ci.iam.gserviceaccount.com"
 PRIVATE_ZONE_NAME="ci-op-xpn-private-zone"
+BASE_DOMAIN="installer.gcp.devcluster.openshift.com"
 
 cat > "${SHARED_DIR}/xpn.json" << EOF
 {
@@ -40,6 +41,7 @@ cat > "${SHARED_DIR}/xpn.json" << EOF
     "controlSubnet": "${CONTROL_SUBNET}",
     "computeServiceAccount": "${COMPUTE_SERVICE_ACCOUNT}",
     "controlServiceAccount": "${CONTROL_SERVICE_ACCOUNT}",
-    "privateZoneName": "${PRIVATE_ZONE_NAME}"
+    "privateZoneName": "${PRIVATE_ZONE_NAME}",
+    "baseDomain": "${BASE_DOMAIN}"
 }
 EOF

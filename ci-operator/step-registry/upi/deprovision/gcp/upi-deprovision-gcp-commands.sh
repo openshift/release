@@ -29,24 +29,18 @@ if [[ -s "${SHARED_DIR}/xpn.json" ]]; then
   echo "Reading variables from ${SHARED_DIR}/xpn.json..."
   IS_XPN=1
   HOST_PROJECT="$(jq -r '.hostProject' "${SHARED_DIR}/xpn.json")"
-  HOST_PROJECT_PRIVATE_ZONE_NAME="$(jq -r '.privateZoneName' "${SHARED_DIR}/xpn.json")"
+  #HOST_PROJECT_PRIVATE_ZONE_NAME="$(jq -r '.privateZoneName' "${SHARED_DIR}/xpn.json")"
+  HOST_PROJECT_PRIVATE_ZONE_NAME="${INFRA_ID}-private-zone"
+  HOST_BASE_DOMAIN="$(jq -r '.baseDomain' "${SHARED_DIR}/xpn.json")"
+  BASE_DOMAIN="${HOST_BASE_DOMAIN}"
 fi
+BASE_DOMAIN_ZONE_NAME="$(gcloud --project="${HOST_PROJECT}" dns managed-zones list --filter "DNS_NAME=${BASE_DOMAIN}." --format json | jq -r .[0].name)"
 
 # Delete the bootstrap deployment, but expect it to error.
 echo "$(date -u --rfc-3339=seconds) - Deleting bootstrap deployment (errors when bootstrap-complete)..."
 set +e
 gcloud deployment-manager deployments delete -q "${INFRA_ID}-bootstrap"
 set -e
-
-# Delete the deployments that should always exist.
-echo "$(date -u --rfc-3339=seconds) - Deleting worker, control-plane, and infra deployments..."
-gcloud deployment-manager deployments delete -q "${INFRA_ID}"-{worker,control-plane,infra}
-
-# Only delete these deployments when they are expected to exist.
-if [[ ! -v IS_XPN ]]; then
-  echo "$(date -u --rfc-3339=seconds) - Deleting security and vpc deployments..."
-  gcloud deployment-manager deployments delete -q "${INFRA_ID}"-{security,vpc}
-fi
 
 # Delete XPN DNS entries
 if [[ -v IS_XPN ]]; then
@@ -67,5 +61,28 @@ if [[ -v IS_XPN ]]; then
     "0 10 2380 etcd-1.${CLUSTER_NAME}.${BASE_DOMAIN}." \
     "0 10 2380 etcd-2.${CLUSTER_NAME}.${BASE_DOMAIN}."
   gcloud --project="${HOST_PROJECT}" dns record-sets transaction execute --zone "${HOST_PROJECT_PRIVATE_ZONE_NAME}"
+  
+  # Delete record-sets of the base domain
+  if [ -f transaction.yaml ]; then rm transaction.yaml; fi
+  gcloud --project="${HOST_PROJECT}" dns record-sets transaction start --zone "${BASE_DOMAIN_ZONE_NAME}"
+  while read -r line; do
+    DNSNAME=$(echo "${line}" | jq -r '.name')
+    DNSTTL=$(echo "${line}" | jq -r '.ttl')
+    DNSTYPE=$(echo "${line}" | jq -r '.type')
+    DNSDATA=$(echo "${line}" | jq -r '.rrdatas[]')
+    gcloud --project="${HOST_PROJECT}" dns record-sets transaction remove --zone "${BASE_DOMAIN_ZONE_NAME}" --name "${DNSNAME}" --ttl "${DNSTTL}" --type "${DNSTYPE}" "${DNSDATA}"
+  done < <(gcloud --project="${HOST_PROJECT}" dns record-sets list --zone="${BASE_DOMAIN_ZONE_NAME}" --filter="name:.${CLUSTER_NAME}.${BASE_DOMAIN}." --format=json | jq -c '.[]')
+  gcloud --project="${HOST_PROJECT}" dns record-sets transaction execute --zone "${BASE_DOMAIN_ZONE_NAME}"
   set -e
 fi
+
+# Delete the deployments that should always exist.
+echo "$(date -u --rfc-3339=seconds) - Deleting worker, control-plane, and infra deployments..."
+gcloud deployment-manager deployments delete -q "${INFRA_ID}"-{worker,control-plane,infra}
+
+# Only delete these deployments when they are expected to exist.
+if [[ ! -v IS_XPN ]]; then
+  echo "$(date -u --rfc-3339=seconds) - Deleting security and vpc deployments..."
+  gcloud deployment-manager deployments delete -q "${INFRA_ID}"-{security,vpc}
+fi
+

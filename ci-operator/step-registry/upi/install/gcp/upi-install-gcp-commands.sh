@@ -97,7 +97,8 @@ if [[ -s "${SHARED_DIR}/xpn.json" ]]; then
   HOST_PROJECT_CONTROL_SUBNET="$(jq -r '.controlSubnet' "${SHARED_DIR}/xpn.json")"
   HOST_PROJECT_COMPUTE_SERVICE_ACCOUNT="$(jq -r '.computeServiceAccount' "${SHARED_DIR}/xpn.json")"
   HOST_PROJECT_CONTROL_SERVICE_ACCOUNT="$(jq -r '.controlServiceAccount' "${SHARED_DIR}/xpn.json")"
-  HOST_PROJECT_PRIVATE_ZONE_NAME="$(jq -r '.privateZoneName' "${SHARED_DIR}/xpn.json")"
+  #HOST_PROJECT_PRIVATE_ZONE_NAME="$(jq -r '.privateZoneName' "${SHARED_DIR}/xpn.json")"
+  HOST_BASE_DOMAIN="$(jq -r '.baseDomain' "${SHARED_DIR}/xpn.json")"
 else
   # Set HOST_PROJECT to the cluster project so commands with `--project` work in both scenarios.
   HOST_PROJECT="${PROJECT_NAME}"
@@ -114,8 +115,6 @@ if [[ -v IS_XPN ]]; then
   ZONE_0="$(gcloud compute regions describe "${REGION}" --format=json | jq -r .zones[0] | cut -d "/" -f9)"
   ZONE_1="$(gcloud compute regions describe "${REGION}" --format=json | jq -r .zones[1] | cut -d "/" -f9)"
   ZONE_2="$(gcloud compute regions describe "${REGION}" --format=json | jq -r .zones[2] | cut -d "/" -f9)"
-  BASE_DOMAIN="installer.gcp.devcluster.openshift.com"
-  BASE_DOMAIN_ZONE_NAME="$(gcloud --project="${HOST_PROJECT}" dns managed-zones list --filter "DNS_NAME=${BASE_DOMAIN}." --format json | jq -r .[0].name)"
 else
   cat <<EOF > 01_vpc.yaml
 imports:
@@ -142,12 +141,22 @@ fi
 echo "$(date -u --rfc-3339=seconds) - Creating load balancers and DNS zone..."
 if [[ -v IS_XPN ]]; then
   echo "$(date -u --rfc-3339=seconds) - Using pre-existing XPN private zone..."
-  PRIVATE_ZONE_NAME="${HOST_PROJECT_PRIVATE_ZONE_NAME}"
+  #PRIVATE_ZONE_NAME="${HOST_PROJECT_PRIVATE_ZONE_NAME}"
+  PRIVATE_ZONE_NAME="${INFRA_ID}-private-zone"
+  BASE_DOMAIN="${HOST_BASE_DOMAIN}"
+  BASE_DOMAIN_ZONE_NAME="$(gcloud --project="${HOST_PROJECT}" dns managed-zones list --filter "DNS_NAME=${BASE_DOMAIN}." --format json | jq -r .[0].name)"
   cat <<EOF > 02_infra.yaml
 imports:
+- path: 02_dns.py
 - path: 02_lb_ext.py
 - path: 02_lb_int.py
 resources:
+- name: cluster-dns
+  type: 02_dns.py
+  properties:
+    infra_id: '${INFRA_ID}'
+    cluster_domain: '${CLUSTER_NAME}.${BASE_DOMAIN}'
+    cluster_network: '${CLUSTER_NETWORK}'
 - name: cluster-lb-ext
   type: 02_lb_ext.py
   properties:
@@ -231,17 +240,10 @@ ret=$(gcloud --project="${HOST_PROJECT}" dns managed-zones list --filter "name=$
 if [[ $ret =~ 'not found' ]]; then
   echo ">>The private zone ${PRIVATE_ZONE_NAME} doesn't exist in project ${HOST_PROJECT}."
 else
-  private_zone_dns_name=$(gcloud --project="${HOST_PROJECT}" dns managed-zones list --filter "name=${PRIVATE_ZONE_NAME}" | grep ${PRIVATE_ZONE_NAME} | awk '{print $2}')
-  if [[ -v IS_XPN ]]; then
-    suffix="${CLUSTER_NAME}.${private_zone_dns_name}"
-  else
-    suffix="${CLUSTER_NAME}.${BASE_DOMAIN}."
-  fi
-
   if [ -f transaction.yaml ]; then rm transaction.yaml; fi
   gcloud --project="${HOST_PROJECT}" dns record-sets transaction start --zone "${PRIVATE_ZONE_NAME}"
-  gcloud --project="${HOST_PROJECT}" dns record-sets transaction add "${CLUSTER_IP}" --name "api.${suffix}" --ttl 60 --type A --zone "${PRIVATE_ZONE_NAME}"
-  gcloud --project="${HOST_PROJECT}" dns record-sets transaction add "${CLUSTER_IP}" --name "api-int.${suffix}" --ttl 60 --type A --zone "${PRIVATE_ZONE_NAME}"
+  gcloud --project="${HOST_PROJECT}" dns record-sets transaction add "${CLUSTER_IP}" --name "api.${CLUSTER_NAME}.${BASE_DOMAIN}." --ttl 60 --type A --zone "${PRIVATE_ZONE_NAME}"
+  gcloud --project="${HOST_PROJECT}" dns record-sets transaction add "${CLUSTER_IP}" --name "api-int.${CLUSTER_NAME}.${BASE_DOMAIN}." --ttl 60 --type A --zone "${PRIVATE_ZONE_NAME}"
   gcloud --project="${HOST_PROJECT}" dns record-sets transaction execute --zone "${PRIVATE_ZONE_NAME}"
 fi
 
