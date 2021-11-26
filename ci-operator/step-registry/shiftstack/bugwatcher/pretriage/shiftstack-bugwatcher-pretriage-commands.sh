@@ -10,4 +10,4 @@ export BUGZILLA_API_KEY
 export SLACK_HOOK
 export TEAM_MEMBERS
 
-python ./main.py
+python3 ./main.py
