@@ -8,6 +8,7 @@ export OS_CLIENT_CONFIG_FILE=${SHARED_DIR}/clouds.yaml
 
 CLUSTER_NAME=$(<"${SHARED_DIR}/CLUSTER_NAME")
 OPENSTACK_EXTERNAL_NETWORK="${OPENSTACK_EXTERNAL_NETWORK:-$(<"${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK")}"
+OPENSTACK_CONTROLPLANE_FLAVOR="${OPENSTACK_CONTROLPLANE_FLAVOR:-$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR")}"
 OPENSTACK_COMPUTE_FLAVOR="${OPENSTACK_COMPUTE_FLAVOR:-$(<"${SHARED_DIR}/OPENSTACK_COMPUTE_FLAVOR")}"
 ZONES="${ZONES:-$(<"${SHARED_DIR}/ZONES")}"
 ZONES_COUNT="${ZONES_COUNT:-0}"
@@ -71,7 +72,6 @@ cat >> "${CONFIG}" << EOF
 platform:
   openstack:
     cloud:             ${OS_CLOUD}
-    computeFlavor:     ${OPENSTACK_COMPUTE_FLAVOR}
 EOF
 if [[ "${CONFIG_TYPE}" == "minimal" ]]; then
 cat >> "${CONFIG}" << EOF
@@ -92,16 +92,34 @@ fi
 cat >> "${CONFIG}" << EOF
 compute:
 - name: worker
+  replicas: 3
   platform:
     openstack:
       type: ${OPENSTACK_COMPUTE_FLAVOR}
       zones: ${ZONES_STR}
-  replicas: 3
+EOF
+if [[ ${ADDITIONAL_WORKERS_NETWORKS} != "" ]]; then
+    cat >> "${CONFIG}" << EOF
+      additionalNetworkIDs:
+EOF
+    for network in $(echo "${ADDITIONAL_WORKERS_NETWORKS}" | tr " " "\n"); do
+        if ! openstack network show "${network}" > /dev/null 2>&1; then
+            echo "Network ${network} does not exist"
+            exit 1
+        fi
+        net_id=$(openstack network show -f value -c id "${network}")
+        cat >> "${CONFIG}" << EOF
+      - ${net_id}
+EOF
+    done
+fi
+
+cat >> "${CONFIG}" << EOF
 controlPlane:
   name: master
   platform:
     openstack:
-      type: ${OPENSTACK_COMPUTE_FLAVOR}
+      type: ${OPENSTACK_CONTROLPLANE_FLAVOR}
       zones: ${ZONES_STR}
   replicas: 3
 pullSecret: >
