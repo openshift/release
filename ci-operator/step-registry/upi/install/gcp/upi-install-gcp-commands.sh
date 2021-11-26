@@ -114,6 +114,8 @@ if [[ -v IS_XPN ]]; then
   ZONE_0="$(gcloud compute regions describe "${REGION}" --format=json | jq -r .zones[0] | cut -d "/" -f9)"
   ZONE_1="$(gcloud compute regions describe "${REGION}" --format=json | jq -r .zones[1] | cut -d "/" -f9)"
   ZONE_2="$(gcloud compute regions describe "${REGION}" --format=json | jq -r .zones[2] | cut -d "/" -f9)"
+  BASE_DOMAIN="origin-ci-int-gce.dev.openshift.com"
+  BASE_DOMAIN_ZONE_NAME="origin-ci-int-gce"
 else
   cat <<EOF > 01_vpc.yaml
 imports:
@@ -127,21 +129,6 @@ resources:
     master_subnet_cidr: '${MASTER_SUBNET_CIDR}'
     worker_subnet_cidr: '${WORKER_SUBNET_CIDR}'
 EOF
-
-  ## Applying 'roles/deploymentmanager.editor' to the service-account, if not already...
-  sa_email=$(jq -r .client_email ${GOOGLE_CLOUD_KEYFILE_JSON})
-  echo "Checking if the service-account ${sa_email} has 'roles/deploymentmanager.editor'..."
-  curr_roles=$(gcloud projects get-iam-policy ${HOST_PROJECT} --flatten="bindings[].members" --format="table(bindings.role)" --filter="bindings.members:${sa_email}" | grep 'roles/deploymentmanager.editor' || echo "NOT FOUND")
-  if [[ ${curr_roles} = "NOT FOUND" ]]; then
-    echo "Granting role 'roles/deploymentmanager.editor' to the service-account..."
-    backoff gcloud projects add-iam-policy-binding ${HOST_PROJECT} --member "serviceAccount:${sa_email}" --role "roles/deploymentmanager.editor"
-    echo "Re-Checking the roles of the service-account..."
-    gcloud projects get-iam-policy ${HOST_PROJECT} --flatten="bindings[].members" --format="table(bindings.role)" --filter="bindings.members:${sa_email}"
-  else
-    echo ">>The SA has 'roles/deploymentmanager.editor' already."
-    gcloud projects get-iam-policy ${HOST_PROJECT} --flatten="bindings[].members" --format="table(bindings.role)" --filter="bindings.members:${sa_email}"
-  fi
-  ##
 
   gcloud deployment-manager deployments create "${INFRA_ID}-vpc" --config 01_vpc.yaml
 
@@ -240,9 +227,8 @@ CLUSTER_PUBLIC_IP="$(gcloud compute addresses describe "${INFRA_ID}-cluster-publ
 
 ### Add internal DNS entries
 echo "$(date -u --rfc-3339=seconds) - Adding internal DNS entries..."
-res=$(gcloud --project="${HOST_PROJECT}" dns managed-zones list --filter "name=${PRIVATE_ZONE_NAME}")
-echo -e ">>priv zone info: \n${res}"
-if [[ -n $res ]]; then
+gcloud --project="${HOST_PROJECT}" dns managed-zones list --filter "name=${PRIVATE_ZONE_NAME}" | grep "${PRIVATE_ZONE_NAME}"
+if [ $? -eq 0 ]; then
   private_zone_dns_name=$(gcloud --project="${HOST_PROJECT}" dns managed-zones list --filter "name=${PRIVATE_ZONE_NAME}" | grep ${PRIVATE_ZONE_NAME} | awk '{print $2}')
   if [[ -v IS_XPN ]]; then
     suffix="${CLUSTER_NAME}.${private_zone_dns_name}"
@@ -256,20 +242,19 @@ if [[ -n $res ]]; then
   gcloud --project="${HOST_PROJECT}" dns record-sets transaction add "${CLUSTER_IP}" --name "api-int.${suffix}" --ttl 60 --type A --zone "${PRIVATE_ZONE_NAME}"
   gcloud --project="${HOST_PROJECT}" dns record-sets transaction execute --zone "${PRIVATE_ZONE_NAME}"
 else
-  echo ">>private zone ${PRIVATE_ZONE_NAME} doesn't exist in project ${HOST_PROJECT}"
+  echo ">>The private zone ${PRIVATE_ZONE_NAME} doesn't exist in project ${HOST_PROJECT}."
 fi
 
 ### Add external DNS entries (optional)
 echo "$(date -u --rfc-3339=seconds) - Adding external DNS entries..."
-res=$(gcloud --project="${HOST_PROJECT}" dns managed-zones list --filter "name=${BASE_DOMAIN_ZONE_NAME}")
-echo -e ">>base domain info: \n${res}"
-if [[ -n $res ]]; then
+gcloud --project="${HOST_PROJECT}" dns managed-zones list --filter "name=${BASE_DOMAIN_ZONE_NAME}" | grep "${BASE_DOMAIN_ZONE_NAME}"
+if [ $? -eq 0 ]; then
   if [ -f transaction.yaml ]; then rm transaction.yaml; fi
   gcloud --project="${HOST_PROJECT}" dns record-sets transaction start --zone "${BASE_DOMAIN_ZONE_NAME}"
   gcloud --project="${HOST_PROJECT}" dns record-sets transaction add "${CLUSTER_PUBLIC_IP}" --name "api.${CLUSTER_NAME}.${BASE_DOMAIN}." --ttl 60 --type A --zone "${BASE_DOMAIN_ZONE_NAME}"
   gcloud --project="${HOST_PROJECT}" dns record-sets transaction execute --zone "${BASE_DOMAIN_ZONE_NAME}"
 else
-  echo ">>base domain ${BASE_DOMAIN_ZONE_NAME} doesn't exist in project ${HOST_PROJECT}"
+  echo ">>The base domain ${BASE_DOMAIN_ZONE_NAME} doesn't exist in project ${HOST_PROJECT}."
 fi
 
 ## Create firewall rules and IAM roles
@@ -279,18 +264,11 @@ if [[ -v IS_XPN ]]; then
   echo "$(date -u --rfc-3339=seconds) - using pre-existing XPN service accounts..."
   MASTER_SERVICE_ACCOUNT="${HOST_PROJECT_CONTROL_SERVICE_ACCOUNT}"
   WORKER_SERVICE_ACCOUNT="${HOST_PROJECT_COMPUTE_SERVICE_ACCOUNT}"
-  ret=$(gcloud iam service-accounts keys create service-account-key.json "--iam-account=${MASTER_SERVICE_ACCOUNT}" || echo "Failed to create the SA key!")
-  if [[ $ret = "Failed to create the SA key!" ]]; then
-    echo "$(date -u --rfc-3339=seconds) - Problem on the pre-existing XPN service accounts, creating new service-accounts as a work-around..."
-    cat <<EOF >03_security.yaml
-imports:
-- path: 03_iam.py
-resources:
-- name: cluster-iam
-  type: 03_iam.py
-  properties:
-    infra_id: '${INFRA_ID}' 
-EOF
+  ret=$(gcloud iam service-accounts keys create service-account-key.json "--iam-account=${MASTER_SERVICE_ACCOUNT}" || echo "Failed to create key with the service-account ${MASTER_SERVICE_ACCOUNT}.")
+  if [[ $ret =~ "Failed to create key" ]]; then
+    echo ">>Using tmp SA as the MASTER_SERVICE_ACCOUNT."
+    MASTER_SERVICE_ACCOUNT=$(jq -r .client_email ${GOOGLE_CLOUD_KEYFILE_JSON})
+    cp ${GOOGLE_CLOUD_KEYFILE_JSON} service-account-key.json
   fi
 elif [ -f 03_firewall.py ]; then # for workflow using 03_iam.py and 03_firewall.py
   # https://github.com/openshift/installer/pull/2574
@@ -346,37 +324,11 @@ if [[ -f  03_security.yaml ]]; then
 
   backoff gcloud projects add-iam-policy-binding "${PROJECT_NAME}" --member "serviceAccount:${WORKER_SERVICE_ACCOUNT}" --role "roles/compute.viewer"
   backoff gcloud projects add-iam-policy-binding "${PROJECT_NAME}" --member "serviceAccount:${WORKER_SERVICE_ACCOUNT}" --role "roles/storage.admin"
-
-  if [[ -v IS_XPN ]]; then
-    sa_email=$(jq -r .client_email ${GOOGLE_CLOUD_KEYFILE_JSON})
-    ##
-    gcloud iam service-accounts list
-    gcloud --project="${HOST_PROJECT}" iam service-accounts list
-    gcloud projects get-iam-policy ${PROJECT_NAME} --flatten="bindings[].members" --format="table(bindings.role)" --filter="bindings.members:${sa_email}"
-    gcloud projects get-iam-policy ${HOST_PROJECT} --flatten="bindings[].members" --format="table(bindings.role)" --filter="bindings.members:${sa_email}"
-    ##
-    echo "Checking if the service-account ${sa_email} has 'roles/iam.securityAdmin'..."
-    curr_roles=$(gcloud projects get-iam-policy ${HOST_PROJECT} --flatten="bindings[].members" --format="table(bindings.role)" --filter="bindings.members:${sa_email}" | grep 'roles/iam.securityAdmin' || echo "NOT FOUND")
-    if [[ ${curr_roles} = "NOT FOUND" ]]; then
-      echo "Granting role 'roles/iam.securityAdmin' to the service-account..."
-      backoff gcloud projects add-iam-policy-binding ${HOST_PROJECT} --member "serviceAccount:${sa_email}" --role "roles/iam.securityAdmin"
-      echo "Re-Checking the roles of the service-account..."
-      gcloud projects get-iam-policy ${HOST_PROJECT} --flatten="bindings[].members" --format="table(bindings.role)" --filter="bindings.members:${sa_email}"
-    else
-      echo ">>The SA has 'roles/iam.securityAdmin' already."
-      gcloud projects get-iam-policy ${HOST_PROJECT} --flatten="bindings[].members" --format="table(bindings.role)" --filter="bindings.members:${sa_email}"
-    fi
-    backoff gcloud --project=${HOST_PROJECT} projects add-iam-policy-binding ${HOST_PROJECT} --member "serviceAccount:${MASTER_SERVICE_ACCOUNT}" --role "roles/compute.networkViewer"
-    backoff gcloud --project=${HOST_PROJECT} compute networks subnets add-iam-policy-binding "${HOST_PROJECT_CONTROL_SUBNET}" --member "serviceAccount:${MASTER_SERVICE_ACCOUNT}" --role "roles/compute.networkUser" --region ${REGION}
-    backoff gcloud --project=${HOST_PROJECT} compute networks subnets add-iam-policy-binding "${HOST_PROJECT_CONTROL_SUBNET}" --member "serviceAccount:${WORKER_SERVICE_ACCOUNT}" --role "roles/compute.networkUser" --region ${REGION}
-    backoff gcloud --project=${HOST_PROJECT} compute networks subnets add-iam-policy-binding "${HOST_PROJECT_COMPUTE_SUBNET}" --member "serviceAccount:${MASTER_SERVICE_ACCOUNT}" --role "roles/compute.networkUser" --region ${REGION}
-    backoff gcloud --project=${HOST_PROJECT} compute networks subnets add-iam-policy-binding "${HOST_PROJECT_COMPUTE_SUBNET}" --member "serviceAccount:${WORKER_SERVICE_ACCOUNT}" --role "roles/compute.networkUser" --region ${REGION}
-  fi
 fi
 
 if [ ! -f 'service-account-key.json' ]; then
   ## Generate a service-account-key for signing the bootstrap.ign url
-  gcloud iam service-accounts keys create service-account-key.json "--iam-account=${MASTER_SERVICE_ACCOUNT}" || echo "Failed to create the SA key!"
+  gcloud iam service-accounts keys create service-account-key.json "--iam-account=${MASTER_SERVICE_ACCOUNT}" || echo "Failed to create key with the service-account ${MASTER_SERVICE_ACCOUNT}."
 fi
 
 ## Create the cluster image.
