@@ -3,10 +3,10 @@ base_images:
     name: "4.10"
     namespace: ocp
     tag: base
-  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
+  ocp_builder_rhel-8-golang-1.16-openshift-4.10:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.17-openshift-4.10
+    tag: rhel-8-golang-1.16-openshift-4.10
 binary_build_commands: NO_DOCKER=1 make build
 build_root:
   from_repository: true
@@ -14,12 +14,11 @@ images:
 - dockerfile_path: Dockerfile.rhel
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.10:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.10
   to: gcp-machine-controllers
 promotion:
-  disabled: true
   name: "4.10"
   namespace: ocp
 releases:
@@ -43,15 +42,11 @@ tests:
   container:
     from: src
 - as: goimports
-  commands: IS_CONTAINER=TRUE make goimports
-  container:
-    from: src
-- as: generate
-  commands: IS_CONTAINER=TRUE NO_DOCKER=1 make generate
+  commands: make goimports
   container:
     from: src
 - as: govet
-  commands: IS_CONTAINER=TRUE make vet
+  commands: make vet
   container:
     from: src
 - as: e2e-gcp-operator
@@ -71,6 +66,6 @@ tests:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
 zz_generated_metadata:
-  branch: master
+  branch: main
   org: openshift
-  repo: cluster-api-provider-gcp
+  repo: machine-api-provider-gcp
