@@ -114,8 +114,8 @@ if [[ -v IS_XPN ]]; then
   ZONE_0="$(gcloud compute regions describe "${REGION}" --format=json | jq -r .zones[0] | cut -d "/" -f9)"
   ZONE_1="$(gcloud compute regions describe "${REGION}" --format=json | jq -r .zones[1] | cut -d "/" -f9)"
   ZONE_2="$(gcloud compute regions describe "${REGION}" --format=json | jq -r .zones[2] | cut -d "/" -f9)"
-  BASE_DOMAIN="origin-ci-int-gce.dev.openshift.com"
-  BASE_DOMAIN_ZONE_NAME="origin-ci-int-gce"
+  BASE_DOMAIN="installer.gcp.devcluster.openshift.com"
+  BASE_DOMAIN_ZONE_NAME="$(gcloud dns managed-zones list --filter "DNS_NAME=${BASE_DOMAIN}." --format json | jq -r .[0].name)"
 else
   cat <<EOF > 01_vpc.yaml
 imports:
@@ -256,6 +256,7 @@ else
   gcloud --project="${HOST_PROJECT}" dns record-sets transaction start --zone "${BASE_DOMAIN_ZONE_NAME}"
   gcloud --project="${HOST_PROJECT}" dns record-sets transaction add "${CLUSTER_PUBLIC_IP}" --name "api.${CLUSTER_NAME}.${BASE_DOMAIN}." --ttl 60 --type A --zone "${BASE_DOMAIN_ZONE_NAME}"
   gcloud --project="${HOST_PROJECT}" dns record-sets transaction execute --zone "${BASE_DOMAIN_ZONE_NAME}"
+  gcloud --project="${HOST_PROJECT}" dns managed-zones list
 fi
 
 ## Create firewall rules and IAM roles
