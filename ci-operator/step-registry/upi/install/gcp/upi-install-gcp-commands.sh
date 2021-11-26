@@ -115,7 +115,7 @@ if [[ -v IS_XPN ]]; then
   ZONE_1="$(gcloud compute regions describe "${REGION}" --format=json | jq -r .zones[1] | cut -d "/" -f9)"
   ZONE_2="$(gcloud compute regions describe "${REGION}" --format=json | jq -r .zones[2] | cut -d "/" -f9)"
   BASE_DOMAIN="installer.gcp.devcluster.openshift.com"
-  BASE_DOMAIN_ZONE_NAME="$(gcloud --project="${HOST_PROJECT} dns managed-zones list --filter "DNS_NAME=${BASE_DOMAIN}." --format json | jq -r .[0].name)"
+  BASE_DOMAIN_ZONE_NAME="$(gcloud --project="${HOST_PROJECT}" dns managed-zones list --filter "DNS_NAME=${BASE_DOMAIN}." --format json | jq -r .[0].name)"
 else
   cat <<EOF > 01_vpc.yaml
 imports:
