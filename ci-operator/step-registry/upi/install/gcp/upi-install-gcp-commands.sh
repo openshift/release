@@ -250,6 +250,7 @@ echo "$(date -u --rfc-3339=seconds) - Adding external DNS entries..."
 ret=$(gcloud --project="${HOST_PROJECT}" dns managed-zones list --filter "name=${BASE_DOMAIN_ZONE_NAME}" | grep ${BASE_DOMAIN_ZONE_NAME} || echo "${BASE_DOMAIN_ZONE_NAME} not found")
 if [[ $ret =~ 'not found' ]]; then
   echo ">>The base domain ${BASE_DOMAIN_ZONE_NAME} doesn't exist in project ${HOST_PROJECT}."
+  gcloud --project="${HOST_PROJECT}" dns managed-zones list
 else
   if [ -f transaction.yaml ]; then rm transaction.yaml; fi
   gcloud --project="${HOST_PROJECT}" dns record-sets transaction start --zone "${BASE_DOMAIN_ZONE_NAME}"
