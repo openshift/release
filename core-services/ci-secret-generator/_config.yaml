@@ -8,6 +8,7 @@
     - build01
     - build02
     - build03
+    - build04
     - vsphere
     service_account:
     - config-updater
@@ -73,6 +74,7 @@
     - build01
     - build02
     - build03
+    - build04
     - vsphere
 - fields:
   - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
@@ -97,6 +99,7 @@
     - build01
     - build02
     - build03
+    - build04
     - vsphere
     service_account:
     - ci-chat-bot
@@ -111,6 +114,7 @@
     - build01
     - build02
     - build03
+    - build04
     service_account:
     - pod-scaler
 - fields:
@@ -157,3 +161,14 @@
       sa get-token --namespace openshift-monitoring ci
     name: hive-openshift-monitoring-ci-token
   item_name: hive-openshift-monitoring-credentials
+- fields:
+  - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
+      sa create-kubeconfig --namespace ci $(service_account) | sed "s/$(service_account)/$(cluster)/g"
+    name: sa.$(service_account).$(cluster).config
+  item_name: build_farm
+  params:
+    cluster:
+    - build01
+    - build02
+    service_account:
+    - sprint-automation

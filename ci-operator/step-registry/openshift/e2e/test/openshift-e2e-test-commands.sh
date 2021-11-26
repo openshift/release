@@ -285,7 +285,7 @@ do
         # if it made it to a node or not.
         if [[ -n "${TEST_REQUIRES_SSH-}" ]]; then
             echo "Attempting to gather system journal logs from each machine via ssh bastion pod"
-            mkdir -p "${ARTIFACT_DIR}/machine-journal-logs/"
+            mkdir -p "${ARTIFACT_DIR}/ssh-bastion-gather/"
 
             # This returns each IP all on one line, separated by spaces:
             machine_ips="$(oc --insecure-skip-tls-verify get machines -n openshift-machine-api -o 'jsonpath={.items[*].status.addresses[?(@.type=="InternalIP")].address}')"
@@ -293,11 +293,16 @@ do
             ingress_host="$(oc get service --all-namespaces -l run=ssh-bastion -o go-template='{{ with (index (index .items 0).status.loadBalancer.ingress 0) }}{{ or .hostname .ip }}{{end}}')"
             echo "Ingress host: $ingress_host"
 
+            # Disable errors so we keep trying hosts if any of these commands fail.
+            set +e
             for ip in $machine_ips
             do
                 echo "Gathering journalctl logs from ${ip}"
-                ssh -i "${KUBE_SSH_KEY_PATH}" -o StrictHostKeyChecking=no -o ProxyCommand="ssh -i ${KUBE_SSH_KEY_PATH} -A -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p core@${ingress_host}" core@$ip "sudo journalctl --no-pager" > "${ARTIFACT_DIR}/machine-journal-logs/${ip}-journal.log"
+                ssh -i "${KUBE_SSH_KEY_PATH}" -o StrictHostKeyChecking=no -o ProxyCommand="ssh -i ${KUBE_SSH_KEY_PATH} -A -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p core@${ingress_host}" core@$ip "sudo journalctl --no-pager" > "${ARTIFACT_DIR}/ssh-bastion-gather/${ip}-journal.log"
+                ssh -i "${KUBE_SSH_KEY_PATH}" -o StrictHostKeyChecking=no -o ProxyCommand="ssh -i ${KUBE_SSH_KEY_PATH} -A -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p core@${ingress_host}" core@$ip "sudo /sbin/ip addr show" > "${ARTIFACT_DIR}/ssh-bastion-gather/${ip}-ip-addr-show.log"
+                ssh -i "${KUBE_SSH_KEY_PATH}" -o StrictHostKeyChecking=no -o ProxyCommand="ssh -i ${KUBE_SSH_KEY_PATH} -A -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p core@${ingress_host}" core@$ip "sudo /sbin/ip route show" > "${ARTIFACT_DIR}/ssh-bastion-gather/${ip}-ip-route-show.log"
             done
+            set -e
         fi
 
         exit 1

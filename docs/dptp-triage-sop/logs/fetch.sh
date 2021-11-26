@@ -15,12 +15,16 @@ if [[ "${OSTYPE}" == "darwin"* ]]; then
   DATE_CMD=gdate
 fi
 
-query_id="$( aws --profile openshift-ci-infra --region us-east-1 logs start-query --log-group-name app-ci-pod-logs --start-time "$( ${DATE_CMD} --date '1 day ago' '+%s' )" --end-time "$( ${DATE_CMD} '+%s' )" --query-string "${query}" --query queryId --output text )"
+now=$("${DATE_CMD}" +%Y-%m-%dT%H:%M:%S)
+cmd=(aws --profile openshift-ci-infra --region us-east-1)
+query_id="$( "${cmd[@]}" logs start-query --log-group-name app-ci-pod-logs --start-time "$( ${DATE_CMD} --date '1 day ago' '+%s' )" --end-time "$( ${DATE_CMD} '+%s' )" --query-string "${query}" --query queryId --output text )"
 echo "[INFO] Log query id: ${query_id}"
 echo "[INFO] Fetching log query results..."
-out="$( mktemp /tmp/aws-logs-XXXXXXXXXX )"
+out_dir=/tmp/aws-logs-${now}
+out=${out_dir}/log.json
+mkdir "${out_dir}"
 while true; do
-	if ! aws --profile openshift-ci-infra --region us-east-1 logs get-query-results --query-id "${query_id}" --output json > "${out}" 2>&1; then
+	if ! "${cmd[@]}" logs get-query-results --query-id "${query_id}" --output json > "${out}" 2>&1; then
 		echo "[ERROR] Fetching query results failed:"
 		cat "${out}"
 		exit 1
@@ -35,7 +39,7 @@ while true; do
 	break
 done
 echo "[INFO] Found $( jq .statistics.recordsMatched <"${out}" ) matching logs, stored in ${out}"
-filtered="$( mktemp /tmp/aws-logs-XXXXXXXXXX )"
+filtered=${out_dir}/filtered.json
 docs/dptp-triage-sop/logs/filter.py "${target}" "${out}" > "${filtered}"
 echo "[INFO] Filtered to $( jq length <"${filtered}" ) matching logs, stored in ${filtered}"
 docs/dptp-triage-sop/logs/table.py "${filtered}"
