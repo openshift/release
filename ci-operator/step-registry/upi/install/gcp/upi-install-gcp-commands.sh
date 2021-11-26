@@ -227,7 +227,7 @@ CLUSTER_PUBLIC_IP="$(gcloud compute addresses describe "${INFRA_ID}-cluster-publ
 
 ### Add internal DNS entries
 echo "$(date -u --rfc-3339=seconds) - Adding internal DNS entries..."
-ret=$(gcloud --project="${HOST_PROJECT}" dns managed-zones list --filter "name=${PRIVATE_ZONE_NAME}" || echo "${PRIVATE_ZONE_NAME} not found")
+ret=$(gcloud --project="${HOST_PROJECT}" dns managed-zones list --filter "name=${PRIVATE_ZONE_NAME}" | grep ${PRIVATE_ZONE_NAME} || echo "${PRIVATE_ZONE_NAME} not found")
 if [[ $ret =~ 'not found' ]]; then
   echo ">>The private zone ${PRIVATE_ZONE_NAME} doesn't exist in project ${HOST_PROJECT}."
 else
@@ -247,7 +247,7 @@ fi
 
 ### Add external DNS entries (optional)
 echo "$(date -u --rfc-3339=seconds) - Adding external DNS entries..."
-ret=$(gcloud --project="${HOST_PROJECT}" dns managed-zones list --filter "name=${BASE_DOMAIN_ZONE_NAME}" || echo "${BASE_DOMAIN_ZONE_NAME} not found")
+ret=$(gcloud --project="${HOST_PROJECT}" dns managed-zones list --filter "name=${BASE_DOMAIN_ZONE_NAME}" | grep ${BASE_DOMAIN_ZONE_NAME} || echo "${BASE_DOMAIN_ZONE_NAME} not found")
 if [[ $ret =~ 'not found' ]]; then
   echo ">>The base domain ${BASE_DOMAIN_ZONE_NAME} doesn't exist in project ${HOST_PROJECT}."
 else
