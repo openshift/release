@@ -223,7 +223,7 @@ resources:
 EOF
 fi
 
-gcloud deployment-manager deployments create "${INFRA_ID}-infra" --config 02_infra.yaml
+gcloud deployment-manager deployments create "${INFRA_ID}-infra" --config 02_infra.yaml || gcloud --project="${HOST_PROJECT}" dns managed-zones list
 
 ## Configure infra variables
 if [ -f 02_lb_int.py ]; then # workflow using internal load balancers
@@ -311,7 +311,7 @@ resources:
 EOF
 fi
 
-if [[ -f  03_security.yaml ]]; then
+if [[ -f 03_security.yaml ]]; then
   gcloud deployment-manager deployments create "${INFRA_ID}-security" --config 03_security.yaml
 
   ## Configure security variables

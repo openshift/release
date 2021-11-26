@@ -21,6 +21,7 @@ if [[ ! -s "${SHARED_DIR}/metadata.json" ]]; then
   exit
 fi
 BASE_DOMAIN="$(cat ${CLUSTER_PROFILE_DIR}/public_hosted_zone)"
+BASE_DOMAIN_ZONE_NAME="$(gcloud dns managed-zones list --filter "DNS_NAME=${BASE_DOMAIN}." --format json | jq -r .[0].name)"
 CLUSTER_NAME="$(jq -r .clusterName "${SHARED_DIR}/metadata.json")"
 INFRA_ID="$(jq -r .infraID "${SHARED_DIR}/metadata.json")"
 
@@ -33,8 +34,8 @@ if [[ -s "${SHARED_DIR}/xpn.json" ]]; then
   HOST_PROJECT_PRIVATE_ZONE_NAME="${INFRA_ID}-private-zone"
   HOST_BASE_DOMAIN="$(jq -r '.baseDomain' "${SHARED_DIR}/xpn.json")"
   BASE_DOMAIN="${HOST_BASE_DOMAIN}"
+  BASE_DOMAIN_ZONE_NAME="$(gcloud --project="${HOST_PROJECT}" dns managed-zones list --filter "DNS_NAME=${BASE_DOMAIN}." --format json | jq -r .[0].name)"
 fi
-BASE_DOMAIN_ZONE_NAME="$(gcloud --project="${HOST_PROJECT}" dns managed-zones list --filter "DNS_NAME=${BASE_DOMAIN}." --format json | jq -r .[0].name)"
 
 # Delete the bootstrap deployment, but expect it to error.
 echo "$(date -u --rfc-3339=seconds) - Deleting bootstrap deployment (errors when bootstrap-complete)..."
