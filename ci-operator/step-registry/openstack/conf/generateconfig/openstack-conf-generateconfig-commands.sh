@@ -102,7 +102,7 @@ if [[ ${ADDITIONAL_WORKERS_NETWORKS} != "" ]]; then
     cat >> "${CONFIG}" << EOF
       additionalNetworkIDs:
 EOF
-    for network in $(echo "${ADDITIONAL_WORKERS_NETWORKS}" | tr " " "\n"); do
+    for network in $ADDITIONAL_WORKERS_NETWORKS; do
         if ! openstack network show "${network}" > /dev/null 2>&1; then
             echo "Network ${network} does not exist"
             exit 1
