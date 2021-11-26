@@ -1,12 +1,12 @@
+binary_build_commands: pip install --requirement requirements.txt
 build_root:
   image_stream_tag:
-    name: shellcheck
-    namespace: ci
-    tag: latest
+    name: ubi-python-39
+    namespace: ocp
+    tag: "8"
 images:
-- dockerfile_path: pretriage/Containerfile
-  from: src
-  to: bugwatcher-pretriage-image
+- from: bin
+  to: shiftstack-bugwatcher-image
 resources:
   '*':
     limits:
@@ -14,11 +14,12 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+test_binary_build_commands: pip install pycodestyle
 tests:
 - as: pep8
   commands: pycodestyle --verbose ./*.py
   container:
-    from: bugwatcher-pretriage-image
+    from: test-bin
 - as: bugwatcher
   cron: '*/30 * * * *'
   steps:
