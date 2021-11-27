@@ -1,4 +1,5 @@
 #!/bin/bash
+
 function queue() {
   local TARGET="${1}"
   shift
