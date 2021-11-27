@@ -1,11 +1,17 @@
 binary_build_commands: pip install --requirement requirements.txt
 build_root:
-  image_stream_tag:
-    name: ubi-python-39
-    namespace: ocp
-    tag: "8"
+  project_image:
+    dockerfile_literal: |-
+      FROM registry.access.redhat.com/ubi8/python-39
+
+      # Prow expects to be able to check out a repo under /go
+      USER 0:0
+      WORKDIR /go
+      RUN chown 1001:1001 .
+      USER 1001:1001
 images:
-- from: bin
+- dockerfile_literal: FROM scratch
+  from: bin
   to: shiftstack-bugwatcher-image
 resources:
   '*':
