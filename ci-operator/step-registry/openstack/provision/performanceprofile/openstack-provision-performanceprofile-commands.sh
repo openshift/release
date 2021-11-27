@@ -114,7 +114,9 @@ EOF
 )
 echo "Created \"$PAO_OPERATORGROUP\" OperatorGroup"
 
-channel=$(oc get packagemanifest performance-addon-operator -n openshift-marketplace -o jsonpath='{.status.defaultChannel}')
+# Force the channel to be 4.9 until 4.10 is released
+#channel=$(oc get packagemanifest performance-addon-operator -n openshift-marketplace -o jsonpath='{.status.defaultChannel}')
+channel=4.9
 PAO_SUBSCRIPTION=$(
     oc create -f - -o jsonpath='{.metadata.name}' <<EOF
 apiVersion: operators.coreos.com/v1alpha1
@@ -143,7 +145,7 @@ for _ in $(seq 1 90); do
     echo "Waiting for PAO to be installed"
     sleep 10
 done
-if [ -n "${FOUND_PAO}" ] ; then
+if [ -n "${FOUND_PAO:-}" ] ; then
     echo "PAO was installed successfully"
 else
     echo "PAO was not installed after 15 minutes"
