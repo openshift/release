@@ -22,7 +22,42 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.test-infra
+- dockerfile_literal: |
+    FROM quay.io/ocpmetal/assisted-service:latest AS service
+
+    FROM quay.io/centos/centos:8.3.2011
+
+    RUN yum -y install \
+      make \
+      gcc \
+      unzip \
+      wget \
+      curl \
+      git \
+      podman \
+      httpd-tools \
+      jq \
+      nss_wrapper \
+      python3 \
+      python3-devel \
+      libvirt-client \
+      libvirt-devel \
+      libguestfs-tools \
+        && yum clean all
+
+    RUN curl -Lo terraform.zip https://releases.hashicorp.com/terraform/0.14.11/terraform_0.14.11_linux_amd64.zip && unzip terraform.zip -d /usr/bin/ && rm -rf terraform.zip
+
+    COPY requirements.txt /tmp/
+    COPY requirements-dev.txt /tmp/
+    COPY --from=service /clients/assisted-service-client-*.tar.gz /build/pip/
+    RUN pip3 install --upgrade pip && \
+          pip3 install --no-cache-dir -I -r /tmp/requirements.txt -r /tmp/requirements-dev.txt && \
+          pip3 install --upgrade /build/pip/*
+
+    COPY . .
+
+    # setting pre-commit env
+    ENV PRE_COMMIT_HOME build
   from: src
   inputs:
     assisted-service:
