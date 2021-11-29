@@ -47,10 +47,12 @@ sos report --batch --tmp-dir /tmp/artifacts \
 cp -v -r /var/lib/libvirt/dnsmasq /tmp/artifacts/libvirt-dnsmasq
 
 # Get assisted logs
-export LOGS_DEST=/tmp/artifacts
-export KUBECTL="kubectl --kubeconfig=\${HOME}/.kube/config"
+if [ -f "\${HOME}/.kube/config" ]; then
+  export LOGS_DEST=/tmp/artifacts
+  export KUBECTL="kubectl --kubeconfig=\${HOME}/.kube/config"
 
-make download_service_logs
+  make download_service_logs
+fi
 
 export ADDITIONAL_PARAMS=""
 if [ "${SOSREPORT}" == "true" ]; then
