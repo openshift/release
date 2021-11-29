@@ -22,13 +22,17 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.test-infra
+- dockerfile_literal: |
+    FROM base
+    COPY . .
   from: src
+  to: assisted-test-infra
+- dockerfile_path: Dockerfile.assisted-test-infra
   inputs:
     assisted-service:
       as:
       - quay.io/ocpmetal/assisted-service:latest
-  to: assisted-test-infra
+  to: assisted-test-infra-internal
 promotion:
   name: assisted-test
   namespace: ocp-kni
@@ -52,7 +56,7 @@ tests:
   commands: |
     make lint
   container:
-    from: assisted-test-infra
+    from: assisted-test-infra-internal
 - as: assisted-packet-check
   cron: 0 */2 * * *
   steps:
