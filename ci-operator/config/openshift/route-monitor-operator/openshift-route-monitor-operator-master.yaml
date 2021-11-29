@@ -26,19 +26,26 @@ tests:
   container:
     from: src
 - as: test-integration
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.7"
   steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
-    env:
-      COMPUTE_NODE_TYPE: n1-standard-16
     test:
     - as: test
       cli: latest
-      commands: make test-integration
+      commands: |
+        export NAMESPACE=${NAMESPACE}-test
+        oc new-project $NAMESPACE
+        make test-integration
       from: src
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-gcp
+    workflow: generic-claim
 zz_generated_metadata:
   branch: master
   org: openshift
