@@ -54,7 +54,7 @@ release-controllers:
 	./hack/generators/release-controllers/generate-release-controllers.py .
 
 checkconfig:
-	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR):/release:z" gcr.io/k8s-prow/checkconfig:v20211122-a44ef8b769 --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
+	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR):/release:z" gcr.io/k8s-prow/checkconfig:v20211126-25bee853ec --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
 
 jobs: ci-operator-checkconfig
 	$(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/ci-operator-prowgen:latest
@@ -220,13 +220,14 @@ export force ?= false
 export kubeconfig_path ?= $(HOME)/.kube/config
 
 # these are useful for dptp-team
-# make cluster=app.ci ci-secret-bootstrap
+# make cluster=app.ci secret_names=config-updater dry_run=false force=true ci-secret-bootstrap
 ci-secret-bootstrap:
-	@./hack/ci-secret-bootstrap.sh
+	BUILD_FARM_CREDENTIALS_FOLDER=$(build_farm_credentials_folder) ./hack/ci-secret-bootstrap.sh
 .PHONY: ci-secret-bootstrap
 
+# make dry_run=false ci-secret-generator
 ci-secret-generator: build_farm_credentials_folder
-	BUILD_FARM_CREDENTIALS_FOLDER=$(build_farm_credentials_folder) dry_run=false ./hack/ci-secret-generator.sh
+	BUILD_FARM_CREDENTIALS_FOLDER=$(build_farm_credentials_folder) ./hack/ci-secret-generator.sh
 .PHONY: ci-secret-generator
 
 build_farm_credentials_folder ?= /tmp/build-farm-credentials
@@ -286,7 +287,7 @@ config_updater_vault_secret:
 		--kubeconfig=/_kubeconfig
 	mkdir -p $(build_farm_credentials_folder)
 	oc --context "$(cluster)" sa create-kubeconfig -n ci config-updater > "$(build_farm_credentials_folder)/sa.config-updater.$(cluster).config"
-	make ci-secret-generator
+	make dry_run=false ci-secret-generator
 .PHONY: config_updater_vault_secret
 
 ### one-off configuration on a build farm cluster
@@ -294,6 +295,7 @@ build_farm_day2:
 	@[[ $$cluster ]] || (echo "ERROR: \$$cluster must be set"; exit 1)
 	hack/build_farm_day2_cluster_auto_scaler.sh $(cluster)
 	hack/build_farm_day2_candidate_channel.sh $(cluster)
+	hack/build_farm_day2_image_registry.sh $(cluster)
 .PHONY: build_farm_day2
 
 # Need to run inside Red Had network

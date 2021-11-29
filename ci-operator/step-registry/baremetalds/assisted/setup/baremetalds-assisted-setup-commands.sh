@@ -10,11 +10,34 @@ echo "************ baremetalds assisted setup command ************"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
 
+export CI_CREDENTIALS_DIR=/var/run/assisted-installer-bot
+
 # Copy assisted source from current directory to the remote server
 tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/assisted.tar.gz"
 
 # Prepare configuration and run
 scp "${SSHOPTS[@]}" "${CLUSTER_PROFILE_DIR}/pull-secret" "root@${IP}:pull-secret"
+
+if [ "${ENVIRONMENT}" != "local" ]; then
+
+  if [ "${ENVIRONMENT}" = "production" ]; then
+    remote_service_url="https://api.openshift.com"
+    pull_secret_file="${CI_CREDENTIALS_DIR}/prod-pull-secret"
+  else
+    echo "Unknown environment ${ENVIRONMENT}"
+    exit 1
+  fi
+
+  scp "${SSHOPTS[@]}" "${CI_CREDENTIALS_DIR}/offline-token" "root@${IP}:offline-token"
+  scp "${SSHOPTS[@]}" "${pull_secret_file}" "root@${IP}:pull-secret"
+
+  echo "export REMOTE_SERVICE_URL=${remote_service_url}" >> "${SHARED_DIR}/assisted-additional-config"
+  echo "export NO_MINIKUBE=true" >> "${SHARED_DIR}/assisted-additional-config"
+  echo "export MAKEFILE_TARGET='create_full_environment test_parallel'" >> "${SHARED_DIR}/assisted-additional-config"
+
+  WORKER_DISK_SIZE=$(echo 120G | numfmt --from=iec)
+  echo "export WORKER_DISK=${WORKER_DISK_SIZE}" >> "${SHARED_DIR}/assisted-additional-config"
+fi
 
 # Additional mechanism to inject assisted additional variables directly
 # from a multistage step configuration.
@@ -60,6 +83,7 @@ cd "\${REPO_DIR}"
 
 set +x
 echo "export PULL_SECRET='\$(cat /root/pull-secret)'" >> /root/config
+echo "export OFFLINE_TOKEN='\$(cat /root/offline-token)'" >> /root/config
 set -x
 
 # Save Prow variables that might become handy inside the Packet server

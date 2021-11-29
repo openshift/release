@@ -3,16 +3,18 @@ workflow:
   steps:
     pre:
       - chain: ipi-openstack-pre
+      - ref: openstack-provision-performanceprofile
+      - ref: openstack-provision-vfio-noiommu
+      - ref: openstack-provision-vhostuser
     test:
-      - ref: openshift-e2e-test
+      - ref: openstack-test-nfv
     post:
       - chain: ipi-openstack-post
     env:
+      ADDITIONAL_WORKERS_NETWORKS: "hostonly"
       BASE_DOMAIN: shiftstack.devcluster.openshift.com
       CONFIG_TYPE: "minimal"
-      TEST_SKIPS: >-
-        The HAProxy router should be able to connect to a service that is idled because a GET on the route will unidle it
-      TEST_SUITE: experimental/reliability/minimal
+      OPENSTACK_PERFORMANCE_NETWORK: "hostonly"
   documentation: |-
     The openshift-e2e-openstack-nfv workflow executes an installation of
     OpenShift on OpenStack in NFV environment.

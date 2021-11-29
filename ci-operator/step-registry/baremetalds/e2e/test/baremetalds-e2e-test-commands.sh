@@ -188,6 +188,14 @@ echo "$(date) - waiting for non-samples imagesteams to import..."
 count=0
 while :
 do
+
+  # The local image registry isn't working in 4.6 and isn't needed for the
+  # subset of tests we use for this version
+  if ! is_openshift_version_gte "4.7" ; then
+    echo "Skipping imagesteams wait"
+    break
+  fi
+
   non_imported_imagestreams=$(oc -n openshift get is -o go-template='{{range .items}}{{$namespace := .metadata.namespace}}{{$name := .metadata.name}}{{range .status.tags}}{{if not .items}}{{$namespace}}/{{$name}}:{{.tag}}{{"\n"}}{{end}}{{end}}{{end}}')
   if [ -z "${non_imported_imagestreams}" ]
   then
