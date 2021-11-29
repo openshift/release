@@ -146,10 +146,16 @@ fips: true
 EOF
 fi
 
-# Lets  check the syntax of yaml file by reading it.
+# Lets check the syntax of yaml file by reading it and print a redacted version
+# for debugging.
 python -c 'import yaml;
-import sys;
-data = yaml.safe_load(open(sys.argv[1]))' "${SHARED_DIR}/install-config.yaml"
+import sys
+data = yaml.safe_load(open(sys.argv[1]))
+data["pullSecret"] = "redacted"
+if "proxy" in data:
+    data["proxy"] = "redacted"
+print(yaml.dump(data))
+' "${SHARED_DIR}/install-config.yaml" > ${ARTIFACT_DIR}/install-config.yaml
 
 # This block will remove the ports created in openstack-provision-machinesubnet-commands.sh
 # since the installer will create them again, based on install-config.yaml.
