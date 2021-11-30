@@ -15,9 +15,6 @@ if [ "${TEST_TYPE}" == "image-ecosystem" ]; then
 "[sig-devex][Feature:ImageEcosystem][python][Slow] hot deploy for openshift python image Django example should work with hot deploy"
 EOF
 fi
-if [ "${TEST_TYPE}" != "conformance-parallel" ]; then
-    exit 0
-fi
 # DNS query is blocked on s390x yellow zone
 if [ "${BRANCH}" == "4.10" ] && [ "${ARCH}" == "s390x" ]; then
     cat > "${SHARED_DIR}/excluded_tests" << EOF
