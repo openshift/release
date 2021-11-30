@@ -66,7 +66,7 @@ set -xeuo pipefail
 
 # Some Packet images have a file /usr/config left from the provisioning phase.
 # The problem is that sos expects it to be a directory. Since we don't care
-# about the Packet provisioner, remove the file is it's present.
+# about the Packet provisioner, remove the file if it's present.
 test -f /usr/config && rm -f /usr/config || true
 
 yum install -y git sysstat sos
