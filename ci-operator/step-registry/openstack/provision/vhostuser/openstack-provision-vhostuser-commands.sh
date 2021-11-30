@@ -4,77 +4,20 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-function check_workers_updating() {
-    INTERVAL=6
-    CNT=20
-
-    while [ $((CNT)) -gt 0 ]; do
-        UPDATING=false
-        while read -r i
-        do
-            name=$(echo "${i}" | awk '{print $1}')
-            updating=$(echo "${i}" | awk '{print $4}')
-            if [[ "${updating}" == "True" ]]; then
-                UPDATING=true
-            else
-                echo "Waiting for mcp ${name} to start rolling out"
-                UPDATING=false
-            fi
-        done <<< "$(oc get mcp worker --no-headers)"
-
-        if [[ "${UPDATING}" == "true" ]]; then
-            echo "Workers are rolling out"
-            return 0
-        else
-            sleep "${INTERVAL}"
-            CNT=$((CNT))-1
-        fi
-
-        if [[ $((CNT)) -eq 0 ]]; then
-            echo "Workers did not successfully start rolling out"
-            oc get mcp "${name}"
-            return 1
-        fi
-    done
-}
-
-function check_workers_updated() {
-    INTERVAL=60
-    CNT=20
-
-    while [ $((CNT)) -gt 0 ]; do
-        READY=false
-        while read -r i
-        do
-            name=$(echo "${i}" | awk '{print $1}')
-            updated=$(echo "${i}" | awk '{print $3}')
-            updating=$(echo "${i}" | awk '{print $4}')
-            degraded=$(echo "${i}" | awk '{print $5}')
-            degraded_machine_cnt=$(echo "${i}" | awk '{print $9}')
-
-            if [[ "${updated}" == "True" && "${updating}" == "False" && "${degraded}" == "False" && $((degraded_machine_cnt)) -eq 0 ]]; then
-                READY=true
-            else
-                echo "Waiting for mcp ${name} to rollout"
-                READY=false
-            fi
-        done <<< "$(oc get mcp worker --no-headers)"
-
-        if [[ "${READY}" == "true" ]]; then
-            echo "Workers have successfully rolled out"
-            return 0
-        else
-            sleep "${INTERVAL}"
-            CNT=$((CNT))-1
-        fi
-
-        if [[ $((CNT)) -eq 0 ]]; then
-            echo "Workers did not successfully roll out"
-            oc get mcp "${name}"
-            return 1
-        fi
-    done
-}
+if test -f "${SHARED_DIR}/shiftstack-ci-functions.sh"
+    source "${SHARED_DIR}/shiftstack-ci-functions.sh"
+then
+    echo "Warning: failed to find ${SHARED_DIR}/shiftstack-ci-functions.sh!"
+    CO_DIR=$(mktemp -d)
+    echo "Falling back to local copy in ${CO_DIR}"
+    git clone https://github.com/shiftstack/shiftstack-ci.git "${CO_DIR}"
+    if test -f "${CO_DIR}/shiftstack-ci-functions.sh"
+    then
+        source "${CO_DIR}/shiftstack-ci-functions.sh"
+    else
+        echo "Failed to find ${CO_DIR}/shiftstack-ci-functions.sh!"
+    fi
+fi
 
 export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
 
@@ -152,7 +95,7 @@ EOF
 )
 echo "Created \"$VHOSTUSER_MC\" MachineConfig"
 
-check_workers_updating
-check_workers_updated
+check_mcp_updating 6 20 worker
+check_mcp_updated 60 20 worker
 
 echo "MachineConfig was successfully applied to all workers"

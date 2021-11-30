@@ -1,0 +1,44 @@
+base_images:
+  installer:
+    name: "4.10"
+    namespace: ocp
+    tag: installer
+build_root:
+  image_stream_tag:
+    name: shellcheck
+    namespace: ci
+    tag: latest
+images:
+- dockerfile_literal: |-
+    FROM src
+    ADD openshift-install /usr/bin/openshift-install
+  from: src
+  inputs:
+    installer:
+      paths:
+      - destination_dir: .
+        source_path: /bin/openshift-install
+  to: openstack-installer
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.10"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-openstack-nfv
+  steps:
+    cluster_profile: openstack-nfv
+    workflow: openshift-e2e-openstack-nfv
+zz_generated_metadata:
+  branch: main
+  org: shiftstack
+  repo: shiftstack-ci
+  variant: presubmits-4.10

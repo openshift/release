@@ -2,38 +2,20 @@
 
 set -Eeuo pipefail
 
-function check_pod_status() {
-    INTERVAL=60
-    CNT=10
-    while [ $((CNT)) -gt 0 ]; do
-        READY=false
-        while read -r i
-        do
-            pod_name=$(echo "${i}" | awk '{print $1}')
-            pod_phase=$(echo "${i}" | awk '{print $3}')
-            if [[ "${pod_phase}" == "Running" ]]; then
-                READY=true
-            else
-                echo "Waiting for Pod ${pod_name} to be ready"
-                READY=false
-            fi
-        done <<< "$(oc -n "${CNF_NAMESPACE}" get pods "${CNF_POD}" --no-headers)"
-
-        if [[ "${READY}" == "true" ]]; then
-            echo "Pod ${CNF_POD} has successfully been deployed"
-            return 0
-        else
-            sleep "${INTERVAL}"
-            CNT=$((CNT))-1
-        fi
-
-        if [[ $((CNT)) -eq 0 ]]; then
-            echo "Pod ${CNF_POD} did not successfully deploy"
-            oc -n "${CNF_NAMESPACE}" get pods "${CNF_POD}"
-            return 1
-        fi
-    done
-}
+if test -f "${SHARED_DIR}/shiftstack-ci-functions.sh"
+    source "${SHARED_DIR}/shiftstack-ci-functions.sh"
+then
+    echo "Warning: failed to find ${SHARED_DIR}/shiftstack-ci-functions.sh!"
+    CO_DIR=$(mktemp -d)
+    echo "Falling back to local copy in ${CO_DIR}"
+    git clone https://github.com/shiftstack/shiftstack-ci.git "${CO_DIR}"
+    if test -f "${CO_DIR}/shiftstack-ci-functions.sh"
+    then
+        source "${CO_DIR}/shiftstack-ci-functions.sh"
+    else
+        echo "Failed to find ${CO_DIR}/shiftstack-ci-functions.sh!"
+    fi
+fi
 
 CNF_NAMESPACE="example-cnf"
 export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
@@ -133,7 +115,7 @@ spec:
 EOF
 )
 
-check_pod_status
+check_pod_ready 60 10 "${CNF_NAMESPACE}" "${CNF_POD}"
 
 POD_AFFINITY=$(oc -n "${CNF_NAMESPACE}" rsh "${CNF_POD}" taskset -pc 1)
 if [[ "${POD_AFFINITY}" == *"pid 1's current affinity list: 2"* ]]; then
