@@ -22,6 +22,8 @@ apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfigPool
 metadata:
   name: infra
+  labels:
+    operator.machineconfiguration.openshift.io/required-for-upgrade: ''
 spec:
   machineConfigSelector:
     matchExpressions:
