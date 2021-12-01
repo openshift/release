@@ -7,7 +7,7 @@ set -o pipefail
 # TODO: move to image
 curl -sL https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
 
-#export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
 declare -g MASTER_FAMILY
 declare -g MASTER_TYPE
@@ -20,25 +20,20 @@ existing_zones_setting=$(/tmp/yq r "${CONFIG}" 'controlPlane.platform.aws.zones'
 
 function join_by { local IFS="$1"; shift; echo "$*"; }
 
+# Size definition (ipi-conf-aws-ref.yaml): ref.env["SIZE_VARIANT"].documentation
 function get_master_size {
-  master_size=null
-  if [[ "${SIZE_VARIANT}" == "xlarge" ]]; then
+  master_size=xlarge
+  if [[ "${SIZE_VARIANT:-}" == "xlarge" ]]; then
+    master_size=8xlarge
+  elif [[ "${SIZE_VARIANT:-}" == "large" ]]; then
     master_size=4xlarge
-  elif [[ "${SIZE_VARIANT}" == "large" ]]; then
+  elif [[ "${SIZE_VARIANT:-}" == "compact" ]]; then
     master_size=2xlarge
-  elif [[ "${SIZE_VARIANT}" == "compact" ]]; then
-    master_size=xlarge
   fi
   echo ${master_size}
 }
 
 function set_MASTER_TYPE {
-  local size
-  size=$(get_master_size)
-  if [[ "${size}" == "null" ]]; then
-    MASTER_TYPE="${size}"
-    return
-  fi
   MASTER_TYPE="${MASTER_FAMILY}.$(get_master_size)"
 }
 
@@ -109,13 +104,13 @@ if [[ "${CLUSTER_TYPE}" == "aws-arm64" ]]; then
 else
   choose_preferred_type "${instance_preferred}" "${instance_backup}"
   arch_instance_type=${MASTER_FAMILY}
-  set_MASTER_TYPE
 fi
 
+set_MASTER_TYPE
 BOOTSTRAP_NODE_TYPE=${arch_instance_type}.large
 
 workers=3
-if [[ "${SIZE_VARIANT}" == "compact" ]]; then
+if [[ "${SIZE_VARIANT:-}" == "compact" ]]; then
   workers=0
 fi
 
