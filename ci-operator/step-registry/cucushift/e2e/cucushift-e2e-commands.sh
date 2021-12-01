@@ -9,6 +9,12 @@ if [ -f "${SHARED_DIR}/kubeconfig" ] ; then
 fi
 cp -Lrvf "${KUBECONFIG}" /tmp/kubeconfig
 
+if ! which kubectl; then
+    mkdir /tmp/bin
+    export PATH=$PATH:/tmp/bin
+    ln -s "$(which oc)" /tmp/bin/kubectl
+fi
+
 #shellcheck source=${SHARED_DIR}/runtime_env
 source "${SHARED_DIR}/runtime_env"
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then

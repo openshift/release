@@ -18,7 +18,10 @@ images:
     openshift_release_golang-1.16:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.16
-  to: gpu-init
+  to: nvidia-gpu-add-on-init-container
+promotion:
+  name: latest
+  namespace: edge-infrastructure
 resources:
   '*':
     limits:
@@ -50,6 +53,15 @@ tests:
   container:
     clone: true
     from: golangci-lint
+- as: mirror-vcsref-image
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: nvidia-gpu-add-on-init-container
+    env:
+      IMAGE_REPO: nvidia-gpu-add-on-init-container
+    test:
+    - ref: baremetalds-assisted-images-publish
 zz_generated_metadata:
   branch: main
   org: rh-ecosystem-edge
