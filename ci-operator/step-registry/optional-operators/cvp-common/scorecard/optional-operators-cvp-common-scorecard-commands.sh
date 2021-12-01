@@ -5,47 +5,72 @@ set -o errexit
 set -o pipefail
 set -x
 
+# Runs the supplied command until the non-empty output file is created
+# or retries_max is reached.
+# Takes 2 arguments - the command/function and the output file
 run_scorecard() {
-        local retries_max=3
-        local attempt_num=1
-        until [[ $(jq . "$2") ]]
-        
-        do
-            "$1"
-            if (( attempt_num==retries_max ))
-            then
-                    echo "Retry attempt number: $attempt_num of $retries_max of scorecard tests failed. No more attempts. "
-                    return 1
-            else
-                    echo "Retry attempt number: $attempt_num of $retries_max failed. Retrying."
-                    sleep 5
-                    ((attempt_num++))
-            fi
-        done
+  local retries_max=3
+  local attempt_num=1
+  until [ -s "$2" ]
+
+  do
+    if (( attempt_num>retries_max )); then
+      echo "All $retries_max attempts of scorecard tests failed. No more attempts. "
+      return 1
+    else
+      echo "Attempt $attempt_num of $retries_max."
+      sleep 5
+      ((attempt_num++))
+    fi
+      "$1" "$2"
+  done
 }
 
+# Runs the basic scorecard tests using the prepared scorecard config
+# Takes 1 argument as the output file for the scorecard command
 basic_tests() {
-operator-sdk scorecard --config "${SCORECARD_CONFIG}" \
+  OUTPUT_FILE=$1
+  operator-sdk scorecard --config "${SCORECARD_CONFIG}" \
                        --namespace "${NAMESPACE}" \
                        --kubeconfig "${KUBECONFIG}" \
                        --verbose \
                        --output json \
-                       "${OPERATOR_DIR}" > "${ARTIFACT_DIR}"/scorecard-output-basic.json || true
+                       "${OPERATOR_DIR}" > "${OUTPUT_FILE}" || true
 }
 
+# Runs the custom scorecard using the config in the operator bundle image
+# Takes 1 argument as the output file for the scorecard command
+# If the CUSTOM_SCORECARD_TESTCASE is set, runs in single test case mode:
+#    Outputs the results in xunit format and stores them in the ARTIFACT_DIR
+#    Uses the selector option to execute just a single test from the config
 custom_tests() {
-operator-sdk scorecard \
-    --namespace="${NAMESPACE}" \
-    --kubeconfig "${KUBECONFIG}" \
-    --verbose \
-    --output json \
-    --wait-time 3000s \
-    --service-account "${SCORECARD_SERVICE_ACCOUNT}" \
-    "${OPERATOR_DIR}" > "${ARTIFACT_DIR}"/scorecard-output-custom.json || true
+  OUTPUT_FILE=$1
+  if [ -n "${CUSTOM_SCORECARD_TESTCASE}" ]; then
+    operator-sdk scorecard \
+        --namespace="${NAMESPACE}" \
+        --kubeconfig "${KUBECONFIG}" \
+        --verbose \
+        --output xunit \
+        --wait-time 3000s \
+        --test-output "${ARTIFACT_DIR}" \
+        --service-account "${SCORECARD_SERVICE_ACCOUNT}" \
+        --selector=test="${CUSTOM_SCORECARD_TESTCASE}" \
+        "${OPERATOR_DIR}" > "${OUTPUT_FILE}" || true
+  else
+    operator-sdk scorecard \
+        --namespace="${NAMESPACE}" \
+        --kubeconfig "${KUBECONFIG}" \
+        --verbose \
+        --output json \
+        --wait-time 3000s \
+        --service-account "${SCORECARD_SERVICE_ACCOUNT}" \
+        "${OPERATOR_DIR}" > "${OUTPUT_FILE}" || true
+  fi
 }
 
 OPENSHIFT_AUTH="${OPENSHIFT_AUTH:-/var/run/brew-pullsecret/.dockerconfigjson}"
 SCORECARD_CONFIG="${SCORECARD_CONFIG:-/tmp/config/scorecard-basic-config.yml}"
+CUSTOM_SCORECARD_TESTCASE="${CUSTOM_SCORECARD_TESTCASE:''}"
 
 # Steps for running the basic operator-sdk scorecard test
 # Expects the standard Prow environment variables to be set and
@@ -83,9 +108,16 @@ if [ -f "${OPERATOR_DIR}/tests/scorecard/config.yaml" ]; then
     SCORECARD_SERVICE_ACCOUNT="${CUSTOM_SERVICE_ACCOUNT}"
   fi
 
+  # Use the json output format for regular custom scorecard tests
+  CUSTOM_SCORECARD_OUTPUT_FORMAT="json"
+  # Use the xunit output format if a single test case is selected
+  if [ -n "${CUSTOM_SCORECARD_TESTCASE}" ]; then
+    CUSTOM_SCORECARD_OUTPUT_FORMAT="xunit"
+  fi
+
   echo "Running the operator-sdk scorecard test using the custom, bundle-provided configuration, json output and storing it in the artifacts directory"
   # Runs the custom scorecard tests using the user-provided configuration
   # The wait-time is set higher to allow for long/complex custom tests, should be kept under 1h to not exceed pipeline max time
   # If a custom service account is defined in the scorecard config, it will be set in the '--service-account' option
-  run_scorecard custom_tests "${ARTIFACT_DIR}"/scorecard-output-custom.json
+  run_scorecard custom_tests "${ARTIFACT_DIR}"/scorecard-output-custom."${CUSTOM_SCORECARD_OUTPUT_FORMAT}"
 fi
