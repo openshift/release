@@ -13,6 +13,16 @@ presubmits:
     rerun_command: bundle test
     spec:
       containers:
+      - args:
+        - -c
+        - make test-prow
+        command:
+        - /bin/sh
+        image: quay.io/samwalke/gobuilder:latest
+        name: main
+        resources:
+          requests:
+            cpu: "1"
       - command:
         - /bin/registry
         - serve
@@ -35,16 +45,6 @@ presubmits:
         resources:
           requests:
             cpu: 100m
-      - args:
-        - -c
-        - make test-prow
-        command:
-        - /bin/sh
-        image: quay.io/samwalke/gobuilder:latest
-        name: test-prow
-        resources:
-          requests:
-            cpu: "1"
       shareProcessNamespace: true
     trigger: (?m)bundle test( please)?
   - agent: kubernetes
