@@ -21,7 +21,10 @@ spec:
 EOF
 
 # Use first eight cores on a single node for workload partitioning (see https://github.com/openshift/enhancements/blob/master/enhancements/workload-partitioning/management-workload-partitioning.md#goals)
-cat >"${SHARED_DIR}/manifest_single-node-workload-partitioning.yml" << EOF
+# ... but avoid applying workload partitioning if OCP version < 4.10 (or if OCP_VERSION is not set)
+REQUIRED_OCP_VERSION="4.10"
+if [ "$(printf '%s\n' "${REQUIRED_OCP_VERSION}" "${OCP_VERSION}" | sort --version-sort | head -n1)" = "${REQUIRED_OCP_VERSION}" ]; then 
+  cat >"${SHARED_DIR}/manifest_single-node-workload-partitioning.yml" << EOF
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfig
 metadata:
@@ -49,3 +52,4 @@ spec:
         user:
           name: root
 EOF
+fi
