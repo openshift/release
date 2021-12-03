@@ -8,24 +8,15 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: open-cluster-management
-    tag: go1.17-linux
+    tag: go1.16-linux
 images:
 - dockerfile_path: Dockerfile
   from: base
   to: work
 promotion:
-  name: "2.5"
+  disabled: true
+  name: "1.0"
   namespace: open-cluster-management
-releases:
-  initial:
-    integration:
-      name: "4.6"
-      namespace: ocp
-  latest:
-    integration:
-      include_built_images: true
-      name: "4.6"
-      namespace: ocp
 resources:
   '*':
     limits:
@@ -35,19 +26,31 @@ resources:
       memory: 200Mi
 test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
 tests:
-- as: fast-forward
-  postsubmit: true
-  steps:
-    env:
-      DESTINATION_BRANCH: release-2.5
-    workflow: ocm-ci-fastforward
-- as: backplane-fast-forward
-  postsubmit: true
-  steps:
-    env:
-      DESTINATION_BRANCH: backplane-2.0
-    workflow: ocm-ci-fastforward
+- as: build
+  commands: |
+    true
+  container:
+    from: bin
+- as: verify
+  commands: |
+    make verify -k --warn-undefined-variables
+  container:
+    from: bin
+- as: verify-deps
+  commands: |
+    make verify-deps -k --warn-undefined-variables
+  container:
+    from: bin
+- as: unit
+  commands: |
+    make test-unit --warn-undefined-variables
+  container:
+    from: test-bin
+- as: integration
+  commands: HOME=/tmp make test-integration
+  container:
+    from: test-bin
 zz_generated_metadata:
-  branch: main
+  branch: backplane-2.0
   org: open-cluster-management
   repo: work
