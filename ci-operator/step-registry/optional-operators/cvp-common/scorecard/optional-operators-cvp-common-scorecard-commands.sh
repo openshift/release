@@ -108,10 +108,10 @@ if [ -f "${OPERATOR_DIR}/tests/scorecard/config.yaml" ]; then
     SCORECARD_SERVICE_ACCOUNT="${CUSTOM_SERVICE_ACCOUNT}"
   fi
 
-  # Use the json output format for regular custom scorecard tests
+  # Use the json output format for cvp custom scorecard tests
   CUSTOM_SCORECARD_OUTPUT_FORMAT="json"
-  # Use the xunit output format if a single test case is selected
-  if [ -n "${CUSTOM_SCORECARD_TESTCASE}" ]; then
+  # Use the xunit output format for msp custom scorecard tests
+  if [ "${TEST_MODE}" == "msp" ]; then
     CUSTOM_SCORECARD_OUTPUT_FORMAT="xunit"
   fi
 
