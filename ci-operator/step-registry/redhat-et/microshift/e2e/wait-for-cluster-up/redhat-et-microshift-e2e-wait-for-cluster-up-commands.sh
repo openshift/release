@@ -44,6 +44,8 @@ source /etc/microshift-containerized/microshift-containerized.conf
 
 start=$(date '+%s')
 to=300
+
+# Wait for node to post ready
 while :; do
   if [ $(( $(date '+%s') - start )) -ge $to ]; then
     echo "timed out waiting for node to start ($to seconds)" >&2
@@ -58,6 +60,30 @@ while :; do
   fi
   sleep 10
 done
+
+
+# Wait for pods to post ready condition
+infra_pods=( kube-flannel kubevirt-hostpath-provisioner dns-default node-resolver router-default service-ca )
+
+to=120 # wait 2min per pod.
+for pod in ${infra_pods[@]}; do
+    start=$(date '+%s')
+    echo "Checking pod $pod"
+    while :; do
+        if [ $(( $(date '+%s') - start )) -ge $to ]; then
+            echo "timed out waiting for pod to post Ready: True.  ($to seconds)" >&2
+            exit 1
+        fi
+        namespace_name=( $(oc get pods -A -o custom-columns="NAMESPACE:.metadata.namespace,NAME:.metadata.name" --no-headers) )
+        is_ready="$(oc get pods -n "$namespace_name" -o jsonpath='{.items[*].status.conditions}' | jq '.[] | select(.type == "Ready") | .status == "True"')"
+        if [ "$is_ready" = "true" ]; then
+            echo "$pod posted condition Ready: True"
+            break
+        fi
+    done
+done
+
+
 EOF
 chmod +x "${HOME}"/wait_for_node_ready.sh
 
