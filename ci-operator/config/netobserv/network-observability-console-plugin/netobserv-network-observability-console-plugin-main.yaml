@@ -26,6 +26,10 @@ resources:
 tests:
 - as: ci
   commands: |
+    export HOME="/tmp"
+    export GOCACHE=/tmp/.cache
+    export XDG_CACHE_HOME=/tmp/.cache
+
     nodejs_version=v14.17.5
     nodejs_platform=linux-x64
     nodejs="node-${nodejs_version}-${nodejs_platform}"
@@ -35,15 +39,10 @@ tests:
     tar xf "${nodejs}.tar.gz"
 
     export NODEJS_HOME="/tmp/${nodejs}"
-    export PATH=$PATH:$NODEJS_HOME/bin
-
-    HOME=/tmp npm install yarn
-    export PATH=$PATH:/tmp/node_modules/.bin
+    export PATH=$PATH:$NODEJS_HOME/bin:/tmp/node_modules/.bin
     cd -
 
-    npm install && npm run build
-    npm run lint
-    npm test
+    make build lint test && git diff --exit-code
   container:
     from: src
 zz_generated_metadata:
