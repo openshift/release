@@ -29,7 +29,7 @@ run_scorecard() {
 # Runs the basic scorecard tests using the prepared scorecard config
 # Takes 1 argument as the output file for the scorecard command
 basic_tests() {
-  OUTPUT_FILE=$1
+  local OUTPUT_FILE=$1
   operator-sdk scorecard --config "${SCORECARD_CONFIG}" \
                        --namespace "${NAMESPACE}" \
                        --kubeconfig "${KUBECONFIG}" \
@@ -44,28 +44,20 @@ basic_tests() {
 #    Outputs the results in xunit format and stores them in the ARTIFACT_DIR
 #    Uses the selector option to execute just a single test from the config
 custom_tests() {
-  OUTPUT_FILE=$1
-  if [ -n "${CUSTOM_SCORECARD_TESTCASE}" ]; then
-    operator-sdk scorecard \
-        --namespace="${NAMESPACE}" \
-        --kubeconfig "${KUBECONFIG}" \
-        --verbose \
-        --output xunit \
-        --wait-time 3000s \
-        --test-output "${ARTIFACT_DIR}" \
-        --service-account "${SCORECARD_SERVICE_ACCOUNT}" \
-        --selector=test="${CUSTOM_SCORECARD_TESTCASE}" \
-        "${OPERATOR_DIR}" > "${OUTPUT_FILE}" || true
-  else
-    operator-sdk scorecard \
-        --namespace="${NAMESPACE}" \
-        --kubeconfig "${KUBECONFIG}" \
-        --verbose \
-        --output json \
-        --wait-time 3000s \
-        --service-account "${SCORECARD_SERVICE_ACCOUNT}" \
-        "${OPERATOR_DIR}" > "${OUTPUT_FILE}" || true
+  local OUTPUT_FILE=$1
+  ADDITIONAL_OPTIONS=""
+  if [[ -n "${CUSTOM_SCORECARD_TESTCASE}" && "${TEST_MODE}" == "msp" ]]; then
+    ADDITIONAL_OPTIONS="--test-output ${ARTIFACT_DIR} --selector=test=${CUSTOM_SCORECARD_TESTCASE}"
   fi
+  operator-sdk scorecard \
+      --namespace="${NAMESPACE}" \
+      --kubeconfig "${KUBECONFIG}" \
+      --verbose \
+      --output "${CUSTOM_SCORECARD_OUTPUT_FORMAT}" \
+      --wait-time 3000s \
+      ${ADDITIONAL_OPTIONS} \
+      --service-account "${SCORECARD_SERVICE_ACCOUNT}" \
+      "${OPERATOR_DIR}" > "${OUTPUT_FILE}" || true
 }
 
 OPENSHIFT_AUTH="${OPENSHIFT_AUTH:-/var/run/brew-pullsecret/.dockerconfigjson}"
