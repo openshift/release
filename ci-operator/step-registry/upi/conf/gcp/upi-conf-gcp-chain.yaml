@@ -1,8 +1,12 @@
 chain:
   as: upi-conf-gcp
   steps:
-  - chain: ipi-conf-gcp
-  - ref: upi-conf-gcp
+  - chain: ipi-conf-gcp     # generate "install-config.yaml" for GCP
+  - ref: upi-conf-gcp-vpc   # create a VPC to host the cluster
+  - ref: ipi-conf-gcp-proxy # deploy SSH bastion host
+  - ref: upi-conf-gcp       # create ignition-configs
+  env:
+    CREATE_SSH_BASTION: "no"
   documentation: >-
     This chain generates the files necessary to deploy a GCP UPI cluster.
     It creates an install-config.yaml using the ipi-conf-gcp chain.
