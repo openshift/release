@@ -13,6 +13,9 @@ export GCP_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.gcpcred"
 ## Create the VPC
 echo "$(date -u --rfc-3339=seconds) - Creating the VPC..."
 
+# TODO: move to image
+curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
+
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
 CLUSTER_NAME="$(/tmp/yq r "${CONFIG}" 'metadata.name')"
