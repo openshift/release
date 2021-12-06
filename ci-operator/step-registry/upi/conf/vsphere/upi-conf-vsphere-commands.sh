@@ -183,6 +183,9 @@ if [ $ret -ne 0 ]; then
   exit "$ret"
 fi
 
+# remove channel from CVO
+sed -i '/^  channel:/d' "manifests/cvo-overrides.yaml"
+
 ### Remove control plane machines
 echo "Removing control plane machines..."
 rm -f openshift/99_openshift-cluster-api_master-machines-*.yaml
