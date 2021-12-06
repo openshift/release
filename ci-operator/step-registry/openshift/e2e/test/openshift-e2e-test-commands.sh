@@ -127,13 +127,13 @@ azurestack)
     ;;
 vsphere)
     # shellcheck disable=SC1090
-    source "${SHARED_DIR}/govc.sh"
-    export VSPHERE_CONF_FILE="${SHARED_DIR}/vsphere.conf"
-    oc -n openshift-config get cm/cloud-provider-config -o jsonpath='{.data.config}' > "$VSPHERE_CONF_FILE"
-    # The test suite requires a vSphere config file with explicit user and password fields.
-    sed -i "/secret-name \=/c user = \"${GOVC_USERNAME}\"" "$VSPHERE_CONF_FILE"
-    sed -i "/secret-namespace \=/c password = \"${GOVC_PASSWORD}\"" "$VSPHERE_CONF_FILE"
-    export TEST_PROVIDER=vsphere;;
+    # source "${SHARED_DIR}/govc.sh"
+    # export VSPHERE_CONF_FILE="${SHARED_DIR}/vsphere.conf"
+    # oc -n openshift-config get cm/cloud-provider-config -o jsonpath='{.data.config}' > "$VSPHERE_CONF_FILE"
+    # # The test suite requires a vSphere config file with explicit user and password fields.
+    # sed -i "/secret-name \=/c user = \"${GOVC_USERNAME}\"" "$VSPHERE_CONF_FILE"
+    # sed -i "/secret-namespace \=/c password = \"${GOVC_PASSWORD}\"" "$VSPHERE_CONF_FILE"
+    export TEST_PROVIDER=none;;
 openstack*)
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/cinder_credentials.sh"
