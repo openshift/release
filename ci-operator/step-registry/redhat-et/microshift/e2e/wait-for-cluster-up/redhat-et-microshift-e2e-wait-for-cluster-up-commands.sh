@@ -78,6 +78,8 @@ for pod in ${infra_pods[@]}; do
         if [ -z "$namespace_name[2]" ]; then
             echo "Pod $pod not found"
             # Continue looping until the pod appears or timeout is reached
+            wait 10
+            continue
         fi
         is_ready="$(oc get pods -n ${namespace_name[@]} -o jsonpath='{.items[*].status.conditions}' | jq '.[] | select(.type == "Ready") | .status == "True"')"
         if [ "$is_ready" = "true" ]; then
