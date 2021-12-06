@@ -36,4 +36,5 @@ curl --silent --location --fail --show-error https://docs.projectcalico.org/mani
 curl --silent --location --fail --show-error https://docs.projectcalico.org/manifests/ocp/tigera-operator/02-configmap-calico-resources.yaml -o ${SHARED_DIR}/manifest_02-configmap-calico-resources.yaml
 curl --silent --location --fail --show-error https://docs.projectcalico.org/manifests/ocp/tigera-operator/02-tigera-operator.yaml -o ${SHARED_DIR}/manifest_02-tigera-operator.yaml
 curl --silent --location --fail --show-error https://docs.projectcalico.org/manifests/ocp/01-cr-installation.yaml -o ${SHARED_DIR}/manifest_01-cr-installation.yaml
+curl --silent --location --fail --show-error https://docs.projectcalico.org/manifests/ocp/crds/01-crd-apiserver.yaml -o ${SHARED_DIR}/manifest_01-crd-apiserver.yaml
 # end copied
