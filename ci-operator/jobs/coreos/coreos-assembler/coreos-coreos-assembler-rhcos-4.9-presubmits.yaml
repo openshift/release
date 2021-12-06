@@ -54,23 +54,24 @@ presubmits:
     branches:
     - ^rhcos-4\.9$
     - ^rhcos-4\.9-
-    cluster: build01
-    context: ci/prow/sanity
+    cluster: build04
+    context: ci/prow/rhcos
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
+      devices.kubevirt.io/kvm: "1"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-coreos-coreos-assembler-rhcos-4.9-sanity
-    rerun_command: /test sanity
+    name: pull-ci-coreos-coreos-assembler-rhcos-4.9-rhcos
+    rerun_command: /test rhcos
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=sanity
+        - --target=rhcos
         command:
         - ci-operator
         image: ci-operator:latest
@@ -97,4 +98,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )sanity,?($|\s.*)
+    trigger: (?m)^/test( | .* )rhcos,?($|\s.*)

@@ -124,6 +124,9 @@ spec:
               path: build02.kubeconfig
             - key: sa.ci-chat-bot.vsphere.config
               path: vsphere.kubeconfig
+      - name: workflows-config
+        configMap:
+          name: ci-chat-bot-workflows-config
       containers:
       - name: bot
         image: ci-chat-bot:latest
@@ -179,6 +182,9 @@ spec:
         - name: build-cluster-kubeconfigs
           mountPath: /var/build-cluster-kubeconfigs
           readOnly: true
+        - name: workflows-config
+          mountPath: /etc/workflows-config
+          readOnly: true
         env:
         - name: BOT_TOKEN
           valueFrom:
@@ -194,3 +200,4 @@ spec:
         - --github-endpoint=https://api.github.com
         - --force-pr-owner=system:serviceaccount:ci:ci-chat-bot
         - --build-cluster-kubeconfig=/var/build-cluster-kubeconfigs/build01.kubeconfig
+        - --workflow-config-path=/etc/workflows-config/workflows-config.yaml

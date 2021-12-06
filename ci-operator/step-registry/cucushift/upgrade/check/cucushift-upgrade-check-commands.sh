@@ -15,8 +15,8 @@ fi
 #shellcheck source=${SHARED_DIR}/runtime_env
 . .${SHARED_DIR}/runtime_env
 
-upuser1=$(echo "${USERS}" | cut -d ',' -f 1)
-upuser2=$(echo "${USERS}" | cut -d ',' -f 2)
+upuser1=$(echo "${USERS}" | cut -d ',' -f 30)
+upuser2=$(echo "${USERS}" | cut -d ',' -f 29)
 export BUSHSLICER_CONFIG="
 environments:
   ocp4:
