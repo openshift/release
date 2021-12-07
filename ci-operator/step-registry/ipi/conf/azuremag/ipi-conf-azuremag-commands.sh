@@ -6,7 +6,7 @@ set -o pipefail
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
-REGION="usgovvirginia" --Update
+REGION="usgovvirginia"
 echo "Azure region: ${REGION}"
 
 workers=3
@@ -28,7 +28,7 @@ platform:
   azure:
     baseDomainResourceGroupName: os4-common
     region: ${REGION}
-    cloudName: AzureUSGovernmentCloud --Update
+    cloudName: AzureUSGovernmentCloud
 controlPlane:
   name: master
   platform:
