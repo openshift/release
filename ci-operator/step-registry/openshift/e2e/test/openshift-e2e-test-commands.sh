@@ -137,7 +137,12 @@ vsphere)
 openstack*)
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/cinder_credentials.sh"
-    export TEST_PROVIDER='{"type":"openstack"}';;
+    if test -n "${HTTP_PROXY}" -o -n "${HTTPS_PROXY}"; then
+        export TEST_PROVIDER='{"type":"openstack","disconnected":true}'
+    else
+        export TEST_PROVIDER='{"type":"openstack"}'
+    fi
+    ;;
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
 *) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"; exit 1;;
 esac
