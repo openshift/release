@@ -70,24 +70,25 @@ for pod in ${infra_pods[@]}; do
     start=$(date '+%s')
     echo "Checking pod $pod"
     while :; do
-        if [ $(( $(date '+%s') - start )) -ge $to ]; then
-            echo "timed out waiting for pod ($pod) to post Ready: True.  ($to seconds)" >&2
-            exit 1
-        fi
-        namespace_name="$(oc get pods -A -o custom-columns="NAMESPACE:.metadata.namespace,NAME:.metadata.name" --no-headers | grep "$pod")"
-        ns=${namespace_name% *}
-        name=${namespace_name##* }
-        if [ -z "$name" ]; then
-            echo "Pod $pod not found"
-            # Continue looping until the pod appears or timeout is reached
-            wait 10
-            continue
-        fi
-        is_ready="$(oc get pods -n $namespace $name -o jsonpath='{.items[*].status.conditions}' | jq '.[] | select(.type == "Ready") | .status == "True"')"
-        if [ "$is_ready" = "true" ]; then
-            echo "$pod posted condition Ready: True"
-            break
-        fi
+      if [ $(( $(date '+%s') - start )) -ge $to ]; then
+        echo "timed out waiting for pod ($pod) to post Ready: True.  ($to seconds)" >&2
+        exit 1
+      fi
+      namespace_name_status=( $(oc get pods -A -o custom-columns="NAMESPACE:.metadata.namespace,NAME:.metadata.name,STATUS:.status.phase" --no-headers | grep $pod) )
+      if [ ${#namespace_name_status[@]} -lt 3 ]; then
+        echo "Pod $pod not found"
+        # Continue looping until the pod appears or timeout is reached
+        sleep 10
+        continue
+      fi
+      ns=${namespace_name_status[0]}
+      name=${namespace_name_status[1]}
+      status=${namespace_name_status[2]}
+      echo "Pod $ns/$name status: $status"
+      if [ "$status" = "Running" ]; then
+        echo "$pod posted status: $status, done"
+        break
+      fi
     done
 done
 
