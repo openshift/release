@@ -71,11 +71,11 @@ for pod in ${infra_pods[@]}; do
     echo "Checking pod $pod"
     while :; do
         if [ $(( $(date '+%s') - start )) -ge $to ]; then
-            echo "timed out waiting for pod to post Ready: True.  ($to seconds)" >&2
+            echo "timed out waiting for pod ($pod) to post Ready: True.  ($to seconds)" >&2
             exit 1
         fi
         namespace_name=( $(oc get pods -A -o custom-columns="NAMESPACE:.metadata.namespace,NAME:.metadata.name" --no-headers | grep "$pod") )
-        if [ -z "$namespace_name[2]" ]; then
+        if [ -z "${namespace_name[2]}" ]; then
             echo "Pod $pod not found"
             # Continue looping until the pod appears or timeout is reached
             wait 10
