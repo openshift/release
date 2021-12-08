@@ -870,6 +870,7 @@ presubmits:
         - --dry-run=false
         - --prowjob-kubeconfig=/var/kubeconfigs/sa.pj-rehearse.app.ci.config
         - --kubeconfig-dir=/var/kubeconfigs
+        - --rehearsal-limit=10
         command:
         - ./hack/pj-rehearse.sh
         image: pj-rehearse:latest
@@ -924,6 +925,82 @@ presubmits:
         secret:
           secretName: pj-rehearse
     trigger: (?m)^/test( | .* )pj-rehearse-blocking,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build04
+    context: ci/prow/pj-rehearse-max
+    decorate: true
+    name: pull-ci-openshift-release-master-pj-rehearse-max
+    optional: true
+    rerun_command: /test pj-rehearse-max
+    spec:
+      containers:
+      - args:
+        - --candidate-path=.
+        - --debug-log
+        - $(ARTIFACTS)/debug-log.txt
+        - --dry-run=false
+        - --prowjob-kubeconfig=/var/kubeconfigs/sa.pj-rehearse.app.ci.config
+        - --kubeconfig-dir=/var/kubeconfigs
+        - --rehearsal-limit=35
+        command:
+        - ./hack/pj-rehearse.sh
+        image: pj-rehearse:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 500m
+        volumeMounts:
+        - mountPath: /var/kubeconfigs
+          name: prowjob-kubeconfig
+      serviceAccountName: ci-operator
+      volumes:
+      - name: prowjob-kubeconfig
+        secret:
+          secretName: pj-rehearse
+    trigger: (?m)^/test( | .* )pj-rehearse-max,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build04
+    context: ci/prow/pj-rehearse-more
+    decorate: true
+    name: pull-ci-openshift-release-master-pj-rehearse-more
+    optional: true
+    rerun_command: /test pj-rehearse-more
+    spec:
+      containers:
+      - args:
+        - --candidate-path=.
+        - --debug-log
+        - $(ARTIFACTS)/debug-log.txt
+        - --dry-run=false
+        - --prowjob-kubeconfig=/var/kubeconfigs/sa.pj-rehearse.app.ci.config
+        - --kubeconfig-dir=/var/kubeconfigs
+        - --rehearsal-limit=20
+        command:
+        - ./hack/pj-rehearse.sh
+        image: pj-rehearse:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 500m
+        volumeMounts:
+        - mountPath: /var/kubeconfigs
+          name: prowjob-kubeconfig
+      serviceAccountName: ci-operator
+      volumes:
+      - name: prowjob-kubeconfig
+        secret:
+          secretName: pj-rehearse
+    trigger: (?m)^/test( | .* )pj-rehearse-more,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
