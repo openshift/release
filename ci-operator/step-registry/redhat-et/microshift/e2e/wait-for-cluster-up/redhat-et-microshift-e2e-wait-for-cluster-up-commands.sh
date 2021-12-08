@@ -63,36 +63,38 @@ done
 
 
 # Wait for pods to post ready condition
-infra_pods=( kube-flannel kubevirt-hostpath-provisioner dns-default node-resolver router-default service-ca )
 
-to=120 # wait 2min per pod.
-for pod in ${infra_pods[@]}; do
-    start=$(date '+%s')
-    echo "Checking pod $pod"
-    while :; do
-      if [ $(( $(date '+%s') - start )) -ge $to ]; then
-        echo "timed out waiting for pod ($pod) to post Ready: True.  ($to seconds)" >&2
-        exit 1
-      fi
-      namespace_name_status=( $(oc get pods -A -o custom-columns="NAMESPACE:.metadata.namespace,NAME:.metadata.name,STATUS:.status.phase" --no-headers | grep $pod) )
-      if [ ${#namespace_name_status[@]} -lt 3 ]; then
-        echo "Pod $pod not found"
-        # Continue looping until the pod appears or timeout is reached
-        sleep 10
-        continue
-      fi
-      ns=${namespace_name_status[0]}
-      name=${namespace_name_status[1]}
-      status=${namespace_name_status[2]}
-      echo "Pod $ns/$name status: $status"
-      if [ "$status" = "Running" ]; then
-        echo "$pod posted status: $status, done"
-        break
-      fi
-    done
+start=$(date '+%s')
+to=300
+
+# Until timemout, get all pods in cluster and check their phases.  If any are not "Running,"
+# wait a bit and try again.
+while :; do
+  if [ $(( $(date '+%s') - start )) -ge $to ]; then
+    echo "timed out waiting for node to start ($to seconds)" >&2
+    exit 1
+  fi
+
+  pods_statuses="$(kubectl get pods -A --no-headers -o custom-columns='NAMESPACE:.metadata.namespace,NAME:.metadata.name,STATUS:.status.phase')"
+
+  all_ready=true
+  while read -er line; do
+    ns=$(echo "$line" | awk '{ print $1 }')
+    pod=$(echo "$line" | awk '{ print $2}')
+    status=$(echo "$line" | awk '{ print $3 }')
+    echo "Pod $ns/$pod posted status: $status"
+    if [ "$status" != "Running" ]; then
+      echo "Pod $ns/$pod posted status: $status, waiting for the cluster to settle"
+      all_ready=false
+      sleep 20
+      break
+    fi
+  done <<< $pods_statuses
+  if [ "$all_ready" = "true" ]; then
+    echo "All pods posted Running, continuing"
+    break
+  fi
 done
-
-
 EOF
 chmod +x "${HOME}"/wait_for_node_ready.sh
 
