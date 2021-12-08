@@ -127,20 +127,6 @@ tests:
       COMPUTE_NODE_TYPE: m6g.xlarge
       TEST_ARGS: --from-repository quay.io/multi-arch/community-e2e-images
     workflow: openshift-e2e-aws
-- as: ocp-installer-e2e-aws-arm64
-  interval: 24h
-  steps:
-    cluster_profile: aws-arm64
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-    env:
-      BASE_DOMAIN: arm-ci.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: m6g.xlarge
-    post:
-    - chain: gather-core-dump
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-aws-pre
 - as: ocp-installer-e2e-aws-ovn-arm64
   interval: 24h
   steps:
@@ -242,7 +228,7 @@ tests:
     workflow: openshift-e2e-libvirt
 - as: ocp-jenkins-e2e-remote-libvirt-s390x
   cluster: build01
-  cron: 0 15 * * 1,2,3,4,5
+  cron: 0 15 * * *
   steps:
     cluster_profile: libvirt-s390x
     dependencies:
@@ -283,7 +269,7 @@ tests:
     workflow: openshift-e2e-libvirt
 - as: ocp-installer-remote-libvirt-s390x
   cluster: build01
-  interval: 72h
+  cron: '@weekly'
   steps:
     cluster_profile: libvirt-s390x
     dependencies:
@@ -359,7 +345,7 @@ tests:
     workflow: openshift-e2e-libvirt
 - as: ocp-installer-remote-libvirt-ppc64le
   cluster: build01
-  interval: 72h
+  cron: '@weekly'
   steps:
     cluster_profile: libvirt-ppc64le
     dependencies:
