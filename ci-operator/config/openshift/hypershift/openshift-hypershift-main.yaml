@@ -410,6 +410,8 @@ tests:
       timeout: 25m0s
     - as: conformance-tests
       commands: |-
+        export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG="${KUBECONFIG}"
+        export HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE="clusters-$(echo -n $PROW_JOB_ID|cut -d- -f-2)"
         export AWS_SHARED_CREDENTIALS_FILE=/etc/hypershift-pool-aws-credentials/credentials
         export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
         openshift-tests run openshift/conformance/serial \
@@ -425,7 +427,7 @@ tests:
           cpu: "3"
           memory: 600Mi
     workflow: generic-claim
-- as: e2e-aws-periodic-conformance
+- as: e2e-aws-pooled-periodic-conformance
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -508,6 +510,8 @@ tests:
       timeout: 25m0s
     - as: conformance-tests
       commands: |-
+        export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG="${KUBECONFIG}"
+        export HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE="clusters-$(echo -n $PROW_JOB_ID|cut -d- -f-2)"
         export AWS_SHARED_CREDENTIALS_FILE=/etc/hypershift-pool-aws-credentials/credentials
         export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
         openshift-tests run openshift/conformance/parallel \

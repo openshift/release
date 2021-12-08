@@ -7,10 +7,6 @@ base_images:
     name: golangci-lint
     namespace: ci
     tag: v1.37.1
-  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.17-openshift-4.10
 build_root:
   image_stream_tag:
     name: release
@@ -19,10 +15,6 @@ build_root:
 images:
 - dockerfile_path: Dockerfile
   from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
   to: special-resource-operator
 promotion:
   disabled: true
@@ -52,6 +44,14 @@ tests:
     make lint
   container:
     from: golangci-lint
+- as: unit
+  commands: make unit-test
+  container:
+    from: src
+- as: verify
+  commands: make verify
+  container:
+    from: src
 zz_generated_metadata:
   branch: release-4.10
   org: openshift-psap

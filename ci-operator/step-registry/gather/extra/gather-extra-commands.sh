@@ -114,6 +114,24 @@ while IFS= read -r i; do
   FILTER=gzip queue ${ARTIFACT_DIR}/nodes/$i/audit.gz oc --insecure-skip-tls-verify adm node-logs $i --unify=false --path=audit/audit.log
 done < /tmp/nodes
 
+echo "INFO: gathering the audit logs for each master"
+paths=(openshift-apiserver kube-apiserver oauth-apiserver etcd)
+for path in "${paths[@]}" ; do
+  output_dir="${ARTIFACT_DIR}/audit_logs/$path"
+  mkdir -p "$output_dir"
+  oc adm node-logs --role=master --path="$path" | \
+  tee "${ARTIFACT_DIR}/audit_logs/$path.audit_logs_listing" | \
+  grep -v ".terminating" | \
+  grep -v ".lock" | \
+  sed "s|^|$path $output_dir |"
+done | \
+xargs --max-args=4 bash -c \
+   'echo "INFO: Started  downloading $1/$4 from $3";
+    echo "INFO: gziping to $2/$3-$4.gz";
+    oc --insecure-skip-tls-verify adm node-logs $3 --path=$1/$4 | gzip > $2/$3-$4.gz;
+    echo "INFO: Finished downloading $1/$4 from $3"' \
+  bash
+
 # Snapshot iptables-save on each node for debugging possible kube-proxy issues
 oc --insecure-skip-tls-verify get --request-timeout=20s -n openshift-sdn -l app=sdn pods --template '{{ range .items }}{{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/sdn-pods
 while IFS= read -r i; do
@@ -319,7 +337,7 @@ ${t_all}     cluster:version:info:total   topk(1, max by (version) (max_over_tim
 ${t_install} cluster:version:info:install topk(1, max by (version) (max_over_time(cluster_version{type="completed"}[${d_install}])))*0+1
 
 ${t_all}     cluster:version:current:seconds count_over_time(max by (version) ((cluster_version{type="current"}))[${d_all}:1s])
-${t_test}    cluster:version:updates:seconds count_over_time(max by (version) ((cluster_version{type="updating",from_version!=""}))[${d_test}:1s])
+${t_test}    cluster:version:updates:seconds max by (from_version,version) (max_over_time(((time() - cluster_version{type="updating",version!="",from_version!=""}))[${d_test}:1s]))
 
 ${t_all}     job:duration:total:seconds vector(${s_all})
 ${t_install} job:duration:install:seconds vector(${s_install})

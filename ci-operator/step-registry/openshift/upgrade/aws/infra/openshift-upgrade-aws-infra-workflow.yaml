@@ -1,0 +1,21 @@
+workflow:
+  as: openshift-upgrade-aws-infra
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - ref: ipi-install-hosted-loki
+    - chain: ipi-aws-pre-stableinitial
+    - ref: ipi-conf-inframachineset
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - chain: ipi-aws-post
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: "release:initial"
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: "release:latest"
+    env:
+      TEST_TYPE: upgrade-paused
+      TEST_SUITE: ""
+      TEST_UPGRADE_OPTIONS: ""
+  documentation: |-
+    The Openshift E2E AWS workflow executes the upgrade end-to-end test suite on AWS with infra machineset and Loki as log collector, exercising an upgrade during the process.
