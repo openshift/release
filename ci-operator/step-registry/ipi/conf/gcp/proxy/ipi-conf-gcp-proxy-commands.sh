@@ -85,14 +85,20 @@ cat > /tmp/proxy.ign << EOF
 EOF
 }
 
-export GCP_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.gcpcred"
-
 # TODO: move to image
 curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
 PROXY_IMAGE=registry.ci.openshift.org/origin/4.5:egress-http-proxy
+
+export GCP_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.gcpcred"
+sa_email=$(jq -r .client_email ${GOOGLE_CLOUD_KEYFILE_JSON})
+if ! gcloud auth list | grep -E "\*\s+${sa_email}"
+then
+  gcloud auth activate-service-account --key-file="${GOOGLE_CLOUD_KEYFILE_JSON}"
+  gcloud config set project "$(/tmp/yq r "${CONFIG}" 'platform.gcp.projectID')"
+fi
 
 CLUSTER_NAME="$(/tmp/yq r "${CONFIG}" 'metadata.name')"
 REGION="$(/tmp/yq r "${CONFIG}" 'platform.gcp.region')"

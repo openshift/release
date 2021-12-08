@@ -17,8 +17,6 @@ export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${RELEASE_IMAGE_LATEST}"
 # Ensure ignition assets are configured with the correct invoker to track CI jobs.
 export OPENSHIFT_INSTALL_INVOKER="openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD_ID}"
 
-export GOOGLE_CLOUD_KEYFILE_JSON="${CLUSTER_PROFILE_DIR}/gce.json"
-
 dir=/tmp/installer
 mkdir "${dir}"
 pushd "${dir}"

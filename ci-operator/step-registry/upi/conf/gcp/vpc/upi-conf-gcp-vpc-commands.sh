@@ -8,15 +8,21 @@ if [[ -s "${SHARED_DIR}/xpn.json" ]]; then
   echo "$(date -u --rfc-3339=seconds) - Using pre-existing XPN VPC..." && exit 0
 fi
 
-export GCP_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.gcpcred"
-
-## Create the VPC
-echo "$(date -u --rfc-3339=seconds) - Creating the VPC..."
-
 # TODO: move to image
 curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
+
+export GCP_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.gcpcred"
+sa_email=$(jq -r .client_email ${GOOGLE_CLOUD_KEYFILE_JSON})
+if ! gcloud auth list | grep -E "\*\s+${sa_email}"
+then
+  gcloud auth activate-service-account --key-file="${GOOGLE_CLOUD_KEYFILE_JSON}"
+  gcloud config set project "$(/tmp/yq r "${CONFIG}" 'platform.gcp.projectID')"
+fi
+
+## Create the VPC
+echo "$(date -u --rfc-3339=seconds) - Creating the VPC..."
 
 CLUSTER_NAME="$(/tmp/yq r "${CONFIG}" 'metadata.name')"
 REGION="$(/tmp/yq r "${CONFIG}" 'platform.gcp.region')"

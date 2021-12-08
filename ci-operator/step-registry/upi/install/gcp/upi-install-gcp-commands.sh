@@ -25,8 +25,12 @@ if ! gcloud --version; then
 fi
 
 export GOOGLE_CLOUD_KEYFILE_JSON="${CLUSTER_PROFILE_DIR}/gce.json"
-gcloud auth activate-service-account --key-file="${GOOGLE_CLOUD_KEYFILE_JSON}"
-gcloud config set project "$(jq -r .gcp.projectID "${SHARED_DIR}/metadata.json")"
+sa_email=$(jq -r .client_email ${GOOGLE_CLOUD_KEYFILE_JSON})
+if ! gcloud auth list | grep -E "\*\s+${sa_email}"
+then
+  gcloud auth activate-service-account --key-file="${GOOGLE_CLOUD_KEYFILE_JSON}"
+  gcloud config set project "$(jq -r .gcp.projectID "${SHARED_DIR}/metadata.json")"
+fi
 
 echo "$(date -u --rfc-3339=seconds) - Copying config from shared dir..."
 dir=/tmp/installer
@@ -450,9 +454,9 @@ done;
 
 gcloud deployment-manager deployments create "${INFRA_ID}-worker" --config 06_worker.yaml
 
-# enable http proxy for XPN
-if [[ -v IS_XPN && -f "${SHARED_DIR}/client_proxy_setting.sh" ]]; then
-  echo "$(date -u --rfc-3339=seconds) - Setting up HTTP proxy, as it'll be a private cluster..."
+# enable http proxy
+if [[ -f "${SHARED_DIR}/client_proxy_setting.sh" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - Enable HTTP proxy, as it'll be a private cluster..."
   source "${SHARED_DIR}/client_proxy_setting.sh"
 fi
 
