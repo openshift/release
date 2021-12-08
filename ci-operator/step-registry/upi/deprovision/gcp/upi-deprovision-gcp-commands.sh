@@ -24,6 +24,8 @@ BASE_DOMAIN="$(cat ${CLUSTER_PROFILE_DIR}/public_hosted_zone)"
 BASE_DOMAIN_ZONE_NAME="$(gcloud dns managed-zones list --filter "DNS_NAME=${BASE_DOMAIN}." --format json | jq -r .[0].name)"
 CLUSTER_NAME="$(jq -r .clusterName "${SHARED_DIR}/metadata.json")"
 INFRA_ID="$(jq -r .infraID "${SHARED_DIR}/metadata.json")"
+REGION="$(jq -r .gcp.region "${SHARED_DIR}/metadata.json")"
+ZONE_0=$(gcloud compute regions describe ${REGION} --format=json | jq -r .zones[0] | cut -d "/" -f9)
 
 ### Read XPN config, if exists
 if [[ -s "${SHARED_DIR}/xpn.json" ]]; then
@@ -81,9 +83,15 @@ fi
 echo "$(date -u --rfc-3339=seconds) - Deleting worker, control-plane, and infra deployments..."
 gcloud deployment-manager deployments delete -q "${INFRA_ID}"-{worker,control-plane,infra}
 
+if gcloud compute instances list --filter="name=${CLUSTER_NAME}-bastion" | grep "${CLUSTER_NAME}-bastion"
+then
+  gcloud compute instances delete -q ${CLUSTER_NAME}-bastion --zone ${ZONE_0}
+fi
+
 # Only delete these deployments when they are expected to exist.
 if [[ ! -v IS_XPN ]]; then
   echo "$(date -u --rfc-3339=seconds) - Deleting security and vpc deployments..."
-  gcloud deployment-manager deployments delete -q "${INFRA_ID}"-{security,vpc}
+  gcloud deployment-manager deployments delete -q "${INFRA_ID}-security"
+  gcloud deployment-manager deployments delete -q "${CLUSTER_NAME}-vpc"
 fi
 
