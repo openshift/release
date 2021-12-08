@@ -7,21 +7,18 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.17-openshift-4.10
-binary_build_commands: go build .
+binary_build_commands: NO_DOCKER=1 make build
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.17
-canonical_go_repository: github.com/IBM-Cloud/cloud-provider-ibm
+  from_repository: true
+canonical_go_repository: github.com/openshift/machine-api-provider-gcp
 images:
-- dockerfile_path: openshift-hack/images/Dockerfile.openshift
+- dockerfile_path: Dockerfile.rhel
   from: base
   inputs:
     ocp_builder_rhel-8-golang-1.17-openshift-4.10:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
-  to: ibm-cloud-controller-manager
+  to: gcp-machine-controllers
 promotion:
   name: 4.11-priv
   namespace: ocp-private
@@ -37,33 +34,39 @@ releases:
       namespace: ocp-private
 resources:
   '*':
-    limits:
-      memory: 4Gi
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: vet
-  commands: go vet $(go list ./... | grep -v "/vendor/")
+- as: unit
+  commands: NO_DOCKER=1 make test
   container:
     from: src
-- as: test
-  commands: go test -v -race -covermode=atomic -coverprofile=cover.out $(go list ./...)
+- as: goimports
+  commands: make goimports
   container:
     from: src
-- as: fmt
-  commands: gofmt -l $(find . -type f -name '*.go'| grep -v "/vendor/")
+- as: govet
+  commands: make vet
   container:
     from: src
-- as: e2e-aws
+- as: e2e-gcp-operator
   steps:
-    cluster_profile: aws
-    workflow: openshift-e2e-aws
-- as: e2e-aws-serial
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e
+      from: stable:cluster-api-actuator-pkg
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- as: e2e-gcp
   steps:
-    cluster_profile: aws
-    workflow: openshift-e2e-aws-serial
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp
 zz_generated_metadata:
   branch: release-4.11
   org: openshift-priv
-  repo: cloud-provider-ibm
+  repo: machine-api-provider-gcp
