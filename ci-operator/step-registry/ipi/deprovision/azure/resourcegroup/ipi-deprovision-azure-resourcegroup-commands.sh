@@ -10,12 +10,28 @@ curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
 existing_rg=$(/tmp/yq r "${CONFIG}" 'platform.azure.resourceGroupName')
+cloud_name=$(/tmp/yq r "${CONFIG}" 'platform.azure.cloudName')
 
 # az should already be there
 command -v az
 
 # set the parameters we'll need as env vars
 AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+
+if [ "$cloud_name" == "AzureStackCloud" ]; then
+    AZURE_AUTH_LOCATION="${SHARED_DIR}/osServicePrincipal.json"
+
+	AZURESTACK_ENDPOINT=$(cat ${SHARED_DIR}/AZURESTACK_ENDPOINT)
+	SUFFIX_ENDPOINT=$(cat ${SHARED_DIR}/SUFFIX_ENDPOINT)
+
+	az cloud register \
+		-n PPE \
+		--endpoint-resource-manager "${AZURESTACK_ENDPOINT}" \
+		--suffix-storage-endpoint "${SUFFIX_ENDPOINT}" 
+	az cloud set -n PPE
+	az cloud update --profile 2019-03-01-hybrid
+fi
+
 AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
 AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
 AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
