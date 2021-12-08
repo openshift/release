@@ -10,7 +10,7 @@ curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
 echo "YUNFEI:"
-echo "ls ${CLUSTER_PROFILE_DIR}/"
+echo "ls -la ${CLUSTER_PROFILE_DIR}/"
 ls ${CLUSTER_PROFILE_DIR}/
 echo "cat ${CLUSTER_PROFILE_DIR}/yunjiang_test"
 cat ${CLUSTER_PROFILE_DIR}/yunjiang_test
