@@ -1,12 +1,8 @@
-presubmits:
-  openshift-priv/client-go:
+postsubmits:
+  openshift-priv/machine-api-provider-gcp:
   - agent: kubernetes
-    always_run: true
     branches:
     - ^release-4\.11$
-    - ^release-4\.11-
-    cluster: build03
-    context: ci/prow/verify
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -14,19 +10,21 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
+      ci-operator.openshift.io/is-promotion: "true"
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-client-go-release-4.11-verify
-    path_alias: github.com/openshift/client-go
-    rerun_command: /test verify
+    max_concurrency: 1
+    name: branch-ci-openshift-priv-machine-api-provider-gcp-release-4.11-images
+    path_alias: github.com/openshift/machine-api-provider-gcp
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
         - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --promote
         - --report-credentials-file=/etc/report/credentials
-        - --target=verify
+        - --target=[images]
         command:
         - ci-operator
         image: ci-operator:latest
@@ -45,6 +43,9 @@ presubmits:
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
+        - mountPath: /etc/push-secret
+          name: push-secret
+          readOnly: true
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
@@ -53,7 +54,9 @@ presubmits:
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
+      - name: push-secret
+        secret:
+          secretName: registry-push-credentials-ci-central
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )verify,?($|\s.*)

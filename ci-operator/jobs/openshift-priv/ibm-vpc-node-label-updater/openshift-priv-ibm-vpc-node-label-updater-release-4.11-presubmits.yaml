@@ -1,69 +1,10 @@
 presubmits:
-  openshift-priv/openstack-test:
+  openshift-priv/ibm-vpc-node-label-updater:
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-4\.11$
     - ^release-4\.11-
-    cluster: build02
-    context: ci/prow/build
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    hidden: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-openstack-test-release-4.11-build
-    path_alias: github.com/openshift/openstack-test
-    rerun_command: /test build
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --oauth-token-path=/usr/local/github-credentials/oauth
-        - --report-credentials-file=/etc/report/credentials
-        - --target=build
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )build,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-4\.11$
-    - ^release-4\.11-
-    cluster: build02
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -72,8 +13,8 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-openstack-test-release-4.11-images
-    path_alias: github.com/openshift/openstack-test
+    name: pull-ci-openshift-priv-ibm-vpc-node-label-updater-release-4.11-images
+    path_alias: github.com/openshift/ibm-vpc-node-label-updater
     rerun_command: /test images
     spec:
       containers:
@@ -83,7 +24,6 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --target=bin
         command:
         - ci-operator
         image: ci-operator:latest
@@ -122,30 +62,25 @@ presubmits:
     branches:
     - ^release-4\.11$
     - ^release-4\.11-
-    context: ci/prow/test
+    context: ci/prow/unit
     decorate: true
     decoration_config:
       skip_cloning: true
     hidden: true
     labels:
-      ci-operator.openshift.io/cloud: openstack-vexxhost
-      ci-operator.openshift.io/cloud-cluster-profile: openstack-vexxhost
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-openstack-test-release-4.11-test
-    path_alias: github.com/openshift/openstack-test
-    rerun_command: /test test
+    name: pull-ci-openshift-priv-ibm-vpc-node-label-updater-release-4.11-unit
+    path_alias: github.com/openshift/ibm-vpc-node-label-updater
+    rerun_command: /test unit
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/test-cluster-profile
-        - --target=test
+        - --target=unit
         command:
         - ci-operator
         image: ci-operator:latest
@@ -155,14 +90,6 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/test-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -177,18 +104,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-openstack-vexxhost
       - name: github-credentials-openshift-ci-robot-private-git-cloner
         secret:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
@@ -198,4 +113,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )test,?($|\s.*)
+    trigger: (?m)^/test( | .* )unit,?($|\s.*)
