@@ -99,6 +99,28 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-gcp
+- as: e2e-single-node-functests
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: e2e-single-node-functests
+      cli: latest
+      commands: |
+        export TOPOLOGY_MODE=SingleReplica
+        ./automation/e2e-functests/setup.sh
+        export GOFLAGS=
+        ./automation/e2e-functests/run.sh
+      dependencies:
+      - env: CI_OPERATOR_IMG
+        name: ssp-operator-container
+      - env: CI_VALIDATOR_IMG
+        name: template-validator-container
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp-single-node
 zz_generated_metadata:
   branch: master
   org: kubevirt
