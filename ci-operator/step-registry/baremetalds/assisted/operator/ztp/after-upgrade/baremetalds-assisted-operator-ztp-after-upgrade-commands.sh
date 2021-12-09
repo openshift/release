@@ -26,7 +26,8 @@ source "${SHARED_DIR}/packet-conf.sh"
 #   scp "${SSHOPTS[@]}" "${SHARED_DIR}/assisted-ztp-config" "root@${IP}:assisted-ztp-config"
 # fi
 
-tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/assisted-service.tar.gz"
+ssh "${SSHOPTS[@]}" "root@${IP}" "make bring_assisted_service"
+tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/assisted-test-infra.tar.gz"
 
 # shellcheck disable=SC2087
 ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths\{0,1\}".*/*** PULL_SECRET ***/g'
@@ -38,15 +39,15 @@ source common.sh
 source utils.sh
 source network.sh
 
-REPO_DIR="/home/assisted-service"
+REPO_DIR="/home/assisted-test-infra"
 if [ ! -d "\${REPO_DIR}" ]; then
   mkdir -p "\${REPO_DIR}"
 
-  echo "### Untar assisted-service code..."
-  tar -xzvf /root/assisted-service.tar.gz -C "\${REPO_DIR}"
+  echo "### Untar assisted-test-infra code..."
+  tar -xzvf /root/assisted-test-infra.tar.gz -C "\${REPO_DIR}"
 fi
 
-cd "\${REPO_DIR}/deploy/operator/"
+cd "\${REPO_DIR}/scripts/operator/"
 
 
 echo "### Deploying spoke cluster..."

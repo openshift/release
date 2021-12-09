@@ -15,7 +15,8 @@ fi
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
 
-tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/assisted-service.tar.gz"
+ssh "${SSHOPTS[@]}" "root@${IP}" "make bring_assisted_service"
+tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/assisted-test-infra.tar.gz"
 
 function getlogs() {
   echo "### Downloading logs..."
@@ -40,18 +41,18 @@ cp -r /var/lib/libvirt/dnsmasq /tmp/artifacts/libvirt-dnsmasq
 
 cp -R ./reports /tmp/artifacts || true
 
-REPO_DIR="/home/assisted-service"
+REPO_DIR="/home/assisted-test-infra"
 if [ ! -d "\${REPO_DIR}" ]; then
   mkdir -p "\${REPO_DIR}"
 
-  echo "### Untar assisted-service code..."
-  tar -xzvf /root/assisted-service.tar.gz -C "\${REPO_DIR}"
+  echo "### Untar assisted-test-infra code..."
+  tar -xzvf /root/assisted-test-infra.tar.gz -C "\${REPO_DIR}"
 fi
 
 cd "\${REPO_DIR}"
 
 # Get assisted logs
 export LOGS_DEST=/tmp/artifacts
-deploy/operator/gather.sh
+scripts/operator/gather.sh
 
 EOF

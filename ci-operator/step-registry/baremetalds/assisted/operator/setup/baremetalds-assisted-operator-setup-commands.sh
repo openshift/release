@@ -10,7 +10,9 @@ echo "************ baremetalds assisted operator setup command ************"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
 
-tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/assisted-service.tar.gz"
+ssh "${SSHOPTS[@]}" "root@${IP}" "make bring_assisted_service"
+tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/assisted-test-infra.tar.gz"
+
 
 # shellcheck disable=SC2087
 ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
@@ -23,12 +25,12 @@ source utils.sh
 source network.sh
 export -f wrap_if_ipv6 ipversion
 
-REPO_DIR="/home/assisted-service"
+REPO_DIR="/home/assisted-test-infra"
 if [ ! -d "\${REPO_DIR}" ]; then
   mkdir -p "\${REPO_DIR}"
 
-  echo "### Untar assisted-service code..."
-  tar -xzvf /root/assisted-service.tar.gz -C "\${REPO_DIR}"
+  echo "### Untar assisted-test-infra code..."
+  tar -xzvf /root/assisted-test-infra.tar.gz -C "\${REPO_DIR}"
 fi
 
 cd "\${REPO_DIR}"
@@ -53,6 +55,6 @@ VARS
 
 source /root/config
 
-deploy/operator/deploy.sh
+scripts/operator/deploy.sh
 
 EOF
