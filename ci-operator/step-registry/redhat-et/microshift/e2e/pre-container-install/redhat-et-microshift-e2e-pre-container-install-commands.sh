@@ -69,7 +69,7 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJE
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
-  --command 'sudo ln -s /usr/bin/oc /usr/bin/kubectl '
+  --command 'sudo ln -s /usr/bin/oc /usr/bin/kubectl'
 
 # scp openshift-test bin
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
@@ -83,17 +83,11 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJE
   rhel8user@"${INSTANCE_PREFIX}" \
   --command 'sudo mv openshift-tests /usr/bin/openshift-tests'
 
-# scp and run install.sh
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
-  --quiet \
-  --project "${GOOGLE_PROJECT_ID}" \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  --recurse /usr/bin/install.sh rhel8user@"${INSTANCE_PREFIX}":~/install.sh
-
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
-  --command 'sudo HOSTNAME=$(hostname -A) CONFIG_ENV_ONLY=true ./install.sh'
+  --command 'sudo subscription-manager repos --enable rhocp-4.8-for-rhel-8-x86_64-rpms \
+  && sudo dnf -y install cri-o cri-tools podman && sudo systemctl enable crio --now'
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \
