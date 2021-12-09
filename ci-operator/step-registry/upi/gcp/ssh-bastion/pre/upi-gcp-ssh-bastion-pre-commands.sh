@@ -200,14 +200,12 @@ else
     --allow tcp:22,tcp:3128,icmp \
     --target-tags="${CLUSTER_NAME}-bastion" || echo "Failed to create firewall-rules to allow ingress access to the SSH bastion host."
 fi
-set -x
 echo ">>------------------------------"
 ls "${CLUSTER_PROFILE_DIR}" -l
 echo ">>------------------------------"
 ls "${CLUSTER_PROFILE_DIR}/..data" -lH
 echo ">>------------------------------"
-gcloud ${project_option} compute firewall-rules list --filter="network~${NETWORK}"
-set +x
+gcloud ${project_option} compute firewall-rules list --filter="network~${NETWORK}" || echo "Lack of permissions."
 
 gcloud compute instances create "${CLUSTER_NAME}-bastion" \
   --image=${IMAGE_NAME} \
@@ -266,3 +264,8 @@ export http_proxy=${CLIENT_PROXY_URL}
 export https_proxy=${CLIENT_PROXY_URL}
 EOF
 fi
+
+# DEBUG
+echo ">>Trying to ping the bastion's public IP..."
+ping -c 4 "${PUBLIC_PROXY_IP}"
+curl --proxy "${CLIENT_PROXY_URL}" -I www.google.com --max-time 10
