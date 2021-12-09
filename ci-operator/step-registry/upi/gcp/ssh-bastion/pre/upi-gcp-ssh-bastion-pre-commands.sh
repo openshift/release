@@ -204,12 +204,7 @@ set -x
 echo ">>------------------------------"
 ls "${CLUSTER_PROFILE_DIR}" -l
 echo ">>------------------------------"
-ls "${CLUSTER_PROFILE_DIR}/..data" -l
-ret="$(ls "${CLUSTER_PROFILE_DIR}/..data" -l | awk '{print $11}')"
-echo ">>------------------------------"
-echo ${ret}
-find .
-ls -la
+ls "${CLUSTER_PROFILE_DIR}/..data" -lH
 echo ">>------------------------------"
 gcloud ${project_option} compute firewall-rules list --filter="network~${NETWORK}"
 set +x
