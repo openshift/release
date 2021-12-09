@@ -27,6 +27,11 @@ promotion:
   namespace: hypershift
   tag: latest
 releases:
+  hosted-ocp-410-ci:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.10"
   hosted-ocp-latest:
     candidate:
       product: ocp
@@ -380,6 +385,7 @@ tests:
           --name="$(echo -n $PROW_JOB_ID|cut -d- -f-2)" \
           --region=us-east-1 \
           --base-domain=ci.hypershift.devcluster.openshift.com \
+          --release-image=${OPENSHIFT_410_CI_RELEASE_IMAGE} \
           --instance-type=m5.xlarge \
           --node-pool-replicas=3
         echo "Waiting for cluster to become available"
@@ -402,6 +408,9 @@ tests:
       - mount_path: /etc/ci-pull-credentials
         name: ci-pull-credentials
         namespace: test-credentials
+      dependencies:
+      - env: OPENSHIFT_410_CI_RELEASE_IMAGE
+        name: release:hosted-ocp-410-ci
       from: bin
       grace_period: 1m0s
       resources:
@@ -480,6 +489,7 @@ tests:
           --name="$(echo -n $PROW_JOB_ID|cut -d- -f-2)" \
           --region=us-east-1 \
           --base-domain=ci.hypershift.devcluster.openshift.com \
+          --release-image=${OPENSHIFT_410_CI_RELEASE_IMAGE} \
           --instance-type=m5.xlarge \
           --node-pool-replicas=3
         echo "Waiting for cluster to become available"
@@ -502,6 +512,9 @@ tests:
       - mount_path: /etc/ci-pull-credentials
         name: ci-pull-credentials
         namespace: test-credentials
+      dependencies:
+      - env: OPENSHIFT_410_CI_RELEASE_IMAGE
+        name: release:hosted-ocp-410-ci
       from: bin
       grace_period: 1m0s
       resources:
