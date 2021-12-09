@@ -137,7 +137,7 @@ vsphere)
 openstack*)
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/cinder_credentials.sh"
-    if test -n "${HTTP_PROXY}" -o -n "${HTTPS_PROXY}"; then
+    if test -n "${HTTP_PROXY:-}" -o -n "${HTTPS_PROXY:-}"; then
         export TEST_PROVIDER='{"type":"openstack","disconnected":true}'
     else
         export TEST_PROVIDER='{"type":"openstack"}'
