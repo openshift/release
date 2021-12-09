@@ -10,6 +10,9 @@ echo "************ baremetalds assisted operator setup command ************"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
 
+echo "${SSHOPTS[@]}" "root@${IP}" "make bring_assisted_service"
+ssh "${SSHOPTS[@]}" "root@${IP}" "ls -la"
+ssh "${SSHOPTS[@]}" "root@${IP}" "find . | grep assisted-test-infra"
 ssh "${SSHOPTS[@]}" "root@${IP}" "make bring_assisted_service"
 tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/assisted-test-infra.tar.gz"
 
