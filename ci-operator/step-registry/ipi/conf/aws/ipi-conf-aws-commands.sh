@@ -11,7 +11,7 @@ export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
 echo "YUNFEI:"
 echo "ls -la ${CLUSTER_PROFILE_DIR}/"
-ls ${CLUSTER_PROFILE_DIR}/
+ls -la ${CLUSTER_PROFILE_DIR}/
 echo "cat ${CLUSTER_PROFILE_DIR}/yunjiang_test"
 cat ${CLUSTER_PROFILE_DIR}/yunjiang_test
 
