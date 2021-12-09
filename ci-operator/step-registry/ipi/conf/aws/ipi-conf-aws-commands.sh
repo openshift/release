@@ -12,8 +12,6 @@ export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 echo "YUNFEI-AWS-2:"
 echo "ls -la ${CLUSTER_PROFILE_DIR}/"
 ls -la ${CLUSTER_PROFILE_DIR}/
-echo "cat ${CLUSTER_PROFILE_DIR}/yunjiang_test"
-cat ${CLUSTER_PROFILE_DIR}/yunjiang_test
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
