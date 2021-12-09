@@ -6,6 +6,12 @@ set -o pipefail
 
 echo "************ baremetalds packet setup command ************"
 
+# Avoid requesting a bunch of servers at the same time so they
+# don't race each other for available resources in a facility
+SLEEPTIME=$(( RANDOM % 120 ))
+echo "Sleeping for $SLEEPTIME seconds"
+sleep $SLEEPTIME
+
 # Run Ansible playbook
 cd
 cat > packet-setup.yaml <<-EOF
