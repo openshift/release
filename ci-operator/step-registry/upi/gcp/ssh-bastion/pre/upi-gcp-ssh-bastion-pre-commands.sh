@@ -207,6 +207,7 @@ echo ">>------------------------------"
 ls "${CLUSTER_PROFILE_DIR}/..data" -l
 ret="$(ls "${CLUSTER_PROFILE_DIR}/..data" -l | awk '{print $11}')"
 echo ">>------------------------------"
+echo ${ret}
 find .
 ls -la
 echo ">>------------------------------"
