@@ -93,7 +93,15 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
-  --command 'sudo HOSTNAME=$(hostname -A) CONFIG_ENV_ONLY=true ./install.sh'
+  --command 'subscription-manager repos --enable rhocp-4.8-for-rhel-8-x86_64-rpms \
+            || sudo dnf module enable -y cri-o:1.21 ; \
+            sudo dnf install -y crio cri-tools podman ; \
+            sudo systemctl enable crio --now'
+
+#LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+#  --zone "${GOOGLE_COMPUTE_ZONE}" \
+#  rhel8user@"${INSTANCE_PREFIX}" \
+#  --command 'sudo HOSTNAME=$(hostname -A) CONFIG_ENV_ONLY=true ./install.sh'
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \
