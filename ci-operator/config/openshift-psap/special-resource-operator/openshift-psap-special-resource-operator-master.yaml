@@ -1,21 +1,15 @@
-base_images:
-  base:
-    name: "4.10"
-    namespace: ocp
-    tag: base
-  golangci-lint:
-    name: golangci-lint
-    namespace: ci
-    tag: v1.37.1
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.16
+    tag: golang-1.17
 images:
 - dockerfile_path: Dockerfile
-  from: base
   to: special-resource-operator
+- dockerfile_literal: |
+    FROM src
+    RUN apt update && apt install -y patch shellcheck
+  to: src-patch
 promotion:
   name: "4.10"
   namespace: ocp
@@ -42,7 +36,7 @@ tests:
     export GOPROXY=https://proxy.golang.org
     make lint
   container:
-    from: golangci-lint
+    from: src-patch
   optional: true
 - as: unit
   commands: make unit-test
