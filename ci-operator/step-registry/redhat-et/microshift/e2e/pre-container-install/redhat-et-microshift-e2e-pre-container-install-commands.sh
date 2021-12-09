@@ -1,5 +1,5 @@
 #!/bin/bash
-set -euo pipefail
+set -xeuo pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
@@ -93,7 +93,7 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
-  --command 'subscription-manager repos --enable rhocp-4.8-for-rhel-8-x86_64-rpms \
+  --command 'sudo subscription-manager repos --enable rhocp-4.8-for-rhel-8-x86_64-rpms \
             || sudo dnf module enable -y cri-o:1.21 ; \
             sudo dnf install -y cri-o cri-tools podman ; \
             sudo systemctl enable crio --now'
