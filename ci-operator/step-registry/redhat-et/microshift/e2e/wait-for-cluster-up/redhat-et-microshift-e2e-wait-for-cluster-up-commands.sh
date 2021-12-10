@@ -66,7 +66,7 @@ sleep 300
 
 # Wait for pods to post ready condition
 start=$(date '+%s')
-to=300
+to=600
 
 # Until timemout, get all pods in cluster and check their phases.  If any are not "Running,"
 # wait a bit and try again.
