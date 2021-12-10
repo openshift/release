@@ -62,20 +62,19 @@ while :; do
 done
 
 # Give microshift a bit to start infra pods
-sleep 300
+sleep 180
 
-# Wait for pods to post ready condition
 start=$(date '+%s')
 to=600
 
-# Until timemout, get all pods in cluster and check their phases.  If any are not "Running,"
-# wait a bit and try again.
+# Until timeout, get all pods in cluster and check their phases.  If any are not "Running," wait a bit and try again.
 while :; do
+  # List all pods, where each line is the 'namespace name phase\n'
+  cluster_pod_status="$(kubectl get pods -A --no-headers -o custom-columns='NAMESPACE:.metadata.namespace,NAME:.metadata.name,STATUS:.status.phase')"
 
-  pods_statuses="$(kubectl get pods -A --no-headers -o custom-columns='NAMESPACE:.metadata.namespace,NAME:.metadata.name,STATUS:.status.phase')"
-
+  # check the status of each discovered pod for "Running" status. Set all_ready=1 if any phase is not "Running"
   all_ready=0
-  while read -er line; do
+  while read -r line; do
     ns=$(echo "$line" | awk '{ print $1 }')
     pod=$(echo "$line" | awk '{ print $2}')
     status=$(echo "$line" | awk '{ print $3 }')
@@ -85,18 +84,31 @@ while :; do
       all_ready=1
       break
     fi
-  done <<< $pods_statuses
+  done <<< $cluster_pod_status
+
+  # Success state, all discovered pods posted a status of "Running"
   if [ $all_ready -eq 0 ]; then
     echo "All pods posted Running, continuing"
     break
   fi
+
+  # Fail state, some pods reported status other than "Running".  Describe non-running pods, list pods, and fail.
   if [ $(( $(date '+%s') - start )) -ge $to ]; then
+      # Describe all pods not in running state before exiting
+      while read -r line; do
+          ns=${line% *}
+          name=${line##* }
+          echo "Describing pod $ns/$name:"
+          echo "$(kubectl describe pod -n $ns $name)"
+      done <<< $(echo $cluster_pod_status | grep -v 'Running')
     echo "Infra pods failed to run after $to seconds" >&2
-    echo "$pods_statuses" >&2
+    echo "$cluster_pod_status" >&2
     exit 1
   fi
   sleep 20
 done
+
+
 EOF
 chmod +x "${HOME}"/wait_for_node_ready.sh
 
