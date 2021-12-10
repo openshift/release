@@ -104,19 +104,6 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJE
   rhel8user@"${INSTANCE_PREFIX}" \
   --command 'sudo mv openshift-tests /usr/bin/openshift-tests'
 
-## scp and run install.sh
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
-  --quiet \
-  --project "${GOOGLE_PROJECT_ID}" \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  --recurse /usr/bin/install.sh rhel8user@"${INSTANCE_PREFIX}":~/install.sh
-
-
-#LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
-#  --zone "${GOOGLE_COMPUTE_ZONE}" \
-#  rhel8user@"${INSTANCE_PREFIX}" \
-#  --command 'sudo HOSTNAME=$(hostname -A) CONFIG_ENV_ONLY=true ./install.sh'
-
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \
   --project "${GOOGLE_PROJECT_ID}" \
