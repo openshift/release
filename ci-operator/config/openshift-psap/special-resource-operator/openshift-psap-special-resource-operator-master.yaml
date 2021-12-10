@@ -11,6 +11,11 @@ build_root:
 images:
 - dockerfile_path: Dockerfile
   to: special-resource-operator
+- dockerfile_literal: |
+    FROM golangci-lint
+    RUN ["apt", "update"]
+    RUN ["apt", "install", "-y", "shellcheck"]
+  to: golangci-lint-shellcheck
 promotion:
   name: "4.10"
   namespace: ocp
@@ -35,7 +40,7 @@ tests:
     export XDG_CACHE_HOME=/tmp/.cache
     make lint
   container:
-    from: golangci-lint
+    from: golangci-lint-shellcheck
   optional: true
 - as: unit
   commands: make unit-test
