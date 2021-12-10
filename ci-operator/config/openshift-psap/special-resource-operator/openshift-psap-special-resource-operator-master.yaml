@@ -1,8 +1,4 @@
 base_images:
-  base:
-    name: "4.10"
-    namespace: ocp
-    tag: base
   golangci-lint:
     name: golangci-lint
     namespace: ci
@@ -14,14 +10,7 @@ build_root:
     tag: golang-1.16
 images:
 - dockerfile_path: Dockerfile
-  from: base
   to: special-resource-operator
-- dockerfile_literal: |-
-    FROM golangci-lint
-    RUN ["apt", "update"]
-    RUN ["apt", "install", "-y", "patch"]
-  from: golangci-lint
-  to: golangci-lint-patch
 promotion:
   name: "4.10"
   namespace: ocp
@@ -42,14 +31,9 @@ resources:
       memory: 200Mi
 tests:
 - as: lint
-  commands: |
-    export GOCACHE=/tmp/
-    export GOLANGCI_LINT_CACHE=/tmp/.cache
-    export GOPROXY=https://proxy.golang.org
-    make lint
+  commands: make lint
   container:
-    clone: true
-    from: golangci-lint-patch
+    from: golangci-lint
   optional: true
 - as: unit
   commands: make unit-test
