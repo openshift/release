@@ -27,6 +27,11 @@ promotion:
   namespace: hypershift
   tag: latest
 releases:
+  hosted-ocp-410-ci:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.10"
   hosted-ocp-latest:
     candidate:
       product: ocp
@@ -73,7 +78,7 @@ tests:
     test:
     - as: install-hypershift
       cli: latest
-      commands: make ci-install-hypershift
+      commands: make ci-install-hypershift-private
       credentials:
       - mount_path: /etc/hypershift-pool-aws-credentials
         name: hypershift-pool-aws-credentials
@@ -99,7 +104,8 @@ tests:
           --e2e.base-domain=ci.hypershift.devcluster.openshift.com \
           --e2e.latest-release-image=${OCP_IMAGE_LATEST} \
           --e2e.previous-release-image=${OCP_IMAGE_PREVIOUS} \
-          --e2e.additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)"
+          --e2e.additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
+          --e2e.aws-endpoint-access=PublicAndPrivate
       credentials:
       - mount_path: /etc/hypershift-pool-aws-credentials
         name: hypershift-pool-aws-credentials
@@ -380,6 +386,7 @@ tests:
           --name="$(echo -n $PROW_JOB_ID|cut -d- -f-2)" \
           --region=us-east-1 \
           --base-domain=ci.hypershift.devcluster.openshift.com \
+          --release-image=${OPENSHIFT_410_CI_RELEASE_IMAGE} \
           --instance-type=m5.xlarge \
           --node-pool-replicas=3
         echo "Waiting for cluster to become available"
@@ -402,6 +409,9 @@ tests:
       - mount_path: /etc/ci-pull-credentials
         name: ci-pull-credentials
         namespace: test-credentials
+      dependencies:
+      - env: OPENSHIFT_410_CI_RELEASE_IMAGE
+        name: release:hosted-ocp-410-ci
       from: bin
       grace_period: 1m0s
       resources:
@@ -480,6 +490,7 @@ tests:
           --name="$(echo -n $PROW_JOB_ID|cut -d- -f-2)" \
           --region=us-east-1 \
           --base-domain=ci.hypershift.devcluster.openshift.com \
+          --release-image=${OPENSHIFT_410_CI_RELEASE_IMAGE} \
           --instance-type=m5.xlarge \
           --node-pool-replicas=3
         echo "Waiting for cluster to become available"
@@ -502,6 +513,9 @@ tests:
       - mount_path: /etc/ci-pull-credentials
         name: ci-pull-credentials
         namespace: test-credentials
+      dependencies:
+      - env: OPENSHIFT_410_CI_RELEASE_IMAGE
+        name: release:hosted-ocp-410-ci
       from: bin
       grace_period: 1m0s
       resources:

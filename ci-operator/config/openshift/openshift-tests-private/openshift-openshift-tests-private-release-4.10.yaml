@@ -3,22 +3,38 @@ base_images:
     name: "4.10"
     namespace: ocp
     tag: cli
+  ocp_builder_rhel-8-golang-1.16-openshift-4.10:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.16-openshift-4.10
+  tools:
+    name: "4.10"
+    namespace: ocp
+    tag: tools
 binary_build_commands: make all
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: golang-1.16
+images:
+- dockerfile_path: images/Dockerfile
+  from: tools
+  inputs:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.10:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.10
+  to: tests-private
 promotion:
   disabled: true
-  name: "4.10"
-  namespace: ocp
+  namespace: ci
+  tag: "4.10"
 releases:
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.8"
+      version: "4.10"
 resources:
   '*':
     limits:
@@ -51,20 +67,24 @@ tests:
         -E "OLM.*Critical"|./bin/extended-platform-tests run -f -
       from: bin
       resources:
+        limits:
+          memory: 4Gi
         requests:
           cpu: "2"
-          memory: 4Gi
+          memory: 600Mi
     - as: pr-test
       cli: latest
       commands: make pr-test
       from: bin
       resources:
+        limits:
+          memory: 4Gi
         requests:
           cpu: "2"
-          memory: 4Gi
+          memory: 600Mi
     workflow: ipi-aws
 - as: sanity
-  cron: 0 */8 * * *
+  cron: 0 */24 * * *
   steps:
     cluster_profile: aws
     test:
@@ -73,9 +93,11 @@ tests:
       commands: make nightly-test
       from: bin
       resources:
+        limits:
+          memory: 4Gi
         requests:
           cpu: "2"
-          memory: 4Gi
+          memory: 600Mi
     workflow: ipi-aws
 zz_generated_metadata:
   branch: release-4.10

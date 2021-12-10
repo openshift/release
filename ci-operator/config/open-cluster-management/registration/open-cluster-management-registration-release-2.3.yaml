@@ -3,15 +3,23 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
+  open-cluster-management_builder_go1.17-linux:
+    name: builder
+    namespace: open-cluster-management
+    tag: go1.17-linux
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
     name: builder
     namespace: open-cluster-management
-    tag: go1.16-linux
+    tag: go1.17-linux
 images:
 - dockerfile_path: Dockerfile
   from: base
+  inputs:
+    open-cluster-management_builder_go1.17-linux:
+      as:
+      - registry.ci.openshift.org/open-cluster-management/builder:go1.17-linux
   to: registration
 promotion:
   name: "2.3"
@@ -122,6 +130,16 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+    workflow: ocm-ci-image-mirror
+- as: pr-merge-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: registration
+    env:
+      IMAGE_REPO: registration
+      IMAGE_TAG: release-2.3
+      REGISTRY_ORG: open-cluster-management
     workflow: ocm-ci-image-mirror
 zz_generated_metadata:
   branch: release-2.3

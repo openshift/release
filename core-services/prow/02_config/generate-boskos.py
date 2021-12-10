@@ -110,7 +110,7 @@ CONFIG = {
     'ibmcloud-quota-slice': {
         'default': 15,
     },
-    'alibaba-quota-slice': {
+    'alibabacloud-quota-slice': {
         'us-east-1': 10,
     },
 }
