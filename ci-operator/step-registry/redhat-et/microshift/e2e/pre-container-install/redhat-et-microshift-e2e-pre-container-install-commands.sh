@@ -32,14 +32,14 @@ gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
 gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
 gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
-cat <<EOF > crio-install.sh
+cat <<EOF > "${HOME}/crio-install.sh"
 command -v subscription-manager &> /dev/null \
     && subscription-manager repos --enable rhocp-4.8-for-rhel-8-x86_64-rpms \
         || sudo dnf module enable -y cri-o:1.21
         sudo dnf install -y cri-o cri-tools podman
         sudo systemctl enable crio --now
 EOF
-chmod +x crio-install.sh
+chmod +x "${HOME}"/crio-install.sh
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
@@ -58,12 +58,12 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \
   --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
-  --recurse crio-install.sh rhel8user@"${INSTANCE_PREFIX}":~/crio-install.sh
+  --recurse "${HOME}"/crio-install.sh rhel8user@"${INSTANCE_PREFIX}":~/crio-install.sh
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
-  --command 'sudo ./crio-install.sh'
+  --command 'sudo ~/crio-install.sh'
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
