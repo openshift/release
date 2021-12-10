@@ -41,8 +41,8 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJE
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
   --command "sudo subscription-manager register \
-  --password=$(cat /var/run/rhsm/subscription-manager-passwd ) \
-  --username=$(cat /var/run/rhsm/subscription-manager-user)"
+  --org=$(cat /var/run/rhsm/subscription-manager-org ) \
+  --activationkey=$(cat /var/run/rhsm/subscription-manager-act-key)"
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
