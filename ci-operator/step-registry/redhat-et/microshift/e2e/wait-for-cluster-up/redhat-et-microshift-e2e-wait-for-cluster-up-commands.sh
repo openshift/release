@@ -96,11 +96,14 @@ while :; do
   if [ $(( $(date '+%s') - start )) -ge $to ]; then
       # Describe all pods not in running state before exiting
       while read -r line; do
-          ns=${line% *}
-          name=${line##* }
+          if [ -n "$(echo $line | grep 'Running')" ]; then
+            continue
+          fi
+          ns="${line% *}"
+          name="${line##* }"
           echo "Describing pod $ns/$name:"
           echo "$(kubectl describe pod -n $ns $name)"
-      done <<< "$(echo $cluster_pod_status | grep -v 'Running')"
+      done <<< $cluster_pod_status
     echo "Infra pods failed to run after $to seconds" >&2
     echo "$cluster_pod_status" >&2
     exit 1
