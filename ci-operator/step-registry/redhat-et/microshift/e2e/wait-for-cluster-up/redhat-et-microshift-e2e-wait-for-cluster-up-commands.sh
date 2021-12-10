@@ -100,7 +100,7 @@ while :; do
           name=${line##* }
           echo "Describing pod $ns/$name:"
           echo "$(kubectl describe pod -n $ns $name)"
-      done <<< $(echo $cluster_pod_status | grep -v 'Running')
+      done <<< "$(echo $cluster_pod_status | grep -v 'Running')"
     echo "Infra pods failed to run after $to seconds" >&2
     echo "$cluster_pod_status" >&2
     exit 1
