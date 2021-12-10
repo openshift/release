@@ -71,10 +71,6 @@ to=300
 # Until timemout, get all pods in cluster and check their phases.  If any are not "Running,"
 # wait a bit and try again.
 while :; do
-  if [ $(( $(date '+%s') - start )) -ge $to ]; then
-    echo "timed out waiting for node to start ($to seconds)" >&2
-    exit 1
-  fi
 
   pods_statuses="$(kubectl get pods -A --no-headers -o custom-columns='NAMESPACE:.metadata.namespace,NAME:.metadata.name,STATUS:.status.phase')"
 
@@ -93,6 +89,11 @@ while :; do
   if [ $all_ready -eq 0 ]; then
     echo "All pods posted Running, continuing"
     break
+  fi
+  if [ $(( $(date '+%s') - start )) -ge $to ]; then
+    echo "Infra pods failed to run after $to seconds" >&2
+    echo "$pods_statuses" >&2
+    exit 1
   fi
   sleep 20
 done
