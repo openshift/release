@@ -301,8 +301,13 @@ if [[ -f  03_security.yaml ]]; then
   backoff gcloud projects add-iam-policy-binding "${PROJECT_NAME}" --member "serviceAccount:${WORKER_SERVICE_ACCOUNT}" --role "roles/storage.admin"
 fi
 
-## Generate a service-account-key for signing the bootstrap.ign url
-gcloud iam service-accounts keys create service-account-key.json "--iam-account=${MASTER_SERVICE_ACCOUNT}"
+if [[ -v IS_XPN ]]; then
+	SERVICE_ACCOUNT_KEY="${CLUSTER_PROFILE_DIR}/ci-xpn.json"
+else
+	SERVICE_ACCOUNT_KEY="service-account-key.json"
+	## Generate a service-account-key for signing the bootstrap.ign url
+	gcloud iam service-accounts keys create ${SERVICE_ACCOUNT_KEY} "--iam-account=${MASTER_SERVICE_ACCOUNT}"
+fi
 
 ## Create the cluster image.
 echo "$(date -u --rfc-3339=seconds) - Creating the cluster image..."
@@ -328,7 +333,7 @@ echo "$(date -u --rfc-3339=seconds) - Uploading the bootstrap.ign to a new bucke
 gsutil mb "gs://${INFRA_ID}-bootstrap-ignition"
 gsutil cp bootstrap.ign "gs://${INFRA_ID}-bootstrap-ignition/"
 
-BOOTSTRAP_IGN="$(gsutil signurl -d 1h service-account-key.json "gs://${INFRA_ID}-bootstrap-ignition/bootstrap.ign" | grep "^gs:" | awk '{print $5}')"
+BOOTSTRAP_IGN="$(gsutil signurl -d 1h ${SERVICE_ACCOUNT_KEY} "gs://${INFRA_ID}-bootstrap-ignition/bootstrap.ign" | grep "^gs:" | awk '{print $5}')"
 
 ## Launch temporary bootstrap resources
 echo "$(date -u --rfc-3339=seconds) - Launching temporary bootstrap resources..."
