@@ -39,8 +39,8 @@ gcloud compute firewall-rules create "${INSTANCE_PREFIX}" \
 
 # TODO: make this rhel8, need subscription
 gcloud compute instances create "${INSTANCE_PREFIX}" \
-  --image-family centos-stream-8 \
-  --image-project centos-cloud \
+  --image-family rhel-8 \
+  --image-project rhel-cloud \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   --machine-type e2-standard-8 \
   --boot-disk-type pd-ssd \
