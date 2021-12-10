@@ -78,6 +78,43 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- as: publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: placement
+    env:
+      IMAGE_REPO: placement
+      REGISTRY_ORG: open-cluster-management
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_COMPONENT_NAME=placement
+        export OSCI_COMPONENT_VERSION=0.3.0
+        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/open-cluster-management"
+        export SELF="make -f /opt/build-harness/Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        make -f /opt/build-harness/Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+- as: pr-merge-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: placement
+    env:
+      IMAGE_REPO: placement
+      IMAGE_TAG: release-2.5
+      REGISTRY_ORG: open-cluster-management
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
   branch: release-2.5
   org: open-cluster-management
