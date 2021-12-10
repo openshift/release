@@ -61,9 +61,10 @@ while :; do
   sleep 10
 done
 
+# Give microshift a bit to start infra pods
+sleep 300
 
 # Wait for pods to post ready condition
-
 start=$(date '+%s')
 to=300
 
@@ -77,7 +78,7 @@ while :; do
 
   pods_statuses="$(kubectl get pods -A --no-headers -o custom-columns='NAMESPACE:.metadata.namespace,NAME:.metadata.name,STATUS:.status.phase')"
 
-  all_ready=true
+  all_ready=0
   while read -er line; do
     ns=$(echo "$line" | awk '{ print $1 }')
     pod=$(echo "$line" | awk '{ print $2}')
@@ -85,15 +86,15 @@ while :; do
     echo "Pod $ns/$pod posted status: $status"
     if [ "$status" != "Running" ]; then
       echo "Pod $ns/$pod posted status: $status, waiting for the cluster to settle"
-      all_ready=false
-      sleep 20
+      all_ready=1
       break
     fi
   done <<< $pods_statuses
-  if [ "$all_ready" = "true" ]; then
+  if [ $all_ready -eq 0 ]; then
     echo "All pods posted Running, continuing"
     break
   fi
+  sleep 20
 done
 EOF
 chmod +x "${HOME}"/wait_for_node_ready.sh
