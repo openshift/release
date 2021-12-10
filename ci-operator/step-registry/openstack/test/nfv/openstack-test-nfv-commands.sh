@@ -64,21 +64,12 @@ if ! openstack network show "${OPENSTACK_PERFORMANCE_NETWORK}" >/dev/null 2>&1; 
     exit 1
 fi
 
-SUBNET_ID=$(openstack network show "${OPENSTACK_PERFORMANCE_NETWORK}" -f json -c subnets | jq '.subnets[0]' | sed 's/"//g')
-SUBNET_TAG=$(openstack subnet show "${SUBNET_ID}" -f json -c tags)
-WHEREABOUTS_RANGE=$(echo "${SUBNET_TAG}" | grep 'no_dhcp_range' || true)
-if [[ -z "${WHEREABOUTS_RANGE}" ]]; then
-    echo "Subnet ${SUBNET_ID} doesn't have a no_dhcp_range tag"
-    exit 1
-fi
-# shellcheck disable=SC2001
-WHEREABOUTS_RANGE=$(echo "${WHEREABOUTS_RANGE#*=}" | sed 's/"//g')
 cat <<EOF > "${SHARED_DIR}/additionalnetwork.yaml"
 spec:
   additionalNetworks:
   - name: ${OPENSTACK_PERFORMANCE_NETWORK}
     namespace: ${CNF_NAMESPACE}
-    rawCNIConfig: '{ "cniVersion": "0.3.1", "name": "${OPENSTACK_PERFORMANCE_NETWORK}", "type": "host-device","pciBusId": "0000:00:04.0", "ipam": { "type": "whereabouts", "range": "${WHEREABOUTS_RANGE}"}}'
+    rawCNIConfig: '{ "cniVersion": "0.3.1", "name": "${OPENSTACK_PERFORMANCE_NETWORK}", "type": "host-device","pciBusId": "0000:00:04.0", "ipam": {}}'
     type: Raw
 EOF
 oc patch network.operator cluster --patch "$(cat "${SHARED_DIR}/additionalnetwork.yaml")" --type=merge
