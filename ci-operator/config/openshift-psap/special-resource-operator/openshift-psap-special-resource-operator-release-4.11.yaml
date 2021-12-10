@@ -1,8 +1,4 @@
 base_images:
-  base:
-    name: "4.11"
-    namespace: ocp
-    tag: base
   golangci-lint:
     name: golangci-lint
     namespace: ci
@@ -14,9 +10,16 @@ build_root:
     tag: golang-1.16
 images:
 - dockerfile_path: Dockerfile
-  from: base
   to: special-resource-operator
+- dockerfile_literal: |
+    FROM golangci-lint
+    RUN ["apt", "update"]
+    RUN ["apt", "install", "-y", "shellcheck"]
+  from: golangci-lint
+  to: golangci-lint-shellcheck
 promotion:
+  excluded_images:
+  - golangci-lint-shellcheck
   name: "4.11"
   namespace: ocp
 releases:
@@ -37,13 +40,11 @@ resources:
 tests:
 - as: lint
   commands: |
-    export GOCACHE=/tmp/
-    export GOLANGCI_LINT_CACHE=/tmp/.cache
-    export GOPROXY=https://proxy.golang.org
+    export XDG_CACHE_HOME=/tmp/.cache
     make lint
   container:
-    from: golangci-lint
-  optional: true
+    clone: true
+    from: golangci-lint-shellcheck
 - as: unit
   commands: make unit-test
   container:
