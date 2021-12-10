@@ -1,9 +1,25 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
 binary_build_commands: |
-  export HOME=/tmp
-  ./mage build
+  go build -race -o /usr/bin/kn-event-sender ./cmd/kn-event-sender
 build_root:
   project_image:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
+images:
+- dockerfile_literal: |-
+    FROM base
+    ADD kn-event-sender /usr/bin/kn-event-sender
+    ENTRYPOINT ["/usr/bin/kn-event-sender"]
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/kn-event-sender
+  to: knative-client-plugin-event-sender
 releases:
   latest:
     release:
