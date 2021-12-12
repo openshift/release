@@ -117,7 +117,7 @@ if [[ -z "${NETWORK}" || -z "${CONTROL_PLANE_SUBNET}" ]]; then
     echo "Dumping the content of ${SHARED_DIR}/xpn.json" && cat "${SHARED_DIR}/xpn.json"
     NETWORK="$(jq -r '.clusterNetwork' "${SHARED_DIR}/xpn.json")"
     CONTROL_PLANE_SUBNET="$(jq -r '.controlSubnet' "${SHARED_DIR}/xpn.json")"
-    REGION="$(echo "${HOST_PROJECT_CONTROL_PLANE_SUBNET}" | cut -d/ -f9)"
+    REGION="$(echo "${CONTROL_PLANE_SUBNET}" | cut -d/ -f9)"
   fi
 fi
 if [[ -z "${NETWORK}" || -z "${CONTROL_PLANE_SUBNET}" ]]; then
