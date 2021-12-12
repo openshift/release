@@ -115,10 +115,8 @@ if [[ -z "${NETWORK}" || -z "${CONTROL_PLANE_SUBNET}" ]]; then
     CONTROL_PLANE_SUBNET=$(/tmp/yq r "${SHARED_DIR}/vpc-info.yaml" 'vpc.controlPlaneSubnet')
   elif [[ -s "${SHARED_DIR}/xpn.json" ]]; then
     echo "Dumping the content of ${SHARED_DIR}/xpn.json" && cat "${SHARED_DIR}/xpn.json"
-    HOST_PROJECT_NETWORK="$(jq -r '.clusterNetwork' "${SHARED_DIR}/xpn.json")"
-    HOST_PROJECT_CONTROL_PLANE_SUBNET="$(jq -r '.controlSubnet' "${SHARED_DIR}/xpn.json")"
-    NETWORK="${HOST_PROJECT_NETWORK}"
-    CONTROL_PLANE_SUBNET="${HOST_PROJECT_CONTROL_PLANE_SUBNET}"
+    NETWORK="$(jq -r '.clusterNetwork' "${SHARED_DIR}/xpn.json")"
+    CONTROL_PLANE_SUBNET="$(jq -r '.controlSubnet' "${SHARED_DIR}/xpn.json")"
     REGION="$(echo "${HOST_PROJECT_CONTROL_PLANE_SUBNET}" | cut -d/ -f9)"
   fi
 fi
@@ -190,18 +188,6 @@ generate_proxy_ignition
 # cannot rely on presence of ${SHARED_DIR}/metadata.json
 echo "${REGION}" >> "${SHARED_DIR}/proxyregion"
 
-if [[ -s "${SHARED_DIR}/xpn.json" ]]; then
-  HOST_PROJECT="$(jq -r '.hostProject' "${SHARED_DIR}/xpn.json")"
-  project_option="--project=${HOST_PROJECT}"
-else
-  project_option=""
-  gcloud ${project_option} compute firewall-rules create "${CLUSTER_NAME}-bastion-ingress-allow" \
-    --network ${NETWORK} \
-    --allow tcp:22,tcp:3128,icmp \
-    --target-tags="${CLUSTER_NAME}-bastion" || echo "Failed to create firewall-rules to allow ingress access to the SSH bastion host."
-fi
-gcloud ${project_option} compute firewall-rules list --filter="network~${NETWORK}" || echo "Lack of permissions."
-
 gcloud compute instances create "${CLUSTER_NAME}-bastion" \
   --image=${IMAGE_NAME} \
   --image-project=${IMAGE_PROJECT} \
@@ -215,14 +201,25 @@ gcloud compute instances create "${CLUSTER_NAME}-bastion" \
 echo "Created bastion instance"
 echo "Waiting for the proxy service starting running..." && sleep 60s
 
-if [[ ! -s "${SHARED_DIR}/xpn.json" ]]; then
-  cat > "${SHARED_DIR}/ssh-bastion-destroy.sh" << EOF
+if [[ -s "${SHARED_DIR}/xpn.json" ]]; then
+  HOST_PROJECT="$(jq -r '.hostProject' "${SHARED_DIR}/xpn.json")"
+  project_option="--project=${HOST_PROJECT}"
+else
+  project_option=""
+fi
+gcloud ${project_option} compute firewall-rules create "${CLUSTER_NAME}-bastion-ingress-allow" \
+  --network ${NETWORK} \
+  --allow tcp:22,tcp:3128,tcp:3129,tcp:5000,tcp:8080 \
+  --target-tags="${CLUSTER_NAME}-bastion"
+cat > "${SHARED_DIR}/ssh-bastion-destroy.sh" << EOF
 gcloud compute instances delete -q "${CLUSTER_NAME}-bastion" --zone=${ZONE_0}
 gcloud ${project_option} compute firewall-rules delete -q "${CLUSTER_NAME}-bastion-ingress-allow"
 EOF
-else
-  cat > "${SHARED_DIR}/ssh-bastion-destroy.sh" << EOF
-gcloud compute instances delete -q "${CLUSTER_NAME}-bastion" --zone=${ZONE_0}
+
+if [ X"${DISCONNECTED_NETWORK}" == X"yes" ]; then
+  gcloud ${project_option} compute firewall-rules create "${CLUSTER_NAME}-bastion-egress-allow" --allow='all' --direction=EGRESS --network="${NETWORK}" --target-tags="${CLUSTER_NAME}-bastion"
+  cat >> "${SHARED_DIR}/ssh-bastion-destroy.sh" << EOF
+gcloud ${project_option} compute firewall-rules delete -q "${CLUSTER_NAME}-bastion-egress-allow"
 EOF
 fi
 
@@ -241,7 +238,7 @@ PUBLIC_PROXY_IP="$(jq -r '.[].networkInterfaces[0].accessConfigs[0].natIP' /tmp/
 # echo proxy IP to ${SHARED_DIR}/proxyip
 echo "${PUBLIC_PROXY_IP}" >> "${SHARED_DIR}/proxyip"
 
-if [ X"${PROXY_FOR_DISCONNECTED_NETWORK}" == X"yes" ]; then
+if [ X"${DISCONNECTED_NETWORK}" == X"yes" ]; then
   PROXY_URL="http://${CLUSTER_NAME}:${PASSWORD}@${PRIVATE_PROXY_IP}:3128/"
   # due to https://bugzilla.redhat.com/show_bug.cgi?id=1750650 we don't use a tls end point for squid
 
@@ -252,7 +249,7 @@ proxy:
 EOF
 fi
 
-if [ X"${PROXY_FOR_PRIVATE_NETWORK}" == X"yes" ]; then
+if [ X"${PUBLISH_STRATEGY}" == X"Internal" ]; then
   CLIENT_PROXY_URL="http://${CLUSTER_NAME}:${PASSWORD}@${PUBLIC_PROXY_IP}:3128/"
   cat > "${SHARED_DIR}/proxy.sh" << EOF
 export http_proxy=${CLIENT_PROXY_URL}

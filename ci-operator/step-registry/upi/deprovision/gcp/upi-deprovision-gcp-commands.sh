@@ -36,6 +36,7 @@ fi
 echo "$(date -u --rfc-3339=seconds) - Deleting bootstrap deployment (errors when bootstrap-complete)..."
 if gcloud deployment-manager deployments list --filter="name=${INFRA_ID}-bootstrap" | grep "${INFRA_ID}-bootstrap"
 then
+  echo "$(date -u --rfc-3339=seconds) - Deleting bootstrap deployment..."
   gcloud deployment-manager deployments delete -q "${INFRA_ID}-bootstrap"
 fi
 
@@ -44,7 +45,8 @@ echo "$(date -u --rfc-3339=seconds) - Deleting worker, control-plane, and infra 
 gcloud deployment-manager deployments delete -q "${INFRA_ID}"-{worker,control-plane,infra}
 
 # Only delete these deployments when they are expected to exist.
-if [[ ! -v IS_XPN ]]; then
+if gcloud deployment-manager deployments list --filter="name=${INFRA_ID}-security" | grep "${INFRA_ID}-security"
+then
   echo "$(date -u --rfc-3339=seconds) - Deleting security deployment..."
   gcloud deployment-manager deployments delete -q "${INFRA_ID}-security"
 fi

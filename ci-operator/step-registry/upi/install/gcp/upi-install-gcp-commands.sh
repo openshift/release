@@ -31,9 +31,6 @@ then
   gcloud auth activate-service-account --key-file="${GCP_SHARED_CREDENTIALS_FILE}"
   gcloud config set project "$(jq -r .gcp.projectID "${SHARED_DIR}/metadata.json")"
 fi
-echo ">>------------------------------"
-ls "${CLUSTER_PROFILE_DIR}" -l
-echo ">>------------------------------"
 
 echo "$(date -u --rfc-3339=seconds) - Copying config from shared dir..."
 dir=/tmp/installer
@@ -49,6 +46,9 @@ cp -t "${dir}/auth" \
 cp -t "${dir}" \
     "/var/lib/openshift-install/upi/${CLUSTER_TYPE}"/*
 tar -xzf "${SHARED_DIR}/.openshift_install_state.json.tgz"
+echo ">>------------------------------"
+ls -l
+echo ">>------------------------------"
 
 function backoff() {
     local attempt=0
@@ -106,9 +106,13 @@ if [[ -s "${SHARED_DIR}/xpn.json" ]]; then
   HOST_PROJECT_PRIVATE_ZONE_DNS_NAME="$(gcloud --project="${HOST_PROJECT}" dns managed-zones list --filter="name~${HOST_PROJECT_PRIVATE_ZONE_NAME}" --format json | jq -r '.[].dnsName' | sed 's/.$//')"
   echo ">>HOST_PROJECT_PRIVATE_ZONE_DNS_NAME: '${HOST_PROJECT_PRIVATE_ZONE_DNS_NAME}'"
   gcloud --project="${HOST_PROJECT}" dns managed-zones list
+
+  #project_option="--project=${HOST_PROJECT} --account=${HOST_PROJECT_ACCOUNT}"
+  project_option="--project=${HOST_PROJECT}"
 else
   # Set HOST_PROJECT to the cluster project so commands with `--project` work in both scenarios.
   HOST_PROJECT="${PROJECT_NAME}"
+  project_option=""
 fi
 
 ## Configure VPC variables
@@ -128,42 +132,16 @@ else
 fi
 
 ## Create DNS entries and load balancers
-echo "$(date -u --rfc-3339=seconds) - Creating load balancers and DNS zone..."
 if [[ -v IS_XPN ]]; then
   echo "$(date -u --rfc-3339=seconds) - Using pre-existing XPN private zone..."
   PRIVATE_ZONE_NAME="${HOST_PROJECT_PRIVATE_ZONE_NAME}"
   BASE_DOMAIN="${HOST_PROJECT_PRIVATE_ZONE_DNS_NAME}"
-  cat <<EOF > 02_infra.yaml
-imports:
-- path: 02_lb_ext.py
-- path: 02_lb_int.py
-resources:
-- name: cluster-lb-ext
-  type: 02_lb_ext.py
-  properties:
-    infra_id: '${INFRA_ID}'
-    region: '${REGION}'
-- name: cluster-lb-int
-  type: 02_lb_int.py
-  properties:
-    cluster_network: '${CLUSTER_NETWORK}'
-    control_subnet: '${CONTROL_SUBNET}'
-    infra_id: '${INFRA_ID}'
-    region: '${REGION}'
-    zones:
-    - '${ZONE_0}'
-    - '${ZONE_1}'
-    - '${ZONE_2}'
-EOF
-elif [ -f 02_lb_int.py ]; then # for workflow using internal load balancers
-  # https://github.com/openshift/installer/pull/3270
-  # https://github.com/openshift/installer/pull/2574
+else
+  echo "$(date -u --rfc-3339=seconds) - Creating DNS zone..."
   PRIVATE_ZONE_NAME="${INFRA_ID}-private-zone"
   cat <<EOF > 02_infra.yaml
 imports:
 - path: 02_dns.py
-- path: 02_lb_ext.py
-- path: 02_lb_int.py
 resources:
 - name: cluster-dns
   type: 02_dns.py
@@ -171,6 +149,33 @@ resources:
     infra_id: '${INFRA_ID}'
     cluster_domain: '${CLUSTER_NAME}.${BASE_DOMAIN}'
     cluster_network: '${CLUSTER_NETWORK}'
+EOF
+  gcloud ${project_option} deployment-manager deployments create "${INFRA_ID}-dns" --config 02_dns.yaml
+fi
+
+if [ X"${PUBLISH_STRATEGY}" == X"Internal" ]; then
+  cat <<EOF > 02_infra.yaml
+imports:
+- path: 02_lb_int.py
+resources:
+- name: cluster-lb-int
+  type: 02_lb_int.py
+  properties:
+    cluster_network: '${CLUSTER_NETWORK}'
+    control_subnet: '${CONTROL_SUBNET}'
+    infra_id: '${INFRA_ID}'
+    region: '${REGION}'
+    zones:
+    - '${ZONE_0}'
+    - '${ZONE_1}'
+    - '${ZONE_2}'
+EOF
+else
+  cat <<EOF > 02_infra.yaml
+imports:
+- path: 02_lb_ext.py
+- path: 02_lb_int.py
+resources:
 - name: cluster-lb-ext
   type: 02_lb_ext.py
   properties:
@@ -188,74 +193,44 @@ resources:
     - '${ZONE_1}'
     - '${ZONE_2}'
 EOF
-else # for workflow before splitting up 02_infra.py
-  PRIVATE_ZONE_NAME="${INFRA_ID}-private-zone"
-  cat <<EOF > 02_infra.yaml
-imports:
-- path: 02_infra.py
-resources:
-- name: cluster-infra
-  type: 02_infra.py
-  properties:
-    infra_id: '${INFRA_ID}'
-    region: '${REGION}'
-    cluster_domain: '${CLUSTER_NAME}.${BASE_DOMAIN}'
-    cluster_network: '${CLUSTER_NETWORK}'
-EOF
 fi
-
 gcloud deployment-manager deployments create "${INFRA_ID}-infra" --config 02_infra.yaml
 
 ## Configure infra variables
-if [ -f 02_lb_int.py ]; then # workflow using internal load balancers
-  # https://github.com/openshift/installer/pull/3270
-  CLUSTER_IP="$(gcloud compute addresses describe "${INFRA_ID}-cluster-ip" "--region=${REGION}" --format json | jq -r .address)"
-else # for workflow before internal load balancers
-  CLUSTER_IP="$(gcloud compute addresses describe "${INFRA_ID}-cluster-public-ip" "--region=${REGION}" --format json | jq -r .address)"
-fi
+CLUSTER_IP="$(gcloud compute addresses describe "${INFRA_ID}-cluster-ip" "--region=${REGION}" --format json | jq -r .address)"
 CLUSTER_PUBLIC_IP="$(gcloud compute addresses describe "${INFRA_ID}-cluster-public-ip" "--region=${REGION}" --format json | jq -r .address)"
 
 ### Add internal DNS entries
-ret=$(gcloud --project="${HOST_PROJECT}" dns managed-zones list --filter "name=${PRIVATE_ZONE_NAME}" 2> /dev/null)
-if [[ -z $ret ]]; then
-  echo ">>The private zone ${PRIVATE_ZONE_NAME} doesn't exist in project ${HOST_PROJECT}."
-else
-  echo "$(date -u --rfc-3339=seconds) - Adding internal DNS entries..."
-  if [ -f transaction.yaml ]; then rm transaction.yaml; fi
-  gcloud --project="${HOST_PROJECT}" dns record-sets transaction start --zone "${PRIVATE_ZONE_NAME}"
-  gcloud --project="${HOST_PROJECT}" dns record-sets transaction add "${CLUSTER_IP}" --name "api.${CLUSTER_NAME}.${BASE_DOMAIN}." --ttl 60 --type A --zone "${PRIVATE_ZONE_NAME}"
-  gcloud --project="${HOST_PROJECT}" dns record-sets transaction add "${CLUSTER_IP}" --name "api-int.${CLUSTER_NAME}.${BASE_DOMAIN}." --ttl 60 --type A --zone "${PRIVATE_ZONE_NAME}"
-  gcloud --project="${HOST_PROJECT}" dns record-sets transaction execute --zone "${PRIVATE_ZONE_NAME}"
-fi
+echo "$(date -u --rfc-3339=seconds) - Adding internal DNS entries..."
+if [ -f transaction.yaml ]; then rm transaction.yaml; fi
+gcloud --project="${HOST_PROJECT}" dns record-sets transaction start --zone "${PRIVATE_ZONE_NAME}"
+gcloud --project="${HOST_PROJECT}" dns record-sets transaction add "${CLUSTER_IP}" --name "api.${CLUSTER_NAME}.${BASE_DOMAIN}." --ttl 60 --type A --zone "${PRIVATE_ZONE_NAME}"
+gcloud --project="${HOST_PROJECT}" dns record-sets transaction add "${CLUSTER_IP}" --name "api-int.${CLUSTER_NAME}.${BASE_DOMAIN}." --ttl 60 --type A --zone "${PRIVATE_ZONE_NAME}"
+gcloud --project="${HOST_PROJECT}" dns record-sets transaction execute --zone "${PRIVATE_ZONE_NAME}"
 
 ### Add external DNS entries (optional)
-ret=$(gcloud --project="${HOST_PROJECT}" dns managed-zones list --filter "name=${BASE_DOMAIN_ZONE_NAME}" 2> /dev/null)
-if [[ -z $ret ]]; then
-  echo ">>The base domain ${BASE_DOMAIN_ZONE_NAME} doesn't exist in project ${HOST_PROJECT}."
-else
-  echo "$(date -u --rfc-3339=seconds) - Adding external DNS entries..."
-  if [ -f transaction.yaml ]; then rm transaction.yaml; fi
-  gcloud --project="${HOST_PROJECT}" dns record-sets transaction start --zone "${BASE_DOMAIN_ZONE_NAME}"
-  gcloud --project="${HOST_PROJECT}" dns record-sets transaction add "${CLUSTER_PUBLIC_IP}" --name "api.${CLUSTER_NAME}.${BASE_DOMAIN}." --ttl 60 --type A --zone "${BASE_DOMAIN_ZONE_NAME}"
-  gcloud --project="${HOST_PROJECT}" dns record-sets transaction execute --zone "${BASE_DOMAIN_ZONE_NAME}"
+if [ X"${PUBLISH_STRATEGY}" != X"Internal" ]; then
+  ret=$(gcloud --project="${HOST_PROJECT}" dns managed-zones list --filter "name=${BASE_DOMAIN_ZONE_NAME}" 2> /dev/null)
+  if [[ -z $ret ]]; then
+    echo ">>The base domain ${BASE_DOMAIN_ZONE_NAME} doesn't exist in project ${HOST_PROJECT}."
+  else
+    echo "$(date -u --rfc-3339=seconds) - Adding external DNS entries..."
+    if [ -f transaction.yaml ]; then rm transaction.yaml; fi
+    gcloud --project="${HOST_PROJECT}" dns record-sets transaction start --zone "${BASE_DOMAIN_ZONE_NAME}"
+    gcloud --project="${HOST_PROJECT}" dns record-sets transaction add "${CLUSTER_PUBLIC_IP}" --name "api.${CLUSTER_NAME}.${BASE_DOMAIN}." --ttl 60 --type A --zone "${BASE_DOMAIN_ZONE_NAME}"
+    gcloud --project="${HOST_PROJECT}" dns record-sets transaction execute --zone "${BASE_DOMAIN_ZONE_NAME}"
+  fi
 fi
 
 ## Create firewall rules and IAM roles
 echo "$(date -u --rfc-3339=seconds) - Creating service accounts and firewall rules..."
-if [[ -v IS_XPN ]]; then
-  echo "$(date -u --rfc-3339=seconds) - Using pre-existing XPN firewall rules..."
-  echo "$(date -u --rfc-3339=seconds) - using pre-existing XPN service accounts..."
-  MASTER_SERVICE_ACCOUNT="${HOST_PROJECT_CONTROL_SERVICE_ACCOUNT}"
-  WORKER_SERVICE_ACCOUNT="${HOST_PROJECT_COMPUTE_SERVICE_ACCOUNT}"
-  ret=$(gcloud iam service-accounts keys create service-account-key.json "--iam-account=${MASTER_SERVICE_ACCOUNT}" || echo "Failed to create key with the service-account ${MASTER_SERVICE_ACCOUNT}.")
-  if [[ $ret =~ "Failed to create key" ]]; then
-    echo ">>Using tmp SA as the MASTER_SERVICE_ACCOUNT."
-    MASTER_SERVICE_ACCOUNT=$(jq -r .client_email ${GCP_SHARED_CREDENTIALS_FILE})
-    cp ${GCP_SHARED_CREDENTIALS_FILE} service-account-key.json
-  fi
-elif [ -f 03_firewall.py ]; then # for workflow using 03_iam.py and 03_firewall.py
-  # https://github.com/openshift/installer/pull/2574
-  cat <<EOF > 03_security.yaml
+allowed_external_cidr=""
+if [ X"${PUBLISH_STRATEGY}" == X"Internal" ]; then
+	allowed_external_cidr="${NETWORK_CIDR}"
+else
+	allowed_external_cidr="0.0.0.0/0"
+fi
+cat <<EOF > 03_security.yaml
 imports:
 - path: 03_firewall.py
 - path: 03_iam.py
@@ -263,7 +238,7 @@ resources:
 - name: cluster-firewall
   type: 03_firewall.py
   properties:
-    allowed_external_cidr: '0.0.0.0/0'
+    allowed_external_cidr: '${allowed_external_cidr}'
     infra_id: '${INFRA_ID}'
     cluster_network: '${CLUSTER_NETWORK}'
     network_cidr: '${NETWORK_CIDR}'
@@ -272,47 +247,35 @@ resources:
   properties:
     infra_id: '${INFRA_ID}'
 EOF
-else # for  workflow before splitting out 03_firewall.py
-  MASTER_NAT_IP="$(gcloud compute addresses describe "${INFRA_ID}-master-nat-ip" --region "${REGION}" --format json | jq -r .address)"
-  WORKER_NAT_IP="$(gcloud compute addresses describe "${INFRA_ID}-worker-nat-ip" --region "${REGION}" --format json | jq -r .address)"
-  cat <<EOF > 03_security.yaml
-imports:
-- path: 03_security.py
-resources:
-- name: cluster-security
-  type: 03_security.py
-  properties:
-    infra_id: '${INFRA_ID}'
-    cluster_network: '${CLUSTER_NETWORK}'
-    network_cidr: '${NETWORK_CIDR}'
-    master_nat_ip: '${MASTER_NAT_IP}'
-    worker_nat_ip: '${WORKER_NAT_IP}'
-EOF
-fi
+gcloud deployment-manager deployments create "${INFRA_ID}-security" --config 03_security.yaml
 
-if [[ -f  03_security.yaml ]]; then
-  gcloud deployment-manager deployments create "${INFRA_ID}-security" --config 03_security.yaml
+## Configure security variables
+MASTER_SERVICE_ACCOUNT="$(gcloud iam service-accounts list --filter "email~^${INFRA_ID}-m@${PROJECT_NAME}." --format json | jq -r '.[0].email')"
+WORKER_SERVICE_ACCOUNT="$(gcloud iam service-accounts list --filter "email~^${INFRA_ID}-w@${PROJECT_NAME}." --format json | jq -r '.[0].email')"
 
-  ## Configure security variables
-  MASTER_SERVICE_ACCOUNT="$(gcloud iam service-accounts list --filter "email~^${INFRA_ID}-m@${PROJECT_NAME}." --format json | jq -r '.[0].email')"
-  WORKER_SERVICE_ACCOUNT="$(gcloud iam service-accounts list --filter "email~^${INFRA_ID}-w@${PROJECT_NAME}." --format json | jq -r '.[0].email')"
+## Add required roles to IAM service accounts
+echo "$(date -u --rfc-3339=seconds) - Adding required roles to IAM service accounts..."
+backoff gcloud projects add-iam-policy-binding "${PROJECT_NAME}" --member "serviceAccount:${MASTER_SERVICE_ACCOUNT}" --role "roles/compute.instanceAdmin"
+backoff gcloud projects add-iam-policy-binding "${PROJECT_NAME}" --member "serviceAccount:${MASTER_SERVICE_ACCOUNT}" --role "roles/compute.networkAdmin"
+backoff gcloud projects add-iam-policy-binding "${PROJECT_NAME}" --member "serviceAccount:${MASTER_SERVICE_ACCOUNT}" --role "roles/compute.securityAdmin"
+backoff gcloud projects add-iam-policy-binding "${PROJECT_NAME}" --member "serviceAccount:${MASTER_SERVICE_ACCOUNT}" --role "roles/iam.serviceAccountUser"
+backoff gcloud projects add-iam-policy-binding "${PROJECT_NAME}" --member "serviceAccount:${MASTER_SERVICE_ACCOUNT}" --role "roles/storage.admin"
 
-  ## Add required roles to IAM service accounts
-  echo "$(date -u --rfc-3339=seconds) - Adding required roles to IAM service accounts..."
-  backoff gcloud projects add-iam-policy-binding "${PROJECT_NAME}" --member "serviceAccount:${MASTER_SERVICE_ACCOUNT}" --role "roles/compute.instanceAdmin"
-  backoff gcloud projects add-iam-policy-binding "${PROJECT_NAME}" --member "serviceAccount:${MASTER_SERVICE_ACCOUNT}" --role "roles/compute.networkAdmin"
-  backoff gcloud projects add-iam-policy-binding "${PROJECT_NAME}" --member "serviceAccount:${MASTER_SERVICE_ACCOUNT}" --role "roles/compute.securityAdmin"
-  backoff gcloud projects add-iam-policy-binding "${PROJECT_NAME}" --member "serviceAccount:${MASTER_SERVICE_ACCOUNT}" --role "roles/iam.serviceAccountUser"
-  backoff gcloud projects add-iam-policy-binding "${PROJECT_NAME}" --member "serviceAccount:${MASTER_SERVICE_ACCOUNT}" --role "roles/storage.admin"
+backoff gcloud projects add-iam-policy-binding "${PROJECT_NAME}" --member "serviceAccount:${WORKER_SERVICE_ACCOUNT}" --role "roles/compute.viewer"
+backoff gcloud projects add-iam-policy-binding "${PROJECT_NAME}" --member "serviceAccount:${WORKER_SERVICE_ACCOUNT}" --role "roles/storage.admin"
 
-  backoff gcloud projects add-iam-policy-binding "${PROJECT_NAME}" --member "serviceAccount:${WORKER_SERVICE_ACCOUNT}" --role "roles/compute.viewer"
-  backoff gcloud projects add-iam-policy-binding "${PROJECT_NAME}" --member "serviceAccount:${WORKER_SERVICE_ACCOUNT}" --role "roles/storage.admin"
+if [ X"${ENABLE_GCP_XPN}" == X"yes" ]; then
+  backoff gcloud ${project_option} projects add-iam-policy-binding ${HOST_PROJECT} --member "serviceAccount:${MASTER_SERVICE_ACCOUNT_EMAIL}" --role 'roles/compute.networkViewer'
+
+  backoff gcloud ${project_option} compute networks subnets add-iam-policy-binding "${CONTROL_SUBNET}" --member "serviceAccount:${MASTER_SERVICE_ACCOUNT}" --role 'roles/compute.networkUser' --region ${REGION}
+  backoff gcloud ${project_option} compute networks subnets add-iam-policy-binding "${CONTROL_SUBNET}" --member "serviceAccount:${WORKER_SERVICE_ACCOUNT}" --role 'roles/compute.networkUser' --region ${REGION}
+
+  backoff gcloud ${project_option} compute networks subnets add-iam-policy-binding "${COMPUTE_SUBNET}" --member "serviceAccount:${MASTER_SERVICE_ACCOUNT}" --role 'roles/compute.networkUser' --region ${REGION}
+  backoff gcloud ${project_option} compute networks subnets add-iam-policy-binding "${COMPUTE_SUBNET}" --member "serviceAccount:${WORKER_SERVICE_ACCOUNT}" --role 'roles/compute.networkUser' --region ${REGION}
 fi
 
 ## Generate a service-account-key for signing the bootstrap.ign url
-if [ ! -f 'service-account-key.json' ]; then
-  gcloud iam service-accounts keys create service-account-key.json "--iam-account=${MASTER_SERVICE_ACCOUNT}"
-fi
+gcloud iam service-accounts keys create service-account-key.json "--iam-account=${MASTER_SERVICE_ACCOUNT}"
 
 ## Create the cluster image.
 echo "$(date -u --rfc-3339=seconds) - Creating the cluster image..."
@@ -364,15 +327,8 @@ gcloud deployment-manager deployments create "${INFRA_ID}-bootstrap" --config 04
 
 ## Add the bootstrap instance to the load balancers
 echo "$(date -u --rfc-3339=seconds) - Adding the bootstrap instance to the load balancers..."
-if [ -f 02_lb_int.py ]; then # for workflow using internal load balancers
-  # https://github.com/openshift/installer/pull/3270
-  # https://github.com/openshift/installer/pull/3309
-  gcloud compute instance-groups unmanaged add-instances "${INFRA_ID}-bootstrap-instance-group" "--zone=${ZONE_0}" "--instances=${INFRA_ID}-bootstrap"
-  gcloud compute backend-services add-backend "${INFRA_ID}-api-internal-backend-service" "--region=${REGION}" "--instance-group=${INFRA_ID}-bootstrap-instance-group" "--instance-group-zone=${ZONE_0}"
-else # for workflow before internal load balancers
-  gcloud compute target-pools add-instances "${INFRA_ID}-ign-target-pool" "--instances-zone=${ZONE_0}" "--instances=${INFRA_ID}-bootstrap"
-  gcloud compute target-pools add-instances "${INFRA_ID}-api-target-pool" "--instances-zone=${ZONE_0}" "--instances=${INFRA_ID}-bootstrap"
-fi
+gcloud compute instance-groups unmanaged add-instances "${INFRA_ID}-bootstrap-instance-group" "--zone=${ZONE_0}" "--instances=${INFRA_ID}-bootstrap"
+gcloud compute backend-services add-backend "${INFRA_ID}-api-internal-backend-service" "--region=${REGION}" "--instance-group=${INFRA_ID}-bootstrap-instance-group" "--instance-group-zone=${ZONE_0}"
 
 BOOTSTRAP_IP="$(gcloud compute addresses describe --region "${REGION}" "${INFRA_ID}-bootstrap-public-ip" --format json | jq -r .address)"
 GATHER_BOOTSTRAP_ARGS=('--bootstrap' "${BOOTSTRAP_IP}")
@@ -438,21 +394,16 @@ gcloud "--project=${HOST_PROJECT}" dns record-sets transaction execute --zone "$
 
 ## Add control plane instances to load balancers
 echo "$(date -u --rfc-3339=seconds) - Adding control plane instances to load balancers..."
-if [ -f 02_lb_int.py ]; then # for workflow using internal load balancers
-  # https://github.com/openshift/installer/pull/3270
-  gcloud compute instance-groups unmanaged add-instances "${INFRA_ID}-master-${ZONE_0}-instance-group" "--zone=${ZONE_0}" "--instances=${INFRA_ID}-${MASTER}-0"
-  gcloud compute instance-groups unmanaged add-instances "${INFRA_ID}-master-${ZONE_1}-instance-group" "--zone=${ZONE_1}" "--instances=${INFRA_ID}-${MASTER}-1"
-  gcloud compute instance-groups unmanaged add-instances "${INFRA_ID}-master-${ZONE_2}-instance-group" "--zone=${ZONE_2}" "--instances=${INFRA_ID}-${MASTER}-2"
-else # for workflow before internal load balancers
-  gcloud compute target-pools add-instances "${INFRA_ID}-ign-target-pool" "--instances-zone=${ZONE_0}" "--instances=${INFRA_ID}-${MASTER}-0"
-  gcloud compute target-pools add-instances "${INFRA_ID}-ign-target-pool" "--instances-zone=${ZONE_1}" "--instances=${INFRA_ID}-${MASTER}-1"
-  gcloud compute target-pools add-instances "${INFRA_ID}-ign-target-pool" "--instances-zone=${ZONE_2}" "--instances=${INFRA_ID}-${MASTER}-2"
-fi
+gcloud compute instance-groups unmanaged add-instances "${INFRA_ID}-master-${ZONE_0}-instance-group" "--zone=${ZONE_0}" "--instances=${INFRA_ID}-${MASTER}-0"
+gcloud compute instance-groups unmanaged add-instances "${INFRA_ID}-master-${ZONE_1}-instance-group" "--zone=${ZONE_1}" "--instances=${INFRA_ID}-${MASTER}-1"
+gcloud compute instance-groups unmanaged add-instances "${INFRA_ID}-master-${ZONE_2}-instance-group" "--zone=${ZONE_2}" "--instances=${INFRA_ID}-${MASTER}-2"
 
 ### Add control plane instances to external load balancer target pools (optional)
-gcloud compute target-pools add-instances "${INFRA_ID}-api-target-pool" "--instances-zone=${ZONE_0}" "--instances=${INFRA_ID}-${MASTER}-0"
-gcloud compute target-pools add-instances "${INFRA_ID}-api-target-pool" "--instances-zone=${ZONE_1}" "--instances=${INFRA_ID}-${MASTER}-1"
-gcloud compute target-pools add-instances "${INFRA_ID}-api-target-pool" "--instances-zone=${ZONE_2}" "--instances=${INFRA_ID}-${MASTER}-2"
+if [ X"${PUBLISH_STRATEGY}" != X"Internal" ]; then
+  gcloud compute target-pools add-instances "${INFRA_ID}-api-target-pool" "--instances-zone=${ZONE_0}" "--instances=${INFRA_ID}-${MASTER}-0"
+  gcloud compute target-pools add-instances "${INFRA_ID}-api-target-pool" "--instances-zone=${ZONE_1}" "--instances=${INFRA_ID}-${MASTER}-1"
+  gcloud compute target-pools add-instances "${INFRA_ID}-api-target-pool" "--instances-zone=${ZONE_2}" "--instances=${INFRA_ID}-${MASTER}-2"
+fi
 
 ## Launch additional compute nodes
 echo "$(date -u --rfc-3339=seconds) - Launching additional compute nodes..."
@@ -481,7 +432,7 @@ done;
 
 gcloud deployment-manager deployments create "${INFRA_ID}-worker" --config 06_worker.yaml
 
-# enable http proxy
+# enable client http proxy
 if [[ -f "${SHARED_DIR}/proxy.sh" ]]; then
   echo "$(date -u --rfc-3339=seconds) - Enable HTTP proxy, as it'll be a private cluster..."
   source "${SHARED_DIR}/proxy.sh"
@@ -509,14 +460,7 @@ fi
 
 ## Destroy bootstrap resources
 echo "$(date -u --rfc-3339=seconds) - Bootstrap complete, destroying bootstrap resources"
-if [ -f 02_lb_int.py ]; then # for workflow using internal load balancers
-  # https://github.com/openshift/installer/pull/3270
-  # https://github.com/openshift/installer/pull/3309
-  gcloud compute backend-services remove-backend "${INFRA_ID}-api-internal-backend-service" "--region=${REGION}" "--instance-group=${INFRA_ID}-bootstrap-instance-group" "--instance-group-zone=${ZONE_0}"
-else # for workflow before internal load balancers
-  gcloud compute target-pools remove-instances "${INFRA_ID}-ign-target-pool" "--instances-zone=${ZONE_0}" "--instances=${INFRA_ID}-bootstrap"
-  gcloud compute target-pools remove-instances "${INFRA_ID}-api-target-pool" "--instances-zone=${ZONE_0}" "--instances=${INFRA_ID}-bootstrap"
-fi
+gcloud compute backend-services remove-backend "${INFRA_ID}-api-internal-backend-service" "--region=${REGION}" "--instance-group=${INFRA_ID}-bootstrap-instance-group" "--instance-group-zone=${ZONE_0}"
 gsutil rm "gs://${INFRA_ID}-bootstrap-ignition/bootstrap.ign"
 gsutil rb "gs://${INFRA_ID}-bootstrap-ignition"
 gcloud deployment-manager deployments delete -q "${INFRA_ID}-bootstrap"
@@ -547,24 +491,22 @@ fi
 ## Create default router dns entries
 if [[ -v IS_XPN ]]; then
   ret=$(gcloud --project="${HOST_PROJECT}" dns managed-zones list --filter "name=${PRIVATE_ZONE_NAME}" 2> /dev/null)
-  if [[ -z $ret ]]; then
-    echo ">>The private zone ${PRIVATE_ZONE_NAME} doesn't exist in project ${HOST_PROJECT}."
-  else
-    echo "$(date -u --rfc-3339=seconds) - Creating default router DNS entries..."
-    if [ -f transaction.yaml ]; then rm transaction.yaml; fi
-    gcloud "--project=${HOST_PROJECT}" dns record-sets transaction start --zone "${PRIVATE_ZONE_NAME}"
-    gcloud "--project=${HOST_PROJECT}" dns record-sets transaction add "${ROUTER_IP}" --name "*.apps.${CLUSTER_NAME}.${BASE_DOMAIN}." --ttl 300 --type A --zone "${PRIVATE_ZONE_NAME}"
-    gcloud "--project=${HOST_PROJECT}" dns record-sets transaction execute --zone "${PRIVATE_ZONE_NAME}"
-  fi
+  echo "$(date -u --rfc-3339=seconds) - Creating default router DNS entries..."
+  if [ -f transaction.yaml ]; then rm transaction.yaml; fi
+  gcloud "--project=${HOST_PROJECT}" dns record-sets transaction start --zone "${PRIVATE_ZONE_NAME}"
+  gcloud "--project=${HOST_PROJECT}" dns record-sets transaction add "${ROUTER_IP}" --name "*.apps.${CLUSTER_NAME}.${BASE_DOMAIN}." --ttl 300 --type A --zone "${PRIVATE_ZONE_NAME}"
+  gcloud "--project=${HOST_PROJECT}" dns record-sets transaction execute --zone "${PRIVATE_ZONE_NAME}"
 
-  ret=$(gcloud --project="${HOST_PROJECT}" dns managed-zones list --filter "name=${BASE_DOMAIN_ZONE_NAME}" 2> /dev/null)
-  if [[ -z $ret ]]; then
-    echo ">>The base domain ${BASE_DOMAIN_ZONE_NAME} doesn't exist in project ${HOST_PROJECT}."
-  else
-    if [ -f transaction.yaml ]; then rm transaction.yaml; fi
-    gcloud --project="${HOST_PROJECT}" dns record-sets transaction start --zone "${BASE_DOMAIN_ZONE_NAME}"
-    gcloud --project="${HOST_PROJECT}" dns record-sets transaction add "${ROUTER_IP}" --name "*.apps.${CLUSTER_NAME}.${BASE_DOMAIN}." --ttl 300 --type A --zone "${BASE_DOMAIN_ZONE_NAME}"
-    gcloud --project="${HOST_PROJECT}" dns record-sets transaction execute --zone "${BASE_DOMAIN_ZONE_NAME}"
+  if [ X"${PUBLISH_STRATEGY}" != X"Internal" ]; then
+    ret=$(gcloud --project="${HOST_PROJECT}" dns managed-zones list --filter "name=${BASE_DOMAIN_ZONE_NAME}" 2> /dev/null)
+    if [[ -z $ret ]]; then
+      echo ">>The base domain ${BASE_DOMAIN_ZONE_NAME} doesn't exist in project ${HOST_PROJECT}."
+    else
+      if [ -f transaction.yaml ]; then rm transaction.yaml; fi
+      gcloud --project="${HOST_PROJECT}" dns record-sets transaction start --zone "${BASE_DOMAIN_ZONE_NAME}"
+      gcloud --project="${HOST_PROJECT}" dns record-sets transaction add "${ROUTER_IP}" --name "*.apps.${CLUSTER_NAME}.${BASE_DOMAIN}." --ttl 300 --type A --zone "${BASE_DOMAIN_ZONE_NAME}"
+      gcloud --project="${HOST_PROJECT}" dns record-sets transaction execute --zone "${BASE_DOMAIN_ZONE_NAME}"
+    fi
   fi
 fi
 
