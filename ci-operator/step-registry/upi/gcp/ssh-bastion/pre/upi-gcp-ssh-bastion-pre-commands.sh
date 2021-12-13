@@ -259,4 +259,14 @@ fi
 
 # DEBUG
 echo ">>Trying to connect to the bastion's public IP..."
-curl --proxy "${CLIENT_PROXY_URL}" -I www.google.com --max-time 10
+MAX_ATTEMPTS=10; i=0
+while [ $i -le $MAX_ATTEMPTS ]
+do
+  if curl --proxy "${CLIENT_PROXY_URL}" -I www.google.com --max-time 10
+  then
+    break
+  else
+    sleep 10s
+  fi
+  i=`expr $i + 1`
+done
