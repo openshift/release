@@ -32,23 +32,20 @@ if [[ -s "${SHARED_DIR}/xpn.json" ]]; then
   HOST_PROJECT_PRIVATE_ZONE_NAME="$(jq -r '.privateZoneName' "${SHARED_DIR}/xpn.json")"
 fi
 
-# Delete the bootstrap deployment, if exists
+# Delete the bootstrap deployment, but expect it to error.
 echo "$(date -u --rfc-3339=seconds) - Deleting bootstrap deployment (errors when bootstrap-complete)..."
-if gcloud deployment-manager deployments list --filter="name=${INFRA_ID}-bootstrap" | grep "${INFRA_ID}-bootstrap"
-then
-  echo "$(date -u --rfc-3339=seconds) - Deleting bootstrap deployment..."
-  gcloud deployment-manager deployments delete -q "${INFRA_ID}-bootstrap"
-fi
+set +e
+gcloud deployment-manager deployments delete -q "${INFRA_ID}-bootstrap"
+set -e
 
 # Delete the deployments that should always exist.
 echo "$(date -u --rfc-3339=seconds) - Deleting worker, control-plane, and infra deployments..."
 gcloud deployment-manager deployments delete -q "${INFRA_ID}"-{worker,control-plane,infra}
 
 # Only delete these deployments when they are expected to exist.
-if gcloud deployment-manager deployments list --filter="name=${INFRA_ID}-security" | grep "${INFRA_ID}-security"
-then
-  echo "$(date -u --rfc-3339=seconds) - Deleting security deployment..."
-  gcloud deployment-manager deployments delete -q "${INFRA_ID}-security"
+if [[ ! -v IS_XPN ]]; then
+  echo "$(date -u --rfc-3339=seconds) - Deleting security and vpc deployments..."
+  gcloud deployment-manager deployments delete -q "${INFRA_ID}"-{security,vpc}
 fi
 
 # Delete XPN DNS entries
