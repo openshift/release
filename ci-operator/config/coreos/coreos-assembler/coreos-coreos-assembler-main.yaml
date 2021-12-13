@@ -1,17 +1,28 @@
-binary_build_commands: make && make check && make install
 build_root:
-  image_stream_tag:
-    name: cosa-buildroot
-    namespace: coreos
-    tag: latest
+  project_image:
+    dockerfile_literal: |
+      FROM registry.fedoraproject.org/fedora:35
+      RUN dnf install -y git findutils
+      RUN mkdir /go && chmod 777 /go
+images:
+- dockerfile_path: Dockerfile
+  from: root
+  to: bin
 resources:
   '*':
     requests:
       cpu: 1000m
       memory: 1Gi
+  rhcos:
+    limits:
+      devices.kubevirt.io/kvm: "1"
+    requests:
+      cpu: 1000m
+      devices.kubevirt.io/kvm: "1"
+      memory: 3Gi
 tests:
-- as: sanity
-  commands: coreos-assembler shell true
+- as: rhcos
+  commands: /usr/lib/coreos-assembler/ci/prow-rhcos.sh
   container:
     from: bin
 zz_generated_metadata:

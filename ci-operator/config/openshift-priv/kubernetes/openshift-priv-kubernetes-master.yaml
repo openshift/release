@@ -27,20 +27,17 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.16-openshift-4.8
-  ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.16-openshift-4.9
+    tag: rhel-8-golang-1.17-openshift-4.10
   tools:
     name: 4.10-priv
     namespace: ocp-private
     tag: tools
 binary_build_commands: openshift-hack/build-go.sh
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: rhel-8-release-golang-1.16-openshift-4.8
+  from_repository: true
 canonical_go_repository: k8s.io/kubernetes
 images:
 - dockerfile_path: openshift-hack/images/hyperkube/Dockerfile.rhel
@@ -49,9 +46,9 @@ images:
     ocp_builder_rhel-8-golang-1.16-openshift-4.8:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
-    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
   to: hyperkube
 - dockerfile_path: openshift-hack/images/tests/Dockerfile.rhel
   from: tools
@@ -74,9 +71,9 @@ images:
   dockerfile_path: Dockerfile.Rhel
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
   to: pod
 promotion:
   additional_images:
@@ -192,7 +189,7 @@ tests:
   container:
     from: src
     memory_backed_volume:
-      size: 4Gi
+      size: 6Gi
 - as: integration
   commands: ARTIFACTS="${ARTIFACT_DIR}" TMPDIR=/tmp/volume openshift-hack/test-integration.sh
   container:
@@ -394,6 +391,11 @@ tests:
   steps:
     cluster_profile: openstack-vh-mecha-central
     workflow: openshift-e2e-openstack-csi-manila
+- as: e2e-aws-cgroupsv2
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-cgroupsv2
 zz_generated_metadata:
   branch: master
   org: openshift-priv

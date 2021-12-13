@@ -29,8 +29,9 @@ def read_release_definitions(path):
     with os.scandir(path) as entries:
         for entry in entries:
             if entry.is_file():
-                with open(entry, 'r') as release:
-                    definitions.update({entry.name: json.load(release, object_pairs_hook=raise_on_duplicates)})
+                if entry.name.endswith('.json'):
+                    with open(entry, 'r') as release:
+                        definitions.update({entry.name: json.load(release, object_pairs_hook=raise_on_duplicates)})
     return definitions
 
 

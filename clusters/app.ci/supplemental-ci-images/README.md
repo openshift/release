@@ -26,3 +26,4 @@ These resources provide some supplemental images to be used in CI builds.
 - `redhat-operator-index`: Used by optional operators E2E tests
 - `ansible-runner-ovirt`: used by ovirt infra cleanup periodic [job](../../../ci-operator/config/openshift/cluster-api-provider-ovirt/)
 - `ovirt-prfinder`: used by ovirt prfinder periodic [job](../../../ci-operator/config/openshift/cluster-api-provider-ovirt/)
+- `telco-bastion`: used by cnf-features-deploy periodic [job](../../../ci-operator/config/openshift-kni/cnf-features-deploy/)

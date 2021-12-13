@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -10,6 +10,8 @@ periodics:
     repo: multiarch
   interval: 24h
   labels:
+    ci-operator.openshift.io/cloud: aws-arm64
+    ci-operator.openshift.io/cloud-cluster-profile: aws-arm64
     ci-operator.openshift.io/variant: nightly-4.10
     ci.openshift.io/generator: prowgen
     job-release: "4.10"
@@ -64,10 +66,308 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-aws-arm64
+      secret:
+        secretName: cluster-secrets-aws-arm64
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: multiarch
+  interval: 48h
+  labels:
+    ci-operator.openshift.io/cloud: aws-arm64
+    ci-operator.openshift.io/cloud-cluster-profile: aws-arm64
+    ci-operator.openshift.io/variant: nightly-4.10
+    ci.openshift.io/generator: prowgen
+    job-release: "4.10"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-multiarch-master-nightly-4.10-ocp-e2e-aws-arm64-single-node
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/ocp-e2e-aws-arm64-single-node-cluster-profile
+      - --target=ocp-e2e-aws-arm64-single-node
+      - --variant=nightly-4.10
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/ocp-e2e-aws-arm64-single-node-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws-arm64
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: multiarch
+  interval: 48h
+  labels:
+    ci-operator.openshift.io/cloud: aws-arm64
+    ci-operator.openshift.io/cloud-cluster-profile: aws-arm64
+    ci-operator.openshift.io/variant: nightly-4.10
+    ci.openshift.io/generator: prowgen
+    job-release: "4.10"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-multiarch-master-nightly-4.10-ocp-e2e-aws-arm64-techpreview
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/ocp-e2e-aws-arm64-techpreview-cluster-profile
+      - --target=ocp-e2e-aws-arm64-techpreview
+      - --variant=nightly-4.10
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/ocp-e2e-aws-arm64-techpreview-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws-arm64
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: multiarch
+  interval: 48h
+  labels:
+    ci-operator.openshift.io/cloud: aws-arm64
+    ci-operator.openshift.io/cloud-cluster-profile: aws-arm64
+    ci-operator.openshift.io/variant: nightly-4.10
+    ci.openshift.io/generator: prowgen
+    job-release: "4.10"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-multiarch-master-nightly-4.10-ocp-e2e-aws-arm64-techpreview-serial
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/ocp-e2e-aws-arm64-techpreview-serial-cluster-profile
+      - --target=ocp-e2e-aws-arm64-techpreview-serial
+      - --variant=nightly-4.10
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/ocp-e2e-aws-arm64-techpreview-serial-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws-arm64
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: multiarch
+  interval: 24h
+  labels:
+    ci-operator.openshift.io/cloud: aws-arm64
+    ci-operator.openshift.io/cloud-cluster-profile: aws-arm64
+    ci-operator.openshift.io/variant: nightly-4.10
+    ci.openshift.io/generator: prowgen
+    job-release: "4.10"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-multiarch-master-nightly-4.10-ocp-e2e-aws-ovn-arm64
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/ocp-e2e-aws-ovn-arm64-cluster-profile
+      - --target=ocp-e2e-aws-ovn-arm64
+      - --variant=nightly-4.10
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/ocp-e2e-aws-ovn-arm64-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws-arm64
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -76,7 +376,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
-  cron: 0 7 * * 0
+  cron: '@yearly'
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -85,6 +385,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-ppc64le
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-ppc64le
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.10
     ci.openshift.io/generator: prowgen
@@ -140,10 +442,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-ppc64le
+      secret:
+        secretName: cluster-secrets-libvirt-ppc64le
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -152,7 +452,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
-  cron: 0 7 * * 0
+  cron: '@yearly'
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -161,6 +461,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-s390x
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-s390x
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.10
     ci.openshift.io/generator: prowgen
@@ -216,10 +518,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-s390x
+      secret:
+        secretName: cluster-secrets-libvirt-s390x
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -237,6 +537,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-ppc64le
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-ppc64le
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.10
     ci.openshift.io/generator: prowgen
@@ -292,10 +594,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-ppc64le
+      secret:
+        secretName: cluster-secrets-libvirt-ppc64le
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -313,6 +613,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-s390x
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-s390x
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.10
     ci.openshift.io/generator: prowgen
@@ -368,10 +670,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-s390x
+      secret:
+        secretName: cluster-secrets-libvirt-s390x
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -379,7 +679,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -389,6 +689,8 @@ periodics:
     repo: multiarch
   interval: 48h
   labels:
+    ci-operator.openshift.io/cloud: aws-arm64
+    ci-operator.openshift.io/cloud-cluster-profile: aws-arm64
     ci-operator.openshift.io/variant: nightly-4.10
     ci.openshift.io/generator: prowgen
     job-release: "4.10"
@@ -443,10 +745,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-aws-arm64
+      secret:
+        secretName: cluster-secrets-aws-arm64
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -464,6 +764,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-ppc64le
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-ppc64le
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.10
     ci.openshift.io/generator: prowgen
@@ -519,10 +821,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-ppc64le
+      secret:
+        secretName: cluster-secrets-libvirt-ppc64le
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -540,6 +840,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-s390x
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-s390x
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.10
     ci.openshift.io/generator: prowgen
@@ -595,10 +897,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-s390x
+      secret:
+        secretName: cluster-secrets-libvirt-s390x
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -606,7 +906,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -616,6 +916,8 @@ periodics:
     repo: multiarch
   interval: 24h
   labels:
+    ci-operator.openshift.io/cloud: aws-arm64
+    ci-operator.openshift.io/cloud-cluster-profile: aws-arm64
     ci-operator.openshift.io/variant: nightly-4.10
     ci.openshift.io/generator: prowgen
     job-release: "4.10"
@@ -670,10 +972,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-aws-arm64
+      secret:
+        secretName: cluster-secrets-aws-arm64
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -691,6 +991,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-ppc64le
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-ppc64le
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.10
     ci.openshift.io/generator: prowgen
@@ -746,10 +1048,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-ppc64le
+      secret:
+        secretName: cluster-secrets-libvirt-ppc64le
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -758,7 +1058,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
-  cron: 0 6,18 * * *
+  cron: 0 6 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -767,6 +1067,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-s390x
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-s390x
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.10
     ci.openshift.io/generator: prowgen
@@ -822,10 +1124,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-s390x
+      secret:
+        secretName: cluster-secrets-libvirt-s390x
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -833,7 +1133,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -843,6 +1143,8 @@ periodics:
     repo: multiarch
   interval: 24h
   labels:
+    ci-operator.openshift.io/cloud: aws-arm64
+    ci-operator.openshift.io/cloud-cluster-profile: aws-arm64
     ci-operator.openshift.io/variant: nightly-4.10
     ci.openshift.io/generator: prowgen
     job-release: "4.10"
@@ -897,10 +1199,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-aws-arm64
+      secret:
+        secretName: cluster-secrets-aws-arm64
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -908,7 +1208,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -918,6 +1218,8 @@ periodics:
     repo: multiarch
   interval: 24h
   labels:
+    ci-operator.openshift.io/cloud: aws-arm64
+    ci-operator.openshift.io/cloud-cluster-profile: aws-arm64
     ci-operator.openshift.io/variant: nightly-4.10
     ci.openshift.io/generator: prowgen
     job-release: "4.10"
@@ -972,10 +1274,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-aws-arm64
+      secret:
+        secretName: cluster-secrets-aws-arm64
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -993,6 +1293,8 @@ periodics:
     repo: multiarch
   interval: 72h
   labels:
+    ci-operator.openshift.io/cloud: libvirt-ppc64le
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-ppc64le
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.10
     ci.openshift.io/generator: prowgen
@@ -1048,10 +1350,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-ppc64le
+      secret:
+        secretName: cluster-secrets-libvirt-ppc64le
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -1069,6 +1369,8 @@ periodics:
     repo: multiarch
   interval: 72h
   labels:
+    ci-operator.openshift.io/cloud: libvirt-s390x
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-s390x
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.10
     ci.openshift.io/generator: prowgen
@@ -1124,10 +1426,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-s390x
+      secret:
+        secretName: cluster-secrets-libvirt-s390x
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -1145,6 +1445,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-ppc64le
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-ppc64le
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.10
     ci.openshift.io/generator: prowgen
@@ -1200,10 +1502,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-ppc64le
+      secret:
+        secretName: cluster-secrets-libvirt-ppc64le
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -1221,6 +1521,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-s390x
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-s390x
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.10
     ci.openshift.io/generator: prowgen
@@ -1276,10 +1578,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-s390x
+      secret:
+        secretName: cluster-secrets-libvirt-s390x
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -1287,7 +1587,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -1297,6 +1597,8 @@ periodics:
     repo: multiarch
   interval: 24h
   labels:
+    ci-operator.openshift.io/cloud: aws-arm64
+    ci-operator.openshift.io/cloud-cluster-profile: aws-arm64
     ci-operator.openshift.io/variant: nightly-4.10-upgrade-from-nightly-4.9
     ci.openshift.io/generator: prowgen
     job-release: "4.10"
@@ -1351,10 +1653,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-aws-arm64
+      secret:
+        secretName: cluster-secrets-aws-arm64
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -1372,6 +1672,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-ppc64le
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-ppc64le
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.10-upgrade-from-nightly-4.9
     ci.openshift.io/generator: prowgen
@@ -1427,10 +1729,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-ppc64le
+      secret:
+        secretName: cluster-secrets-libvirt-ppc64le
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -1448,6 +1748,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-s390x
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-s390x
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.10-upgrade-from-nightly-4.9
     ci.openshift.io/generator: prowgen
@@ -1503,10 +1805,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-s390x
+      secret:
+        secretName: cluster-secrets-libvirt-s390x
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -1524,6 +1824,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-ppc64le
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-ppc64le
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.6
     ci.openshift.io/generator: prowgen
@@ -1579,10 +1881,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-ppc64le
+      secret:
+        secretName: cluster-secrets-libvirt-ppc64le
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -1600,6 +1900,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-s390x
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-s390x
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.6
     ci.openshift.io/generator: prowgen
@@ -1655,10 +1957,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-s390x
+      secret:
+        secretName: cluster-secrets-libvirt-s390x
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -1676,6 +1976,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-ppc64le
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-ppc64le
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.6
     ci.openshift.io/generator: prowgen
@@ -1731,10 +2033,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-ppc64le
+      secret:
+        secretName: cluster-secrets-libvirt-ppc64le
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -1752,6 +2052,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-s390x
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-s390x
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.6
     ci.openshift.io/generator: prowgen
@@ -1807,10 +2109,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-s390x
+      secret:
+        secretName: cluster-secrets-libvirt-s390x
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -1828,6 +2128,8 @@ periodics:
     repo: multiarch
   interval: 24h
   labels:
+    ci-operator.openshift.io/cloud: libvirt-ppc64le
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-ppc64le
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.6
     ci.openshift.io/generator: prowgen
@@ -1883,10 +2185,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-ppc64le
+      secret:
+        secretName: cluster-secrets-libvirt-ppc64le
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -1904,6 +2204,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-ppc64le
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-ppc64le
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.6
     ci.openshift.io/generator: prowgen
@@ -1959,10 +2261,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-ppc64le
+      secret:
+        secretName: cluster-secrets-libvirt-ppc64le
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -1980,6 +2280,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-s390x
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-s390x
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.6
     ci.openshift.io/generator: prowgen
@@ -2035,10 +2337,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-s390x
+      secret:
+        secretName: cluster-secrets-libvirt-s390x
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -2056,6 +2356,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-ppc64le
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-ppc64le
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.7
     ci.openshift.io/generator: prowgen
@@ -2111,10 +2413,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-ppc64le
+      secret:
+        secretName: cluster-secrets-libvirt-ppc64le
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -2132,6 +2432,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-s390x
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-s390x
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.7
     ci.openshift.io/generator: prowgen
@@ -2187,10 +2489,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-s390x
+      secret:
+        secretName: cluster-secrets-libvirt-s390x
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -2208,6 +2508,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-ppc64le
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-ppc64le
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.7
     ci.openshift.io/generator: prowgen
@@ -2263,10 +2565,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-ppc64le
+      secret:
+        secretName: cluster-secrets-libvirt-ppc64le
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -2284,6 +2584,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-s390x
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-s390x
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.7
     ci.openshift.io/generator: prowgen
@@ -2339,10 +2641,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-s390x
+      secret:
+        secretName: cluster-secrets-libvirt-s390x
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -2360,6 +2660,8 @@ periodics:
     repo: multiarch
   interval: 24h
   labels:
+    ci-operator.openshift.io/cloud: libvirt-ppc64le
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-ppc64le
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.7
     ci.openshift.io/generator: prowgen
@@ -2415,10 +2717,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-ppc64le
+      secret:
+        secretName: cluster-secrets-libvirt-ppc64le
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -2436,6 +2736,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-ppc64le
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-ppc64le
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.7
     ci.openshift.io/generator: prowgen
@@ -2491,10 +2793,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-ppc64le
+      secret:
+        secretName: cluster-secrets-libvirt-ppc64le
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -2512,6 +2812,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-s390x
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-s390x
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.7
     ci.openshift.io/generator: prowgen
@@ -2567,10 +2869,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-s390x
+      secret:
+        secretName: cluster-secrets-libvirt-s390x
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -2579,7 +2879,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
-  cron: 0 21 * * 5
+  cron: '@yearly'
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -2588,6 +2888,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-ppc64le
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-ppc64le
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.8
     ci.openshift.io/generator: prowgen
@@ -2643,10 +2945,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-ppc64le
+      secret:
+        secretName: cluster-secrets-libvirt-ppc64le
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -2655,7 +2955,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
-  cron: 0 21 * * 5
+  cron: '@yearly'
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -2664,6 +2964,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-s390x
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-s390x
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.8
     ci.openshift.io/generator: prowgen
@@ -2719,10 +3021,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-s390x
+      secret:
+        secretName: cluster-secrets-libvirt-s390x
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -2740,6 +3040,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-ppc64le
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-ppc64le
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.8
     ci.openshift.io/generator: prowgen
@@ -2795,10 +3097,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-ppc64le
+      secret:
+        secretName: cluster-secrets-libvirt-ppc64le
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -2816,6 +3116,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-s390x
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-s390x
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.8
     ci.openshift.io/generator: prowgen
@@ -2871,10 +3173,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-s390x
+      secret:
+        secretName: cluster-secrets-libvirt-s390x
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -2892,6 +3192,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-ppc64le
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-ppc64le
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.8
     ci.openshift.io/generator: prowgen
@@ -2947,10 +3249,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-ppc64le
+      secret:
+        secretName: cluster-secrets-libvirt-ppc64le
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -2968,6 +3268,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-s390x
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-s390x
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.8
     ci.openshift.io/generator: prowgen
@@ -3023,10 +3325,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-s390x
+      secret:
+        secretName: cluster-secrets-libvirt-s390x
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -3044,6 +3344,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-ppc64le
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-ppc64le
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.8
     ci.openshift.io/generator: prowgen
@@ -3099,10 +3401,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-ppc64le
+      secret:
+        secretName: cluster-secrets-libvirt-ppc64le
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -3120,6 +3420,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-s390x
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-s390x
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.8
     ci.openshift.io/generator: prowgen
@@ -3175,10 +3477,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-s390x
+      secret:
+        secretName: cluster-secrets-libvirt-s390x
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -3196,6 +3496,8 @@ periodics:
     repo: multiarch
   interval: 72h
   labels:
+    ci-operator.openshift.io/cloud: libvirt-ppc64le
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-ppc64le
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.8
     ci.openshift.io/generator: prowgen
@@ -3251,10 +3553,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-ppc64le
+      secret:
+        secretName: cluster-secrets-libvirt-ppc64le
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -3272,6 +3572,8 @@ periodics:
     repo: multiarch
   interval: 72h
   labels:
+    ci-operator.openshift.io/cloud: libvirt-s390x
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-s390x
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.8
     ci.openshift.io/generator: prowgen
@@ -3327,10 +3629,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-s390x
+      secret:
+        secretName: cluster-secrets-libvirt-s390x
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -3348,6 +3648,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-ppc64le
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-ppc64le
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.8
     ci.openshift.io/generator: prowgen
@@ -3403,10 +3705,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-ppc64le
+      secret:
+        secretName: cluster-secrets-libvirt-ppc64le
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -3424,6 +3724,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-s390x
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-s390x
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.8
     ci.openshift.io/generator: prowgen
@@ -3479,10 +3781,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-s390x
+      secret:
+        secretName: cluster-secrets-libvirt-s390x
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -3500,6 +3800,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-ppc64le
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-ppc64le
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.8-upgrade-from-nightly-4.7
     ci.openshift.io/generator: prowgen
@@ -3555,10 +3857,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-ppc64le
+      secret:
+        secretName: cluster-secrets-libvirt-ppc64le
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -3576,6 +3876,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-s390x
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-s390x
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.8-upgrade-from-nightly-4.7
     ci.openshift.io/generator: prowgen
@@ -3631,10 +3933,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-s390x
+      secret:
+        secretName: cluster-secrets-libvirt-s390x
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -3642,7 +3942,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -3652,6 +3952,8 @@ periodics:
     repo: multiarch
   interval: 24h
   labels:
+    ci-operator.openshift.io/cloud: aws-arm64
+    ci-operator.openshift.io/cloud-cluster-profile: aws-arm64
     ci-operator.openshift.io/variant: nightly-4.9
     ci.openshift.io/generator: prowgen
     job-release: "4.9"
@@ -3706,10 +4008,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-aws-arm64
+      secret:
+        secretName: cluster-secrets-aws-arm64
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -3718,7 +4018,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
-  cron: 0 2 * * 6
+  cron: '@yearly'
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -3727,6 +4027,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-ppc64le
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-ppc64le
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.9
     ci.openshift.io/generator: prowgen
@@ -3782,10 +4084,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-ppc64le
+      secret:
+        secretName: cluster-secrets-libvirt-ppc64le
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -3794,7 +4094,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
-  cron: 0 2 * * 6
+  cron: '@yearly'
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -3803,6 +4103,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-s390x
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-s390x
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.9
     ci.openshift.io/generator: prowgen
@@ -3858,10 +4160,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-s390x
+      secret:
+        secretName: cluster-secrets-libvirt-s390x
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -3879,6 +4179,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-ppc64le
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-ppc64le
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.9
     ci.openshift.io/generator: prowgen
@@ -3934,10 +4236,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-ppc64le
+      secret:
+        secretName: cluster-secrets-libvirt-ppc64le
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -3955,6 +4255,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-s390x
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-s390x
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.9
     ci.openshift.io/generator: prowgen
@@ -4010,10 +4312,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-s390x
+      secret:
+        secretName: cluster-secrets-libvirt-s390x
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -4031,6 +4331,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-ppc64le
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-ppc64le
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.9
     ci.openshift.io/generator: prowgen
@@ -4086,10 +4388,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-ppc64le
+      secret:
+        secretName: cluster-secrets-libvirt-ppc64le
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -4107,6 +4407,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-s390x
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-s390x
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.9
     ci.openshift.io/generator: prowgen
@@ -4162,10 +4464,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-s390x
+      secret:
+        secretName: cluster-secrets-libvirt-s390x
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -4183,6 +4483,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-ppc64le
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-ppc64le
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.9
     ci.openshift.io/generator: prowgen
@@ -4238,10 +4540,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-ppc64le
+      secret:
+        secretName: cluster-secrets-libvirt-ppc64le
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -4250,7 +4550,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
-  cron: 0 1,13 * * *
+  cron: 0 1 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -4259,6 +4559,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-s390x
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-s390x
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.9
     ci.openshift.io/generator: prowgen
@@ -4314,10 +4616,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-s390x
+      secret:
+        secretName: cluster-secrets-libvirt-s390x
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -4325,7 +4625,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: '@weekly'
   decorate: true
   decoration_config:
@@ -4335,6 +4635,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: aws-arm64
+    ci-operator.openshift.io/cloud-cluster-profile: aws-arm64
     ci-operator.openshift.io/variant: nightly-4.9
     ci.openshift.io/generator: prowgen
     job-release: "4.9"
@@ -4389,10 +4691,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-aws-arm64
+      secret:
+        secretName: cluster-secrets-aws-arm64
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -4400,7 +4700,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -4410,6 +4710,8 @@ periodics:
     repo: multiarch
   interval: 24h
   labels:
+    ci-operator.openshift.io/cloud: aws-arm64
+    ci-operator.openshift.io/cloud-cluster-profile: aws-arm64
     ci-operator.openshift.io/variant: nightly-4.9
     ci.openshift.io/generator: prowgen
     job-release: "4.9"
@@ -4464,10 +4766,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-aws-arm64
+      secret:
+        secretName: cluster-secrets-aws-arm64
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -4485,6 +4785,8 @@ periodics:
     repo: multiarch
   interval: 72h
   labels:
+    ci-operator.openshift.io/cloud: libvirt-ppc64le
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-ppc64le
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.9
     ci.openshift.io/generator: prowgen
@@ -4540,10 +4842,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-ppc64le
+      secret:
+        secretName: cluster-secrets-libvirt-ppc64le
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -4561,6 +4861,8 @@ periodics:
     repo: multiarch
   interval: 72h
   labels:
+    ci-operator.openshift.io/cloud: libvirt-s390x
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-s390x
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.9
     ci.openshift.io/generator: prowgen
@@ -4616,10 +4918,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-s390x
+      secret:
+        secretName: cluster-secrets-libvirt-s390x
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -4637,6 +4937,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-ppc64le
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-ppc64le
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.9
     ci.openshift.io/generator: prowgen
@@ -4692,10 +4994,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-ppc64le
+      secret:
+        secretName: cluster-secrets-libvirt-ppc64le
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -4713,6 +5013,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-s390x
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-s390x
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.9
     ci.openshift.io/generator: prowgen
@@ -4768,10 +5070,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-s390x
+      secret:
+        secretName: cluster-secrets-libvirt-s390x
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -4789,6 +5089,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-ppc64le
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-ppc64le
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.9-upgrade-from-nightly-4.8
     ci.openshift.io/generator: prowgen
@@ -4844,10 +5146,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-ppc64le
+      secret:
+        secretName: cluster-secrets-libvirt-ppc64le
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -4865,6 +5165,8 @@ periodics:
     org: openshift
     repo: multiarch
   labels:
+    ci-operator.openshift.io/cloud: libvirt-s390x
+    ci-operator.openshift.io/cloud-cluster-profile: libvirt-s390x
     ci-operator.openshift.io/cluster: build01
     ci-operator.openshift.io/variant: nightly-4.9-upgrade-from-nightly-4.8
     ci.openshift.io/generator: prowgen
@@ -4920,10 +5222,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-libvirt-s390x
+      secret:
+        secretName: cluster-secrets-libvirt-s390x
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials

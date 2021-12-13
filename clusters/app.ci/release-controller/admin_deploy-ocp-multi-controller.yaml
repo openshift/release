@@ -1,0 +1,268 @@
+##################################################################################
+#                                DO NOT EDIT
+# File generated during execution of: generate-release-controllers.py
+##################################################################################
+
+
+#---------------------------------------------------------------------------------
+# art_namespaces_rbac.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: image-puller
+  namespace: ocp-multi
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:image-puller
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: Group
+  name: system:authenticated
+---
+#---------------------------------------------------------------------------------
+# art_namespaces_rbac.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: user-viewer
+  namespace: ocp-multi
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: view
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: Group
+  name: system:authenticated
+---
+#---------------------------------------------------------------------------------
+# art_namespaces_rbac.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: authorization.openshift.io/v1
+kind: Role
+metadata:
+  name: release-controller-modify
+  namespace: ocp-multi
+rules:
+- apiGroups:
+  - ''
+  resourceNames:
+  - release-upgrade-graph
+  resources:
+  - secrets
+  verbs:
+  - get
+  - update
+  - patch
+- apiGroups:
+  - image.openshift.io
+  resources:
+  - imagestreams
+  - imagestreamtags
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - delete
+  - update
+  - patch
+- apiGroups:
+  - ''
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+  - update
+---
+#---------------------------------------------------------------------------------
+# art_namespaces_rbac.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: authorization.openshift.io/v1
+kind: Role
+metadata:
+  name: release-controller-import-ocp
+  namespace: ocp-multi
+rules:
+- apiGroups:
+  - image.openshift.io
+  resources:
+  - imagestreamimports
+  verbs:
+  - create
+- apiGroups:
+  - image.openshift.io
+  resources:
+  - imagestreams
+  verbs:
+  - get
+  - list
+---
+#---------------------------------------------------------------------------------
+# art_namespaces_rbac.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: authorization.openshift.io/v1
+kind: Role
+metadata:
+  name: release-controller-multi-prowjob
+  namespace: ci
+rules:
+- apiGroups:
+  - prow.k8s.io
+  resources:
+  - prowjobs
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - delete
+  - update
+  - patch
+---
+#---------------------------------------------------------------------------------
+# art_namespaces_rbac.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: release-controller-binding-ocp
+  namespace: ocp-multi
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: release-controller-modify
+subjects:
+- kind: ServiceAccount
+  name: release-controller-ocp-multi
+  namespace: ci
+---
+#---------------------------------------------------------------------------------
+# art_namespaces_rbac.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: release-controller-binding-view
+  namespace: ocp-multi
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: view
+subjects:
+- kind: ServiceAccount
+  name: release-controller-ocp-multi
+  namespace: ci
+---
+#---------------------------------------------------------------------------------
+# art_namespaces_rbac.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: release-controller-binding-prowjob-ocp-multi
+  namespace: ci
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: release-controller-multi-prowjob
+subjects:
+- kind: ServiceAccount
+  name: release-controller-ocp-multi
+  namespace: ci
+---
+#---------------------------------------------------------------------------------
+# art_namespaces_rbac.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ci-release-multi
+---
+#---------------------------------------------------------------------------------
+# art_namespaces_rbac.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: release-controller-binding-ocp
+  namespace: ci-release-multi
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: edit
+subjects:
+- kind: ServiceAccount
+  name: release-controller-ocp-multi
+  namespace: ci
+---
+#---------------------------------------------------------------------------------
+# art_namespaces_rbac.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: release-controller-binding-promote
+  namespace: ocp-multi
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:image-builder
+subjects:
+- kind: ServiceAccount
+  name: builder
+  namespace: ci-release-multi
+---
+#---------------------------------------------------------------------------------
+# art_namespaces_rbac.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: release-controller-binding-import
+  namespace: ocp-multi
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: release-controller-import-ocp
+subjects:
+- kind: ServiceAccount
+  name: builder
+  namespace: ci-release-multi
+---
+#---------------------------------------------------------------------------------
+# art_namespaces_rbac.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: release-upgrade-graph
+  namespace: ocp-multi
+---
+#---------------------------------------------------------------------------------
+# art_namespaces_rbac.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  annotations: {}
+  name: release-controller-ocp-multi
+  namespace: ci

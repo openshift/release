@@ -59,18 +59,6 @@ base_images:
     name: "4.10"
     namespace: ocp
     tag: libvirt-installer
-  manila-csi-driver-operator-test:
-    name: "4.10"
-    namespace: ocp
-    tag: manila-csi-driver-operator-test
-  openstack-cinder-csi-driver-operator-test:
-    name: "4.10"
-    namespace: ocp
-    tag: openstack-cinder-csi-driver-operator-test
-  openstack-installer:
-    name: "4.10"
-    namespace: ocp
-    tag: openstack-installer
   upi-installer:
     name: "4.10"
     namespace: ocp
@@ -163,6 +151,26 @@ tests:
   steps:
     cluster_profile: packet
     workflow: baremetalds-e2e-serial-ipv4
+- as: e2e-metal-ipi-serial-ovn-ipv6
+  interval: 48h
+  steps:
+    cluster_profile: packet
+    workflow: baremetalds-e2e-serial-ovn-ipv6
+- as: e2e-metal-ipi-serial-virtualmedia
+  interval: 48h
+  steps:
+    cluster_profile: packet
+    workflow: baremetalds-e2e-serial-virtualmedia
+- as: e2e-metal-ipi-serial-ovn-dualstack
+  interval: 48h
+  steps:
+    cluster_profile: packet
+    workflow: baremetalds-e2e-serial-ovn-dualstack
+- as: e2e-metal-ipi-serial-compact
+  interval: 48h
+  steps:
+    cluster_profile: packet
+    workflow: baremetalds-e2e-serial-compact
 - as: e2e-metal-ipi-upgrade
   cron: 0 0 1 1 *
   steps:
@@ -170,6 +178,13 @@ tests:
     env:
       TEST_TYPE: upgrade-conformance
     workflow: baremetalds-e2e-upgrade
+- as: e2e-metal-ipi-upgrade-ovn-ipv6
+  cron: 0 0 1 1 *
+  steps:
+    cluster_profile: packet
+    env:
+      TEST_TYPE: upgrade-conformance
+    workflow: baremetalds-e2e-upgrade-ovn-ipv6
 - as: e2e-metal-ipi-ovn-ipv6
   interval: 48h
   steps:
@@ -243,7 +258,7 @@ tests:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere-upi-serial
 - as: e2e-vsphere-csi
-  interval: 12h
+  interval: 24h
   steps:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere-csi
@@ -253,14 +268,14 @@ tests:
     cluster_profile: vsphere-discon
     workflow: openshift-e2e-vsphere-proxy
 - as: e2e-aws-workers-rhel7
-  cron: 30 */6 * * *
+  cron: '@daily'
   steps:
     cluster_profile: aws
     env:
       PLATFORM_VERSION: "7.9"
     workflow: openshift-e2e-aws-workers-rhel
 - as: e2e-aws-workers-rhel8
-  cron: 30 */6 * * *
+  cron: '@daily'
   steps:
     cluster_profile: aws
     env:
@@ -279,7 +294,7 @@ tests:
       NETWORK_TYPE: OVNKubernetes
     workflow: openshift-e2e-ovirt-conformance
 - as: e2e-ovirt-csi
-  interval: 12h
+  interval: 24h
   steps:
     cluster_profile: ovirt
     workflow: openshift-e2e-ovirt-csi
@@ -326,12 +341,12 @@ tests:
     - ref: fips-check
     workflow: openshift-e2e-gcp
 - as: e2e-gcp-csi
-  interval: 12h
+  interval: 24h
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
     workflow: openshift-e2e-gcp-csi
 - as: e2e-gcp-csi-migration
-  interval: 12h
+  interval: 48h
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
     workflow: openshift-e2e-gcp-csi-migration
@@ -370,27 +385,6 @@ tests:
     - chain: ipi-gcp-pre
     - ref: fips-check
     workflow: openshift-e2e-gcp
-- as: e2e-openstack-fips
-  interval: 48h
-  steps:
-    cluster_profile: openstack-vexxhost
-    env:
-      FIPS_ENABLED: "true"
-      TEST_SUITE: experimental/reliability/minimal
-    pre:
-    - chain: ipi-openstack-pre
-    - ref: fips-check
-    workflow: openshift-e2e-openstack-ipi
-- as: e2e-openstack-proxy
-  interval: 72h
-  steps:
-    cluster_profile: openstack-vh-mecha-central
-    workflow: openshift-e2e-openstack-proxy
-- as: e2e-openstack-csi-manila
-  interval: 72h
-  steps:
-    cluster_profile: openstack-vh-mecha-central
-    workflow: openshift-e2e-openstack-csi-manila
 - as: console-aws
   interval: 48h
   steps:
@@ -448,14 +442,14 @@ tests:
       TEST_SUITE: experimental/reliability/minimal
     workflow: openshift-e2e-aws
 - as: e2e-aws-csi
-  interval: 12h
+  interval: 24h
   steps:
     cluster_profile: aws-2
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-e2e-aws-csi
 - as: e2e-aws-csi-migration
-  interval: 12h
+  interval: 48h
   steps:
     cluster_profile: aws-2
     env:
@@ -469,47 +463,24 @@ tests:
       BASE_DOMAIN: ci2.azure.devcluster.openshift.com
     workflow: openshift-e2e-azure
 - as: e2e-azure-csi
-  interval: 12h
+  interval: 24h
   steps:
     cluster_profile: azure-2
     env:
       BASE_DOMAIN: ci2.azure.devcluster.openshift.com
     workflow: openshift-e2e-azure-csi
 - as: e2e-azure-csi-migration
-  interval: 12h
+  interval: 48h
   steps:
     cluster_profile: azure-2
     env:
       BASE_DOMAIN: ci2.azure.devcluster.openshift.com
     workflow: openshift-e2e-azure-csi-migration
 - as: e2e-azurestack-csi
-  interval: 12h
+  interval: 24h
   steps:
     cluster_profile: azurestack
     workflow: openshift-e2e-azurestack-upi-csi
-- as: e2e-openstack-az
-  interval: 48h
-  steps:
-    cluster_profile: openstack-vh-mecha-az0
-    env:
-      TEST_SKIPS: Kubectl Port forwarding With a server listening on 0.0.0.0 should
-        support forwarding over websockets \| Kubectl client Simple pod should support
-        exec through kubectl proxy \| Kubectl client Simple pod should support exec
-        through an HTTP proxy \| Kubectl Port forwarding With a server listening on
-        localhost should support forwarding over websockets \| Pods should support
-        remote command execution over websockets \| Pods should support retrieving
-        logs from the container over websockets \| NetworkPolicy between server and
-        client should deny ingress access to updated pod \| The HAProxy router should
-        be able to connect to a service that is idled because a GET on the route will
-        unidle it \| Image append should create images by appending them \| deploymentconfigs
-        when run iteratively should only deploy the last deployment \| In-tree Volumes
-      ZONES_COUNT: "1"
-    workflow: openshift-e2e-openstack-byon
-- as: e2e-openstack-csi-cinder
-  interval: 72h
-  steps:
-    cluster_profile: openstack-vh-mecha-central
-    workflow: openshift-e2e-openstack-csi-cinder
 - as: e2e-aws-cgroupsv2
   interval: 3h
   steps:

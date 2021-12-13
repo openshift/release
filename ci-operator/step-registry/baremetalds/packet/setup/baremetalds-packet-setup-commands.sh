@@ -6,6 +6,12 @@ set -o pipefail
 
 echo "************ baremetalds packet setup command ************"
 
+# Avoid requesting a bunch of servers at the same time so they
+# don't race each other for available resources in a facility
+SLEEPTIME=$(( RANDOM % 120 ))
+echo "Sleeping for $SLEEPTIME seconds"
+sleep $SLEEPTIME
+
 # Run Ansible playbook
 cd
 cat > packet-setup.yaml <<-EOF
@@ -34,7 +40,7 @@ cat > packet-setup.yaml <<-EOF
         project_id: "{{ packet_project_id }}"
         hostnames: "{{ packet_hostname }}"
         operating_system: centos_8
-        plan: m2.xlarge.x86
+        plan: ${PACKET_PLAN}
         facility: any
         wait_for_public_IPv: 4
         wait_timeout: 1200
@@ -53,7 +59,7 @@ cat > packet-setup.yaml <<-EOF
     - name: Send notification message via Slack in case of failure
       slack:
         token: "{{ 'T027F3GAJ/B011TAG710V/' + lookup('file', slackhook_path) }}"
-        msg: "Packet failure: *Setup*\nHostname: *{{ packet_hostname }}*\nError msg: {{ ansible_failed_result.msg }}\n"
+        msg: "<https://prow.ci.openshift.org/view/gs/origin-ci-test/logs/$JOB_NAME/$BUILD_ID|Packet failure>: *Setup*\nHostname: *{{ packet_hostname }}*\nError msg: {{ ansible_failed_result.msg }}\n"
         username: "OpenShift CI Packet"
         color: warning
         icon_emoji: ":failed:"

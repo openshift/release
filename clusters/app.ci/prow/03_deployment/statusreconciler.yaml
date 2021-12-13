@@ -22,7 +22,7 @@ spec:
       terminationGracePeriodSeconds: 180
       containers:
       - name: statusreconciler
-        image: gcr.io/k8s-prow/status-reconciler:v20211111-bce61c7c4a
+        image: gcr.io/k8s-prow/status-reconciler:v20211210-5766077547
         imagePullPolicy: IfNotPresent
         args:
         - --dry-run=false
@@ -31,19 +31,26 @@ spec:
         - --supplemental-plugin-config-dir=/etc/plugins
         - --config-path=/etc/config/config.yaml
         - --supplemental-prow-config-dir=/etc/config
-        - --github-token-path=/etc/github/oauth
+        - --github-app-id=$(GITHUB_APP_ID)
+        - --github-app-private-key-path=/etc/github/cert
         - --github-endpoint=http://ghproxy
         - --github-endpoint=https://api.github.com
         - --github-graphql-endpoint=http://ghproxy/graphql
         - --job-config-path=/etc/job-config
         - --projected-token-file=/var/sa-token/token
+        env:
+        - name: GITHUB_APP_ID
+          valueFrom:
+            secretKeyRef:
+              name: openshift-prow-github-app
+              key: appid
         ports:
           - name: http
             containerPort: 8888
         volumeMounts:
         - name: service-account-token
           mountPath: /var/sa-token
-        - name: oauth
+        - name: github-app-credentials
           mountPath: /etc/github
           readOnly: true
         - name: config
@@ -107,9 +114,9 @@ spec:
           sources:
           - serviceAccountToken:
               path: token
-      - name: oauth
+      - name: github-app-credentials
         secret:
-          secretName: github-credentials-openshift-ci-robot
+          secretName: openshift-prow-github-app
       - name: config
         configMap:
           name: config

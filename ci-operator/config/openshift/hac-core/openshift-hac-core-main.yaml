@@ -1,0 +1,45 @@
+binary_build_commands: ./build.sh
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: tectonic-console-builder-v23
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: test
+  commands: ./test.sh
+  container:
+    from: src
+- as: release-build-repo
+  commands: |
+    mkdir -p /etc/ssh
+    ssh-keyscan github.com >> /etc/ssh/ssh_known_hosts
+    chmod 600 /tmp/secret/SSH_PRIVATE_KEY
+    echo "Host github.com
+      HostName github.com
+      User git
+      AddKeysToAgent yes
+      IdentityFile /tmp/secret/SSH_PRIVATE_KEY" >> /etc/ssh/ssh_config
+    ./build.sh
+    ./release-build-repo.sh
+  container:
+    from: src
+  postsubmit: true
+- as: release-image
+  commands: |
+    export DOCKER_TOKEN=$(cat /tmp/secret/DOCKER_TOKEN)
+    ./build.sh
+    ./release-image.sh
+  container:
+    from: src
+  postsubmit: true
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: hac-core

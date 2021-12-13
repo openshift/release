@@ -72,6 +72,24 @@ tests:
     env:
       TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
+- as: e2e-metal-assisted-prod
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ENVIRONMENT: production
+      GATHER_ALL_CLUSTERS: "false"
+      TEST_SUITE: minimal
+    workflow: baremetalds-assisted-install
+- as: e2e-metal-assisted-prod-periodic
+  cron: '@daily'
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ENVIRONMENT: production
+      GATHER_ALL_CLUSTERS: "false"
+      TEST_SUITE: full
+    workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-periodic
   cron: '@daily'
   steps:
@@ -116,6 +134,25 @@ tests:
         TEST_FUNC=test_olm_operator
       TEST_SUITE: full
     workflow: baremetalds-assisted
+- as: e2e-metal-assisted-day2
+  optional: true
+  run_if_changed: ^(day2/.*|.*/cluster/.*)$
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        TEST_FUNC=test_deploy_day2_nodes_cloud
+      TEST_SUITE: minimal
+    workflow: baremetalds-assisted-install
+- as: e2e-metal-assisted-day2-periodic
+  cron: '@daily'
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        TEST_FUNC=test_deploy_day2_nodes_cloud
+      TEST_SUITE: full
+    workflow: baremetalds-assisted-install
 - as: system-test-operator
   optional: true
   steps:

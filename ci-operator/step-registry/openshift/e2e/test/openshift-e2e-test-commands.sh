@@ -137,9 +137,13 @@ vsphere)
 openstack*)
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/cinder_credentials.sh"
-    export TEST_PROVIDER='{"type":"openstack"}';;
+    if test -n "${HTTP_PROXY:-}" -o -n "${HTTPS_PROXY:-}"; then
+        export TEST_PROVIDER='{"type":"openstack","disconnected":true}'
+    else
+        export TEST_PROVIDER='{"type":"openstack"}'
+    fi
+    ;;
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
-kubevirt) export TEST_PROVIDER='{"type":"kubevirt"}';;
 *) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"; exit 1;;
 esac
 
@@ -265,30 +269,48 @@ oc -n openshift-config patch cm admin-acks --patch '{"data":{"ack-4.8-kube-1.22-
 # wait for ClusterVersion to level, until https://bugzilla.redhat.com/show_bug.cgi?id=2009845 makes it back to all 4.9 releases being installed in CI
 oc wait --for=condition=Progressing=False --timeout=2m clusterversion/version
 
-# wait for all clusteroperators to reach progressing=false to ensure that we achieved the configuration specified at installation
-# time before we run our e2e tests.
-echo "$(date) - waiting for clusteroperators to finish progressing..."
-oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
-echo "$(date) - all clusteroperators are done progressing."
-
 # wait up to 10m for the number of nodes to match the number of machines
 i=0
 while true
 do
-  MACHINECOUNT="$(kubectl get machines -A --no-headers | wc -l)"
-  NODECOUNT="$(kubectl get nodes --no-headers | wc -l)"
-  if [ "${MACHINECOUNT}" -le "${NODECOUNT}" ]
-  then
-    echo "$(date) - node count ($NODECOUNT) now matches or exceeds machine count ($MACHINECOUNT)"
-    break
-  fi
-  echo "$(date) - $MACHINECOUNT Machines - $NODECOUNT Nodes"
-  sleep 30
-  ((i++))
-  if [ $i -gt 20 ]; then
-    echo "Timed out waiting for node count ($NODECOUNT) to equal or exceed machine count ($MACHINECOUNT)."
-    exit 1
-  fi
+    MACHINECOUNT="$(kubectl get machines -A --no-headers | wc -l)"
+    NODECOUNT="$(kubectl get nodes --no-headers | wc -l)"
+    if [ "${MACHINECOUNT}" -le "${NODECOUNT}" ]
+    then
+        echo "$(date) - node count ($NODECOUNT) now matches or exceeds machine count ($MACHINECOUNT)"
+        break
+    fi
+    echo "$(date) - $MACHINECOUNT Machines - $NODECOUNT Nodes"
+    sleep 30
+    i=$((i+1))
+    if [ $i -gt 20 ]; then
+        echo "Timed out waiting for node count ($NODECOUNT) to equal or exceed machine count ($MACHINECOUNT)."
+        # If we enabled the ssh bastion pod, attempt to gather journal logs from each machine, regardless
+        # if it made it to a node or not.
+        if [[ -n "${TEST_REQUIRES_SSH-}" ]]; then
+            echo "Attempting to gather system journal logs from each machine via ssh bastion pod"
+            mkdir -p "${ARTIFACT_DIR}/ssh-bastion-gather/"
+
+            # This returns each IP all on one line, separated by spaces:
+            machine_ips="$(oc --insecure-skip-tls-verify get machines -n openshift-machine-api -o 'jsonpath={.items[*].status.addresses[?(@.type=="InternalIP")].address}')"
+            echo "Found machine IPs: $machine_ips"
+            ingress_host="$(oc get service --all-namespaces -l run=ssh-bastion -o go-template='{{ with (index (index .items 0).status.loadBalancer.ingress 0) }}{{ or .hostname .ip }}{{end}}')"
+            echo "Ingress host: $ingress_host"
+
+            # Disable errors so we keep trying hosts if any of these commands fail.
+            set +e
+            for ip in $machine_ips
+            do
+                echo "Gathering journalctl logs from ${ip}"
+                ssh -i "${KUBE_SSH_KEY_PATH}" -o StrictHostKeyChecking=no -o ProxyCommand="ssh -i ${KUBE_SSH_KEY_PATH} -A -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p core@${ingress_host}" core@$ip "sudo journalctl --no-pager" > "${ARTIFACT_DIR}/ssh-bastion-gather/${ip}-journal.log"
+                ssh -i "${KUBE_SSH_KEY_PATH}" -o StrictHostKeyChecking=no -o ProxyCommand="ssh -i ${KUBE_SSH_KEY_PATH} -A -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p core@${ingress_host}" core@$ip "sudo /sbin/ip addr show" > "${ARTIFACT_DIR}/ssh-bastion-gather/${ip}-ip-addr-show.log"
+                ssh -i "${KUBE_SSH_KEY_PATH}" -o StrictHostKeyChecking=no -o ProxyCommand="ssh -i ${KUBE_SSH_KEY_PATH} -A -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p core@${ingress_host}" core@$ip "sudo /sbin/ip route show" > "${ARTIFACT_DIR}/ssh-bastion-gather/${ip}-ip-route-show.log"
+            done
+            set -e
+        fi
+
+        exit 1
+    fi
 done
 
 # wait for all nodes to reach Ready=true to ensure that all machines and nodes came up, before we run
@@ -296,6 +318,12 @@ done
 echo "$(date) - waiting for nodes to be ready..."
 oc wait nodes --all --for=condition=Ready=true --timeout=10m
 echo "$(date) - all nodes are ready"
+
+# wait for all clusteroperators to reach progressing=false to ensure that we achieved the configuration specified at installation
+# time before we run our e2e tests.
+echo "$(date) - waiting for clusteroperators to finish progressing..."
+oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
+echo "$(date) - all clusteroperators are done progressing."
 
 # this works around a problem where tests fail because imagestreams aren't imported.  We see this happen for exec session.
 echo "$(date) - waiting for non-samples imagesteams to import..."

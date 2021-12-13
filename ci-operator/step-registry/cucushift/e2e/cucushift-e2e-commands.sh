@@ -9,6 +9,12 @@ if [ -f "${SHARED_DIR}/kubeconfig" ] ; then
 fi
 cp -Lrvf "${KUBECONFIG}" /tmp/kubeconfig
 
+if ! which kubectl; then
+    mkdir /tmp/bin
+    export PATH=$PATH:/tmp/bin
+    ln -s "$(which oc)" /tmp/bin/kubectl
+fi
+
 #shellcheck source=${SHARED_DIR}/runtime_env
 source "${SHARED_DIR}/runtime_env"
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
@@ -16,6 +22,11 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
 fi
 
 export E2E_RUN_TAGS="${E2E_RUN_TAGS} and ${TAG_VERSION}"
+if [ -z "${E2E_SKIP_TAGS}" ] ; then
+    export E2E_SKIP_TAGS="not @customer and not @security"
+else
+    export E2E_SKIP_TAGS="${E2E_SKIP_TAGS} and not @customer and not @security"
+fi
 
 cd verification-tests
 # run normal tests

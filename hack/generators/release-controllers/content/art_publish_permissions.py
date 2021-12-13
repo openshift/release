@@ -108,7 +108,7 @@ in 3.11).''')
 
             for major_minor in config.releases:
                 gendoc.append({
-                    'apiVersion': 'v1',
+                    'apiVersion': 'image.openshift.io/v1',
                     'kind': 'ImageStream',
                     'metadata': {
                         'name': major_minor,
@@ -116,7 +116,7 @@ in 3.11).''')
                     }
                 })
                 gendoc.append({
-                    'apiVersion': 'v1',
+                    'apiVersion': 'image.openshift.io/v1',
                     'kind': 'ImageStream',
                     'metadata': {
                         'name': f'{major_minor}-art-latest{config.get_suffix(arch, private)}',

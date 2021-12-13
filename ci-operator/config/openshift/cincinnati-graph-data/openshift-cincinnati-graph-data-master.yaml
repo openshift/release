@@ -9,8 +9,15 @@ build_root:
     namespace: openshift
     tag: golang-1.12
 images:
+- dockerfile_path: Dockerfile
+  to: stable
 - dockerfile_path: graph-data.rs/Dockerfile
-  to: graphdata
+  to: graphdata-unittests
+promotion:
+  excluded_images:
+  - graphdata-unittests
+  name: cincinnati-graph-data
+  namespace: cincinnati-ci-public
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
@@ -29,7 +36,7 @@ raw_steps:
         paths:
         - destination_dir: .
           source_path: /tmp/Dockerfile
-    to: hack-unittests
+    to: webhook-unittests
 resources:
   '*':
     requests:
@@ -39,17 +46,17 @@ tests:
 - as: e2e
   commands: /usr/local/bin/cincinnati-graph-data
   container:
-    from: graphdata
+    from: graphdata-unittests
 - as: errata-webhook-unittests
   commands: python3 -m unittest
   container:
-    from: hack-unittests
+    from: webhook-unittests
 - as: validate-blocked-edges
   commands: |
     cd /go/src/github.com/openshift/cincinnati-graph-data
     exec hack/validate-blocked-edges.py
   container:
-    from: hack-unittests
+    from: webhook-unittests
 zz_generated_metadata:
   branch: master
   org: openshift

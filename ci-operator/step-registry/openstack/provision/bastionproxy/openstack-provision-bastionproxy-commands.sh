@@ -207,16 +207,6 @@ $SSH_CMD chmod +x /tmp/deploy_squid.sh
 $SSH_CMD bash -c /tmp/deploy_squid.sh
 $SCP_CMD $BASTION_USER@$bastion_fip:/etc/squid/certs/domain.crt ${SHARED_DIR}/
 
-cat <<EOF> "${SHARED_DIR}/proxy-conf.sh"
-export HTTP_PROXY=http://$SQUID_AUTH@${bastion_fip}:3128/
-export HTTPS_PROXY=http://$SQUID_AUTH@${bastion_fip}:3128/
-export NO_PROXY="redhat.io,quay.io,redhat.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,localhost,127.0.0.1"
-
-export http_proxy=http://$SQUID_AUTH@${bastion_fip}:3128/
-export https_proxy=http://$SQUID_AUTH@${bastion_fip}:3128/
-export no_proxy="redhat.io,quay.io,redhat.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,localhost,127.0.0.1"
-EOF
-
 if [[ -f "${SHARED_DIR}/osp-ca.crt" ]]; then
   printf "\n" >> "${SHARED_DIR}/osp-ca.crt"
   cat "${SHARED_DIR}"/domain.crt >> "${SHARED_DIR}/osp-ca.crt"

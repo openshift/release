@@ -1,6 +1,6 @@
-# Expose registry.ci.openshift.org as registry's domain name
+# Expose registry.build03.ci.openshift.org as registry's domain name
 
-After the registry's `defaultRoute` is enabled, its domain name is
+The registry's `defaultRoute` is enabled by default for an OSD cluster, its domain name is
 
 ```console
 $ oc --context build03 get route -n openshift-image-registry

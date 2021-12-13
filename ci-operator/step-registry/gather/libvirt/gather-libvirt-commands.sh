@@ -147,17 +147,22 @@ while IFS= read -r i; do
   FILTER=gzip queue ${ARTIFACT_DIR}/pods/${file}_previous.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s -p $i
 done < /tmp/containers
 
-echo "Snapshotting prometheus (may take 15s) ..."
 # Snapshot the prometheus data from the replica that has the oldest
 # PVC. If persistent storage isn't enabled, it uses the last
 # prometheus instances by default to catch issues that occur when the
 # first prometheus pod upgrades.
-prometheus="$( oc --insecure-skip-tls-verify get pods -n openshift-monitoring -l app.kubernetes.io/name=prometheus | tail -1 )"
-if [[ -n "$( oc --insecure-skip-tls-verify get pvc -n openshift-monitoring -l app.kubernetes.io/name=prometheus --ignore-not-found=true )" ]]; then
-  pvc="$( oc --insecure-skip-tls-verify get pvc -n openshift-monitoring -l app.kubernetes.io/name=prometheus --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[0].metadata.name}' )"
+if [[ -n "$( oc --insecure-skip-tls-verify --request-timeout=20s get pvc -n openshift-monitoring -l app.kubernetes.io/name=prometheus --ignore-not-found )" ]]; then
+  pvc="$( oc --insecure-skip-tls-verify --request-timeout=20s get pvc -n openshift-monitoring -l app.kubernetes.io/name=prometheus --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[0].metadata.name}' )"
   prometheus="${pvc##prometheus-data-}"
+else
+  prometheus="$( oc --insecure-skip-tls-verify --request-timeout=20s get pods -n openshift-monitoring -l app.kubernetes.io/name=prometheus --sort-by=.metadata.creationTimestamp --ignore-not-found -o jsonpath='{.items[0].metadata.name}')"
 fi
-queue ${ARTIFACT_DIR}/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prometheus}" -- tar cvzf - -C /prometheus .
+if [[ -n "${prometheus}" ]]; then
+	echo "Snapshotting Prometheus from ${prometheus} (may take 15s) ..."
+	queue ${ARTIFACT_DIR}/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prometheus}" -- tar cvzf - -C /prometheus .
+else
+	echo "Unable to find a Prometheus pod to snapshot."
+fi
 
 cat >> ${SHARED_DIR}/custom-links.txt << EOF
 <script>
@@ -304,7 +309,7 @@ ${t_test}    cluster:container:test:started  count(count_over_time((count withou
 ${t_all}     cluster:version:info:total   topk(1, max by (version) (max_over_time(cluster_version{type="completed"}[${d_all}])))*0+1
 ${t_install} cluster:version:info:install topk(1, max by (version) (max_over_time(cluster_version{type="completed"}[${d_install}])))*0+1
 ${t_all}     cluster:version:current:seconds count_over_time(max by (version) ((cluster_version{type="current"}))[${d_all}:1s])
-${t_test}    cluster:version:updates:seconds count_over_time(max by (version) ((cluster_version{type="updating",from_version!=""}))[${d_test}:1s])
+${t_test}    cluster:version:updates:seconds max by (from_version,version) (max_over_time(((time() - cluster_version{type="updating",version!="",from_version!=""}))[${d_test}:1s]))
 ${t_all}     job:duration:total:seconds vector(${s_all})
 ${t_install} job:duration:install:seconds vector(${s_install})
 ${t_test}    job:duration:test:seconds vector(${s_test})
@@ -394,4 +399,7 @@ cat >> ${REPORT} << EOF
 <link rel="stylesheet" href="https://code.getmdl.io/1.3.0/material.indigo-pink.min.css">
 <link rel="stylesheet" type="text/css" href="/static/spyglass/spyglass.css">
 EOF
-cat ${SHARED_DIR}/custom-links.txt >> ${REPORT}
+
+if [[ -f ${SHARED_DIR}/custom-links.txt ]]; then
+  cat ${SHARED_DIR}/custom-links.txt >> ${REPORT}
+fi

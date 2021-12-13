@@ -6,7 +6,8 @@ set -o pipefail
 
 echo "************ baremetalds assisted tools report command ************"
 
-JIRA_USERNAME=$(cat /var/run/jira-credentials/username) \
-    JIRA_PASSWORD=$(cat /var/run/jira-credentials/password) \
-    WEBHOOK=$(cat /var/run/jira-credentials/webhook) \
+export CI_CREDENTIALS_DIR=/var/run/assisted-installer-bot
+
+JIRA_ACCESS_TOKEN=$(cat ${CI_CREDENTIALS_DIR}/jira-access-token) \
+    WEBHOOK=$(cat ${CI_CREDENTIALS_DIR}/triage-webhook) \
     ./tools/triage_status_report.py

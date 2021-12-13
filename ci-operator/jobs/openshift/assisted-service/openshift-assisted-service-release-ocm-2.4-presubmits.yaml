@@ -5,7 +5,111 @@ presubmits:
     branches:
     - ^release-ocm-2\.4$
     - ^release-ocm-2\.4-
-    cluster: build01
+    cluster: build02
+    context: ci/prow/bundle-ci-index-assisted-service-bundle
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: bundle
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-assisted-service-release-ocm-2.4-bundle-ci-index-assisted-service-bundle
+    rerun_command: /test bundle-ci-index-assisted-service-bundle
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=ci-index-assisted-service-bundle
+        - --variant=bundle
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )bundle-ci-index-assisted-service-bundle,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-ocm-2\.4$
+    - ^release-ocm-2\.4-
+    cluster: build02
+    context: ci/prow/bundle-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: bundle
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-assisted-service-release-ocm-2.4-bundle-images
+    rerun_command: /test bundle-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --target=assisted-service-bundle
+        - --target=ci-index-assisted-service-bundle
+        - --variant=bundle
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )bundle-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-ocm-2\.4$
+    - ^release-ocm-2\.4-
+    cluster: build02
     context: ci/prow/ci-index
     decorate: true
     decoration_config:
@@ -54,12 +158,14 @@ presubmits:
     branches:
     - ^release-ocm-2\.4$
     - ^release-ocm-2\.4-
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-ai-operator-ztp-ipv4v6-3masters-ocp-48
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/cloud: packet
+      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-release-ocm-2.4-e2e-ai-operator-ztp-ipv4v6-3masters-ocp-48
@@ -113,10 +219,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-packet-assisted
+        secret:
+          secretName: cluster-secrets-packet-assisted
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -129,12 +233,14 @@ presubmits:
     branches:
     - ^release-ocm-2\.4$
     - ^release-ocm-2\.4-
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-ai-operator-ztp-ipv4v6-3masters-ocp-49
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/cloud: packet
+      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-release-ocm-2.4-e2e-ai-operator-ztp-ipv4v6-3masters-ocp-49
@@ -188,10 +294,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-packet-assisted
+        secret:
+          secretName: cluster-secrets-packet-assisted
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -204,12 +308,14 @@ presubmits:
     branches:
     - ^release-ocm-2\.4$
     - ^release-ocm-2\.4-
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-ai-operator-ztp-ipv4v6-sno-ocp-48
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/cloud: packet
+      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-release-ocm-2.4-e2e-ai-operator-ztp-ipv4v6-sno-ocp-48
@@ -263,10 +369,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-packet-assisted
+        secret:
+          secretName: cluster-secrets-packet-assisted
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -279,12 +383,14 @@ presubmits:
     branches:
     - ^release-ocm-2\.4$
     - ^release-ocm-2\.4-
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-ai-operator-ztp-ipv4v6-sno-ocp-49
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/cloud: packet
+      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-release-ocm-2.4-e2e-ai-operator-ztp-ipv4v6-sno-ocp-49
@@ -338,10 +444,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-packet-assisted
+        secret:
+          secretName: cluster-secrets-packet-assisted
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -354,12 +458,14 @@ presubmits:
     branches:
     - ^release-ocm-2\.4$
     - ^release-ocm-2\.4-
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-metal-assisted
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/cloud: packet
+      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-release-ocm-2.4-e2e-metal-assisted
@@ -413,10 +519,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-packet-assisted
+        secret:
+          secretName: cluster-secrets-packet-assisted
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -429,12 +533,14 @@ presubmits:
     branches:
     - ^release-ocm-2\.4$
     - ^release-ocm-2\.4-
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-metal-assisted-ipv6
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/cloud: packet
+      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-release-ocm-2.4-e2e-metal-assisted-ipv6
@@ -489,10 +595,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-packet-assisted
+        secret:
+          secretName: cluster-secrets-packet-assisted
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -505,12 +609,14 @@ presubmits:
     branches:
     - ^release-ocm-2\.4$
     - ^release-ocm-2\.4-
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-metal-assisted-kube-api
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/cloud: packet
+      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-release-ocm-2.4-e2e-metal-assisted-kube-api
@@ -564,10 +670,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-packet-assisted
+        secret:
+          secretName: cluster-secrets-packet-assisted
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -580,12 +684,14 @@ presubmits:
     branches:
     - ^release-ocm-2\.4$
     - ^release-ocm-2\.4-
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-metal-assisted-kube-api-late-binding-single-node
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/cloud: packet
+      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-release-ocm-2.4-e2e-metal-assisted-kube-api-late-binding-single-node
@@ -639,10 +745,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-packet-assisted
+        secret:
+          secretName: cluster-secrets-packet-assisted
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -655,12 +759,14 @@ presubmits:
     branches:
     - ^release-ocm-2\.4$
     - ^release-ocm-2\.4-
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-metal-assisted-multi-version
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/cloud: packet
+      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-release-ocm-2.4-e2e-metal-assisted-multi-version
@@ -714,10 +820,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-packet-assisted
+        secret:
+          secretName: cluster-secrets-packet-assisted
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -730,12 +834,14 @@ presubmits:
     branches:
     - ^release-ocm-2\.4$
     - ^release-ocm-2\.4-
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-metal-assisted-none
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/cloud: packet
+      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-release-ocm-2.4-e2e-metal-assisted-none
@@ -789,10 +895,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-packet-assisted
+        secret:
+          secretName: cluster-secrets-packet-assisted
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -805,12 +909,14 @@ presubmits:
     branches:
     - ^release-ocm-2\.4$
     - ^release-ocm-2\.4-
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-metal-assisted-olm
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/cloud: packet
+      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-release-ocm-2.4-e2e-metal-assisted-olm
@@ -865,10 +971,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-packet-assisted
+        secret:
+          secretName: cluster-secrets-packet-assisted
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -881,12 +985,14 @@ presubmits:
     branches:
     - ^release-ocm-2\.4$
     - ^release-ocm-2\.4-
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-metal-assisted-operator-disconnected
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/cloud: packet
+      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-release-ocm-2.4-e2e-metal-assisted-operator-disconnected
@@ -941,10 +1047,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-packet-assisted
+        secret:
+          secretName: cluster-secrets-packet-assisted
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -957,12 +1061,14 @@ presubmits:
     branches:
     - ^release-ocm-2\.4$
     - ^release-ocm-2\.4-
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-metal-assisted-operator-ztp
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/cloud: packet
+      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-release-ocm-2.4-e2e-metal-assisted-operator-ztp
@@ -1016,10 +1122,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-packet-assisted
+        secret:
+          secretName: cluster-secrets-packet-assisted
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -1032,12 +1136,14 @@ presubmits:
     branches:
     - ^release-ocm-2\.4$
     - ^release-ocm-2\.4-
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-metal-assisted-operator-ztp-multinode-spoke
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/cloud: packet
+      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-release-ocm-2.4-e2e-metal-assisted-operator-ztp-multinode-spoke
@@ -1091,10 +1197,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-packet-assisted
+        secret:
+          secretName: cluster-secrets-packet-assisted
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -1107,12 +1211,14 @@ presubmits:
     branches:
     - ^release-ocm-2\.4$
     - ^release-ocm-2\.4-
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-metal-assisted-single-node
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/cloud: packet
+      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-release-ocm-2.4-e2e-metal-assisted-single-node
@@ -1167,10 +1273,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-packet-assisted
+        secret:
+          secretName: cluster-secrets-packet-assisted
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -1183,12 +1287,14 @@ presubmits:
     branches:
     - ^release-ocm-2\.4$
     - ^release-ocm-2\.4-
-    cluster: build01
+    cluster: build02
     context: ci/prow/e2e-metal-assisted-static-ip
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/cloud: packet
+      ci-operator.openshift.io/cloud-cluster-profile: packet
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-release-ocm-2.4-e2e-metal-assisted-static-ip
@@ -1241,10 +1347,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-packet
+        secret:
+          secretName: cluster-secrets-packet
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -1257,7 +1361,7 @@ presubmits:
     branches:
     - ^release-ocm-2\.4$
     - ^release-ocm-2\.4-
-    cluster: build01
+    cluster: build02
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -1274,8 +1378,6 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --target=ci-bundle0
-        - --target=ci-index
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1308,7 +1410,7 @@ presubmits:
     branches:
     - ^release-ocm-2\.4$
     - ^release-ocm-2\.4-
-    cluster: build01
+    cluster: build02
     context: ci/prow/lint
     decorate: true
     decoration_config:
@@ -1357,7 +1459,7 @@ presubmits:
     branches:
     - ^release-ocm-2\.4$
     - ^release-ocm-2\.4-
-    cluster: build01
+    cluster: build02
     context: ci/prow/subsystem-aws
     decorate: true
     decoration_config:
@@ -1421,7 +1523,7 @@ presubmits:
     branches:
     - ^release-ocm-2\.4$
     - ^release-ocm-2\.4-
-    cluster: build01
+    cluster: build02
     context: ci/prow/subsystem-kubeapi-aws
     decorate: true
     decoration_config:

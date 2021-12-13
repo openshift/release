@@ -20,6 +20,9 @@ images:
       as:
       - registry.ci.openshift.org/ocp/4.10:installer
   to: machine-os-images
+promotion:
+  name: "4.10"
+  namespace: ocp
 releases:
   initial:
     integration:
@@ -43,6 +46,17 @@ tests:
     bash {} \+
   container:
     from: src
+  run_if_changed: (^scripts/)|(\.sh$)
+- as: e2e-metal-ipi-ovn-ipv6
+  skip_if_only_changed: (^[A-Z]+\.md$)|((^|/)OWNERS$)
+  steps:
+    cluster_profile: packet
+    workflow: baremetalds-e2e-ovn-ipv6
+- as: e2e-metal-ipi-serial-ipv4
+  skip_if_only_changed: (^[A-Z]+\.md$)|((^|/)OWNERS$)
+  steps:
+    cluster_profile: packet
+    workflow: baremetalds-e2e-serial-ipv4
 zz_generated_metadata:
   branch: main
   org: openshift

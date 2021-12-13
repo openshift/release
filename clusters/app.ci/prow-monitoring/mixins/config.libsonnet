@@ -12,6 +12,7 @@
       'ghproxy.json': 'd72fe8d0400b2912e319b1e95d0ab1b3',
       'osde2e.json': '4238b58e99c5470481c2050f823e4fb9',
       'configresolver.json': '703f0ccf02cc4339a374b52eb10f653b',
+      'clusterpool.json': '22491886c1e19dde8d2984bca82154c1',
     },
     buildCopSuccessRateTargets: {
       'branch-.*-images': 100,

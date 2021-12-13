@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: 0 */2 * * *
   decorate: true
   extra_refs:
@@ -8,6 +8,8 @@ periodics:
     org: openshift
     repo: assisted-test-infra
   labels:
+    ci-operator.openshift.io/cloud: packet
+    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-test-infra-master-assisted-packet-check
@@ -59,10 +61,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-packet-assisted
+      secret:
+        secretName: cluster-secrets-packet-assisted
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -70,14 +70,95 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
-  cron: '@daily'
+  cluster: build02
+  cron: 39 1 * * *
   decorate: true
   extra_refs:
   - base_ref: master
     org: openshift
     repo: assisted-test-infra
   labels:
+    ci-operator.openshift.io/cloud: packet
+    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-day2-periodic
+  reporter_config:
+    slack:
+      channel: '#assisted-deployment-ci'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
+        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs>'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-metal-assisted-day2-periodic-cluster-profile
+      - --target=e2e-metal-assisted-day2-periodic
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-metal-assisted-day2-periodic-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-packet-assisted
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  cron: 16 2 * * *
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: assisted-test-infra
+  labels:
+    ci-operator.openshift.io/cloud: packet
+    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-ipv4v6-periodic
@@ -138,10 +219,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-packet-assisted
+      secret:
+        secretName: cluster-secrets-packet-assisted
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -149,14 +228,16 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
-  cron: '@daily'
+  cluster: build02
+  cron: 22 2 * * *
   decorate: true
   extra_refs:
   - base_ref: master
     org: openshift
     repo: assisted-test-infra
   labels:
+    ci-operator.openshift.io/cloud: packet
+    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-ipv6-periodic
@@ -217,10 +298,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-packet-assisted
+      secret:
+        secretName: cluster-secrets-packet-assisted
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -228,14 +307,16 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
-  cron: '@daily'
+  cluster: build02
+  cron: 3 1 * * *
   decorate: true
   extra_refs:
   - base_ref: master
     org: openshift
     repo: assisted-test-infra
   labels:
+    ci-operator.openshift.io/cloud: packet
+    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-kube-api-periodic
@@ -296,10 +377,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-packet-assisted
+      secret:
+        secretName: cluster-secrets-packet-assisted
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -307,14 +386,16 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
-  cron: '@daily'
+  cluster: build02
+  cron: 17 3 * * *
   decorate: true
   extra_refs:
   - base_ref: master
     org: openshift
     repo: assisted-test-infra
   labels:
+    ci-operator.openshift.io/cloud: packet
+    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-multi-version-periodic
@@ -375,10 +456,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-packet-assisted
+      secret:
+        secretName: cluster-secrets-packet-assisted
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -386,7 +465,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: 0 */4 * * *
   decorate: true
   extra_refs:
@@ -394,6 +473,8 @@ periodics:
     org: openshift
     repo: assisted-test-infra
   labels:
+    ci-operator.openshift.io/cloud: packet
+    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-networking-periodic
@@ -454,10 +535,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-packet-assisted
+      secret:
+        secretName: cluster-secrets-packet-assisted
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -465,14 +544,16 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
-  cron: '@daily'
+  cluster: build02
+  cron: 5 3 * * *
   decorate: true
   extra_refs:
   - base_ref: master
     org: openshift
     repo: assisted-test-infra
   labels:
+    ci-operator.openshift.io/cloud: packet
+    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-none-ipv6-periodic
@@ -524,10 +605,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-packet-assisted
+      secret:
+        secretName: cluster-secrets-packet-assisted
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -535,14 +614,16 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
-  cron: '@daily'
+  cluster: build02
+  cron: 13 23 * * *
   decorate: true
   extra_refs:
   - base_ref: master
     org: openshift
     repo: assisted-test-infra
   labels:
+    ci-operator.openshift.io/cloud: packet
+    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-none-periodic
@@ -603,10 +684,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-packet-assisted
+      secret:
+        secretName: cluster-secrets-packet-assisted
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -614,14 +693,16 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
-  cron: '@daily'
+  cluster: build02
+  cron: 51 1 * * *
   decorate: true
   extra_refs:
   - base_ref: master
     org: openshift
     repo: assisted-test-infra
   labels:
+    ci-operator.openshift.io/cloud: packet
+    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-olm-periodic
@@ -682,10 +763,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-packet-assisted
+      secret:
+        secretName: cluster-secrets-packet-assisted
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -693,14 +772,16 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
-  cron: '@daily'
+  cluster: build02
+  cron: 52 2 * * *
   decorate: true
   extra_refs:
   - base_ref: master
     org: openshift
     repo: assisted-test-infra
   labels:
+    ci-operator.openshift.io/cloud: packet
+    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-periodic
@@ -761,10 +842,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-packet-assisted
+      secret:
+        secretName: cluster-secrets-packet-assisted
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -772,14 +851,95 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
-  cron: '@daily'
+  cluster: build02
+  cron: 30 22 * * *
   decorate: true
   extra_refs:
   - base_ref: master
     org: openshift
     repo: assisted-test-infra
   labels:
+    ci-operator.openshift.io/cloud: packet
+    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-prod-periodic
+  reporter_config:
+    slack:
+      channel: '#assisted-deployment-ci'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
+        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs>'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-metal-assisted-prod-periodic-cluster-profile
+      - --target=e2e-metal-assisted-prod-periodic
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-metal-assisted-prod-periodic-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-packet-assisted
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  cron: 22 2 * * *
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: assisted-test-infra
+  labels:
+    ci-operator.openshift.io/cloud: packet
+    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-single-node-periodic
@@ -840,10 +1000,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-packet-assisted
+      secret:
+        secretName: cluster-secrets-packet-assisted
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -851,21 +1009,24 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
-  cron: '@daily'
+  cluster: build02
+  cron: 14 0 * * *
   decorate: true
   extra_refs:
   - base_ref: master
     org: openshift
     repo: assisted-test-infra
   labels:
+    ci-operator.openshift.io/cloud: packet
+    ci-operator.openshift.io/cloud-cluster-profile: packet-sno
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-single-node-live-iso-periodic
   reporter_config:
     slack:
-      channel: '#edge-group-single-node'
+      channel: '#single-node-ci'
       job_states_to_report:
+      - success
       - failure
       - error
       report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
@@ -919,10 +1080,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-packet-sno
+      secret:
+        secretName: cluster-secrets-packet-sno
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -930,7 +1089,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: 0 */2 * * *
   decorate: true
   extra_refs:
@@ -938,6 +1097,8 @@ periodics:
     org: openshift
     repo: assisted-test-infra
   labels:
+    ci-operator.openshift.io/cloud: packet
+    ci-operator.openshift.io/cloud-cluster-profile: packet-sno
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-test-infra-master-sno-packet-check
@@ -989,10 +1150,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-packet-sno
+      secret:
+        secretName: cluster-secrets-packet-sno
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -1000,14 +1159,16 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
-  cron: '@daily'
+  cluster: build02
+  cron: 38 0 * * *
   decorate: true
   extra_refs:
   - base_ref: master
     org: openshift
     repo: assisted-test-infra
   labels:
+    ci-operator.openshift.io/cloud: packet
+    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-test-infra-master-system-test-operator-periodic
@@ -1059,10 +1220,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-packet-assisted
+      secret:
+        secretName: cluster-secrets-packet-assisted
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials

@@ -3,10 +3,10 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  open-cluster-management_builder_go1.16-linux:
+  open-cluster-management_builder_go1.17-linux:
     name: builder
     namespace: open-cluster-management
-    tag: go1.16-linux
+    tag: go1.17-linux
 binary_build_commands: |-
   GOFLAGS="" go build ./cmd/clusterlifecycle-state-metrics; \
   GOFLAGS="" go test -covermode=atomic -coverpkg=github.com/open-cluster-management/clusterlifecycle-state-metrics/pkg/... -c -tags testrunmain ./cmd/clusterlifecycle-state-metrics -o clusterlifecycle-state-metrics-coverage
@@ -14,20 +14,20 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: open-cluster-management
-    tag: go1.16-linux
+    tag: go1.17-linux
 images:
 - dockerfile_path: build/Dockerfile.prow
   from: base
   inputs:
-    open-cluster-management_builder_go1.16-linux:
+    open-cluster-management_builder_go1.17-linux:
       as:
-      - registry.ci.openshift.org/open-cluster-management/builder:go1.16-linux
+      - registry.ci.openshift.org/open-cluster-management/builder:go1.17-linux
   to: clusterlifecycle-state-metrics
 - dockerfile_path: build/Dockerfile.coverage.prow
   from: clusterlifecycle-state-metrics
   to: clusterlifecycle-state-metrics-coverage
 promotion:
-  name: "2.4"
+  name: "2.5"
   namespace: open-cluster-management
 releases:
   initial:
@@ -82,6 +82,12 @@ tests:
       IMAGE_TAG: latest
       REGISTRY_ORG: open-cluster-management
     workflow: ocm-ci-image-mirror
+- as: fast-forward
+  postsubmit: true
+  steps:
+    env:
+      DESTINATION_BRANCH: release-2.5
+    workflow: ocm-ci-fastforward
 zz_generated_metadata:
   branch: main
   org: open-cluster-management

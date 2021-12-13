@@ -10,6 +10,8 @@ periodics:
     repo: verification-tests
   interval: 24h
   labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws
     ci-operator.openshift.io/variant: ocp-4.10
     ci.openshift.io/generator: prowgen
     job-release: "4.10"
@@ -64,10 +66,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-aws
+      secret:
+        secretName: cluster-secrets-aws
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -85,6 +85,8 @@ periodics:
     repo: verification-tests
   interval: 168h
   labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws
     ci-operator.openshift.io/variant: ocp-4.10
     ci.openshift.io/generator: prowgen
     job-release: "4.10"
@@ -139,10 +141,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-aws
+      secret:
+        secretName: cluster-secrets-aws
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -160,6 +160,8 @@ periodics:
     repo: verification-tests
   interval: 24h
   labels:
+    ci-operator.openshift.io/cloud: packet
+    ci-operator.openshift.io/cloud-cluster-profile: packet
     ci-operator.openshift.io/variant: ocp-4.10
     ci.openshift.io/generator: prowgen
     job-release: "4.10"
@@ -214,10 +216,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-packet
+      secret:
+        secretName: cluster-secrets-packet
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -235,6 +235,8 @@ periodics:
     repo: verification-tests
   interval: 24h
   labels:
+    ci-operator.openshift.io/cloud: gcp
+    ci-operator.openshift.io/cloud-cluster-profile: gcp
     ci-operator.openshift.io/variant: ocp-4.10
     ci.openshift.io/generator: prowgen
     job-release: "4.10"
@@ -312,6 +314,8 @@ periodics:
     repo: verification-tests
   interval: 24h
   labels:
+    ci-operator.openshift.io/cloud: gcp
+    ci-operator.openshift.io/cloud-cluster-profile: gcp
     ci-operator.openshift.io/variant: ocp-4.10
     ci.openshift.io/generator: prowgen
     job-release: "4.10"
@@ -389,6 +393,8 @@ periodics:
     repo: verification-tests
   interval: 24h
   labels:
+    ci-operator.openshift.io/cloud: openstack
+    ci-operator.openshift.io/cloud-cluster-profile: openstack
     ci-operator.openshift.io/variant: ocp-4.10
     ci.openshift.io/generator: prowgen
     job-release: "4.10"
@@ -443,85 +449,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-openstack
-    - name: pull-secret
       secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build01
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: verification-tests
-  interval: 24h
-  labels:
-    ci-operator.openshift.io/variant: ocp-4.10
-    ci.openshift.io/generator: prowgen
-    job-release: "4.10"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-verification-tests-master-ocp-4.10-e2e-openstack-cucushift-upi
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-openstack-cucushift-upi-cluster-profile
-      - --target=e2e-openstack-cucushift-upi
-      - --variant=ocp-4.10
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/e2e-openstack-cucushift-upi-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-openstack
+        secretName: cluster-secrets-openstack
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -539,6 +468,8 @@ periodics:
     repo: verification-tests
   interval: 24h
   labels:
+    ci-operator.openshift.io/cloud: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere
     ci-operator.openshift.io/variant: ocp-4.10
     ci.openshift.io/generator: prowgen
     job-release: "4.10"
@@ -593,10 +524,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-vsphere
+      secret:
+        secretName: cluster-secrets-vsphere
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -614,6 +543,8 @@ periodics:
     repo: verification-tests
   interval: 24h
   labels:
+    ci-operator.openshift.io/cloud: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere
     ci-operator.openshift.io/variant: ocp-4.10
     ci.openshift.io/generator: prowgen
     job-release: "4.10"
@@ -668,10 +599,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-vsphere
+      secret:
+        secretName: cluster-secrets-vsphere
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -689,6 +618,8 @@ periodics:
     repo: verification-tests
   interval: 48h
   labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-2
     ci-operator.openshift.io/variant: ocp-4.10-upgrade-from-eus-4.8
     ci.openshift.io/generator: prowgen
     job-release: "4.10"
@@ -743,10 +674,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-aws-2
+      secret:
+        secretName: cluster-secrets-aws-2
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -764,6 +693,8 @@ periodics:
     repo: verification-tests
   interval: 24h
   labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws
     ci-operator.openshift.io/variant: ocp-4.10-upgrade-from-stable-4.9
     ci.openshift.io/generator: prowgen
     job-release: "4.10"
@@ -818,10 +749,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-aws
+      secret:
+        secretName: cluster-secrets-aws
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -839,11 +768,13 @@ periodics:
     repo: verification-tests
   interval: 24h
   labels:
-    ci-operator.openshift.io/variant: ocp-4.9
+    ci-operator.openshift.io/cloud: gcp
+    ci-operator.openshift.io/cloud-cluster-profile: gcp
+    ci-operator.openshift.io/variant: ocp-4.10-upgrade-from-stable-4.9
     ci.openshift.io/generator: prowgen
-    job-release: "4.9"
+    job-release: "4.10"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-verification-tests-master-ocp-4.9-e2e-aws-cucushift-ipi
+  name: periodic-ci-openshift-verification-tests-master-ocp-4.10-upgrade-from-stable-4.9-upgrade-verification-tests-gcp-ipi
   spec:
     containers:
     - args:
@@ -852,9 +783,9 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-aws-cucushift-ipi-cluster-profile
-      - --target=e2e-aws-cucushift-ipi
-      - --variant=ocp-4.9
+      - --secret-dir=/usr/local/upgrade-verification-tests-gcp-ipi-cluster-profile
+      - --target=upgrade-verification-tests-gcp-ipi
+      - --variant=ocp-4.10-upgrade-from-stable-4.9
       command:
       - ci-operator
       image: ci-operator:latest
@@ -870,157 +801,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-aws-cucushift-ipi-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-aws
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build01
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: verification-tests
-  interval: 24h
-  labels:
-    ci-operator.openshift.io/variant: ocp-4.9
-    ci.openshift.io/generator: prowgen
-    job-release: "4.9"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-verification-tests-master-ocp-4.9-e2e-baremetal-cucushift-ipi
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-baremetal-cucushift-ipi-cluster-profile
-      - --target=e2e-baremetal-cucushift-ipi
-      - --variant=ocp-4.9
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/e2e-baremetal-cucushift-ipi-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-packet
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build01
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: verification-tests
-  interval: 24h
-  labels:
-    ci-operator.openshift.io/variant: ocp-4.9
-    ci.openshift.io/generator: prowgen
-    job-release: "4.9"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-verification-tests-master-ocp-4.9-e2e-gcp-cucushift-ipi
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-gcp-cucushift-ipi-cluster-profile
-      - --target=e2e-gcp-cucushift-ipi
-      - --variant=ocp-4.9
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/e2e-gcp-cucushift-ipi-cluster-profile
+      - mountPath: /usr/local/upgrade-verification-tests-gcp-ipi-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -1064,13 +845,15 @@ periodics:
   - base_ref: master
     org: openshift
     repo: verification-tests
-  interval: 24h
+  interval: 960h
   labels:
-    ci-operator.openshift.io/variant: ocp-4.9
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws
+    ci-operator.openshift.io/variant: ocp-installer-rehearse
     ci.openshift.io/generator: prowgen
-    job-release: "4.9"
+    job-release: "4.10"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-verification-tests-master-ocp-4.9-e2e-gcp-cucushift-upi
+  name: periodic-ci-openshift-verification-tests-master-ocp-installer-rehearse-installer-rehearse-aws
   spec:
     containers:
     - args:
@@ -1079,9 +862,9 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-gcp-cucushift-upi-cluster-profile
-      - --target=e2e-gcp-cucushift-upi
-      - --variant=ocp-4.9
+      - --secret-dir=/usr/local/installer-rehearse-aws-cluster-profile
+      - --target=installer-rehearse-aws
+      - --variant=ocp-installer-rehearse
       command:
       - ci-operator
       image: ci-operator:latest
@@ -1097,7 +880,157 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-gcp-cucushift-upi-cluster-profile
+      - mountPath: /usr/local/installer-rehearse-aws-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: verification-tests
+  interval: 960h
+  labels:
+    ci-operator.openshift.io/cloud: azure4
+    ci-operator.openshift.io/cloud-cluster-profile: azure4
+    ci-operator.openshift.io/variant: ocp-installer-rehearse
+    ci.openshift.io/generator: prowgen
+    job-release: "4.10"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-verification-tests-master-ocp-installer-rehearse-installer-rehearse-azure
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/installer-rehearse-azure-cluster-profile
+      - --target=installer-rehearse-azure
+      - --variant=ocp-installer-rehearse
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/installer-rehearse-azure-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-azure4
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: verification-tests
+  interval: 960h
+  labels:
+    ci-operator.openshift.io/cloud: gcp
+    ci-operator.openshift.io/cloud-cluster-profile: gcp
+    ci-operator.openshift.io/variant: ocp-installer-rehearse
+    ci.openshift.io/generator: prowgen
+    job-release: "4.10"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-verification-tests-master-ocp-installer-rehearse-installer-rehearse-gcp
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/installer-rehearse-gcp-cluster-profile
+      - --target=installer-rehearse-gcp
+      - --variant=ocp-installer-rehearse
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/installer-rehearse-gcp-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -1133,7 +1066,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: vsphere
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -1141,13 +1074,15 @@ periodics:
   - base_ref: master
     org: openshift
     repo: verification-tests
-  interval: 24h
+  interval: 960h
   labels:
-    ci-operator.openshift.io/variant: ocp-4.9
+    ci-operator.openshift.io/cloud: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/variant: ocp-installer-rehearse
     ci.openshift.io/generator: prowgen
-    job-release: "4.9"
+    job-release: "4.10"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-verification-tests-master-ocp-4.9-e2e-openstack-cucushift-ipi
+  name: periodic-ci-openshift-verification-tests-master-ocp-installer-rehearse-installer-rehearse-vsphere
   spec:
     containers:
     - args:
@@ -1156,9 +1091,9 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-openstack-cucushift-ipi-cluster-profile
-      - --target=e2e-openstack-cucushift-ipi
-      - --variant=ocp-4.9
+      - --secret-dir=/usr/local/installer-rehearse-vsphere-cluster-profile
+      - --target=installer-rehearse-vsphere
+      - --variant=ocp-installer-rehearse
       command:
       - ci-operator
       image: ci-operator:latest
@@ -1174,7 +1109,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-openstack-cucushift-ipi-cluster-profile
+      - mountPath: /usr/local/installer-rehearse-vsphere-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -1197,85 +1132,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-openstack
-    - name: pull-secret
       secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build01
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: verification-tests
-  interval: 24h
-  labels:
-    ci-operator.openshift.io/variant: ocp-4.9
-    ci.openshift.io/generator: prowgen
-    job-release: "4.9"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-verification-tests-master-ocp-4.9-e2e-openstack-cucushift-upi
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-openstack-cucushift-upi-cluster-profile
-      - --target=e2e-openstack-cucushift-upi
-      - --variant=ocp-4.9
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/e2e-openstack-cucushift-upi-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-openstack
+        secretName: cluster-secrets-vsphere
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -1291,13 +1149,15 @@ periodics:
   - base_ref: master
     org: openshift
     repo: verification-tests
-  interval: 24h
+  interval: 960h
   labels:
-    ci-operator.openshift.io/variant: ocp-4.9
+    ci-operator.openshift.io/cloud: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-discon
+    ci-operator.openshift.io/variant: ocp-installer-rehearse
     ci.openshift.io/generator: prowgen
-    job-release: "4.9"
+    job-release: "4.10"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-verification-tests-master-ocp-4.9-e2e-vsphere-cucushift-ipi
+  name: periodic-ci-openshift-verification-tests-master-ocp-installer-rehearse-installer-rehearse-vsphere-discon
   spec:
     containers:
     - args:
@@ -1306,9 +1166,9 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-vsphere-cucushift-ipi-cluster-profile
-      - --target=e2e-vsphere-cucushift-ipi
-      - --variant=ocp-4.9
+      - --secret-dir=/usr/local/installer-rehearse-vsphere-discon-cluster-profile
+      - --target=installer-rehearse-vsphere-discon
+      - --variant=ocp-installer-rehearse
       command:
       - ci-operator
       image: ci-operator:latest
@@ -1324,7 +1184,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-vsphere-cucushift-ipi-cluster-profile
+      - mountPath: /usr/local/installer-rehearse-vsphere-discon-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -1347,85 +1207,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-vsphere
-    - name: pull-secret
       secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: vsphere
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: verification-tests
-  interval: 24h
-  labels:
-    ci-operator.openshift.io/variant: ocp-4.9
-    ci.openshift.io/generator: prowgen
-    job-release: "4.9"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-verification-tests-master-ocp-4.9-e2e-vsphere-cucushift-upi
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-vsphere-cucushift-upi-cluster-profile
-      - --target=e2e-vsphere-cucushift-upi
-      - --variant=ocp-4.9
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/e2e-vsphere-cucushift-upi-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-vsphere
+        secretName: cluster-secrets-vsphere
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials

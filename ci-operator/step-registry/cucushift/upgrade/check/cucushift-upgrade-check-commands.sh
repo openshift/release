@@ -15,8 +15,8 @@ fi
 #shellcheck source=${SHARED_DIR}/runtime_env
 . .${SHARED_DIR}/runtime_env
 
-upuser1=$(echo "${USERS}" | cut -d ',' -f 1)
-upuser2=$(echo "${USERS}" | cut -d ',' -f 2)
+upuser1=$(echo "${USERS}" | cut -d ',' -f 30)
+upuser2=$(echo "${USERS}" | cut -d ',' -f 29)
 export BUSHSLICER_CONFIG="
 environments:
   ocp4:
@@ -27,6 +27,11 @@ environments:
 export OPENSHIFT_ENV_OCP4_USER_MANAGER=UpgradeUserManager
 export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS=${USERS}
 export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/upgrade-check"
+if [ -z "${UPGRADE_SKIP_TAGS}" ] ; then
+    export UPGRADE_SKIP_TAGS="not @customer and not @security"
+else
+    export UPGRADE_SKIP_TAGS="${UPGRADE_SKIP_TAGS} and not @customer and not @security"
+fi
 
 cd verification-tests
 cucumber --tags "${UPGRADE_CHECK_RUN_TAGS} and ${UPGRADE_SKIP_TAGS}" -p junit || true

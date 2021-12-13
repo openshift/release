@@ -4,7 +4,11 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-SINGLE_NODE_AWS_INSTANCE_TYPE="m5d.2xlarge"
+if [[ "${CLUSTER_TYPE}" == "aws-arm64" ]]; then
+    SINGLE_NODE_AWS_INSTANCE_TYPE="m6gd.2xlarge"
+else
+    SINGLE_NODE_AWS_INSTANCE_TYPE="m5d.2xlarge"
+fi
 
 echo "Updating install-config.yaml to a single ${SINGLE_NODE_AWS_INSTANCE_TYPE} control plane node and 0 workers"
 

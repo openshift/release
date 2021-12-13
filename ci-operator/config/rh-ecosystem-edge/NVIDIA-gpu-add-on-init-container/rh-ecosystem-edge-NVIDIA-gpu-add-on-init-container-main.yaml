@@ -1,0 +1,68 @@
+base_images:
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.37.1
+  openshift_release_golang-1.16:
+    name: release
+    namespace: openshift
+    tag: golang-1.16
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.16
+images:
+- dockerfile_path: Dockerfile.gpu_init
+  inputs:
+    openshift_release_golang-1.16:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.16
+  to: nvidia-gpu-add-on-init-container
+promotion:
+  name: latest
+  namespace: edge-infrastructure
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lint
+  commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    make init_test_env
+    go mod vendor
+    make lint
+  container:
+    clone: true
+    from: golangci-lint
+- as: unit-test
+  commands: |
+    export REPORTS=${ARTIFACT_DIR}
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    make init_test_env
+    go mod vendor
+    make unit-test
+  container:
+    clone: true
+    from: golangci-lint
+- as: mirror-vcsref-image
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: nvidia-gpu-add-on-init-container
+    env:
+      IMAGE_REPO: nvidia-gpu-add-on-init-container
+    test:
+    - ref: baremetalds-assisted-images-publish
+zz_generated_metadata:
+  branch: main
+  org: rh-ecosystem-edge
+  repo: NVIDIA-gpu-add-on-init-container
