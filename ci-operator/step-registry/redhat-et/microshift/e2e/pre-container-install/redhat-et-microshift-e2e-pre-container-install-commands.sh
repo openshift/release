@@ -37,26 +37,12 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJE
   rhel8user@"${INSTANCE_PREFIX}" \
   --command 'sudo dnf install subscription-manager -y'
 
-# Copy subscription assets
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
-  --quiet \
-  --project "${GOOGLE_PROJECT_ID}" \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  --recurse /opt/subscription-manager-org rhel8user@"${INSTANCE_PREFIX}":/opt
-
-# Copy subscription assets
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
-  --quiet \
-  --project "${GOOGLE_PROJECT_ID}" \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  --recurse /opt/subscription-manager-act-key rhel8user@"${INSTANCE_PREFIX}":/opt
-
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
   --command "sudo subscription-manager register \
-  --org=$(cat /opt/subscription-manager-org ) \
-  --activationkey=$(cat /opt/subscription-manager-act-key)"
+  --org=$(cat /var/run/rhsm/subscription-manager-org ) \
+  --activationkey=$(cat /var/run/rhsm/subscription-manager-act-key)"
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
