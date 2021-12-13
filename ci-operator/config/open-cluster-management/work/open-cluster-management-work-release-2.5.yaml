@@ -3,26 +3,27 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  open-cluster-management_builder_go1.17-linux:
+  open-cluster-management_builder_go1.16-linux:
     name: builder
     namespace: open-cluster-management
-    tag: go1.17-linux
+    tag: go1.16-linux
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
     name: builder
     namespace: open-cluster-management
-    tag: go1.17-linux
+    tag: go1.16-linux
 images:
 - dockerfile_path: Dockerfile
   from: base
   inputs:
-    open-cluster-management_builder_go1.17-linux:
+    open-cluster-management_builder_go1.16-linux:
       as:
-      - registry.ci.openshift.org/open-cluster-management/builder:go1.17-linux
+      - registry.ci.openshift.org/open-cluster-management/builder:go1.16-linux
   to: work
 promotion:
-  name: "2.3"
+  disabled: true
+  name: "2.5"
   namespace: open-cluster-management
 releases:
   initial:
@@ -64,28 +65,9 @@ tests:
   container:
     from: test-bin
 - as: integration
-  commands: make test-integration
+  commands: HOME=/tmp make test-integration
   container:
     from: test-bin
-- as: sonar-pre-submit
-  commands: |
-    export SELF="make -f /opt/build-harness/Makefile.prow"
-    make -f /opt/build-harness/Makefile.prow sonar/go/prow
-  container:
-    from: src
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
-- as: sonar-post-submit
-  commands: |
-    export SELF="make -f /opt/build-harness/Makefile.prow"
-    make -f /opt/build-harness/Makefile.prow sonar/go/prow
-  container:
-    from: src
-  postsubmit: true
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
 - as: e2e
   steps:
     cluster_profile: aws
@@ -116,7 +98,7 @@ tests:
     - as: publish
       commands: |-
         export OSCI_COMPONENT_NAME=work
-        export OSCI_COMPONENT_VERSION=0.4.0
+        export OSCI_COMPONENT_VERSION=release-2.5
         export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/open-cluster-management"
         export SELF="make -f /opt/build-harness/Makefile.prow"
         export OSCI_PUBLISH_DELAY="0"
@@ -138,10 +120,10 @@ tests:
       SOURCE_IMAGE_REF: work
     env:
       IMAGE_REPO: work
-      IMAGE_TAG: release-2.3
+      IMAGE_TAG: release-2.5
       REGISTRY_ORG: open-cluster-management
     workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: release-2.3
+  branch: release-2.5
   org: open-cluster-management
   repo: work
