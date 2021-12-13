@@ -13,14 +13,24 @@ resources:
       memory: 200Mi
 tests:
 - as: test
-  commands: ./test.sh
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN) 
+    ./test.sh
   container:
     from: src
+  secret: 
+    mount_path: /tmp/secret
+    name: hac-dev-codecov-token
 - as: test-periodic
-  commands: ./test.sh
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN) 
+    ./test.sh
   container:
     from: src
   cron: 0 */24 * * *
+  secret: 
+    mount_path: /tmp/secret
+    name: hac-dev-codecov-token
 zz_generated_metadata:
   branch: main
   org: openshift
