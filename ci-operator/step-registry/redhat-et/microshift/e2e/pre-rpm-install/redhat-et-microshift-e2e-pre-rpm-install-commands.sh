@@ -42,6 +42,13 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
+  --command "sudo subscription-manager register \
+  --org=$(cat /var/run/rhsm/subscription-manager-org ) \
+  --activationkey=$(cat /var/run/rhsm/subscription-manager-act-key)"
+
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  rhel8user@"${INSTANCE_PREFIX}" \
   --command 'sudo cp microshift-containerized /usr/bin/'
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
