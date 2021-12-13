@@ -106,19 +106,19 @@ then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-echo "RELEASE_IMAGE_INITIAL is ${RELEASE_IMAGE_INITIAL}"
 echo "RELEASE_IMAGE_LATEST is ${RELEASE_IMAGE_LATEST}"
+echo "RELEASE_IMAGE_TARGET is ${RELEASE_IMAGE_TARGET}"
 
 echo -e "Current cluster version: oc get clusterversion\n"
 oc get clusterversion
 
-echo -e "RELEASE_IMAGE_INITIAL release info:\n"
-oc adm release info "${RELEASE_IMAGE_INITIAL}"
-
 echo -e "RELEASE_IMAGE_LATEST release info:\n"
 oc adm release info "${RELEASE_IMAGE_LATEST}"
 
-target="${RELEASE_IMAGE_LATEST}"
+echo -e "RELEASE_IMAGE_TARGET release info:\n"
+oc adm release info "${RELEASE_IMAGE_TARGET}"
+
+target="${RELEASE_IMAGE_TARGET}"
 
 source_minor_version="$(oc get clusterversion --no-headers | awk '{print $2}' | cut -f2 -d.)"
 echo -e "Source release minor version is: ${source_minor_version}"

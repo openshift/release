@@ -7,20 +7,12 @@ base_images:
     name: builder
     namespace: open-cluster-management
     tag: go1.16-linux
-  registration:
-    name: "2.4"
-    namespace: open-cluster-management
-    tag: registration
-  work:
-    name: "2.4"
-    namespace: open-cluster-management
-    tag: work
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
     name: builder
     namespace: open-cluster-management
-    tag: go1.16-linux
+    tag: go1.17-linux
 images:
 - dockerfile_path: Dockerfile
   from: base
@@ -32,18 +24,17 @@ images:
 promotion:
   additional_images:
     registration-operator-src: src
-  disabled: true
   name: "2.4"
   namespace: open-cluster-management
 releases:
   initial:
     integration:
-      name: "4.6"
+      name: "4.8"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.6"
+      name: "4.8"
       namespace: ocp
 resources:
   '*':
@@ -84,14 +75,16 @@ tests:
     test:
     - as: deploy
       commands: |
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar xvzf - oc
         KUBECTL=oc
-        IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:registration-operator}
-        REGISTRATION_IMAGE=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:registration}
-        WORK_IMAGE=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:work}
+        REGISTRATION_IMAGE=release-2.4
+        WORK_IMAGE=release-2.4
+        PLACEMENT_IMAGE=release-2.4
         PATH=.:$PATH
-        export KUBECTL OLM_NAMESPACE PATH IMAGE_NAME REGISTRATION_IMAGE WORK_IMAGE
+        export KUBECTL PATH REGISTRATION_IMAGE WORK_IMAGE PLACEMENT_IMAGE
         make deploy-hub e2e-bootstrap-secret
+      dependencies:
+      - env: IMAGE_NAME
+        name: registration-operator
       from: src
       resources:
         limits:
@@ -99,34 +92,18 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    - as: registration-e2e-test
-      commands: |
-        export IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:registration}
-        /e2e.test -test.v -ginkgo.v
-      from: registration
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: work-e2e-test
-      commands: |
-        export IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:work}
-        /e2e.test -test.v -ginkgo.v
-      from: work
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
     - as: operator-e2e-test
       commands: |
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar xvzf - oc
         KUBECTL=oc
-        IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:registration-operator}
-        REGISTRATION_IMAGE=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:registration}
-        WORK_IMAGE=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:work}
+        REGISTRATION_IMAGE=release-2.4
+        WORK_IMAGE=release-2.4
+        PLACEMENT_IMAGE=release-2.4
         PATH=.:$PATH
-        export KUBECTL PATH IMAGE_NAME REGISTRATION_IMAGE WORK_IMAGE
-        make deploy-spoke-operator run-e2e
+        export KUBECTL PATH REGISTRATION_IMAGE WORK_IMAGE PLACEMENT_IMAGE
+        make hub-kubeconfig deploy-spoke-operator run-e2e
+      dependencies:
+      - env: IMAGE_NAME
+        name: registration-operator
       from: src
       resources:
         requests:
@@ -145,7 +122,7 @@ tests:
     - as: publish
       commands: |-
         export OSCI_COMPONENT_NAME=registration-operator
-        export OSCI_COMPONENT_VERSION=0.5.0
+        export OSCI_COMPONENT_VERSION=release-2.4
         export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/open-cluster-management"
         export SELF="make -f /opt/build-harness/Makefile.prow"
         export OSCI_PUBLISH_DELAY="0"
@@ -159,6 +136,16 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+    workflow: ocm-ci-image-mirror
+- as: pr-merge-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: registration-operator
+    env:
+      IMAGE_REPO: registration-operator
+      IMAGE_TAG: release-2.4
+      REGISTRY_ORG: open-cluster-management
     workflow: ocm-ci-image-mirror
 zz_generated_metadata:
   branch: release-2.4

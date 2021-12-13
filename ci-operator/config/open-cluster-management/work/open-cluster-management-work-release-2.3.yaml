@@ -8,7 +8,7 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: open-cluster-management
-    tag: go1.16-linux
+    tag: go1.17-linux
 images:
 - dockerfile_path: Dockerfile
   from: base
@@ -16,6 +16,16 @@ images:
 promotion:
   name: "2.3"
   namespace: open-cluster-management
+releases:
+  initial:
+    integration:
+      name: "4.6"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.6"
+      namespace: ocp
 resources:
   '*':
     limits:
@@ -68,6 +78,24 @@ tests:
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
+- as: e2e
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        KUBECTL=oc
+        export KUBECTL
+        make test-e2e
+      dependencies:
+      - env: IMAGE_NAME
+        name: work
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: publish
   postsubmit: true
   steps:
