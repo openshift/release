@@ -72,9 +72,15 @@ tests:
     run --all-files --show-diff-on-failure
   container:
     from: addon-operator-tooling
-- as: e2e
+- as: "operator-e2e"
   steps:
+    workflow: "optional-operators-ci-aws"
     cluster_profile: aws
+    env:
+      OO_PACKAGE: "addon-operator"
+      OO_CHANNEL: "alpha"
+    dependencies:
+      OO_INDEX: "ci-index"  
     test:
     - as: test
       commands: make test-e2e
