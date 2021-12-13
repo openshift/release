@@ -222,7 +222,7 @@ wait_clusteroperators_continous_success
 echo "Step #3: Make sure every machine is in 'Ready' status"
 check_node
 
-#4. All pods are in status running or complate
-echo "Step #4: check all pods are in status running or complate"
+#4. All pods are in status running or complete
+echo "Step #4: check all pods are in status running or complete"
 check_pod
 
