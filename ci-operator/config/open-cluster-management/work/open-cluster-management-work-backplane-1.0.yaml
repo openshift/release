@@ -8,15 +8,24 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: open-cluster-management
-    tag: go1.16-linux
+    tag: go1.17-linux
 images:
 - dockerfile_path: Dockerfile
   from: base
   to: work
 promotion:
-  disabled: true
   name: "1.0"
   namespace: open-cluster-management
+releases:
+  initial:
+    integration:
+      name: "4.6"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.6"
+      namespace: ocp
 resources:
   '*':
     limits:
@@ -47,9 +56,27 @@ tests:
   container:
     from: test-bin
 - as: integration
-  commands: make test-integration
+  commands: HOME=/tmp make test-integration
   container:
     from: test-bin
+- as: e2e
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        KUBECTL=oc
+        export KUBECTL
+        make test-e2e
+      dependencies:
+      - env: IMAGE_NAME
+        name: work
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: publish
   postsubmit: true
   steps:
@@ -62,7 +89,7 @@ tests:
     - as: publish
       commands: |-
         export OSCI_COMPONENT_NAME=work
-        export OSCI_COMPONENT_VERSION=0.5.0
+        export OSCI_COMPONENT_VERSION=backplane-1.0
         export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/open-cluster-management"
         export OSCI_PIPELINE_PRODUCT_PREFIX=backplane
         export OSCI_PIPELINE_REPO=backplane-pipeline
