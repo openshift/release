@@ -35,6 +35,13 @@ images:
 - dockerfile_path: config/docker/Dockerfile.src.ci
   from: src
   to: addon-operator-tooling
+operator:
+  bundles:
+  - context_dir: config/openshift
+    dockerfile_path: addon-operator-bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/openshift/addon-operator:latest
+    with: addon-operator-manager
 promotion:
   name: addon-operator-manager
   namespace: addon-operator
@@ -67,7 +74,15 @@ tests:
     from: addon-operator-tooling
 - as: e2e
   steps:
+    workflow: "optional-operators-ci-aws"
     cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: '!create'
+      OO_PACKAGE: addon-operator
+      OO_TARGET_NAMESPACES: '!all'
     test:
     - as: test
       commands: make test-e2e
@@ -78,12 +93,13 @@ tests:
         name: addon-operator-webhook
       - env: API_MOCK_IMAGE
         name: api-mock
+      - env: OO_INDEX
+        name: replaced-by-ci-operator
       from: src
       resources:
         requests:
           cpu: 500m
           memory: 1Gi
-    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: openshift
