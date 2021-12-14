@@ -255,6 +255,12 @@ if [ X"${PUBLISH_STRATEGY}" == X"Internal" ]; then
 export http_proxy=${CLIENT_PROXY_URL}
 export https_proxy=${CLIENT_PROXY_URL}
 EOF
+
+PATCH=/tmp/install-config-sharednetwork.yaml.patch
+cat > "${PATCH}" << EOF
+publish: Internal
+EOF
+/tmp/yq m -x -i "${CONFIG}" "${PATCH}"
 fi
 
 # DEBUG
