@@ -22,12 +22,18 @@ images:
 - dockerfile_literal: |
     FROM libvirt-installer
     USER root
+    RUN yum remove -y google-cloud-sdk && yum install -y google-cloud-sdk-365.0.1 # currently gcloud 366 is broken
+  from: libvirt-installer
+  to: rhel8-gcloud-installer
+- dockerfile_literal: |
+    FROM rhel8-gcloud-installer
+    USER root
     COPY microshift-containerized.service /tmp/microshift-containerized.service
     COPY microshift-containerized /tmp/microshift-containerized
     COPY oc /usr/bin/oc
     COPY install.sh /usr/bin/install.sh
     COPY openshift-tests /usr/bin/openshift-tests
-  from: libvirt-installer
+  from: rhel8-gcloud-installer
   inputs:
     cli:
       paths:
@@ -55,7 +61,7 @@ images:
         rm -rf /var/cache/dnf/*
     WORKDIR /go/src/github.com/redhat-et/microshift
     RUN make rpm
-    FROM libvirt-installer
+    FROM rhel8-gcloud-installer
     WORKDIR /opt/microshift-rpms
     USER root
     RUN mkdir bin selinux
@@ -64,15 +70,15 @@ images:
     COPY microshift-containerized /tmp/microshift-containerized
     COPY openshift-tests /usr/bin/openshift-tests
     COPY oc /usr/bin/oc
-  from: libvirt-installer
+  from: rhel8-gcloud-installer
   inputs:
     cli:
       paths:
       - destination_dir: .
         source_path: /usr/bin/oc
-    libvirt-installer:
+    rhel8-gcloud-installer:
       as:
-      - libvirt-installer
+      - rhel8-gcloud-installer
     src:
       as:
       - src
