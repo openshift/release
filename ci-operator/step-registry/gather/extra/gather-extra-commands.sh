@@ -133,7 +133,7 @@ for path in "${paths[@]}" ; do
     fname=$(echo $item |cut -d ' ' -f 2)
     echo "INFO: Queueing download/gzip of ${path}/${fname} from ${node}";
     echo "INFO:   gziping to ${output_dir}/${node}-${fname}.gz";
-    echo FILTER=gzip queue ${output_dir}/${node}-${fname}.gz oc --insecure-skip-tls-verify adm node-logs ${node} --path=${path}/${fname}
+    FILTER=gzip queue ${output_dir}/${node}-${fname}.gz oc --insecure-skip-tls-verify adm node-logs ${node} --path=${path}/${fname}
   done < ${output_dir}.audit_logs_listing
 done
 
