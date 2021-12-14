@@ -45,6 +45,34 @@ tests:
   optional: true
   steps:
     cluster_profile: aws
+    test:
+    - as: functests
+      cli: latest
+      commands: |
+        # Make kubectl available by creating a symlink to oc.
+        pushd "$CLI_DIR"
+        if [ ! -f kubectl ]; then
+            ln -s oc kubectl
+        fi
+        popd
+        GO_INSTALL_DIR=$(mktemp -d)
+        cd $GO_INSTALL_DIR
+        curl -LO "https://go.dev/dl/go1.17.3.linux-amd64.tar.gz"
+        tar xf "go1.17.3.linux-amd64.tar.gz"
+        export PATH=$GO_INSTALL_DIR/go/bin:$PATH
+        export GOROOT=$GO_INSTALL_DIR/go
+        cd -
+        # silence deprecations
+        export ACK_GINKGO_DEPRECATIONS=1.16.5
+        # silence Ginkgo 2.0 notice
+        export ACK_GINKGO_RC=true
+        oc get nodes
+        hack/deploy_test.sh deploy
+        make functests
+      from: src
+      resources:
+        requests:
+          cpu: 100m
     workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: main
