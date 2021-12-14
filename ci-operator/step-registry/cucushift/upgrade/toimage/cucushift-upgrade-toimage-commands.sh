@@ -99,6 +99,10 @@ function check_history() {
     fi
 }
 
+if [ -f "${SHARED_DIR}/kubeconfig" ] ; then
+    export KUBECONFIG=${SHARED_DIR}/kubeconfig
+fi
+
 # Setup proxy if it's present in the shared dir
 if test -f "${SHARED_DIR}/proxy-conf.sh"
 then
