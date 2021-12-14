@@ -12,6 +12,11 @@ export GOOGLE_CLOUD_KEYFILE_JSON=$CLUSTER_PROFILE_DIR/gce.json
 export OS_CLIENT_CONFIG_FILE=${SHARED_DIR}/clouds.yaml
 export OVIRT_CONFIG=${SHARED_DIR}/ovirt-config.yaml
 
+if [[ "${CLUSTER_TYPE}" == "ibmcloud" ]]; then
+  IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
+  export IC_API_KEY
+fi
+
 echo "Deprovisioning cluster ..."
 if [[ ! -s "${SHARED_DIR}/metadata.json" ]]; then
   echo "Skipping: ${SHARED_DIR}/metadata.json not found."
