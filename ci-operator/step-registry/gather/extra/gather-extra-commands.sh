@@ -114,24 +114,6 @@ while IFS= read -r i; do
   FILTER=gzip queue ${ARTIFACT_DIR}/nodes/$i/audit.gz oc --insecure-skip-tls-verify adm node-logs $i --unify=false --path=audit/audit.log
 done < /tmp/nodes
 
-echo "INFO: gathering the audit logs for each master"
-paths=(openshift-apiserver kube-apiserver oauth-apiserver etcd)
-for path in "${paths[@]}" ; do
-  output_dir="${ARTIFACT_DIR}/audit_logs/$path"
-  mkdir -p "$output_dir"
-  oc adm node-logs --role=master --path="$path" | \
-  tee "${ARTIFACT_DIR}/audit_logs/$path.audit_logs_listing" | \
-  grep -v ".terminating" | \
-  grep -v ".lock" | \
-  sed "s|^|$path $output_dir |"
-done | \
-xargs --max-args=4 bash -c \
-   'echo "INFO: Started  downloading $1/$4 from $3";
-    echo "INFO: gziping to $2/$3-$4.gz";
-    oc --insecure-skip-tls-verify adm node-logs $3 --path=$1/$4 | gzip > $2/$3-$4.gz;
-    echo "INFO: Finished downloading $1/$4 from $3"' \
-  bash
-
 # Snapshot iptables-save on each node for debugging possible kube-proxy issues
 oc --insecure-skip-tls-verify get --request-timeout=20s -n openshift-sdn -l app=sdn pods --template '{{ range .items }}{{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/sdn-pods
 while IFS= read -r i; do
