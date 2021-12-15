@@ -1,26 +1,27 @@
-base_images:
-  base:
-    name: "4.10"
-    namespace: ocp
-    tag: base
-  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.17-openshift-4.10
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.16
+    tag: golang-1.17
 images:
 - dockerfile_path: Dockerfile
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
   to: special-resource-operator
+- dockerfile_literal: |
+    FROM src
+    RUN ["yum", "update", "-y"]
+    RUN ["yum", "install", "-y", "ShellCheck"]
+    RUN mkdir /tmp/helm && \
+        cd /tmp/helm && \
+        curl https://get.helm.sh/helm-v3.6.0-linux-amd64.tar.gz -o helm.tar.gz && \
+        tar xvfpz helm.tar.gz && \
+        mv linux-amd64/helm /usr/local/bin && \
+        chmod +x /usr/local/bin/helm && \
+        rm -rf /tmp/helm
+  from: src
+  to: test-bin
 promotion:
+  excluded_images:
+  - test-bin
   name: "4.10"
   namespace: ocp
 releases:
@@ -38,6 +39,29 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- as: lint
+  commands: |
+    export XDG_CACHE_HOME=/tmp/.cache
+    make lint
+  container:
+    clone: true
+    from: test-bin
+- as: helm-lint
+  commands: |
+    make helm-lint
+  container:
+    clone: true
+    from: test-bin
+  optional: true
+- as: unit
+  commands: make unit-test
+  container:
+    from: src
+- as: verify
+  commands: make verify
+  container:
+    from: src
 zz_generated_metadata:
   branch: master
   org: openshift-psap

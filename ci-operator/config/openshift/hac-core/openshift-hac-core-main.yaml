@@ -16,6 +16,19 @@ tests:
   commands: ./test.sh
   container:
     from: src
+- as: release-build-repo
+  commands: |
+    chmod 600 /tmp/secret/SSH_PRIVATE_KEY
+    echo "Host github.com
+      HostName github.com
+      User git
+      AddKeysToAgent yes
+      IdentityFile /tmp/secret/SSH_PRIVATE_KEY" >> /root/.ssh/ssh_config
+    ./build.sh
+    ./release-build-repo.sh
+  container:
+    from: src
+  postsubmit: true
 zz_generated_metadata:
   branch: main
   org: openshift

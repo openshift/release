@@ -403,7 +403,7 @@ periodics:
   labels:
     ci.openshift.io/area: openshift-container-storage
     ci.openshift.io/role: image-mirroring
-  name: periodic-image-mirroring-ocs-operator
+  name: periodic-image-mirroring-red-hat-storage
   spec:
     containers:
     - args:
@@ -411,7 +411,7 @@ periodics:
       - |
         set -o errexit
         failures=0
-        for mapping in /etc/imagemirror/mapping_ocs-operator*; do
+        for mapping in /etc/imagemirror/mapping_red-hat-storage_*; do
           echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
           if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
             echo "ERROR: Failed to mirror images from $mapping"
@@ -803,7 +803,8 @@ periodics:
   reporter_config:
     slack:
       channel: '#announce-logging'
-      job_states_to_report: null
+      job_states_to_report:
+      - failure
       report_template: Job {{.Spec.Job}} failed
   spec:
     containers:

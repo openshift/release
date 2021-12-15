@@ -69,6 +69,10 @@ aws|aws-arm64) export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscre
 azure4) export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json;;
 azurestack) export AZURE_AUTH_LOCATION=${SHARED_DIR}/osServicePrincipal.json;;
 gcp) export GOOGLE_CLOUD_KEYFILE_JSON=${CLUSTER_PROFILE_DIR}/gce.json;;
+ibmcloud)
+    IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
+    export IC_API_KEY
+    ;;
 kubevirt) export KUBEVIRT_KUBECONFIG=${HOME}/.kube/config;;
 vsphere) ;;
 openstack-osuosl) ;;

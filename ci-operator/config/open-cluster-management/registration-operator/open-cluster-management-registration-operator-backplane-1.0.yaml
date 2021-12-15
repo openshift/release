@@ -7,14 +7,6 @@ base_images:
     name: builder
     namespace: open-cluster-management
     tag: go1.16-linux
-  registration:
-    name: "2.4"
-    namespace: open-cluster-management
-    tag: registration
-  work:
-    name: "2.4"
-    namespace: open-cluster-management
-    tag: work
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
@@ -32,7 +24,6 @@ images:
 promotion:
   additional_images:
     registration-operator-src: src
-  disabled: true
   name: "1.0"
   namespace: open-cluster-management
 releases:
@@ -82,51 +73,18 @@ tests:
   steps:
     cluster_profile: aws
     test:
-    - as: deploy
-      commands: |
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar xvzf - oc
-        KUBECTL=oc
-        IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:registration-operator}
-        REGISTRATION_IMAGE=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:registration}
-        WORK_IMAGE=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:work}
-        PATH=.:$PATH
-        export KUBECTL OLM_NAMESPACE PATH IMAGE_NAME REGISTRATION_IMAGE WORK_IMAGE
-        make deploy-hub e2e-bootstrap-secret
-      from: src
-      resources:
-        limits:
-          memory: 4Gi
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: registration-e2e-test
-      commands: |
-        export IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:registration}
-        /e2e.test -test.v -ginkgo.v
-      from: registration
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: work-e2e-test
-      commands: |
-        export IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:work}
-        /e2e.test -test.v -ginkgo.v
-      from: work
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
     - as: operator-e2e-test
       commands: |
-        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar xvzf - oc
         KUBECTL=oc
-        IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:registration-operator}
-        REGISTRATION_IMAGE=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:registration}
-        WORK_IMAGE=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:work}
+        REGISTRATION_TAG=backplane-1.0
+        WORK_TAG=backplane-1.0
+        PLACEMENT_TAG=backplane-1.0
         PATH=.:$PATH
-        export KUBECTL PATH IMAGE_NAME REGISTRATION_IMAGE WORK_IMAGE
-        make hub-kubeconfig deploy-spoke-operator run-e2e
+        export KUBECTL PATH REGISTRATION_TAG WORK_TAG PLACEMENT_TAG
+        make test-e2e
+      dependencies:
+      - env: IMAGE_NAME
+        name: registration-operator
       from: src
       resources:
         requests:
@@ -145,7 +103,7 @@ tests:
     - as: publish
       commands: |-
         export OSCI_COMPONENT_NAME=registration-operator
-        export OSCI_COMPONENT_VERSION=0.5.0
+        export OSCI_COMPONENT_VERSION=backplane-1.0
         export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/open-cluster-management"
         export OSCI_PIPELINE_PRODUCT_PREFIX=backplane
         export OSCI_PIPELINE_REPO=backplane-pipeline
@@ -161,6 +119,16 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+    workflow: ocm-ci-image-mirror
+- as: pr-merge-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: registration-operator
+    env:
+      IMAGE_REPO: registration-operator
+      IMAGE_TAG: backplane-1.0
+      REGISTRY_ORG: open-cluster-management
     workflow: ocm-ci-image-mirror
 zz_generated_metadata:
   branch: backplane-1.0

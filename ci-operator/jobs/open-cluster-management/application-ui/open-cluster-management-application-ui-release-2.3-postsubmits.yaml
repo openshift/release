@@ -1,6 +1,7 @@
 postsubmits:
   open-cluster-management/application-ui:
   - agent: kubernetes
+    always_run: true
     branches:
     - ^release-2\.3$
     cluster: build02
@@ -54,6 +55,7 @@ postsubmits:
         secret:
           secretName: result-aggregator
   - agent: kubernetes
+    always_run: true
     branches:
     - ^release-2\.3$
     cluster: build02
@@ -98,6 +100,7 @@ postsubmits:
         secret:
           secretName: result-aggregator
   - agent: kubernetes
+    always_run: true
     branches:
     - ^release-2\.3$
     cluster: build02
@@ -142,44 +145,146 @@ postsubmits:
         secret:
           secretName: result-aggregator
   - agent: kubernetes
+    always_run: true
     branches:
     - ^release-2\.3$
     cluster: build02
     decorate: true
+    decoration_config:
+      skip_cloning: true
     labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+      ci.openshift.io/generator: prowgen
     name: branch-ci-open-cluster-management-application-ui-release-2.3-publish
     spec:
       containers:
       - args:
-        - -f
-        - Makefile.prow
-        - osci/publish
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=publish
         command:
-        - make
-        env:
-        - name: OSCI_IMAGE_REMOTE_REPO_SRC
-          value: registry.ci.openshift.org/open-cluster-management
-        - name: OSCI_PUBLISH_DELAY
-          value: "15"
-        - name: SELF
-          value: make -f Makefile.prow
-        image: registry.ci.openshift.org/open-cluster-management/builder:nodejs14-linux
+        - ci-operator
+        image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
         resources:
           requests:
-            cpu: 100m
-            memory: 200Mi
+            cpu: 10m
         volumeMounts:
-        - mountPath: /etc/github
-          name: acm-cicd-github
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: acm-cicd-github
+      - name: pull-secret
         secret:
-          secretName: acm-cicd-github
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-2\.3$
+    cluster: build02
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-open-cluster-management-application-ui-release-2.3-publish-tests
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=publish-tests
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-2\.3$
+    cluster: build02
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-open-cluster-management-application-ui-release-2.3-sonar-post-submit
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/acm-sonarcloud-token
+        - --target=sonar-post-submit
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/acm-sonarcloud-token
+          name: acm-sonarcloud-token
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: acm-sonarcloud-token
+        secret:
+          secretName: acm-sonarcloud-token
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
   - agent: kubernetes
     branches:
     - ^release-2\.3$

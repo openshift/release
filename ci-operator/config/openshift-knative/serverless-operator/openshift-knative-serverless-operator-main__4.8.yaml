@@ -68,6 +68,14 @@ images:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.17
   to: openshift-knative-operator
+- context_dir: .
+  dockerfile_path: serving/metadata-webhook/Dockerfile
+  from: base
+  inputs:
+    openshift_release_golang-1.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
+  to: metadata-webhook
 - context_dir: olm-catalog/serverless-operator
   from: base
   to: serverless-bundle
@@ -161,34 +169,6 @@ tests:
     test:
     - as: serverless-e2e
       commands: make test-upstream-e2e-mesh
-      dependencies:
-      - env: KNATIVE_OPENSHIFT_INGRESS
-        name: knative-openshift-ingress
-      - env: KNATIVE_OPERATOR
-        name: knative-operator
-      - env: OPENSHIFT_KNATIVE_OPERATOR
-        name: openshift-knative-operator
-      from: serverless-operator-src
-      resources:
-        limits:
-          memory: 6Gi
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: generic-claim
-- as: ui-tests
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.8"
-  cron: 0 */12 * * *
-  steps:
-    test:
-    - as: serverless-ui
-      commands: make test-ui-e2e
       dependencies:
       - env: KNATIVE_OPENSHIFT_INGRESS
         name: knative-openshift-ingress

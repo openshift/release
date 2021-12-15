@@ -10,7 +10,7 @@ function check_signed() {
     digest="$(echo "${target}" | cut -f2 -d@)"
     algorithm="$(echo "${digest}" | cut -f1 -d:)"
     hash_value="$(echo "${digest}" | cut -f2 -d:)"
-    response=$(curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
+    response=$(curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror2.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
     if (( response == 200 )); then
         echo "${target} is signed" && return 0
     else
@@ -31,7 +31,7 @@ function admin_ack() {
     
     echo "Require admin ack"
     local wait_time_loop_var=0 ack_data 
-    ack_data="$(echo $out | awk '{print $2}' | cut -f2 -d\")" && echo "Admin ack patch data is: ${ack_data}"
+    ack_data="$(echo "${out}" | awk '{print $2}' | cut -f2 -d\")" && echo "Admin ack patch data is: ${ack_data}"
     oc -n openshift-config patch configmap admin-acks --patch '{"data":{"'"${ack_data}"'": "true"}}' --type=merge
     
     echo "Admin-acks patch gets started"
@@ -82,6 +82,7 @@ function check_upgrade_status() {
         fi        
     done
     if (( wait_upgrade <= 0 )); then
+        echo "oc get clusterversion/version -oyaml" && oc get clusterversion/version -oyaml
         echo >&2 "Upgrade timeout, exiting" && return 1
     fi
 }
@@ -99,6 +100,10 @@ function check_history() {
     fi
 }
 
+if [ -f "${SHARED_DIR}/kubeconfig" ] ; then
+    export KUBECONFIG=${SHARED_DIR}/kubeconfig
+fi
+
 # Setup proxy if it's present in the shared dir
 if test -f "${SHARED_DIR}/proxy-conf.sh"
 then
@@ -106,19 +111,19 @@ then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-echo "RELEASE_IMAGE_INITIAL is ${RELEASE_IMAGE_INITIAL}"
 echo "RELEASE_IMAGE_LATEST is ${RELEASE_IMAGE_LATEST}"
+echo "RELEASE_IMAGE_TARGET is ${RELEASE_IMAGE_TARGET}"
 
 echo -e "Current cluster version: oc get clusterversion\n"
 oc get clusterversion
 
-echo -e "RELEASE_IMAGE_INITIAL release info:\n"
-oc adm release info "${RELEASE_IMAGE_INITIAL}"
-
 echo -e "RELEASE_IMAGE_LATEST release info:\n"
 oc adm release info "${RELEASE_IMAGE_LATEST}"
 
-target="${RELEASE_IMAGE_LATEST}"
+echo -e "RELEASE_IMAGE_TARGET release info:\n"
+oc adm release info "${RELEASE_IMAGE_TARGET}"
+
+target="${RELEASE_IMAGE_TARGET}"
 
 source_minor_version="$(oc get clusterversion --no-headers | awk '{print $2}' | cut -f2 -d.)"
 echo -e "Source release minor version is: ${source_minor_version}"
@@ -127,11 +132,12 @@ target_version="$(oc adm release info "${target}" --output=json | jq -r '.metada
 target_minor_version="$(echo "${target_version}" | cut -f2 -d.)"
 echo -e "Target release version is: ${target_version}\nTarget minor version is: ${target_minor_version}"
 
-if [[ "${FORCE_UPDATE}" == "false" ]]; then
-    if ! check_signed; then
-        echo "You're updating to an unsigned images, you must override the verification using --force flag, exiting" && exit 1
-    fi
-    admin_ack 
+FORCE_UPDATE=false
+if ! check_signed; then
+    echo "You're updating to an unsigned images, you must override the verification using --force flag"
+    FORCE_UPDATE=true
+else
+    admin_ack
 fi
 
 upgrade 

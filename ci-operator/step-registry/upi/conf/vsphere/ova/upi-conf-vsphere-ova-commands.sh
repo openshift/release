@@ -35,12 +35,6 @@ EOF
 
 echo "$(date -u --rfc-3339=seconds) - Checking if RHCOS OVA needs to be downloaded from ${ova_url}..."
 
-# Troubleshooting UPI OVA import issue
-export GOVC_DEBUG_PATH="${ARTIFACT_DIR}/govc"
-mkdir -p "${GOVC_DEBUG_PATH}"
-govc vm.info -debug "${vm_template}" || true
-unset GOVC_DEBUG_PATH
-
 if [[ "$(govc vm.info "${vm_template}" | wc -c)" -eq 0 ]]
 then
     echo "$(date -u --rfc-3339=seconds) - Creating a template for the VMs from ${ova_url}..."

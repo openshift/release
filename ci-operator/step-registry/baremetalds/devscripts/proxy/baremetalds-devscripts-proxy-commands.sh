@@ -20,7 +20,7 @@ acl cluster dstdomain .metalkube.org
 http_access allow cluster
 http_access deny all
 http_port 8213
-debug_options ALL,9
+debug_options ALL,2
 dns_v4_first on
 coredump_dir /var/spool/squid
 SQUID
