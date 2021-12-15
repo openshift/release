@@ -117,7 +117,7 @@ def _add_origin_resources(gendoc):
                                 ],
                                 "image": "release-controller:latest",
                                 "name": "controller",
-                                "volumeMounts": get_rc_volume_mounts(context)
+                                "volumeMounts": get_rc_volume_mounts()
                             }
                         ],
                         "serviceAccountName": "release-controller",
