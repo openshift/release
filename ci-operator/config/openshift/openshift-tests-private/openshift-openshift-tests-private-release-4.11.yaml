@@ -3,13 +3,40 @@ base_images:
     name: "4.11"
     namespace: ocp
     tag: cli
+  ocp_builder_rhel-8-golang-1.16-openshift-4.10:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.16-openshift-4.10
+  tools:
+    name: "4.11"
+    namespace: ocp
+    tag: tools
 binary_build_commands: make all
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: golang-1.16
+images:
+- dockerfile_path: images/Dockerfile
+  from: tools
+  inputs:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.10:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.10
+  to: tests-private
+- dockerfile_literal: |
+    FROM src
+    RUN curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo | tee /etc/yum.repos.d/yarn.repo && \
+        PACKAGES="openssh-clients httpd-tools nodejs yarn" && \
+        yum install --setopt=tsflags=nodocs -y $PACKAGES && \
+        yum clean all && rm -rf /var/cache/yum/*
+  from: src
+  to: tests-private-ui
 promotion:
+  excluded_images:
+  - tests-private
+  - tests-private-ui
   name: "4.11"
   namespace: ocp
 releases:
@@ -17,7 +44,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.8"
+      version: "4.10"
 resources:
   '*':
     limits:
@@ -41,6 +68,7 @@ tests:
     from: src
 - as: e2e-aws
   optional: true
+  skip_if_only_changed: frontend/
   steps:
     cluster_profile: aws
     test:
