@@ -61,36 +61,14 @@ while :; do
   sleep 10
 done
 
-
-# Wait for pods to post ready condition
-infra_pods=( kube-flannel kubevirt-hostpath-provisioner dns-default node-resolver router-default service-ca )
-
-to=120 # wait 2min per pod.
-for pod in ${infra_pods[@]}; do
-    start=$(date '+%s')
-    echo "Checking pod $pod"
-    while :; do
-        if [ $(( $(date '+%s') - start )) -ge $to ]; then
-            echo "timed out waiting for pod to post Ready: True.  ($to seconds)" >&2
-            exit 1
-        fi
-        namespace_name=( $(oc get pods -A -o custom-columns="NAMESPACE:.metadata.namespace,NAME:.metadata.name" --no-headers | grep "$pod") )
-        if [ -z "$namespace_name" ]; then
-            echo "Pod $pod not found"
-            # Continue looping until the pod appears or timeout is reached
-        fi
-        is_ready="$(oc get pods -n "$namespace_name" -o jsonpath='{.items[*].status.conditions}' | jq '.[] | select(.type == "Ready") | .status == "True"')"
-        if [ "$is_ready" = "true" ]; then
-            echo "$pod posted condition Ready: True"
-            break
-        fi
-    done
-done
-
-
 EOF
 chmod +x "${HOME}"/wait_for_node_ready.sh
 
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+￼  --quiet \
+￼  --project "${GOOGLE_PROJECT_ID}" \
+￼  --zone "${GOOGLE_COMPUTE_ZONE}" \
+￼  --recurse /tmp/validate-microshift rhel8user@"${INSTANCE_PREFIX}":~/validate-microshift
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \
@@ -102,3 +80,8 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJE
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
   --command 'sudo ~/wait_for_node_ready.sh'
+
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+￼  --zone "${GOOGLE_COMPUTE_ZONE}" \
+￼  rhel8user@"${INSTANCE_PREFIX}" \
+￼  --command 'cd ~/validate-microshift && ./kuttl-test.sh'
