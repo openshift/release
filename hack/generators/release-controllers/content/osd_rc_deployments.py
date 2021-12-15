@@ -240,7 +240,7 @@ def _add_osd_rc_deployment(gendoc):
                                         '--authentication-message=Pulling these images requires <a href="https://docs.ci.openshift.org/docs/how-tos/use-registries-in-build-farm/">authenticating to the app.ci cluster</a>.'],
                             'image': 'release-controller:latest',
                             'name': 'controller',
-                            'volumeMounts': get_rc_volume_mounts(context)
+                            'volumeMounts': get_rc_volume_mounts()
                         }],
                     'serviceAccountName': f'release-controller-{context.is_namespace}',
                     'volumes': get_rc_volumes(context, context.is_namespace)

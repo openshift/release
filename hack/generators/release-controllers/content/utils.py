@@ -1,5 +1,5 @@
 
-def get_rc_volume_mounts(context):
+def get_rc_volume_mounts():
     return [
         {
             'mountPath': '/etc/config',
