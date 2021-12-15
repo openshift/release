@@ -53,6 +53,11 @@ tests:
   commands: IS_CONTAINER=TRUE make lint
   container:
     from: src
+- as: gomod
+  commands: if [ $(go mod tidy && go mod vendor && git diff | wc -l) -gt 0 ]; then
+    git diff && exit 1; fi
+  container:
+    from: src
 - as: e2e-openstack
   steps:
     cluster_profile: openstack-vexxhost
