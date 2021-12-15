@@ -65,10 +65,10 @@ EOF
 chmod +x "${HOME}"/wait_for_node_ready.sh
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
-￼  --quiet \
-￼  --project "${GOOGLE_PROJECT_ID}" \
-￼  --zone "${GOOGLE_COMPUTE_ZONE}" \
-￼  --recurse /tmp/validate-microshift rhel8user@"${INSTANCE_PREFIX}":~/validate-microshift
+  --quiet \
+  --project "${GOOGLE_PROJECT_ID}" \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  --recurse /tmp/validate-microshift rhel8user@"${INSTANCE_PREFIX}":~/validate-microshift
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \
