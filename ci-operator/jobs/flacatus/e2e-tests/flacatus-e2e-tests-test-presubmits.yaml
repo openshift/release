@@ -6,7 +6,7 @@ presubmits:
     - ^test$
     - ^test-
     cluster: build01
-    context: ci/prow/ela
+    context: ci/prow/appstudio-e2e-deployment
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -15,8 +15,8 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-flacatus-e2e-tests-test-ela
-    rerun_command: /test ela
+    name: pull-ci-flacatus-e2e-tests-test-appstudio-e2e-deployment
+    rerun_command: /test appstudio-e2e-deployment
     spec:
       containers:
       - args:
@@ -25,8 +25,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/ela-cluster-profile
-        - --target=ela
+        - --secret-dir=/usr/local/appstudio-e2e-deployment-cluster-profile
+        - --target=appstudio-e2e-deployment
         command:
         - ci-operator
         image: ci-operator:latest
@@ -42,7 +42,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/ela-cluster-profile
+        - mountPath: /usr/local/appstudio-e2e-deployment-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -73,4 +73,53 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ela,?($|\s.*)
+    trigger: (?m)^/test( | .* )appstudio-e2e-deployment,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^test$
+    - ^test-
+    cluster: build01
+    context: ci/prow/images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-flacatus-e2e-tests-test-images
+    rerun_command: /test images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )images,?($|\s.*)
