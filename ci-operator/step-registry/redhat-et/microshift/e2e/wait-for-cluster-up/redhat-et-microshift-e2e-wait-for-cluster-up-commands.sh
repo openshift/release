@@ -82,11 +82,11 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJE
   --command 'sudo ~/wait_for_node_ready.sh'
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
-￼  --zone "${GOOGLE_COMPUTE_ZONE}" \
-￼  rhel8user@"${INSTANCE_PREFIX}" \
-￼  --command 'ls && ls ~/validate-microshift'
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  rhel8user@"${INSTANCE_PREFIX}" \
+  --command 'ls && ls ~/validate-microshift'
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
-￼  --zone "${GOOGLE_COMPUTE_ZONE}" \
-￼  rhel8user@"${INSTANCE_PREFIX}" \
-￼  --command 'cd ~/validate-microshift && ./kuttl-test.sh'
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  rhel8user@"${INSTANCE_PREFIX}" \
+  --command 'cd ~/validate-microshift && ./kuttl-test.sh'
