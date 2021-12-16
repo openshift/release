@@ -7,6 +7,10 @@ base_images:
     name: builder
     namespace: open-cluster-management
     tag: go1.16-linux
+  open-cluster-management_builder_go1.17-linux:
+    name: builder
+    namespace: open-cluster-management
+    tag: go1.17-linux
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
@@ -17,9 +21,9 @@ images:
 - dockerfile_path: Dockerfile
   from: base
   inputs:
-    open-cluster-management_builder_go1.16-linux:
+    open-cluster-management_builder_go1.17-linux:
       as:
-      - registry.ci.openshift.org/open-cluster-management/builder:go1.16-linux
+      - registry.ci.openshift.org/open-cluster-management/builder:go1.17-linux
   to: registration-operator
 promotion:
   additional_images:
@@ -73,34 +77,15 @@ tests:
   steps:
     cluster_profile: aws
     test:
-    - as: deploy
-      commands: |
-        KUBECTL=oc
-        REGISTRATION_IMAGE=release-2.4
-        WORK_IMAGE=release-2.4
-        PLACEMENT_IMAGE=release-2.4
-        PATH=.:$PATH
-        export KUBECTL PATH REGISTRATION_IMAGE WORK_IMAGE PLACEMENT_IMAGE
-        make deploy-hub e2e-bootstrap-secret
-      dependencies:
-      - env: IMAGE_NAME
-        name: registration-operator
-      from: src
-      resources:
-        limits:
-          memory: 4Gi
-        requests:
-          cpu: 100m
-          memory: 200Mi
     - as: operator-e2e-test
       commands: |
         KUBECTL=oc
-        REGISTRATION_IMAGE=release-2.4
-        WORK_IMAGE=release-2.4
-        PLACEMENT_IMAGE=release-2.4
+        REGISTRATION_TAG=release-2.4
+        WORK_TAG=release-2.4
+        PLACEMENT_TAG=release-2.4
         PATH=.:$PATH
-        export KUBECTL PATH REGISTRATION_IMAGE WORK_IMAGE PLACEMENT_IMAGE
-        make hub-kubeconfig deploy-spoke-operator run-e2e
+        export KUBECTL PATH REGISTRATION_TAG WORK_TAG PLACEMENT_TAG
+        make test-e2e
       dependencies:
       - env: IMAGE_NAME
         name: registration-operator

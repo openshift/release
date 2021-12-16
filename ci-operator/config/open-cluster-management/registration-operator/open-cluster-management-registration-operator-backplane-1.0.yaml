@@ -73,34 +73,15 @@ tests:
   steps:
     cluster_profile: aws
     test:
-    - as: deploy
-      commands: |
-        KUBECTL=oc
-        REGISTRATION_IMAGE=backplane-1.0
-        WORK_IMAGE=backplane-1.0
-        PLACEMENT_IMAGE=backplane-1.0
-        PATH=.:$PATH
-        export KUBECTL PATH REGISTRATION_IMAGE WORK_IMAGE PLACEMENT_IMAGE
-        make deploy-hub e2e-bootstrap-secret
-      dependencies:
-      - env: IMAGE_NAME
-        name: registration-operator
-      from: src
-      resources:
-        limits:
-          memory: 4Gi
-        requests:
-          cpu: 100m
-          memory: 200Mi
     - as: operator-e2e-test
       commands: |
         KUBECTL=oc
-        REGISTRATION_IMAGE=backplane-1.0
-        WORK_IMAGE=backplane-1.0
-        PLACEMENT_IMAGE=backplane-1.0
+        REGISTRATION_TAG=backplane-1.0
+        WORK_TAG=backplane-1.0
+        PLACEMENT_TAG=backplane-1.0
         PATH=.:$PATH
-        export KUBECTL PATH REGISTRATION_IMAGE WORK_IMAGE PLACEMENT_IMAGE
-        make hub-kubeconfig deploy-spoke-operator run-e2e
+        export KUBECTL PATH REGISTRATION_TAG WORK_TAG PLACEMENT_TAG
+        make test-e2e
       dependencies:
       - env: IMAGE_NAME
         name: registration-operator
