@@ -14,7 +14,7 @@ else
     bin=config-bootstrapper
 fi
 config_dir=${dir}/core-services/prow/02_config
-git rev-parse HEAD > VERSION
+printf %s "$(git rev-parse HEAD)" > VERSION
 # `=` is necessary in `--dry-run=false` because Go is silly
 "${bin}" \
     --dry-run=false \
