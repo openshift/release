@@ -31,7 +31,7 @@ function admin_ack() {
     
     echo "Require admin ack"
     local wait_time_loop_var=0 ack_data 
-    ack_data="$(echo "${out}" | awk '{print $2}' | cut -f2 -d\")" && echo "Admin ack patch data is: ${ack_data}"
+    ack_data="$(echo ${out} | awk '{print $2}' | cut -f2 -d\")" && echo "Admin ack patch data is: ${ack_data}"
     oc -n openshift-config patch configmap admin-acks --patch '{"data":{"'"${ack_data}"'": "true"}}' --type=merge
     
     echo "Admin-acks patch gets started"

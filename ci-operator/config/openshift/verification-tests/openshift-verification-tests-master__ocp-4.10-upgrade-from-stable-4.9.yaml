@@ -3,6 +3,14 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  openstack-installer:
+    name: "4.10"
+    namespace: ocp
+    tag: openstack-installer
+  upi-installer:
+    name: "4.10"
+    namespace: ocp
+    tag: upi-installer
 releases:
   latest:
     release:
@@ -33,6 +41,20 @@ tests:
     pre:
     - chain: ipi-aws-pre
     workflow: cucushift-upgrade
+- as: upgrade-verification-tests-baremetal-ipi
+  interval: 24h
+  steps:
+    cluster_profile: packet
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+      UPGRADE_CHECK_RUN_TAGS: '@4.9 and @baremetal-ipi and @upgrade-check'
+      UPGRADE_PRE_RUN_TAGS: '@4.9 and @baremetal-ipi and @upgrade-prepare'
+    post:
+    - chain: baremetalds-ipi-post
+    pre:
+    - chain: baremetalds-ipi-pre
+    workflow: cucushift-upgrade
 - as: upgrade-verification-tests-gcp-ipi
   interval: 24h
   steps:
@@ -44,6 +66,20 @@ tests:
     - chain: ipi-gcp-post
     pre:
     - chain: ipi-gcp-pre
+    workflow: cucushift-upgrade
+- as: upgrade-verification-tests-openstack-ipi
+  interval: 24h
+  steps:
+    cluster_profile: openstack
+    env:
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_TYPE: minimal
+      UPGRADE_CHECK_RUN_TAGS: '@4.9 and @openstack-ipi and @upgrade-check'
+      UPGRADE_PRE_RUN_TAGS: '@4.9 and @openstack-ipi and @upgrade-prepare'
+    post:
+    - chain: ipi-openstack-post
+    pre:
+    - chain: ipi-openstack-pre
     workflow: cucushift-upgrade
 zz_generated_metadata:
   branch: master
