@@ -64,17 +64,48 @@ done
 EOF
 chmod +x "${HOME}"/wait_for_node_ready.sh
 
+# TODO: Remove this ASAP
+# Temporary step wait for flannel to be ready, then kill service-ca pod before starting kuttl tests
+cat > "${HOME}"/wait_for_flannel.sh <<'EOF'
+#!/bin/bash
+set -xeuo pipefail
+
+start=$(date '+%s')
+to=300
+
+# Wait for flannel to post ready
+while :; do
+  if [ $(( $(date '+%s') - start )) -ge $to ]; then
+    echo "timed out waiting for flannel to start ($to seconds)" >&2
+    exit 1
+  fi
+  echo "waiting for flannel ready" >&2
+  # get the condation where type == Ready, where condition.statusx == True.
+  flannel="$(oc get pods -n kube-system -o jsonpath='{.items[*].status.conditions}' | jq '.[] | select(.type == "Ready") | select(.status == "True")')" || echo ''
+  if [ "$flannel" ]; then
+    echo "flannel posted ready status" >&2
+    break
+  fi
+  sleep 10
+done
+# after flannel ready, kill service-ca pod to workaround current issue
+oc delete pods --all -n openshift-service-ca
+
+EOF
+chmod +x "${HOME}"/wait_for_flannel.sh
+
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \
   --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   --recurse /tmp/validate-microshift rhel8user@"${INSTANCE_PREFIX}":~/validate-microshift
 
+# TODO: REMOVE
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \
   --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
-  --recurse "${HOME}"/wait_for_node_ready.sh rhel8user@"${INSTANCE_PREFIX}":~/wait_for_node_ready.sh
+  --recurse "${HOME}"/wait_for_flannel.sh rhel8user@"${INSTANCE_PREFIX}":~/wait_for_flannel.sh
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \
@@ -85,7 +116,7 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
-  --command 'sudo systemctl enable --now microshift.service'
+  --command 'sudo systemctl enable --now microshift.service && sudo KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig && sudo ~/wait_for_node_ready.sh && sudo ~/wait_for_flannel.sh'
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
