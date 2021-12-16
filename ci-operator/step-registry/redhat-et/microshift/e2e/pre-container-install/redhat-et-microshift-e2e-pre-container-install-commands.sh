@@ -41,8 +41,8 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJE
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
   --command "sudo subscription-manager register \
-  --password=$(cat /var/run/rhsm/subscription-manager-passwd ) \
-  --username=$(cat /var/run/rhsm/subscription-manager-user)"
+  --org=$(cat /var/run/rhsm/subscription-manager-org ) \
+  --activationkey=$(cat /var/run/rhsm/subscription-manager-act-key)"
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
@@ -69,7 +69,7 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJE
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
-  --command 'sudo ln -s /usr/bin/oc /usr/bin/kubectl '
+  --command 'sudo ln -s /usr/bin/oc /usr/bin/kubectl'
 
 # scp openshift-test bin
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
@@ -83,17 +83,27 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJE
   rhel8user@"${INSTANCE_PREFIX}" \
   --command 'sudo mv openshift-tests /usr/bin/openshift-tests'
 
-# scp and run install.sh
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \
   --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
-  --recurse /usr/bin/install.sh rhel8user@"${INSTANCE_PREFIX}":~/install.sh
+  --recurse /tmp/100-crio-bridge.conf rhel8user@"${INSTANCE_PREFIX}":~/
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
-  --command 'sudo HOSTNAME=$(hostname -A) CONFIG_ENV_ONLY=true ./install.sh'
+  --command 'sudo subscription-manager repos --enable rhocp-4.8-for-rhel-8-x86_64-rpms \
+  && sudo dnf -y install cri-o cri-tools podman && sudo mv 100-crio-bridge.conf /etc/cni/net.d/100-crio-bridge.conf'
+
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  rhel8user@"${INSTANCE_PREFIX}" \
+  --command "sudo sed -i 's|/usr/libexec/crio/conmon|/usr/bin/conmon|' /etc/crio/crio.conf"
+
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  rhel8user@"${INSTANCE_PREFIX}" \
+  --command 'sudo systemctl enable crio --now'
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \
