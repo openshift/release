@@ -18,24 +18,14 @@ tests:
     from: src
 - as: release-build-repo
   commands: |
-    mkdir -p /etc/ssh
-    ssh-keyscan github.com >> /etc/ssh/ssh_known_hosts
     chmod 600 /tmp/secret/SSH_PRIVATE_KEY
     echo "Host github.com
       HostName github.com
       User git
       AddKeysToAgent yes
-      IdentityFile /tmp/secret/SSH_PRIVATE_KEY" >> /etc/ssh/ssh_config
+      IdentityFile /tmp/secret/SSH_PRIVATE_KEY" >> /root/.ssh/ssh_config
     ./build.sh
     ./release-build-repo.sh
-  container:
-    from: src
-  postsubmit: true
-- as: release-image
-  commands: |
-    export DOCKER_TOKEN=$(cat /tmp/secret/DOCKER_TOKEN)
-    ./build.sh
-    ./release-image.sh
   container:
     from: src
   postsubmit: true

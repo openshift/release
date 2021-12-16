@@ -33,7 +33,7 @@ base_images:
     tag: golang-1.16
   postgresql-12-centos7:
     name: postgresql-12-centos7
-    namespace: ocp-kni
+    namespace: edge-infrastructure
     tag: latest
 build_root:
   image_stream_tag:
@@ -41,6 +41,13 @@ build_root:
     namespace: openshift
     tag: golang-1.16
 images:
+- dockerfile_path: Dockerfile.assisted-service-build
+  from: postgresql-12-centos7
+  inputs:
+    openshift_release_golang-1.16:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.16
+  to: assisted-service-unit-test
 - dockerfile_path: Dockerfile.assisted-service
   from: coreos_centos_stream8
   inputs:
@@ -120,6 +127,14 @@ tests:
     && make lint
   container:
     from: test-bin
+- as: unit-test
+  commands: |
+    export ROOT_DIR=/tmp
+    export COVER_PROFILE=/tmp/reports/unit_coverage.out
+    export GINKGO_REPORTFILE=/tmp/junit_unit_test.xml
+    make ci-unit-test
+  container:
+    from: assisted-service-unit-test
 - as: subsystem-aws
   cluster_claim:
     architecture: amd64
@@ -641,6 +656,18 @@ tests:
       POST_INSTALL_COMMANDS: |
         export TEST=./discovery-infra/tests/test_kube_api.py
         export TEST_FUNC=test_kube_api_late_binding_ipv4_single_node
+        export KUBECONFIG=$(find ${KUBECONFIG} -type f)
+        make deploy_assisted_operator test_parallel
+      TEST_SUITE: minimal
+    workflow: baremetalds-assisted-install
+- as: e2e-metal-assisted-kube-api-late-unbinding-ipv4-single-node
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      POST_INSTALL_COMMANDS: |
+        export TEST=./discovery-infra/tests/test_kube_api.py
+        export TEST_FUNC=test_kube_api_late_unbinding_ipv4_single_node
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
         make deploy_assisted_operator test_parallel
       TEST_SUITE: minimal

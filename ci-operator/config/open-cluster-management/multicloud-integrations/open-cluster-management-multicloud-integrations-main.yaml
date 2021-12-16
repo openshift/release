@@ -29,7 +29,7 @@ images:
       - registry.ci.openshift.org/open-cluster-management/builder:go1.17-linux
   to: multicloud-integrations
 promotion:
-  name: "2.4"
+  name: "2.5"
   namespace: open-cluster-management
 resources:
   '*':
@@ -60,9 +60,6 @@ tests:
   steps:
     dependencies:
       SOURCE_IMAGE_REF: multicloud-integrations
-    env:
-      IMAGE_REPO: multicloud-integrations
-      REGISTRY_ORG: open-cluster-management
     workflow: ocm-ci-image-mirror
 - as: fast-forward
   commands: |
@@ -74,15 +71,15 @@ tests:
         --username=acm-cicd \
         --token-path=/etc/github/token \
         --current-promotion-namespace=open-cluster-management \
-        --current-release=2.4 \
-        --future-release=2.4
+        --current-release=2.5 \
+        --future-release=2.5
   container:
     from: repo-brancher
   postsubmit: true
   secrets:
   - mount_path: /etc/github
     name: acm-cicd-github
-- as: pr-merge-image-mirror
+- as: latest-image-mirror
   postsubmit: true
   steps:
     dependencies:

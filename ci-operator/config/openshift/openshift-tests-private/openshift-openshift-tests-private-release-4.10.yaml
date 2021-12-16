@@ -25,10 +25,21 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.10
   to: tests-private
+- dockerfile_literal: |
+    FROM src
+    RUN curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo | tee /etc/yum.repos.d/yarn.repo && \
+        PACKAGES="openssh-clients httpd-tools nodejs yarn" && \
+        yum install --setopt=tsflags=nodocs -y $PACKAGES && \
+        yum clean all && rm -rf /var/cache/yum/*
+  from: src
+  to: tests-private-ui
 promotion:
   disabled: true
-  namespace: ci
-  tag: "4.10"
+  excluded_images:
+  - tests-private
+  - tests-private-ui
+  name: "4.10"
+  namespace: ocp
 releases:
   latest:
     candidate:
@@ -58,6 +69,7 @@ tests:
     from: src
 - as: e2e-aws
   optional: true
+  skip_if_only_changed: frontend/
   steps:
     cluster_profile: aws
     test:

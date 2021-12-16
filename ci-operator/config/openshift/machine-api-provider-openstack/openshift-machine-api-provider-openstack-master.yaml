@@ -19,6 +19,11 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
   to: openstack-machine-controllers
+promotion:
+  excluded_images:
+  - openstack-machine-controllers
+  name: "4.10"
+  namespace: ocp
 releases:
   initial:
     integration:
@@ -53,7 +58,13 @@ tests:
   commands: IS_CONTAINER=TRUE make lint
   container:
     from: src
+- as: gomod
+  commands: if [ $(go mod tidy && go mod vendor && git diff | wc -l) -gt 0 ]; then
+    git diff && exit 1; fi
+  container:
+    from: src
 - as: e2e-openstack
+  optional: true
   steps:
     cluster_profile: openstack-vexxhost
     env:
