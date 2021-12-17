@@ -3,10 +3,6 @@ base_images:
     name: "4.10"
     namespace: ocp
     tag: base
-  ci-artifacts:
-    name: master
-    namespace: openshift-psap
-    tag: ci-artifacts
   ocp_builder_rhel-8-golang-1.17-openshift-4.10:
     name: builder
     namespace: ocp
@@ -62,27 +58,6 @@ tests:
       OO_INSTALL_NAMESPACE: '!create'
       OO_PACKAGE: node-feature-discovery-operator
       OO_TARGET_NAMESPACES: '!install'
-    workflow: optional-operators-ci-aws
-- as: e2e-master
-  postsubmit: true
-  steps:
-    cluster_profile: aws
-    dependencies:
-      OO_INDEX: ci-index
-    env:
-      OO_CHANNEL: stable
-      OO_INSTALL_NAMESPACE: '!create'
-      OO_PACKAGE: node-feature-discovery-operator
-      OO_TARGET_NAMESPACES: '!install'
-    test:
-    - as: postsubmit
-      cli: latest
-      commands: run nfd-operator test_master_branch
-      from: ci-artifacts
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 2Gi
     workflow: optional-operators-ci-aws
 zz_generated_metadata:
   branch: master
