@@ -26,36 +26,6 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: multi-host-next-deployment
-  steps:
-    cluster_profile: gcp
-    env:
-      OO_CHANNEL: next
-      OO_INSTALL_NAMESPACE: eclipse-che
-      OO_PACKAGE: eclipse-che-preview-openshift
-      OO_TARGET_NAMESPACES: '!install'
-    test:
-    - as: multi-host-nightly-deployment
-      cli: latest
-      commands: |
-        echo -e "[INFO] Test script content:"
-        cat .ci/oci-multi-host.sh
-
-        /bin/bash .ci/oci-multi-host.sh
-      dependencies:
-      - env: CI_CHE_OPERATOR_IMAGE
-        name: che-operator-image
-      env:
-      - name: OO_CHANNEL
-      - name: OO_INSTALL_NAMESPACE
-      - name: OO_PACKAGE
-      - name: OO_TARGET_NAMESPACES
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: optional-operators-ci-gcp
 - as: devworkspace-happy-path
   steps:
     cluster_profile: gcp
@@ -75,11 +45,11 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-gcp
-- as: stable-to-nightly
+- as: upgrade-stable-to-next
   steps:
     cluster_profile: gcp
     test:
-    - as: stable-to-nightly
+    - as: upgrade-stable-to-next
       cli: latest
       commands: |
         echo -e "[INFO] Test script content:"
@@ -100,27 +70,7 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-gcp
-- as: devworkspace-periodic-happy-path
-  cron: 0 */24 * * *
-  steps:
-    cluster_profile: gcp
-    test:
-    - as: devworkspace-happy-path
-      cli: latest
-      commands: |
-        echo -e "[INFO] Test script content:"
-        cat .ci/oci-devworkspace-happy-path.sh
-        /bin/bash .ci/oci-devworkspace-happy-path.sh
-      dependencies:
-      - env: CI_CHE_OPERATOR_IMAGE
-        name: che-operator-image
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: ipi-gcp
-- as: single-host-nightly-deployment
+- as: operator-test
   steps:
     cluster_profile: gcp
     env:
@@ -129,7 +79,7 @@ tests:
       OO_PACKAGE: eclipse-che-preview-openshift
       OO_TARGET_NAMESPACES: '!install'
     test:
-    - as: single-host-next-deployment
+    - as: operator-test
       cli: latest
       commands: |
         echo -e "[INFO] Test script content"
