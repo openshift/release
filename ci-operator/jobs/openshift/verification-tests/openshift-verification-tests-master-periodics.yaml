@@ -773,7 +773,7 @@ periodics:
     ci-operator.openshift.io/variant: ocp-4.10-upgrade-from-stable-4.9
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-verification-tests-master-ocp-4.10-upgrade-from-stable-4.9-upgrade-aws-cucushift-ipi
+  name: periodic-ci-openshift-verification-tests-master-ocp-4.10-upgrade-from-stable-4.9-upgrade-verification-tests-aws-ipi
   spec:
     containers:
     - args:
@@ -782,8 +782,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/upgrade-aws-cucushift-ipi-cluster-profile
-      - --target=upgrade-aws-cucushift-ipi
+      - --secret-dir=/usr/local/upgrade-verification-tests-aws-ipi-cluster-profile
+      - --target=upgrade-verification-tests-aws-ipi
       - --variant=ocp-4.10-upgrade-from-stable-4.9
       command:
       - ci-operator
@@ -800,7 +800,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/upgrade-aws-cucushift-ipi-cluster-profile
+      - mountPath: /usr/local/upgrade-verification-tests-aws-ipi-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -1430,6 +1430,80 @@ periodics:
     - name: cluster-profile
       secret:
         secretName: cluster-secrets-vsphere
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: verification-tests
+  interval: 72h
+  labels:
+    ci-operator.openshift.io/cloud: packet
+    ci-operator.openshift.io/cloud-cluster-profile: packet
+    ci-operator.openshift.io/variant: stable-4.9-upgrade-from-stable-4.8
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-verification-tests-master-stable-4.9-upgrade-from-stable-4.8-upgrade-verification-tests-baremetal-ipi
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/upgrade-verification-tests-baremetal-ipi-cluster-profile
+      - --target=upgrade-verification-tests-baremetal-ipi
+      - --variant=stable-4.9-upgrade-from-stable-4.8
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/upgrade-verification-tests-baremetal-ipi-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-packet
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials

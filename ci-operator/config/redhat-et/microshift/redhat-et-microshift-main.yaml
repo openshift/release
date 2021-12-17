@@ -4,7 +4,7 @@ base_images:
     namespace: ocp
     tag: cli
   libvirt-installer:
-    name: "4.8"
+    name: "4.10"
     namespace: ocp
     tag: libvirt-installer
   test-bin:
@@ -22,10 +22,11 @@ images:
 - dockerfile_literal: |
     FROM libvirt-installer
     USER root
+    ADD validate-microshift /tmp/
     COPY microshift-containerized.service /tmp/microshift-containerized.service
     COPY microshift-containerized /tmp/microshift-containerized
+    COPY crio-bridge.conf /tmp/100-crio-bridge.conf
     COPY oc /usr/bin/oc
-    COPY install.sh /usr/bin/install.sh
     COPY openshift-tests /usr/bin/openshift-tests
   from: libvirt-installer
   inputs:
@@ -35,12 +36,14 @@ images:
         source_path: /usr/bin/oc
     src:
       paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/redhat-et/microshift/install.sh
+      - destination_dir: validate-microshift
+        source_path: /go/src/github.com/redhat-et/microshift/validate-microshift/
       - destination_dir: .
         source_path: /go/src/github.com/redhat-et/microshift/packaging/systemd/microshift-containerized
       - destination_dir: .
         source_path: /go/src/github.com/redhat-et/microshift/packaging/systemd/microshift-containerized.service
+      - destination_dir: .
+        source_path: /go/src/github.com/redhat-et/microshift/packaging/images/microshift-aio/crio-bridge.conf
     test-bin:
       paths:
       - destination_dir: .
