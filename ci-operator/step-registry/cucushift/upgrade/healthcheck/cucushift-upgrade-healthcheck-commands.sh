@@ -11,10 +11,10 @@ function run_command_oc() {
         return 0
     fi
 
-    if [[ "$*" != *"image"* ]] && [[ "$*" != *"release"* ]]; then
-        # Don't re-try it, when we access the cluster
-        max=1
-    fi
+    # if [[ "$*" != *"image"* ]] && [[ "$*" != *"release"* ]]; then
+    #     # Don't re-try it, when we access the cluster
+    #     max=1
+    # fi
 
     while (( try < max )); do
         if ret_val=$(oc "$@" 2>&1); then
