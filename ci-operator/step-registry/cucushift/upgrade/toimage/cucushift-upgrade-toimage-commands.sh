@@ -10,7 +10,7 @@ function check_signed() {
     digest="$(echo "${target}" | cut -f2 -d@)"
     algorithm="$(echo "${digest}" | cut -f1 -d:)"
     hash_value="$(echo "${digest}" | cut -f2 -d:)"
-    response=$(curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
+    response=$(curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror2.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
     if (( response == 200 )); then
         echo "${target} is signed" && return 0
     else
@@ -31,7 +31,7 @@ function admin_ack() {
     
     echo "Require admin ack"
     local wait_time_loop_var=0 ack_data 
-    ack_data="$(echo $out | awk '{print $2}' | cut -f2 -d\")" && echo "Admin ack patch data is: ${ack_data}"
+    ack_data="$(echo ${out} | awk '{print $2}' | cut -f2 -d\")" && echo "Admin ack patch data is: ${ack_data}"
     oc -n openshift-config patch configmap admin-acks --patch '{"data":{"'"${ack_data}"'": "true"}}' --type=merge
     
     echo "Admin-acks patch gets started"
@@ -82,6 +82,7 @@ function check_upgrade_status() {
         fi        
     done
     if (( wait_upgrade <= 0 )); then
+        echo "oc get clusterversion/version -oyaml" && oc get clusterversion/version -oyaml
         echo >&2 "Upgrade timeout, exiting" && return 1
     fi
 }
@@ -131,11 +132,12 @@ target_version="$(oc adm release info "${target}" --output=json | jq -r '.metada
 target_minor_version="$(echo "${target_version}" | cut -f2 -d.)"
 echo -e "Target release version is: ${target_version}\nTarget minor version is: ${target_minor_version}"
 
-if [[ "${FORCE_UPDATE}" == "false" ]]; then
-    if ! check_signed; then
-        echo "You're updating to an unsigned images, you must override the verification using --force flag, exiting" && exit 1
-    fi
-    admin_ack 
+FORCE_UPDATE=false
+if ! check_signed; then
+    echo "You're updating to an unsigned images, you must override the verification using --force flag"
+    FORCE_UPDATE=true
+else
+    admin_ack
 fi
 
 upgrade 

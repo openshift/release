@@ -1,0 +1,47 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  openstack-installer:
+    name: "4.8"
+    namespace: ocp
+    tag: openstack-installer
+  upi-installer:
+    name: "4.8"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.8"
+  target:
+    release:
+      channel: stable
+      version: "4.9"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: upgrade-verification-tests-baremetal-ipi
+  interval: 72h
+  steps:
+    cluster_profile: packet
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+      UPGRADE_CHECK_RUN_TAGS: '@4.8 and @baremetal-ipi and @upgrade-check'
+      UPGRADE_PRE_RUN_TAGS: '@4.8 and @baremetal-ipi and @upgrade-prepare'
+    post:
+    - chain: baremetalds-ipi-post
+    pre:
+    - chain: baremetalds-ipi-pre
+    workflow: cucushift-upgrade
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: verification-tests
+  variant: stable-4.9-upgrade-from-stable-4.8
