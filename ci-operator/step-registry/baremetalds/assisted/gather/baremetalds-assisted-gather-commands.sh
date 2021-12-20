@@ -46,6 +46,8 @@ sos report --batch --tmp-dir /tmp/artifacts \
 # TODO: remove when https://github.com/sosreport/sos/pull/2594 is available
 cp -v -r /var/lib/libvirt/dnsmasq /tmp/artifacts/libvirt-dnsmasq
 
+cp -v -r /var/log/swtpm/libvirt/qemu /tmp/artifacts/libvirt-qemu || true
+
 # Get assisted logs
 if [ -f "\${HOME}/.kube/config" ]; then
   export LOGS_DEST=/tmp/artifacts
