@@ -48,6 +48,9 @@ CONFIG = {
     'azurestack-quota-slice': {
         'ppe3': 2
     },
+    'azuremag-quota-slice': {
+        'usgovvirginia': 5
+    },
     'gcp-quota-slice': {
         'us-central1': 70,
     },
