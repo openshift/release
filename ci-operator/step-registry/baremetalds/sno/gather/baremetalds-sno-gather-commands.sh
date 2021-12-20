@@ -36,6 +36,8 @@ sos report --batch --tmp-dir /tmp/artifacts \
 # TODO: remove when https://github.com/sosreport/sos/pull/2594 is available
 cp -r /var/lib/libvirt/dnsmasq /tmp/artifacts/libvirt-dnsmasq
 
+cp -v -r /var/log/swtpm/libvirt/qemu /tmp/artifacts/libvirt-qemu || true
+
 echo "Copy content from setup step to artifacts dir..."
 cp -r /home/sno/build/ /tmp/artifacts/
 
