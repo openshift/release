@@ -5,6 +5,11 @@ set -o errexit
 set -o pipefail
 
 function populate_artifact_dir() {
+  if [[ "${GATHER_POST_INSTALLATION}" == "true" ]]; then
+    echo "Running installer-gather post installation..."
+    openshift-install --dir="${dir}" gather bootstrap
+  fi
+
   set +e
   echo "Copying log bundle..."
   cp "${dir}"/log-bundle-*.tar.gz "${ARTIFACT_DIR}/" 2>/dev/null
