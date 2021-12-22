@@ -24,6 +24,16 @@ images:
 promotion:
   name: "4.10"
   namespace: edge-infrastructure
+releases:
+  initial:
+    integration:
+      name: "4.9"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.9"
+      namespace: ocp
 resources:
   '*':
     limits:
@@ -61,6 +71,26 @@ tests:
   container:
     from: src
   skip_if_only_changed: (^(docs|config)/)|(\.md$)|((^|/)OWNERS$)
+- as: e2e-capi-provider-hypershift
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    workflow: baremetalds-assisted-install-capi
+- as: e2e-capi-provider-hypershift-periodic
+  cron: '@daily'
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        KUBE_API=yes
+        ENABLE_KUBE_API=true
+        MINIKUBE_DISK_SIZE=70g
+        MINIKUBE_RAM_MB=10240
+        TEST=./src/tests/test_kube_api.py
+        TEST_FUNC=test_capi_provider
+        MAKEFILE_TARGET="create_full_environment run deploy_capi_env test"
+      TEST_SUITE: minimal
+    workflow: baremetalds-assisted-install-capi
 zz_generated_metadata:
   branch: master
   org: openshift

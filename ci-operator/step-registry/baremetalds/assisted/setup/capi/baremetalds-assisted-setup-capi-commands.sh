@@ -95,10 +95,6 @@ echo "export PULL_NUMBER=${PULL_NUMBER:-}" >> /root/config
 echo "export RELEASE_IMAGE_LATEST=${RELEASE_IMAGE_LATEST}" >> /root/config
 
 # Override default images
-echo "export SERVICE=${ASSISTED_SERVICE_IMAGE}" >> /root/config
-echo "export AGENT_DOCKER_IMAGE=${ASSISTED_AGENT_IMAGE}" >> /root/config
-echo "export CONTROLLER_IMAGE=${ASSISTED_CONTROLLER_IMAGE}" >> /root/config
-echo "export INSTALLER_IMAGE=${ASSISTED_INSTALLER_IMAGE}" >> /root/config
 echo "export PROVIDER_IMAGE=${PROVIDER_IMAGE}" >> /root/config
 
 # expr command's return value is 1 in case of a false expression. We don't want to exit in this case.
@@ -118,15 +114,17 @@ else
   echo "export OPENSHIFT_INSTALL_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}" >> /root/config
 fi
 
-IMAGES=(${ASSISTED_AGENT_IMAGE} ${ASSISTED_CONTROLLER_IMAGE} ${ASSISTED_INSTALLER_IMAGE} ${RELEASE_IMAGE_LATEST})
+IMAGES=(${PROVIDER_IMAGE})
 CI_REGISTRIES=\$(for image in \${IMAGES}; do echo \${image} | cut -d'/' -f1; done | sort -u | paste -sd "," -)
 
 echo "export PUBLIC_CONTAINER_REGISTRIES=quay.io,\${CI_REGISTRIES}" >> /root/config
 echo "export ASSISTED_SERVICE_HOST=${IP}" >> /root/config
 echo "export CHECK_CLUSTER_VERSION=True" >> /root/config
-echo "export NUM_WORKERS=2" >> /root/config
 echo "export TEST_TEARDOWN=false" >> /root/config
-echo "export TEST_FUNC=test_install" >> /root/config
+echo "export TEST_FUNC=test_capi_provider" >> /root/config
+echo "export KUBE_API=yes" >> /root/config
+echo "export MINIKUBE_DISK_SIZE=70g" >> /root/config
+echo "export MINIKUBE_RAM_MB=10240" >> /root/config
 echo "export INSTALLER_KUBECONFIG=\${REPO_DIR}/build/kubeconfig" >> /root/config
 
 if [[ -e /root/assisted-additional-config ]]; then
@@ -135,7 +133,7 @@ fi
 
 source /root/config
 
-make \${MAKEFILE_TARGET:-create_full_environment run test_parallel}
+make \${MAKEFILE_TARGET:-create_full_environment run deploy_capi_env test_kube_api_parallel}
 
 EOF
 
