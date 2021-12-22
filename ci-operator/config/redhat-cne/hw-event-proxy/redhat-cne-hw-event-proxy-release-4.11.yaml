@@ -2,7 +2,10 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.16
+    tag: golang-1.17
+images:
+- dockerfile_path: Dockerfile
+  to: hw-event-proxy
 promotion:
   name: "4.11"
   namespace: ocp
@@ -38,12 +41,16 @@ tests:
         fi
         popd
         export VERSION=latest
+        export PROXY_IMG=${IMAGE_HW_EVENT_PROXY}
         make test-ci
+      dependencies:
+      - env: IMAGE_HW_EVENT_PROXY
+        name: pipeline:hw-event-proxy
       from: src
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: release-4.11
   org: redhat-cne
