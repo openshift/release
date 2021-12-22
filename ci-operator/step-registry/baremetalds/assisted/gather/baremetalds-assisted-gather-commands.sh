@@ -47,6 +47,7 @@ sos report --batch --tmp-dir /tmp/artifacts \
 cp -v -r /var/lib/libvirt/dnsmasq /tmp/artifacts/libvirt-dnsmasq
 
 cp -v -r /var/log/swtpm/libvirt/qemu /tmp/artifacts/libvirt-qemu || true
+ls -ltr /var/lib/swtpm-localca/ >> /tmp/artifacts/libvirt-qemu/ls-swtpm-localca.txt || true
 
 # Get assisted logs
 if [ -f "\${HOME}/.kube/config" ]; then
