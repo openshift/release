@@ -22,28 +22,6 @@ periodics:
           cpu: 500m
     serviceAccountName: clonerefs-manager
 - agent: kubernetes
-  cluster: build01
-  cron: 30 7 * * *
-  decorate: true
-  labels:
-    ci.openshift.io/role: infra
-  name: periodic-build01-upgrade
-  spec:
-    containers:
-    - args:
-      - adm
-      - upgrade
-      - --to-latest
-      command:
-      - /usr/bin/oc
-      image: registry.ci.openshift.org/ocp/4.9:cli
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-    serviceAccountName: upgrader
-- agent: kubernetes
   cluster: app.ci
   cron: 0 8 * * 1-5
   decorate: true
@@ -794,37 +772,6 @@ periodics:
         - key: gce.json
           path: gce.json
         secretName: cluster-secrets-gcp-openshift-gce-devel-ci-2
-- agent: kubernetes
-  cluster: app.ci
-  decorate: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: release
-  interval: 12h
-  labels:
-    ci.openshift.io/role: infra
-  name: periodic-prow-image-autobump
-  spec:
-    containers:
-    - args:
-      - --config=core-services/prow/02_config/_bumper.yaml
-      command:
-      - /app/prow/cmd/generic-autobumper/app.binary
-      image: gcr.io/k8s-prow/generic-autobumper:v20211221-aa59567d4d
-      imagePullPolicy: IfNotPresent
-      name: autobump
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /etc/github
-        name: token
-        readOnly: true
-    volumes:
-    - name: token
-      secret:
-        secretName: github-credentials-openshift-bot
 - agent: kubernetes
   cluster: app.ci
   cron: '@hourly'
