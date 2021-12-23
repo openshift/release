@@ -83,11 +83,18 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJE
   rhel8user@"${INSTANCE_PREFIX}" \
   --command 'sudo mv openshift-tests /usr/bin/openshift-tests'
 
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+   --quiet \
+   --project "${GOOGLE_PROJECT_ID}" \
+   --zone "${GOOGLE_COMPUTE_ZONE}" \
+   --recurse /tmp/microshift.conf rhel8user@"${INSTANCE_PREFIX}":~/
+
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
   --command 'sudo subscription-manager repos --enable rhocp-4.8-for-rhel-8-x86_64-rpms \
-  && sudo dnf -y install cri-o cri-tools podman'
+  && sudo dnf -y install cri-o cri-tools podman && sudo mkdir -p /etc/crio/crio.conf.d \
+  && sudo cp /tmp/microshift.conf /etc/crio/crio.conf.d/microshift.conf'
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
