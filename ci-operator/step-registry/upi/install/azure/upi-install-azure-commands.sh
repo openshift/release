@@ -61,6 +61,7 @@ AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
 export AZURE_AUTH_LOCATION
 
 pushd ${ARTIFACT_DIR}/installer
+python3 -c "import yaml" || pip3 install --user pyyaml
 
 CLUSTER_NAME=$(python3 -c 'import yaml;data = yaml.full_load(open("install-config.yaml"));print(data["metadata"]["name"])')
 BASE_DOMAIN=$(python3 -c 'import yaml;data = yaml.full_load(open("install-config.yaml"));print(data["baseDomain"])')
@@ -133,7 +134,7 @@ ACCOUNT_KEY=$(az storage account keys list -g $RESOURCE_GROUP --account-name $AC
 if openshift-install coreos print-stream-json 2>/tmp/err.txt >/tmp/coreos.json; then
   VHD_URL="$(jq -r '.architectures.x86_64."rhel-coreos-extensions"."azure-disk".url' /tmp/coreos.json)"
 else
-  VHD_URL="$(jq -r .amis[\"${AZURE_REGION}\"].hvm /var/lib/openshift-install/rhcos.json)"
+  VHD_URL="$(jq -r .azure.url /var/lib/openshift-install/rhcos.json)"
 fi
 
 echo "Copying VHD image from ${VHD_URL}"
