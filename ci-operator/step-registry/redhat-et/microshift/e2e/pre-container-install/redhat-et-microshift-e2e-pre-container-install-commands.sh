@@ -84,10 +84,10 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJE
   --command 'sudo mv openshift-tests /usr/bin/openshift-tests'
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
-   --quiet \
-   --project "${GOOGLE_PROJECT_ID}" \
-   --zone "${GOOGLE_COMPUTE_ZONE}" \
-   --recurse /tmp/microshift.conf rhel8user@"${INSTANCE_PREFIX}":~/
+  --quiet \
+  --project "${GOOGLE_PROJECT_ID}" \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  --recurse /tmp/microshift.conf rhel8user@"${INSTANCE_PREFIX}":~/
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
