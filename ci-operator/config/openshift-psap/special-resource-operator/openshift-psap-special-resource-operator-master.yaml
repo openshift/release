@@ -17,13 +17,6 @@ images:
         mv linux-amd64/helm /usr/local/bin && \
         chmod +x /usr/local/bin/helm && \
         rm -rf /tmp/helm
-    RUN mkdir /tmp/oc && \
-        cd /tmp/oc && \
-        curl -L https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz -o oc.tar.gz && \
-        tar xzvf oc.tar.gz && \
-        mv kubectl oc /usr/local/bin/ && \
-        cd - && \
-        rm -rf /tmp/oc
   from: src
   to: test-bin
 promotion:
@@ -91,7 +84,7 @@ tests:
         cd cluster-nfd-operator
         make deploy VERSION=4.9.0
         oc apply -f config/samples/nfd.openshift.io_v1_nodefeaturediscovery.yaml
-      from: test-bin
+      from: src
       resources:
         requests:
           cpu: 300m
@@ -99,11 +92,13 @@ tests:
     - as: deploy-sro
       cli: latest
       commands: |
+        which oc
+        ln -s /usr/local/bin/oc /usr/local/bin/kubectl
         make deploy
       dependencies:
       - env: IMG
         name: special-resource-operator
-      from: test-bin
+      from: src
       resources:
         requests:
           cpu: 300m
@@ -112,7 +107,7 @@ tests:
       cli: latest
       commands: |
         make e2e-test
-      from: test-bin
+      from: src
       resources:
         requests:
           cpu: 300m
