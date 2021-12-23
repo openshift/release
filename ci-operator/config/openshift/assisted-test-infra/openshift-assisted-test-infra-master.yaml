@@ -358,6 +358,38 @@ tests:
         MAKEFILE_TARGET=all
       TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
+- as: e2e-metal-assisted-capi
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        KUBE_API=yes
+        ENABLE_KUBE_API=true
+        MINIKUBE_DISK_SIZE=70g
+        MINIKUBE_RAM_MB=10240
+        TEST=./src/tests/test_kube_api.py
+        TEST_FUNC=test_capi_provider
+        DISABLED_HOST_VALIDATIONS=api-vip-connected
+        MAKEFILE_TARGET="create_full_environment run deploy_capi_env test"
+      TEST_SUITE: minimal
+    workflow: baremetalds-assisted-install
+- as: e2e-metal-assisted-capi-periodic
+  cron: '@daily'
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        KUBE_API=yes
+        ENABLE_KUBE_API=true
+        MINIKUBE_DISK_SIZE=70g
+        MINIKUBE_RAM_MB=10240
+        TEST=./src/tests/test_kube_api.py
+        TEST_FUNC=test_capi_provider
+        DISABLED_HOST_VALIDATIONS=api-vip-connected
+        MAKEFILE_TARGET="create_full_environment run deploy_capi_env test"
+      TEST_SUITE: minimal
+    workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-kube-api-periodic
   cron: '@daily'
   steps:
