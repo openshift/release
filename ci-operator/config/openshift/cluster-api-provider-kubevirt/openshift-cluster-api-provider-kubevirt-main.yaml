@@ -3,6 +3,10 @@ base_images:
     name: "4.10"
     namespace: ocp
     tag: base
+  cli:
+    name: "4.10"
+    namespace: ocp
+    tag: cli
   openshift_release_golang-1.17:
     name: release
     namespace: openshift
@@ -53,6 +57,25 @@ images:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.17
   to: cluster-api-kubevirt-controller
+- build_args:
+  - name: ARCH
+    value: amd64
+  - name: ldflags
+  dockerfile_literal: |-
+    FROM src
+
+    RUN yum install -y expect
+    COPY oc /usr/bin/oc
+
+    RUN curl -L https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.0.0/clusterctl-linux-amd64 -o /usr/bin/clusterctl && \
+        chmod +x /usr/bin/clusterctl
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: capk-oc-bin-image
 promotion:
   namespace: hypershift
   tag: main
@@ -78,6 +101,126 @@ tests:
   commands: GOFLAGS="-mod=readonly" make test
   container:
     from: src
+- as: cluster-api-provider-kubevirt-e2e
+  steps:
+    cluster_profile: azure4
+    test:
+    - as: deploy-cnv
+      commands: |-
+        oc apply -f - <<EOF
+        apiVersion: v1
+        kind: Namespace
+        metadata:
+          name: openshift-cnv
+        EOF
+
+        oc apply -f - <<EOF
+        apiVersion: operators.coreos.com/v1
+        kind: OperatorGroup
+        metadata:
+          name: openshift-cnv-group
+          namespace: openshift-cnv
+        spec:
+          targetNamespaces:
+          - openshift-cnv
+        EOF
+
+        cat <<EOF | oc apply -f -
+        apiVersion: operators.coreos.com/v1alpha1
+        kind: Subscription
+        metadata:
+          labels:
+            operators.coreos.com/kubevirt-hyperconverged.openshift-cnv: ''
+          name: kubevirt-hyperconverged
+          namespace: openshift-cnv
+        spec:
+          channel: stable
+          installPlanApproval: Automatic
+          name: kubevirt-hyperconverged
+          source: redhat-operators
+          sourceNamespace: openshift-marketplace
+        EOF
+
+        sleep 60
+
+        RETRIES=30
+        CSV=
+        for i in $(seq ${RETRIES}); do
+          if [[ -z ${CSV} ]]; then
+            CSV=$(oc get subscription -n openshift-cnv kubevirt-hyperconverged -o jsonpath='{.status.installedCSV}')
+          fi
+
+          if [[ -z ${CSV} ]]; then
+            echo "Try ${i}/${RETRIES}: can't get the CSV yet. Checking again in 30 seconds"
+            sleep 30
+          fi
+
+          if [[ $(oc get csv -n openshift-cnv ${CSV} -o jsonpath={.status.phase}) == "Succeeded" ]]; then
+            echo "CNV is deployed"
+            break
+          else
+            echo "Try ${i}/${RETRIES}: CNV is not deployed yet. Checking again in 30 seconds"
+            sleep 30
+          fi
+        done
+
+        if [[ $(oc get csv -n openshift-cnv ${CSV} -o jsonpath={.status.phase}) != "Succeeded" ]]; then
+          echo "Error: Failed to deploy CNV"
+          echo "CSV ${CSV} YAML"
+          oc get CSV ${CSV} -n openshift-cnv -o yaml
+          echo
+          echo "CSV ${CSV} Describe"
+          oc describe CSV ${CSV} -n openshift-cnv
+          exit 1
+        fi
+
+        oc create -f - <<EOF
+        apiVersion: hco.kubevirt.io/v1beta1
+        kind: HyperConverged
+        metadata:
+          name: kubevirt-hyperconverged
+          namespace: openshift-cnv
+        EOF
+
+        oc wait hyperconverged -n openshift-cnv kubevirt-hyperconverged --for=condition=Available --timeout=15m
+      from: capk-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    - as: deploy-capi-kubevirt
+      commands: |-
+        set -x
+
+        echo "installing capi..."
+        clusterctl init
+
+        echo "deploying CAPI-Kubevirt..."
+        sed -i -e "s|image: .*$|image: ${KAPK_IMAGE}|" ./config/default/manager_image_patch.yaml
+        oc kustomize ./config/default | oc apply -f -
+
+        oc wait -n capk-system --for=condition=Available deployment/capk-controller-manager --timeout=10m
+      dependencies:
+      - env: KAPK_IMAGE
+        name: cluster-api-kubevirt-controller
+      from: capk-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    - as: create-hosted-cluster
+      commands: |-
+        set -x
+
+        export =quay.io/kubevirtci/fedora-kubeadm:35
+        export IMAGE_REPO=k8s.gcr.io
+        clusterctl generate cluster kvcluster --kubernetes-version v1.21.0 --control-plane-machine-count=1 --worker-machine-count=1 --from templates/cluster-template.yaml | oc apply -f -
+      from: capk-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: ipi-azure
 zz_generated_metadata:
   branch: main
   org: openshift
