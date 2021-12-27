@@ -74,6 +74,8 @@ then
   mkfs.xfs -f "\${NVME_DEVICE}"
   mkdir -p "\${REPO_DIR}"
   mount "\${NVME_DEVICE}" "\${REPO_DIR}"
+  mkdir -p "\${REPO_DIR}"/minikube_home
+  echo "export MINIKUBE_HOME=\${REPO_DIR}/minikube_home" >> /root/config
 fi
 
 tar -xzvf assisted.tar.gz -C "\${REPO_DIR}"
