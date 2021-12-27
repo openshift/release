@@ -134,6 +134,7 @@ fi
 
 source /root/config
 
+sleep 9999999
 make \${MAKEFILE_TARGET:-create_full_environment run test_parallel}
 
 EOF
