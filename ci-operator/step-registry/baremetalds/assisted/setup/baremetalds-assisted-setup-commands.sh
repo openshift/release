@@ -12,6 +12,8 @@ source "${SHARED_DIR}/packet-conf.sh"
 
 export CI_CREDENTIALS_DIR=/var/run/assisted-installer-bot
 
+git clone https://github.com/nmagnezi/assisted-test-infra.git --branch tpm_debug
+cd assisted-test-infra/
 # Copy assisted source from current directory to the remote server
 tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/assisted.tar.gz"
 
