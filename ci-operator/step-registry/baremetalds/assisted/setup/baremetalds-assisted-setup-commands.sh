@@ -101,6 +101,11 @@ echo "export SERVICE=${ASSISTED_SERVICE_IMAGE}" >> /root/config
 echo "export AGENT_DOCKER_IMAGE=${ASSISTED_AGENT_IMAGE}" >> /root/config
 echo "export CONTROLLER_IMAGE=${ASSISTED_CONTROLLER_IMAGE}" >> /root/config
 echo "export INSTALLER_IMAGE=${ASSISTED_INSTALLER_IMAGE}" >> /root/config
+# Most jobs and tests don't require this image, so this allows it as optional
+if [ "${PROVIDER_IMAGE}" != "${ASSISTED_CONTROLLER_IMAGE}" ];
+then
+  echo "export PROVIDER_IMAGE=${PROVIDER_IMAGE}" >> /root/config
+fi
 
 # expr command's return value is 1 in case of a false expression. We don't want to exit in this case.
 set +e
