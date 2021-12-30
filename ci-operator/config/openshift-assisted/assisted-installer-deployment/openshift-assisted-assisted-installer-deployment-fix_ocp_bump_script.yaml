@@ -1,0 +1,39 @@
+base_images:
+  coreos_centos_stream8:
+    name: stream8
+    namespace: coreos
+    tag: "8"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.16
+images:
+- dockerfile_path: Dockerfile.build
+  inputs:
+    coreos_centos_stream8:
+      as:
+      - quay.io/centos/centos:stream8
+  to: assisted-installer-deployment-build
+- dockerfile_path: Dockerfile.assisted-installer-deployment
+  inputs:
+    coreos_centos_stream8:
+      as:
+      - quay.io/centos/centos:stream8
+  to: assisted-installer-deployment
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: bump-ocp
+  steps:
+    test:
+    - ref: baremetalds-assisted-tools-bump-ocp
+zz_generated_metadata:
+  branch: fix_ocp_bump_script
+  org: openshift-assisted
+  repo: assisted-installer-deployment
