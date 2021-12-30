@@ -55,6 +55,9 @@ if [ -f "\${HOME}/.kube/config" ]; then
   export KUBECTL="kubectl --kubeconfig=\${HOME}/.kube/config"
 
   make download_service_logs
+  if [ "${GATHER_CAPI_LOGS}" == "true" ]; then
+    make download_capi_logs
+  fi
 fi
 
 export ADDITIONAL_PARAMS=""
@@ -75,5 +78,7 @@ for kubeconfig in \$(find \${KUBECONFIG} -type f); do
   export LOGS_DEST=/tmp/artifacts/new_cluster_\${name}
   make download_service_logs
 done
+
+
 
 EOF
