@@ -43,7 +43,7 @@ echo "readable_version: $readable_version"
 # MIRROR IMAGES
 
 echo "running commad: oc adm release -a /tmp/new-pull-secret mirror --from=${RELEASE_IMAGE_LATEST} --to=${target_release_image_repo} --to-release-image=${target_release_image}"
-oc adm release -a '/tmp/new-pull-secret' mirror --insecure=true \
+oc adm release -a '/tmp/new-pull-secret' mirror --insecure=true --max-per-registry=2 \
  --from=${RELEASE_IMAGE_LATEST} \
  --to=${target_release_image_repo} \
  --to-release-image=${target_release_image} | tee "${mirror_output}"
