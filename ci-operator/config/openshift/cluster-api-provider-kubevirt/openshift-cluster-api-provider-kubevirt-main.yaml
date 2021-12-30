@@ -67,7 +67,7 @@ images:
     RUN yum install -y expect
     COPY oc /usr/bin/oc
 
-    RUN curl -L https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.0.0/clusterctl-linux-amd64 -o /usr/bin/clusterctl && \
+    RUN curl -L https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.0.2/clusterctl-linux-amd64 -o /usr/bin/clusterctl && \
         chmod +x /usr/bin/clusterctl
   from: src
   inputs:
@@ -103,7 +103,7 @@ tests:
     from: src
 - as: cluster-api-provider-kubevirt-e2e
   steps:
-    cluster_profile: azure4
+    cluster_profile: gcp
     test:
     - as: deploy-cnv
       commands: |-
@@ -188,39 +188,157 @@ tests:
         requests:
           cpu: 500m
           memory: 1Gi
-    - as: deploy-capi-kubevirt
+    - as: deploy-capk
       commands: |-
         set -x
+        # Deploy cluster API
+        cat <<EOF > clusterctl_config.yaml
+        cert-manager:
+          url: "https://github.com/cert-manager/cert-manager/releases/latest/cert-manager.yaml"
+        EOF
 
-        echo "installing capi..."
-        clusterctl init
+        clusterctl init -v 4 --config=clusterctl_config.yaml
 
-        echo "deploying CAPI-Kubevirt..."
-        sed -i -e "s|image: .*$|image: ${KAPK_IMAGE}|" ./config/default/manager_image_patch.yaml
-        oc kustomize ./config/default | oc apply -f -
+        oc adm policy add-scc-to-user privileged system:serviceaccount:capk-system:capk-manager
 
-        oc wait -n capk-system --for=condition=Available deployment/capk-controller-manager --timeout=10m
+        export MANIFEST_IMG=${CAPK_IMAGE%:*}
+        export MANIFEST_TAG=${CAPK_IMAGE/*:}
+        GOFLAGS="-mod=readonly" make generate-manifests
+
+        sed -i -E "s|(^ +- image: ).*$|\1${CAPK_IMAGE}|" config/default/manager_image_patch.yaml
+
+        oc kustomize config/default | oc apply -f -
+        sleep 60
+
+        # Validate capk manager was created successfully
+        oc wait pod --for=condition=Ready -l cluster.x-k8s.io/provider=infrastructure-kubevirt -n capk-system --timeout=120s
       dependencies:
-      - env: KAPK_IMAGE
+      - env: CAPK_IMAGE
         name: cluster-api-kubevirt-controller
       from: capk-oc-bin-image
       resources:
         requests:
           cpu: 500m
           memory: 1Gi
-    - as: create-hosted-cluster
+    - as: create-cluster
       commands: |-
         set -x
+        sed -i -E "/controlPlaneServiceTemplate:/{ n; /spec:/ { n; /type:/ { s/ClusterIP/LoadBalancer/; p; d;}}}" templates/cluster-template.yaml
 
-        export =quay.io/kubevirtci/fedora-kubeadm:35
+        export NODE_VM_IMAGE_TEMPLATE=quay.io/kubevirtci/fedora-kubeadm:35
         export IMAGE_REPO=k8s.gcr.io
-        clusterctl generate cluster kvcluster --kubernetes-version v1.21.0 --control-plane-machine-count=1 --worker-machine-count=1 --from templates/cluster-template.yaml | oc apply -f -
+        export CRI_PATH="/var/run/crio/crio.sock"
+        export CLUSTER_NAME=tenant-capk
+        clusterctl generate cluster ${CLUSTER_NAME} \
+                   --kubernetes-version v1.21.0 \
+                   --control-plane-machine-count=1 \
+                   --worker-machine-count=1 \
+                   --from templates/cluster-template.yaml \
+                   -n capk-system | oc apply -f -
       from: capk-oc-bin-image
       resources:
         requests:
           cpu: 500m
           memory: 1Gi
-    workflow: ipi-azure
+    - as: validate-cluster
+      commands: |-
+        set -x
+        export CLUSTER_NAME=tenant-capk
+        export CLUSTER_NS=capk-system
+
+        sleep 60
+
+        oc wait kubevirtcluster -l cluster.x-k8s.io/cluster-name=${CLUSTER_NAME} --for=condition=Ready -n ${CLUSTER_NS} --timeout=120s
+
+        RETRIES=20
+        VMS_EXISTS=false
+        for i in $(seq ${RETRIES}); do
+          if [[ $(oc get vm -n ${CLUSTER_NS} --no-headers | wc -l) -lt 2 ]]; then
+            sleep 30
+            echo "Try ${i}/${RETRIES}: not all the VMs were created, yet; trying again in 30 seconds"
+            continue
+          else
+            VMS_EXISTS=true
+            break
+          fi
+        done
+
+        if [[ ${VMS_EXISTS} == "false" ]]; then
+          echo "should create at least 2 VMs, but it didn't"
+          exit 1
+        fi
+
+        #check VMs
+        for VM in $(oc get vm -n ${CLUSTER_NS} -o custom-columns=NAME:.metadata.name --no-headers); do
+          oc wait vm -n ${CLUSTER_NS} ${VM} --for=condition=Ready
+        done
+
+        #check VMIs
+        for VMI in $(oc get vmi -n ${CLUSTER_NS} -o custom-columns=NAME:.metadata.name --no-headers); do
+          oc wait vmi -n ${CLUSTER_NS} ${VMI} --for=condition=Ready
+          [[ $(oc get vmi -n ${CLUSTER_NS} ${VMI} -o custom-columns=PHASE:.status.phase --no-headers) == "Running" ]]
+        done
+
+        oc get vmi -n ${CLUSTER_NS}
+
+        TENANT_CLUSTER_IP=$(oc get svc -n ${CLUSTER_NS} -l cluster.x-k8s.io/cluster-name=tenant-capk -o custom-columns=EXT_IP:.status.loadBalancer.ingress[0].ip --no-headers)
+        clusterctl get kubeconfig ${CLUSTER_NAME} -n ${CLUSTER_NS} > ${CLUSTER_NAME}-kubeconfig
+        sed -i -E "/certificate-authority-data/d;s|(server: https://)[^:]+|\1${TENANT_CLUSTER_IP}|;/^- cluster:/a\    insecure-skip-tls-verify: true" ${CLUSTER_NAME}-kubeconfig
+
+        # check the tenant cluster. Check if the API-Server is responsive
+        MNGMNT_KUBECONFI=${KUBECONFIG}
+        export KUBECONFIG=${CLUSTER_NAME}-kubeconfig
+
+        RETRIES=20
+        API_SERVER_IS_UP=false
+        for i in $(seq ${RETRIES}); do
+          if [[ $(oc get --raw='/readyz') ]]; then
+            API_SERVER_IS_UP=true
+            break
+          else
+            echo "Try ${i}/${RETRIES}: tenant API Server is not up, yet; trying again in 30 seconds"
+            sleep 30
+            continue
+          fi
+        done
+
+        if [[ ${API_SERVER_IS_UP} == "false" ]]; then
+          echo "Should have a responsive tenenat API server by now; aborting..."
+          exit 1
+        fi
+
+        RETRIES=20
+        NODES_ARE_UP=false
+        for i in $(seq ${RETRIES}); do
+          if [[ $(oc get nodes --no-headers | wc -l) -lt 2 ]]; then
+            echo "Try ${i}/${RETRIES}: not all the nodes are up, yet; trying again in 30 seconds"
+            sleep 30
+            continue
+          else
+            NODES_ARE_UP=true
+            break
+          fi
+        done
+
+        if [[ ${NODES_ARE_UP} == "false" ]]; then
+          echo "Should have two working nodes by now; aborting..."
+          exit 1
+        fi
+
+        oc get nodes -o wide
+
+        oc config set-context $(oc config current-context) --namespace=default
+
+        # create a workload on the tenant cluster
+        oc run testpod --image=nginx
+        oc wait pod testpod --for=condition=Ready --timeout=90s
+        oc get pods
+      from: capk-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: ipi-gcp
 zz_generated_metadata:
   branch: main
   org: openshift
