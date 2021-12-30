@@ -40,94 +40,13 @@ jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}}" '
 readable_version=$(oc adm release info "${RELEASE_IMAGE_LATEST}" --output=json | jq .metadata.version)
 echo "readable_version: $readable_version"
 
-
-
-#
-#
-# MIRROR IMAGES - option 1
-#
-#
+# MIRROR IMAGES
 
 echo "running commad: oc adm release -a /tmp/new-pull-secret mirror --from=${RELEASE_IMAGE_LATEST} --to=${target_release_image_repo} --to-release-image=${target_release_image}"
-oc adm release -a '/tmp/new-pull-secret' mirror --insecure \
+oc adm release -a '/tmp/new-pull-secret' mirror --insecure=true \
  --from=${RELEASE_IMAGE_LATEST} \
  --to=${target_release_image_repo} \
  --to-release-image=${target_release_image} | tee "${mirror_output}"
-
-######################################################
-
-#
-#
-# MIRROR IMAGES - option 2
-#
-#
-# BASTION_HOST=`head -n 1 "${SHARED_DIR}/bastion_dns"`
-# BASTION_USER="core"
-# #SSH_ARGS="-o ConnectTimeout=10 -o \"StrictHostKeyChecking=no\" -i ${CLUSTER_PROFILE_DIR}/ssh-privatekey"
-
-# # compliant with SC2090 SC2089 SC2124
-# SSH_ARGS=(-o ConnectTimeout=10 -o "StrictHostKeyChecking=no" -i "${CLUSTER_PROFILE_DIR}/ssh-privatekey")
-# SSH_CMD="ssh ${SSH_ARGS[*]} $BASTION_USER@$BASTION_HOST"
-# SCP_CMD="scp ${SSH_ARGS[*]}"
-
-# oc_path="$(which oc)"
-# cmd="$SCP_CMD \"$oc_path\" ${BASTION_USER}@${BASTION_HOST}:/tmp/"
-# echo "copy oc to bastion host."
-# echo "running command: ${cmd}"
-# eval "${cmd}"
-
-# cmd="$SCP_CMD /tmp/new-pull-secret ${BASTION_USER}@${BASTION_HOST}:/tmp/"
-# echo "copy new-pull-secret to bastion host"
-# echo "running command: ${cmd}"
-# eval "${cmd}"
-
-
-# cmd="$SCP_CMD -r /etc/pki/ca-trust/source/anchors ${BASTION_USER}@${BASTION_HOST}:/tmp/"
-# echo "copy certs to bastion host"
-# echo "running command: ${cmd}"
-# eval "${cmd}"
-
-
-
-
-# cat > /tmp/mirror.sh << EOF
-# sudo cp /tmp/* /etc/pki/ca-trust/source/anchors/
-# sudo update-ca-trust
-# /tmp/oc adm release -a '/tmp/new-pull-secret' mirror \
-#  --from=${RELEASE_IMAGE_LATEST} \
-#  --to=${target_release_image_repo} \
-#  --to-release-image=${target_release_image} | tee "/tmp/mirror_output"
-# EOF
-
-# echo "mirror.sh content:"
-# cat /tmp/mirror.sh
-
-# cmd="$SCP_CMD /tmp/mirror.sh $BASTION_USER@$BASTION_HOST:/tmp/"
-# echo "copy mirror.sh to bastion host"
-# echo "running command: ${cmd}"
-# eval "${cmd}"
-
-
-# cmd="$SSH_CMD chmod +x /tmp/mirror.sh"
-# echo "running command: ${cmd}"
-# eval "${cmd}"
-
-
-# cmd="$SSH_CMD bash -c /tmp/mirror.sh"
-# echo "running mirror.sh on bastion host"
-# echo "running command: ${cmd}"
-# eval "${cmd}"
-
-# # copy result back
-
-# cmd="$SCP_CMD ${BASTION_USER}@${BASTION_HOST}:/tmp/mirror_output \"${mirror_output}\""
-# echo "copy mirror.sh from bastion host"
-# echo "running command: ${cmd}"
-# eval "${cmd}"
-
-# echo "mirror_output:"
-# cat "${mirror_output}"
-######################################################
 
 
 # grep -B 1 -A 10 "kind: ImageContentSourcePolicy" ${mirror_output}
