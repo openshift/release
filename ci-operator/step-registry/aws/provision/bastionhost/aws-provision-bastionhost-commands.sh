@@ -249,6 +249,7 @@ ExecStartPre=/usr/bin/chcon -Rt container_file_t /opt/registry
 
 ExecStart=/usr/bin/podman run   --name poc-registry -p 5000:5000 \
                                 --net host \
+                                --restart always \
                                 -v /opt/registry/data:/var/lib/registry:z \
                                 -v /opt/registry/auth:/auth \
                                 -e "REGISTRY_AUTH=htpasswd" \
