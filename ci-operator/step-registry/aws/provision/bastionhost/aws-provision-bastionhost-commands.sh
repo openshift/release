@@ -31,6 +31,7 @@ if [ "${REGION}" == "us-gov-east-1" ]; then
 fi
 
 ssh_pub_key=$(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")
+ssh_pub_key2=$(<"${CLUSTER_PROFILE_DIR}/qe-ssh-publickey")
 
 workdir=`mktemp -d`
 
@@ -306,7 +307,8 @@ cat > ${workdir}/bastion.ign << EOF
       {
         "name": "core",
         "sshAuthorizedKeys": [
-          "${ssh_pub_key}"
+          "${ssh_pub_key}",
+          "${ssh_pub_key2}"
         ]
       }
     ]
