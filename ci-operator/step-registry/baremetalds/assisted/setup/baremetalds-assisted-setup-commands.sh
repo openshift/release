@@ -12,6 +12,9 @@ source "${SHARED_DIR}/packet-conf.sh"
 
 export CI_CREDENTIALS_DIR=/var/run/assisted-installer-bot
 
+git clone https://github.com/osherdp/assisted-test-infra --branch fix/interactive-skipper
+cd assisted-test-infra/
+
 # Copy assisted source from current directory to the remote server
 tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/assisted.tar.gz"
 
