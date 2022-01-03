@@ -167,6 +167,11 @@ while IFS= read -r i; do
   queue ${ARTIFACT_DIR}/network/iptables-save-$i oc --insecure-skip-tls-verify --request-timeout=20s rsh -n openshift-sdn -c sdn $i iptables-save -c
 done < /tmp/sdn-pods
 
+# Snapshot all used ports on each node.
+while IFS= read -r i; do
+  queue ${ARTIFACT_DIR}/network/ss-$i oc --insecure-skip-tls-verify rsh --request-timeout=20s -n openshift-sdn -c sdn $i ss -apn
+done < /tmp/sdn-pods
+
 while IFS= read -r i; do
   file="$( echo "$i" | cut -d ' ' -f 3 | tr -s ' ' '_' )"
   queue ${ARTIFACT_DIR}/metrics/${file}-heap oc --insecure-skip-tls-verify exec $i -- /bin/bash -c 'oc --insecure-skip-tls-verify get --raw /debug/pprof/heap --server "https://$( hostname ):8443" --config /etc/origin/master/admin.kubeconfig'
