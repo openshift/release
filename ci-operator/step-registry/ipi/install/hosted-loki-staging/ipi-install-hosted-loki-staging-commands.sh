@@ -334,7 +334,7 @@ spec:
         volumeMounts:
           - mountPath: "/tmp/shared"
             name: shared-data
-        image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
+        image: quay.io/openshift/origin-cli:4.6.0
         name: fetch-cluster-data
       serviceAccountName: loki-promtail
       tolerations:
