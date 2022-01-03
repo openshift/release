@@ -72,7 +72,7 @@ make download_cluster_logs
 for kubeconfig in \$(find \${KUBECONFIG} -type f); do
   export KUBECTL="kubectl --kubeconfig=\${kubeconfig}"
   name=\$(basename \${kubeconfig})
-  export LOGS_DEST=/tmp/artifacts/new_cluster_\${name}
+  export LOGS_DEST=/tmp/artifacts/
   make download_service_logs
 done
 
