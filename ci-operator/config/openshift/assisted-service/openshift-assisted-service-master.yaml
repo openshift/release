@@ -688,6 +688,23 @@ tests:
         make deploy_assisted_operator test_kube_api_parallel
       TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
+- as: e2e-assisted-capi-provider-agent-hypershift
+  optional: true
+  run_if_changed: ^(data/.*|internal/.*)$
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        KUBE_API=yes
+        ENABLE_KUBE_API=true
+        MINIKUBE_DISK_SIZE=70g
+        MINIKUBE_RAM_MB=10240
+        TEST=./src/tests/test_kube_api.py
+        TEST_FUNC=test_capi_provider
+        MAKEFILE_TARGET="create_full_environment run deploy_capi_env test"
+      GATHER_CAPI_LOGS: "true"
+      TEST_SUITE: minimal
+    workflow: baremetalds-assisted-install
 zz_generated_metadata:
   branch: master
   org: openshift
