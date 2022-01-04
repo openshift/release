@@ -259,6 +259,7 @@ ExecStart=/usr/bin/podman run   --name poc-registry -p 5000:5000 \
                                 -v /opt/registry/certs:/certs:z \
                                 -e REGISTRY_HTTP_TLS_CERTIFICATE=/certs/domain.crt \
                                 -e REGISTRY_HTTP_TLS_KEY=/certs/domain.key \
+                                -e DEBUG=true \
                                 registry:2
 
 ExecReload=-/usr/bin/podman stop "poc-registry"
