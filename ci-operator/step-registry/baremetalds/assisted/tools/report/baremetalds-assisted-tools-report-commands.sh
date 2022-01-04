@@ -10,7 +10,7 @@ set +e
 IS_REHEARSAL=$(expr "${REPO_OWNER:-}" = "openshift" "&" "${REPO_NAME:-}" = "release")
 set -e
 
-if (( ! ${IS_REHEARSAL} )); then
+if (( ! ${IS_REHEARSAL} )) && [[ ${DRY_RUN} == "false" ]]; then
     export WEBHOOK
     WEBHOOK=$(cat ${CI_CREDENTIALS_DIR}/triage-webhook)
 fi
