@@ -1,0 +1,38 @@
+base_images:
+  os:
+    name: ubi
+    namespace: ocp
+    tag: "8"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.16
+images:
+- dockerfile_path: build/Dockerfile
+  from: os
+  to: ci-artifacts
+promotion:
+  name: master
+  namespace: edge-infrastructure
+resources:
+  '*':
+    limits:
+      memory: 2Gi
+    requests:
+      cpu: 2000m
+      memory: 2Gi
+tests:
+- as: mirror-vcsref-image
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: ci-artifacts
+    env:
+      IMAGE_REPO: ci-artifacts
+    test:
+    - ref: baremetalds-assisted-images-publish
+zz_generated_metadata:
+  branch: master
+  org: rh-ecosystem-edge
+  repo: ci-artifacts
