@@ -16,6 +16,9 @@ if [ ! -f "${SHARED_DIR}/allsubnetids" ]; then
 fi
 
 MIRROR_REGISTRY_HOST=`head -n 1 "${SHARED_DIR}/mirrorregistryhost"`
+
+echo "debug, reset MIRROR_REGISTRY_HOST=ec2-15-205-129-91.us-gov-west-1.compute.amazonaws.com:5000"
+MIRROR_REGISTRY_HOST="ec2-15-205-129-91.us-gov-west-1.compute.amazonaws.com:5000"
 echo "MIRROR_REGISTRY_HOST: $MIRROR_REGISTRY_HOST"
 
 target_release_image="${MIRROR_REGISTRY_HOST}/${RELEASE_IMAGE_LATEST#*/}"
