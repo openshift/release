@@ -1,0 +1,78 @@
+base_images:
+  stolstron_builder_nodejs14-linux:
+    name: builder
+    namespace: stolstron
+    tag: nodejs14-linux
+  repo-brancher:
+    name: repo-brancher
+    namespace: ci
+    tag: latest
+binary_build_commands: make -f Makefile.prow install && make -f Makefile.prow build
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolstron
+    tag: nodejs14-linux
+images:
+- dockerfile_path: Dockerfile.prow
+  inputs:
+    stolstron_builder_nodejs14-linux:
+      as:
+      - registry.ci.openshift.org/stolstron/builder:nodejs14-linux
+  to: console
+promotion:
+  name: "2.5"
+  namespace: stolstron
+resources:
+  '*':
+    requests:
+      cpu: 400m
+      memory: 2Gi
+tests:
+- as: lint-check-unittests-sonarcloud
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow lint
+    make -f Makefile.prow check
+    make -f Makefile.prow unit-tests
+    make -f Makefile.prow sonar/js/prow
+  container:
+    from: bin
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: console
+    workflow: ocm-ci-image-mirror
+- as: latest-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: console
+    env:
+      IMAGE_TAG: latest
+    workflow: ocm-ci-image-mirror
+- as: fast-forward
+  commands: |
+    git clone -b master https://github.com/openshift/release.git /tmp/release
+    repo-brancher \
+        --fast-forward \
+        --confirm \
+        --config-dir=/tmp/release/ci-operator/config/stolstron/console/ \
+        --username=acm-cicd \
+        --token-path=/etc/github/token \
+        --current-promotion-namespace=stolstron \
+        --current-release=2.5 \
+        --future-release=2.5
+  container:
+    from: repo-brancher
+  postsubmit: true
+  secrets:
+  - mount_path: /etc/github
+    name: acm-cicd-github
+zz_generated_metadata:
+  branch: main
+  org: stolstron
+  repo: console

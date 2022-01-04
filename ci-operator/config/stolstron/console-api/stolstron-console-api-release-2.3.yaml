@@ -1,0 +1,64 @@
+base_images:
+  stolstron_builder_nodejs14-linux:
+    name: builder
+    namespace: stolstron
+    tag: nodejs14-linux
+  stolstron_common-nodejs-parent_nodejs-14:
+    name: common-nodejs-parent
+    namespace: stolstron
+    tag: nodejs-14
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolstron
+    tag: nodejs14-linux
+images:
+- dockerfile_path: Dockerfile.prow
+  inputs:
+    stolstron_builder_nodejs14-linux:
+      as:
+      - registry.ci.openshift.org/stolstron/builder:nodejs14-linux
+    stolstron_common-nodejs-parent_nodejs-14:
+      as:
+      - registry.ci.openshift.org/stolstron/common-nodejs-parent:nodejs-14
+  to: console-api
+promotion:
+  name: "2.3"
+  namespace: stolstron
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: console-api
+    env:
+      IMAGE_REPO: console-api
+      REGISTRY_ORG: stolstron
+    workflow: ocm-ci-image-mirror
+- as: unit-tests
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow install
+    make -f Makefile.prow unit-tests
+  container:
+    from: src
+- as: sonarcloud
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow sonar/js/jest-init
+    make -f Makefile.prow unit-tests
+    make -f Makefile.prow sonar/js/prow
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+zz_generated_metadata:
+  branch: release-2.3
+  org: stolstron
+  repo: console-api
