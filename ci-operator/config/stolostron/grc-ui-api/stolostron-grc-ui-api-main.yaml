@@ -1,0 +1,62 @@
+base_images:
+  stolostron_common-nodejs-parent_nodejs-14:
+    name: common-nodejs-parent
+    namespace: stolostron
+    tag: nodejs-14
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: nodejs14-linux
+images:
+- dockerfile_path: Dockerfile
+  inputs:
+    stolostron_common-nodejs-parent_nodejs-14:
+      as:
+      - registry.ci.openshift.org/stolostron/common-nodejs-parent:nodejs-14
+  to: grc-ui-api
+promotion:
+  name: "2.5"
+  namespace: stolostron
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: grc-ui-api
+    env:
+      IMAGE_REPO: grc-ui-api
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: lint-unittest-sonarcloud
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make install
+    make lint
+    make -f Makefile.prow sonar/js/jest-init
+    make unit-test
+    make -f Makefile.prow sonar/js/prow
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+- as: latest-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: grc-ui-api
+    env:
+      IMAGE_REPO: grc-ui-api
+      IMAGE_TAG: latest
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+zz_generated_metadata:
+  branch: main
+  org: stolostron
+  repo: grc-ui-api
