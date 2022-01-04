@@ -17,8 +17,6 @@ fi
 
 MIRROR_REGISTRY_HOST=`head -n 1 "${SHARED_DIR}/mirrorregistryhost"`
 
-echo "debug, reset MIRROR_REGISTRY_HOST=ec2-15-205-129-91.us-gov-west-1.compute.amazonaws.com:5000"
-MIRROR_REGISTRY_HOST="ec2-15-205-129-91.us-gov-west-1.compute.amazonaws.com:5000"
 echo "MIRROR_REGISTRY_HOST: $MIRROR_REGISTRY_HOST"
 
 target_release_image="${MIRROR_REGISTRY_HOST}/${RELEASE_IMAGE_LATEST#*/}"
@@ -46,7 +44,7 @@ echo "readable_version: $readable_version"
 # MIRROR IMAGES
 
 echo "running commad: oc adm release -a /tmp/new-pull-secret mirror --from=${RELEASE_IMAGE_LATEST} --to=${target_release_image_repo} --to-release-image=${target_release_image}"
-oc adm release -a '/tmp/new-pull-secret' mirror --insecure=true --max-per-registry=2 \
+oc adm release -a '/tmp/new-pull-secret' mirror --insecure=true \
  --from=${RELEASE_IMAGE_LATEST} \
  --to=${target_release_image_repo} \
  --to-release-image=${target_release_image} | tee "${mirror_output}"

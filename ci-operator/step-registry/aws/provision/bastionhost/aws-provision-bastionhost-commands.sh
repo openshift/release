@@ -448,3 +448,6 @@ cp "${SHARED_DIR}/proxy_url" "${ARTIFACT_DIR}/"
 cp "${SHARED_DIR}/bastionhoststackname" "${ARTIFACT_DIR}/"
 cp "${SHARED_DIR}/bastionhosts3bucket" "${ARTIFACT_DIR}/"
 cp "${SHARED_DIR}/aws-instance-ids.txt" "${ARTIFACT_DIR}/"
+
+echo "sleeping 5 mins, wait for bastion get ready"
+sleep 300
