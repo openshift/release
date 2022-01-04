@@ -7,6 +7,13 @@ metadata:
     openshift.io/display-name: HyperShift CI
   name: hypershift
 ---
+# service account for pushing images from CI jobs into this namespace
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: ci-image-pusher
+  namespace: hypershift
+---
 # this grants all authenticated users rights to pull images
 kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
@@ -26,3 +33,18 @@ subjects:
 - apiGroup: rbac.authorization.k8s.io
   kind: Group
   name: system:unauthenticated
+---
+# enables the ci-image-pusher SA to push images into this namespace
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ci-image-pusher
+  namespace: hypershift
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: system:image-pusher
+subjects:
+  - kind: ServiceAccount
+    name: ci-image-pusher
+    namespace: hypershift
