@@ -35,7 +35,7 @@ echo
 echo "Running tcpdump:"
 echo
 
-/usr/sbin/tcpdump -i any -s 256 -w '/var/log/tcpdump/tcpdump.pcap' \$tcpdump_filter
+/usr/sbin/tcpdump -nn -U -i any -s 256 -w '/var/log/tcpdump/tcpdump.pcap' \$tcpdump_filter
 EOF
 )
 
