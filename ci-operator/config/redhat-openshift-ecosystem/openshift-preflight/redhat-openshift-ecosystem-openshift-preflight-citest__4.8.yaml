@@ -24,6 +24,7 @@ images:
       gzip \
       iptables \
       findutils \
+      git \
       && dnf clean all
 
     RUN curl -Lo /usr/local/bin/operator-sdk https://github.com/operator-framework/operator-sdk/releases/download/v${OPERATOR_SDK_VERSION}/operator-sdk_linux_${ARCH} \
@@ -73,6 +74,10 @@ tests:
         oc version | tee ${ARTIFACT_DIR}/oc-version.txt
         echo "== operator-sdk version =="
         operator-sdk version | tee ${ARTIFACT_DIR}/operator-sdk-version.txt
+
+        git log --oneline | head > ${ARTIFACT_DIR}/git-log-last-ten.txt
+        git rev-parse HEAD > ${ARTIFACT_DIR}/git-rev-parse-head.txt
+
         make test-e2e
 
         mv artifacts/* ${ARTIFACT_DIR}/
