@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-export PROMTAIL_IMAGE="quay.io/openshift-logging/promtail"
+export PROMTAIL_IMAGE="quay.io/openshift-cr/promtail"
 export PROMTAIL_VERSION="v2.4.1"
 export LOKI_ENDPOINT=https://observatorium.api.stage.openshift.com/api/logs/v1/dptp/loki/api/v1
 
@@ -491,7 +491,9 @@ metadata:
   name: loki-promtail
   namespace: loki
 EOF
-cat >> "${SHARED_DIR}/manifest_metrics.yml" << EOF
+if [ -n "${LOKI_USE_SERVICEMONITOR:-}" ]; then
+  echo "Including Loki servicemonitor manifests (LOKI_USE_SERVICEMONITOR='${LOKI_USE_SERVICEMONITOR}')"
+  cat >> "${SHARED_DIR}/manifest_metrics.yml" << EOF
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
@@ -516,7 +518,7 @@ spec:
       - loki
   selector: {}
 EOF
-cat >> "${SHARED_DIR}/manifest_metrics_role.yml" << EOF
+  cat >> "${SHARED_DIR}/manifest_metrics_role.yml" << EOF
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -534,7 +536,7 @@ rules:
   - list
   - watch
 EOF
-cat >> "${SHARED_DIR}/manifest_metrics_rb.yml" << EOF
+  cat >> "${SHARED_DIR}/manifest_metrics_rb.yml" << EOF
 kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
@@ -549,6 +551,7 @@ subjects:
     name: prometheus-k8s
     namespace: openshift-monitoring
 EOF
+fi
 
 echo "Promtail manifests created, the cluster can be found at https://grafana-loki.ci.openshift.org/explore using '{invoker=\"${OPENSHIFT_INSTALL_INVOKER}\"} | unpack' query. See https://gist.github.com/vrutkovs/ef7cc9bca50f5f49d7eab831e3f082d8 for Loki cheat sheet."
 

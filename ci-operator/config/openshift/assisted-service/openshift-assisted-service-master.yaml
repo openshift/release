@@ -532,6 +532,16 @@ tests:
       IP_STACK: v4v6
       NUM_EXTRA_WORKERS: "1"
     workflow: baremetalds-assisted-operator-ztp
+- as: e2e-metal-assisted-tpmv2
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        DISK_ENCRYPTION_ROLES=all
+        DISK_ENCRYPTION_MODE=tpmv2
+      TEST_SUITE: minimal
+    workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-ipv6
   run_if_changed: ^(data/.*)$
   steps:
@@ -607,6 +617,15 @@ tests:
     env:
       TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
+- as: e2e-metal-assisted-onprem
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        DEPLOY_TARGET=onprem
+      TEST_SUITE: minimal
+    workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-multi-version
   optional: true
   run_if_changed: ^(data/.*)$
@@ -642,10 +661,9 @@ tests:
     cluster_profile: packet-assisted
     env:
       POST_INSTALL_COMMANDS: |
-        export TEST=./discovery-infra/tests/test_kube_api.py
         export TEST_FUNC=test_kube_api_late_binding_ipv4_single_node
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
-        make deploy_assisted_operator test_parallel
+        make deploy_assisted_operator test_kube_api_parallel
       TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-kube-api-late-binding-single-node
@@ -654,10 +672,9 @@ tests:
     cluster_profile: packet-assisted
     env:
       POST_INSTALL_COMMANDS: |
-        export TEST=./discovery-infra/tests/test_kube_api.py
         export TEST_FUNC=test_kube_api_late_binding_ipv4_single_node
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
-        make deploy_assisted_operator test_parallel
+        make deploy_assisted_operator test_kube_api_parallel
       TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
 - as: e2e-metal-assisted-kube-api-late-unbinding-ipv4-single-node
@@ -666,10 +683,26 @@ tests:
     cluster_profile: packet-assisted
     env:
       POST_INSTALL_COMMANDS: |
-        export TEST=./discovery-infra/tests/test_kube_api.py
         export TEST_FUNC=test_kube_api_late_unbinding_ipv4_single_node
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
-        make deploy_assisted_operator test_parallel
+        make deploy_assisted_operator test_kube_api_parallel
+      TEST_SUITE: minimal
+    workflow: baremetalds-assisted-install
+- as: e2e-assisted-capi-provider-agent-hypershift
+  optional: true
+  run_if_changed: ^(data/.*|internal/.*)$
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        KUBE_API=yes
+        ENABLE_KUBE_API=true
+        MINIKUBE_DISK_SIZE=70g
+        MINIKUBE_RAM_MB=10240
+        TEST=./src/tests/test_kube_api.py
+        TEST_FUNC=test_capi_provider
+        MAKEFILE_TARGET="create_full_environment run deploy_capi_env test"
+      GATHER_CAPI_LOGS: "true"
       TEST_SUITE: minimal
     workflow: baremetalds-assisted-install
 zz_generated_metadata:

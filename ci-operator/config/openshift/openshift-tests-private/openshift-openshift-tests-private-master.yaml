@@ -27,8 +27,9 @@ images:
   to: tests-private
 - dockerfile_literal: |
     FROM src
-    RUN curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo | tee /etc/yum.repos.d/yarn.repo && \
-        PACKAGES="openssh-clients httpd-tools nodejs yarn" && \
+    RUN curl --silent --location https://rpm.nodesource.com/setup_lts.x | bash - && \
+        curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo | tee /etc/yum.repos.d/yarn.repo && \
+        PACKAGES="openssh-clients httpd-tools nodejs yarn xorg-x11-server-Xvfb gtk2-devel gtk3-devel libnotify-devel GConf2 nss libXScrnSaver alsa-lib" && \
         yum install --setopt=tsflags=nodocs -y $PACKAGES && \
         yum clean all && rm -rf /var/cache/yum/*
   from: src
@@ -94,6 +95,22 @@ tests:
           cpu: "2"
           memory: 600Mi
     workflow: ipi-aws
+- as: e2e-console
+  optional: true
+  run_if_changed: frontend/
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    test:
+    - as: console-test
+      cli: latest
+      commands: cd frontend;./console-test-frontend.sh
+      from: tests-private-ui
+      resources:
+        requests:
+          cpu: "2"
+          memory: 600Mi
+      timeout: 1h0m0s
+    workflow: ipi-gcp
 - as: sanity
   cron: 0 */24 * * *
   steps:

@@ -2395,6 +2395,11 @@ periodics:
       - name: NAMESPACE
       - name: UNRESOLVED_CONFIG
         value: |
+          base_images:
+            openstack-installer:
+              name: "$(BRANCH)"
+              namespace: ocp
+              tag: openstack-installer
           resources:
             '*':
               limits:
@@ -2411,6 +2416,14 @@ periodics:
               workflow: openshift-e2e-$(CLUSTER_TYPE)-ipi
               test:
               - ref: clusterbot-wait
+          - as: launch-nfv
+            steps:
+              cluster_profile: openstack-nfv
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-nfv
           - as: launch-ovn
             steps:
               cluster_profile: openstack-vh-mecha-central
@@ -2420,6 +2433,14 @@ periodics:
               test:
               - ref: clusterbot-wait
               workflow: openshift-e2e-$(CLUSTER_TYPE)-ipi
+          - as: launch-proxy
+            steps:
+              cluster_profile: openstack-vh-mecha-central
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-proxy
           - as: launch-techpreview
             steps:
               cluster_profile: $(CLUSTER_TYPE)
