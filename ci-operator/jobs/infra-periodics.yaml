@@ -875,47 +875,6 @@ periodics:
         secretName: github-credentials-openshift-bot
 - agent: kubernetes
   cluster: app.ci
-  cron: '@yearly'
-  decorate: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: release
-  - base_ref: openshift-4.10
-    org: openshift
-    repo: ocp-build-data
-  labels:
-    ci.openshift.io/role: infra
-  name: periodic-ci-operator-yaml-creator
-  spec:
-    containers:
-    - args:
-      - --github-token-path=/etc/github/oauth
-      - --github-endpoint=http://ghproxy
-      - --github-endpoint=https://api.github.com
-      - --github-graphql-endpoint=http://ghproxy/graphql
-      - --ci-operator-config-dir=./ci-operator/config
-      - --create-prs=true
-      - --push-ceiling=0
-      - --self-approve=true
-      command:
-      - /usr/bin/ci-operator-yaml-creator
-      image: registry.ci.openshift.org/ci/ci-operator-yaml-creator:latest
-      imagePullPolicy: Always
-      name: ci-operator-yaml-creator
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /etc/github
-        name: token
-        readOnly: true
-    volumes:
-    - name: token
-      secret:
-        secretName: github-credentials-openshift-ci-robot
-- agent: kubernetes
-  cluster: app.ci
   cron: 30 7 * * 1
   decorate: true
   extra_refs:
