@@ -40,7 +40,7 @@ EOF
 )
 
 # Base64 encode the script for use in the MachineConfig.
-b64_script=$(echo $sysd_script | base64 -w 0)
+b64_script=$(echo "$sysd_script" | base64 -w 0)
 
 # Create the MachineConfig manifest with embedded b64 encoded systemd script, and the two
 # systemd units to (a) install tcpdump, and (b) run the script.
