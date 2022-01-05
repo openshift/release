@@ -95,9 +95,9 @@ export OSCI_COMPONENT_NAME=${OSCI_COMPONENT_NAME:-$REPO_NAME}
 log "INFO OSCI_COMPONENT_NAME is ${OSCI_COMPONENT_NAME}."
 
 # Set defaults for OCM pipeline and repo if not set.
-export OSCI_PIPELINE_ORG=${OSCI_PIPELINE_ORG:-open-cluster-management}
-export OSCI_IMAGE_REMOTE_REPO=${OSCI_IMAGE_REMOTE_REPO:-quay.io/open-cluster-management}
-export OSCI_IMAGE_REMOTE_REPO_SRC=${OSCI_IMAGE_REMOTE_REPO_SRC:-registry.ci.openshift.org/open-cluster-management}
+export OSCI_PIPELINE_ORG=${OSCI_PIPELINE_ORG:-stolostron}
+export OSCI_IMAGE_REMOTE_REPO=${OSCI_IMAGE_REMOTE_REPO:-quay.io/stolostron}
+export OSCI_IMAGE_REMOTE_REPO_SRC=${OSCI_IMAGE_REMOTE_REPO_SRC:-registry.ci.openshift.org/stolostron}
 
 # Debug information
 echo "INFO OSCI Environment variables are set to: "
