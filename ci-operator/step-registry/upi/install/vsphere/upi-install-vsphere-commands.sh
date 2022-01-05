@@ -141,6 +141,16 @@ if proxy_info="$(cat install-config.yaml | grep -oP 'httpProxy\s*:\s*\K.*')" ; t
   sed -i "/TimeoutStartSec=0/a Environment=HTTPS_PROXY=${proxy_info}" ./lb/haproxy.service
 fi
 
+# update haproxy image of haproxy.service on lb server if deploying cluster in a disconnected network
+if [ -f ${SHARED_DIR}/haproxy-router-image ]; then
+  echo "$(date -u --rfc-3339=seconds) - replace haproxy image with one in private registry on lb server"
+  tgt_haproxy_image=$(head -1 "${SHARED_DIR}/haproxy-router-image")
+  registry_auths=$(tail -1 "${SHARED_DIR}/haproxy-router-image")
+  src_haproxy_image=$(grep "podman pull" ./lb/haproxy.service | awk -F' ' '{print $3}')
+  sed -i "s#${src_haproxy_image}#${tgt_haproxy_image}#" ./lb/haproxy.service
+  sed -i "s#/bin/podman pull #/bin/podman pull --creds=${registry_auths} --tls-verify=false #" ./lb/haproxy.service
+fi
+
 date +%s > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
 echo "$(date -u --rfc-3339=seconds) - terraform init..."

@@ -46,12 +46,18 @@ sos report --batch --tmp-dir /tmp/artifacts \
 # TODO: remove when https://github.com/sosreport/sos/pull/2594 is available
 cp -v -r /var/lib/libvirt/dnsmasq /tmp/artifacts/libvirt-dnsmasq
 
+cp -v -r /var/log/swtpm/libvirt/qemu /tmp/artifacts/libvirt-qemu || true
+ls -ltr /var/lib/swtpm-localca/ >> /tmp/artifacts/libvirt-qemu/ls-swtpm-localca.txt || true
+
 # Get assisted logs
 if [ -f "\${HOME}/.kube/config" ]; then
   export LOGS_DEST=/tmp/artifacts
   export KUBECTL="kubectl --kubeconfig=\${HOME}/.kube/config"
 
   make download_service_logs
+  if [ "${GATHER_CAPI_LOGS}" == "true" ]; then
+    make download_capi_logs
+  fi
 fi
 
 export ADDITIONAL_PARAMS=""
@@ -72,5 +78,7 @@ for kubeconfig in \$(find \${KUBECONFIG} -type f); do
   export LOGS_DEST=/tmp/artifacts/new_cluster_\${name}
   make download_service_logs
 done
+
+
 
 EOF
