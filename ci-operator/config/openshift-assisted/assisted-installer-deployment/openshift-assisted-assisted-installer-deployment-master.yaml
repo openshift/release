@@ -45,18 +45,30 @@ tests:
   steps:
     test:
     - ref: baremetalds-assisted-tools-bump-ocp
+- as: ci-status-report-dry-run
+  run_if_changed: tools/ci_status_report.py
+  steps:
+    env:
+      DRY_RUN: "true"
+    test:
+    - ref: baremetalds-assisted-tools-ci-report
+- as: ci-status-report
+  cron: 0 7 * * 0-5
+  steps:
+    test:
+    - ref: baremetalds-assisted-tools-ci-report
 - as: triage-status-report-dry-run
   run_if_changed: tools/triage_status_report.py
   steps:
     env:
       DRY_RUN: "true"
     test:
-    - ref: baremetalds-assisted-tools-report
+    - ref: baremetalds-assisted-tools-triage-report
 - as: triage-status-report
   cron: 0 7 * * 0-5
   steps:
     test:
-    - ref: baremetalds-assisted-tools-report
+    - ref: baremetalds-assisted-tools-triage-report
 zz_generated_metadata:
   branch: master
   org: openshift-assisted
