@@ -43,6 +43,7 @@ def get_kubeconfig_volumes(context, namespace=None):
         suffix = f'-{namespace}'
 
     return [
+        *_get_dynamic_deployment_volumes(context),
         {
             'name': 'release-controller-kubeconfigs',
             'secret': {
@@ -98,7 +99,6 @@ def get_rc_volumes(context, namespace=None):
                 ]
             }
         },
-        *_get_dynamic_deployment_volumes(context),
         {
             'name': 'oauth',
             'secret': {
