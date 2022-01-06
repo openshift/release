@@ -13,12 +13,14 @@ sysd_script=$(cat << EOF
 
 set -e
 
-# Build up a tcpdump filter for all quay.io IPs. These change seemingly daily
-# so by doing the lookup before we launch we increase our chances of dumping
-# the packets we're after.
-quay_lines=\$(dig quay.io | grep "^quay.io\." | awk '{print \$5}')
+# Build up a tcpdump filter for all quay.io and registry.ci IPs.
+# quay.io IPs change often so by doing the lookup before we launch
+# we increase our chances of dumping the packets we're after.
+# Use grep to filter out CNAME responses and get only the A records.
+registry_ip_lines=\$(dig +short quay.io registry.ci.openshift.org | grep -v "\.$")
+
 tcpdump_filter=""
-for i in \$quay_lines
+for i in \$registry_ip_lines
 do
     if [ -z "\$tcpdump_filter" ]
     then
@@ -27,8 +29,8 @@ do
         tcpdump_filter+=" or host \$i"
     fi
 done
-# Add in registry.ci.openshift.org IPs as of 2021-12-22 and close the filter:
-tcpdump_filter+=" or host 3.210.253.73 or host 3.234.78.82)"
+# Close our tcpdump filter brace:
+tcpdump_filter+=")"
 
 echo "tcpdump filter: \$tcpdump_filter"
 echo
