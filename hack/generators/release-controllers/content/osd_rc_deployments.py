@@ -1,5 +1,5 @@
 
-from content.utils import get_rc_volumes, get_rc_volume_mounts
+from content.utils import get_rc_volumes, get_rc_volume_mounts, get_kubeconfig_volumes, get_kubeconfig_volume_mounts
 
 
 def _add_osd_rc_bootstrap(gendoc):
@@ -60,6 +60,25 @@ def _add_osd_rc_route(gendoc):
             }
         }
     })
+    gendoc.append({
+        'apiVersion': 'route.openshift.io/v1',
+        'kind': 'Route',
+        'metadata': {
+            'name': context.rc_temp_route_name,
+            'namespace': context.config.rc_deployment_namespace,
+        },
+        'spec': {
+            'host': f'{context.rc_temp_app_url}',
+            'tls': {
+                'insecureEdgeTerminationPolicy': 'Redirect',
+                'termination': 'Reencrypt' if context.private else 'Edge'
+            },
+            'to': {
+                'kind': 'Service',
+                'name': context.rc_api_service_name,
+            }
+        }
+    })
 
 
 def _add_osd_rc_service(gendoc):
@@ -91,6 +110,28 @@ def _add_osd_rc_service(gendoc):
             }
         }
     })
+    gendoc.append({
+        'apiVersion': 'v1',
+        'kind': 'Service',
+        'metadata': {
+            'name': context.rc_api_service_name,
+            'namespace': context.config.rc_deployment_namespace,
+            'annotations': annotations,
+            'labels': {
+                'app': context.rc_api_service_name
+            }
+        },
+        'spec': {
+            'ports': [{
+                'name': 'main',
+                'port': 443 if context.private else 80,
+                'targetPort': 8443 if context.private else 8080
+            }],
+            'selector': {
+                'app': context.rc_api_service_name
+            }
+        }
+    })
 
 
 def _add_osd_rc_servicemonitor(gendoc):
@@ -117,6 +158,30 @@ def _add_osd_rc_servicemonitor(gendoc):
             'selector': {
                 'matchLabels': {
                     'app': context.rc_service_name,
+                }
+            }
+        }
+    })
+    gendoc.append({
+        'apiVersion': 'monitoring.coreos.com/v1',
+        'kind': 'ServiceMonitor',
+        'metadata': {
+            'name': context.rc_api_service_name,
+            'namespace': 'prow-monitoring',
+            'annotations': annotations,
+        },
+        'spec': {
+            'endpoints': [{
+                'interval': '30s',
+                'port': 'main',
+                'scheme': 'http',
+            }],
+            'namespaceSelector': {
+                'matchNames': ['ci'],
+            },
+            'selector': {
+                'matchLabels': {
+                    'app': context.rc_api_service_name,
                 }
             }
         }
@@ -244,6 +309,59 @@ def _add_osd_rc_deployment(gendoc):
                         }],
                     'serviceAccountName': f'release-controller-{context.is_namespace}',
                     'volumes': get_rc_volumes(context, context.is_namespace)
+                }
+            }
+        }
+    })
+    gendoc.append({
+        'apiVersion': 'apps/v1',
+        'kind': 'Deployment',
+        'metadata': {
+            'annotations': {
+                'image.openshift.io/triggers': '[{"from":{"kind":"ImageStreamTag","name":"release-controller-api:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\\"controller\\")].image"}]'
+            },
+            'name': f'release-controller-api-{context.is_namespace}',
+            'namespace': context.config.rc_deployment_namespace,
+        },
+        'spec': {
+            'replicas': 3,
+            'selector': {
+                'matchLabels': {
+                    'app': context.rc_api_service_name
+                }
+            },
+            'template': {
+                'metadata': {
+                    'labels': {
+                        'app': context.rc_api_service_name
+                    }
+                },
+                'spec': {
+                    'containers': [
+                        *_get_osd_rc_deployment_sidecars(context),
+                        {
+                            "resources": {
+                                "requests": {
+                                    "memory": "2Gi"
+                                },
+                            },
+                            'command': ['/usr/bin/release-controller-api',
+                                        # '--to=release',  # Removed according to release controller help
+                                        f'--release-namespace={context.is_namespace}',
+                                        f'--artifacts={context.fc_app_url}',
+                                        '--listen=' + ('127.0.0.1:8080' if context.private else ':8080'),
+                                        '--non-prow-job-kubeconfig=/etc/kubeconfig/kubeconfig',
+                                        f'--job-namespace={context.jobs_namespace}',
+                                        '--tools-image-stream-tag=release-controller-bootstrap:tests',
+                                        f'--release-architecture={context.get_supported_architecture_name()}',
+                                        '-v=6',
+                                        '--authentication-message=Pulling these images requires <a href="https://docs.ci.openshift.org/docs/how-tos/use-registries-in-build-farm/">authenticating to the app.ci cluster</a>.'],
+                            'image': 'release-controller-api:latest',
+                            'name': 'controller',
+                            'volumeMounts': get_kubeconfig_volume_mounts()
+                        }],
+                    'serviceAccountName': f'release-controller-{context.is_namespace}',
+                    'volumes': get_kubeconfig_volumes(context, context.is_namespace)
                 }
             }
         }
