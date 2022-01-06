@@ -350,6 +350,7 @@ def _add_osd_rc_deployment(gendoc):
                                         f'--release-namespace={context.is_namespace}',
                                         f'--artifacts={context.fc_app_url}',
                                         '--listen=' + ('127.0.0.1:8080' if context.private else ':8080'),
+                                        f'--prow-namespace={context.config.rc_deployment_namespace}',
                                         '--non-prow-job-kubeconfig=/etc/kubeconfig/kubeconfig',
                                         f'--job-namespace={context.jobs_namespace}',
                                         '--tools-image-stream-tag=release-controller-bootstrap:tests',
