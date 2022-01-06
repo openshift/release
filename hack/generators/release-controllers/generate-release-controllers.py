@@ -108,19 +108,14 @@ class Context:
         self.rc_service_name = f'release-controller-{self.is_namespace}'
         self.rc_api_service_name = f'release-controller-api-{self.is_namespace}'
         self.rc_route_name = self.rc_service_name
-        self.rc_temp_route_name = self.rc_api_service_name
 
         # Routes on the api.ci cluster
-        # release-controller
-        self.rc_api_url = f'{self.rc_hostname}.{self.config.rc_release_domain}'
-        self.rc_temp_api_url = f'{self.rc_temp_hostname}.{self.config.rc_release_domain}'
         # files-cache
         self.fc_api_url = f'{self.hostname_artifacts}.{self.config.rc_release_domain}'
 
         # Routes on the app.ci cluster
         # release-controller
         self.rc_app_url = f'{self.rc_hostname}.{self.config.rc_deployment_domain}'
-        self.rc_temp_app_url = f'{self.rc_temp_hostname}.{self.config.rc_deployment_domain}'
         # files-cache
         self.fc_app_url = f'{self.hostname_artifacts}.{self.config.rc_deployment_domain}'
 

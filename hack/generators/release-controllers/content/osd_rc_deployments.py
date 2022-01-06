@@ -56,25 +56,6 @@ def _add_osd_rc_route(gendoc):
             },
             'to': {
                 'kind': 'Service',
-                'name': context.rc_service_name,
-            }
-        }
-    })
-    gendoc.append({
-        'apiVersion': 'route.openshift.io/v1',
-        'kind': 'Route',
-        'metadata': {
-            'name': context.rc_temp_route_name,
-            'namespace': context.config.rc_deployment_namespace,
-        },
-        'spec': {
-            'host': f'{context.rc_temp_app_url}',
-            'tls': {
-                'insecureEdgeTerminationPolicy': 'Redirect',
-                'termination': 'Reencrypt' if context.private else 'Edge'
-            },
-            'to': {
-                'kind': 'Service',
                 'name': context.rc_api_service_name,
             }
         }
