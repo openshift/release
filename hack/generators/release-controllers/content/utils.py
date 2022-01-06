@@ -1,4 +1,13 @@
 
+def get_kubeconfig_volume_mounts():
+    return [
+        {
+            'mountPath': '/etc/kubeconfig',
+            'name': 'release-controller-kubeconfigs',
+            'readOnly': True
+        }]
+
+
 def get_rc_volume_mounts():
     return [
         {
@@ -9,11 +18,6 @@ def get_rc_volume_mounts():
         {
             'mountPath': '/etc/job-config',
             'name': 'job-config',
-            'readOnly': True
-        },
-        {
-            'mountPath': '/etc/kubeconfig',
-            'name': 'release-controller-kubeconfigs',
             'readOnly': True
         },
         {
@@ -30,14 +34,30 @@ def get_rc_volume_mounts():
             'mountPath': '/etc/plugins',
             'name': 'plugins',
             'readOnly': True
-        }]
+        }] + get_kubeconfig_volume_mounts()
 
 
-def get_rc_volumes(context, namespace=None):
+def get_kubeconfig_volumes(context, namespace=None):
     suffix = ''
     if namespace is not None and len(namespace) > 0:
         suffix = f'-{namespace}'
 
+    return [
+        *_get_dynamic_deployment_volumes(context),
+        {
+            'name': 'release-controller-kubeconfigs',
+            'secret': {
+                'defaultMode': 420,
+                'items': [{
+                    'key': f'sa.release-controller{suffix}.app.ci.config',
+                    'path': 'kubeconfig'
+                }],
+                'secretName': 'release-controller-kubeconfigs'
+            }
+        }]
+
+
+def get_rc_volumes(context, namespace=None):
     return [
         {
             'configMap': {
@@ -79,18 +99,6 @@ def get_rc_volumes(context, namespace=None):
                 ]
             }
         },
-        *_get_dynamic_deployment_volumes(context),
-        {
-            'name': 'release-controller-kubeconfigs',
-            'secret': {
-                'defaultMode': 420,
-                'items': [{
-                    'key': f'sa.release-controller{suffix}.app.ci.config',
-                    'path': 'kubeconfig'
-                }],
-                'secretName': 'release-controller-kubeconfigs'
-            }
-        },
         {
             'name': 'oauth',
             'secret': {
@@ -111,7 +119,7 @@ def get_rc_volumes(context, namespace=None):
                 'name': 'plugins'
             },
             'name': 'plugins'
-        }]
+        }] + get_kubeconfig_volumes(context, namespace)
 
 
 def _get_dynamic_deployment_volumes(context):
