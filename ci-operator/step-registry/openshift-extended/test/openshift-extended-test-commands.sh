@@ -135,11 +135,11 @@ function run {
 
     set -x
     if [ "W${TEST_PROVIDER}W" == "WnoneW" ]; then
-        extended-platform-tests run --max-parallel-tests 4 \
+        extended-platform-tests run --max-parallel-tests ${TEST_PARALLEL} \
         -o "${ARTIFACT_DIR}/extended.log" \
         --timeout "${TEST_TIMEOUT}m" --junit-dir="${ARTIFACT_DIR}/junit" -f ./case_selected
     else
-        extended-platform-tests run --max-parallel-tests 4 \
+        extended-platform-tests run --max-parallel-tests ${TEST_PARALLEL} \
         --provider "${TEST_PROVIDER}" -o "${ARTIFACT_DIR}/extended.log" \
         --timeout "${TEST_TIMEOUT}m" --junit-dir="${ARTIFACT_DIR}/junit" -f ./case_selected
     fi
