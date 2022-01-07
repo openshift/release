@@ -300,7 +300,7 @@ spec:
         - --cookie-secret-file=/etc/tls/cookie-secret/cookie-secret
         - '--openshift-sar={"resource": "namespaces", "verb": "get"}'
         - '--openshift-delegate-urls={"/": {"resource": "namespaces", "verb": "get"}}'
-        image: quay.io/openshift/origin-oauth-proxy:4.7
+        image: registry.redhat.io/openshift4/ose-oauth-proxy:latest
         imagePullPolicy: IfNotPresent
         name: oauth-proxy
         ports:
