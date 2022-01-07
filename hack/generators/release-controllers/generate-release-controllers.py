@@ -101,6 +101,7 @@ class Context:
         self.rc_temp_hostname = f'openshift-release{self.suffix}-temp'
         self.hostname_artifacts = f'openshift-release-artifacts{self.suffix}'
         self.secret_name_tls = f'release-controller{self.suffix}-tls'
+        self.secret_name_tls_api = f'release-controller-api{self.suffix}-tls'
         self.is_namespace = f'ocp{self.suffix}'
         self.rc_serviceaccount_name = f'release-controller-{self.is_namespace}'
         self.rc_api_serviceaccount_name = f'release-controller-api-{self.is_namespace}'
