@@ -232,7 +232,20 @@ spec:
         - --verify-bugzilla
         - --authentication-message=Pulling these images requires <a href="https://docs.ci.openshift.org/docs/how-tos/use-registries-in-build-farm/">authenticating to the app.ci cluster</a>.
         image: release-controller:latest
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 3
+          periodSeconds: 3
         name: controller
+        readinessProbe:
+          httpGet:
+            path: /healthz/ready
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 3
+          timeoutSeconds: 600
         resources:
           requests:
             memory: 2Gi
