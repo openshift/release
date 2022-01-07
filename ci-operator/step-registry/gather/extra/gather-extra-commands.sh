@@ -137,6 +137,30 @@ for path in "${paths[@]}" ; do
   done < ${output_dir}.audit_logs_listing
 done
 
+
+echo "INFO: gathering quay tcpdump packet headers if present"
+output_dir="${ARTIFACT_DIR}/tcpdump/"
+mkdir -p "$output_dir"
+
+# Skip downloading of .terminating and .lock files.
+oc adm node-logs --role=worker --path="/tcpdump" | \
+grep -v ".terminating" | \
+grep -v ".lock" | \
+tee "${output_dir}.tcpdump_listing"
+
+cat "${output_dir}.tcpdump_listing"
+
+# The ${output_dir}.tcpdump_listing file contains lines with the node and filename
+# separated by a space.
+while IFS= read -r item; do
+node=$(echo $item |cut -d ' ' -f 1)
+fname=$(echo $item |cut -d ' ' -f 2)
+echo "INFO: Queueing download/gzip of /tcpdump/${fname} from ${node}";
+echo "INFO:   gziping to ${output_dir}/${node}-${fname}.gz";
+FILTER=gzip queue ${output_dir}/${node}-${fname}.gz oc --insecure-skip-tls-verify adm node-logs ${node} --path=/tcpdump/${fname}
+done < ${output_dir}.tcpdump_listing
+
+
 # Snapshot iptables-save on each node for debugging possible kube-proxy issues
 oc --insecure-skip-tls-verify get --request-timeout=20s -n openshift-sdn -l app=sdn pods --template '{{ range .items }}{{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/sdn-pods
 while IFS= read -r i; do
