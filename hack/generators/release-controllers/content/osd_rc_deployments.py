@@ -64,10 +64,12 @@ def _add_osd_rc_route(gendoc):
 
 def _add_osd_rc_service(gendoc):
     annotations = {}
+    annotationsAPI = {}
     context = gendoc.context
 
     if context.private:
         annotations['service.alpha.openshift.io/serving-cert-secret-name'] = context.secret_name_tls
+        annotationsAPI['service.alpha.openshift.io/serving-cert-secret-name'] = context.secret_name_tls_api
 
     gendoc.append({
         'apiVersion': 'v1',
@@ -97,7 +99,7 @@ def _add_osd_rc_service(gendoc):
         'metadata': {
             'name': context.rc_api_service_name,
             'namespace': context.config.rc_deployment_namespace,
-            'annotations': annotations,
+            'annotations': annotationsAPI,
             'labels': {
                 'app': context.rc_api_service_name
             }
