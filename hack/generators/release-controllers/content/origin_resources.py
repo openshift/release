@@ -135,7 +135,24 @@ def _add_origin_resources(gendoc):
                                 ],
                                 "image": "release-controller:latest",
                                 "name": "controller",
-                                "volumeMounts": get_rc_volume_mounts()
+                                "volumeMounts": get_rc_volume_mounts(),
+                                'livenessProbe': {
+                                    'httpGet': {
+                                    'path': '/healthz',
+                                    'port': 8081
+                                    },
+                                    'initialDelaySeconds': 3,
+                                    'periodSeconds': 3,
+                                },
+                                'readinessProbe': {
+                                    'httpGet': {
+                                    'path': '/healthz/ready',
+                                    'port': 8081
+                                    },
+                                    'initialDelaySeconds': 10,
+                                    'periodSeconds': 3,
+                                    'timeoutSeconds': 600,
+                                },
                             }
                         ],
                         "serviceAccountName": "release-controller",
@@ -181,7 +198,24 @@ def _add_origin_resources(gendoc):
                                 ],
                                 "image": "release-controller-api:latest",
                                 "name": "controller",
-                                "volumeMounts": get_kubeconfig_volume_mounts()
+                                "volumeMounts": get_kubeconfig_volume_mounts(),
+                                'livenessProbe': {
+                                    'httpGet': {
+                                    'path': '/healthz',
+                                    'port': 8081
+                                    },
+                                    'initialDelaySeconds': 3,
+                                    'periodSeconds': 3,
+                                },
+                                'readinessProbe': {
+                                    'httpGet': {
+                                    'path': '/healthz/ready',
+                                    'port': 8081
+                                    },
+                                    'initialDelaySeconds': 10,
+                                    'periodSeconds': 3,
+                                    'timeoutSeconds': 600,
+                                },
                             }
                         ],
                         "serviceAccountName": "release-controller",

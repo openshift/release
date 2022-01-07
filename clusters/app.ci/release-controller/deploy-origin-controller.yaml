@@ -89,7 +89,20 @@ spec:
         - --release-architecture=amd64
         - -v=4
         image: release-controller:latest
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 3
+          periodSeconds: 3
         name: controller
+        readinessProbe:
+          httpGet:
+            path: /healthz/ready
+            port: 8081
+          initialDelaySeconds: 10
+          periodSeconds: 3
+          timeoutSeconds: 600
         volumeMounts:
         - mountPath: /etc/config
           name: config
@@ -200,7 +213,20 @@ spec:
         - --release-architecture=amd64
         - -v=4
         image: release-controller-api:latest
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 3
+          periodSeconds: 3
         name: controller
+        readinessProbe:
+          httpGet:
+            path: /healthz/ready
+            port: 8081
+          initialDelaySeconds: 10
+          periodSeconds: 3
+          timeoutSeconds: 600
         volumeMounts:
         - mountPath: /etc/kubeconfig
           name: release-controller-kubeconfigs
