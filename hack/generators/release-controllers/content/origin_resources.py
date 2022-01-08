@@ -138,16 +138,16 @@ def _add_origin_resources(gendoc):
                                 "volumeMounts": get_rc_volume_mounts(),
                                 'livenessProbe': {
                                     'httpGet': {
-                                    'path': '/healthz',
-                                    'port': 8081
+                                        'path': '/healthz',
+                                        'port': 8081
                                     },
                                     'initialDelaySeconds': 3,
                                     'periodSeconds': 3,
                                 },
                                 'readinessProbe': {
                                     'httpGet': {
-                                    'path': '/healthz/ready',
-                                    'port': 8081
+                                        'path': '/healthz/ready',
+                                        'port': 8081
                                     },
                                     'initialDelaySeconds': 10,
                                     'periodSeconds': 3,
@@ -201,16 +201,16 @@ def _add_origin_resources(gendoc):
                                 "volumeMounts": get_kubeconfig_volume_mounts(),
                                 'livenessProbe': {
                                     'httpGet': {
-                                    'path': '/healthz',
-                                    'port': 8081
+                                        'path': '/healthz',
+                                        'port': 8081
                                     },
                                     'initialDelaySeconds': 3,
                                     'periodSeconds': 3,
                                 },
                                 'readinessProbe': {
                                     'httpGet': {
-                                    'path': '/healthz/ready',
-                                    'port': 8081
+                                        'path': '/healthz/ready',
+                                        'port': 8081
                                     },
                                     'initialDelaySeconds': 10,
                                     'periodSeconds': 3,
@@ -219,7 +219,7 @@ def _add_origin_resources(gendoc):
                             }
                         ],
                         "serviceAccountName": "release-controller",
-                        "volumes": get_kubeconfig_volumes(context, None)
+                        "volumes": get_kubeconfig_volumes(context, namespace=None, secret_name=context.secret_name_tls_api)
                     }
                 }
             }

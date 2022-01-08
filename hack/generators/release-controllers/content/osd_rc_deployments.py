@@ -313,6 +313,7 @@ def _add_osd_rc_deployment(gendoc):
             }
         }
     })
+
     gendoc.append({
         'apiVersion': 'apps/v1',
         'kind': 'Deployment',
@@ -379,7 +380,7 @@ def _add_osd_rc_deployment(gendoc):
                             },
                         }],
                     'serviceAccountName': f'release-controller-{context.is_namespace}',
-                    'volumes': get_kubeconfig_volumes(context, context.is_namespace)
+                    'volumes': get_kubeconfig_volumes(context, namespace=context.is_namespace, secret_name=context.secret_name_tls_api)
                 }
             }
         }
