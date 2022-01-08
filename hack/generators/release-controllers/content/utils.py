@@ -37,13 +37,16 @@ def get_rc_volume_mounts():
         }] + get_kubeconfig_volume_mounts()
 
 
-def get_kubeconfig_volumes(context, namespace=None):
+def get_kubeconfig_volumes(context, namespace=None, secret_name=None):
     suffix = ''
     if namespace is not None and len(namespace) > 0:
         suffix = f'-{namespace}'
 
+    if secret_name is None:
+        secret_name = context.secret_name_tls
+
     return [
-        *_get_dynamic_deployment_volumes(context),
+        *_get_dynamic_deployment_volumes(context, secret_name),
         {
             'name': 'release-controller-kubeconfigs',
             'secret': {
@@ -119,17 +122,17 @@ def get_rc_volumes(context, namespace=None):
                 'name': 'plugins'
             },
             'name': 'plugins'
-        }] + get_kubeconfig_volumes(context, namespace)
+        }] + get_kubeconfig_volumes(context, namespace=namespace, secret_name=context.secret_name_tls)
 
 
-def _get_dynamic_deployment_volumes(context):
+def _get_dynamic_deployment_volumes(context, secret_name):
     prow_volumes = []
 
     if context.private:
         prow_volumes.append({
             'name': 'internal-tls',
             'secret': {
-                'secretName': context.secret_name_tls,
+                'secretName': secret_name,
             }
         })
         prow_volumes.append({
