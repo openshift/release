@@ -9,12 +9,6 @@ build_root:
     namespace: openshift
     tag: golang-1.16
 images:
-- dockerfile_path: Dockerfile.build
-  inputs:
-    coreos_centos_stream8:
-      as:
-      - quay.io/centos/centos:stream8
-  to: assisted-installer-deployment-build
 - dockerfile_path: Dockerfile.assisted-installer-deployment
   inputs:
     coreos_centos_stream8:
@@ -32,13 +26,11 @@ tests:
 - as: lint
   commands: make lint
   container:
-    clone: true
-    from: assisted-installer-deployment-build
+    from: assisted-installer-deployment
 - as: lint-post-submit
   commands: make lint
   container:
-    clone: true
-    from: assisted-installer-deployment-build
+    from: assisted-installer-deployment
   postsubmit: true
 - as: bump-ocp
   cron: 0 7 * * 0-5
