@@ -540,8 +540,7 @@ tests:
       ASSISTED_CONFIG: |
         DISK_ENCRYPTION_ROLES=all
         DISK_ENCRYPTION_MODE=tpmv2
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-ipv6
   run_if_changed: ^(data/.*)$
   steps:
@@ -550,8 +549,7 @@ tests:
       ASSISTED_CONFIG: |
         IPv6=yes
         IPv4=no
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-ipv4v6
   optional: true
   run_if_changed: ^(data/.*)$
@@ -561,8 +559,7 @@ tests:
       ASSISTED_CONFIG: |
         IPv6=yes
         IPv4=yes
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-none
   optional: true
   steps:
@@ -570,8 +567,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         PLATFORM=none
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-single-node
   optional: true
   run_if_changed: ^(data/.*)$
@@ -580,8 +576,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-networking
   optional: true
   run_if_changed: ^(data/.*)$
@@ -590,8 +585,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         TEST_FUNC=test_networking
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-kube-api
   run_if_changed: ^(cmd/.*|data/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
@@ -608,15 +602,12 @@ tests:
         KUBE_API=yes
         ENABLE_KUBE_API=true
         MAKEFILE_TARGET=all
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted
   run_if_changed: ^(cmd/.*|data/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     cluster_profile: packet-assisted
-    env:
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-onprem
   optional: true
   steps:
@@ -624,8 +615,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         DEPLOY_TARGET=onprem
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-multi-version
   optional: true
   run_if_changed: ^(data/.*)$
@@ -634,8 +624,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=""
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-olm
   run_if_changed: ^(data/.*|internal/operators/.*)$
   steps:
@@ -643,8 +632,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         TEST_FUNC=test_olm_operator
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-day2
   optional: true
   run_if_changed: ^(data/.*)$
@@ -653,8 +641,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         TEST_FUNC=test_deploy_day2_nodes_cloud
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-kube-api-late-binding-single-node-periodic
   cron: '@daily'
   steps:
@@ -664,8 +651,8 @@ tests:
         export TEST_FUNC=test_kube_api_late_binding_ipv4_single_node
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
         make deploy_assisted_operator test_kube_api_parallel
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+      TEST_SUITE: full
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-kube-api-late-binding-single-node
   optional: true
   steps:
@@ -675,8 +662,7 @@ tests:
         export TEST_FUNC=test_kube_api_late_binding_ipv4_single_node
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
         make deploy_assisted_operator test_kube_api_parallel
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-kube-api-late-unbinding-ipv4-single-node
   optional: true
   steps:
@@ -686,8 +672,7 @@ tests:
         export TEST_FUNC=test_kube_api_late_unbinding_ipv4_single_node
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
         make deploy_assisted_operator test_kube_api_parallel
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-assisted-capi-provider-agent-hypershift
   optional: true
   run_if_changed: ^(data/.*|internal/.*)$
@@ -703,8 +688,7 @@ tests:
         TEST_FUNC=test_capi_provider
         MAKEFILE_TARGET="create_full_environment run deploy_capi_env test"
       GATHER_CAPI_LOGS: "true"
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 zz_generated_metadata:
   branch: master
   org: openshift
