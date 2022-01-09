@@ -58,8 +58,9 @@ tests:
     - as: test-default
       cli: latest
       commands: |
-        oc adm must-gather --image="${KMG_IMAGE}" --dest-dir=${ARTIFACT_DIR}/must-gather-output
-        (cd ${ARTIFACT_DIR}; KUBECONFIG=${KUBECONFIG} ACK_GINKGO_DEPRECATIONS=1.16.4 /go/bin/must-gather.test --ginkgo.focus=level:product --junit-output=${ARTIFACT_DIR}/junit/report.xml --ginkgo.v)
+        MG_OUTPUT_DIR=must-gather-output-default
+        oc adm must-gather --image="${KMG_IMAGE}" --dest-dir=${ARTIFACT_DIR}/${MG_OUTPUT_DIR}
+        (cd ${ARTIFACT_DIR}; KUBECONFIG=${KUBECONFIG} ACK_GINKGO_DEPRECATIONS=1.16.4 MG_OUTPUT_DIR=${MG_OUTPUT_DIR} /go/bin/must-gather.test --ginkgo.focus=level:product --junit-output=${ARTIFACT_DIR}/junit/report.xml --ginkgo.v)
       dependencies:
       - env: KMG_IMAGE
         name: kubevirt-must-gather
@@ -70,8 +71,9 @@ tests:
     - as: test-targeted
       cli: latest
       commands: |
-        oc adm must-gather --image="${KMG_IMAGE}" --dest-dir=${ARTIFACT_DIR}/must-gather-output -- gather_vms_details
-        (cd ${ARTIFACT_DIR}; KUBECONFIG=${KUBECONFIG} ACK_GINKGO_DEPRECATIONS=1.16.4 /go/bin/must-gather.test --ginkgo.focus=level:workloads --junit-output=${ARTIFACT_DIR}/junit/report.xml --ginkgo.v)
+        MG_OUTPUT_DIR=must-gather-output-vms_details
+        oc adm must-gather --image="${KMG_IMAGE}" --dest-dir=${ARTIFACT_DIR}/${MG_OUTPUT_DIR} -- gather_vms_details
+        (cd ${ARTIFACT_DIR}; KUBECONFIG=${KUBECONFIG} ACK_GINKGO_DEPRECATIONS=1.16.4 MG_OUTPUT_DIR=${MG_OUTPUT_DIR} /go/bin/must-gather.test --ginkgo.focus=level:workloads --junit-output=${ARTIFACT_DIR}/junit/report.xml --ginkgo.v)
       dependencies:
       - env: KMG_IMAGE
         name: kubevirt-must-gather
