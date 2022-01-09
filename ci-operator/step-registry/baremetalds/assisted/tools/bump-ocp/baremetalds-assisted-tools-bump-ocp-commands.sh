@@ -15,7 +15,7 @@ IS_REHEARSAL=$(expr "${REPO_OWNER:-}" = "openshift" "&" "${REPO_NAME:-}" = "rele
 set -e
 
 export DRY_RUN=""
-if (( ${IS_REHEARSAL} )); then
+if (( ${IS_REHEARSAL} )) || [[ ${DRY_RUN} == "true" ]]; then
     DRY_RUN="--dry-run"
 fi
 
