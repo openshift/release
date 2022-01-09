@@ -73,9 +73,7 @@ tests:
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE|Jenkinsfile.*)$
   steps:
     cluster_profile: packet-assisted
-    env:
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-prod
   optional: true
   steps:
@@ -83,8 +81,7 @@ tests:
     env:
       ENVIRONMENT: production
       GATHER_ALL_CLUSTERS: "false"
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-onprem
   optional: true
   steps:
@@ -92,8 +89,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         DEPLOY_TARGET=onprem
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-onprem-periodic
   cron: '@daily'
   steps:
@@ -101,8 +97,8 @@ tests:
     env:
       ASSISTED_CONFIG: |
         DEPLOY_TARGET=onprem
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+      TEST_SUITE: full
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-prod-periodic
   cron: '@daily'
   steps:
@@ -111,7 +107,7 @@ tests:
       ENVIRONMENT: production
       GATHER_ALL_CLUSTERS: "false"
       TEST_SUITE: full
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-periodic
   cron: '@daily'
   steps:
@@ -127,7 +123,6 @@ tests:
       ASSISTED_CONFIG: |
         DISK_ENCRYPTION_ROLES=all
         DISK_ENCRYPTION_MODE=tpmv2
-      TEST_SUITE: minimal
     workflow: baremetalds-assisted
 - as: e2e-metal-assisted-tpmv2-periodic
   cron: '@daily'
@@ -146,8 +141,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=""
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-multi-version-periodic
   cron: '@daily'
   steps:
@@ -156,7 +150,7 @@ tests:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=""
       TEST_SUITE: full
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-olm
   optional: true
   run_if_changed: .*operator.*
@@ -165,8 +159,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         TEST_FUNC=test_olm_operator
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-olm-periodic
   cron: '@daily'
   steps:
@@ -184,8 +177,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         TEST_FUNC=test_deploy_day2_nodes_cloud
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-day2-periodic
   cron: '@daily'
   steps:
@@ -194,7 +186,7 @@ tests:
       ASSISTED_CONFIG: |
         TEST_FUNC=test_deploy_day2_nodes_cloud
       TEST_SUITE: full
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: system-test-operator
   optional: true
   steps:
@@ -204,8 +196,7 @@ tests:
         export TEST_FUNC=test_kube_api_ipv4
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
         make deploy_assisted_operator test_kube_api_parallel
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: system-test-operator-periodic
   cron: '@daily'
   steps:
@@ -226,8 +217,7 @@ tests:
         export TEST_FUNC=test_kube_api_late_binding_ipv4_single_node
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
         make deploy_assisted_operator test_kube_api_parallel
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-kube-api-late-unbinding-single-node
   optional: true
   steps:
@@ -237,8 +227,7 @@ tests:
         export TEST_FUNC=test_kube_api_late_unbinding_ipv4_single_node
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
         make deploy_assisted_operator test_kube_api_parallel
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-ipv6
   optional: true
   run_if_changed: ^(terraform_files/.*|.*/controllers/.*)$
@@ -248,8 +237,7 @@ tests:
       ASSISTED_CONFIG: |
         IPv6=yes
         IPv4=no
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-ipv6-periodic
   cron: '@daily'
   steps:
@@ -269,8 +257,7 @@ tests:
       ASSISTED_CONFIG: |
         IPv6=yes
         IPv4=yes
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-ipv4v6-periodic
   cron: '@daily'
   steps:
@@ -289,8 +276,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         PLATFORM=none
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-none-periodic
   cron: '@daily'
   steps:
@@ -311,8 +297,7 @@ tests:
         VIP_DHCP_ALLOCATION=no
         PROXY=yes
         PLATFORM=none
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-none-ipv6-periodic
   cron: '@daily'
   steps:
@@ -333,8 +318,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-single-node-periodic
   cron: '@daily'
   steps:
@@ -360,8 +344,7 @@ tests:
         KUBE_API=yes
         ENABLE_KUBE_API=true
         MAKEFILE_TARGET=all
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-capi
   optional: true
   steps:
@@ -376,8 +359,7 @@ tests:
         TEST_FUNC=test_capi_provider
         MAKEFILE_TARGET="create_full_environment run deploy_capi_env test"
       GATHER_CAPI_LOGS: "true"
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-capi-periodic
   cron: '@daily'
   steps:
@@ -392,8 +374,8 @@ tests:
         TEST_FUNC=test_capi_provider
         MAKEFILE_TARGET="create_full_environment run deploy_capi_env test"
       GATHER_CAPI_LOGS: "true"
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+      TEST_SUITE: full
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-kube-api-periodic
   cron: '@daily'
   steps:
@@ -420,8 +402,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         TEST_FUNC=test_networking
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-networking-periodic
   cron: 0 */4 * * *
   steps:
