@@ -86,6 +86,7 @@ cd dev-scripts
 cp /root/pull-secret /root/dev-scripts/pull_secret.json
 
 echo "export OPENSHIFT_RELEASE_IMAGE=${OPENSHIFT_INSTALL_RELEASE_IMAGE}" >> /root/dev-scripts/config_root.sh
+echo "export OPENSHIFT_UPGRADE_RELEASE_IMAGE=${OPENSHIFT_UPGRADE_RELEASE_IMAGE}" >> /root/dev-scripts/config_root.sh
 echo "export ADDN_DNS=\$(awk '/nameserver/ { print \$2;exit; }' /etc/resolv.conf)" >> /root/dev-scripts/config_root.sh
 echo "export OPENSHIFT_CI=true" >> /root/dev-scripts/config_root.sh
 echo "export NUM_WORKERS=3" >> /root/dev-scripts/config_root.sh
