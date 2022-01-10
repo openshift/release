@@ -1,9 +1,9 @@
 postsubmits:
-  stolostron/prometheus:
+  stolostron/prometheus-alertmanager:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-2\.4$
+    - ^release-2\.5$
     cluster: build02
     decorate: true
     decoration_config:
@@ -12,7 +12,7 @@ postsubmits:
       ci-operator.openshift.io/is-promotion: "true"
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-stolostron-prometheus-release-2.4-images
+    name: branch-ci-stolostron-prometheus-alertmanager-release-2.5-images
     spec:
       containers:
       - args:
@@ -57,20 +57,22 @@ postsubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-2\.4$
+    - ^release-2\.5$
     cluster: build02
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-    name: branch-ci-stolostron-prometheus-release-2.4-publish
+    max_concurrency: 1
+    name: branch-ci-stolostron-prometheus-alertmanager-release-2.5-publish
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --target=publish
         command:
         - ci-operator
@@ -81,6 +83,9 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -92,6 +97,9 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
