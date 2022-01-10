@@ -27,9 +27,8 @@ oc wait --all --for=condition=Progressing=False clusteroperators.config.openshif
 
 oc wait --all --for=condition=Degraded=False clusteroperators.config.openshift.io --timeout=1m
 
+function setE2eMirror() {
 # Maps e2e images on dockerhub to locally hosted mirror
-if [[ "$JOB_NAME" == *"4.6-e2e"* ]]; then
-  echo "Remapping dockerhub e2e images to local mirror for 4.6 e2e vSphere jobs"
 
   oc create -f - <<EOF
 apiVersion: machineconfiguration.openshift.io/v1
@@ -56,4 +55,16 @@ EOF
 
   echo "Waiting for machineconfig to finish rolling out"
   oc wait --for=condition=Updated mcp/worker --timeout=30m
+}
+
+if [[ "$JOB_NAME" == *"4.6-e2e"* ]]; then
+  echo "Remapping dockerhub e2e images to local mirror for 4.6 e2e vSphere jobs"
+  setE2eMirror
+  
+elif [[ $JOB_NAME =~ .*okd-4.*-e2e-vsphere.* ]]; then
+  echo "Remapping dockerhub e2e images to local mirror for OKD e2e vSphere jobs"
+  setE2eMirror
+
+  echo "Patching cluster-samples-operator for OKD e2e vSphere jobs"
+  oc --type=merge patch configs.samples.operator.openshift.io cluster -p='{"spec":{"samplesRegistry":"e2e-cache.vmc-ci.devcluster.openshift.com:5000"}}' -n openshift-cluster-samples-operator
 fi
