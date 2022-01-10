@@ -186,7 +186,7 @@ def _get_osd_rc_deployment_sidecars(context):
                      '-http-address=',
                      '-email-domain=*',
                      '-upstream=http://localhost:8080',
-                     f'-client-id=system:serviceaccount:{context.config.rc_deployment_namespace}:release-controller',
+                     f'-client-id=system:serviceaccount:{context.config.rc_deployment_namespace}:release-controller-{context.is_namespace}',
                      '-openshift-ca=/etc/pki/tls/cert.pem',
                      '-openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt',
                      '-openshift-sar={"verb": "get", "resource": "imagestreams", "namespace": "ocp-private"}',
