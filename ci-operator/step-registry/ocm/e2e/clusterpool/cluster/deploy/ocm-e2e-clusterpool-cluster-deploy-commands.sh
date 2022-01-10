@@ -270,7 +270,7 @@ fi
 QUAY_TOKEN=$(cat "$QUAY_TOKEN_FILE")
 
 # Set up additional deploy variables
-NAMESPACE=stolostron
+NAMESPACE=open-cluster-management
 OPERATOR_DIR=acm-operator
 
 # Function to deploy ACM to a cluster.
