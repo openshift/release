@@ -271,6 +271,7 @@ QUAY_TOKEN=$(cat "$QUAY_TOKEN_FILE")
 
 # Set up additional deploy variables
 NAMESPACE=open-cluster-management
+CATALOG_NAMESPACE=openshift-marketplace
 OPERATOR_DIR=acm-operator
 
 # Function to deploy ACM to a cluster.
@@ -411,7 +412,12 @@ deploy() {
 
         KUBECONFIG="$_kc" oc -n $NAMESPACE apply --openapi-patch=true -k prereqs/ \
             > >(tee -a "$_log") 2>&1 && {
-            logf "$_log" "Deploy $_cluster: YAML files from prereqs directory applied after ${_elapsed}s"
+            logf "$_log" "Deploy $_cluster: YAML files from prereqs directory applied to $NAMESPACE after ${_elapsed}s"
+        }
+
+        KUBECONFIG="$_kc" oc -n $CATALOG_NAMESPACE apply --openapi-patch=true -k prereqs/ \
+            > >(tee -a "$_log") 2>&1 && {
+            logf "$_log" "Deploy $_cluster: YAML files from prereqs directory applied to $CATALOG_NAMESPACE after ${_elapsed}s"
             break
         }
 
