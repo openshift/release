@@ -482,6 +482,9 @@ tests:
     - as: create-cluster
       cli: latest
       commands: |-
+        # The release controller overrides the version to test through the RELEASE_IMAGE_LATEST
+        # variable, so use that if present.
+        RELEASE_IMAGE="${RELEASE_IMAGE_LATEST:-${OPENSHIFT_410_CI_RELEASE_IMAGE}}"
         bin/hypershift create cluster aws \
           --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
           --aws-creds=/etc/hypershift-pool-aws-credentials/credentials \
@@ -489,7 +492,7 @@ tests:
           --name="$(echo -n $PROW_JOB_ID|cut -d- -f-2)" \
           --region=us-east-1 \
           --base-domain=ci.hypershift.devcluster.openshift.com \
-          --release-image=${OPENSHIFT_410_CI_RELEASE_IMAGE} \
+          --release-image=${RELEASE_IMAGE} \
           --instance-type=m5.xlarge \
           --node-pool-replicas=3
         echo "Waiting for cluster to become available"
