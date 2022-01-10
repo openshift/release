@@ -3,10 +3,10 @@ base_images:
     name: "4.10"
     namespace: ocp
     tag: base
-  ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.16-openshift-4.9
+    tag: rhel-8-golang-1.17-openshift-4.10
 binary_build_commands: make build
 build_root:
   from_repository: true
@@ -15,10 +15,13 @@ images:
 - dockerfile_path: Dockerfile.rhel
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
-  to: openstack-machine-controllers
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
+  to: machine-api-provider-openstack
+promotion:
+  name: "4.10"
+  namespace: ocp
 releases:
   initial:
     integration:
@@ -53,7 +56,13 @@ tests:
   commands: IS_CONTAINER=TRUE make lint
   container:
     from: src
+- as: gomod
+  commands: if [ $(go mod tidy && go mod vendor && git diff | wc -l) -gt 0 ]; then
+    git diff && exit 1; fi
+  container:
+    from: src
 - as: e2e-openstack
+  optional: true
   steps:
     cluster_profile: openstack-vexxhost
     env:

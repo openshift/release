@@ -18,11 +18,19 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/exporter
   to: numaresources-operator
+- dockerfile_path: Dockerfile.openshift.rte
+  from: os-min8
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/exporter
+  to: resource-topology-exporter
 operator:
   bundles:
   - dockerfile_path: bundle.Dockerfile
   substitutions:
-  - pullspec: quay.io/openshift-kni/numaresources-operator:4.10-snapshot
+  - pullspec: quay.io/openshift-kni/numaresources-operator:4.10.0
     with: numaresources-operator
 promotion:
   name: numaresources-operator
@@ -47,6 +55,27 @@ tests:
   commands: make test-unit
   container:
     from: src
+- as: ci-e2e
+  steps:
+    cluster_profile: aws
+    env:
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: numaresources-operator
+      OO_PACKAGE: numaresources-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: e2e-test
+      cli: latest
+      commands: make test-e2e
+      dependencies:
+      - env: OO_INDEX
+        name: ci-index
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-aws
 zz_generated_metadata:
   branch: main
   org: openshift-kni

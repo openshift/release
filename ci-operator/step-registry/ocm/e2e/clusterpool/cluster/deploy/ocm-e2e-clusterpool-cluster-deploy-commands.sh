@@ -258,7 +258,7 @@ if [[ -z "$IMAGE_NAME" ]]; then
 fi
 IMAGE_NAME="$COMPONENT_NAME"
 log "Using IMAGE_NAME: $IMAGE_NAME"
-IMAGE_QUERY="quay.io/open-cluster-management/${IMAGE_NAME}@sha256:[[:alnum:]]+"
+IMAGE_QUERY="quay.io/stolostron/${IMAGE_NAME}@sha256:[[:alnum:]]+"
 log "Using IMAGE_QUERY: $IMAGE_QUERY"
 
 # Set up Quay credentials.

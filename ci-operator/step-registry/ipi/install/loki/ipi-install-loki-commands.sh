@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-export LOKI_VERSION="2.2.1"
+export LOKI_VERSION="2.4.1"
 
 cat >> "${SHARED_DIR}/manifest_loki-ns.yml" << EOF
 apiVersion: v1
@@ -598,7 +598,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
-        image: quay.io/vrutkovs/promtail:${LOKI_VERSION}
+        image: quay.io/openshift-cr/promtail:${LOKI_VERSION}
         imagePullPolicy: IfNotPresent
         name: promtail
         ports:
@@ -646,7 +646,7 @@ spec:
         volumeMounts:
           - mountPath: "/tmp/shared"
             name: shared-data
-        image: quay.io/openshift/origin-cli:4.6.0
+        image: registry.redhat.io/openshift4/ose-cli:latest
         name: fetch-cluster-id
       serviceAccountName: loki-promtail
       tolerations:

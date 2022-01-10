@@ -119,23 +119,52 @@ paths=(openshift-apiserver kube-apiserver oauth-apiserver etcd)
 for path in "${paths[@]}" ; do
   output_dir="${ARTIFACT_DIR}/audit_logs/$path"
   mkdir -p "$output_dir"
+
+  # Skip downloading of .terminating and .lock files.
   oc adm node-logs --role=master --path="$path" | \
-  tee "${ARTIFACT_DIR}/audit_logs/$path.audit_logs_listing" | \
-  grep -v ".terminating" | \
-  grep -v ".lock" | \
-  sed "s|^|$path $output_dir |"
-done | \
-xargs --max-args=4 bash -c \
-   'echo "INFO: Started  downloading $1/$4 from $3";
-    echo "INFO: gziping to $2/$3-$4.gz";
-    oc --insecure-skip-tls-verify adm node-logs $3 --path=$1/$4 | gzip > $2/$3-$4.gz;
-    echo "INFO: Finished downloading $1/$4 from $3"' \
-  bash
+    grep -v ".terminating" | \
+    grep -v ".lock" | \
+  tee "${output_dir}.audit_logs_listing"
+
+  # The ${output_dir}.audit_logs_listing file contains lines with the node and filename
+  # separated by a space.
+  while IFS= read -r item; do
+    node=$(echo $item |cut -d ' ' -f 1)
+    fname=$(echo $item |cut -d ' ' -f 2)
+    echo "INFO: Queueing download/gzip of ${path}/${fname} from ${node}";
+    echo "INFO:   gziping to ${output_dir}/${node}-${fname}.gz";
+    FILTER=gzip queue ${output_dir}/${node}-${fname}.gz oc --insecure-skip-tls-verify adm node-logs ${node} --path=${path}/${fname}
+  done < ${output_dir}.audit_logs_listing
+done
+
+
+echo "INFO: gathering quay tcpdump packet headers if present"
+output_dir="${ARTIFACT_DIR}/tcpdump/"
+mkdir -p "$output_dir"
+
+# Skip downloading of .terminating and .lock files.
+oc adm node-logs --role=worker --path="/tcpdump" | \
+grep -v ".terminating" | \
+grep -v ".lock" | \
+tee "${output_dir}.tcpdump_listing"
+
+cat "${output_dir}.tcpdump_listing"
+
+# The ${output_dir}.tcpdump_listing file contains lines with the node and filename
+# separated by a space.
+while IFS= read -r item; do
+node=$(echo $item |cut -d ' ' -f 1)
+fname=$(echo $item |cut -d ' ' -f 2)
+echo "INFO: Queueing download/gzip of /tcpdump/${fname} from ${node}";
+echo "INFO:   gziping to ${output_dir}/${node}-${fname}.gz";
+FILTER=gzip queue ${output_dir}/${node}-${fname}.gz oc --insecure-skip-tls-verify adm node-logs ${node} --path=/tcpdump/${fname}
+done < ${output_dir}.tcpdump_listing
+
 
 # Snapshot iptables-save on each node for debugging possible kube-proxy issues
 oc --insecure-skip-tls-verify get --request-timeout=20s -n openshift-sdn -l app=sdn pods --template '{{ range .items }}{{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/sdn-pods
 while IFS= read -r i; do
-  queue ${ARTIFACT_DIR}/network/iptables-save-$i oc --insecure-skip-tls-verify rsh --timeout=20 -n openshift-sdn -c sdn $i iptables-save -c
+  queue ${ARTIFACT_DIR}/network/iptables-save-$i oc --insecure-skip-tls-verify --request-timeout=20s rsh -n openshift-sdn -c sdn $i iptables-save -c
 done < /tmp/sdn-pods
 
 while IFS= read -r i; do

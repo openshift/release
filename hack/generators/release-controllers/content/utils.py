@@ -1,5 +1,14 @@
 
-def get_rc_volume_mounts(context):
+def get_kubeconfig_volume_mounts():
+    return [
+        {
+            'mountPath': '/etc/kubeconfig',
+            'name': 'release-controller-kubeconfigs',
+            'readOnly': True
+        }]
+
+
+def get_rc_volume_mounts():
     return [
         {
             'mountPath': '/etc/config',
@@ -7,34 +16,8 @@ def get_rc_volume_mounts(context):
             'readOnly': True
         },
         {
-            'mountPath': '/etc/job-config/misc',
-            'name': 'job-config-misc',
-            'readOnly': True
-        },
-        {
-            'mountPath': '/etc/job-config/master-periodics',
-            'name': 'job-config-master-periodics',
-            'readOnly': True
-        },
-        {
-            'mountPath': '/etc/job-config/master-postsubmits',
-            'name': 'job-config-master-postsubmits',
-            'readOnly': True
-        },
-        {
-            'mountPath': '/etc/job-config/master-presubmits',
-            'name': 'job-config-master-presubmits',
-            'readOnly': True
-        },
-        {
-            'mountPath': '/etc/job-config/3.x',
-            'name': 'job-config-3x',
-            'readOnly': True
-        },
-        *_get_dynamic_rc_volume_mounts(context),
-        {
-            'mountPath': '/etc/kubeconfig',
-            'name': 'release-controller-kubeconfigs',
+            'mountPath': '/etc/job-config',
+            'name': 'job-config',
             'readOnly': True
         },
         {
@@ -51,58 +34,19 @@ def get_rc_volume_mounts(context):
             'mountPath': '/etc/plugins',
             'name': 'plugins',
             'readOnly': True
-        }]
+        }] + get_kubeconfig_volume_mounts()
 
 
-def get_rc_volumes(context, namespace=None):
+def get_kubeconfig_volumes(context, namespace=None, secret_name=None):
     suffix = ''
     if namespace is not None and len(namespace) > 0:
         suffix = f'-{namespace}'
 
+    if secret_name is None:
+        secret_name = context.secret_name_tls
+
     return [
-        {
-            'configMap': {
-                'defaultMode': 420,
-                'name': 'config'
-            },
-            'name': 'config'
-        },
-        {
-            'configMap': {
-                'defaultMode': 420,
-                'name': 'job-config-misc'
-            },
-            'name': 'job-config-misc'
-        },
-        {
-            'configMap': {
-                'defaultMode': 420,
-                'name': 'job-config-master-periodics'
-            },
-            'name': 'job-config-master-periodics'
-        },
-        {
-            'configMap': {
-                'defaultMode': 420,
-                'name': 'job-config-master-postsubmits'
-            },
-            'name': 'job-config-master-postsubmits'
-        },
-        {
-            'configMap': {
-                'defaultMode': 420,
-                'name': 'job-config-master-presubmits'
-            },
-            'name': 'job-config-master-presubmits'
-        },
-        {
-            'configMap': {
-                'defaultMode': 420,
-                'name': 'job-config-3.x'
-            },
-            'name': 'job-config-3x'
-        },
-        *_get_dynamic_deployment_volumes(context),
+        *_get_dynamic_deployment_volumes(context, secret_name),
         {
             'name': 'release-controller-kubeconfigs',
             'secret': {
@@ -112,6 +56,50 @@ def get_rc_volumes(context, namespace=None):
                     'path': 'kubeconfig'
                 }],
                 'secretName': 'release-controller-kubeconfigs'
+            }
+        }]
+
+
+def get_rc_volumes(context, namespace=None):
+    return [
+        {
+            'configMap': {
+                'defaultMode': 420,
+                'name': 'config'
+            },
+            'name': 'config'
+        },
+        {
+            'name': 'job-config',
+            'projected': {
+                'sources': [
+                    {
+                        'configMap': {
+                            'name': 'job-config-misc'
+                        }
+                    },
+                    {
+                        'configMap': {
+                            'name': 'job-config-master-periodics'
+                        }
+                    },
+                    {
+                        'configMap': {
+                            'name': 'job-config-master-postsubmits'
+                        }
+                    },
+                    {
+                        'configMap': {
+                            'name': 'job-config-master-presubmits'
+                        }
+                    },
+                    {
+                        'configMap': {
+                            'name': 'job-config-3.x'
+                        }
+                    },
+                    *_get_dynamic_projected_deployment_volumes(context),
+                ]
             }
         },
         {
@@ -134,30 +122,17 @@ def get_rc_volumes(context, namespace=None):
                 'name': 'plugins'
             },
             'name': 'plugins'
-        }]
+        }] + get_kubeconfig_volumes(context, namespace=namespace, secret_name=context.secret_name_tls)
 
 
-def _get_dynamic_rc_volume_mounts(context):
-    prow_volume_mounts = []
-
-    for major_minor in context.config.releases:
-        prow_volume_mounts.append({
-            'mountPath': f'/etc/job-config/{major_minor}',
-            'name': f'job-config-{major_minor.replace(".", "")}',  # e.g. job-config-45
-            'readOnly': True
-        })
-
-    return prow_volume_mounts
-
-
-def _get_dynamic_deployment_volumes(context):
+def _get_dynamic_deployment_volumes(context, secret_name):
     prow_volumes = []
 
     if context.private:
         prow_volumes.append({
             'name': 'internal-tls',
             'secret': {
-                'secretName': context.secret_name_tls,
+                'secretName': secret_name,
             }
         })
         prow_volumes.append({
@@ -168,13 +143,16 @@ def _get_dynamic_deployment_volumes(context):
             }
         })
 
+    return prow_volumes
+
+
+def _get_dynamic_projected_deployment_volumes(context):
+    prow_volumes = []
+
     for major_minor in context.config.releases:
         prow_volumes.append({
             'configMap': {
-                'defaultMode': 420,
                 'name': f'job-config-{major_minor}'
-            },
-            'name': f'job-config-{major_minor.replace(".", "")}'
+            }
         })
-
     return prow_volumes

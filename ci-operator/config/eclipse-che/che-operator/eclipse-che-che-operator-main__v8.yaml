@@ -8,8 +8,6 @@ operator:
   bundles:
   - context_dir: bundle/next/eclipse-che-preview-openshift
     dockerfile_path: bundle.Dockerfile
-  - context_dir: bundle/next-all-namespaces/eclipse-che-preview-openshift
-    dockerfile_path: bundle.Dockerfile
 releases:
   initial:
     integration:
@@ -28,46 +26,16 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: multi-host-next-deployment
+- as: operator-test
   steps:
     cluster_profile: gcp
     env:
       OO_CHANNEL: next
       OO_INSTALL_NAMESPACE: eclipse-che
       OO_PACKAGE: eclipse-che-preview-openshift
-      OO_TARGET_NAMESPACES: '!install'
+      OO_TARGET_NAMESPACES: '!all'
     test:
-    - as: multi-host-next-deployment
-      cli: latest
-      commands: |
-        echo -e "[INFO] Test script content:"
-        cat .ci/oci-multi-host.sh
-
-        /bin/bash .ci/oci-multi-host.sh
-      dependencies:
-      - env: CI_CHE_OPERATOR_IMAGE
-        name: che-operator-image
-      env:
-      - name: OO_CHANNEL
-      - name: OO_INSTALL_NAMESPACE
-      - name: OO_PACKAGE
-      - name: OO_TARGET_NAMESPACES
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: optional-operators-ci-gcp
-- as: single-host-next-deployment
-  steps:
-    cluster_profile: gcp
-    env:
-      OO_CHANNEL: next
-      OO_INSTALL_NAMESPACE: eclipse-che
-      OO_PACKAGE: eclipse-che-preview-openshift
-      OO_TARGET_NAMESPACES: '!install'
-    test:
-    - as: single-host-deployment
+    - as: operator-test
       cli: latest
       commands: |
         echo -e "[INFO] Test script content:"
@@ -118,36 +86,6 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: openshift-e2e-aws-proxy
-- as: e2e-all-namespaces-deployment
-  steps:
-    cluster_profile: gcp
-    env:
-      OO_CHANNEL: next-all-namespaces
-      OO_INSTALL_NAMESPACE: eclipse-che
-      OO_PACKAGE: eclipse-che-preview-openshift
-      OO_TARGET_NAMESPACES: '!all'
-    test:
-    - as: single-host-deployment
-      cli: latest
-      commands: |
-        echo -e "[INFO] Test script content:"
-        cat .ci/oci-single-host.sh
-
-        /bin/bash .ci/oci-single-host.sh
-      dependencies:
-      - env: CI_CHE_OPERATOR_IMAGE
-        name: che-operator-image
-      env:
-      - name: OO_CHANNEL
-      - name: OO_INSTALL_NAMESPACE
-      - name: OO_PACKAGE
-      - name: OO_TARGET_NAMESPACES
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: optional-operators-ci-gcp
 zz_generated_metadata:
   branch: main
   org: eclipse-che

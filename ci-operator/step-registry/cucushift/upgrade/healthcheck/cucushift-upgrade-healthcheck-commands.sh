@@ -11,10 +11,10 @@ function run_command_oc() {
         return 0
     fi
 
-    if [[ "$*" != *"image"* ]] && [[ "$*" != *"release"* ]]; then
-        # Don't re-try it, when we access the cluster
-        max=1
-    fi
+    # if [[ "$*" != *"image"* ]] && [[ "$*" != *"release"* ]]; then
+    #     # Don't re-try it, when we access the cluster
+    #     max=1
+    # fi
 
     while (( try < max )); do
         if ret_val=$(oc "$@" 2>&1); then
@@ -53,7 +53,7 @@ function check_clusteroperators() {
     do
         rc=$(echo "${line}" | awk '{print NF}')
         if (( rc != column )); then
-	        echo >&2 "The following line have empty column"
+            echo >&2 "The following line have empty column"
             echo >&2 "${line}"
             (( tmp_ret += 1 ))
         fi
@@ -190,14 +190,8 @@ function check_node() {
 }
 
 function check_pod() {
-    local pods_status
-    if pods_status=$(${OC} get pod --all-namespaces | grep -Evi "running|Completed" |grep -v NAMESPACE); then
-        echo >&2  "There are some failed pods:"
-        echo >&2 "${pods_status}"
-        return 1
-    fi
-    echo "All pods status check PASSED"
-    return 0
+    echo "Show all pods status for reference/debug"
+    oc get pods --all-namespaces
 }
 
 # Setup proxy if it's present in the shared dir
