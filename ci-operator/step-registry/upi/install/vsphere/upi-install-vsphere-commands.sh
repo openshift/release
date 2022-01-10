@@ -151,6 +151,10 @@ if [ -f ${SHARED_DIR}/haproxy-router-image ]; then
   sed -i "s#/bin/podman pull #/bin/podman pull --creds=${registry_auths} --tls-verify=false #" ./lb/haproxy.service
 fi
 
+if [ ${SECURE_BOOT_ENABLED} = "true" ]; then
+  sed -i '/guest_id/a\  firmware         = "efi"\n  efi_secure_boot_enabled = "true"' ./vm/main.tf
+fi
+
 date +%s > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
 echo "$(date -u --rfc-3339=seconds) - terraform init..."
