@@ -104,12 +104,10 @@ class Context:
         self.secret_name_tls_api = f'release-controller-api{self.suffix}-tls'
         self.is_namespace = f'ocp{self.suffix}'
         self.rc_serviceaccount_name = f'release-controller-{self.is_namespace}'
-        self.rc_api_serviceaccount_name = f'release-controller-api-{self.is_namespace}'
 
         self.rc_service_name = f'release-controller-{self.is_namespace}'
         self.rc_api_service_name = f'release-controller-api-{self.is_namespace}'
         self.rc_route_name = self.rc_service_name
-        self.rc_api_route_name = self.rc_api_service_name
 
         # Routes on the api.ci cluster
         # files-cache
