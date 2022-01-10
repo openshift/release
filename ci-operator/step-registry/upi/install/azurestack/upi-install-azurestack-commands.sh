@@ -173,7 +173,7 @@ KUBECONFIG="${dir}/auth/kubeconfig"
 export KUBECONFIG
 
 ACCOUNT_NAME=$(echo ${CLUSTER_NAME}sa | tr -cd '[:alnum:]')
-echo "Creating storage account"
+echo "Creating storage account ${ACCOUNT_NAME}"
 az storage account create -g "$RESOURCE_GROUP" --location "$AZURE_REGION" --name "$ACCOUNT_NAME" --kind Storage --sku Standard_LRS
 ACCOUNT_KEY=$(az storage account keys list -g "$RESOURCE_GROUP" --account-name "$ACCOUNT_NAME" --query "[0].value" -o tsv)
 
