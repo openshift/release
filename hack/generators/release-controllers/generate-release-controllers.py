@@ -109,6 +109,7 @@ class Context:
         self.rc_service_name = f'release-controller-{self.is_namespace}'
         self.rc_api_service_name = f'release-controller-api-{self.is_namespace}'
         self.rc_route_name = self.rc_service_name
+        self.rc_api_route_name = self.rc_api_service_name
 
         # Routes on the api.ci cluster
         # files-cache
