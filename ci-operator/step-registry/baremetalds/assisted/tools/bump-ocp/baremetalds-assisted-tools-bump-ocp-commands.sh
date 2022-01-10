@@ -14,10 +14,10 @@ set +e
 IS_REHEARSAL=$(expr "${REPO_OWNER:-}" = "openshift" "&" "${REPO_NAME:-}" = "release")
 set -e
 
-export DRY_RUN=""
+DRY_RUN_CMD=""
 if (( ${IS_REHEARSAL} )) || [[ ${DRY_RUN} == "true" ]]; then
-    DRY_RUN="--dry-run"
+    DRY_RUN_CMD="--dry-run"
 fi
 
 GITHUB_CREDS=$(cat ${CI_CREDENTIALS_DIR}/username <(echo ':') ${CI_CREDENTIALS_DIR}/github-access-token | tr -d "[:space:]") \
-    ${workdir}/tools/bump_ocp_releases.py ${DRY_RUN}
+    ${workdir}/tools/bump_ocp_releases.py ${DRY_RUN_CMD}
