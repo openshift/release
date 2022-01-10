@@ -22,7 +22,7 @@ cat > packet-teardown.yaml <<-EOF
   - name: check cluster type
     fail:
       msg: "Unsupported CLUSTER_TYPE '{{ cluster_type }}'"
-    when: cluster_type != "packet"
+    when: "cluster_type is not regex('^packet.*$|^equinix.*$')"
 
   - name: remove Packet host with error handling
     block:
