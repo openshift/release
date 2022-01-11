@@ -271,6 +271,7 @@ QUAY_TOKEN=$(cat "$QUAY_TOKEN_FILE")
 
 # Set up additional deploy variables
 NAMESPACE=open-cluster-management
+CATALOG_NAMESPACE=openshift-marketplace
 OPERATOR_DIR=acm-operator
 
 # Function to deploy ACM to a cluster.
@@ -411,7 +412,12 @@ deploy() {
 
         KUBECONFIG="$_kc" oc -n $NAMESPACE apply --openapi-patch=true -k prereqs/ \
             > >(tee -a "$_log") 2>&1 && {
-            logf "$_log" "Deploy $_cluster: YAML files from prereqs directory applied after ${_elapsed}s"
+            logf "$_log" "Deploy $_cluster: YAML files from prereqs directory applied to $NAMESPACE after ${_elapsed}s"
+        }
+
+        KUBECONFIG="$_kc" oc -n $CATALOG_NAMESPACE apply --openapi-patch=true -k prereqs/ \
+            > >(tee -a "$_log") 2>&1 && {
+            logf "$_log" "Deploy $_cluster: YAML files from prereqs directory applied to $CATALOG_NAMESPACE after ${_elapsed}s"
             break
         }
 
@@ -472,6 +478,14 @@ deploy() {
         fi
         logf "$_log" "INFO Deploy $_cluster: Elapsed time is ${_elapsed}/${_timeout}s"
 
+        # Check timeout
+        logf "$_log" "INFO Deploy $_cluster: Checking for timeout."
+        if (( _elapsed > _timeout )); then
+                logf "$_log" "ERROR Deploy $_cluster: Timeout (${_timeout}s) waiting for multiclusterhub-operator pod"
+                echo "ERROR WAIT_MCHO" > "${_status}"
+                return 1
+        fi
+
         # Get pod names
         logf "$_log" "INFO Deploy $_cluster: Getting pod names."
         KUBECONFIG="$_kc" oc -n $NAMESPACE get pods -o name > pod_names 2> >(tee -a "$_log") || {
@@ -518,14 +532,6 @@ deploy() {
         if (( _total > 0 && _ready == _total )); then
             logf "$_log" "Deploy $_cluster: multiclusterhub-operator pod is ready after ${_elapsed}s"
             break
-        fi
-
-        # Check timeout
-        logf "$_log" "INFO Deploy $_cluster: Checking for timeout."
-        if (( _elapsed > _timeout )); then
-                logf "$_log" "ERROR Deploy $_cluster: Timeout (${_timeout}s) waiting for multiclusterhub-operator pod"
-                echo "ERROR WAIT_MCHO" > "${_status}"
-                return 1
         fi
 
         logf "$_log" "WARN Deploy $_cluster: Not all containers ready ($_ready/$_total). Will retry (${_elapsed}/${_timeout}s)"
@@ -588,6 +594,13 @@ deploy() {
             _elapsed=$(( _elapsed + _step ))
         fi
 
+        # Check timeout
+        if (( _elapsed > _timeout )); then
+                logf "$_log" "ERROR Deploy $_cluster: Timeout (${_timeout}s) waiting for CSV"
+                echo "ERROR WAIT_CSV_1" > "${_status}"
+                return 1
+        fi
+
         # Get CSV name
         KUBECONFIG="$_kc" oc -n $NAMESPACE get csv -o name > csv_name 2> >(tee -a "$_log") || {
             logf "$_log" "WARN Deploy $_cluster: Error getting CSV name. Will retry (${_elapsed}/${_timeout}s)"
@@ -627,13 +640,6 @@ deploy() {
                 ;;
         esac
 
-        # Check timeout
-        if (( _elapsed > _timeout )); then
-                logf "$_log" "ERROR Deploy $_cluster: Timeout (${_timeout}s) waiting for CSV"
-                echo "ERROR WAIT_CSV_1" > "${_status}"
-                return 1
-        fi
-
         logf "$_log" "WARN Deploy $_cluster: Current CSV status is $_csv_status. Will retry (${_elapsed}/${_timeout}s)"
     done
 
@@ -661,6 +667,13 @@ deploy() {
         # Wait for _step seconds, including first iteration
         sleep $_step
         _elapsed=$(( _elapsed + _step ))
+
+        # Check timeout
+        if (( _elapsed > _timeout )); then
+                logf "$_log" "ERROR Deploy $_cluster: Timeout (${_timeout}s) waiting for CSV"
+                echo "ERROR WAIT_CSV_2" > "${_status}"
+                return 1
+        fi
 
         # Get CSV name
         KUBECONFIG="$_kc" oc -n $NAMESPACE get csv -o name > csv_name 2> >(tee -a "$_log") || {
@@ -700,13 +713,6 @@ deploy() {
                 break
                 ;;
         esac
-
-        # Check timeout
-        if (( _elapsed > _timeout )); then
-                logf "$_log" "ERROR Deploy $_cluster: Timeout (${_timeout}s) waiting for CSV"
-                echo "ERROR WAIT_CSV_2" > "${_status}"
-                return 1
-        fi
 
         logf "$_log" "WARN Deploy $_cluster: Current CSV status is $_csv_status. Will retry (${_elapsed}/${_timeout}s)"
     done
@@ -755,6 +761,13 @@ deploy() {
             _elapsed=$(( _elapsed + _step ))
         fi
 
+        # Check timeout
+        if (( _elapsed > _timeout )); then
+                logf "$_log" "ERROR Deploy $_cluster: Timeout (${_timeout}s) waiting for MCH CR"
+                echo "ERROR WAIT_MCH" > "${_status}"
+                return 1
+        fi
+
         # Get MCH name
         KUBECONFIG="$_kc" oc -n $NAMESPACE get multiclusterhub -o name > mch_name 2> >(tee -a "$_log") || {
             logf "$_log" "WARN Deploy $_cluster: Error getting MCH name. Will retry (${_elapsed}/${_timeout}s)"
@@ -780,13 +793,6 @@ deploy() {
         if [[ "$_mch_status" == "Running" ]]; then
             logf "$_log" "Deploy $_cluster: MCH CR is ready after ${_elapsed}s"
             break
-        fi
-
-        # Check timeout
-        if (( _elapsed > _timeout )); then
-                logf "$_log" "ERROR Deploy $_cluster: Timeout (${_timeout}s) waiting for MCH CR"
-                echo "ERROR WAIT_MCH" > "${_status}"
-                return 1
         fi
 
         logf "$_log" "WARN Deploy $_cluster: Current MCH status is $_mch_status. Will retry (${_elapsed}/${_timeout}s)"
