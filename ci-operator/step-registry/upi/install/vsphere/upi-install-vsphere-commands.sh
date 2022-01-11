@@ -226,9 +226,16 @@ cp -t "${SHARED_DIR}" \
     "${installer_dir}/auth/kubeconfig"
 
 # Maps e2e images on dockerhub to locally hosted mirror
-if [[ "$JOB_NAME" == *"4.6-e2e"* ]]; then
+if [[ $JOB_NAME =~ 4.6-e2e-vsphere.* ]]; then
   echo "Remapping dockerhub e2e images to local mirror for 4.6 e2e vSphere jobs"
   setE2eMirror
+  
+elif [[ $JOB_NAME =~ .*okd-4.*-e2e-vsphere.* ]]; then
+  echo "Remapping dockerhub e2e images to local mirror for OKD e2e vSphere jobs"
+  setE2eMirror
+
+  echo "Patching cluster-samples-operator for OKD e2e vSphere jobs"
+  oc --type=merge patch configs.samples.operator.openshift.io cluster -p='{"spec":{"samplesRegistry":"e2e-cache.vmc-ci.devcluster.openshift.com:5000"}}' -n openshift-cluster-samples-operator
 fi
 
 exit "$ret"
