@@ -1,0 +1,118 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+  stolostron_builder_go1.17-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.17-linux
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: go1.17-linux
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  inputs:
+    stolostron_builder_go1.17-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.17-linux
+  to: idp-mgmt-operator
+promotion:
+  disabled: true
+  name: fake
+  namespace: identitatem
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 80m
+      memory: 200Mi
+tests:
+- as: check
+  commands: make check
+  container:
+    from: src
+- as: unit
+  commands: HOME=/tmp make test
+  container:
+    from: src
+- as: sonar-pre-submit
+  commands: |
+    export SELF="make -f /opt/build-harness/Makefile.prow"
+    export SONAR_ORG=identitatem
+    make -f /opt/build-harness/Makefile.prow sonar/go/prow
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+- as: sonar-post-submit
+  commands: |
+    export SELF="make -f /opt/build-harness/Makefile.prow"
+    export SONAR_ORG=identitatem
+    make -f /opt/build-harness/Makefile.prow sonar/go/prow
+  container:
+    from: src
+  postsubmit: true
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: idp-mgmt-operator
+    env:
+      IMAGE_REPO: idp-mgmt-operator
+      REGISTRY_ORG: identitatem
+    workflow: identitatem-ci-image-mirror
+- as: pr-merge-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: idp-mgmt-operator
+    env:
+      IMAGE_REPO: idp-mgmt-operator
+      REGISTRY_ORG: identitatem
+    workflow: identitatem-ci-image-mirror
+- as: latest-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: idp-mgmt-operator
+    env:
+      IMAGE_TAG: latest
+      REGISTRY_ORG: identitatem
+    workflow: identitatem-ci-image-mirror
+- as: e2e-tests
+  steps:
+    dependencies:
+      COMPONENT_IMAGE_REF: ""
+    env:
+      CLUSTERPOOL_GROUP_NAME: idp-for-the-masses
+      CLUSTERPOOL_HOST_NAMESPACE: managed-services
+      CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-idp-clusterpool
+      CLUSTERPOOL_LIFETIME: 1h
+      CLUSTERPOOL_LIST_EXCLUSION_FILTER: dev\|autoclaims
+      CLUSTERPOOL_LIST_INCLUSION_FILTER: prow
+      CLUSTERPOOL_MANAGED_COUNT: "1"
+    test:
+    - as: e2e
+      commands: |
+        export SELF="make -f opt/build-harness/Makefile.prow"
+        export VERSION_TAG=latest
+        ./build/run-e2e-tests.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-e2e-clusterpool
+zz_generated_metadata:
+  branch: test
+  org: identitatem
+  repo: idp-mgmt-operator
