@@ -21,7 +21,7 @@ case "${SIZE_VARIANT}" in
         master_type=bx2-8x32
         ;;
     default)
-        master_type=mx2d-4x32
+        master_type=bx2-4x16
         ;;
     large)
         master_type=bx2-16x64
