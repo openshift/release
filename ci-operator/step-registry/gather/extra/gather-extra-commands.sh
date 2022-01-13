@@ -16,8 +16,6 @@ function queue() {
   fi
 }
 
-export PATH=$PATH:/tmp/shared
-
 if test ! -f "${KUBECONFIG}"
 then
 	echo "No kubeconfig, so no point in gathering extra artifacts."
