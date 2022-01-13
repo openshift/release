@@ -121,18 +121,12 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \
   --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
-  --recurse /tmp/microshift-containerized rhel8user@"${INSTANCE_PREFIX}":~/
-
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
-  --quiet \
-  --project "${GOOGLE_PROJECT_ID}" \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
   --recurse /tmp/microshift-containerized.service rhel8user@"${INSTANCE_PREFIX}":~/
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
-  --command 'sudo cp microshift-containerized.service /usr/lib/systemd/system/microshift.service; sudo cp microshift-containerized /usr/bin/'
+  --command 'sudo cp microshift-containerized.service /usr/lib/systemd/system/microshift.service'
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
