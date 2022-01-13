@@ -45,6 +45,33 @@ tests:
       IMAGE_REPO: klusterlet-addon-operator
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
+- as: publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: klusterlet-addon-operator
+    env:
+      IMAGE_REPO: klusterlet-addon-operator
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_COMPONENT_NAME=klusterlet-addon-operator
+        export OSCI_COMPONENT_VERSION=release-2.5
+        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
+        export SELF="make -f /opt/build-harness/Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        make -f /opt/build-harness/Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
   branch: release-2.5
   org: stolostron
