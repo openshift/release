@@ -19,10 +19,11 @@ images:
     open-cluster-management_builder_go1.16-linux:
       as:
       - registry.ci.openshift.org/open-cluster-management/builder:go1.16-linux
-  to: search-indexer
+  to: search-v2-api
 promotion:
+  disabled: true
   name: "2.5"
-  namespace: open-cluster-management
+  namespace: stolostron 
 resources:
   '*':
     requests:
@@ -32,38 +33,42 @@ tests:
 - as: pr-image-mirror
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: search-indexer
+      SOURCE_IMAGE_REF: search-v2-api
     env:
-      IMAGE_REPO: search-indexer
+      IMAGE_REPO: search-v2-api
       REGISTRY_ORG: open-cluster-management
     workflow: ocm-ci-image-mirror
-- as: backplane-fast-forward
-  postsubmit: true
-  steps:
-    env:
-      DESTINATION_BRANCH: release-2.5
-    workflow: ocm-ci-fastforward
-- as: lint
-  commands: |
-    GOLANGCI_LINT_CACHE=/tmp/golangci-cache make -f Makefile.prow lint
-  container:
-    from: src
 - as: test-unit
   commands: |
     export SELF="make -f Makefile.prow"
     make -f Makefile.prow unit-test
   container:
     from: src
-- as: sonar-pre-submit
-  commands: |
-    export SELF="make -f Makefile.prow"
-    export DEPLOYED_IN_HUB=true
-    make -f Makefile.prow sonar/go/prow
-  container:
-    from: src
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
+- as: publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: search-v2-api
+    env:
+      IMAGE_REPO: search-v2-api
+      REGISTRY_ORG: open-cluster-management
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/open-cluster-management"
+        export SELF="make -f Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 - as: sonar-post-submit
   commands: |
     export SELF="make -f Makefile.prow"
@@ -76,6 +81,6 @@ tests:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
 zz_generated_metadata:
-  branch: main
+  branch: release-2.5
   org: open-cluster-management
   repo: search-indexer
