@@ -105,6 +105,10 @@ data:
           - host
           - invoker
       relabel_configs:
+      - action: drop
+        regex: ''
+        source_labels:
+        - __meta_kubernetes_pod_annotation_kubernetes_io_config_mirror
       - source_labels:
         - __meta_kubernetes_pod_label_name
         target_label: __service__
@@ -134,6 +138,60 @@ data:
         separator: "/"
         source_labels:
         - __meta_kubernetes_pod_uid
+        - __meta_kubernetes_pod_container_name
+        target_label: __path__
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_(.+)
+    - job_name: kubernetes-pods-static
+      pipeline_stages:
+      - cri: {}
+      - labeldrop:
+        - filename
+      - pack:
+          labels:
+          - namespace
+          - pod_name
+          - container_name
+          - app
+      - labelallow:
+          - host
+          - invoker
+      kubernetes_sd_configs:
+      - role: pod
+      relabel_configs:
+      - action: drop
+        regex: ''
+        source_labels:
+        - __meta_kubernetes_pod_uid
+      - source_labels:
+        - __meta_kubernetes_pod_label_name
+        target_label: __service__
+      - source_labels:
+        - __meta_kubernetes_pod_node_name
+        target_label: __host__
+      - action: replace
+        replacement:
+        separator: "/"
+        source_labels:
+        - __meta_kubernetes_namespace
+        - __service__
+        target_label: job
+      - action: replace
+        source_labels:
+        - __meta_kubernetes_namespace
+        target_label: namespace
+      - action: replace
+        source_labels:
+        - __meta_kubernetes_pod_name
+        target_label: pod_name
+      - action: replace
+        source_labels:
+        - __meta_kubernetes_pod_container_name
+        target_label: container_name
+      - replacement: /var/log/pods/*\$1/*.log
+        separator: /
+        source_labels:
+        - __meta_kubernetes_pod_annotation_kubernetes_io_config_mirror
         - __meta_kubernetes_pod_container_name
         target_label: __path__
       - action: labelmap
