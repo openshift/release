@@ -3,7 +3,7 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  open-cluster-management_builder_go1.17-linux:
+  open-cluster-management_builder_go1.1=7-linux:
     name: builder
     namespace: open-cluster-management
     tag: go1.17-linux
@@ -19,7 +19,7 @@ images:
     open-cluster-management_builder_go1.17-linux:
       as:
       - registry.ci.openshift.org/open-cluster-management/builder:go1.17-linux
-  to: search-indexer
+  to: search-v2-api
 promotion:
   name: "2.5"
   namespace: stolostron 
@@ -32,11 +32,31 @@ tests:
 - as: pr-image-mirror
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: search-indexer
+      SOURCE_IMAGE_REF: search-v2-api
     env:
-      IMAGE_REPO: search-indexer
-      REGISTRY_ORG: stolostron
+      IMAGE_REPO: search-v2-api
+      REGISTRY_ORG: stolostron 
     workflow: ocm-ci-image-mirror
+- as: e2e
+  steps:
+    dependencies:
+      COMPONENT_IMAGE_REF: search-v2-api
+    env:
+      CLUSTERPOOL_GROUP_NAME: Search
+      CLUSTERPOOL_HOST_NAMESPACE: acm-observability-usa
+      CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-obs-usa-clusterpool
+      CLUSTERPOOL_LIST_INCLUSION_FILTER: prow
+    test:
+    - as: e2e
+      commands: |
+        export SELF="make -f Makefile.prow"
+        make -f Makefile.prow test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-e2e-clusterpool
 - as: backplane-fast-forward
   postsubmit: true
   steps:
