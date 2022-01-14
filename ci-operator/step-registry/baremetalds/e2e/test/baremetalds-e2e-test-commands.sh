@@ -107,13 +107,6 @@ packet)
 
         # Mirroring test images is supported only for versions greater than or equal to 4.8
         mirror_test_images
-
-        # Skipping proxy related tests ([Skipped:Proxy]) is supported only for version  greater than or equal to 4.10
-        # For lower versions they must be skipped manually (only when running parallel suite)
-        if ! is_openshift_version_gte "4.10" && [[ "$TEST_SUITE" == "openshift/conformance/parallel" ]]; then
-            TEST_SKIPS="${TEST_SKIPS}
-${TEST_SKIPS_PROXY}"
-        fi
     else
         export TEST_PROVIDER='{"type":"skeleton"}'
         use_minimal_test_list
