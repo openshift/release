@@ -3,7 +3,7 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  open-cluster-management_builder_go1.1=7-linux:
+  open-cluster-management_builder_go1.17-linux:
     name: builder
     namespace: open-cluster-management
     tag: go1.17-linux
@@ -21,6 +21,7 @@ images:
       - registry.ci.openshift.org/open-cluster-management/builder:go1.17-linux
   to: search-v2-api
 promotion:
+  disabled: true
   name: "2.5"
   namespace: stolostron
 resources:
@@ -37,52 +38,37 @@ tests:
       IMAGE_REPO: search-v2-api
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
-- as: e2e
-  steps:
-    dependencies:
-      COMPONENT_IMAGE_REF: search-v2-api
-    env:
-      CLUSTERPOOL_GROUP_NAME: Search
-      CLUSTERPOOL_HOST_NAMESPACE: acm-observability-usa
-      CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-obs-usa-clusterpool
-      CLUSTERPOOL_LIST_INCLUSION_FILTER: prow
-    test:
-    - as: e2e
-      commands: |
-        export SELF="make -f Makefile.prow"
-        make -f Makefile.prow test-e2e
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: ocm-e2e-clusterpool
-- as: backplane-fast-forward
-  postsubmit: true
-  steps:
-    env:
-      DESTINATION_BRANCH: release-2.5
-    workflow: ocm-ci-fastforward
-- as: lint
-  commands: |
-    GOLANGCI_LINT_CACHE=/tmp/golangci-cache make -f Makefile.prow lint
-  container:
-    from: src
 - as: test-unit
   commands: |
     export SELF="make -f Makefile.prow"
     make -f Makefile.prow unit-test
   container:
     from: src
-- as: sonar-pre-submit
-  commands: |
-    export SELF="make -f Makefile.prow"
-    make -f Makefile.prow sonar/go/prow
-  container:
-    from: src
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
+- as: publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: search-v2-api
+    env:
+      IMAGE_REPO: search-v2-api
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/open-cluster-management"
+        export SELF="make -f Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 - as: sonar-post-submit
   commands: |
     export SELF="make -f Makefile.prow"
@@ -94,6 +80,6 @@ tests:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
 zz_generated_metadata:
-  branch: main
+  branch: open-cluster-management-search-v2-api-release-2.5
   org: stolostron
   repo: search-v2-api
