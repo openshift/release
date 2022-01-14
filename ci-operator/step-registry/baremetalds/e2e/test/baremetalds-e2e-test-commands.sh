@@ -45,16 +45,29 @@ function mirror_release_image_for_disconnected_upgrade() {
     if [[ "${DS_IP_STACK}" == "v6" ]]; then
       # shellcheck disable=SC2087
       ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
-MIRRORED_RELEASE_IMAGE=${DS_REGISTRY}/localimages/local-release-image
+MIRRORED_RELEASE_IMAGE=${DS_REGISTRY}/localimages/local-upgrade-image
 DIGEST=\$(oc adm release info --registry-config ${DS_WORKING_DIR}/pull_secret.json ${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE} --output=jsonpath="{.digest}")
-echo "Mirroring release images for disconnected environment"
-oc adm release mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --from=${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE} --to=\${MIRRORED_RELEASE_IMAGE} --apply-release-image-signature
-echo "OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE=\${MIRRORED_RELEASE_IMAGE}@\${DIGEST}" >> /tmp/disconnected_mirror.conf
-EOF
+RELEASE_TAG=\$(sed -e "s/^sha256://" <<< \${DIGEST})
+MIRROR_RESULT_LOG=/tmp/image_mirror-\${RELEASE_TAG}.log
 
-      # shellcheck source=/dev/null
-      source <(ssh "${SSHOPTS[@]}" "root@${IP}" "cat /tmp/disconnected_mirror.conf")
-      echo "OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE is overridden to ${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"
+echo "Mirroring release images for disconnected environment"
+oc adm release mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json \
+  --from=${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE} \
+  --to=\${MIRRORED_RELEASE_IMAGE} \
+  --to-release-image=\${MIRRORED_RELEASE_IMAGE}:\${RELEASE_TAG}  2>&1 | tee \${MIRROR_RESULT_LOG}
+
+echo "Create ImageContentSourcePolicy to use mirrored registry in upgrade"
+UPGRADE_ICS=\$(cat \${MIRROR_RESULT_LOG} | sed -n '/repositoryDigestMirrors/,//p')
+
+cat <<EOF1 | oc apply -f -
+apiVersion: operator.openshift.io/v1alpha1
+kind: ImageContentSourcePolicy
+metadata:
+  name: disconnected-upgrade-ics
+spec:
+\${UPGRADE_ICS}
+EOF1
+EOF
 
       TEST_UPGRADE_ARGS="--from-repository ${DS_REGISTRY}/localimages/local-test-image"
     fi
