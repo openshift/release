@@ -262,12 +262,10 @@ def _add_osd_rc_deployment(gendoc):
                                 },
                             },
                             'command': ['/usr/bin/release-controller',
-                                        # '--to=release',  # Removed according to release controller help
                                         *extra_rc_args,
                                         '--prow-config=/etc/config/config.yaml',
                                         '--supplemental-prow-config-dir=/etc/config',
                                         '--job-config=/etc/job-config',
-                                        f'--artifacts={context.fc_app_url}',
                                         '--listen=' + ('127.0.0.1:8080' if context.private else ':8080'),
                                         f'--prow-namespace={context.config.rc_deployment_namespace}',
                                         '--non-prow-job-kubeconfig=/etc/kubeconfig/kubeconfig',
@@ -350,7 +348,6 @@ def _add_osd_rc_deployment(gendoc):
                                         # '--to=release',  # Removed according to release controller help
                                         f'--release-namespace={context.is_namespace}',
                                         f'--artifacts={context.fc_app_url}',
-                                        '--listen=' + ('127.0.0.1:8080' if context.private else ':8080'),
                                         f'--prow-namespace={context.config.rc_deployment_namespace}',
                                         '--non-prow-job-kubeconfig=/etc/kubeconfig/kubeconfig',
                                         f'--job-namespace={context.jobs_namespace}',

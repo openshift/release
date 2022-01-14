@@ -74,7 +74,7 @@ ibmcloud)
     export IC_API_KEY
     ;;
 kubevirt) export KUBEVIRT_KUBECONFIG=${HOME}/.kube/config;;
-vsphere) ;;
+vsphere) export VSPHERE_PERSIST_SESSION=true;;
 openstack-osuosl) ;;
 openstack-ppc64le) ;;
 openstack*) export OS_CLIENT_CONFIG_FILE=${SHARED_DIR}/clouds.yaml ;;
