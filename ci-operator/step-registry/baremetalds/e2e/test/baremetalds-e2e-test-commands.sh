@@ -128,7 +128,7 @@ function upgrade() {
 }
 
 function suite() {
-    if [[ -n "${TEST_SKIPS}" ]]; then       
+    if [[ -n "${TEST_SKIPS}" && "${TEST_SUITE}" == "openshift/conformance/parallel" ]]; then
         TESTS="$(openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")" &&
         echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests &&
         echo "Skipping tests:" &&
