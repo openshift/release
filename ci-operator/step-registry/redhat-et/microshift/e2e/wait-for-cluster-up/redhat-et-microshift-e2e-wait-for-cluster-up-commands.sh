@@ -39,8 +39,9 @@ set -xeuo pipefail
 
 systemctl enable --now microshift.service
 
-microshift-containerized
-source /etc/microshift-containerized/microshift-containerized.conf
+sudo podman cp microshift:/var/lib/microshift/resources/kubeadmin/kubeconfig kubeconfig
+sudo chown $(whoami): kubeconfig
+export KUBECONFIG=$(pwd)/kubeconfig
 
 start=$(date '+%s')
 to=300
