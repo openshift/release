@@ -21,6 +21,12 @@ images:
       as:
       - registry.ci.openshift.org/stolostron/builder:go1.17-linux
   to: idp-mgmt-operator
+- dockerfile_path: Dockerfile.cypress
+  inputs:
+    stolostron_builder_go1.17-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.17-linux
+  to: idp-mgmt-operator-e2e-tests
 promotion:
   disabled: true
   name: fake
@@ -67,7 +73,8 @@ tests:
       IMAGE_TAG: latest
       REGISTRY_ORG: identitatem
     workflow: identitatem-ci-image-mirror
-- as: e2e-tests
+- as: e2e-cluster
+  skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|DCO|LICENSE|OWNERS)$
   steps:
     dependencies:
       COMPONENT_IMAGE_REF: idp-mgmt-operator
@@ -81,13 +88,21 @@ tests:
       CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-mgdsvcs-clusterpool
       CLUSTERPOOL_LIFETIME: 1h
       CLUSTERPOOL_LIST_INCLUSION_FILTER: aws-4-9-sno-2x
-      CLUSTERPOOL_MANAGED_COUNT: "0"
+      CLUSTERPOOL_MANAGED_COUNT: "1"
     test:
-    - as: e2e
+    - as: import
+      commands: |
+        KUBECONFIG=${SHARED_DIR}/hub-1.kc oc cm attach cluster --cluster managed --cluster-kubeconfig ${SHARED_DIR}/managed-1.kc
+      from: root
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: e2e-test
       commands: |
         export SELF="make -f opt/build-harness/Makefile.prow"
         export VERSION_TAG=latest
-        ./build/run-e2e-tests.sh
+        ./run-prow-e2e.sh
       credentials:
       - mount_path: /etc/ocm-mgdsvcs-clusterpool
         name: ocm-mgdsvcs-clusterpool
