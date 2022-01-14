@@ -22,15 +22,8 @@ tests:
     env:
       DESTINATION_BRANCH: release-2.5
     workflow: ocm-ci-fastforward
-- as: pr-image-mirror
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: search-e2e-test
-    env:
-      IMAGE_REPO: search-e2e-test
-      REGISTRY_ORG: stolostron
-    workflow: ocm-ci-image-mirror
-- as: e2e
+- as: e2e-cluster
+  skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$
   steps:
     dependencies:
       COMPONENT_IMAGE_REF: search-e2e-test
@@ -39,11 +32,10 @@ tests:
       CLUSTERPOOL_HOST_NAMESPACE: acm-observability-usa
       CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-obs-usa-clusterpool
       CLUSTERPOOL_LIST_INCLUSION_FILTER: prow
+      CLUSTERPOOL_MANAGED_COUNT: "1"
     test:
-    - as: e2e
+    - as: e2e-test
       commands: |
-        echo $(ls -ltr)
-        echo $(pwd)
         export SELF="make -f Makefile.prow"
         make -f Makefile.prow test-e2e
       credentials:
@@ -56,6 +48,14 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ocm-e2e-clusterpool
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: search-e2e-test
+    env:
+      IMAGE_REPO: search-e2e-test
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
   branch: main
   org: stolostron
