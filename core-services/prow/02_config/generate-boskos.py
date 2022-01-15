@@ -97,6 +97,7 @@ CONFIG = {
     'vsphere-quota-slice':{},
     'vsphere-discon-quota-slice':{},
     'vsphere-clusterbot-quota-slice':{},
+    'vsphere-platform-none-quota-slice':{},
     'osd-ephemeral-quota-slice': {
         'default': 15,
     },
@@ -142,6 +143,9 @@ for i in range(1, 7):
 
 for i in range(76,100):
     CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
+
+for i in range(56,60):
+    CONFIG['vsphere-platform-none-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 for i in range(60,62):
     CONFIG['vsphere-discon-quota-slice']['qe-discon-segment-{}'.format(i)] = 1
