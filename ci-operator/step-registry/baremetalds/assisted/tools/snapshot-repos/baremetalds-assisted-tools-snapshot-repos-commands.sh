@@ -10,7 +10,6 @@ set +e
 IS_REHEARSAL=$(expr "${REPO_OWNER:-}" = "openshift" "&" "${REPO_NAME:-}" = "release")
 set -e
 
-
 echo "Moving to a writable directory"
 cp -r . /tmp/assisted-installer-deployment
 cd /tmp/assisted-installer-deployment
@@ -29,7 +28,7 @@ fi
 
 username=$(cat ${CI_CREDENTIALS_DIR}/username)
 password=$(cat ${CI_CREDENTIALS_DIR}/github-access-token)
-git remote add origin https://${username}:${password}@github.com/${REPO_OWNER}/${REPO_NAME}.git
+git remote add origin https://${username}:${password}@github.com/openshift-assisted/assisted-installer-deployment.git
 
 commit_date=$(date +%d-%m-%Y-%H-%M)
 git commit -am "Automatic snapshot of repositories' current git revisions" -am "${commit_date}"
