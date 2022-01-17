@@ -84,16 +84,17 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJE
   --command 'sudo mv openshift-tests /usr/bin/openshift-tests'
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
-  --quiet \
-  --project "${GOOGLE_PROJECT_ID}" \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  --recurse /tmp/100-crio-bridge.conf rhel8user@"${INSTANCE_PREFIX}":~/
+   --quiet \
+   --project "${GOOGLE_PROJECT_ID}" \
+   --zone "${GOOGLE_COMPUTE_ZONE}" \
+   --recurse /tmp/microshift.conf rhel8user@"${INSTANCE_PREFIX}":~/
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
   --command 'sudo subscription-manager repos --enable rhocp-4.8-for-rhel-8-x86_64-rpms \
-  && sudo dnf -y install cri-o cri-tools podman && sudo mv 100-crio-bridge.conf /etc/cni/net.d/100-crio-bridge.conf'
+  && sudo dnf -y install cri-o cri-tools podman && sudo mkdir -p /etc/crio/crio.conf.d \
+  && sudo cp ~/microshift.conf /etc/crio/crio.conf.d/microshift.conf'
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
@@ -120,18 +121,12 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \
   --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
-  --recurse /tmp/microshift-containerized rhel8user@"${INSTANCE_PREFIX}":~/
-
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
-  --quiet \
-  --project "${GOOGLE_PROJECT_ID}" \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
   --recurse /tmp/microshift-containerized.service rhel8user@"${INSTANCE_PREFIX}":~/
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
-  --command 'sudo cp microshift-containerized.service /usr/lib/systemd/system/microshift.service; sudo cp microshift-containerized /usr/bin/'
+  --command 'sudo cp microshift-containerized.service /usr/lib/systemd/system/microshift.service'
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \

@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: "4.7"
+    name: "4.9"
     namespace: ocp
     tag: base
 build_root:
@@ -9,12 +9,12 @@ build_root:
 releases:
   initial:
     integration:
-      name: "4.7"
+      name: "4.9"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.7"
+      name: "4.9"
       namespace: ocp
 resources:
   '*':
@@ -314,7 +314,7 @@ tests:
           cpu: 200m
           memory: 400Mi
     workflow: ipi-azure
-- as: e2e-azure-common-templates-centos8
+- as: e2e-azure-common-templates-centos-stream8
   steps:
     cluster_profile: azure4
     test:
@@ -324,7 +324,24 @@ tests:
         #kubeconfig is mounted from a secret, so its immutable. We have to copy it to some writable location.
         cp -L $KUBECONFIG /tmp/kubeconfig && export KUBECONFIG=/tmp/kubeconfig
         echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
-        export TARGET=centos8 && make e2e-tests
+        export TARGET=centos-stream8 && make e2e-tests
+      from: src
+      resources:
+        requests:
+          cpu: 200m
+          memory: 400Mi
+    workflow: ipi-azure
+- as: e2e-azure-common-templates-centos-stream9
+  steps:
+    cluster_profile: azure4
+    test:
+    - as: e2e-tests-centos9
+      commands: |
+        set -o pipefail
+        #kubeconfig is mounted from a secret, so its immutable. We have to copy it to some writable location.
+        cp -L $KUBECONFIG /tmp/kubeconfig && export KUBECONFIG=/tmp/kubeconfig
+        echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
+        export TARGET=centos-stream9 && make e2e-tests
       from: src
       resources:
         requests:

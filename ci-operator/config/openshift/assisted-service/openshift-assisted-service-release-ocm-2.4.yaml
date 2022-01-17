@@ -1,19 +1,19 @@
 base_images:
   assisted-image-service:
-    name: "2.4"
-    namespace: open-cluster-management
+    name: ocm-2.4
+    namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: "2.4"
-    namespace: open-cluster-management
+    name: ocm-2.4
+    namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: "2.4"
-    namespace: open-cluster-management
+    name: ocm-2.4
+    namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: "2.4"
-    namespace: open-cluster-management
+    name: ocm-2.4
+    namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-test-infra:
     name: ocm-2.4
@@ -70,8 +70,8 @@ operator:
   - pullspec: quay.io/edge-infrastructure/postgresql-12-centos7:latest
     with: postgresql-12-centos7
 promotion:
-  name: "2.4"
-  namespace: open-cluster-management
+  name: ocm-2.4
+  namespace: edge-infrastructure
 releases:
   candidate:
     release:
@@ -542,8 +542,7 @@ tests:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=release-ocm-2.4
         IPv6=yes
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-none
   optional: true
   steps:
@@ -552,8 +551,7 @@ tests:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=release-ocm-2.4
         PLATFORM=none
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-single-node
   optional: true
   run_if_changed: ^(data/.*)$
@@ -563,8 +561,7 @@ tests:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=release-ocm-2.4
         NUM_MASTERS=1
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-static-ip
   steps:
     cluster_profile: packet
@@ -572,8 +569,7 @@ tests:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=release-ocm-2.4
         STATIC_IPS=yes
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-kube-api
   run_if_changed: ^(cmd/.*|data/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
@@ -591,8 +587,7 @@ tests:
         KUBE_API=yes
         ENABLE_KUBE_API=true
         MAKEFILE_TARGET=all
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted
   run_if_changed: ^(cmd/.*|data/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
@@ -600,8 +595,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=release-ocm-2.4
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-multi-version
   run_if_changed: ^(data/.*)$
   steps:
@@ -610,8 +604,7 @@ tests:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=release-ocm-2.4
         OPENSHIFT_VERSION=""
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-olm
   optional: true
   run_if_changed: ^(data/.*|internal/operators/.*)$
@@ -622,8 +615,7 @@ tests:
         SERVICE_BASE_REF=release-ocm-2.4
         OPENSHIFT_VERSION=""
         TEST_FUNC=test_olm_operator
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-kube-api-late-binding-single-node
   optional: true
   steps:
@@ -636,8 +628,7 @@ tests:
         export TEST_FUNC=test_kube_api_late_binding_ipv4_single_node
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
         make deploy_assisted_operator test_parallel
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-kube-api-late-binding-single-node-periodic
   cron: '@daily'
   steps:
@@ -650,8 +641,8 @@ tests:
         export TEST_FUNC=test_kube_api_late_binding_ipv4_single_node
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
         make deploy_assisted_operator test_parallel
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+      TEST_SUITE: full
+    workflow: baremetalds-assisted
 zz_generated_metadata:
   branch: release-ocm-2.4
   org: openshift

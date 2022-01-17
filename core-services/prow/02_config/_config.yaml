@@ -36,6 +36,7 @@ deck:
     gcs_browser_prefixes:
       '*': https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift-priv: https://gcsweb-private-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
+      smg247/ci-docs: https://gcsweb-private-deck-poc-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
     lenses:
     - lens:
         name: metadata
@@ -123,6 +124,9 @@ jenkins_operators:
     openshift-priv: '[Full PR test history](https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
       index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/pr?query=is:pr+state:open+author:{{with
       index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
+    smg247/ci-docs: '[Full PR test history](https://private-deck-poc-ci.apps.ci.l2s4.p1.openshiftapps.com/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
+      index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://private-deck-poc-ci.apps.ci.l2s4.p1.openshiftapps.com/pr?query=is:pr+state:open+author:{{with
+      index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
 - job_url_template: http://jenkins.katacontainers.io/job/{{.Spec.Job}}/{{.Status.JenkinsBuildID}}
   label_selector: master=jenkins.katacontainers.io
   max_concurrency: 10
@@ -178,17 +182,17 @@ plank:
             memory: 250Mi
       timeout: 4h0m0s
       utility_images:
-        clonerefs: gcr.io/k8s-prow/clonerefs:v20211217-0d65bb41b3
-        entrypoint: gcr.io/k8s-prow/entrypoint:v20211217-0d65bb41b3
-        initupload: gcr.io/k8s-prow/initupload:v20211217-0d65bb41b3
-        sidecar: gcr.io/k8s-prow/sidecar:v20211217-0d65bb41b3
+        clonerefs: gcr.io/k8s-prow/clonerefs:v20220115-3e20513bd7
+        entrypoint: gcr.io/k8s-prow/entrypoint:v20220115-3e20513bd7
+        initupload: gcr.io/k8s-prow/initupload:v20220115-3e20513bd7
+        sidecar: gcr.io/k8s-prow/sidecar:v20220115-3e20513bd7
   - cluster: arm01
     config:
       utility_images:
-        clonerefs: gcr.io/k8s-prow/clonerefs:v20211217-0d65bb41b3-arm64
-        entrypoint: gcr.io/k8s-prow/entrypoint:v20211217-0d65bb41b3-arm64
-        initupload: gcr.io/k8s-prow/initupload:v20211217-0d65bb41b3-arm64
-        sidecar: gcr.io/k8s-prow/sidecar:v20211217-0d65bb41b3-arm64
+        clonerefs: gcr.io/k8s-prow/clonerefs:v20220115-3e20513bd7-arm64
+        entrypoint: gcr.io/k8s-prow/entrypoint:v20220115-3e20513bd7-arm64
+        initupload: gcr.io/k8s-prow/initupload:v20220115-3e20513bd7-arm64
+        sidecar: gcr.io/k8s-prow/sidecar:v20220115-3e20513bd7-arm64
   - config:
       gcs_configuration:
         bucket: origin-ci-private
@@ -196,6 +200,13 @@ plank:
           log: text/plain
       gcs_credentials_secret: gce-sa-credentials-gcs-private
     repo: openshift-priv
+  - config:
+      gcs_configuration:
+        bucket: private-deck-poc
+        mediaTypes:
+          log: text/plain
+      gcs_credentials_secret: gce-sa-credentials-gcs-private-deck-poc
+    repo: smg247/ci-docs
   - config:
       timeout: 8h0m0s
     repo: openshift/verification-tests
@@ -205,6 +216,7 @@ plank:
   job_url_prefix_config:
     '*': https://prow.ci.openshift.org/view/
     openshift-priv: https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
+    smg247/ci-docs: https://private-deck-poc-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
   job_url_template: https://{{if .Spec.Hidden }}deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/view/gs/origin-ci-private/{{else}}prow.ci.openshift.org/view/gs/origin-ci-test/{{end}}
     {{if eq .Spec.Type "presubmit"}}pr-logs/pull{{else if eq .Spec.Type "batch"}}pr-logs/pull{{else}}logs{{end}}{{if
     ne .Spec.Refs.Repo "origin"}}/{{.Spec.Refs.Org}}_{{.Spec.Refs.Repo}}{{end}}{{if
@@ -225,7 +237,15 @@ plank:
     openshift-priv: '[Full PR test history](https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
       index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/pr?query=is:pr+state:open+author:{{with
       index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
+    smg247/ci-docs: '[Full PR test history](https://private-deck-poc-ci.apps.ci.l2s4.p1.openshiftapps.com/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
+      index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://private-deck-poc-ci.apps.ci.l2s4.p1.openshiftapps.com/pr?query=is:pr+state:open+author:{{with
+      index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
 pod_namespace: ci
+prowjob_default_entries:
+- cluster: '*'
+  config:
+    tenant_id: private-deck-poc-tenant
+  repo: smg247/ci-docs
 prowjob_namespace: ci
 push_gateway:
   interval: 1m0s
@@ -251,6 +271,8 @@ tide:
     orgs:
       containers:
         repos:
+          aardvark-dns:
+            skip-unknown-contexts: true
           common:
             skip-unknown-contexts: true
           dnsname:
@@ -303,6 +325,7 @@ tide:
   pr_status_base_urls:
     '*': https://prow.ci.openshift.org/pr
     openshift-priv: https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
+    smg247: https://private-deck-poc-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
   priority:
   - labels:
     - bugzilla/severity-urgent

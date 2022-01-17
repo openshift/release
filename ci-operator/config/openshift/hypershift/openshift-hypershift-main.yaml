@@ -3,6 +3,10 @@ base_images:
     name: "4.10"
     namespace: ocp
     tag: base
+  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.17-openshift-4.10
   openshift-tests:
     name: "4.10"
     namespace: ocp
@@ -21,11 +25,21 @@ images:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.17
   to: hypershift
+- dockerfile_path: Dockerfile.control-plane
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
+    openshift_release_golang-1.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
+  to: hypershift-control-plane-operator
 promotion:
-  additional_images:
-    e2e-bin: test-bin
-  namespace: hypershift
-  tag: latest
+  excluded_images:
+  - hypershift-control-plane-operator
+  name: "4.10"
+  namespace: ocp
 releases:
   hosted-ocp-410-ci:
     candidate:
@@ -105,7 +119,7 @@ tests:
           --e2e.latest-release-image=${OCP_IMAGE_LATEST} \
           --e2e.previous-release-image=${OCP_IMAGE_PREVIOUS} \
           --e2e.additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
-          --e2e.aws-endpoint-access=Public
+          --e2e.aws-endpoint-access=PublicAndPrivate
       credentials:
       - mount_path: /etc/hypershift-pool-aws-credentials
         name: hypershift-pool-aws-credentials
@@ -307,7 +321,6 @@ tests:
         bin/test-e2e \
           -test.v \
           -test.timeout=0 \
-          -test.run=TestUpgradeControlPlane \
           --e2e.aws-credentials-file=/etc/hypershift-pool-aws-credentials/credentials \
           --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson \
           --e2e.base-domain=ci.hypershift.devcluster.openshift.com \
@@ -483,6 +496,9 @@ tests:
     - as: create-cluster
       cli: latest
       commands: |-
+        # The release controller overrides the version to test through the RELEASE_IMAGE_LATEST
+        # variable, so use that if present.
+        RELEASE_IMAGE="${RELEASE_IMAGE_LATEST:-${OPENSHIFT_410_CI_RELEASE_IMAGE}}"
         bin/hypershift create cluster aws \
           --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
           --aws-creds=/etc/hypershift-pool-aws-credentials/credentials \
@@ -490,7 +506,7 @@ tests:
           --name="$(echo -n $PROW_JOB_ID|cut -d- -f-2)" \
           --region=us-east-1 \
           --base-domain=ci.hypershift.devcluster.openshift.com \
-          --release-image=${OPENSHIFT_410_CI_RELEASE_IMAGE} \
+          --release-image=${RELEASE_IMAGE} \
           --instance-type=m5.xlarge \
           --node-pool-replicas=3
         echo "Waiting for cluster to become available"
@@ -541,6 +557,184 @@ tests:
           cpu: "3"
           memory: 600Mi
     workflow: generic-claim
+- as: e2e-conformance
+  optional: true
+  steps:
+    post:
+    - as: dump-guest-cluster
+      cli: latest
+      commands: |-
+        export KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
+        bin/hypershift dump cluster --artifact-dir=$ARTIFACT_DIR \
+        --name="$(echo -n $PROW_JOB_ID|cut -d- -f-2)"
+      from: bin
+      grace_period: 15m0s
+      resources:
+        requests:
+          cpu: 100m
+    - as: destroy-guest-cluster
+      cli: latest
+      commands: |-
+        export KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
+        bin/hypershift destroy cluster aws \
+        --aws-creds=/etc/hypershift-pool-aws-credentials/credentials  \
+        --name="$(echo -n $PROW_JOB_ID|cut -d- -f-2)"
+      credentials:
+      - mount_path: /etc/hypershift-pool-aws-credentials
+        name: hypershift-pool-aws-credentials
+        namespace: test-credentials
+      from: bin
+      grace_period: 15m0s
+      resources:
+        requests:
+          cpu: 100m
+    - as: destroy-management-cluster
+      cli: latest
+      commands: |-
+        export KUBECONFIG=/etc/hypershift-kubeconfig/kubeconfig
+        bin/hypershift destroy cluster aws \
+        --aws-creds=/etc/hypershift-pool-aws-credentials/credentials  \
+        --name="$(echo -n $PROW_JOB_ID|cut -d- -f-2)-mgmt"
+      credentials:
+      - mount_path: /etc/hypershift-pool-aws-credentials
+        name: hypershift-pool-aws-credentials
+        namespace: test-credentials
+      - mount_path: /etc/hypershift-kubeconfig
+        name: hypershift-client-kubeconfig
+        namespace: test-credentials
+      from: bin
+      grace_period: 15m0s
+      resources:
+        requests:
+          cpu: 100m
+    test:
+    - as: create-management-cluster
+      cli: latest
+      commands: |-
+        CLUSTER_NAME="$(echo -n $PROW_JOB_ID|cut -d- -f-2)-mgmt"
+        export KUBECONFIG=/etc/hypershift-kubeconfig/kubeconfig
+        bin/hypershift create cluster aws \
+          --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
+          --aws-creds=/etc/hypershift-pool-aws-credentials/credentials \
+          --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
+          --name=${CLUSTER_NAME} \
+          --region=us-east-1 \
+          --base-domain=ci.hypershift.devcluster.openshift.com \
+          --instance-type=m5.xlarge \
+          --service-cidr=172.29.0.0/16 \
+          --node-pool-replicas=3
+        echo "Waiting for cluster to become available"
+        oc wait --timeout=10m --for=condition=Available --namespace=clusters hostedcluster/${CLUSTER_NAME}
+        echo "Cluster became available, creating kubeconfig"
+        bin/hypershift create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} >${SHARED_DIR}/management_cluster_kubeconfig
+        echo "Waiting for clusteroperators to be ready"
+        export KUBECONFIG=${SHARED_DIR}/management_cluster_kubeconfig
+        until \
+          oc wait --all=true clusteroperator --for='condition=Available=True' >/dev/null && \
+          oc wait --all=true clusteroperator --for='condition=Progressing=False' >/dev/null && \
+          oc wait --all=true clusteroperator --for='condition=Degraded=False' >/dev/null;  do
+            echo "$(date --rfc-3339=seconds) Clusteroperators not yet ready"
+            sleep 1s
+        done
+      credentials:
+      - mount_path: /etc/hypershift-pool-aws-credentials
+        name: hypershift-pool-aws-credentials
+        namespace: test-credentials
+      - mount_path: /etc/ci-pull-credentials
+        name: ci-pull-credentials
+        namespace: test-credentials
+      - mount_path: /etc/hypershift-kubeconfig
+        name: hypershift-client-kubeconfig
+        namespace: test-credentials
+      from: bin
+      grace_period: 1m0s
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 25m0s
+    - as: install-hypershift
+      cli: latest
+      commands: |-
+        unset KUBECONFIG
+        oc adm policy add-role-to-group system:image-puller system:authenticated --namespace "${NAMESPACE}"
+        oc adm policy add-role-to-group system:image-puller system:unauthenticated --namespace "${NAMESPACE}"
+        export KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
+        make ci-install-hypershift
+      credentials:
+      - mount_path: /etc/hypershift-pool-aws-credentials
+        name: hypershift-pool-aws-credentials
+        namespace: test-credentials
+      dependencies:
+      - env: HYPERSHIFT_RELEASE_LATEST
+        name: hypershift
+      from: bin
+      resources:
+        requests:
+          cpu: 100m
+    - as: create-guest-cluster
+      cli: latest
+      commands: |-
+        export KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
+        bin/hypershift create cluster aws \
+          --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
+          --aws-creds=/etc/hypershift-pool-aws-credentials/credentials \
+          --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
+          --name="$(echo -n $PROW_JOB_ID|cut -d- -f-2)" \
+          --region=us-east-1 \
+          --base-domain=ci.hypershift.devcluster.openshift.com \
+          --release-image=${OPENSHIFT_410_CI_RELEASE_IMAGE} \
+          --instance-type=m5.xlarge \
+          --node-pool-replicas=3
+        echo "Waiting for cluster to become available"
+        oc wait --timeout=10m --for=condition=Available --namespace=clusters hostedcluster/$(echo -n $PROW_JOB_ID|cut -d- -f-2)
+        echo "Cluster became available, creating kubeconfig"
+        bin/hypershift create kubeconfig --namespace=clusters --name=$(echo -n $PROW_JOB_ID|cut -d- -f-2) >${SHARED_DIR}/nested_kubeconfig
+        echo "Waiting for clusteroperators to be ready"
+        export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
+        until \
+          oc wait --all=true clusteroperator --for='condition=Available=True' >/dev/null && \
+          oc wait --all=true clusteroperator --for='condition=Progressing=False' >/dev/null && \
+          oc wait --all=true clusteroperator --for='condition=Degraded=False' >/dev/null;  do
+            echo "$(date --rfc-3339=seconds) Clusteroperators not yet ready"
+            sleep 1s
+        done
+      credentials:
+      - mount_path: /etc/hypershift-pool-aws-credentials
+        name: hypershift-pool-aws-credentials
+        namespace: test-credentials
+      - mount_path: /etc/ci-pull-credentials
+        name: ci-pull-credentials
+        namespace: test-credentials
+      dependencies:
+      - env: OPENSHIFT_410_CI_RELEASE_IMAGE
+        name: release:hosted-ocp-410-ci
+      from: bin
+      grace_period: 1m0s
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 25m0s
+    - as: conformance-tests
+      commands: |-
+        export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG=/etc/hypershift-kubeconfig/kubeconfig
+        export HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE="clusters-$(echo -n $PROW_JOB_ID|cut -d- -f-2)"
+        export AWS_SHARED_CREDENTIALS_FILE=/etc/hypershift-pool-aws-credentials/credentials
+        export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
+        openshift-tests run openshift/conformance/serial \
+          -o "${ARTIFACT_DIR}/e2e.log" \
+          --junit-dir "${ARTIFACT_DIR}/junit"
+      credentials:
+      - mount_path: /etc/hypershift-pool-aws-credentials
+        name: hypershift-pool-aws-credentials
+        namespace: test-credentials
+      - mount_path: /etc/hypershift-kubeconfig
+        name: hypershift-client-kubeconfig
+        namespace: test-credentials
+      from: openshift-tests
+      resources:
+        requests:
+          cpu: "3"
+          memory: 600Mi
 zz_generated_metadata:
   branch: main
   org: openshift

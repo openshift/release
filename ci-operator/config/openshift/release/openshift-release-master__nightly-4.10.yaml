@@ -3,6 +3,10 @@ base_images:
     name: "4.10"
     namespace: ocp
     tag: ansible
+  assisted-image-service:
+    name: ocm-2.5
+    namespace: edge-infrastructure
+    tag: assisted-image-service
   assisted-installer:
     name: ocm-2.5
     namespace: edge-infrastructure
@@ -20,8 +24,8 @@ base_images:
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: assisted-test
-    namespace: ocp-kni
+    name: ocm-2.5
+    namespace: edge-infrastructure
     tag: assisted-test-infra
   aws-ebs-csi-driver-operator-test:
     name: "4.10"
@@ -51,6 +55,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  driver-toolkit-tests:
+    name: "4.10"
+    namespace: ocp
+    tag: driver-toolkit-tests
   gcp-pd-csi-driver-operator-test:
     name: "4.10"
     namespace: ocp
@@ -262,11 +270,6 @@ tests:
   steps:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere-csi
-- as: e2e-vsphere-proxy
-  interval: 24h
-  steps:
-    cluster_profile: vsphere-discon
-    workflow: openshift-e2e-vsphere-proxy
 - as: e2e-aws-workers-rhel7
   cron: '@daily'
   steps:
@@ -486,6 +489,11 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-cgroupsv2
+- as: e2e-aws-crun
+  interval: 3h
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-crun
 - as: e2e-azure-deploy-cnv
   interval: 12h
   steps:
@@ -551,6 +559,19 @@ tests:
           cpu: 100m
           memory: 600Mi
     workflow: ipi-azure
+- as: e2e-aws-driver-toolkit
+  cron: 0 */8 * * *
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: driver-toolkit-tests
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: openshift

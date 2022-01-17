@@ -16,8 +16,6 @@ function queue() {
   fi
 }
 
-export PATH=$PATH:/tmp/shared
-
 if test ! -f "${KUBECONFIG}"
 then
 	echo "No kubeconfig, so no point in gathering extra artifacts."
@@ -137,11 +135,55 @@ for path in "${paths[@]}" ; do
   done < ${output_dir}.audit_logs_listing
 done
 
-# Snapshot iptables-save on each node for debugging possible kube-proxy issues
-oc --insecure-skip-tls-verify get --request-timeout=20s -n openshift-sdn -l app=sdn pods --template '{{ range .items }}{{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/sdn-pods
-while IFS= read -r i; do
-  queue ${ARTIFACT_DIR}/network/iptables-save-$i oc --insecure-skip-tls-verify rsh --timeout=20 -n openshift-sdn -c sdn $i iptables-save -c
-done < /tmp/sdn-pods
+
+echo "INFO: gathering quay tcpdump packet headers if present"
+output_dir="${ARTIFACT_DIR}/tcpdump/"
+mkdir -p "$output_dir"
+
+# Skip downloading of .terminating and .lock files.
+oc adm node-logs --role=worker --path="/tcpdump" | \
+grep -v ".terminating" | \
+grep -v ".lock" | \
+tee "${output_dir}.tcpdump_listing"
+
+cat "${output_dir}.tcpdump_listing"
+
+# The ${output_dir}.tcpdump_listing file contains lines with the node and filename
+# separated by a space.
+while IFS= read -r item; do
+node=$(echo $item |cut -d ' ' -f 1)
+fname=$(echo $item |cut -d ' ' -f 2)
+echo "INFO: Queueing download/gzip of /tcpdump/${fname} from ${node}";
+echo "INFO:   gziping to ${output_dir}/${node}-${fname}.gz";
+FILTER=gzip queue ${output_dir}/${node}-${fname}.gz oc --insecure-skip-tls-verify adm node-logs ${node} --path=/tcpdump/${fname}
+done < ${output_dir}.tcpdump_listing
+
+function gather_network() {
+  local namespace=$1
+  local selector=$2
+  local container=$3
+
+  if ! oc --insecure-skip-tls-verify --request-timeout=20s get ns ${namespace}; then
+    echo "Namespace ${namespace} does not exist, skipping ${namespace} network pods"
+    return
+  fi
+
+  local podlist="/tmp/${namespace}-pods"
+
+  # Snapshot iptables-save on each node for debugging possible kube-proxy issues
+  oc --insecure-skip-tls-verify --request-timeout=20s get -n "${namespace}" -l "${selector}" pods --template '{{ range .items }}{{ .metadata.name }}{{ "\n" }}{{ end }}' > ${podlist}
+  while IFS= read -r i; do
+    queue ${ARTIFACT_DIR}/network/iptables-save-$i oc --insecure-skip-tls-verify --request-timeout=20s rsh -n ${namespace} -c ${container} $i iptables-save -c
+  done < ${podlist}
+  # Snapshot all used ports on each node.
+  while IFS= read -r i; do
+    queue ${ARTIFACT_DIR}/network/ss-$i oc --insecure-skip-tls-verify --request-timeout=20s rsh -n ${namespace} -c ${container} $i ss -apn
+  done < ${podlist}
+}
+
+# Gather network details both from SDN and OVN. One of them should succeed.
+gather_network openshift-sdn app=sdn sdn
+gather_network openshift-ovn-kubernetes app=ovnkube-node ovnkube-node
 
 while IFS= read -r i; do
   file="$( echo "$i" | cut -d ' ' -f 3 | tr -s ' ' '_' )"

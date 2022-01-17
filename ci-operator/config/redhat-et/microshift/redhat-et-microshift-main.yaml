@@ -24,8 +24,8 @@ images:
     USER root
     ADD validate-microshift /tmp/
     COPY microshift-containerized.service /tmp/microshift-containerized.service
-    COPY microshift-containerized /tmp/microshift-containerized
-    COPY crio-bridge.conf /tmp/100-crio-bridge.conf
+    RUN bash -c 'sed -i "s/autoupdate=registry/autoupdate=local/g" /tmp/microshift-containerized.service'
+    COPY microshift.conf /tmp/microshift.conf
     COPY oc /usr/bin/oc
     COPY openshift-tests /usr/bin/openshift-tests
   from: libvirt-installer
@@ -39,11 +39,9 @@ images:
       - destination_dir: validate-microshift
         source_path: /go/src/github.com/redhat-et/microshift/validate-microshift/
       - destination_dir: .
-        source_path: /go/src/github.com/redhat-et/microshift/packaging/systemd/microshift-containerized
-      - destination_dir: .
         source_path: /go/src/github.com/redhat-et/microshift/packaging/systemd/microshift-containerized.service
       - destination_dir: .
-        source_path: /go/src/github.com/redhat-et/microshift/packaging/images/microshift-aio/crio-bridge.conf
+        source_path: /go/src/github.com/redhat-et/microshift/packaging/crio.conf.d/microshift.conf
     test-bin:
       paths:
       - destination_dir: .
@@ -64,7 +62,7 @@ images:
     RUN mkdir bin selinux
     COPY --from=builder /go/src/github.com/redhat-et/microshift/packaging/rpm/_rpmbuild/RPMS/x86_64/microshift-* bin/
     COPY --from=builder /go/src/github.com/redhat-et/microshift/packaging/rpm/_rpmbuild/RPMS/noarch/microshift-selinux-* selinux/
-    COPY microshift-containerized /tmp/microshift-containerized
+    COPY microshift.conf /tmp/microshift.conf
     COPY openshift-tests /usr/bin/openshift-tests
     COPY oc /usr/bin/oc
   from: libvirt-installer
@@ -81,7 +79,7 @@ images:
       - src
       paths:
       - destination_dir: .
-        source_path: /go/src/github.com/redhat-et/microshift/packaging/systemd/microshift-containerized
+        source_path: /go/src/github.com/redhat-et/microshift/packaging/crio.conf.d/microshift.conf
     test-bin:
       paths:
       - destination_dir: .
@@ -113,76 +111,76 @@ tests:
   commands: make srpm
   container:
     from: src
-  run_if_changed: ^(rpm/*|Makefile)
+  run_if_changed: ^(rpm/*|packaging/.*|Makefile)
 - as: e2e-rpm-install
   optional: true
-  run_if_changed: ^(cmd/.*|pkg/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
+  run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
   steps:
     cluster_profile: gcp
     workflow: redhat-et-microshift-e2e-rpm-install
 - as: e2e-openshift-conformance-sig-api-machinery
   optional: true
-  run_if_changed: ^(cmd/.*|pkg/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
+  run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
   steps:
     cluster_profile: gcp
     workflow: redhat-et-microshift-e2e-openshift-conformance-sig-api-machinery
 - as: e2e-openshift-conformance-sig-apps
   optional: true
-  run_if_changed: ^(cmd/.*|pkg/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+  run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
   steps:
     cluster_profile: gcp
     workflow: redhat-et-microshift-e2e-openshift-conformance-sig-apps
 - as: e2e-openshift-conformance-sig-arch
   optional: true
-  run_if_changed: ^(cmd/.*|pkg/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+  run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
   steps:
     cluster_profile: gcp
     workflow: redhat-et-microshift-e2e-openshift-conformance-sig-arch
 - as: e2e-openshift-conformance-sig-auth
   optional: true
-  run_if_changed: ^(cmd/.*|pkg/.*|vendor/.*|go\.sum|go\.mod)|Makefile
+  run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod)|Makefile
   steps:
     cluster_profile: gcp
     workflow: redhat-et-microshift-e2e-openshift-conformance-sig-auth
 - as: e2e-openshift-conformance-sig-cli
   optional: true
-  run_if_changed: ^(cmd/.*|pkg/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+  run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
   steps:
     cluster_profile: gcp
     workflow: redhat-et-microshift-e2e-openshift-conformance-sig-cli
 - as: e2e-openshift-conformance-sig-instrumentation
   optional: true
-  run_if_changed: ^(cmd/.*|pkg/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+  run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
   steps:
     cluster_profile: gcp
     workflow: redhat-et-microshift-e2e-openshift-conformance-sig-instrumentation
 - as: e2e-openshift-conformance-sig-network
   optional: true
-  run_if_changed: ^(cmd/.*|pkg/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+  run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
   steps:
     cluster_profile: gcp
     workflow: redhat-et-microshift-e2e-openshift-conformance-sig-network
 - as: e2e-openshift-conformance-sig-node
   optional: true
-  run_if_changed: ^(cmd/.*|pkg/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+  run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
   steps:
     cluster_profile: gcp
     workflow: redhat-et-microshift-e2e-openshift-conformance-sig-node
 - as: e2e-openshift-conformance-sig-scheduling
   optional: true
-  run_if_changed: ^(cmd/.*|pkg/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+  run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
   steps:
     cluster_profile: gcp
     workflow: redhat-et-microshift-e2e-openshift-conformance-sig-scheduling
 - as: e2e-openshift-conformance-sig-storage
   optional: true
-  run_if_changed: ^(cmd/.*|pkg/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+  run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
   steps:
     cluster_profile: gcp
     workflow: redhat-et-microshift-e2e-openshift-conformance-sig-storage
 - as: e2e-reboot
   optional: true
-  run_if_changed: ^(cmd/.*|pkg/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+  run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
   steps:
     cluster_profile: gcp
     workflow: redhat-et-microshift-e2e-reboot-tests

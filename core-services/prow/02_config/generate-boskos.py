@@ -48,6 +48,9 @@ CONFIG = {
     'azurestack-quota-slice': {
         'ppe3': 2
     },
+    'azuremag-quota-slice': {
+        'usgovvirginia': 5
+    },
     'gcp-quota-slice': {
         'us-central1': 70,
     },
@@ -115,8 +118,8 @@ CONFIG = {
     },
 }
 
-for i in range(2):
-    for j in range(5):
+for i in range(3):
+    for j in range(4):
         CONFIG['libvirt-s390x-quota-slice']['libvirt-s390x-{}-{}'.format(i, j)] = 1
 
 for i in range(3):
@@ -137,7 +140,7 @@ for i in range(10, 24):
 for i in range(1, 7):
     CONFIG['ovirt-upgrade-quota-slice']['ovirt-upgrade-{}'.format(i)] = 1
 
-for i in range(78,98):
+for i in range(76,100):
     CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 for i in range(60,62):

@@ -13,4 +13,4 @@ python --version
 pushd /tmp
 git clone https://github.com/cloud-bulldozer/e2e-benchmarking
 pushd e2e-benchmarking/workloads/kube-burner
-./run_nodedensity_test_fromgit.sh
+./run_clusterdensity_test_fromgit.sh

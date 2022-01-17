@@ -141,6 +141,20 @@ if proxy_info="$(cat install-config.yaml | grep -oP 'httpProxy\s*:\s*\K.*')" ; t
   sed -i "/TimeoutStartSec=0/a Environment=HTTPS_PROXY=${proxy_info}" ./lb/haproxy.service
 fi
 
+# update haproxy image of haproxy.service on lb server if deploying cluster in a disconnected network
+if [ -f ${SHARED_DIR}/haproxy-router-image ]; then
+  echo "$(date -u --rfc-3339=seconds) - replace haproxy image with one in private registry on lb server"
+  tgt_haproxy_image=$(head -1 "${SHARED_DIR}/haproxy-router-image")
+  registry_auths=$(tail -1 "${SHARED_DIR}/haproxy-router-image")
+  src_haproxy_image=$(grep "podman pull" ./lb/haproxy.service | awk -F' ' '{print $3}')
+  sed -i "s#${src_haproxy_image}#${tgt_haproxy_image}#" ./lb/haproxy.service
+  sed -i "s#/bin/podman pull #/bin/podman pull --creds=${registry_auths} --tls-verify=false #" ./lb/haproxy.service
+fi
+
+if [ ${SECURE_BOOT_ENABLED} = "true" ]; then
+  sed -i '/guest_id/a\  firmware         = "efi"\n  efi_secure_boot_enabled = "true"' ./vm/main.tf
+fi
+
 date +%s > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
 echo "$(date -u --rfc-3339=seconds) - terraform init..."
@@ -212,9 +226,16 @@ cp -t "${SHARED_DIR}" \
     "${installer_dir}/auth/kubeconfig"
 
 # Maps e2e images on dockerhub to locally hosted mirror
-if [[ "$JOB_NAME" == *"4.6-e2e"* ]]; then
+if [[ $JOB_NAME =~ 4.6-e2e-vsphere.* ]]; then
   echo "Remapping dockerhub e2e images to local mirror for 4.6 e2e vSphere jobs"
   setE2eMirror
+  
+elif [[ $JOB_NAME =~ .*okd-4.*-e2e-vsphere.* ]]; then
+  echo "Remapping dockerhub e2e images to local mirror for OKD e2e vSphere jobs"
+  setE2eMirror
+
+  echo "Patching cluster-samples-operator for OKD e2e vSphere jobs"
+  oc --type=merge patch configs.samples.operator.openshift.io cluster -p='{"spec":{"samplesRegistry":"e2e-cache.vmc-ci.devcluster.openshift.com:5000"}}' -n openshift-cluster-samples-operator
 fi
 
 exit "$ret"

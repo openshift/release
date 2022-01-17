@@ -74,6 +74,8 @@ then
   mkfs.xfs -f "\${NVME_DEVICE}"
   mkdir -p "\${REPO_DIR}"
   mount "\${NVME_DEVICE}" "\${REPO_DIR}"
+  mkdir -p "\${REPO_DIR}"/minikube_home
+  echo "export MINIKUBE_HOME=\${REPO_DIR}/minikube_home" >> /root/config
 fi
 
 tar -xzvf assisted.tar.gz -C "\${REPO_DIR}"
@@ -99,6 +101,11 @@ echo "export SERVICE=${ASSISTED_SERVICE_IMAGE}" >> /root/config
 echo "export AGENT_DOCKER_IMAGE=${ASSISTED_AGENT_IMAGE}" >> /root/config
 echo "export CONTROLLER_IMAGE=${ASSISTED_CONTROLLER_IMAGE}" >> /root/config
 echo "export INSTALLER_IMAGE=${ASSISTED_INSTALLER_IMAGE}" >> /root/config
+# Most jobs and tests don't require this image, so this allows it as optional
+if [ "${PROVIDER_IMAGE}" != "${ASSISTED_CONTROLLER_IMAGE}" ];
+then
+  echo "export PROVIDER_IMAGE=${PROVIDER_IMAGE}" >> /root/config
+fi
 
 # expr command's return value is 1 in case of a false expression. We don't want to exit in this case.
 set +e
@@ -106,9 +113,6 @@ IS_REHEARSAL=\$(expr "${REPO_OWNER:-}" = "openshift" "&" "${REPO_NAME:-}" = "rel
 set -e
 
 if [ "${JOB_TYPE:-}" = "presubmit" ] && (( ! \${IS_REHEARSAL} )); then
-  # We would like to keep running a stable version for PRs
-  echo "export OPENSHIFT_VERSION=4.8" >> /root/config
-
   if [ "${REPO_NAME:-}" = "assisted-service" ]; then
     echo "export SERVICE_BRANCH=${PULL_PULL_SHA:-master}" >> /root/config
   fi
@@ -133,6 +137,9 @@ if [[ -e /root/assisted-additional-config ]]; then
 fi
 
 source /root/config
+
+# TODO: remove once we finished moving to the new dockerfile
+export TEST_INFRA_DOCKERFILE=Dockerfile.assisted-test-infra
 
 make \${MAKEFILE_TARGET:-create_full_environment run test_parallel}
 

@@ -105,6 +105,10 @@ data:
           - host
           - invoker
       relabel_configs:
+      - action: drop
+        regex: ''
+        source_labels:
+        - __meta_kubernetes_pod_annotation_kubernetes_io_config_mirror
       - source_labels:
         - __meta_kubernetes_pod_label_name
         target_label: __service__
@@ -134,6 +138,60 @@ data:
         separator: "/"
         source_labels:
         - __meta_kubernetes_pod_uid
+        - __meta_kubernetes_pod_container_name
+        target_label: __path__
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_(.+)
+    - job_name: kubernetes-pods-static
+      pipeline_stages:
+      - cri: {}
+      - labeldrop:
+        - filename
+      - pack:
+          labels:
+          - namespace
+          - pod_name
+          - container_name
+          - app
+      - labelallow:
+          - host
+          - invoker
+      kubernetes_sd_configs:
+      - role: pod
+      relabel_configs:
+      - action: drop
+        regex: ''
+        source_labels:
+        - __meta_kubernetes_pod_uid
+      - source_labels:
+        - __meta_kubernetes_pod_label_name
+        target_label: __service__
+      - source_labels:
+        - __meta_kubernetes_pod_node_name
+        target_label: __host__
+      - action: replace
+        replacement:
+        separator: "/"
+        source_labels:
+        - __meta_kubernetes_namespace
+        - __service__
+        target_label: job
+      - action: replace
+        source_labels:
+        - __meta_kubernetes_namespace
+        target_label: namespace
+      - action: replace
+        source_labels:
+        - __meta_kubernetes_pod_name
+        target_label: pod_name
+      - action: replace
+        source_labels:
+        - __meta_kubernetes_pod_container_name
+        target_label: container_name
+      - replacement: /var/log/pods/*\$1/*.log
+        separator: /
+        source_labels:
+        - __meta_kubernetes_pod_annotation_kubernetes_io_config_mirror
         - __meta_kubernetes_pod_container_name
         target_label: __path__
       - action: labelmap
@@ -300,7 +358,7 @@ spec:
         - --cookie-secret-file=/etc/tls/cookie-secret/cookie-secret
         - '--openshift-sar={"resource": "namespaces", "verb": "get"}'
         - '--openshift-delegate-urls={"/": {"resource": "namespaces", "verb": "get"}}'
-        image: quay.io/openshift/origin-oauth-proxy:4.7
+        image: registry.redhat.io/openshift4/ose-oauth-proxy:latest
         imagePullPolicy: IfNotPresent
         name: oauth-proxy
         ports:
@@ -491,7 +549,9 @@ metadata:
   name: loki-promtail
   namespace: loki
 EOF
-cat >> "${SHARED_DIR}/manifest_metrics.yml" << EOF
+if [ -n "${LOKI_USE_SERVICEMONITOR:-}" ]; then
+  echo "Including Loki servicemonitor manifests (LOKI_USE_SERVICEMONITOR='${LOKI_USE_SERVICEMONITOR}')"
+  cat >> "${SHARED_DIR}/manifest_metrics.yml" << EOF
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
@@ -516,7 +576,7 @@ spec:
       - loki
   selector: {}
 EOF
-cat >> "${SHARED_DIR}/manifest_metrics_role.yml" << EOF
+  cat >> "${SHARED_DIR}/manifest_metrics_role.yml" << EOF
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -534,7 +594,7 @@ rules:
   - list
   - watch
 EOF
-cat >> "${SHARED_DIR}/manifest_metrics_rb.yml" << EOF
+  cat >> "${SHARED_DIR}/manifest_metrics_rb.yml" << EOF
 kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
@@ -549,6 +609,7 @@ subjects:
     name: prometheus-k8s
     namespace: openshift-monitoring
 EOF
+fi
 
 echo "Promtail manifests created, the cluster can be found at https://grafana-loki.ci.openshift.org/explore using '{invoker=\"${OPENSHIFT_INSTALL_INVOKER}\"} | unpack' query. See https://gist.github.com/vrutkovs/ef7cc9bca50f5f49d7eab831e3f082d8 for Loki cheat sheet."
 

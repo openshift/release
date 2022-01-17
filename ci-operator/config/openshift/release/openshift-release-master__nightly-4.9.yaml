@@ -3,6 +3,10 @@ base_images:
     name: "4.9"
     namespace: ocp
     tag: ansible
+  assisted-image-service:
+    name: ocm-2.5
+    namespace: edge-infrastructure
+    tag: assisted-image-service
   assisted-installer:
     name: ocm-2.5
     namespace: edge-infrastructure
@@ -20,8 +24,8 @@ base_images:
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: assisted-test
-    namespace: ocp-kni
+    name: ocm-2.5
+    namespace: edge-infrastructure
     tag: assisted-test-infra
   aws-ebs-csi-driver-operator-test:
     name: "4.9"
@@ -47,6 +51,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  driver-toolkit-tests:
+    name: "4.9"
+    namespace: ocp
+    tag: driver-toolkit-tests
   gcp-pd-csi-driver-operator-test:
     name: "4.9"
     namespace: ocp
@@ -535,6 +543,19 @@ tests:
           cpu: 100m
           memory: 600Mi
     workflow: ipi-azure
+- as: e2e-aws-driver-toolkit
+  cron: 0 */8 * * *
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: driver-toolkit-tests
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: openshift

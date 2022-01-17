@@ -1,11 +1,11 @@
 base_images:
   assisted-installer-agent:
-    name: "2.4"
-    namespace: open-cluster-management
+    name: ocm-2.4
+    namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-service:
-    name: "2.4"
-    namespace: open-cluster-management
+    name: ocm-2.4
+    namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
     name: assisted-test
@@ -42,8 +42,8 @@ images:
       - registry.ci.openshift.org/openshift/release:golang-1.16
   to: assisted-installer-controller
 promotion:
-  name: "2.4"
-  namespace: open-cluster-management
+  name: ocm-2.4
+  namespace: edge-infrastructure
 releases:
   initial:
     integration:
@@ -78,6 +78,7 @@ tests:
     dependencies:
       SOURCE_IMAGE_REF: assisted-installer-controller
     env:
+      IMAGE_REPO: assisted-installer-controller
       RELEASE_TAG_PREFIX: ocm-2.4
     test:
     - ref: baremetalds-assisted-images-publish
@@ -96,6 +97,7 @@ tests:
     dependencies:
       SOURCE_IMAGE_REF: assisted-installer-controller
     env:
+      IMAGE_REPO: assisted-installer-controller
       RELEASE_TAG_PREFIX: ocm-2.4
     test:
     - ref: baremetalds-assisted-images-publish
@@ -146,8 +148,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=release-ocm-2.4
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-ipv6
   optional: true
   steps:
@@ -156,8 +157,7 @@ tests:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=release-ocm-2.4
         IPv6=yes
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-single-node
   optional: true
   steps:
@@ -167,8 +167,7 @@ tests:
         SERVICE_BASE_REF=release-ocm-2.4
         IPv6=yes
         NUM_MASTERS=1
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-olm
   optional: true
   run_if_changed: ^(src/assisted_installer_controller/.*)$
@@ -178,8 +177,7 @@ tests:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=release-ocm-2.4
         TEST_FUNC=test_olm_operator
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 zz_generated_metadata:
   branch: release-ocm-2.4
   org: openshift

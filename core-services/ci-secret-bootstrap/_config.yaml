@@ -289,6 +289,14 @@ secret_configs:
     name: github-app-credentials-private
     namespace: ci
 - from:
+    config.json:
+      field: client-configuration
+      item: private-deck-poc-ci.apps.ci.l2s4.p1.openshiftapps.com
+  to:
+  - cluster: app.ci
+    name: github-app-private-deck-poc
+    namespace: ci
+- from:
     cookie:
       field: cookie32
       item: prow.ci.openshift.org
@@ -353,6 +361,15 @@ secret_configs:
   - cluster_groups:
     - build_farm
     name: gce-sa-credentials-gcs-private
+    namespace: ci
+- from:
+    service-account.json:
+      field: credentials.json
+      item: gcs-private-deck-poc
+  to:
+  - cluster_groups:
+    - build_farm
+    name: gce-sa-credentials-gcs-private-deck-poc
     namespace: ci
 - from:
     service-account.json:
@@ -1529,6 +1546,39 @@ secret_configs:
     name: cluster-secrets-azure4
     namespace: ci
 - from:
+    pull-secret:
+      dockerconfigJSON:
+      - auth_field: token_image-puller_app.ci_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.ci.openshift.org
+      - auth_field: auth
+        email_field: email
+        item: cloud.openshift.com-pull-secret
+        registry_url: cloud.openshift.com
+      - auth_field: auth
+        email_field: email
+        item: quay.io-pull-secret
+        registry_url: quay.io
+      - auth_field: auth
+        email_field: email
+        item: registry.connect.redhat.com-pull-secret
+        registry_url: registry.connect.redhat.com
+      - auth_field: auth
+        email_field: email
+        item: registry.redhat.io-pull-secret
+        registry_url: registry.redhat.io
+    ssh-privatekey:
+      field: ssh-privatekey
+      item: jenkins-ci-iam
+    ssh-publickey:
+      field: ssh-publickey
+      item: jenkins-ci-iam
+  to:
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-azuremag
+    namespace: ci
+- from:
     osServicePrincipal.json:
       field: osServicePrincipal.json
       item: os4-installer.openshift-ci.azure
@@ -2249,6 +2299,14 @@ secret_configs:
   to:
   - cluster: app.ci
     name: openshift-private-viewer
+    namespace: ci
+- from:
+    credentials.json:
+      field: credentials.json
+      item: private-deck-poc-viewer
+  to:
+  - cluster: app.ci
+    name: private-deck-poc-viewer
     namespace: ci
 - from:
     app_id:
