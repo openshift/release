@@ -7,6 +7,8 @@ set -o pipefail
 export PROMTAIL_IMAGE="quay.io/openshift-cr/promtail"
 export PROMTAIL_VERSION="v2.4.1"
 export LOKI_ENDPOINT=https://observatorium.api.stage.openshift.com/api/logs/v1/dptp/loki/api/v1
+export KUBERNETES_EVENT_EXPORTER_IMAGE="ghcr.io/opsgenie/kubernetes-event-exporter"
+export KUBERNETES_EVENT_EXPORTER_VERSION="v0.11"
 
 GRAFANACLOUND_USERNAME=$(cat /var/run/loki-grafanacloud-secret/client-id)
 export OPENSHIFT_INSTALL_INVOKER="openshift-internal-ci/${JOB_NAME}/${BUILD_ID}"
@@ -93,6 +95,9 @@ data:
       - role: pod
       pipeline_stages:
       - cri: {}
+      - match:
+          selector: '{app="event-exporter", namespace="loki"}'
+          action: drop
       - labeldrop:
         - filename
       - pack:
@@ -104,6 +109,7 @@ data:
       - labelallow:
           - host
           - invoker
+          - audit
       relabel_configs:
       - action: drop
         regex: ''
@@ -236,6 +242,33 @@ data:
         labels:
           audit: oauth-apiserver
           __path__: /var/log/oauth-apiserver/audit.log
+    - job_name: events
+      kubernetes_sd_configs:
+      - role: pod
+      pipeline_stages:
+      - cri: {}
+      - match:
+          selector: '{app="event-exporter", namespace="loki"}'
+          stages:
+          - static_labels:
+              audit: events
+      - labelallow:
+          - host
+          - invoker
+          - audit
+      relabel_configs:
+      - action: replace
+        source_labels:
+        - __meta_kubernetes_namespace
+        target_label: namespace
+      - replacement: "/var/log/pods/*\$1/*.log"
+        separator: "/"
+        source_labels:
+        - __meta_kubernetes_pod_uid
+        - __meta_kubernetes_pod_container_name
+        target_label: __path__
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_(.+)
     server:
       http_listen_port: 3101
     target_config:
@@ -610,6 +643,77 @@ subjects:
     namespace: openshift-monitoring
 EOF
 fi
+
+cat >> "${SHARED_DIR}/manifest_eventexporter_sa.yml" << EOF
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  namespace: loki
+  name: event-exporter
+EOF
+cat >> "${SHARED_DIR}/manifest_eventexporter_crb.yml" << EOF
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: event-exporter
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: view
+subjects:
+  - kind: ServiceAccount
+    namespace: loki
+    name: event-exporter
+EOF
+cat >> "${SHARED_DIR}/manifest_eventexporter_config.yml" << EOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: event-exporter-cfg
+  namespace: loki
+data:
+  config.yaml: |
+    logLevel: error
+    logFormat: json
+    route:
+      routes:
+        - match:
+            - receiver: "dump"
+    receivers:
+      - name: "dump"
+        stdout: {}
+EOF
+cat >> "${SHARED_DIR}/manifest_eventexporter_deployment.yml" << EOF
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: event-exporter
+  namespace: loki
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: event-exporter
+    spec:
+      serviceAccountName: event-exporter
+      containers:
+        - name: event-exporter
+          image: ${KUBERNETES_EVENT_EXPORTER_IMAGE}:${KUBERNETES_EVENT_EXPORTER_VERSION}
+          imagePullPolicy: IfNotPresent
+          args:
+            - -conf=/data/config.yaml
+          volumeMounts:
+            - mountPath: /data
+              name: cfg
+      volumes:
+        - name: cfg
+          configMap:
+            name: event-exporter-cfg
+  selector:
+    matchLabels:
+      app: event-exporter
+EOF
 
 echo "Promtail manifests created, the cluster can be found at https://grafana-loki.ci.openshift.org/explore using '{invoker=\"${OPENSHIFT_INSTALL_INVOKER}\"} | unpack' query. See https://gist.github.com/vrutkovs/ef7cc9bca50f5f49d7eab831e3f082d8 for Loki cheat sheet."
 
