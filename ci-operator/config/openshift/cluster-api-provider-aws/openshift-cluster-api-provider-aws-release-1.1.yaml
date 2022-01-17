@@ -3,10 +3,10 @@ base_images:
     name: "4.10"
     namespace: ocp
     tag: base
-  openshift_release_golang-1.17:
-    name: release
-    namespace: openshift
-    tag: golang-1.17
+  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.17-openshift-4.10
 build_root:
   image_stream_tag:
     name: release
@@ -18,7 +18,7 @@ images:
     value: amd64
   - name: ldflags
   dockerfile_literal: |-
-    FROM registry.ci.openshift.org/openshift/release:golang-1.17 as toolchain
+    FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10 as toolchain
 
     # Run this with docker build --build_arg $(go env GOPROXY) to override the goproxy
     ARG goproxy=https://proxy.golang.org
@@ -59,9 +59,9 @@ images:
     ENTRYPOINT ["/manager"]
   from: base
   inputs:
-    openshift_release_golang-1.17:
+    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.17
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
   to: cluster-api-aws-controller
 promotion:
   namespace: hypershift

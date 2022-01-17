@@ -55,7 +55,6 @@ function queue() {
   fi
 }
 
-export PATH=$PATH:/tmp/shared
 echo "Gathering artifacts ..."
 mkdir -p ${ARTIFACT_DIR}/pods ${ARTIFACT_DIR}/nodes ${ARTIFACT_DIR}/metrics ${ARTIFACT_DIR}/bootstrap ${ARTIFACT_DIR}/network ${ARTIFACT_DIR}/oc_cmds
 
