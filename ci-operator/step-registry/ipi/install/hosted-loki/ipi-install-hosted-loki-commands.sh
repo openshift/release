@@ -17,7 +17,7 @@ cat >> "${SHARED_DIR}/manifest_01_ns.yml" << EOF
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: loki
+  name: openshift-e2e-loki
 EOF
 cat >> "${SHARED_DIR}/manifest_clusterrole.yml" << EOF
 apiVersion: rbac.authorization.k8s.io/v1
@@ -65,14 +65,14 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: loki-promtail
-  namespace: loki
+  namespace: openshift-e2e-loki
 EOF
 cat >> "${SHARED_DIR}/manifest_cm.yml" << EOF
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: loki-promtail
-  namespace: loki
+  namespace: openshift-e2e-loki
 data:
   promtail.yaml: |-
     clients:
@@ -96,7 +96,7 @@ data:
       pipeline_stages:
       - cri: {}
       - match:
-          selector: '{app="event-exporter", namespace="loki"}'
+          selector: '{app="event-exporter", namespace="openshift-e2e-loki"}'
           action: drop
       - labeldrop:
         - filename
@@ -248,7 +248,7 @@ data:
       pipeline_stages:
       - cri: {}
       - match:
-          selector: '{app="event-exporter", namespace="loki"}'
+          selector: '{app="event-exporter", namespace="openshift-e2e-loki"}'
           stages:
           - static_labels:
               audit: events
@@ -279,7 +279,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: promtail-creds
-  namespace: loki
+  namespace: openshift-e2e-loki
 data:
   client-id: "$(cat /var/run/loki-secret/client-id | base64 -w 0)"
   client-secret: "$(cat /var/run/loki-secret/client-secret | base64 -w 0)"
@@ -289,7 +289,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: promtail-grafanacom-creds
-  namespace: loki
+  namespace: openshift-e2e-loki
 data:
   password: "$(cat /var/run/loki-grafanacloud-secret/client-secret | base64 -w 0)"
 EOF
@@ -298,7 +298,7 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: loki-promtail
-  namespace: loki
+  namespace: openshift-e2e-loki
 spec:
   selector:
     matchLabels:
@@ -459,7 +459,7 @@ kind: Secret
 apiVersion: v1
 metadata:
   name: cookie-secret
-  namespace: loki
+  namespace: openshift-e2e-loki
 data:
   cookie-secret: Y2I3YzljNmJxaGQ5dndwdjV3ZHQ2YzVwY3B6MnI0Zmo=
 type: Opaque
@@ -471,7 +471,7 @@ metadata:
   annotations:
     service.beta.openshift.io/serving-cert-secret-name: proxy-tls
   name: promtail
-  namespace: loki
+  namespace: openshift-e2e-loki
 spec:
   ports:
     - name: metrics
@@ -514,7 +514,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: loki-promtail
-  namespace: loki
+  namespace: openshift-e2e-loki
 rules:
 - apiGroups:
   - extensions
@@ -530,7 +530,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: loki-promtail
-  namespace: loki
+  namespace: openshift-e2e-loki
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -544,7 +544,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: loki-promtail-oauth
-  namespace: loki
+  namespace: openshift-e2e-loki
 rules:
 - apiGroups:
   - authentication.k8s.io
@@ -573,14 +573,14 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: loki-promtail
-  namespace: loki
+  namespace: openshift-e2e-loki
 EOF
 cat >> "${SHARED_DIR}/manifest_sa.yml" << EOF
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: loki-promtail
-  namespace: loki
+  namespace: openshift-e2e-loki
 EOF
 if [ -n "${LOKI_USE_SERVICEMONITOR:-}" ]; then
   echo "Including Loki servicemonitor manifests (LOKI_USE_SERVICEMONITOR='${LOKI_USE_SERVICEMONITOR}')"
@@ -606,7 +606,7 @@ spec:
         serverName: promtail.loki.svc
   namespaceSelector:
     matchNames:
-      - loki
+      - openshift-e2e-loki
   selector: {}
 EOF
   cat >> "${SHARED_DIR}/manifest_metrics_role.yml" << EOF
@@ -614,7 +614,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: promtail-prometheus
-  namespace: loki
+  namespace: openshift-e2e-loki
 rules:
 - apiGroups:
   - ""
@@ -632,7 +632,7 @@ kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: prom-scrape-loki
-  namespace: loki
+  namespace: openshift-e2e-loki
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -648,7 +648,7 @@ cat >> "${SHARED_DIR}/manifest_eventexporter_sa.yml" << EOF
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  namespace: loki
+  namespace: openshift-e2e-loki
   name: event-exporter
 EOF
 cat >> "${SHARED_DIR}/manifest_eventexporter_crb.yml" << EOF
@@ -662,7 +662,7 @@ roleRef:
   name: view
 subjects:
   - kind: ServiceAccount
-    namespace: loki
+    namespace: openshift-e2e-loki
     name: event-exporter
 EOF
 cat >> "${SHARED_DIR}/manifest_eventexporter_config.yml" << EOF
@@ -670,7 +670,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: event-exporter-cfg
-  namespace: loki
+  namespace: openshift-e2e-loki
 data:
   config.yaml: |
     logLevel: error
@@ -688,7 +688,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: event-exporter
-  namespace: loki
+  namespace: openshift-e2e-loki
 spec:
   replicas: 1
   template:
