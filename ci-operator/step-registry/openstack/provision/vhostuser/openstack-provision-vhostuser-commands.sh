@@ -78,14 +78,14 @@ function check_workers_updated() {
 
 export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
 
-if [[ ${OPENSTACK_PERFORMANCE_NETWORK} == "" ]]; then
-    echo "OPENSTACK_PERFORMANCE_NETWORK is not set"
+if [[ ${OPENSTACK_DPDK_NETWORK} == "" ]]; then
+    echo "OPENSTACK_DPDK_NETWORK is not set"
     exit 1
 fi
 
-NETWORK_ID=$(openstack network show "${OPENSTACK_PERFORMANCE_NETWORK}" -f value -c id)
+NETWORK_ID=$(openstack network show "${OPENSTACK_DPDK_NETWORK}" -f value -c id)
 if [[ "${NETWORK_ID}" == "" ]]; then
-    echo "Failed to find network ${OPENSTACK_PERFORMANCE_NETWORK}"
+    echo "Failed to find network ${OPENSTACK_DPDK_NETWORK}"
     exit 1
 fi
 

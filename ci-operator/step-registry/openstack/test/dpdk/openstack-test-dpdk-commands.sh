@@ -35,7 +35,7 @@ function check_pod_status() {
     done
 }
 
-CNF_NAMESPACE="example-cnf"
+CNF_NAMESPACE="example-cnf-dpdk"
 export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
 
 # For disconnected or otherwise unreachable environments, we want to
@@ -59,25 +59,25 @@ EOF
 )
 echo "Created \"$CNF_NAMESPACE\" Namespace"
 
-if ! openstack network show "${OPENSTACK_PERFORMANCE_NETWORK}" >/dev/null 2>&1; then
-    echo "Network ${OPENSTACK_PERFORMANCE_NETWORK} doesn't exist"
+if ! openstack network show "${OPENSTACK_DPDK_NETWORK}" >/dev/null 2>&1; then
+    echo "Network ${OPENSTACK_DPDK_NETWORK} doesn't exist"
     exit 1
 fi
 
 cat <<EOF > "${SHARED_DIR}/additionalnetwork.yaml"
 spec:
   additionalNetworks:
-  - name: ${OPENSTACK_PERFORMANCE_NETWORK}
+  - name: ${OPENSTACK_DPDK_NETWORK}
     namespace: ${CNF_NAMESPACE}
-    rawCNIConfig: '{ "cniVersion": "0.3.1", "name": "${OPENSTACK_PERFORMANCE_NETWORK}", "type": "host-device","pciBusId": "0000:00:04.0", "ipam": {}}'
+    rawCNIConfig: '{ "cniVersion": "0.3.1", "name": "${OPENSTACK_DPDK_NETWORK}", "type": "host-device","pciBusId": "0000:00:04.0", "ipam": {}}'
     type: Raw
 EOF
 oc patch network.operator cluster --patch "$(cat "${SHARED_DIR}/additionalnetwork.yaml")" --type=merge
 # Give the operator some time to apply the patch
 sleep 5
 
-NETWORK_ATTACHED=$(oc get network-attachment-definitions "${OPENSTACK_PERFORMANCE_NETWORK}" -n "${CNF_NAMESPACE}" -o jsonpath='{.metadata.name}')
-if [[ "${NETWORK_ATTACHED}" == "${OPENSTACK_PERFORMANCE_NETWORK}" ]]; then
+NETWORK_ATTACHED=$(oc get network-attachment-definitions "${OPENSTACK_DPDK_NETWORK}" -n "${CNF_NAMESPACE}" -o jsonpath='{.metadata.name}')
+if [[ "${NETWORK_ATTACHED}" == "${OPENSTACK_DPDK_NETWORK}" ]]; then
     echo "Successfully Added additional network to the Network Operator"
 else
     echo "Failed to add additional network to the Network Operator"
@@ -90,10 +90,10 @@ CNF_POD=$(
 apiVersion: v1
 kind: Pod
 metadata:
-  name: testpmd-host-device
+  name: testpmd-host-device-dpdk
   namespace: ${CNF_NAMESPACE}
   annotations:
-    k8s.v1.cni.cncf.io/networks: ${OPENSTACK_PERFORMANCE_NETWORK}
+    k8s.v1.cni.cncf.io/networks: ${OPENSTACK_DPDK_NETWORK}
 spec:
   containers:
   - name: testpmd
@@ -145,4 +145,4 @@ else
     exit 1
 fi
 
-echo "Successfully ran NFV tests"
+echo "Successfully ran NFV DPDK tests"
