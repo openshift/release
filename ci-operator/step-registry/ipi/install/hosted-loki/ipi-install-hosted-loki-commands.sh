@@ -453,6 +453,9 @@ spec:
           secretName: cookie-secret
   updateStrategy:
     type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 10%
+      maxSurge: 0
 EOF
 cat >> "${SHARED_DIR}/manifest_promtail_cookie_secret.yml" << EOF
 kind: Secret
