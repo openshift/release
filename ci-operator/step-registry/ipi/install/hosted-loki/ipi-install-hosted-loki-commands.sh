@@ -603,7 +603,7 @@ spec:
         ca: {}
         caFile: /etc/prometheus/configmaps/serving-certs-ca-bundle/service-ca.crt
         cert: {}
-        serverName: promtail.loki.svc
+        serverName: promtail.openshift-e2e-loki.svc
   namespaceSelector:
     matchNames:
       - openshift-e2e-loki
