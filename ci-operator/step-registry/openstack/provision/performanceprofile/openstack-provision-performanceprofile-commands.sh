@@ -94,11 +94,13 @@ CPU_RESERVED="${CPU_RESERVED:-0-1}"
 oc_version=$(oc version -o json | jq -r '.openshiftVersion')
 # Once 4.10 is GA, we need to bump it to 4.11 and so on.
 if [[ "${oc_version}" == *"4.10"* ]]; then
-    git clone https://github.com/openshift-kni/performance-addon-operators
-    pushd performance-addon-operators
-    CLUSTER=manual make cluster-deploy
-    oc delete PerformanceProfile manual
+    git clone https://github.com/openshift-kni/performance-addon-operators /tmp/performance-addon-operators
+    pushd /tmp/performance-addon-operators
+    export CLUSTER=manual
+    export FULL_INDEX_IMAGE="quay.io/openshift-kni/performance-addon-operator-index:4.10-snapshot"
+    ./hack/deploy.sh
     popd
+    oc delete PerformanceProfile manual
 else
     PAO_NAMESPACE=$(
         oc create -f - -o jsonpath='{.metadata.name}' <<EOF
