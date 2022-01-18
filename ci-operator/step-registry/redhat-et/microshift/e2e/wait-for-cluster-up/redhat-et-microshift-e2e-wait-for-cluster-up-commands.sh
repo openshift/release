@@ -37,7 +37,7 @@ cat > "${HOME}"/wait_for_node_ready.sh <<'EOF'
 #!/bin/bash
 set -xeuo pipefail
 
-systemctl enable --now microshift.service
+trap "sudo journalctl -eu microshift" EXIT
 
 sudo podman cp microshift:/var/lib/microshift/resources/kubeadmin/kubeconfig kubeconfig
 sudo chown $(whoami): kubeconfig
@@ -77,16 +77,10 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   --recurse "${HOME}"/wait_for_node_ready.sh rhel8user@"${INSTANCE_PREFIX}":~/wait_for_node_ready.sh
 
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
-  --quiet \
-  --project "${GOOGLE_PROJECT_ID}" \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  --recurse "${HOME}"/wait_for_node_ready.sh rhel8user@"${INSTANCE_PREFIX}":~/wait_for_node_ready.sh
-
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
-  --command 'sudo systemctl enable --now microshift.service'
+  --command 'sudo systemctl enable --now microshift.service && /home/rhel8user/wait_for_node_ready.sh'
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
