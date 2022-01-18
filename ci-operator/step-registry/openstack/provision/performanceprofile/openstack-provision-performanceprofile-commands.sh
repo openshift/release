@@ -91,8 +91,17 @@ HUGEPAGES="${HUGEPAGES:-1}"
 CPU_ISOLATED="${CPU_ISOLATED:-2-7}"
 CPU_RESERVED="${CPU_RESERVED:-0-1}"
 
-PAO_NAMESPACE=$(
-    oc create -f - -o jsonpath='{.metadata.name}' <<EOF
+oc_version=$(oc version -o json | jq -r '.openshiftVersion')
+# Once 4.10 is GA, we need to bump it to 4.11 and so on.
+if [[ "${oc_version}" == *"4.10"* ]]; then
+    git clone https://github.com/openshift-kni/performance-addon-operators
+    pushd performance-addon-operators
+    CLUSTER=manual make cluster-deploy
+    oc delete PerformanceProfile manual
+    popd
+else
+    PAO_NAMESPACE=$(
+        oc create -f - -o jsonpath='{.metadata.name}' <<EOF
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -100,23 +109,23 @@ metadata:
   annotations:
     workload.openshift.io/allowed: management
 EOF
-)
-echo "Created \"$PAO_NAMESPACE\" Namespace"
-
-PAO_OPERATORGROUP=$(
-    oc create -f - -o jsonpath='{.metadata.name}' <<EOF
+    )
+    echo "Created \"$PAO_NAMESPACE\" Namespace"
+    
+    PAO_OPERATORGROUP=$(
+        oc create -f - -o jsonpath='{.metadata.name}' <<EOF
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
   name: openshift-performance-addon-operator
   namespace: openshift-performance-addon-operator
 EOF
-)
-echo "Created \"$PAO_OPERATORGROUP\" OperatorGroup"
-
-channel=$(oc get packagemanifest performance-addon-operator -n openshift-marketplace -o jsonpath='{.status.defaultChannel}')
-PAO_SUBSCRIPTION=$(
-    oc create -f - -o jsonpath='{.metadata.name}' <<EOF
+    )
+    echo "Created \"$PAO_OPERATORGROUP\" OperatorGroup"
+    
+    channel=$(oc get packagemanifest performance-addon-operator -n openshift-marketplace -o jsonpath='{.status.defaultChannel}')
+    PAO_SUBSCRIPTION=$(
+        oc create -f - -o jsonpath='{.metadata.name}' <<EOF
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
@@ -128,26 +137,28 @@ spec:
   source: redhat-operators 
   sourceNamespace: openshift-marketplace
 EOF
-)
-echo "Created \"$PAO_SUBSCRIPTION\" Subscription"
+    )
+    echo "Created \"$PAO_SUBSCRIPTION\" Subscription"
 
-# Wait up to 15 minutes for PAO to be installed
-for _ in $(seq 1 90); do
-    PAO_CSV=$(oc -n "${PAO_NAMESPACE}" get subscription "${PAO_SUBSCRIPTION}" -o jsonpath='{.status.installedCSV}' || true)
-    if [ -n "$PAO_CSV" ]; then
-        if [[ "$(oc -n "${PAO_NAMESPACE}" get csv "${PAO_CSV}" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
-            FOUND_PAO=1
-            break
+    # Wait up to 15 minutes for PAO to be installed
+    for _ in $(seq 1 90); do
+        PAO_CSV=$(oc -n "${PAO_NAMESPACE}" get subscription "${PAO_SUBSCRIPTION}" -o jsonpath='{.status.installedCSV}' || true)
+        if [ -n "$PAO_CSV" ]; then
+            if [[ "$(oc -n "${PAO_NAMESPACE}" get csv "${PAO_CSV}" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
+                FOUND_PAO=1
+                break
+            fi
         fi
+        echo "Waiting for PAO to be installed"
+        sleep 10
+    done
+
+    if [ -n "${FOUND_PAO:-}" ] ; then
+        echo "PAO was installed successfully"
+    else
+        echo "PAO was not installed after 15 minutes"
+        exit 1
     fi
-    echo "Waiting for PAO to be installed"
-    sleep 10
-done
-if [ -n "${FOUND_PAO}" ] ; then
-    echo "PAO was installed successfully"
-else
-    echo "PAO was not installed after 15 minutes"
-    exit 1
 fi
 
 PAO_PROFILE=$(
