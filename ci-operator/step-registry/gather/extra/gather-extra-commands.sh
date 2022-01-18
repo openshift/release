@@ -158,12 +158,32 @@ echo "INFO:   gziping to ${output_dir}/${node}-${fname}.gz";
 FILTER=gzip queue ${output_dir}/${node}-${fname}.gz oc --insecure-skip-tls-verify adm node-logs ${node} --path=/tcpdump/${fname}
 done < ${output_dir}.tcpdump_listing
 
+function gather_network() {
+  local namespace=$1
+  local selector=$2
+  local container=$3
 
-# Snapshot iptables-save on each node for debugging possible kube-proxy issues
-oc --insecure-skip-tls-verify get --request-timeout=20s -n openshift-sdn -l app=sdn pods --template '{{ range .items }}{{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/sdn-pods
-while IFS= read -r i; do
-  queue ${ARTIFACT_DIR}/network/iptables-save-$i oc --insecure-skip-tls-verify --request-timeout=20s rsh -n openshift-sdn -c sdn $i iptables-save -c
-done < /tmp/sdn-pods
+  if ! oc --insecure-skip-tls-verify --request-timeout=20s get ns ${namespace}; then
+    echo "Namespace ${namespace} does not exist, skipping ${namespace} network pods"
+    return
+  fi
+
+  local podlist="/tmp/${namespace}-pods"
+
+  # Snapshot iptables-save on each node for debugging possible kube-proxy issues
+  oc --insecure-skip-tls-verify --request-timeout=20s get -n "${namespace}" -l "${selector}" pods --template '{{ range .items }}{{ .metadata.name }}{{ "\n" }}{{ end }}' > ${podlist}
+  while IFS= read -r i; do
+    queue ${ARTIFACT_DIR}/network/iptables-save-$i oc --insecure-skip-tls-verify --request-timeout=20s rsh -n ${namespace} -c ${container} $i iptables-save -c
+  done < ${podlist}
+  # Snapshot all used ports on each node.
+  while IFS= read -r i; do
+    queue ${ARTIFACT_DIR}/network/ss-$i oc --insecure-skip-tls-verify --request-timeout=20s rsh -n ${namespace} -c ${container} $i ss -apn
+  done < ${podlist}
+}
+
+# Gather network details both from SDN and OVN. One of them should succeed.
+gather_network openshift-sdn app=sdn sdn
+gather_network openshift-ovn-kubernetes app=ovnkube-node ovnkube-node
 
 while IFS= read -r i; do
   file="$( echo "$i" | cut -d ' ' -f 3 | tr -s ' ' '_' )"
@@ -338,6 +358,20 @@ ${t_test}    cluster:api:read:test:requests sum(increase(apiserver_request_total
 ${t_all}     cluster:api:write:total:requests sum(increase(apiserver_request_total{verb!~"GET|LIST|WATCH"}[${d_all}]))
 ${t_install} cluster:api:write:install:requests sum(increase(apiserver_request_total{verb!~"GET|LIST|WATCH"}[${d_install}]))
 ${t_test}    cluster:api:write:test:requests sum(increase(apiserver_request_total{verb!~"GET|LIST|WATCH"}[${d_test}]))
+
+${t_all}     cluster:api:read:requests:latency:total:quantile histogram_quantile(0.99, sum(rate(apiserver_request_duration_seconds_bucket{job="apiserver",verb=~"GET|LIST"}[${d_all}])) by (le,scope))
+${t_install} cluster:api:read:requests:latency:install:quantile histogram_quantile(0.99, sum(rate(apiserver_request_duration_seconds_bucket{job="apiserver",verb=~"GET|LIST"}[${d_install}])) by (le,scope))
+${t_test}    cluster:api:read:requests:latency:test:quantile histogram_quantile(0.99, sum(rate(apiserver_request_duration_seconds_bucket{job="apiserver",verb=~"GET|LIST"}[${d_test}])) by (le,scope))
+${t_all}     cluster:api:write:requests:latency:total:quantile histogram_quantile(0.99, sum(rate(apiserver_request_duration_seconds_bucket{job="apiserver",verb=~"POST|PUT|PATCH|DELETE"}[${d_all}])) by (le,scope))
+${t_install} cluster:api:write:requests:latency:install:quantile histogram_quantile(0.99, sum(rate(apiserver_request_duration_seconds_bucket{job="apiserver",verb=~"POST|PUT|PATCH|DELETE"}[${d_install}])) by (le,scope))
+${t_test}    cluster:api:write:requests:latency:test:quantile histogram_quantile(0.99, sum(rate(apiserver_request_duration_seconds_bucket{job="apiserver",verb=~"POST|PUT|PATCH|DELETE"}[${d_test}])) by (le,scope))
+
+${t_all}     cluster:api:read:requests:latency:total:avg sum(rate(apiserver_request_duration_seconds_sum{job="apiserver",verb=~"GET|LIST"}[${d_all}])) by (le,scope) / sum(rate(apiserver_request_duration_seconds_count{job="apiserver",verb=~"GET|LIST"}[${d_all}])) by (le,scope)
+${t_install} cluster:api:read:requests:latency:install:avg sum(rate(apiserver_request_duration_seconds_sum{job="apiserver",verb=~"GET|LIST"}[${d_install}])) by (le,scope) / sum(rate(apiserver_request_duration_seconds_count{job="apiserver",verb=~"GET|LIST"}[${d_install}])) by (le,scope)
+${t_test}    cluster:api:read:requests:latency:test:avg sum(rate(apiserver_request_duration_seconds_sum{job="apiserver",verb=~"GET|LIST"}[${d_test}])) by (le,scope) / sum(rate(apiserver_request_duration_seconds_count{job="apiserver",verb=~"GET|LIST"}[${d_test}])) by (le,scope)
+${t_all}     cluster:api:write:requests:latency:total:avg sum(rate(apiserver_request_duration_seconds_sum{job="apiserver",verb=~"POST|PUT|PATCH|DELETE"}[${d_all}])) by (le,scope) / sum(rate(apiserver_request_duration_seconds_count{job="apiserver",verb=~"POST|PUT|PATCH|DELETE"}[${d_all}])) by (le,scope)
+${t_install} cluster:api:write:requests:latency:install:avg sum(rate(apiserver_request_duration_seconds_sum{job="apiserver",verb=~"POST|PUT|PATCH|DELETE"}[${d_install}])) by (le,scope) / sum(rate(apiserver_request_duration_seconds_count{job="apiserver",verb=~"POST|PUT|PATCH|DELETE"}[${d_install}])) by (le,scope)
+${t_test}    cluster:api:write:requests:latency:test:avg sum(rate(apiserver_request_duration_seconds_sum{job="apiserver",verb=~"POST|PUT|PATCH|DELETE"}[${d_test}])) by (le,scope) / sum(rate(apiserver_request_duration_seconds_count{job="apiserver",verb=~"POST|PUT|PATCH|DELETE"}[${d_test}])) by (le,scope)
 
 ${t_all}     cluster:api:errors:total:requests sum(increase(apiserver_request_total{code=~"5\\\\d\\\\d|0"}[${d_all}]))
 ${t_install} cluster:api:errors:install:requests sum(increase(apiserver_request_total{code=~"5\\\\d\\\\d|0"}[${d_install}]))

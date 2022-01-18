@@ -29,6 +29,7 @@ if [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
   export AZURE_AUTH_LOCATION=$SHARED_DIR/osServicePrincipal.json
 fi
 
+echo "Copying the installation artifacts to the Installer's asset directory..."
 cp -ar "${SHARED_DIR}" /tmp/installer
 
 # TODO: remove once BZ#1926093 is done and backported
@@ -39,6 +40,7 @@ if [[ "${CLUSTER_TYPE}" == "ovirt" ]]; then
   set -e
 fi
 
+echo "Running the Installer's 'destroy cluster' command..."
 OPENSHIFT_INSTALL_REPORT_QUOTA_FOOTPRINT="true"; export OPENSHIFT_INSTALL_REPORT_QUOTA_FOOTPRINT
 openshift-install --dir /tmp/installer destroy cluster &
 
@@ -47,6 +49,7 @@ wait "$!"
 ret="$?"
 set -e
 
+echo "Copying the Installer logs to the artifacts directory..."
 cp /tmp/installer/.openshift_install.log "${ARTIFACT_DIR}"
 if [[ -s /tmp/installer/quota.json ]]; then
 	cp /tmp/installer/quota.json "${ARTIFACT_DIR}"
