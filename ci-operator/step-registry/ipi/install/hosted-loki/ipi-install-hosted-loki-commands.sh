@@ -415,6 +415,7 @@ spec:
       - effect: NoSchedule
         key: node-role.kubernetes.io/master
         operator: Exists
+      priorityClassName: system-cluster-critical
       volumes:
       - configMap:
           name: loki-promtail
@@ -699,6 +700,7 @@ spec:
       labels:
         app: event-exporter
     spec:
+      priorityClassName: system-cluster-critical
       serviceAccountName: event-exporter
       containers:
         - name: event-exporter
