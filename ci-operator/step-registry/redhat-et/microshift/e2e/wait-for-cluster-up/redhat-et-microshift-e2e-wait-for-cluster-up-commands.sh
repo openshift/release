@@ -39,9 +39,9 @@ set -xeuo pipefail
 
 trap "sudo journalctl -eu microshift" EXIT
 
-sudo podman cp microshift:/var/lib/microshift/resources/kubeadmin/kubeconfig kubeconfig
-sudo chown $(whoami): kubeconfig
-export KUBECONFIG=$(pwd)/kubeconfig
+sudo podman cp microshift:/var/lib/microshift/resources/kubeadmin/kubeconfig /tmp/kubeconfig
+sudo chown $(whoami): /tmp/kubeconfig
+export KUBECONFIG=/tmp/kubeconfig
 
 start=$(date '+%s')
 to=300
@@ -85,4 +85,4 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJE
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
-  --command 'cd ~/validate-microshift && sudo KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig ./kuttl-test.sh'
+  --command 'cd ~/validate-microshift && sudo ls -la /tmp/kubeconfig && sudo KUBECONFIG=/tmp/kubeconfig ./kuttl-test.sh'
