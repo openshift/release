@@ -329,6 +329,10 @@ spec:
           value: "${OPENSHIFT_INSTALL_INVOKER}"
         image: ${PROMTAIL_IMAGE}:${PROMTAIL_VERSION}
         imagePullPolicy: IfNotPresent
+        resources:
+          requests:
+            cpu: 10m
+            memory: 20Mi
         lifecycle:
           preStop:
             # We want the pod to keep running when a node is being drained
@@ -415,6 +419,7 @@ spec:
       - effect: NoSchedule
         key: node-role.kubernetes.io/master
         operator: Exists
+      priorityClassName: system-cluster-critical
       volumes:
       - configMap:
           name: loki-promtail
@@ -453,6 +458,9 @@ spec:
           secretName: cookie-secret
   updateStrategy:
     type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 10%
+      maxSurge: 0
 EOF
 cat >> "${SHARED_DIR}/manifest_promtail_cookie_secret.yml" << EOF
 kind: Secret
@@ -603,7 +611,7 @@ spec:
         ca: {}
         caFile: /etc/prometheus/configmaps/serving-certs-ca-bundle/service-ca.crt
         cert: {}
-        serverName: promtail.loki.svc
+        serverName: promtail.openshift-e2e-loki.svc
   namespaceSelector:
     matchNames:
       - openshift-e2e-loki
@@ -696,11 +704,16 @@ spec:
       labels:
         app: event-exporter
     spec:
+      priorityClassName: system-cluster-critical
       serviceAccountName: event-exporter
       containers:
         - name: event-exporter
           image: ${KUBERNETES_EVENT_EXPORTER_IMAGE}:${KUBERNETES_EVENT_EXPORTER_VERSION}
           imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              cpu: 10m
+              memory: 20Mi
           args:
             - -conf=/data/config.yaml
           volumeMounts:
