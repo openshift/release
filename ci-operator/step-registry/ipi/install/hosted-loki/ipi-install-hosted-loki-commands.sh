@@ -329,6 +329,10 @@ spec:
           value: "${OPENSHIFT_INSTALL_INVOKER}"
         image: ${PROMTAIL_IMAGE}:${PROMTAIL_VERSION}
         imagePullPolicy: IfNotPresent
+        resources:
+          requests:
+            cpu: 10m
+            memory: 20Mi
         lifecycle:
           preStop:
             # We want the pod to keep running when a node is being drained
@@ -706,6 +710,10 @@ spec:
         - name: event-exporter
           image: ${KUBERNETES_EVENT_EXPORTER_IMAGE}:${KUBERNETES_EVENT_EXPORTER_VERSION}
           imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              cpu: 10m
+              memory: 20Mi
           args:
             - -conf=/data/config.yaml
           volumeMounts:
