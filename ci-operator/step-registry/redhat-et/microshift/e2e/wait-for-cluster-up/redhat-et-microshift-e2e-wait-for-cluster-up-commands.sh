@@ -41,8 +41,8 @@ trap "sudo journalctl -eu microshift" EXIT
 
 sudo systemctl enable microshift --now
 
-# If kubeadm directory exists, it's an rpm install, so no podman
-if [ ! -d /var/lib/microshift/resources/kubeadmin ]; then
+# If /run/podman/ is empty it's an rpm install, so no podman
+if [[ $(sudo ls -A /run/podman) ]]; then
   sudo mkdir -p /var/lib/microshift/resources/kubeadmin/
   sudo podman cp microshift:/var/lib/microshift/resources/kubeadmin/kubeconfig /var/lib/microshift/resources/kubeadmin/kubeconfig
 fi
