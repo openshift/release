@@ -41,17 +41,20 @@ trap "sudo journalctl -eu microshift" EXIT
 
 sudo systemctl enable microshift --now
 
-
-# If /run/podman/ is empty it's an rpm install, so no podman
-if [[ $(sudo ls -A /run/podman) ]]; then
+# If condition is true there is podman, it's not a rpm install.
+if [[ $(command -v podman) ]]; then
+  # podman is present so copy the config file
   sudo mkdir -p /var/lib/microshift/resources/kubeadmin/
-  sudo podman cp microshift:/var/lib/microshift/resources/kubeadmin/kubeconfig /var/lib/microshift/resources/kubeadmin/kubeconfig
+  sudo podman cp microshift:/var/lib/microshift/resources/kubeadmin/kubeconfig /var/lib/microshift/resources/kubeadmin/kubeconfig  
 else
   echo "This is rpm run";
+  sleep 3600;
   # test if microshift is running
   sudo systemctl status microshift;
   # test if microshift created the files under /var/lib/microshift
+  sudo ls -la /var/lib/microshift
   sudo ls -la /var/lib/microshift/resources/kubeadmin/kubeconfig
+  
 fi
 EOF
 
