@@ -148,9 +148,9 @@ release_url="https://${RELEASE_REPO}.git"
 deploy_url="https://${DEPLOY_REPO}.git"
 component_url="https://${COMPONENT_REPO}.git"
 
-# Get release branch. This is a Prow variable as described here:
+# Get release branch. PULL_BASE_REF is a Prow variable as described here:
 # https://github.com/kubernetes/test-infra/blob/master/prow/jobs.md#job-environment-variables
-release="${PULL_BASE_REF}"
+release=${ACM_RELEASE_VERSION:-"${PULL_BASE_REF}"}
 log "INFO This PR's base branch is $release"
 
 # See if we need to get release from the release repo.
