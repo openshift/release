@@ -56,7 +56,7 @@ tests:
   container:
     from: test-bin
 - as: integration
-  commands: make test-integration
+  commands: HOME=/tmp make test-integration
   container:
     from: test-bin
 - as: e2e
@@ -67,14 +67,26 @@ tests:
       cli: latest
       commands: |
         KUBECTL=oc
-        IMAGE_NAME=${IMAGE_FORMAT//\/stable:\$\{component\}//pipeline:registration}
-        export KUBECTL IMAGE_NAME
+        export KUBECTL
         make test-e2e
+      dependencies:
+      - env: IMAGE_NAME
+        name: registration
       from: src
       resources:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- as: pr-merge-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: registration
+    env:
+      IMAGE_REPO: registration
+      IMAGE_TAG: release-2.2
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
   branch: release-2.2
   org: stolostron
