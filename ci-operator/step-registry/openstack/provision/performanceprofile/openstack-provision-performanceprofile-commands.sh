@@ -6,7 +6,7 @@ set -o pipefail
 
 function check_workers_updating() {
     INTERVAL=6
-    CNT=20
+    CNT=50
 
     while [ $((CNT)) -gt 0 ]; do
         UPDATING=false
@@ -96,11 +96,11 @@ oc_version=$(oc version -o json | jq -r '.openshiftVersion')
 if [[ "${oc_version}" == *"4.10"* ]]; then
     git clone https://github.com/openshift-kni/performance-addon-operators /tmp/performance-addon-operators
     pushd /tmp/performance-addon-operators
-    export CLUSTER=manual
+    export CLUSTER=ci
     export FULL_INDEX_IMAGE="quay.io/openshift-kni/performance-addon-operator-index:4.10-snapshot"
     ./hack/deploy.sh
     popd
-    oc delete PerformanceProfile manual
+    oc describe sub performance-addon-operator -n openshift-performance-addon-operator
 else
     PAO_NAMESPACE=$(
         oc create -f - -o jsonpath='{.metadata.name}' <<EOF
@@ -162,6 +162,9 @@ EOF
         exit 1
     fi
 fi
+
+# It can take time for the operator to be ready.
+sleep 30
 
 PAO_PROFILE=$(
     oc create -f - -o jsonpath='{.metadata.name}' <<EOF

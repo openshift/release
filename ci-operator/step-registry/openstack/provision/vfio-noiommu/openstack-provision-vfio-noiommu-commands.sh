@@ -6,7 +6,7 @@ set -o pipefail
 
 function check_workers_updating() {
     INTERVAL=6
-    CNT=20
+    CNT=30
 
     while [ $((CNT)) -gt 0 ]; do
         UPDATING=false
