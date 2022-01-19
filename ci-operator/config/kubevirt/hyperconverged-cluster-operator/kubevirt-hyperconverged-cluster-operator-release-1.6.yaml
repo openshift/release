@@ -167,27 +167,6 @@ tests:
           cpu: 500m
           memory: 1Gi
     workflow: optional-operators-ci-azure-sno
-- as: hco-e2e-upgrade-index-sno-azure
-  optional: true
-  run_if_changed: ^(assets/.*|build/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
-  steps:
-    cluster_profile: azure4
-    dependencies:
-      OO_INDEX: ci-index-hco-upgrade-bundle
-    env:
-      OO_CHANNEL: 1.6.0
-      OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
-      OO_PACKAGE: community-kubevirt-hyperconverged
-      OO_TARGET_NAMESPACES: '!all'
-    test:
-    - as: e2e-index-image-upgrade-azure
-      commands: RELEASE_DELTA=1 make upgrade-test-index-image
-      from: hco-oc-bin-image
-      resources:
-        requests:
-          cpu: 500m
-          memory: 1Gi
-    workflow: optional-operators-ci-azure-sno
 - as: hco-e2e-upgrade-prev-index-sno-azure
   optional: true
   run_if_changed: ^(assets/.*|build/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
@@ -234,27 +213,6 @@ tests:
       dependencies:
       - env: FUNCTEST_IMAGE
         name: hyperconverged-cluster-functest
-      from: hco-oc-bin-image
-      resources:
-        requests:
-          cpu: 500m
-          memory: 1Gi
-    workflow: optional-operators-ci-aws-sno
-- as: hco-e2e-upgrade-index-sno-aws
-  optional: true
-  run_if_changed: ^(assets/.*|build/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
-  steps:
-    cluster_profile: aws
-    dependencies:
-      OO_INDEX: ci-index-hco-upgrade-bundle
-    env:
-      OO_CHANNEL: 1.6.0
-      OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
-      OO_PACKAGE: community-kubevirt-hyperconverged
-      OO_TARGET_NAMESPACES: '!all'
-    test:
-    - as: e2e-index-image-upgrade-aws
-      commands: RELEASE_DELTA=1 KVM_EMULATION=true make upgrade-test-index-image
       from: hco-oc-bin-image
       resources:
         requests:
@@ -332,56 +290,6 @@ tests:
           cpu: 500m
           memory: 1Gi
     workflow: optional-operators-ci-aws
-- as: hco-e2e-image-index-gcp
-  run_if_changed: ^(assets/.*|build/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
-  steps:
-    cluster_profile: gcp
-    env:
-      OO_CHANNEL: 1.6.0
-      OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
-      OO_PACKAGE: community-kubevirt-hyperconverged
-      OO_TARGET_NAMESPACES: '!all'
-    test:
-    - as: deploy-cr
-      commands: |
-        make deploy_cr
-      from: hco-oc-bin-image
-      resources:
-        requests:
-          cpu: 500m
-          memory: 1Gi
-    - as: e2e-test
-      commands: |
-        make functest
-      dependencies:
-      - env: FUNCTEST_IMAGE
-        name: hyperconverged-cluster-functest
-      from: hco-oc-bin-image
-      resources:
-        requests:
-          cpu: 500m
-          memory: 1Gi
-    workflow: optional-operators-ci-gcp
-- as: hco-e2e-kv-smoke-gcp
-  run_if_changed: ^(assets/.*|build/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
-  steps:
-    cluster_profile: gcp
-    env:
-      OO_CHANNEL: 1.6.0
-      OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
-      OO_PACKAGE: community-kubevirt-hyperconverged
-      OO_TARGET_NAMESPACES: '!all'
-    test:
-    - as: e2e-test
-      commands: |
-        make deploy_cr
-        make test-kv-smoke-prow
-      from: hco-oc-bin-image
-      resources:
-        requests:
-          cpu: 500m
-          memory: 1Gi
-    workflow: optional-operators-ci-gcp
 - as: hco-e2e-upgrade-index-aws
   run_if_changed: ^(assets/.*|build/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
   steps:
