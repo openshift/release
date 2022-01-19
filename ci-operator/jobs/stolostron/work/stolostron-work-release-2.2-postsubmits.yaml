@@ -100,32 +100,38 @@ postsubmits:
         secret:
           secretName: result-aggregator
   - agent: kubernetes
-    always_run: true
     branches:
     - ^release-2\.2$
     cluster: build02
     decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
     name: branch-ci-stolostron-work-release-2.2-publish
     spec:
       containers:
       - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=publish
+        - -f
+        - /opt/build-harness/Makefile.prow
+        - osci/publish
         command:
-        - ci-operator
-        image: ci-operator:latest
+        - make
+        env:
+        - name: OSCI_COMPONENT_NAME
+          value: work
+        - name: OSCI_COMPONENT_VERSION
+          value: 2.2.0
+        - name: OSCI_IMAGE_REMOTE_REPO_SRC
+          value: registry.ci.openshift.org/stolostron
+        - name: SELF
+          value: make -f /opt/build-harness/Makefile.prow
+        image: registry.ci.openshift.org/stolostron/builder:go1.17-linux
         imagePullPolicy: Always
         name: ""
         resources:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/github
+          name: acm-cicd-github
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -137,6 +143,9 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: acm-cicd-github
+        secret:
+          secretName: acm-cicd-github
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
