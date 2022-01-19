@@ -71,25 +71,6 @@ tests:
   commands: make test-integration
   container:
     from: test-bin
-- as: sonar-pre-submit
-  commands: |
-    export SELF="make -f /opt/build-harness/Makefile.prow"
-    make -f /opt/build-harness/Makefile.prow sonar/go/prow
-  container:
-    from: src
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
-- as: sonar-post-submit
-  commands: |
-    export SELF="make -f /opt/build-harness/Makefile.prow"
-    make -f /opt/build-harness/Makefile.prow sonar/go/prow
-  container:
-    from: src
-  postsubmit: true
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
 - as: e2e
   steps:
     cluster_profile: aws
@@ -120,7 +101,7 @@ tests:
     - as: publish
       commands: |-
         export OSCI_COMPONENT_NAME=work
-        export OSCI_COMPONENT_VERSION=0.4.0
+        export OSCI_COMPONENT_VERSION=2.3.0
         export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
         export SELF="make -f /opt/build-harness/Makefile.prow"
         export OSCI_PUBLISH_DELAY="0"
