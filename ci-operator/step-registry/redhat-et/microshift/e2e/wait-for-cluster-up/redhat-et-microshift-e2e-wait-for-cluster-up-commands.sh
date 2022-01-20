@@ -48,10 +48,16 @@ if [[ $(command -v podman) ]]; then
   sudo podman cp microshift:/var/lib/microshift/resources/kubeadmin/kubeconfig /var/lib/microshift/resources/kubeadmin/kubeconfig  
 else
   echo "This is rpm run";
-  sleep 3600;
+
   # test if microshift is running
   sudo systemctl status microshift;
-  # test if microshift created the files under /var/lib/microshift
+
+  # test if microshift created the kubeconfig under /var/lib/microshift/resources/kubeadmin/kubeconfig
+  while ! sudo test -f "/var/lib/microshift/resources/kubeadmin/kubeconfig";
+  do
+    echo "Waiting for kubeconfig..."
+    sleep 5;
+  done
   sudo ls -la /var/lib/microshift
   sudo ls -la /var/lib/microshift/resources/kubeadmin/kubeconfig
   
