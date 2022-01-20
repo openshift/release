@@ -50,6 +50,41 @@ tests:
     dependencies:
       SOURCE_IMAGE_REF: multicluster-operators-subscription
     workflow: ocm-ci-image-mirror
+- as: publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: multicluster-operators-subscription
+    env:
+      IMAGE_REPO: multicluster-operators-subscription
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
+        export OSCI_PUBLISH_DELAY="0"
+        export SELF="make -f Makefile.prow"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+- as: latest-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: multicluster-operators-subscription
+    env:
+      IMAGE_REPO: multicluster-operators-subscription
+      IMAGE_TAG: 2.3.0
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
   branch: release-2.3
   org: stolostron
