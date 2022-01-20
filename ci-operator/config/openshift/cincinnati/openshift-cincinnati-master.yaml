@@ -22,7 +22,7 @@ images:
     ENV PATH="${HOME}/.cargo/bin:${HOME}/.local/bin:${PATH}"
     RUN chgrp root /opt/app-root/src/cincinnati && \
         chmod g+w /opt/app-root/src/cincinnati && \
-        dnf install -y jq python38 && \
+        dnf install -y jq python38 gcc openssl-devel protobuf-c && \
         dnf clean all
     # build: Rust stable toolchain
     RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain 1.55.0 -y && \
@@ -139,6 +139,10 @@ tests:
           memory: 200Mi
 - as: yaml-lint
   commands: dist/prow_yaml_lint.sh
+  container:
+    from: src-rust
+- as: cargo-clippy
+  commands: cargo clippy --all-targets --all-features -- -D warnings
   container:
     from: src-rust
 - as: rustfmt-1.55.0
