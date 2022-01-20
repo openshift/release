@@ -65,6 +65,26 @@ tests:
   steps:
     cluster_profile: aws
     test:
+    - as: deploy
+      commands: |
+        curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar xvzf - oc
+        KUBECTL=oc
+        OLM_NAMESPACE=openshift-operator-lifecycle-manager
+        REGISTRATION_IMAGE=quay.io/stolostron/registration:release-2.2
+        WORK_IMAGE=quay.io/stolostron/work:release-2.2
+        PATH=.:$PATH
+        export KUBECTL OLM_NAMESPACE PATH REGISTRATION_IMAGE WORK_IMAGE
+        make deploy-hub e2e-bootstrap-secret
+      dependencies:
+      - env: IMAGE_NAME
+        name: registration-operator
+      from: src
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
     - as: operator-e2e-test
       commands: |
         curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/4.4/linux/oc.tar.gz | tar xvzf - oc
