@@ -330,6 +330,22 @@ ${t_all}     cluster:usage:cpu:control_plane:total:avg   avg(rate(container_cpu_
 ${t_install} cluster:usage:cpu:control_plane:install:avg avg(rate(container_cpu_usage_seconds_total{id="/"}[${d_install}]) * on(node) group_left() group by (node) (kube_node_role{role="master"}))
 ${t_test}    cluster:usage:cpu:control_plane:test:avg    avg(rate(container_cpu_usage_seconds_total{id="/"}[${d_test}]) * on(node) group_left() group by (node) (kube_node_role{role="master"}))
 
+${t_all}     cluster:usage:cpu:kube_apiserver:total:avg   avg(sum(rate(container_cpu_usage_seconds_total{pod=~"kube-apiserver-ip-.*", namespace="openshift-kube-apiserver"}[${d_all}])) by (pod))
+${t_install} cluster:usage:cpu:kube_apiserver:install:avg avg(sum(rate(container_cpu_usage_seconds_total{pod=~"kube-apiserver-ip-.*", namespace="openshift-kube-apiserver"}[${d_install}])) by (pod))
+${t_test}    cluster:usage:cpu:kube_apiserver:test:avg    avg(sum(rate(container_cpu_usage_seconds_total{pod=~"kube-apiserver-ip-.*", namespace="openshift-kube-apiserver"}[${d_test}])) by (pod))
+
+${t_all}     cluster:usage:cpu:etcd:total:avg   avg(sum(rate(container_cpu_usage_seconds_total{pod=~"etcd-ip-.*", namespace="openshift-etcd"}[${d_all}])) by (pod))
+${t_install} cluster:usage:cpu:etcd:install:avg avg(sum(rate(container_cpu_usage_seconds_total{pod=~"etcd-ip-.*", namespace="openshift-etcd"}[${d_install}])) by (pod))
+${t_test}    cluster:usage:cpu:etcd:test:avg    avg(sum(rate(container_cpu_usage_seconds_total{pod=~"etcd-ip-.*", namespace="openshift-etcd"}[${d_test}])) by (pod))
+
+${t_all}     cluster:usage:cpu:openshift_apiserver:total:avg   avg(sum(rate(container_cpu_usage_seconds_total{pod=~"apiserver-.*", namespace="openshift-apiserver"}[${d_all}])) by (pod))
+${t_install} cluster:usage:cpu:openshift_apiserver:install:avg avg(sum(rate(container_cpu_usage_seconds_total{pod=~"apiserver-.*", namespace="openshift-apiserver"}[${d_install}])) by (pod))
+${t_test}    cluster:usage:cpu:openshift_apiserver:test:avg    avg(sum(rate(container_cpu_usage_seconds_total{pod=~"apiserver-.*", namespace="openshift-apiserver"}[${d_test}])) by (pod))
+
+${t_all}     cluster:usage:cpu:oauth_apiserver:total:avg   avg(sum(rate(container_cpu_usage_seconds_total{pod=~"apiserver-.*", namespace="openshift-oauth-apiserver"}[${d_all}])) by (pod))
+${t_install} cluster:usage:cpu:oauth_apiserver:install:avg avg(sum(rate(container_cpu_usage_seconds_total{pod=~"apiserver-.*", namespace="openshift-oauth-apiserver"}[${d_install}])) by (pod))
+${t_test}    cluster:usage:cpu:oauth_apiserver:test:avg    avg(sum(rate(container_cpu_usage_seconds_total{pod=~"apiserver-.*", namespace="openshift-oauth-apiserver"}[${d_test}])) by (pod))
+
 ${t_all}     cluster:usage:mem:rss:control_plane:quantile label_replace(max(quantile_over_time(0.99, ((container_memory_rss{id="/"} * on(node) group_left() group by (node) (kube_node_role{role="master"})))[${d_all}:1s] )), "quantile", "0.99", "", "")
 ${t_all}     cluster:usage:mem:rss:control_plane:quantile label_replace(max(quantile_over_time(0.9, ((container_memory_rss{id="/"} * on(node) group_left() group by (node) (kube_node_role{role="master"})))[${d_all}:1s] )), "quantile", "0.9", "", "")
 ${t_all}     cluster:usage:mem:rss:control_plane:quantile label_replace(max(quantile_over_time(0.5, ((container_memory_rss{id="/"} * on(node) group_left() group by (node) (kube_node_role{role="master"})))[${d_all}:1s] )), "quantile", "0.5", "", "")
@@ -337,6 +353,22 @@ ${t_all}     cluster:usage:mem:rss:control_plane:quantile label_replace(max(quan
 ${t_all}     cluster:usage:mem:working_set:control_plane:quantile label_replace(max(quantile_over_time(0.99, ((container_memory_working_set_bytes{id="/"} * on(node) group_left() group by (node) (kube_node_role{role="master"})))[${d_all}:1s] )), "quantile", "0.99", "", "")
 ${t_all}     cluster:usage:mem:working_set:control_plane:quantile label_replace(max(quantile_over_time(0.9, ((container_memory_working_set_bytes{id="/"} * on(node) group_left() group by (node) (kube_node_role{role="master"})))[${d_all}:1s] )), "quantile", "0.9", "", "")
 ${t_all}     cluster:usage:mem:working_set:control_plane:quantile label_replace(max(quantile_over_time(0.5, ((container_memory_working_set_bytes{id="/"} * on(node) group_left() group by (node) (kube_node_role{role="master"})))[${d_all}:1s] )), "quantile", "0.5", "", "")
+
+${t_all}     cluster:usage:memory:kube_apiserver:total:avg   avg(sum(rate(container_memory_working_set_bytes{pod=~"kube-apiserver-ip.*", namespace="openshift-kube-apiserver"}[${d_all}])) by (pod))
+${t_install} cluster:usage:memory:kube_apiserver:install:avg avg(sum(rate(container_memory_working_set_bytes{pod=~"kube-apiserver-ip.*", namespace="openshift-kube-apiserver"}[${d_install}])) by (pod))
+${t_test}    cluster:usage:memory:kube_apiserver:test:avg    avg(sum(rate(container_memory_working_set_bytes{pod=~"kube-apiserver-ip.*", namespace="openshift-kube-apiserver"}[${d_test}])) by (pod))
+
+${t_all}     cluster:usage:memory:etcd:total:avg   avg(sum(rate(container_memory_working_set_bytes{pod=~"etcd-ip-.*", namespace="openshift-etcd"}[${d_all}])) by (pod))
+${t_install} cluster:usage:memory:etcd:install:avg avg(sum(rate(container_memory_working_set_bytes{pod=~"etcd-ip.*", namespace="openshift-etcd"}[${d_install}])) by (pod))
+${t_test}    cluster:usage:memory:etcd:test:avg    avg(sum(rate(container_memory_working_set_bytes{pod=~"etcd-ip.*", namespace"openshift-etcd"}[${d_test}])) by (pod))
+
+${t_all}     cluster:usage:memory:openshift_apiserver:total:avg   avg(sum(rate(container_memory_working_set_bytes{pod=~"apiserver-.*", namespace="openshift-apiserver"}[${d_all}])) by (pod))
+${t_install} cluster:usage:memory:openshift_apiserver:install:avg avg(sum(rate(container_memory_working_set_bytes{pod=~"apiserver-.*", namespace="openshift-apiserver"}[${d_install}])) by (pod))
+${t_test}    cluster:usage:memory:openshift_apiserver:test:avg    avg(sum(rate(container_memory_working_set_bytes{pod=~"apiserver-.*", namespace="openshift-apiserver"}[${d_test}])) by (pod))
+
+${t_all}     cluster:usage:memory:oauth_apiserver:total:avg   avg(sum(rate(container_memory_working_set_bytes{pod=~"apiserver-.*", namespace="openshift-oauth-apiserver"}[${d_all}])) by (pod))
+${t_install} cluster:usage:memory:oauth_apiserver:install:avg avg(sum(rate(container_memory_working_set_bytes{pod=~"apiserver-.*", namespace="openshift-oauth-apiserver"}[${d_install}])) by (pod))
+${t_test}    cluster:usage:memory:oauth_apiserver:test:avg    avg(sum(rate(container_memory_working_set_bytes{pod=~"apiserver-.*", namespace="openshift-oauth-apiserver"}[${d_test}])) by (pod))
 
 ${t_all}     cluster:alerts:total:firing:distinct:severity count by (severity) (count by (alertname,severity) (count_over_time(ALERTS{alertstate="firing",alertname!~"AlertmanagerReceiversNotConfigured|Watchdog"}[${d_all}])))
 
