@@ -346,15 +346,6 @@ spec:
         ports:
         - containerPort: 3101
           name: http-metrics
-        readinessProbe:
-          failureThreshold: 5
-          httpGet:
-            path: "/ready"
-            port: http-metrics
-          initialDelaySeconds: 10
-          periodSeconds: 10
-          successThreshold: 1
-          timeoutSeconds: 1
         securityContext:
           privileged: true
           readOnlyRootFilesystem: true
