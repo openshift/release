@@ -92,15 +92,57 @@ CPU_ISOLATED="${CPU_ISOLATED:-2-7}"
 CPU_RESERVED="${CPU_RESERVED:-0-1}"
 
 oc_version=$(oc version -o json | jq -r '.openshiftVersion')
+
+if [[ "${oc_version}" == *"4.10"* ]]; then
+    pao_api_version="v2"
+else
+    pao_api_version="v1"
+fi
+
+cat >/tmp/performance_profile.yaml <<EOL
+apiVersion: performance.openshift.io/${pao_api_version}
+kind: PerformanceProfile
+metadata:
+  name: cnf-performanceprofile
+spec:
+  additionalKernelArgs:
+    - nmi_watchdog=0
+    - audit=0
+    - mce=off
+    - processor.max_cstate=1
+    - idle=poll
+    - intel_idle.max_cstate=0
+    - default_hugepagesz=1GB
+    - hugepagesz=1G
+    - amd_iommu=on
+  cpu:
+    isolated: "${CPU_ISOLATED}"
+    reserved: "${CPU_RESERVED}"
+  hugepages:
+    defaultHugepagesSize: 1G
+    pages:
+      - count: $HUGEPAGES
+        node: 0
+        size: 1G
+  nodeSelector:
+    node-role.kubernetes.io/worker: ''
+  realTimeKernel:
+    enabled: false
+EOL
+
 # Once 4.10 is GA, we need to bump it to 4.11 and so on.
 if [[ "${oc_version}" == *"4.10"* ]]; then
     git clone https://github.com/openshift-kni/performance-addon-operators /tmp/performance-addon-operators
     pushd /tmp/performance-addon-operators
-    export CLUSTER=ci
+    if [[ ! -f cluster-setup/manual-cluster/performance/performance_profile.yaml ]]; then
+        echo "performance_profile.yaml was not found"
+        exit 1
+    fi
+    cp /tmp/performance_profile.yaml cluster-setup/manual-cluster/performance/
+    export CLUSTER=manual
     export FULL_INDEX_IMAGE="quay.io/openshift-kni/performance-addon-operator-index:4.10-snapshot"
-    ./hack/deploy.sh
+    make cluster-deploy
     popd
-    oc describe sub performance-addon-operator -n openshift-performance-addon-operator
 else
     PAO_NAMESPACE=$(
         oc create -f - -o jsonpath='{.metadata.name}' <<EOF
@@ -161,44 +203,10 @@ EOF
         echo "PAO was not installed after 15 minutes"
         exit 1
     fi
+
+    PAO_PROFILE=$(oc create -f /tmp/performance_profile.yaml -o jsonpath='{.metadata.name}')
+    echo "Created \"$PAO_PROFILE\" PerformanceProfile"
 fi
-
-# It can take time for the operator to be ready.
-sleep 30
-
-PAO_PROFILE=$(
-    oc create -f - -o jsonpath='{.metadata.name}' <<EOF
-apiVersion: performance.openshift.io/v1
-kind: PerformanceProfile
-metadata:
-  name: cnf-performanceprofile
-spec:
-  additionalKernelArgs:
-    - nmi_watchdog=0
-    - audit=0
-    - mce=off
-    - processor.max_cstate=1
-    - idle=poll
-    - intel_idle.max_cstate=0
-    - default_hugepagesz=1GB
-    - hugepagesz=1G
-    - amd_iommu=on
-  cpu:
-    isolated: "${CPU_ISOLATED}"
-    reserved: "${CPU_RESERVED}"
-  hugepages:
-    defaultHugepagesSize: 1G
-    pages:
-      - count: $HUGEPAGES
-        node: 0
-        size: 1G
-  nodeSelector:
-    node-role.kubernetes.io/worker: ''
-  realTimeKernel:
-    enabled: false
-EOF
-)
-echo "Created \"$PAO_PROFILE\" PerformanceProfile"
 
 check_workers_updating
 check_workers_updated
