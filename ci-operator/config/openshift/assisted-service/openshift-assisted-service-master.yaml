@@ -211,7 +211,6 @@ tests:
         export REPORTS=${ARTIFACT_DIR}
         export TARGET=oc
         export GENERATE_CRD=false
-
         make deploy-on-openshift-ci
         make enable-kube-api-for-subsystem
         make test-kube-api
@@ -588,23 +587,20 @@ tests:
       ASSISTED_CONFIG: |
         TEST_FUNC=test_networking
     workflow: baremetalds-assisted
-- as: e2e-metal-assisted-kube-api
+- as: e2e-metal-assisted-kube-api-net-suite
   optional: true
   run_if_changed: ^(cmd/.*|data/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        NUM_MASTERS=1
-        NUM_WORKERS=0
-        IPv6=yes
-        IPv4=no
-        PROXY=yes
-        ADDITIONAL_PARAMS="--with-static-network-config"
-        ISO_IMAGE_TYPE=minimal-iso
-        KUBE_API=yes
+        KUBE_API=true
         ENABLE_KUBE_API=true
-        MAKEFILE_TARGET=all
+        NUM_MASTERS=1
+        ISO_IMAGE_TYPE=minimal-iso
+        STATIC_IPS=true
+        TEST_FUNC=test_kubeapi
+        MAKEFILE_TARGET="create_full_environment run test_kube_api_parallel"
     workflow: baremetalds-assisted
 - as: e2e-metal-assisted
   run_if_changed: ^(cmd/.*|data/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
@@ -651,7 +647,7 @@ tests:
     cluster_profile: packet-assisted
     env:
       POST_INSTALL_COMMANDS: |
-        export TEST_FUNC=test_kube_api_late_binding_ipv4_single_node
+        export TEST_FUNC=test_late_binding_kube_api_sno
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
         make deploy_assisted_operator test_kube_api_parallel
       TEST_SUITE: full
@@ -662,7 +658,7 @@ tests:
     cluster_profile: packet-assisted
     env:
       POST_INSTALL_COMMANDS: |
-        export TEST_FUNC=test_kube_api_late_binding_ipv4_single_node
+        export TEST_FUNC=test_late_binding_kube_api_sno
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
         make deploy_assisted_operator test_kube_api_parallel
     workflow: baremetalds-assisted
@@ -672,11 +668,12 @@ tests:
     cluster_profile: packet-assisted
     env:
       POST_INSTALL_COMMANDS: |
-        export TEST_FUNC=test_kube_api_late_unbinding_ipv4_single_node
+        export TEST_FUNC=test_late_binding_kube_api_sno
+        export HOLD_INSTALLATION=true
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
         make deploy_assisted_operator test_kube_api_parallel
     workflow: baremetalds-assisted
-- as: e2e-assisted-capi-provider-agent-hypershift
+- as: e2e-metal-assisted-capi
   optional: true
   run_if_changed: ^(api/.*|internal/controller/controllers/.*)$
   steps:
@@ -687,9 +684,8 @@ tests:
         ENABLE_KUBE_API=true
         MINIKUBE_DISK_SIZE=70g
         MINIKUBE_RAM_MB=10240
-        TEST=./src/tests/test_kube_api.py
         TEST_FUNC=test_capi_provider
-        MAKEFILE_TARGET="create_full_environment run deploy_capi_env test"
+        MAKEFILE_TARGET="create_full_environment run deploy_capi_env test_kube_api_parallel"
       GATHER_CAPI_LOGS: "true"
     workflow: baremetalds-assisted
 zz_generated_metadata:
