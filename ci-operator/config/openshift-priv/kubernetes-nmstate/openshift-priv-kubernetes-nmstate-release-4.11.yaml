@@ -69,6 +69,15 @@ releases:
       include_built_images: true
       name: 4.11-priv
       namespace: ocp-private
+  nightly:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.10"
+  stable:
+    release:
+      channel: stable
+      version: "4.9"
 resources:
   '*':
     limits:
@@ -95,29 +104,7 @@ tests:
         NMSTATE1_NETWORK_SUBNET_V6="fd2e:6f44:5dd8:ca56::/120"
         NMSTATE2_NETWORK_SUBNET_V4="192.168.222.0/24"
         NMSTATE2_NETWORK_SUBNET_V6="fd2e:6f44:5dd8:cc56::/120"
-      SKIP_IMAGE_BUILD: "true"
-    post:
-    - chain: baremetalds-ipi-post
-    pre:
-    - chain: baremetalds-ipi-pre
-    test:
-    - as: e2e
-      commands: |
-        export KUBECONFIG=${SHARED_DIR}/kubeconfig
-        make test-e2e-ocp
-      dependencies:
-      - env: OPERATOR_IMAGE
-        name: pipeline:kubernetes-nmstate-operator
-      - env: HANDLER_IMAGE
-        name: pipeline:kubernetes-nmstate-handler
-      env:
-      - name: SKIP_IMAGE_BUILD
-      from: src-with-oc-and-kubectl
-      resources:
-        requests:
-          cpu: "2"
-          memory: 1Gi
-      timeout: 3h0m0s
+    workflow: kubernetes-nmstate-e2e
 zz_generated_metadata:
   branch: release-4.11
   org: openshift-priv
