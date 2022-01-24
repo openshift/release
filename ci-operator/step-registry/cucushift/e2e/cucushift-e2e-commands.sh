@@ -29,6 +29,7 @@ else
 fi
 
 cd verification-tests
+export BUSHSLICER_LOG_LEVEL=plain
 # run normal tests
 export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/parallel/normal"
 parallel_cucumber -n "${PARALLEL}" --first-is-1 --type cucumber --serialize-stdout --combine-stderr --prefix-output-with-test-env-number --exec \
