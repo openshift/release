@@ -91,7 +91,7 @@ function is_openshift_version_gte() {
 }
 
 case "${CLUSTER_TYPE}" in
-packet)
+packet|equinix*)
     # shellcheck source=/dev/null
     source "${SHARED_DIR}/packet-conf.sh"
     # shellcheck source=/dev/null
