@@ -1,6 +1,20 @@
+base_images:
+  base:
+    name: release
+    namespace: openshift
+    tag: tectonic-console-builder-v23
 build_root:
-  project_image:
-    dockerfile_path: Dockerfile.ci
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: tectonic-console-builder-v23
+images:
+- dockerfile_path: Dockerfile.ci
+  inputs:
+    base:
+      as:
+      - node:15
+  to: odf-console
 releases:
   initial:
     integration:
@@ -33,7 +47,7 @@ tests:
   steps:
     cluster_profile: aws
     dependencies:
-      ODF_CONSOLE_FULL_IMG_NAME: pipeline:root
+      ODF_CONSOLE_FULL_IMG_NAME: odf-console
     env:
       COMPUTE_NODE_TYPE: m4.2xlarge
       ZONES_COUNT: "1"
