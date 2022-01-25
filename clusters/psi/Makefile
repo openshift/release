@@ -12,9 +12,9 @@ $(serviceaccounts):
 
 apply_credentials: $(serviceaccounts)
 
-cronjobs = github-ldap-mapping-update release-schedules-update sync-rover-groups
+cronjobs = github-ldap-mapping-update release-schedules-update sync-rover-groups-update
 
 $(cronjobs):
-	echo --context psi apply -f $@_cronjob.yaml
+	oc --context psi apply -f $@_cronjob.yaml
 
 apply_cronjobs: $(cronjobs)
