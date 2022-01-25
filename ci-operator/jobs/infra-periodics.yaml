@@ -2176,6 +2176,10 @@ periodics:
       mediaTypes:
         log: text/plain
     gcs_credentials_secret: gce-sa-credentials-gcs-private
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
   hidden: true
   interval: 24h
   labels:
@@ -2187,6 +2191,8 @@ periodics:
       - /usr/bin/github-ldap-user-group-creator
       - --kubeconfig-dir=/tmp/build-farm-credentials
       - --mapping-file=/etc/github-ldap-mapping/mapping.yaml
+      - --groups-file=/etc/sync-rover-groups/groups.yaml
+      - --config-file=./core-services/sync-rover-groups/_config.yaml
       - --log-level=debug
       - --dry-run=false
       image: registry.ci.openshift.org/ci/github-ldap-user-group-creator:latest
@@ -2196,6 +2202,8 @@ periodics:
         requests:
           cpu: 500m
       volumeMounts:
+      - mountPath: /etc/sync-rover-groups
+        name: sync-rover-groups
       - mountPath: /etc/github-ldap-mapping
         name: github-ldap-mapping
       - mountPath: /tmp/build-farm-credentials
@@ -2206,6 +2214,9 @@ periodics:
     - configMap:
         name: github-ldap-mapping
       name: github-ldap-mapping
+    - configMap:
+        name: sync-rover-groups
+      name: sync-rover-groups
     - name: build-farm-credentials
       secret:
         secretName: github-ldap-user-group-creator
