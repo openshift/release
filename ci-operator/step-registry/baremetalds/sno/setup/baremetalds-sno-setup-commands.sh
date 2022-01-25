@@ -55,13 +55,14 @@ systemctl start sysstat
 
 mkdir -p /tmp/artifacts
 
+REPO_DIR="/home/sno"
+mkdir -p "\${REPO_DIR}"
+
 # NVMe makes it faster
 NVME_DEVICE="/dev/nvme0n1"
-REPO_DIR="/home/sno"
 if [ -e "\$NVME_DEVICE" ];
 then
   mkfs.xfs -f "\${NVME_DEVICE}"
-  mkdir -p "\${REPO_DIR}"
   mount "\${NVME_DEVICE}" "\${REPO_DIR}"
 fi
 
