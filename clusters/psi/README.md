@@ -15,6 +15,12 @@ $ make applyconfig
 
 ## troubleshooting
 
-```
-$ oc --context psi -n ocp-test-platform create job github-ldap-mapping-update-test-job-$USER-$(echo $RANDOM | md5sum | head -c 8) --from=cronjob/github-ldap-mapping-update
+```console
+$ oc --context psi get cronjob
+NAME                         SCHEDULE    SUSPEND   ACTIVE   LAST SCHEDULE   AGE
+github-ldap-mapping-update   0 1 * * *   False     0        14h             88d
+release-schedules-update     0 1 * * *   False     0        14h             83d
+sync-rover-groups-update     0 1 * * *   False     0        <none>          20s
+$ cronjob_name=sync-rover-groups-update
+$ oc --context psi -n ocp-test-platform create job ${cronjob_name}-test-job-$USER-$(echo $RANDOM | md5sum | head -c 8) --from=cronjob/${cronjob_name}
 ```
