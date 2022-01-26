@@ -35,10 +35,10 @@ git commit -am "Automatic snapshot of repositories' current git revisions" -am "
 
 git tag nightly -f
 
-if (( ${IS_REHEARSAL} )) || [[ ${DRY_RUN} == "true" ]]; then
-    echo "On dry-run mode. Only showing how the commit looks like:"
-    git show
-    exit 0
-fi
+# if (( ${IS_REHEARSAL} )) || [[ ${DRY_RUN} == "true" ]]; then
+#     echo "On dry-run mode. Only showing how the commit looks like:"
+#     git show
+#     exit 0
+# fi
 
 git push --atomic origin master nightly -f
