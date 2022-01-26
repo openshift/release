@@ -77,7 +77,7 @@ CONFIG = {
         'default': 2,
     },
     'openstack-nfv-quota-slice': {
-        'default': 2,
+        'default': 6,
     },
     'openstack-vh-mecha-central-quota-slice': {
         'default': 5,
