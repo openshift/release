@@ -52,11 +52,13 @@ on_exit(){
 trap "on_exit; exit;" EXIT
 
 set -xe
-sudo subscription-manager repos --enable rhocp-4.8-for-rhel-8-x86_64-rpms
-sudo dnf install -y cri-o cri-tools && sudo systemctl enable crio --now
-sudo dnf copr enable -y @redhat-et/microshift
-sudo dnf install -y microshift firewalld
-sudo systemctl enable microshift --now
+subscription-manager repos --enable rhocp-4.8-for-rhel-8-x86_64-rpms
+dnf install -y cri-o cri-tools firewalld
+systemctl enable crio --now
+systemctl enable firewalld --now
+dnf copr enable -y @redhat-et/microshift
+dnf install -y microshift
+systemctl enable microshift --now
 EOF
 
 chmod +x "${HOME}"/install.sh
@@ -70,4 +72,4 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
-  --command 'sudo install.sh'
+  --command 'sudo ~/install.sh'
