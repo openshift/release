@@ -44,6 +44,10 @@ data:
 EOF
 fi
 
+
+# Alibaba requires PVCs to be >= 20GB
+STORAGE="20Gi"
+
 # On top of setting up persistent storage for the platform Prometheus, we are
 # also annotating the PVCs so that the cluster-monitoring-operator can delete
 # the PVC if needed to prevent single point of failure. This is required to
@@ -58,7 +62,7 @@ prometheusK8s:
     spec:
       resources:
         requests:
-          storage: 10Gi
+          storage: ${STORAGE}
 EOF
 
 CONFIG_CONTENTS="$(echo "${CONFIG_CONTENTS}" | /tmp/yq m - "${PATCH}")"
