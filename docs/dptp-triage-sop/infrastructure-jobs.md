@@ -1,5 +1,10 @@
 # Infrastructure CI Jobs
 
+1. [`branch-ci-openshift-release-master-release-controller-annotate`](#branch-ci-openshift-release-master-release-controller-annotate)
+2. [`periodic-branch-protector`](#periodic-branch-protector)
+3. [`periodic-branch-protector-openshift-org`](#periodic-branch-protector-openshift-org)
+4. [`periodic-org-sync`](#periodic-org-sync)
+
 ## `branch-ci-openshift-release-master-release-controller-annotate`
 
 TODO
@@ -82,3 +87,47 @@ outside of `openshift`, see [periodic-branch-protection](#periodic-branch-protec
 - [Recent executions on Deck](https://prow.ci.openshift.org/?job=periodic-branch-protector-openshift-org)
 - [infra-periodics.yaml (ProwJob configuration)](https://github.com/openshift/release/blob/master/ci-operator/jobs/infra-periodics.yaml)
 - [Branch Protection documentation on docs.ci](https://docs.ci.openshift.org/docs/architecture/branch-protection/)
+
+## `periodic-org-sync`
+
+This job runs [Prow `peribolos`](https://github.com/kubernetes/test-infra/tree/master/prow/cmd/peribolos) to reconcile
+members, teams, team membership and other properties of the `openshift`
+GitHub organization based on configuration stored in private [openshift/config](https://github.com/openshift/config)
+repository. We share the ownership of this job with DPP: we make sure that `peribolos` works and DPP owns the config in
+[openshift/config](https://github.com/openshift/config). Most problems with this job are caused by the configuration, so
+we often just ping `@dpp-triage` to resolve them.
+
+#### Useful links
+
+- [Recent executions on Deck](https://prow.ci.openshift.org/?job=periodic-org-sync)
+- [infra-periodics.yaml (ProwJob configuration)](https://github.com/openshift/release/blob/master/ci-operator/jobs/infra-periodics.yaml)
+
+### User renamed or removed their GitHub account
+
+#### Symptom
+
+```json
+{
+  "component": "peribolos",
+  "file": "prow/cmd/peribolos/main.go:209",
+  "func": "main.main",
+  "level": "fatal",
+  "msg": "Configuration failed: failed to configure openshift teams: failed to update Team Red Hat members: UpdateTeamMembership(111111(Team Name), some-user, false) failed: status code 404 not one of [200], body: {\"message\":\"Not Found\",\"documentation_url\":\"https://docs.github.com/rest/reference/teams#add-or-update-team-membership-for-a-user\"}",
+  "severity": "fatal",
+  "time": "2022-01-25T12:53:32Z"
+}
+```
+
+#### Culprit
+
+Someone renamed or deleted their GitHub account and now our config is stale, trying to add a nonexistent GitHub user to
+a team, organization or something similar.
+
+#### Resolution
+
+1. Identify the failing operations and entities involved:`UpdateTeamMembership(111111(Team Name), some-user, false)`
+   means `peribolos` tried to set membership of user `some-user` in a team `Team Name`.
+2. The status code hints about what kind of error was encountered: `status code 404 not one of [200]` hints that one of
+   the entities was not found (and so likely does not exist).
+3. Confirm the existence of `some-user` by visiting https://github.com/some-user
+4. Ping `@dpp-triage` to remove the user from their Peribolos configuration.
