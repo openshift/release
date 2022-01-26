@@ -1,7 +1,7 @@
 apiVersion: template.openshift.io/v1
 kind: Template
 metadata:
-  name: private-deck-poc
+  name: qe-private-deck
 parameters:
   - description: The session secret for the component.
     name: SESSION_SECRET
@@ -15,7 +15,7 @@ objects:
     kind: Route
     metadata:
       namespace: ${NAMESPACE}
-      name: private-deck-poc
+      name: qe-private-deck
       annotations:
         haproxy.router.openshift.io/timeout: "90s"
     spec:
@@ -26,21 +26,21 @@ objects:
         termination: Reencrypt
       to:
         kind: Service
-        name: private-deck-poc
+        name: qe-private-deck
   - apiVersion: v1
     kind: Service
     metadata:
       namespace: ${NAMESPACE}
-      name: private-deck-poc
+      name: qe-private-deck
       labels:
         app: prow
-        component: private-deck-poc
+        component: qe-private-deck
       annotations:
-        service.alpha.openshift.io/serving-cert-secret-name: private-deck-poc-tls
+        service.alpha.openshift.io/serving-cert-secret-name: qe-private-deck-tls
     spec:
       selector:
         app: prow
-        component: private-deck-poc
+        component: qe-private-deck
       ports:
         - name: main
           port: 443
@@ -53,25 +53,25 @@ objects:
   - kind: Deployment
     apiVersion: apps/v1
     metadata:
-      name: private-deck-poc
+      name: qe-private-deck
       namespace: ci
       labels:
         app: prow
-        component: private-deck-poc
+        component: qe-private-deck
     spec:
       replicas: 2
       revisionHistoryLimit: 2
       selector:
         matchLabels:
           app: prow
-          component: private-deck-poc
+          component: qe-private-deck
       template:
         metadata:
           labels:
             app: prow
-            component: private-deck-poc
+            component: qe-private-deck
         spec:
-          serviceAccountName: private-deck-poc
+          serviceAccountName: qe-private-deck
           containers:
             - name: oauth-proxy
               image: quay.io/openshift/origin-oauth-proxy:4.8
@@ -85,11 +85,11 @@ objects:
                 - -http-address=
                 - -email-domain=*
                 - -upstream=http://localhost:8080
-                - -client-id=system:serviceaccount:ci:private-deck-poc
+                - -client-id=system:serviceaccount:ci:qe-private-deck
                 - -openshift-ca=/etc/pki/tls/cert.pem
                 - -openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-                - '-openshift-sar={"verb": "get", "resource": "secrets", "namespace": "private-deck-poc"}'
-                - '-openshift-delegate-urls={"/": {"verb": "get", "resource": "secrets", "namespace": "private-deck-poc"}}'
+                - '-openshift-sar={"verb": "get", "resource": "secrets", "namespace": "qe-private-deck"}'
+                - '-openshift-delegate-urls={"/": {"verb": "get", "resource": "secrets", "namespace": "qe-private-deck"}}'
                 - -client-secret-file=/var/run/secrets/kubernetes.io/serviceaccount/token
                 - -cookie-secret-file=/etc/proxy/secrets/session_secret
                 - -cookie-samesite=none
@@ -97,7 +97,7 @@ objects:
                 - -tls-key=/etc/tls/private/tls.key
               volumeMounts:
                 - mountPath: /etc/tls/private
-                  name: private-deck-poc-tls
+                  name: qe-private-deck-tls
                 - mountPath: /etc/proxy/secrets
                   name: session-secret
             - name: deck
@@ -116,12 +116,12 @@ objects:
                 - --hook-url=http://hook:8888/plugin-help
                 - --spyglass=true
                 - --cookie-secret=/etc/proxy/secrets/session_secret
-                - --gcs-credentials-file=/etc/gce-sa-credentials-gcs-private-deck-poc/service-account.json
+                - --gcs-credentials-file=/etc/gce-sa-credentials-gcs-qe-private-deck/service-account.json
                 - --projected-token-file=/var/sa-token/token
                 - --rerun-creates-job=true
                 - --supplemental-plugin-config-dir=/etc/plugins
                 - --kubeconfig-dir=/etc/build-farm-credentials
-                - --tenant-id=private-deck-poc-tenant
+                - --tenant-id=qe-private
               ports:
                 - name: main
                   containerPort: 8080
@@ -143,8 +143,8 @@ objects:
               volumeMounts:
                 - name: service-account-token
                   mountPath: /var/sa-token
-                - name: gce-sa-credentials-gcs-private-deck-poc
-                  mountPath: /etc/gce-sa-credentials-gcs-private-deck-poc
+                - name: gce-sa-credentials-gcs-qe-private-deck
+                  mountPath: /etc/gce-sa-credentials-gcs-qe-private-deck
                   readOnly: true
                 - mountPath: /etc/proxy/secrets
                   name: session-secret
@@ -223,22 +223,22 @@ objects:
                 name: config
             - name: extensions
               configMap:
-                name: private-deck-poc-extensions
+                name: qe-private-deck-extensions
             - name: oauth
               secret:
                 secretName: github-credentials-openshift-ci-robot
             - name: oauth-config
               secret:
-                secretName: github-app-private-deck-poc
-            - name: gce-sa-credentials-gcs-private-deck-poc
+                secretName: github-app-qe-private-deck
+            - name: gce-sa-credentials-gcs-qe-private-deck
               secret:
-                secretName: gce-sa-credentials-gcs-private-deck-poc
+                secretName: gce-sa-credentials-gcs-qe-private-deck
             - name: session-secret
               secret:
-                secretName: private-deck-poc-session-secret
-            - name: private-deck-poc-tls
+                secretName: qe-private-deck-session-secret
+            - name: qe-private-deck-tls
               secret:
-                secretName: private-deck-poc-tls
+                secretName: qe-private-deck-tls
             - name: job-config-misc
               configMap:
                 name: job-config-misc
@@ -291,6 +291,6 @@ objects:
     kind: Secret
     metadata:
       namespace: ${NAMESPACE}
-      name: private-deck-poc-session-secret
+      name: qe-private-deck-session-secret
     stringData:
       session_secret: "${SESSION_SECRET}="
