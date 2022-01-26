@@ -37,6 +37,7 @@ export GOCACHE=/tmp/gocache
 export GOROOT=/usr/local/go
 
 # compile extended-platform-tests if it does not exist.
+export DEFAULT_EXTENDED_BIN=1
 # if [ -f "/usr/bin/extended-platform-tests" ]; then
 if ! [ -f "/usr/bin/extended-platform-tests" ]; then
     echo "extended-platform-tests does not exist, and try to compile it"
@@ -53,6 +54,7 @@ if ! [ -f "/usr/bin/extended-platform-tests" ]; then
     export REPORT_HANDLE_PATH="/tmp/extendedbin"
     cd ..
     rm -fr openshift-tests-private
+    export DEFAULT_EXTENDED_BIN=0
 fi
 which extended-platform-tests
 
@@ -121,6 +123,7 @@ echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_START"
 trap 'echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"' EXIT
 
 # check if the cluster is ready
+oc version --client
 oc wait nodes --all --for=condition=Ready=true --timeout=10m
 oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
 
@@ -177,7 +180,7 @@ function run {
         exit 0
     fi
     echo "fail"
-    exit 1
+    exit ${DEFAULT_EXTENDED_BIN}
 }
 
 # select the cases per FILTERS
