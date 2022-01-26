@@ -22,5 +22,5 @@ github-ldap-mapping-update   0 1 * * *   False     0        14h             88d
 release-schedules-update     0 1 * * *   False     0        14h             83d
 sync-rover-groups-update     0 1 * * *   False     0        <none>          20s
 $ cronjob_name=sync-rover-groups-update
-$ oc --context psi -n ocp-test-platform create job ${cronjob_name}-test-job-$USER-$(echo $RANDOM | md5sum | head -c 8) --from=cronjob/${cronjob_name}
+$ oc --context psi -n ocp-test-platform create job ${cronjob_name}-test-job-$USER-$(openssl rand -hex 6) --from=cronjob/${cronjob_name}
 ```
