@@ -17,6 +17,7 @@ else
 fi
 
 cd verification-tests
+export BUSHSLICER_LOG_LEVEL=plain
 # run destructive tests in serial
 export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/destructive"
 export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS="${USERS}"
