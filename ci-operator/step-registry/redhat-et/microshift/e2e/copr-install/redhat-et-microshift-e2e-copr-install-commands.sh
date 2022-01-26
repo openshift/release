@@ -39,17 +39,35 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJE
   --org=$(cat /var/run/rhsm/subscription-manager-org ) \
   --activationkey=$(cat /var/run/rhsm/subscription-manager-act-key)"
 
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+set -x
+
+cat <<EOF > "${HOME}"/install.sh
+#! /bin/sh
+
+on_exit(){
+  systemctl status microshift
+  journalctl -u microshift
+}
+
+trap "on_exit; exit;" EXIT
+
+set -xe
+sudo subscription-manager repos --enable rhocp-4.8-for-rhel-8-x86_64-rpms
+sudo dnf install -y cri-o cri-tools && sudo systemctl enable crio --now
+sudo dnf copr enable -y @redhat-et/microshift
+sudo dnf install -y microshift firewalld
+sudo systemctl enable microshift --now
+EOF
+
+chmod +x "${HOME}"/install.sh
+
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+  --quiet \
+  --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
-  rhel8user@"${INSTANCE_PREFIX}" \
-  --command 'sudo subscription-manager repos --enable rhocp-4.8-for-rhel-8-x86_64-rpms'
+  --recurse "${HOME}"/install.sh rhel8user@"${INSTANCE_PREFIX}":~/install.sh
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
-  --command 'sudo dnf install -y cri-o cri-tools && sudo systemctl enable crio --now'
-
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  rhel8user@"${INSTANCE_PREFIX}" \
-  --command 'sudo dnf copr enable -y @redhat-et/microshift && sudo dnf install -y microshift firewalld  && sudo systemctl enable microshift --now'
+  --command 'sudo install.sh'
