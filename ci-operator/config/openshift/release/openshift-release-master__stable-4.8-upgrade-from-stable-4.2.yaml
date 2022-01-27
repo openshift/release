@@ -1,0 +1,71 @@
+releases:
+  four-five:
+    release:
+      channel: stable
+      version: "4.5"
+  four-four:
+    release:
+      channel: stable
+      version: "4.4"
+  four-seven:
+    release:
+      channel: stable
+      version: "4.7"
+  four-six:
+    release:
+      channel: stable
+      version: "4.6"
+  four-three:
+    release:
+      channel: stable
+      version: "4.3"
+  initial:
+    release:
+      channel: stable
+      version: "4.2"
+  latest:
+    release:
+      channel: stable
+      version: "4.8"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws-upgrade
+  interval: 72h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      TEST_UPGRADE_OPTIONS: ""
+      TEST_UPGRADE_SUITE: none
+    test:
+    - as: set-releases-release
+      commands: |
+        echo "${RELEASE_IMAGE_4_3},${RELEASE_IMAGE_4_4},${RELEASE_IMAGE_4_5},${RELEASE_IMAGE_4_6},${RELEASE_IMAGE_4_7},${RELEASE_IMAGE_LATEST}" > ${SHARED_DIR}/override-upgrade
+      dependencies:
+      - env: RELEASE_IMAGE_4_3
+        name: release:four-three
+      - env: RELEASE_IMAGE_4_4
+        name: release:four-four
+      - env: RELEASE_IMAGE_4_5
+        name: release:four-five
+      - env: RELEASE_IMAGE_4_6
+        name: release:four-six
+      - env: RELEASE_IMAGE_4_7
+        name: release:four-seven
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: openshift-e2e-test
+    workflow: openshift-upgrade-aws
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: release
+  variant: stable-4.8-upgrade-from-stable-4.2
