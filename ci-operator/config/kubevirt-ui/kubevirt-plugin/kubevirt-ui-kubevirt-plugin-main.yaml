@@ -1,0 +1,70 @@
+base_images:
+  base:
+    name: release
+    namespace: openshift
+    tag: tectonic-console-builder-v23
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: tectonic-console-builder-v23
+images:
+- dockerfile_path: Dockerfile.ci
+  inputs:
+    base:
+      as:
+      - node:16
+  to: kubevirt-plugin
+releases:
+  initial:
+    integration:
+      name: "4.10"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.10"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: kubevirt-e2e-aws
+  steps:
+    cluster_profile: aws
+    dependencies:
+      KUBEVIRT_PLUGIN_IMG_NAME: kubevirt-plugin
+    env:
+      COMPUTE_NODE_TYPE: m4.2xlarge
+      ZONES_COUNT: "1"
+    test:
+    - as: tests
+      cli: latest
+      commands: |2
+
+        # Deploy Kubevirt
+        source ./deploy-kubevirt-gating.sh
+
+        # Run kubevirt-plugin gating suite
+        ./test-prow-e2e.sh ${KUBEVIRT_PLUGIN_IMG_NAME};
+      credentials:
+      - mount_path: /var/run/operator-secret
+        name: operator-secret
+        namespace: test-credentials
+      dependencies:
+      - env: KUBEVIRT_PLUGIN_IMG_NAME
+        name: kubevirt-plugin-img
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: kubevirt-ui
+  repo: kubevirt-plugin
