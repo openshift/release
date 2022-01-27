@@ -71,16 +71,17 @@ systemctl start sysstat
 
 mkdir -p /tmp/artifacts
 
+REPO_DIR="/home/assisted"
+mkdir -p "\${REPO_DIR}"
+mkdir -p "\${REPO_DIR}"/minikube_home
+echo "export MINIKUBE_HOME=\${REPO_DIR}/minikube_home" >> /root/config
+
 # NVMe makes it faster
 NVME_DEVICE="/dev/nvme0n1"
-REPO_DIR="/home/assisted"
 if [ -e "\$NVME_DEVICE" ];
 then
   mkfs.xfs -f "\${NVME_DEVICE}"
-  mkdir -p "\${REPO_DIR}"
   mount "\${NVME_DEVICE}" "\${REPO_DIR}"
-  mkdir -p "\${REPO_DIR}"/minikube_home
-  echo "export MINIKUBE_HOME=\${REPO_DIR}/minikube_home" >> /root/config
 fi
 
 tar -xzvf assisted.tar.gz -C "\${REPO_DIR}"
