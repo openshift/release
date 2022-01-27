@@ -136,6 +136,7 @@ for path in "${paths[@]}" ; do
 done
 
 
+# If the tcpdump-service step was used, grab the pcap files.
 echo "INFO: gathering quay tcpdump packet headers if present"
 output_dir="${ARTIFACT_DIR}/tcpdump/"
 mkdir -p "$output_dir"
