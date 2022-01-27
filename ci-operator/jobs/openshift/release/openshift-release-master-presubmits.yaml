@@ -593,7 +593,7 @@ presubmits:
             secretKeyRef:
               key: appid
               name: openshift-prow-github-app
-        image: gcr.io/k8s-prow/checkconfig:v20220126-5d5a1ff911
+        image: gcr.io/k8s-prow/checkconfig:v20220126-2ee0870088
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -1379,6 +1379,37 @@ presubmits:
           requests:
             cpu: 10m
     trigger: (?m)^/test( | .* )pylint,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build03
+    context: ci/prow/sync-rover-groups
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-sync-rover-groups
+    optional: true
+    rerun_command: /test sync-rover-groups
+    run_if_changed: ^clusters/.*
+    spec:
+      containers:
+      - args:
+        - --manifest-dir
+        - clusters
+        - --log-level
+        - debug
+        - --validate-subjects
+        command:
+        - sync-rover-groups
+        image: sync-rover-groups:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )sync-rover-groups,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
