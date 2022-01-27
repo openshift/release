@@ -4,6 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# List of exclude tests from upgrade suite
+if [ "${TEST_TYPE}" == "upgrade" ]; then
+    cat > "${SHARED_DIR}/excluded_tests" << EOF
+"[sig-cluster-lifecycle] cluster upgrade should complete in 90.00 minutes"
+EOF
 # List of exclude tests from conformance/serial suite
 if [ "${TEST_TYPE}" == "conformance-serial" ]; then
     cat > "${SHARED_DIR}/excluded_tests" << EOF
