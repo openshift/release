@@ -17,22 +17,20 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: unit-test-sonar-pre-submit
+- as: sonar-pre-submit
   commands: |
     export SELF="make -f Makefile.prow"
     make -f Makefile.prow sonar/js/jest-init
-    make -f Makefile.prow unit-test
     make -f Makefile.prow sonar/js/prow
   container:
     from: bin
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
-- as: unit-test-sonar-post-submit
+- as: sonar-post-submit
   commands: |
     export SELF="make -f Makefile.prow"
     make -f Makefile.prow sonar/js/jest-init
-    make -f Makefile.prow unit-test
     make -f Makefile.prow sonar/js/prow
   container:
     from: bin
