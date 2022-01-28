@@ -272,13 +272,24 @@ function handle_result {
     fi
     current_time=`date "+%Y-%m-%d-%H-%M-%S"`
     newresultfile="${ARTIFACT_DIR}/junit/junit_e2e_${current_time}.xml"
-    handle_ret=0
-    python3 ${REPORT_HANDLE_PATH}/handleresult.py -a replace -i ${resultfile} -o ${newresultfile} || handle_ret=$?
-    if [ "W${handle_ret}W" == "W0W" ]; then
-        echo ${newresultfile}
+    replace_ret=0
+    python3 ${REPORT_HANDLE_PATH}/handleresult.py -a replace -i ${resultfile} -o ${newresultfile} || replace_ret=$?
+    if ! [ "W${replace_ret}W" == "W0W" ]; then
+        echo "replacing file is not ok"
         rm -fr ${resultfile}
-        cp ${newresultfile} ${resultfile}
-        rm -fr ${newresultfile}
+        return
     fi 
+    rm -fr ${resultfile}
+
+    echo ${newresultfile}
+    split_ret=0
+    python3 ${REPORT_HANDLE_PATH}/handleresult.py -a split -i ${newresultfile} || split_ret=$?
+    if ! [ "W${split_ret}W" == "W0W" ]; then
+        echo "splitting file is not ok"
+        rm -fr ${newresultfile}
+        return
+    fi
+    cp -fr import-*.xml "${ARTIFACT_DIR}/junit/"
+    rm -fr ${newresultfile}
 }
 run
