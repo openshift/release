@@ -20,14 +20,17 @@ periodics:
     slack:
       channel: '#microshift-alerts'
       job_states_to_report:
-      - triggered
       - pending
       - success
       - failure
       - aborted
       - error
-      report_template: |
-        Job: {{.Spec.Job}}
+      report_template: '{{define "status_icon"}}{{with $st := .Status.State}}{{if
+        eq $st "success"}}:green_jenkins_circle:{{else if eq $st "pending"}}:yellow_jenkins_circle{{else
+        if eq $st "failed" or eq $st "aborted" or $st "error"}}:red_jenkins_circle:
+        @here{{else}}:question:{{end}}{{end}}{{end}}{{- template "status_icon"}} Job
+        {{.Spec.Job}} entered state: {{printf "%q" .Status.State}}. See logs: <{{.Status.URL}}|View>{{"\n"}}{{"\n"}}#<{{.Pull.Link}}|{{.Pull.Number}}>:
+        {{.Pull.Title}}{{"\n"}}{{"\n"}}{{"\n"}}Author: {{.Pull.Author}}'
   spec:
     containers:
     - args:
