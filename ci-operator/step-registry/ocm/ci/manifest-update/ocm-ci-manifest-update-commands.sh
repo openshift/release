@@ -86,9 +86,9 @@ git checkout "$branch" || {
     exit 1
 }
 release=$(cat "$release_dir/Z_RELEASE_VERSION")
-export OCSI_COMPONENT_VERSION=${OCSI_COMPONENT_VERSION:-$release}
+export OSCI_COMPONENT_VERSION=${OSCI_COMPONENT_VERSION:-$release}
 echo "INFO Z-stream version is $release"
-echo "INFO OCSI_COMPONENT_VERSION is ${OCSI_COMPONENT_VERSION}"
+echo "INFO OSCI_COMPONENT_VERSION is ${OSCI_COMPONENT_VERSION}"
 
 # Set OSCI_COMPONENT_NAME to REPO_NAME if it is not provided
 export OSCI_COMPONENT_NAME=${OSCI_COMPONENT_NAME:-$REPO_NAME}
