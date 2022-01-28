@@ -88,6 +88,53 @@ tests:
       IMAGE_TAG: latest
       REGISTRY_ORG: identitatem
     workflow: identitatem-ci-image-mirror
+- as: e2e-cluster
+  skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|DCO|LICENSE|OWNERS)$
+  steps:
+    dependencies:
+      COMPONENT_IMAGE_REF: idp-mgmt-operator
+    env:
+      ACM_RELEASE_VERSION: release-2.4
+      CLUSTERPOOL_CHECKOUT_TIMEOUT_MINUTES: "15"
+      CLUSTERPOOL_GROUP_NAME: idp-for-the-masses
+      CLUSTERPOOL_HOST_NAMESPACE: managed-services
+      CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-mgdsvcs-clusterpool
+      CLUSTERPOOL_LIFETIME: 1h
+      CLUSTERPOOL_LIST_INCLUSION_FILTER: aws-4-9-sno-2x
+      CLUSTERPOOL_MANAGED_COUNT: "1"
+      COMPONENT_NAME: ""
+      PIPELINE_STAGE: edge
+      SKIP_COMPONENT_INSTALL: "true"
+    test:
+    - as: import
+      commands: |
+        KUBECONFIG=${SHARED_DIR}/hub-1.kc oc cm attach cluster --cluster managed --cluster-kubeconfig ${SHARED_DIR}/managed-1.kc
+      from: root
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: e2e-test
+      commands: |
+        export SELF="make -f /opt/build-harness/Makefile.prow"
+        export VERSION_TAG=latest
+        ./run-prow-e2e.sh
+      credentials:
+      - mount_path: /etc/ocm-mgdsvcs-e2e-test
+        name: ocm-mgdsvcs-e2e-test
+        namespace: test-credentials
+      - mount_path: /etc/ocm-mgdsvcs-clusterpool
+        name: ocm-mgdsvcs-clusterpool
+        namespace: test-credentials
+      - mount_path: /etc/acm-cicd-quay-pull
+        name: acm-cicd-quay-pull
+        namespace: test-credentials
+      from: idp-mgmt-operator-e2e-tests
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-e2e-clusterpool
 zz_generated_metadata:
   branch: main
   org: identitatem
