@@ -1,27 +1,29 @@
-postsubmits:
-  openshift/assisted-service:
+presubmits:
+  openshift/assisted-image-service:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^ocm-2\.3$
+    - ^release-ocm-2\.5$
+    - ^release-ocm-2\.5-
     cluster: build01
+    context: ci/prow/stolostron-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/is-promotion: "true"
+      ci-operator.openshift.io/variant: stolostron
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-openshift-assisted-service-ocm-2.3-images
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-assisted-image-service-release-ocm-2.5-stolostron-images
+    rerun_command: /test stolostron-images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
-        - --promote
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
+        - --variant=stolostron
         command:
         - ci-operator
         image: ci-operator:latest
@@ -37,9 +39,6 @@ postsubmits:
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
-        - mountPath: /etc/push-secret
-          name: push-secret
-          readOnly: true
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
@@ -48,9 +47,7 @@ postsubmits:
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
-      - name: push-secret
-        secret:
-          secretName: registry-push-credentials-ci-central
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )stolostron-images,?($|\s.*)
