@@ -29,11 +29,6 @@ scp "${SSHOPTS[@]}" "${SHARED_DIR}/test-list" "root@${IP}:/tmp/test-list"
 
 echo "### Running tests"
 timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
-    if [ -z "\$(ls -A \${KUBECONFIG})" ]; then
-        echo "Directory \${KUBECONFIG} is empty, indicating no installation was successful!"
-        exit 1
-    fi
-
     for kubeconfig in \$(find \${KUBECONFIG} -type f); do
         export KUBECONFIG=\${kubeconfig}
         name=\$(basename \${kubeconfig})
