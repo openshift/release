@@ -267,7 +267,7 @@ do
   cp "${item}" "${dir}/tls/${manifest##tls_}"
 done <   <( find "${SHARED_DIR}" \( -name "tls_*.key" -o -name "tls_*.pub" \) -print0)
 
-if [ ! -z "${OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP}" ]; then
+if [ ! -z "${OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP:-}" ]; then
   # Inject promtail in bootstrap.ign
   openshift-install --dir="${dir}" create ignition-configs &
   wait "$!"
