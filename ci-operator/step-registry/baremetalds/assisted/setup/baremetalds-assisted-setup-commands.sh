@@ -133,6 +133,7 @@ CI_REGISTRIES=\$(for image in \${IMAGES}; do echo \${image} | cut -d'/' -f1; don
 echo "export PUBLIC_CONTAINER_REGISTRIES=quay.io,\${CI_REGISTRIES}" >> /root/config
 echo "export ASSISTED_SERVICE_HOST=${IP}" >> /root/config
 echo "export CHECK_CLUSTER_VERSION=True" >> /root/config
+echo "export NUM_WORKERS=2" >> /root/config
 echo "export TEST_TEARDOWN=false" >> /root/config
 echo "export TEST_FUNC=test_install" >> /root/config
 echo "export INSTALLER_KUBECONFIG=\${REPO_DIR}/build/kubeconfig" >> /root/config
