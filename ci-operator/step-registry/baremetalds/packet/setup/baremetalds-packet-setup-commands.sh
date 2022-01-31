@@ -111,6 +111,25 @@ cat > packet-setup.yaml <<-EOF
             ssh "\${SSHOPTS[@]}" "root@\${IP}" hostname && break
             sleep 10
         done
+
+        ssh "\${SSHOPTS[@]}" "root@\${IP}" bash - << EOF2
+        echo "Making sure we use vault mirror, as default CentOS repositories are already EOL..."
+        mv /etc/yum.repos.d /etc/yum.repos.d_\$(date +%s)
+        mkdir /etc/yum.repos.d
+        cat << EOF3 > /etc/yum.repos.d/centos-vault.repo
+        [base]
+        name=base
+        baseurl=https://vault.centos.org/8.4.2105/BaseOS/x86_64/os/
+        gpgcheck=0
+        enabled=1
+        [apps]
+        name=apps
+        baseurl=https://vault.centos.org/8.4.2105/AppStream/x86_64/os/
+        gpgcheck=0
+        enabled=1
+        EOF3
+        EOF2
+
       dest: "${SHARED_DIR}/packet-conf.sh"
 EOF
 
