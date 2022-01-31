@@ -111,6 +111,22 @@ cat > packet-setup.yaml <<-EOF
             ssh "\${SSHOPTS[@]}" "root@\${IP}" hostname && break
             sleep 10
         done
+
+        ssh "\${SSHOPTS[@]}" "root@\${IP}" bash - << EOC
+            echo "Making sure we use vault mirror, as default CentOS repositories are already EOL..."
+
+            sed -i '/mirrorlist=.*/d' /etc/yum.repos.d/CentOS-AppStream.repo
+            grep -qF 'vault.centos.org' /etc/yum.repos.d/CentOS-AppStream.repo || \
+              echo 'baseurl=http://vault.centos.org/\\\$contentdir/\\\$releasever/AppStream/\\\$basearch/os/' >> /etc/yum.repos.d/CentOS-AppStream.repo
+
+            sed -i '/mirrorlist=.*/d' /etc/yum.repos.d/CentOS-Base.repo
+            grep -qF 'vault.centos.org' /etc/yum.repos.d/CentOS-Base.repo || \
+              echo 'baseurl=http://vault.centos.org/\\\$contentdir/\\\$releasever/BaseOS/\\\$basearch/os/' >> /etc/yum.repos.d/CentOS-Base.repo
+
+            sed -i '/mirrorlist=.*/d' /etc/yum.repos.d/CentOS-Extras.repo
+            grep -qF 'vault.centos.org' /etc/yum.repos.d/CentOS-Extras.repo || \
+              echo 'baseurl=http://vault.centos.org/\\\$contentdir/\\\$releasever/extras/\\\$basearch/os/' >> /etc/yum.repos.d/CentOS-Extras.repo
+        EOC
       dest: "${SHARED_DIR}/packet-conf.sh"
 EOF
 
