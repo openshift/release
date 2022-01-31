@@ -47,7 +47,7 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJE
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
-  --command 'sudo dnf install jq -y'
+  --command 'sudo dnf install jq firewalld -y'
 
 # scp and install microshift-selinux & microshift RPMs
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
@@ -83,6 +83,22 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJE
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
   --command 'sudo systemctl enable --now crio.service'
+
+#Firewalld ports
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  rhel8user@"${INSTANCE_PREFIX}" \
+  --command 'sudo systemctl enable --now firewalld'
+
+#Firewalld ports
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  rhel8user@"${INSTANCE_PREFIX}" \
+  --command 'sudo firewall-cmd --zone=trusted --add-source=10.42.0.0/16 --permanent && \
+  sudo firewall-cmd --zone=public --add-port=80/tcp --permanent && \
+  sudo firewall-cmd --zone=public --add-port=443/tcp --permanent && \
+  sudo firewall-cmd --zone=public --add-port=5353/udp --permanent && \
+  sudo firewall-cmd --reload'
 
 # scp and install oc binary
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
