@@ -39,7 +39,7 @@ cat > packet-setup.yaml <<-EOF
         auth_token: "{{ packet_auth_token }}"
         project_id: "{{ packet_project_id }}"
         hostnames: "{{ packet_hostname }}"
-        operating_system: centos_8
+        operating_system: rocky_8
         plan: ${PACKET_PLAN}
         facility: any
         wait_for_public_IPv: 4
