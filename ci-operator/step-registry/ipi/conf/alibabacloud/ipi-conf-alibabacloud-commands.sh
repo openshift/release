@@ -19,4 +19,5 @@ baseDomain: ${BASE_DOMAIN}
 platform:
   alibabacloud:
     region: ${REGION}
+    resourceGroupID: ${CI_RESOURCE_GROUP_ID}
 EOF
