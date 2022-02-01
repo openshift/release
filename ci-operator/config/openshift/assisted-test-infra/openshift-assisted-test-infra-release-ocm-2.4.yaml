@@ -20,18 +20,19 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.16
+  from_repository: true
 images:
-- dockerfile_path: Dockerfile.test-infra
+- dockerfile_literal: |
+    FROM base
+    COPY . .
   from: src
+  to: assisted-test-infra
+- dockerfile_path: Dockerfile.assisted-test-infra
   inputs:
     assisted-service:
       as:
       - quay.io/ocpmetal/assisted-service:latest
-  to: assisted-test-infra
+  to: assisted-test-infra-internal
 promotion:
   name: ocm-2.4
   namespace: edge-infrastructure
