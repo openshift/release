@@ -21,17 +21,7 @@ metadata:
     release.openshift.io/create-only: "true"
   name: cluster
 spec:
-  customNoUpgrade:
-    enabled:
-    - ExternalCloudProvider
-    - CSIMigrationAWS
-    - CSIMigrationOpenStack
-    - CSIMigrationAzureDisk
-    - CSIDriverAzureDisk
-    - CSIMigrationGCE
-    - CSIDriverVSphere
-    - CSIMigrationvSphere
-  featureSet: CustomNoUpgrade
+  featureSet: TechPreviewNoUpgrade
 EOF
 }
 
