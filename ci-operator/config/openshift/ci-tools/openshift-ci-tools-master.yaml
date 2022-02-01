@@ -749,6 +749,29 @@ tests:
   commands: make lint
   container:
     from: golangci-lint
+- as: something
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 15m0s
+    version: "4.9"
+  steps:
+    test:
+    - as: something
+      commands: |
+        curl --quiet https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/origin-ci-test/pr-logs/pull/openshift-psap_ci-artifacts/326/pull-ci-openshift-psap-ci-artifacts-master-test-commit/1488598968538501120/artifacts/test-commit/test-commit/build-log.txt
+      credentials:
+      - mount_path: /var/run/leaky-secret
+        name: psap-entitlement-secret
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
 zz_generated_metadata:
   branch: master
   org: openshift
