@@ -1,38 +1,38 @@
 base_images:
   base:
-    name: 4.10-priv
+    name: 4.11-priv
     namespace: ocp-private
     tag: base
   insights-operator-tests:
     name: insights-operator-tests
     namespace: ci
     tag: latest
-  ocp_builder_rhel-8-golang-1.16-openshift-4.10:
+  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.16-openshift-4.10
+    tag: rhel-8-golang-1.17-openshift-4.10
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/insights-operator
 images:
 - from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.10:
+    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.10
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
   to: insights-operator
 promotion:
-  name: 4.10-priv
+  name: 4.11-priv
   namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.10-priv
+      name: 4.11-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.10-priv
+      name: 4.11-priv
       namespace: ocp-private
 resources:
   '*':
@@ -67,6 +67,10 @@ tests:
     - as: test
       cli: latest
       commands: pytest.sh -m "not ui"
+      credentials:
+      - mount_path: /secrets
+        name: insights-qa
+        namespace: test-credentials
       from: insights-operator-tests
       resources:
         requests:

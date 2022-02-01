@@ -12,8 +12,8 @@ base_images:
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-test-infra:
-    name: assisted-test
-    namespace: ocp-kni
+    name: ocm-2.5
+    namespace: edge-infrastructure
     tag: assisted-test-infra
   coreos_centos_stream8:
     name: stream8
@@ -101,24 +101,74 @@ tests:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.8
         NUM_MASTERS=1
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
-- as: e2e-metal-assisted
+    workflow: baremetalds-assisted
+- as: e2e-metal-assisted-ocp46
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION="4.6"
+    workflow: baremetalds-assisted
+- as: e2e-metal-assisted-ocp48
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION="4.8"
+    workflow: baremetalds-assisted
+- as: e2e-metal-assisted-ocp49
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION="4.9"
+    workflow: baremetalds-assisted
+- as: e2e-metal-assisted-onprem
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        DEPLOY_TARGET=onprem
+    workflow: baremetalds-assisted
+- as: e2e-metal-assisted-day2
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        TEST_FUNC=test_deploy_day2_nodes_cloud
+    workflow: baremetalds-assisted
+- as: e2e-metal-assisted-ipv4v6
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        IPv6=yes
+        IPv4=yes
+    workflow: baremetalds-assisted
+- as: e2e-metal-assisted-multi-version
+  optional: true
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=""
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
+- as: e2e-metal-assisted-networking
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        TEST_FUNC=test_networking
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-olm
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         TEST_FUNC=test_olm_operator
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+      PACKET_PLAN: m2.xlarge.x86
+    workflow: baremetalds-assisted
 zz_generated_metadata:
   branch: cloud_hotfix_releases
   org: openshift

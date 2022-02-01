@@ -1274,7 +1274,7 @@ periodics:
         fi
         next_1=$( python -c 'from __future__ import print_function; import json,sys; print(json.load(open(sys.argv[1], "r"))["pullSpec"])' "${data}" )
 
-        if ! curl --fail -X GET -G --location https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestream/4.9.0-0.ci/latest > ${data}; then
+        if ! curl --fail -X GET -G --location https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestream/4.10.0-0.ci/latest > ${data}; then
           echo "error: Could not find newest version"
           exit 1
         fi
@@ -1355,106 +1355,6 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-aws
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-- agent: kubernetes
-  cluster: build01
-  decorate: true
-  interval: 48h
-  labels:
-    job-env: aws
-    job-release: "4.10"
-    job-test: e2e
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: canary-release-openshift-origin-installer-e2e-aws-4.10-cnv
-  spec:
-    containers:
-    - args:
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --secret-dir=/usr/local/e2e-aws-cnv-cluster-profile
-      - --secret-dir=/usr/local/pull-secret
-      - --target=e2e-aws
-      - --template=/usr/local/e2e-aws
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      command:
-      - ci-operator
-      env:
-      - name: RELEASE_IMAGE_LATEST
-        value: registry.ci.openshift.org/ocp/release:4.10-ci
-      - name: BRANCH
-        value: "4.10"
-      - name: CLUSTER_TYPE
-        value: aws
-      - name: CONFIG_SPEC
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 6Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
-          tests:
-          - as: e2e-$(CLUSTER_TYPE)
-            commands: TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-      - name: JOB_NAME_SAFE
-        value: e2e-aws-cnv
-      - name: TEST_COMMAND
-        value: ENABLE_SSP=true make start && make functest
-      - name: TEST_IMAGESTREAM_TAG
-        value: stable:hyperconverged-cluster-operator-tests
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/e2e-aws-cnv-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /usr/local/e2e-aws
-        name: job-definition
-        subPath: cluster-launch-installer-custom-test-image.yaml
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-aws
-    - configMap:
-        name: prow-job-cluster-launch-installer-custom-test-image
-      name: job-definition
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials

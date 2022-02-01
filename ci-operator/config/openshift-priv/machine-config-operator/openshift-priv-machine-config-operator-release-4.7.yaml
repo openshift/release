@@ -1,7 +1,23 @@
 base_images:
+  assisted-installer:
+    name: ocm-2.5
+    namespace: edge-infrastructure
+    tag: assisted-installer
+  assisted-installer-agent:
+    name: ocm-2.5
+    namespace: edge-infrastructure
+    tag: assisted-installer-agent
+  assisted-installer-controller:
+    name: ocm-2.5
+    namespace: edge-infrastructure
+    tag: assisted-installer-controller
+  assisted-service:
+    name: ocm-2.5
+    namespace: edge-infrastructure
+    tag: assisted-service
   assisted-test-infra:
-    name: assisted-test
-    namespace: ocp-kni
+    name: ocm-2.5
+    namespace: edge-infrastructure
     tag: assisted-test-infra
   base:
     name: 4.7-priv
@@ -53,7 +69,7 @@ tests:
   container:
     from: src
 - as: e2e-aws
-  run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
+  skip_if_only_changed: ^docs/
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
@@ -68,7 +84,7 @@ tests:
   container:
     from: src
 - as: e2e-gcp-op
-  run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
+  skip_if_only_changed: ^docs/
   steps:
     cluster_profile: gcp
     test:
@@ -117,16 +133,12 @@ tests:
   optional: true
   steps:
     cluster_profile: packet
-    workflow: baremetalds-e2e
+    workflow: baremetalds-e2e-ipv4
 - as: e2e-metal-ipi-ovn-dualstack
   optional: true
   steps:
     cluster_profile: packet
-    env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4v6
-        NETWORK_TYPE=OVNKubernetes
-    workflow: baremetalds-e2e
+    workflow: baremetalds-e2e-ovn-dualstack
 - as: e2e-azure
   optional: true
   steps:
@@ -155,7 +167,7 @@ tests:
 - as: e2e-metal-assisted
   optional: true
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     workflow: baremetalds-assisted
 - as: e2e-ovirt
   optional: true

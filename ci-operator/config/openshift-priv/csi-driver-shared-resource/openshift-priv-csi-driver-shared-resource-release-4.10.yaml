@@ -3,10 +3,10 @@ base_images:
     name: 4.10-priv
     namespace: ocp-private
     tag: base
-  ocp_builder_rhel-8-golang-1.16-openshift-4.10:
+  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.16-openshift-4.10
+    tag: rhel-8-golang-1.17-openshift-4.10
 binary_build_commands: make build
 build_root:
   from_repository: true
@@ -15,14 +15,13 @@ images:
 - dockerfile_path: Dockerfile
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.10:
+    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.10
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
   to: csi-driver-shared-resource
 promotion:
   additional_images:
     csi-driver-shared-resource-scripts: src
-  disabled: true
   name: 4.10-priv
   namespace: ocp-private
 releases:
@@ -53,73 +52,57 @@ tests:
     from: src
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: e2e-aws-csi-driver
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
     test:
     - as: test
       cli: latest
       commands: make test-e2e
-      dependencies:
-      - env: DRIVER_IMAGE
-        name: csi-driver-shared-resource
-      - env: NODE_REGISTRAR_IMAGE
-        name: csi-node-driver-registrar
       from: src
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    workflow: csi-driver-shared-resource-e2e-techpreview
 - as: e2e-aws-csi-driver-no-refreshresource
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
     test:
     - as: test
       cli: latest
       commands: make test-e2e-no-refreshresources
-      dependencies:
-      - env: DRIVER_IMAGE
-        name: csi-driver-shared-resource
-      - env: NODE_REGISTRAR_IMAGE
-        name: csi-node-driver-registrar
       from: src
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    workflow: csi-driver-shared-resource-e2e-techpreview
 - as: e2e-aws-csi-driver-disruptive
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
     test:
     - as: test
       cli: latest
       commands: make test-e2e-disruptive
-      dependencies:
-      - env: DRIVER_IMAGE
-        name: csi-driver-shared-resource
-      - env: NODE_REGISTRAR_IMAGE
-        name: csi-node-driver-registrar
       from: src
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    workflow: csi-driver-shared-resource-e2e-techpreview
 - as: e2e-aws-csi-driver-slow
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
     test:
     - as: test
       cli: latest
       commands: make test-e2e-slow
-      dependencies:
-      - env: DRIVER_IMAGE
-        name: csi-driver-shared-resource
-      - env: NODE_REGISTRAR_IMAGE
-        name: csi-node-driver-registrar
       from: src
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    workflow: csi-driver-shared-resource-e2e-techpreview
 zz_generated_metadata:
   branch: release-4.10
   org: openshift-priv

@@ -5,7 +5,6 @@ set -o errexit
 set -o pipefail
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
-CLUSTER_NAME="${NAMESPACE}"
 REGION="ppe3"
 echo "Azure region: ${REGION}"
 
@@ -30,8 +29,6 @@ cp "/var/run/azurestack-cluster-secrets/service-principal" "${SHARED_DIR}/osServ
 cat >> "${CONFIG}" << EOF
 baseDomain: ppe.azurestack.devcluster.openshift.com
 credentialsMode: Manual
-metadata:
-  name: ${CLUSTER_NAME}
 platform:
   azure:
     baseDomainResourceGroupName: openshiftInstallerRG

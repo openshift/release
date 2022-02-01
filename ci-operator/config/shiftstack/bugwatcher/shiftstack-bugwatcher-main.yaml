@@ -1,12 +1,18 @@
+binary_build_commands: pip install --requirement requirements.txt
 build_root:
-  image_stream_tag:
-    name: shellcheck
-    namespace: ci
-    tag: latest
+  project_image:
+    dockerfile_literal: |-
+      FROM registry.access.redhat.com/ubi8/python-39
+
+      # Prow expects to be able to check out a repo under /go
+      USER 0:0
+      WORKDIR /go
+      RUN chown 1001:1001 .
+      USER 1001:1001
 images:
-- dockerfile_path: pretriage/Containerfile
-  from: src
-  to: bugwatcher-pretriage-image
+- dockerfile_literal: FROM scratch
+  from: bin
+  to: shiftstack-bugwatcher-image
 resources:
   '*':
     limits:
@@ -14,13 +20,24 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+test_binary_build_commands: pip install pycodestyle
 tests:
 - as: pep8
   commands: pycodestyle --verbose ./*.py
   container:
-    from: bugwatcher-pretriage-image
-- as: bugwatcher
-  cron: '*/5 * * * *'
+    from: test-bin
+- as: bugwatcher-doctext
+  cron: 0 8 * * *
+  steps:
+    test:
+    - ref: shiftstack-bugwatcher-doctext
+- as: bugwatcher-posttriage
+  cron: 0 7 * * *
+  steps:
+    test:
+    - ref: shiftstack-bugwatcher-posttriage
+- as: bugwatcher-pretriage
+  cron: '*/30 * * * *'
   steps:
     test:
     - ref: shiftstack-bugwatcher-pretriage

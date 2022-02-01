@@ -1,0 +1,42 @@
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+images:
+- dockerfile_path: prow/Dockerfile
+  to: ocp-qe-perfscale-ci
+promotion:
+  namespace: ci
+  tag: latest
+releases:
+  initial:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: nightly
+      version: "4.10"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.10"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: ocp-qe-perfscale-ci-tests
+  interval: 24h
+  steps:
+    cluster_profile: aws
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    workflow: openshift-qe-ocp-qe-perfscale-ci-tests
+zz_generated_metadata:
+  branch: main
+  org: openshift-qe
+  repo: ocp-qe-perfscale-ci

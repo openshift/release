@@ -103,6 +103,8 @@ spec:
         - --job-config-path=/etc/job-config
         - --ci-operator-config-path=/etc/configs
         - --github-endpoint=http://ghproxy
+        - --github-endpoint=https://api.github.com
+        - --github-graphql-endpoint=http://ghproxy/graphql
         - --github-app-id=$(GITHUB_APP_ID)
         - --github-app-private-key-path=/etc/github/cert
         - --registry-cluster-name=app.ci
@@ -113,14 +115,11 @@ spec:
         - --testImagesDistributorOptions.additional-image-stream-tag=ocp/builder:rhel-7-golang-1.11
         - --testImagesDistributorOptions.additional-image-stream-tag=ocp/builder:rhel-7-golang-1.12
         - --testImagesDistributorOptions.additional-image-stream-tag=ocp/builder:rhel-7-golang-1.13
-        - --testImagesDistributorOptions.additional-image-stream-tag=ocp/builder:rhel-8-golang-1.11
         - --testImagesDistributorOptions.additional-image-stream-tag=ocp/builder:rhel-golang-1.11
         - --testImagesDistributorOptions.additional-image-stream-tag=ocp/builder:rhel-golang-1.12
         - --testImagesDistributorOptions.additional-image-stream-tag=ocp/builder:rhel-golang-1.13
         - --testImagesDistributorOptions.additional-image-stream-namespace=ci
         - --testImagesDistributorOptions.additional-image-stream=rhcos/machine-os-content
-        - --testImagesDistributorOptions.forbidden-registry=registry.build01.ci.openshift.org
-        - --testImagesDistributorOptions.forbidden-registry=registry.build02.ci.openshift.org
         - --testImagesDistributorOptions.ignore-cluster-name=hive
         - --testImagesDistributorOptions.ignore-cluster-name=arm01
         - --enable-controller=test_images_distributor
@@ -161,93 +160,15 @@ spec:
         - name: config
           mountPath: /etc/config
           readOnly: true
-        - name: master
-          mountPath: /etc/configs/master
+        - name: ci-operator-configs
+          mountPath: /etc/configs
           readOnly: true
-        - name: misc
-          mountPath: /etc/configs/misc
-          readOnly: true
-        - name: release-3x
-          mountPath: /etc/configs/release-3.x
-          readOnly: true
-        - name: release-41
-          mountPath: /etc/configs/release-4.1
-          readOnly: true
-        - name: release-42
-          mountPath: /etc/configs/release-4.2
-          readOnly: true
-        - name: release-43
-          mountPath: /etc/configs/release-4.3
-          readOnly: true
-        - name: release-44
-          mountPath: /etc/configs/release-4.4
-          readOnly: true
-        - name: release-45
-          mountPath: /etc/configs/release-4.5
-          readOnly: true
-        - name: release-46
-          mountPath: /etc/configs/release-4.6
-          readOnly: true
-        - name: release-47
-          mountPath: /etc/configs/release-4.7
-          readOnly: true
-        - name: release-48
-          mountPath: /etc/configs/release-4.8
-          readOnly: true
-        - name: release-49
-          mountPath: /etc/configs/release-4.9
-          readOnly: true
-        - name: release-410
-          mountPath: /etc/configs/release-4.10
-          readOnly: true
-        - name: job-config-misc
-          mountPath: /etc/job-config/misc
-          readOnly: true
-        - name: job-config-master-periodics
-          mountPath: /etc/job-config/master-periodics
-          readOnly: true
-        - name: job-config-master-postsubmits
-          mountPath: /etc/job-config/master-postsubmits
-          readOnly: true
-        - name: job-config-master-presubmits
-          mountPath: /etc/job-config/master-presubmits
-          readOnly: true
-        - name: job-config-3x
-          mountPath: /etc/job-config/3.x
-          readOnly: true
-        - name: job-config-41
-          mountPath: /etc/job-config/4.1
-          readOnly: true
-        - name: job-config-42
-          mountPath: /etc/job-config/4.2
-          readOnly: true
-        - name: job-config-43
-          mountPath: /etc/job-config/4.3
-          readOnly: true
-        - name: job-config-44
-          mountPath: /etc/job-config/4.4
-          readOnly: true
-        - name: job-config-45
-          mountPath: /etc/job-config/4.5
-          readOnly: true
-        - name: job-config-46
-          mountPath: /etc/job-config/4.6
-          readOnly: true
-        - name: job-config-47
-          mountPath: /etc/job-config/4.7
-          readOnly: true
-        - name: job-config-48
-          mountPath: /etc/job-config/4.8
-          readOnly: true
-        - name: job-config-49
-          mountPath: /etc/job-config/4.9
-          readOnly: true
-        - name: job-config-410
-          mountPath: /etc/job-config/4.10
+        - name: job-config
+          mountPath: /etc/job-config
           readOnly: true
         resources:
           requests:
-            memory: "6Gi"
+            memory: "9Gi"
             cpu: "1"
       serviceAccountName: dptp-controller-manager
       volumes:
@@ -266,90 +187,72 @@ spec:
       - name: secret-mirroring
         configMap:
           name: secret-mirroring
-      - name: master
-        configMap:
-          name: ci-operator-master-configs
-      - name: misc
-        configMap:
-          name: ci-operator-misc-configs
-      - name: release-3x
-        configMap:
-          name: ci-operator-3.x-configs
-      - name: release-41
-        configMap:
-          name: ci-operator-4.1-configs
-      - name: release-42
-        configMap:
-          name: ci-operator-4.2-configs
-      - name: release-43
-        configMap:
-          name: ci-operator-4.3-configs
-      - name: release-44
-        configMap:
-          name: ci-operator-4.4-configs
-      - name: release-45
-        configMap:
-          name: ci-operator-4.5-configs
-      - name: release-46
-        configMap:
-          name: ci-operator-4.6-configs
-      - name: release-47
-        configMap:
-          name: ci-operator-4.7-configs
-      - name: release-48
-        configMap:
-          name: ci-operator-4.8-configs
-      - name: release-49
-        configMap:
-          name: ci-operator-4.9-configs
-      - name: release-410
-        configMap:
-          name: ci-operator-4.10-configs
       - name: config
         configMap:
           name: config
-      - name: job-config-misc
-        configMap:
-          name: job-config-misc
-      - name: job-config-master-periodics
-        configMap:
-          name: job-config-master-periodics
-      - name: job-config-master-postsubmits
-        configMap:
-          name: job-config-master-postsubmits
-      - name: job-config-master-presubmits
-        configMap:
-          name: job-config-master-presubmits
-      - name: job-config-3x
-        configMap:
-          name: job-config-3.x
-      - name: job-config-41
-        configMap:
-          name: job-config-4.1
-      - name: job-config-42
-        configMap:
-          name: job-config-4.2
-      - name: job-config-43
-        configMap:
-          name: job-config-4.3
-      - name: job-config-44
-        configMap:
-          name: job-config-4.4
-      - name: job-config-45
-        configMap:
-          name: job-config-4.5
-      - name: job-config-46
-        configMap:
-          name: job-config-4.6
-      - name: job-config-47
-        configMap:
-          name: job-config-4.7
-      - name: job-config-48
-        configMap:
-          name: job-config-4.8
-      - name: job-config-49
-        configMap:
-          name: job-config-4.9
-      - name: job-config-410
-        configMap:
-          name: job-config-4.10
+      - name: ci-operator-configs
+        projected:
+          sources:
+          - configMap:
+              name: ci-operator-master-configs
+          - configMap:
+              name: ci-operator-misc-configs
+          - configMap:
+              name: ci-operator-3.x-configs
+          - configMap:
+              name: ci-operator-4.1-configs
+          - configMap:
+              name: ci-operator-4.2-configs
+          - configMap:
+              name: ci-operator-4.3-configs
+          - configMap:
+              name: ci-operator-4.4-configs
+          - configMap:
+              name: ci-operator-4.5-configs
+          - configMap:
+              name: ci-operator-4.6-configs
+          - configMap:
+              name: ci-operator-4.7-configs
+          - configMap:
+              name: ci-operator-4.8-configs
+          - configMap:
+              name: ci-operator-4.9-configs
+          - configMap:
+              name: ci-operator-4.10-configs
+          - configMap:
+              name: ci-operator-4.11-configs
+      - name: job-config
+        projected:
+          sources:
+          - configMap:
+              name: job-config-misc
+          - configMap:
+              name: job-config-master-periodics
+          - configMap:
+              name: job-config-master-postsubmits
+          - configMap:
+              name: job-config-master-presubmits
+          - configMap:
+              name: job-config-3.x
+          - configMap:
+              name: job-config-4.1
+          - configMap:
+              name: job-config-4.2
+          - configMap:
+              name: job-config-4.3
+          - configMap:
+              name: job-config-4.4
+          - configMap:
+              name: job-config-4.5
+          - configMap:
+              name: job-config-4.6
+          - configMap:
+              name: job-config-4.7
+          - configMap:
+              name: job-config-4.8
+          - configMap:
+              name: job-config-4.9
+          - configMap:
+              name: job-config-4.10
+          - configMap:
+              name: job-config-4.11

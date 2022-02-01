@@ -1,16 +1,8 @@
 base_images:
   cli:
-    name: "4.9"
+    name: "4.10"
     namespace: ocp
     tag: cli
-  ocp_builder_rhel-8-golang-1.16-openshift-4.9:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.16-openshift-4.9
-  os:
-    name: centos
-    namespace: origin
-    tag: "8"
   ubi_minimal:
     name: ubi-minimal
     namespace: ocp
@@ -19,7 +11,7 @@ binary_build_commands: make all
 build_root:
   project_image:
     dockerfile_literal: |
-      FROM registry.fedoraproject.org/fedora:34
+      FROM registry.fedoraproject.org/fedora:35
       USER root
       RUN dnf install -y ShellCheck yamllint asciidoctor && \
           dnf install -y make go diffutils openssl && \
@@ -28,10 +20,11 @@ build_root:
           chmod 700 get_helm.sh && \
           ./get_helm.sh
       ENV GOPATH=/go GOCACHE=/go/src/.cache GO111MODULE=on
-      RUN mkdir -p $GOCACHE /.cache $GOPATH/src/github.com/backube/testbin
+      RUN mkdir -p $GOCACHE /.cache
       RUN chmod -R 777 /go /.cache
-      RUN curl -sSLo envtest-bins.tar.gz "https://storage.googleapis.com/kubebuilder-tools/kubebuilder-tools-1.19.2-$(go env GOOS)-$(go env GOARCH).tar.gz"
-      RUN tar -C $GOPATH/src/github.com/backube/testbin --strip-components=1 -zvxf envtest-bins.tar.gz
+      # envtest DLs and saves its files to XDG_DATA_HOME, so we need to make sure there is someplace writable
+      RUN mkdir /.local && chmod 777 /.local
+      ENV XDG_DATA_HOME=/.local
       WORKDIR $GOPATH/src/github.com/backube/volsync
 images:
 - dockerfile_literal: |
@@ -47,27 +40,15 @@ images:
   to: src-oc
 - context_dir: .
   from: ubi_minimal
-  inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
-      as:
-      - golang:1.16
   to: volsync
 - context_dir: mover-rclone
   from: ubi_minimal
-  inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
-      as:
-      - golang:1.16
   to: volsync-mover-rclone
 - context_dir: mover-restic
   from: ubi_minimal
-  inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
-      as:
-      - golang:1.16
   to: volsync-mover-restic
 - context_dir: mover-rsync
-  from: os
+  from: ubi_minimal
   to: volsync-mover-rsync
 promotion:
   additional_images:
@@ -82,7 +63,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.9"
+      version: "4.10"
 resources:
   '*':
     limits:
@@ -93,7 +74,6 @@ resources:
 tests:
 - as: unit
   commands: |
-    cp -R ../testbin .
     export TEST_ARGS='-progress -randomizeAllSpecs -nodes 1 -randomizeSuites -slowSpecThreshold 30 -cover -coverprofile cover.out -outputdir .'
     make test
   container:
@@ -106,6 +86,8 @@ tests:
   optional: true
   steps:
     cluster_profile: aws
+    env:
+      FIPS_ENABLED: "true"
     test:
     - as: e2e
       commands: |
@@ -116,8 +98,8 @@ tests:
         cp $(echo "${KUBECONFIG}") /go/src/github.com/backube/volsync/test-kuttl/kubeconfig
         helm repo add bitnami https://charts.bitnami.com/bitnami
         helm repo update
-        helm install --create-namespace -n minio --set accessKey.password=access --set secretKey.password=password --set defaultBuckets=mybucket --set containerSecurityContext.enabled=false --set podSecurityContext.enabled=false --version 7.3.0 minio bitnami/minio
-        oc -n minio wait --for=condition=available --timeout=300s deployment/minio
+        # minio version should be kept in sync with https://github.com/backube/volsync/blob/main/hack/run-minio.sh
+        helm install --create-namespace -n minio --set accessKey.password=access --set secretKey.password=password --set defaultBuckets=mybucket --set containerSecurityContext.enabled=false --set podSecurityContext.enabled=false --version 9.0.5 --wait --timeout=300s minio bitnami/minio
         make test-e2e
       from: src-oc
       resources:

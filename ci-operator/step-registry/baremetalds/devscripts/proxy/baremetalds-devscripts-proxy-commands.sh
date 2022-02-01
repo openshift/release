@@ -20,7 +20,7 @@ acl cluster dstdomain .metalkube.org
 http_access allow cluster
 http_access deny all
 http_port 8213
-debug_options ALL,9
+debug_options ALL,2
 dns_v4_first on
 coredump_dir /var/spool/squid
 SQUID
@@ -40,9 +40,9 @@ EOF
 cat <<EOF> "${SHARED_DIR}/proxy-conf.sh"
 export HTTP_PROXY=http://${IP}:8213/
 export HTTPS_PROXY=http://${IP}:8213/
-export NO_PROXY="redhat.io,quay.io,redhat.com,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,localhost,127.0.0.1"
+export NO_PROXY="redhat.io,quay.io,redhat.com,openshift.org,openshift.com,svc,amazonaws.com,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,localhost,127.0.0.1"
 
 export http_proxy=http://${IP}:8213/
 export https_proxy=http://${IP}:8213/
-export no_proxy="redhat.io,quay.io,redhat.com,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,localhost,127.0.0.1"
+export no_proxy="redhat.io,quay.io,redhat.com,openshift.org,openshift.com,svc,amazonaws.com,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,localhost,127.0.0.1"
 EOF

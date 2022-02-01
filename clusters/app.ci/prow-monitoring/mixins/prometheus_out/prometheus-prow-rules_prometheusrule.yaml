@@ -40,6 +40,14 @@ spec:
       for: 5m
       labels:
         severity: critical
+    - alert: qe-private-deckDown
+      annotations:
+        message: The service qe-private-deck has been down for 5 minutes.
+      expr: |
+        absent(up{job="qe-private-deck"} == 1)
+      for: 5m
+      labels:
+        severity: critical
     - alert: hook-appsDown
       annotations:
         message: The service hook-apps has been down for 5 minutes.
@@ -108,10 +116,10 @@ spec:
     rules:
     - alert: ghproxyDown
       annotations:
-        message: The service ghproxy has been down for 10 minutes.
+        message: The service ghproxy has been down for 15 minutes.
       expr: |
         absent(up{job="ghproxy"} == 1)
-      for: 10m
+      for: 15m
       labels:
         severity: critical
   - name: prow-monitoring-absent
@@ -205,11 +213,13 @@ spec:
       for: 1m
       labels:
         severity: critical
-    - alert: plank-job-with-infra-role-failures
+    - alert: infrastructure-job-failures
       annotations:
-        message: plank jobs {{ $labels.job_name }} with infra role has failures. Check
-          on <https://grafana-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/d/8ce131e226b7fd2901c2fce45d4e21c1/dptp-dashboard?orgId=1&fullscreen&viewPanel=4|grafana>
-          and <https://prow.ci.openshift.org/?job={{ $labels.job_name }}|deck>.
+        message: Infrastructure CI job {{ $labels.job_name }} is failing. Investigate
+          the symptoms, assess the urgency and take appropriate action (<https://grafana-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/d/8ce131e226b7fd2901c2fce45d4e21c1/dptp-dashboard?orgId=1&fullscreen&viewPanel=4|Grafana
+          Dashboard> | <https://prow.ci.openshift.org/?job={{ $labels.job_name }}|Deck>
+          | <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/infrastructure-jobs.md#{{
+          $labels.job_name}}|SOP>).
       expr: |
         sum by (job_name) (
           rate(

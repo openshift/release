@@ -5,19 +5,21 @@ presubmits:
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
-    cluster: build01
-    context: ci/prow/e2e-metal-ipi
+    cluster: build04
+    context: ci/prow/e2e-metal-ipi-ovn-ipv6
     decorate: true
     decoration_config:
       skip_cloning: true
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: equinix-ocp-metal
+      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-ironic-image-release-4.7-e2e-metal-ipi
+    name: pull-ci-openshift-priv-ironic-image-release-4.7-e2e-metal-ipi-ovn-ipv6
     path_alias: github.com/openshift/ironic-image
-    rerun_command: /test e2e-metal-ipi
-    skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS)$
+    rerun_command: /test e2e-metal-ipi-ovn-ipv6
+    skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
     spec:
       containers:
       - args:
@@ -27,8 +29,8 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-ipi-cluster-profile
-        - --target=e2e-metal-ipi
+        - --secret-dir=/usr/local/e2e-metal-ipi-ovn-ipv6-cluster-profile
+        - --target=e2e-metal-ipi-ovn-ipv6
         command:
         - ci-operator
         image: ci-operator:latest
@@ -44,7 +46,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-ipi-cluster-profile
+        - mountPath: /usr/local/e2e-metal-ipi-ovn-ipv6-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -70,10 +72,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-packet
+        secret:
+          secretName: cluster-secrets-equinix-ocp-metal
       - name: github-credentials-openshift-ci-robot-private-git-cloner
         secret:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
@@ -83,25 +83,27 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-ipi,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-metal-ipi-ovn-ipv6,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-metal-ipi-virtualmedia
     decorate: true
     decoration_config:
       skip_cloning: true
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: equinix-ocp-metal
+      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-ironic-image-release-4.7-e2e-metal-ipi-virtualmedia
     path_alias: github.com/openshift/ironic-image
     rerun_command: /test e2e-metal-ipi-virtualmedia
-    skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS)$
+    skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
     spec:
       containers:
       - args:
@@ -154,10 +156,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-packet
+        secret:
+          secretName: cluster-secrets-equinix-ocp-metal
       - name: github-credentials-openshift-ci-robot-private-git-cloner
         secret:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
@@ -173,7 +173,7 @@ presubmits:
     branches:
     - ^release-4\.7$
     - ^release-4\.7-
-    cluster: build01
+    cluster: build04
     context: ci/prow/images
     decorate: true
     decoration_config:

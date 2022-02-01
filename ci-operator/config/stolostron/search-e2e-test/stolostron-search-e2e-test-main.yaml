@@ -1,0 +1,72 @@
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: nodejs14-linux
+images:
+- dockerfile_path: Dockerfile
+  to: search-e2e-test
+promotion:
+  name: "2.5"
+  namespace: stolostron
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: backplane-fast-forward
+  postsubmit: true
+  steps:
+    env:
+      DESTINATION_BRANCH: release-2.5
+    workflow: ocm-ci-fastforward
+- as: e2e
+  skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$
+  steps:
+    dependencies:
+      COMPONENT_IMAGE_REF: search-e2e-test
+    env:
+      CLUSTERPOOL_CHECKOUT_TIMEOUT_MINUTES: "15"
+      CLUSTERPOOL_GROUP_NAME: Search
+      CLUSTERPOOL_HOST_NAMESPACE: acm-observability-usa
+      CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-obs-usa-clusterpool
+      CLUSTERPOOL_LIFETIME: 4h
+      CLUSTERPOOL_LIST_INCLUSION_FILTER: prow
+      CLUSTERPOOL_MANAGED_COUNT: "1"
+      DEPLOY_TIMEOUT: "2700"
+    test:
+    - as: import
+      commands: |
+        KUBECONFIG=${SHARED_DIR}/hub-1.kc oc cm attach cluster --cluster managed --cluster-kubeconfig ${SHARED_DIR}/managed-1.kc
+      from: root
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: e2e-test
+      commands: |
+        ./run-prow-e2e.sh
+      credentials:
+      - mount_path: /etc/secret
+        name: ocm-obs-usa-acmcreds
+        namespace: test-credentials
+      from: search-e2e-test
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-e2e-clusterpool
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: search-e2e-test
+    env:
+      IMAGE_REPO: search-e2e-test
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+zz_generated_metadata:
+  branch: main
+  org: stolostron
+  repo: search-e2e-test

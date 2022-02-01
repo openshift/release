@@ -20,6 +20,7 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - namespaces
   - pods
   verbs:
   - watch
@@ -121,7 +122,7 @@ spec:
       serviceAccountName: vector-log-shipper
       containers:
       - name: vector
-        image: vector:0.14.X-alpine
+        image: vector:0.19.X-alpine
         args:
         - --watch-config=/etc/vector/vector.toml
         env:
@@ -175,7 +176,7 @@ spec:
       - name: var-lib
         hostPath:
           path: /var/lib/
-      # Temporary files. Must persist accross pods so logs do not get permanently lost on misconfiguration
+      # Temporary files. Must persist across pods so logs do not get permanently lost on misconfiguration
       - name: var-lib-vector
         hostPath:
           path: /var/lib/vector
@@ -244,5 +245,12 @@ spec:
       kind: DockerImage
       # Mirror of docker.io/timberio/vector::0.14.X-alpine because the cluster hit the ratelimit for that
       name: quay.io/alvaroaleman/vector:0.14.X-alpine
+    referencePolicy:
+      type: Local
+  - name: 0.19.X-alpine
+    from:
+      kind: DockerImage
+      # Mirror of docker.io/timberio/vector:0.19.X-alpine because the cluster hit the ratelimit for that
+      name: quay.io/openshiftci/vector:0.19.X-alpine
     referencePolicy:
       type: Local

@@ -22,7 +22,10 @@ if mode == "warnings":
             any(s in message.get(m, "") for m in ["msg", "error"]) for s in [
                 "object doesn't exist",
                 "failed to read started.json",
-                "Error getting ProwJob name for source"
+                "Error getting ProwJob name for source",
+                "failed to get job history: invalid url /job-history/",
+                "error rendering spyglass page: error when resolving real path",
+                "Cookie secret should be exactly 32 bytes. Consider truncating the existing cookie to that length" # https://issues.redhat.com/browse/DPTP-2615
             ]
         ),
         lambda message: any(
@@ -49,7 +52,11 @@ if mode == "warnings":
             any(
                 s in message.get(m, "") for s in ["connect: connection refused", "i/o timeout"]
             ) for m in ["msg", "error"]
-        )
+        ),
+        lambda message: matches(message, "tide", error="non-200 OK status code: 403 Forbidden"),
+        lambda message: matches(message, "tide", msg="GitHub status description needed to be truncated to fit GH API limit"),
+        # our automation doesn't have access to the repo
+        lambda message: matches(message, "hook", msg="Could not list labels on PR", error="the GitHub API request returns a 403"),
     ]
 elif mode == "errors":
     filters = [
@@ -85,9 +92,9 @@ elif mode == "errors":
         ),
         # why???
         lambda message: any(
-            s in message.get("error", "") for s in ["context canceled", "context deadline exceeded"]
+            s in message.get("error", "") for s in ["context canceled", "context deadline exceeded", "net/http: request canceled"]
         ) and any(
-            s in message.get("component", "") for s in ["crier", "dptp-controller-manager", 'prow-controller-manager', "deck"]
+            s in message.get("component", "") for s in ["crier", "dptp-controller-manager", 'prow-controller-manager', "deck", "tide"]
         ) or message.get("logger", "") == "controller-runtime",
         # do we even care?
         lambda message: "kata-jenkins-operator" in json.dumps(message),
@@ -117,11 +124,36 @@ elif mode == "errors":
         "missing client token" in message.get("error", "") and
         any(
             err in message.get("error", "") for err in ("failed to get policy", "failed to list policies")
-        )
-        ,
-    ]
+        ),
+
+        # Looks temporary
+        lambda message: matches(message, "pod-scaler", error="server_error: server error: 504"),
+
+        # This is due to rate limiting: DPTP-2449
+        lambda message: "hook" in message.get("component", "") and
+        (
+            "Failed to list collaborators while loading RepoOwners" in message.get("msg", "") or
+            "return code not 2XX: 403 Forbidden" in message.get("error", ""),
+        ),
+
+        # DPTP-2613
+        lambda message: matches(message, "dptp-controller-manager", error="failed to create namespace openshift-psap"),
+
+        # Dummy PRPQR errors, we will see it until DPTP-2577
+        lambda message: matches(message, "prow-controller-manager", msg='error executing URL template: template: JobURL:1:287: executing "JobURL" at <.Spec.Refs.Repo>: nil pointer evaluating *v1.Refs.Repo'),
+        ]
+
 else:
     print("Filter mode must be 'warnings' or 'errors', not " + mode)
+
+def matches(message, component, *args, **kwargs):
+    if not component in message.get("component", ""):
+        return False
+    for field, symptom in kwargs.items():
+        if not symptom in message.get(field, ""):
+            return False
+    return True
+
 
 
 def aggregate_filter(entry):

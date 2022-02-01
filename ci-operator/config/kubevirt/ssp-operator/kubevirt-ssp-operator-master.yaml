@@ -2,7 +2,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.15
+    tag: golang-1.16
 images:
 - dockerfile_path: Dockerfile
   to: ssp-operator-container
@@ -11,12 +11,12 @@ images:
 releases:
   initial:
     integration:
-      name: "4.8"
+      name: "4.9"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.8"
+      name: "4.9"
       namespace: ocp
 resources:
   '*':
@@ -78,16 +78,17 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-gcp
-- as: e2e-upgrade-from-old-operator-functests
+- as: e2e-single-node-functests
   steps:
     cluster_profile: gcp
     test:
-    - as: e2e-upgrade-from-old-operator-functests
+    - as: e2e-single-node-functests
       cli: latest
       commands: |
-        ./automation/e2e-upgrade-from-old-operator-functests/setup.sh
+        export TOPOLOGY_MODE=SingleReplica
+        ./automation/e2e-functests/setup.sh
         export GOFLAGS=
-        ./automation/e2e-upgrade-from-old-operator-functests/run.sh
+        ./automation/e2e-functests/run.sh
       dependencies:
       - env: CI_OPERATOR_IMG
         name: ssp-operator-container
@@ -98,7 +99,7 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: ipi-gcp
+    workflow: ipi-gcp-single-node
 zz_generated_metadata:
   branch: master
   org: kubevirt

@@ -35,6 +35,10 @@ export PFLT_ARTIFACTS
 export PFLT_INDEXIMAGE
 export PFLT_LOGLEVEL
 
+if [ -f "${SHARED_DIR}/decrypted_config.json" ]; then
+    export PFLT_DOCKERCONFIG="${SHARED_DIR}/decrypted_config.json"
+fi
+
 echo "Running Preflight."
 preflight check "${ASSET_TYPE}" "${TEST_ASSET}" > "${preflight_stdout_file}" 2> "${preflight_stderr_file}"
 

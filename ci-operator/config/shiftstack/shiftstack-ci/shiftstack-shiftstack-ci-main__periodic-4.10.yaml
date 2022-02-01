@@ -1,0 +1,148 @@
+base_images:
+  manila-csi-driver-operator-test:
+    name: "4.10"
+    namespace: ocp
+    tag: manila-csi-driver-operator-test
+  openstack-cinder-csi-driver-operator-test:
+    name: "4.10"
+    namespace: ocp
+    tag: openstack-cinder-csi-driver-operator-test
+  openstack-installer:
+    name: "4.10"
+    namespace: ocp
+    tag: openstack-installer
+  openstack-tests:
+    name: "4.10"
+    namespace: ocp
+    tag: openstack-tests
+releases:
+  initial:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: nightly
+      version: "4.10"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.10"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-openstack-fips
+  interval: 48h
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      FIPS_ENABLED: "true"
+      TEST_SUITE: experimental/reliability/minimal
+    pre:
+    - chain: ipi-openstack-pre
+    - ref: fips-check
+    workflow: openshift-e2e-openstack-ipi
+- as: e2e-openstack-proxy
+  interval: 72h
+  steps:
+    cluster_profile: openstack-vh-mecha-central
+    workflow: openshift-e2e-openstack-proxy
+- as: e2e-openstack-nfv
+  interval: 24h
+  steps:
+    cluster_profile: openstack-nfv
+    workflow: openshift-e2e-openstack-nfv
+- as: e2e-openstack-csi-manila
+  interval: 72h
+  steps:
+    cluster_profile: openstack-vh-mecha-central
+    workflow: openshift-e2e-openstack-csi-manila
+- as: e2e-openstack-az
+  interval: 48h
+  steps:
+    cluster_profile: openstack-vh-mecha-az0
+    env:
+      TEST_SKIPS: Kubectl Port forwarding With a server listening on 0.0.0.0 should
+        support forwarding over websockets \| Kubectl client Simple pod should support
+        exec through kubectl proxy \| Kubectl client Simple pod should support exec
+        through an HTTP proxy \| Kubectl Port forwarding With a server listening on
+        localhost should support forwarding over websockets \| Pods should support
+        remote command execution over websockets \| Pods should support retrieving
+        logs from the container over websockets \| NetworkPolicy between server and
+        client should deny ingress access to updated pod \| The HAProxy router should
+        be able to connect to a service that is idled because a GET on the route will
+        unidle it \| Image append should create images by appending them \| deploymentconfigs
+        when run iteratively should only deploy the last deployment \| In-tree Volumes
+      ZONES_COUNT: "1"
+    workflow: openshift-e2e-openstack-byon
+- as: e2e-openstack-csi-cinder
+  interval: 72h
+  steps:
+    cluster_profile: openstack-vh-mecha-central
+    workflow: openshift-e2e-openstack-csi-cinder
+- as: e2e-openstack-parallel
+  interval: 24h
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      TEST_SUITE: openshift/conformance/parallel
+    workflow: openshift-e2e-openstack-ipi
+- as: e2e-openstack-techpreview-parallel
+  interval: 24h
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      TEST_SUITE: openshift/conformance/parallel
+    workflow: openshift-e2e-openstack-techpreview
+- as: e2e-openstack-serial
+  interval: 24h
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      TEST_SUITE: openshift/conformance/serial
+    workflow: openshift-e2e-openstack-ipi
+- as: e2e-openstack-techpreview-serial
+  interval: 24h
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      TEST_SUITE: openshift/conformance/serial
+    workflow: openshift-e2e-openstack-techpreview
+- as: e2e-openstack-ovn
+  interval: 24h
+  steps:
+    cluster_profile: openstack-vexxhost
+    workflow: openshift-e2e-openstack-ovn
+- as: e2e-openstack-kuryr
+  interval: 24h
+  steps:
+    cluster_profile: openstack-kuryr
+    env:
+      NETWORK_TYPE: Kuryr
+      TEST_SKIPS: NodePort \| session affinity \| Services should be able to change
+        the type from ExternalName to ClusterIP \| Pods should delete a collection
+        of pods \| Kubectl client Guestbook application should create and stop a working
+        application \| Services should serve multiport endpoints from pods \| Services
+        should serve a basic endpoint from pods
+      TEST_SUITE: kubernetes/conformance
+    workflow: openshift-e2e-openstack-ipi
+- as: e2e-openstack-ccm-install
+  interval: 24h
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      CONFIG_TYPE: minimal
+      TEST_SKIPS: Managed cluster should start all core operators\| Alerts shouldn't
+        report any unexpected alerts in firing or pending state\| Prometheus when
+        installed on the cluster shouldn't report any alerts in firing state apart
+        from Watchdog and AlertmanagerReceiversNotConfigured
+    workflow: openshift-e2e-openstack-ccm-install
+zz_generated_metadata:
+  branch: main
+  org: shiftstack
+  repo: shiftstack-ci
+  variant: periodic-4.10

@@ -1,0 +1,84 @@
+base_images:
+  base:
+    name: "4.10"
+    namespace: ocp
+    tag: base
+  openshift_release_golang-1.17:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
+binary_build_commands: make manager
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
+images:
+- build_args:
+  - name: ARCH
+    value: amd64
+  - name: ldflags
+  dockerfile_literal: |-
+    FROM registry.ci.openshift.org/openshift/release:golang-1.17 as toolchain
+
+    # Run this with docker build --build_arg $(go env GOPROXY) to override the goproxy
+    ARG goproxy=https://proxy.golang.org
+    ENV GOPROXY=$goproxy
+    ENV GOFLAGS="-mod=readonly"
+
+    FROM toolchain as builder
+    WORKDIR /workspace
+
+    # Copy the sources
+    COPY ./ ./
+    RUN go mod download
+
+    # Build
+    ARG package=.
+    ARG ARCH
+    ARG LDFLAGS
+    RUN CGO_ENABLED=0 GOOS=linux GOARCH=${ARCH} go build -ldflags "${LDFLAGS} -extldflags '-static'"  -o manager ${package}
+    ENTRYPOINT [ "/start.sh", "/workspace/manager" ]
+
+    # Copy the controller-manager into a thin image
+    FROM gcr.io/distroless/static:nonroot
+    WORKDIR /
+    COPY --from=builder /workspace/manager .
+    # Use uid of nonroot user (65532) because kubernetes expects numeric user when applying pod security policies
+    USER 65532
+    ENTRYPOINT ["/manager"]
+  from: base
+  inputs:
+    openshift_release_golang-1.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
+  to: cluster-api-kubevirt-controller
+promotion:
+  namespace: hypershift
+  tag: main
+releases:
+  initial:
+    integration:
+      name: "4.10"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.10"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit-tests
+  commands: GOFLAGS="-mod=readonly" make test
+  container:
+    from: src
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: cluster-api-provider-kubevirt

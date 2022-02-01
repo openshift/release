@@ -1,0 +1,273 @@
+base_images:
+  assisted-installer:
+    name: ocm-2.5
+    namespace: edge-infrastructure
+    tag: assisted-installer
+  assisted-installer-agent:
+    name: ocm-2.5
+    namespace: edge-infrastructure
+    tag: assisted-installer-agent
+  assisted-installer-controller:
+    name: ocm-2.5
+    namespace: edge-infrastructure
+    tag: assisted-installer-controller
+  assisted-service:
+    name: ocm-2.5
+    namespace: edge-infrastructure
+    tag: assisted-service
+  assisted-test-infra:
+    name: ocm-2.5
+    namespace: edge-infrastructure
+    tag: assisted-test-infra
+  base:
+    name: 4.11-priv
+    namespace: ocp-private
+    tag: base
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.17-openshift-4.10
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/machine-config-operator
+images:
+- dockerfile_path: Dockerfile.rhel7
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
+  to: machine-config-operator
+promotion:
+  disabled: true
+  name: 4.11-priv
+  namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.11-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.11-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: make test-unit
+  container:
+    from: src
+- as: e2e-aws
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- as: e2e-aws-upgrade
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: openshift-upgrade-aws
+- as: e2e-aws-serial
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-serial
+- as: verify
+  commands: |
+    make verify
+  container:
+    from: src
+- as: bootstrap-unit
+  commands: make bootstrap-e2e
+  container:
+    from: src
+  optional: true
+- as: e2e-gcp-upgrade
+  optional: true
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-upgrade-gcp
+- as: e2e-gcp-op
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- as: e2e-agnostic-upgrade
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-upgrade-azure
+- as: e2e-aws-workers-rhel7
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  steps:
+    cluster_profile: aws
+    env:
+      PLATFORM_VERSION: "7.9"
+    workflow: openshift-e2e-aws-workers-rhel
+- as: e2e-aws-workers-rhel8
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  steps:
+    cluster_profile: aws
+    env:
+      PLATFORM_VERSION: "8.3"
+    workflow: openshift-e2e-aws-workers-rhel
+- as: e2e-aws-disruptive
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-disruption
+- as: cluster-bootimages
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: ./test/e2e/old-bootimages.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-vsphere-upi
+  optional: true
+  steps:
+    cluster_profile: vsphere
+    workflow: openshift-e2e-vsphere-upi
+- as: e2e-metal-ipi
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  steps:
+    cluster_profile: packet
+    workflow: baremetalds-e2e-ipv4
+- as: e2e-metal-ipi-ovn-ipv6
+  optional: true
+  steps:
+    cluster_profile: packet
+    workflow: baremetalds-e2e-ovn-ipv6
+- as: e2e-metal-ipi-ovn-dualstack
+  optional: true
+  steps:
+    cluster_profile: packet
+    workflow: baremetalds-e2e-ovn-dualstack
+- as: e2e-azure
+  optional: true
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure
+- as: e2e-azure-upgrade
+  optional: true
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-upgrade-azure
+- as: e2e-aws-proxy
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-proxy
+- as: e2e-vsphere
+  optional: true
+  steps:
+    cluster_profile: vsphere
+    workflow: openshift-e2e-vsphere
+- as: e2e-vsphere-upgrade
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  steps:
+    cluster_profile: vsphere
+    workflow: openshift-upgrade-vsphere
+- as: e2e-ovn-step-registry
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-ovn
+- as: e2e-metal-assisted
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    workflow: baremetalds-assisted
+- as: e2e-ovirt
+  optional: true
+  steps:
+    cluster_profile: ovirt
+    workflow: openshift-e2e-ovirt-minimal
+- as: e2e-ovirt-upgrade
+  optional: true
+  steps:
+    cluster_profile: ovirt
+    workflow: openshift-upgrade-ovirt
+- as: e2e-aws-single-node
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-single-node
+- as: e2e-gcp-single-node
+  optional: true
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-single-node
+- as: e2e-gcp-op-single-node
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e-single-node
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-gcp-single-node
+- as: e2e-aws-upgrade-single-node
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  steps:
+    cluster_profile: aws
+    workflow: openshift-upgrade-aws-single-node
+- as: e2e-openstack
+  optional: true
+  run_if_changed: .*/on-prem/.*|.*openstack.*
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_TYPE: minimal
+      TEST_SUITE: experimental/reliability/minimal
+    workflow: openshift-e2e-openstack-ipi
+- as: e2e-openstack-parallel
+  optional: true
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_TYPE: minimal
+      TEST_SUITE: openshift/conformance/parallel
+    workflow: openshift-e2e-openstack-ipi
+zz_generated_metadata:
+  branch: release-4.11
+  org: openshift-priv
+  repo: machine-config-operator

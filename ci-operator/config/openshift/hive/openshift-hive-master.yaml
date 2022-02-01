@@ -148,6 +148,8 @@ tests:
         # We'll exceed the 21c cluster name cutoff at PR 1Mi or some
         # time in July of 4147, whichever comes first.
         export CLUSTER_NAME=$(printf "hiveci-%x-%x" $(date +%s) $PULL_NUMBER)
+        # Disable managed DNS (on by default, and left on for the e2e test)
+        USE_MANAGED_DNS=false
         CLOUD=aws make test-e2e-pool
       credentials:
       - mount_path: /tmp/secret/hive-aws-creds
@@ -168,6 +170,7 @@ tests:
     workflow: generic-claim
 - as: e2e-gcp
   optional: true
+  run_if_changed: gcp
   steps:
     cluster_profile: gcp
     test:
@@ -186,6 +189,7 @@ tests:
     workflow: ipi-gcp
 - as: e2e-azure
   optional: true
+  run_if_changed: azure
   steps:
     cluster_profile: azure4
     test:

@@ -1,7 +1,7 @@
 #
 SHELL=/usr/bin/env bash -o pipefail
 
-dashboards = build_cop boskos boskos_acquire boskos_http canary configresolver deck e2e_template_jobs dptp ghproxy hook jenkins_operator osde2e plank prow sinker tide
+dashboards = build_cop boskos boskos_acquire boskos_http canary configresolver deck e2e_template_jobs dptp ghproxy hook jenkins_operator osde2e plank prow sinker tide clusterpool
 
 all: $(dashboards) prometheus-prow-rules_prometheusrule.yaml alertmanager-prow-secret_template.yaml
 

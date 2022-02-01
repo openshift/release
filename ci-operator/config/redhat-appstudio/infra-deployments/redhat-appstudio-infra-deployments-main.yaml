@@ -1,0 +1,58 @@
+build_root:
+  project_image:
+    dockerfile_path: .ci/openshift-ci/Dockerfile
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: stable
+      version: "4.9"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: appstudio-e2e-deployment
+  steps:
+    cluster_profile: aws
+    test:
+    - as: appstudio-e2e-deployment
+      cli: latest
+      commands: |
+        export PATH=$PATH:/tmp/bin
+        mkdir -p /tmp/bin
+        curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"  | bash
+        cp kustomize /tmp/bin/
+        chmod ug+x /tmp/bin/kustomize
+        /bin/bash .ci/oci-e2e-deployment.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: appstudio-e2e-deployment-periodic
+  cron: 0 */24 * * *
+  steps:
+    cluster_profile: aws
+    test:
+    - as: appstudio-e2e-deployment-periodic
+      cli: latest
+      commands: |
+        export PATH=$PATH:/tmp/bin
+        mkdir -p /tmp/bin
+        curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"  | bash
+        cp kustomize /tmp/bin/
+        chmod ug+x /tmp/bin/kustomize
+        /bin/bash .ci/oci-e2e-deployment.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: redhat-appstudio
+  repo: infra-deployments

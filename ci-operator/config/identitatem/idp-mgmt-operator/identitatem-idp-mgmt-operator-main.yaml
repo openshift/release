@@ -3,25 +3,32 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  open-cluster-management_builder_go1.16-linux:
+  stolostron_builder_go1.17-linux:
     name: builder
-    namespace: open-cluster-management
-    tag: go1.16-linux
+    namespace: stolostron
+    tag: go1.17-linux
 binary_build_commands: make build
 build_root:
   image_stream_tag:
     name: builder
-    namespace: open-cluster-management
-    tag: go1.16-linux
+    namespace: stolostron
+    tag: go1.17-linux
 images:
 - dockerfile_path: Dockerfile
   from: base
   inputs:
-    open-cluster-management_builder_go1.16-linux:
+    stolostron_builder_go1.17-linux:
       as:
-      - registry.ci.openshift.org/open-cluster-management/builder:go1.16-linux
+      - registry.ci.openshift.org/stolostron/builder:go1.17-linux
   to: idp-mgmt-operator
+- dockerfile_path: Dockerfile.cypress
+  inputs:
+    stolostron_builder_go1.17-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.17-linux
+  to: idp-mgmt-operator-e2e-tests
 promotion:
+  disabled: true
   name: stable
   namespace: identitatem
 resources:
@@ -43,6 +50,7 @@ tests:
 - as: sonar-pre-submit
   commands: |
     export SELF="make -f /opt/build-harness/Makefile.prow"
+    export SONAR_ORG=identitatem
     make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
     from: src
@@ -52,6 +60,7 @@ tests:
 - as: sonar-post-submit
   commands: |
     export SELF="make -f /opt/build-harness/Makefile.prow"
+    export SONAR_ORG=identitatem
     make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
     from: src
@@ -59,12 +68,6 @@ tests:
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
-- as: fast-forward
-  postsubmit: true
-  steps:
-    env:
-      DESTINATION_BRANCH: stable
-    workflow: ocm-ci-fastforward
 - as: pr-image-mirror
   steps:
     dependencies:
@@ -91,6 +94,53 @@ tests:
       IMAGE_TAG: latest
       REGISTRY_ORG: identitatem
     workflow: identitatem-ci-image-mirror
+- as: e2e-cluster
+  skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|DCO|LICENSE|OWNERS)$
+  steps:
+    dependencies:
+      COMPONENT_IMAGE_REF: idp-mgmt-operator
+    env:
+      ACM_RELEASE_VERSION: release-2.4
+      CLUSTERPOOL_CHECKOUT_TIMEOUT_MINUTES: "15"
+      CLUSTERPOOL_GROUP_NAME: idp-for-the-masses
+      CLUSTERPOOL_HOST_NAMESPACE: managed-services
+      CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-mgdsvcs-clusterpool
+      CLUSTERPOOL_LIFETIME: 1h
+      CLUSTERPOOL_LIST_INCLUSION_FILTER: aws-4-9-sno-2x
+      CLUSTERPOOL_MANAGED_COUNT: "1"
+      COMPONENT_NAME: ""
+      PIPELINE_STAGE: edge
+      SKIP_COMPONENT_INSTALL: "true"
+    test:
+    - as: import
+      commands: |
+        KUBECONFIG=${SHARED_DIR}/hub-1.kc oc cm attach cluster --cluster managed --cluster-kubeconfig ${SHARED_DIR}/managed-1.kc
+      from: root
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: e2e-test
+      commands: |
+        export SELF="make -f /opt/build-harness/Makefile.prow"
+        export VERSION_TAG=latest
+        ./run-prow-e2e.sh
+      credentials:
+      - mount_path: /etc/ocm-mgdsvcs-e2e-test
+        name: ocm-mgdsvcs-e2e-test
+        namespace: test-credentials
+      - mount_path: /etc/ocm-mgdsvcs-clusterpool
+        name: ocm-mgdsvcs-clusterpool
+        namespace: test-credentials
+      - mount_path: /etc/acm-cicd-quay-pull
+        name: acm-cicd-quay-pull
+        namespace: test-credentials
+      from: idp-mgmt-operator-e2e-tests
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-e2e-clusterpool
 zz_generated_metadata:
   branch: main
   org: identitatem

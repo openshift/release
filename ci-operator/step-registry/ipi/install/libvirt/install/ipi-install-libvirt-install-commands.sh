@@ -49,7 +49,7 @@ function init_bootstrap() {
 	CLUSTER_DOMAIN=$(sed -n -r -e 's,^ *"cluster_domain": "([^"]*).*$,\1,p' "${DIR}/terraform.tfvars.json")
 	BOOTSTRAP_HOSTNAME="bootstrap.${CLUSTER_DOMAIN}"
 	RESOURCE_ID=$(echo "${CLUSTER_DOMAIN}" | cut -d- -f4)
-	BASTION_SSH_PORTS=( 1023 1033 1043 1053 1063 1073 )
+	BASTION_SSH_PORTS=( 1033 1043 1053 1063 1073 1083 )
 }
 
 function collect_bootstrap() {
@@ -123,9 +123,7 @@ for ((i=0; i<${MASTER_REPLICAS}; i++))
 do
   yq write --inplace ${dir}/openshift/99_openshift-cluster-api_master-machines-${i}.yaml spec.providerSpec.value[domainMemory] ${MASTER_MEMORY}
   yq write --inplace ${dir}/openshift/99_openshift-cluster-api_master-machines-${i}.yaml spec.providerSpec.value.volume[volumeSize] ${MASTER_DISK}
-  if [ "${BRANCH}" == "4.9" ] || [ "${BRANCH}" == "4.10" ] && [ "${ARCH}" == "ppc64le" ]; then
-    yq write --inplace ${dir}/openshift/99_openshift-cluster-api_master-machines-${i}.yaml spec.providerSpec.value[Vcpu] 8
-  fi
+  yq write --inplace ${dir}/openshift/99_openshift-cluster-api_master-machines-${i}.yaml spec.providerSpec.value[domainVcpu] 6
 done
 # Bump the libvirt workers memory to 16GB
 yq write --inplace ${dir}/openshift/99_openshift-cluster-api_worker-machineset-0.yaml spec.template.spec.providerSpec.value[domainMemory] ${WORKER_MEMORY}

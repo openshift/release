@@ -1,9 +1,9 @@
 ref:
   as: ocm-e2e-clusterpool-cluster-deploy
   from_image:
-    namespace: open-cluster-management
+    namespace: stolostron
     name: builder
-    tag: go1.16-linux
+    tag: go1.17-linux
   grace_period: 10m
   commands: ocm-e2e-clusterpool-cluster-deploy-commands.sh
   dependencies:
@@ -55,6 +55,11 @@ ref:
         
         The special value "none" can be used to indicate that no deploy is to
         take place.
+    - name: SKIP_COMPONENT_INSTALL
+      default: "false"
+      documentation: |-
+        Setting this value to anything other than "false" will skip installing
+        a developement version of a component.
     - name: COMPONENT_NAME
       default: ""
       documentation: |-
@@ -83,22 +88,29 @@ ref:
         The file that stores the GitHub token. Should match credentials stanza
         mount path.
     - name: PIPELINE_REPO
-      default: "github.com/open-cluster-management/pipeline"
+      default: "github.com/stolostron/pipeline"
       documentation: |-
         The GitHub repo where CICD pipeline data is stored. Do not include
         the "https://" prefix or the ".git" suffix.
     - name: RELEASE_REPO
-      default: "github.com/open-cluster-management/release"
+      default: "github.com/stolostron/release"
       documentation: |-
         The GitHub repo where ACM release data is stored. Do not include
         the "https://" prefix or the ".git" suffix.
+    - name: ACM_RELEASE_VERSION
+      default: ""
+      documentation: |-
+        If the PR is against a branch other than "main", "master", or 
+        "release-X.Y" or to deploy a different version than the target
+        branch, use this to override the release version branch to deploy, 
+        such as "release-2.4" (or specify "main" for the latest release).
     - name: PIPELINE_STAGE
       default: "edge"
       documentation: |-
         The pipeline stage to use as the base deployment of ACM. Value is
         either "edge" or "integration". An invalid value will cause an error.
     - name: DEPLOY_REPO
-      default: "github.com/open-cluster-management/deploy"
+      default: "github.com/stolostron/deploy"
       documentation: |-
         The GitHub repo where the ACM deployment code is stored. Do not include
         the "https://" prefix or the ".git" suffix.

@@ -5,16 +5,18 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build02
-    context: ci/prow/e2e-aws-jenkins
+    cluster: build01
+    context: ci/prow/e2e-aws-jenkins-sync-plugin
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-jenkins-openshift-login-plugin-release-4.10-e2e-aws-jenkins
-    rerun_command: /test e2e-aws-jenkins
+    name: pull-ci-openshift-jenkins-openshift-login-plugin-release-4.10-e2e-aws-jenkins-sync-plugin
+    rerun_command: /test e2e-aws-jenkins-sync-plugin
     spec:
       containers:
       - args:
@@ -23,8 +25,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-aws-jenkins-cluster-profile
-        - --target=e2e-aws-jenkins
+        - --secret-dir=/usr/local/e2e-aws-jenkins-sync-plugin-cluster-profile
+        - --target=e2e-aws-jenkins-sync-plugin
         command:
         - ci-operator
         image: ci-operator:latest
@@ -40,7 +42,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-aws-jenkins-cluster-profile
+        - mountPath: /usr/local/e2e-aws-jenkins-sync-plugin-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -63,23 +65,21 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
+        secret:
+          secretName: cluster-secrets-aws
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-jenkins,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-jenkins-sync-plugin,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build02
+    cluster: build01
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -96,6 +96,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
+        - --target=[release:latest]
         command:
         - ci-operator
         image: ci-operator:latest

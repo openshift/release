@@ -57,7 +57,7 @@ class Config:
         self.rc_deployment_domain = 'apps.ci.l2s4.p1.openshiftapps.com'
         self.rc_release_domain = 'svc.ci.openshift.org'
         self.rc_deployment_namespace = 'ci'
-        self.arches = ('x86_64', 's390x', 'ppc64le', 'arm64')
+        self.arches = ('x86_64', 's390x', 'ppc64le', 'arm64', 'multi')
         self.paths = RCPaths(git_clone_dir)
         self.releases = self._get_releases()
 
@@ -98,17 +98,18 @@ class Context:
         self.suffix = config.get_suffix(arch, private)
         self.jobs_namespace = f'ci-release{self.suffix}'
         self.rc_hostname = f'openshift-release{self.suffix}'
+        self.rc_temp_hostname = f'openshift-release{self.suffix}-temp'
         self.hostname_artifacts = f'openshift-release-artifacts{self.suffix}'
         self.secret_name_tls = f'release-controller{self.suffix}-tls'
+        self.secret_name_tls_api = f'release-controller-api{self.suffix}-tls'
         self.is_namespace = f'ocp{self.suffix}'
         self.rc_serviceaccount_name = f'release-controller-{self.is_namespace}'
 
-        self.rc_route_name = f'release-controller-{self.is_namespace}'
-        self.rc_service_name = self.rc_route_name
+        self.rc_service_name = f'release-controller-{self.is_namespace}'
+        self.rc_api_service_name = f'release-controller-api-{self.is_namespace}'
+        self.rc_route_name = self.rc_service_name
 
         # Routes on the api.ci cluster
-        # release-controller
-        self.rc_api_url = f'{self.rc_hostname}.{self.config.rc_release_domain}'
         # files-cache
         self.fc_api_url = f'{self.hostname_artifacts}.{self.config.rc_release_domain}'
 

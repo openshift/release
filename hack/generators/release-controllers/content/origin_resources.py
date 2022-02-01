@@ -1,5 +1,5 @@
 
-from content.utils import get_rc_volumes, get_rc_volume_mounts
+from content.utils import get_rc_volumes, get_rc_volume_mounts, get_kubeconfig_volumes, get_kubeconfig_volume_mounts
 
 
 def _add_origin_rbac(gendoc):
@@ -55,7 +55,7 @@ def _add_origin_resources(gendoc):
                 },
                 "to": {
                     "kind": "Service",
-                    "name": "release-controller",
+                    "name": "release-controller-api",
                 }
             }
         }, {
@@ -74,6 +74,24 @@ def _add_origin_resources(gendoc):
                 ],
                 "selector": {
                     "app": "release-controller"
+                }
+            }
+        }, {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "name": "release-controller-api",
+                "namespace": "ci",
+            },
+            "spec": {
+                "ports": [
+                    {
+                        "port": 80,
+                        "targetPort": 8080
+                    }
+                ],
+                "selector": {
+                    "app": "release-controller-api"
                 }
             }
         }, {
@@ -117,11 +135,91 @@ def _add_origin_resources(gendoc):
                                 ],
                                 "image": "release-controller:latest",
                                 "name": "controller",
-                                "volumeMounts": get_rc_volume_mounts(context)
+                                "volumeMounts": get_rc_volume_mounts(),
+                                'livenessProbe': {
+                                    'httpGet': {
+                                        'path': '/healthz',
+                                        'port': 8081
+                                    },
+                                    'initialDelaySeconds': 3,
+                                    'periodSeconds': 3,
+                                },
+                                'readinessProbe': {
+                                    'httpGet': {
+                                        'path': '/healthz/ready',
+                                        'port': 8081
+                                    },
+                                    'initialDelaySeconds': 10,
+                                    'periodSeconds': 3,
+                                    'timeoutSeconds': 600,
+                                },
                             }
                         ],
                         "serviceAccountName": "release-controller",
                         "volumes": get_rc_volumes(context, None)
+                    }
+                }
+            }
+        }, {
+            "apiVersion": "apps/v1",
+            "kind": "Deployment",
+            "metadata": {
+                "annotations": {
+                    "image.openshift.io/triggers": "[{\"from\":{\"kind\":\"ImageStreamTag\",\"name\":\"release-controller-api:latest\"},\"fieldPath\":\"spec.template.spec.containers[?(@.name==\\\"controller\\\")].image\"}]",
+                },
+                "name": "release-controller-api",
+                "namespace": "ci",
+            },
+            "spec": {
+                "replicas": 3,
+                "selector": {
+                    "matchLabels": {
+                        "app": "release-controller-api"
+                    }
+                },
+                "template": {
+                    "metadata": {
+                        "labels": {
+                            "app": "release-controller-api"
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "command": [
+                                    "/usr/bin/release-controller-api",
+                                    "--release-namespace=origin",
+                                    "--prow-namespace=ci",
+                                    "--non-prow-job-kubeconfig=/etc/kubeconfig/kubeconfig",
+                                    "--job-namespace=ci-release",
+                                    "--tools-image-stream-tag=4.6:tests",
+                                    "--release-architecture=amd64",
+                                    "-v=4"
+                                ],
+                                "image": "release-controller-api:latest",
+                                "name": "controller",
+                                "volumeMounts": get_kubeconfig_volume_mounts(),
+                                'livenessProbe': {
+                                    'httpGet': {
+                                        'path': '/healthz',
+                                        'port': 8081
+                                    },
+                                    'initialDelaySeconds': 3,
+                                    'periodSeconds': 3,
+                                },
+                                'readinessProbe': {
+                                    'httpGet': {
+                                        'path': '/healthz/ready',
+                                        'port': 8081
+                                    },
+                                    'initialDelaySeconds': 10,
+                                    'periodSeconds': 3,
+                                    'timeoutSeconds': 600,
+                                },
+                            }
+                        ],
+                        "serviceAccountName": "release-controller",
+                        "volumes": get_kubeconfig_volumes(context, namespace=None, secret_name=context.secret_name_tls_api)
                     }
                 }
             }

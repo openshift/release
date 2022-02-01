@@ -1,4 +1,8 @@
 base_images:
+  jenkins-agent-maven:
+    name: 4.10-priv
+    namespace: ocp-private
+    tag: jenkins-agent-maven
   original_jenkins:
     name: 4.10-priv
     namespace: ocp-private
@@ -13,6 +17,9 @@ images:
 - dockerfile_path: Dockerfile
   from: original_jenkins
   inputs:
+    jenkins-agent-maven:
+      as:
+      - quay.io/openshift/origin-jenkins-agent-maven:4.9.0
     src:
       paths:
       - destination_dir: .
@@ -21,7 +28,6 @@ images:
 promotion:
   additional_images:
     jenkins-sync-plugin-e2e: src
-  disabled: true
   excluded_images:
   - jenkins
   name: 4.10-priv
@@ -42,10 +48,6 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-aws-jenkins
-  steps:
-    cluster_profile: aws
-    workflow: openshift-e2e-aws-jenkins
 - as: e2e-aws-jenkins-sync-plugin
   steps:
     cluster_profile: aws

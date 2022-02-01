@@ -11,7 +11,7 @@ PACKET_AUTH_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/packet-auth-token")
 SLACK_AUTH_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/slackhook")
 
 # Initial check
-if [ "${CLUSTER_TYPE}" != "packet" ] ; then
+if [[ ! "${CLUSTER_TYPE}" =~ ^packet.*$|^equinix.*$ ]] ; then
     echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"
     exit 1
 fi

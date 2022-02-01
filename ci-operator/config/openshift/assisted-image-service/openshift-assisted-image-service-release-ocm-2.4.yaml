@@ -25,8 +25,8 @@ images:
       - registry.ci.openshift.org/openshift/release:golang-1.16
   to: assisted-image-service
 promotion:
-  name: "2.4"
-  namespace: open-cluster-management
+  name: ocm-2.4
+  namespace: edge-infrastructure
 releases:
   candidate:
     release:
@@ -50,6 +50,24 @@ test_binary_build_commands: |
   make build-openshift-ci-test-bin
   go mod vendor
 tests:
+- as: mirror-nightly-image
+  cron: '@daily'
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-image-service
+    env:
+      RELEASE_TAG_PREFIX: ocm-2.4
+    test:
+    - ref: baremetalds-assisted-images-publish
+- as: mirror-vcsref-image
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-image-service
+    env:
+      RELEASE_TAG_PREFIX: ocm-2.4
+    test:
+    - ref: baremetalds-assisted-images-publish
 - as: ocm-publish
   postsubmit: true
   steps:
@@ -59,7 +77,6 @@ tests:
       IMAGE_REPO: assisted-image-service
       OSCI_ENV_CONFIG: |
         OSCI_PUBLISH_DELAY=0
-      REGISTRY_ORG: open-cluster-management
       RELEASE_REF: release-2.4
     workflow: ocm-ci-manifest-update
 - as: lint

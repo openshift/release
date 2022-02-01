@@ -12,7 +12,7 @@ logger = logging.getLogger('validate-release-jobs')
 logger.setLevel(logging.INFO)
 
 release_definition_path = 'core-services/release-controller/_releases'
-job_definitions_paths = ['ci-operator/jobs/openshift/release', 'ci-operator/jobs/openshift/multiarch']
+job_definitions_paths = ['ci-operator/jobs/openshift/release', 'ci-operator/jobs/openshift/multiarch', 'ci-operator/jobs/openshift/hypershift']
 
 
 def raise_on_duplicates(ordered_pairs):
@@ -29,8 +29,9 @@ def read_release_definitions(path):
     with os.scandir(path) as entries:
         for entry in entries:
             if entry.is_file():
-                with open(entry, 'r') as release:
-                    definitions.update({entry.name: json.load(release, object_pairs_hook=raise_on_duplicates)})
+                if entry.name.endswith('.json'):
+                    with open(entry, 'r') as release:
+                        definitions.update({entry.name: json.load(release, object_pairs_hook=raise_on_duplicates)})
     return definitions
 
 

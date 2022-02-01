@@ -172,11 +172,13 @@ az group create --name "$RESOURCE_GROUP" --location "$AZURE_REGION"
 KUBECONFIG="${dir}/auth/kubeconfig"
 export KUBECONFIG
 
-az storage account create -g "$RESOURCE_GROUP" --location "$AZURE_REGION" --name "${INFRA_ID}sa" --kind Storage --sku Standard_LRS
-ACCOUNT_KEY=$(az storage account keys list -g "$RESOURCE_GROUP" --account-name "${INFRA_ID}sa" --query "[0].value" -o tsv)
+ACCOUNT_NAME=$(echo ${CLUSTER_NAME}sa | tr -cd '[:alnum:]')
+echo "Creating storage account"
+az storage account create -g "$RESOURCE_GROUP" --location "$AZURE_REGION" --name "$ACCOUNT_NAME" --kind Storage --sku Standard_LRS
+ACCOUNT_KEY=$(az storage account keys list -g "$RESOURCE_GROUP" --account-name "$ACCOUNT_NAME" --query "[0].value" -o tsv)
 
-az storage container create --name files --account-name "${INFRA_ID}sa" --public-access blob --account-key "$ACCOUNT_KEY"
-az storage blob upload --account-name "${INFRA_ID}sa" --account-key "$ACCOUNT_KEY" -c "files" -f "bootstrap.ign" -n "bootstrap.ign"
+az storage container create --name files --account-name "${ACCOUNT_NAME}" --public-access blob --account-key "$ACCOUNT_KEY"
+az storage blob upload --account-name "${ACCOUNT_NAME}" --account-key "$ACCOUNT_KEY" -c "files" -f "bootstrap.ign" -n "bootstrap.ign"
 
 AZURESTACK_UPI_LOCATION="/var/lib/openshift-install/upi/azurestack"
 az deployment group create -g "$RESOURCE_GROUP" \
@@ -199,7 +201,7 @@ PRIVATE_IP=$(az network lb frontend-ip show -g "$RESOURCE_GROUP" --lb-name "${IN
 az network dns record-set a add-record -g "$RESOURCE_GROUP" -z "${CLUSTER_NAME}.${BASE_DOMAIN}" -n api -a "$PUBLIC_IP" --ttl 60
 az network dns record-set a add-record -g "$RESOURCE_GROUP" -z "${CLUSTER_NAME}.${BASE_DOMAIN}" -n api-int -a "$PRIVATE_IP" --ttl 60
 
-BOOTSTRAP_URL=$(az storage blob url --account-name "${INFRA_ID}sa" --account-key "$ACCOUNT_KEY" -c "files" -n "bootstrap.ign" -o tsv)
+BOOTSTRAP_URL=$(az storage blob url --account-name "${ACCOUNT_NAME}" --account-key "$ACCOUNT_KEY" -c "files" -n "bootstrap.ign" -o tsv)
 BOOTSTRAP_IGNITION=$(jq -rcnM --arg v "3.2.0" --arg url "$BOOTSTRAP_URL" '{ignition:{version:$v,config:{replace:{source:$url}}}}' | base64 | tr -d '\n')
 
 az deployment group create --verbose -g "$RESOURCE_GROUP" \
@@ -207,7 +209,7 @@ az deployment group create --verbose -g "$RESOURCE_GROUP" \
   --parameters bootstrapIgnition="$BOOTSTRAP_IGNITION" \
   --parameters sshKeyData="$SSH_KEY" \
   --parameters baseName="$INFRA_ID" \
-  --parameters diagnosticsStorageAccountName="${INFRA_ID}sa"
+  --parameters diagnosticsStorageAccountName="${ACCOUNT_NAME}"
 
 MASTER_IGNITION=$(cat master.ign | base64 | tr -d '\n')
 az deployment group create -g "$RESOURCE_GROUP" \
@@ -215,7 +217,7 @@ az deployment group create -g "$RESOURCE_GROUP" \
   --parameters masterIgnition="$MASTER_IGNITION" \
   --parameters sshKeyData="$SSH_KEY" \
   --parameters baseName="$INFRA_ID" \
-  --parameters diagnosticsStorageAccountName="${INFRA_ID}sa"
+  --parameters diagnosticsStorageAccountName="${ACCOUNT_NAME}"
 
 echo "$(date -u --rfc-3339=seconds) - Monitoring for bootstrap to complete"
 openshift-install wait-for bootstrap-complete &
@@ -242,7 +244,7 @@ az vm deallocate -g "$RESOURCE_GROUP" --name "${INFRA_ID}"-bootstrap
 az vm delete -g "$RESOURCE_GROUP" --name "${INFRA_ID}"-bootstrap --yes
 az disk delete -g "$RESOURCE_GROUP" --name "${INFRA_ID}"-bootstrap_OSDisk --no-wait --yes
 az network nic delete -g "$RESOURCE_GROUP" --name "${INFRA_ID}"-bootstrap-nic --no-wait
-az storage blob delete --account-key "$ACCOUNT_KEY" --account-name "${INFRA_ID}sa" --container-name files --name bootstrap.ign
+az storage blob delete --account-key "$ACCOUNT_KEY" --account-name "${ACCOUNT_NAME}" --container-name files --name bootstrap.ign
 az network public-ip delete -g "$RESOURCE_GROUP" --name "${INFRA_ID}"-bootstrap-ssh-pip
 
 WORKER_IGNITION=$(cat worker.ign | base64 | tr -d '\n')
@@ -251,7 +253,7 @@ az deployment group create -g "$RESOURCE_GROUP" \
   --parameters workerIgnition="$WORKER_IGNITION" \
   --parameters sshKeyData="$SSH_KEY" \
   --parameters baseName="$INFRA_ID" \
-  --parameters diagnosticsStorageAccountName="${INFRA_ID}sa"
+  --parameters diagnosticsStorageAccountName="${ACCOUNT_NAME}"
 
 echo "$(date -u --rfc-3339=seconds) - Approving the CSR requests for nodes..."
 function approve_csrs() {

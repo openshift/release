@@ -1,8 +1,4 @@
 base_images:
-  ocp_builder_rhel-8-golang-1.16-openshift-4.9:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.16-openshift-4.9
   ocp_builder_rhel-8-golang-1.16-openshift-4.10:
     name: builder
     namespace: ocp
@@ -24,9 +20,6 @@ images:
 - dockerfile_path: release/ansible/Dockerfile.rhel8
   from: os
   inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
     ocp_builder_rhel-8-golang-1.16-openshift-4.10:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.10
@@ -34,16 +27,13 @@ images:
 - dockerfile_path: release/helm/Dockerfile
   from: os-minimal
   inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.10:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.10
   to: helm-operator
 - dockerfile_path: release/sdk/Dockerfile
   from: os-minimal
   inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
     ocp_builder_rhel-8-golang-1.16-openshift-4.10:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.10
@@ -74,17 +64,17 @@ promotion:
   - osdk-helm-e2e
   - memcached-operator
   - nginx-operator
-  name: "4.10"
+  name: "4.11"
   namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.10"
+      name: "4.11"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.10"
+      name: "4.11"
       namespace: ocp
 resources:
   '*':
@@ -120,6 +110,11 @@ tests:
     - as: test
       cli: latest
       commands: make -f ci/prow.Makefile test-e2e-ansible
+      dependencies:
+      - env: ANSIBLE_IMAGE
+        name: osdk-ansible-e2e
+      - env: IMAGE_FORMAT
+        name: osdk-ansible-e2e
       from: src
       resources:
         requests:
@@ -132,6 +127,11 @@ tests:
     - as: test
       cli: latest
       commands: make -f ci/prow.Makefile test-e2e-helm
+      dependencies:
+      - env: HELM_IMAGE
+        name: osdk-helm-e2e
+      - env: IMAGE_FORMAT
+        name: osdk-helm-e2e
       from: src
       resources:
         requests:

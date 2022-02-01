@@ -1,0 +1,328 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.6.3-0.20210827222652-7b3a8699fa04
+  creationTimestamp: null
+  name: pullrequestpayloadqualificationruns.ci.openshift.io
+spec:
+  group: ci.openshift.io
+  names:
+    kind: PullRequestPayloadQualificationRun
+    listKind: PullRequestPayloadQualificationRunList
+    plural: pullrequestpayloadqualificationruns
+    shortNames:
+    - prpqr
+    singular: pullrequestpayloadqualificationrun
+  scope: Namespaced
+  versions:
+  - name: v1
+    schema:
+      openAPIV3Schema:
+        description: PullRequestPayloadQualificationRun represents the intent to run
+          a battery of OCP release payload validating jobs
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: Spec is considered immutable and should be entirely created
+              by the requestor
+            properties:
+              jobs:
+                description: Jobs specifies the jobs to be executed. Immutable.
+                properties:
+                  releaseControllerConfig:
+                    description: ReleaseControllerConfig specifies the source of the
+                      selected jobs
+                    properties:
+                      ocp:
+                        description: OCP is an OCP version, such as "4.10"
+                        type: string
+                      release:
+                        description: Release is a release type, such as "nightly"
+                          or "ci"
+                        type: string
+                      revision:
+                        description: Revision is a git revision of the release controller
+                          configuration files. Optional.
+                        type: string
+                      specifier:
+                        description: 'Specifier specifies which jobs were selected
+                          from the release controller configs. Example: "informing"'
+                        type: string
+                    required:
+                    - ocp
+                    - release
+                    - specifier
+                    type: object
+                  releaseJobSpec:
+                    description: Jobs is a list of jobs to be executed. This list
+                      should be fully specified when the custom resource is created
+                      and should not be changed afterwards.
+                    items:
+                      description: ReleaseJobSpec identifies the release payload one
+                        qualification test to execute. In this context, "test" means
+                        one item in the specified ci-operator configuration file.
+                        This structure corresponds to a single configured Prowjob
+                        (like "periodic-ci-openshift-release-master-ci-4.9-e2e-gcp")
+                        and serves as a specification for dynamically building a one-off
+                        Prowjob that runs the identical test as the configured one.
+                      properties:
+                        aggregatedCount:
+                          description: AggregatedCount is a number that specifies
+                            how many instances of the job will run in parallel. When
+                            the value is 0 it means that the job is not run as aggregated
+                            and 1 means that the job is aggregated with a single execution.
+                          type: integer
+                        ciOperatorConfig:
+                          description: CIOperatorConfig identifies the ci-operator
+                            configuration with the test
+                          properties:
+                            branch:
+                              type: string
+                            org:
+                              type: string
+                            repo:
+                              type: string
+                            variant:
+                              type: string
+                          required:
+                          - branch
+                          - org
+                          - repo
+                          type: object
+                        test:
+                          description: Test is the name of the test in the ci-operator
+                            configuration
+                          type: string
+                      required:
+                      - ciOperatorConfig
+                      - test
+                      type: object
+                    type: array
+                required:
+                - releaseControllerConfig
+                - releaseJobSpec
+                type: object
+              pullRequest:
+                description: PullRequest specifies the code to be tested. Immutable
+                  and required.
+                properties:
+                  baseRef:
+                    description: BaseRef identifies the target branch for the PR
+                    type: string
+                  baseSHA:
+                    description: BaseSHA identifies the HEAD of BaseRef at the time
+                    type: string
+                  org:
+                    description: Org is something like "openshift" in github.com/openshift/kubernetes
+                    type: string
+                  pr:
+                    description: PullRequest identifies a pull request in a repository
+                    properties:
+                      author:
+                        type: string
+                      number:
+                        type: integer
+                      sha:
+                        type: string
+                      title:
+                        type: string
+                    required:
+                    - author
+                    - number
+                    - sha
+                    - title
+                    type: object
+                  repo:
+                    description: Repo is something like "kubernetes" in github.com/openshift/kubernetes
+                    type: string
+                required:
+                - baseRef
+                - baseSHA
+                - org
+                - pr
+                - repo
+                type: object
+            required:
+            - jobs
+            - pullRequest
+            type: object
+          status:
+            description: PullRequestPayloadTestStatus provides runtime data, such
+              as references to submitted ProwJobs, whether all jobs are submitted,
+              finished, etc.
+            properties:
+              conditions:
+                items:
+                  description: "Condition contains details for one aspect of the current
+                    state of this API Resource. --- This struct is intended for direct
+                    use as an array at the field path .status.conditions.  For example,
+                    type FooStatus struct{     // Represents the observations of a
+                    foo's current state.     // Known .status.conditions.type are:
+                    \"Available\", \"Progressing\", and \"Degraded\"     // +patchMergeKey=type
+                    \    // +patchStrategy=merge     // +listType=map     // +listMapKey=type
+                    \    Conditions []metav1.Condition `json:\"conditions,omitempty\"
+                    patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"`
+                    \n     // other fields }"
+                  properties:
+                    lastTransitionTime:
+                      description: lastTransitionTime is the last time the condition
+                        transitioned from one status to another. This should be when
+                        the underlying condition changed.  If that is not known, then
+                        using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: message is a human readable message indicating
+                        details about the transition. This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: observedGeneration represents the .metadata.generation
+                        that the condition was set based upon. For instance, if .metadata.generation
+                        is currently 12, but the .status.conditions[x].observedGeneration
+                        is 9, the condition is out of date with respect to the current
+                        state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: reason contains a programmatic identifier indicating
+                        the reason for the condition's last transition. Producers
+                        of specific condition types may define expected values and
+                        meanings for this field, and whether the values are considered
+                        a guaranteed API. The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                        --- Many .condition.type values are consistent across resources
+                        like Available, but because arbitrary conditions can be useful
+                        (see .node.status.conditions), the ability to deconflict is
+                        important. The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              jobs:
+                items:
+                  description: PullRequestPayloadJobStatus is a reference to a Prowjob
+                    submitted for a single item from the list of jobs to be submitted
+                  properties:
+                    jobName:
+                      description: ReleaseJobName is a name of the job that corresponds
+                        to the name corresponding to the ReleaseJobSpec tuple. This
+                        name is inferred from ReleaseJobSpec data and corresponds
+                        to the name which the user would see in e.g. release-controller
+                      type: string
+                    prowJob:
+                      description: ProwJob is a name of the submitted ProwJob resource
+                      type: string
+                    status:
+                      description: ProwJobStatus provides runtime metadata, such as
+                        when it finished, whether it is running, etc.
+                      properties:
+                        build_id:
+                          description: BuildID is the build identifier vended either
+                            by tot or the snowflake library for this job and used
+                            as an identifier for grouping artifacts in GCS for views
+                            in TestGrid and Gubernator. Idenitifiers vended by tot
+                            are monotonically increasing whereas identifiers vended
+                            by the snowflake library are not.
+                          type: string
+                        completionTime:
+                          description: CompletionTime is the timestamp for when the
+                            job goes to a final state
+                          format: date-time
+                          type: string
+                        description:
+                          type: string
+                        jenkins_build_id:
+                          description: JenkinsBuildID applies only to ProwJobs fulfilled
+                            by the jenkins-operator. This field is the build identifier
+                            that Jenkins gave to the build for this ProwJob.
+                          type: string
+                        pendingTime:
+                          description: PendingTime is the timestamp for when the job
+                            moved from triggered to pending
+                          format: date-time
+                          type: string
+                        pod_name:
+                          description: PodName applies only to ProwJobs fulfilled
+                            by plank. This field should always be the same as the
+                            ProwJob.ObjectMeta.Name field.
+                          type: string
+                        prev_report_states:
+                          additionalProperties:
+                            description: ProwJobState specifies whether the job is
+                              running
+                            type: string
+                          description: PrevReportStates stores the previous reported
+                            prowjob state per reporter So crier won't make duplicated
+                            report attempt
+                          type: object
+                        startTime:
+                          description: StartTime is equal to the creation time of
+                            the ProwJob
+                          format: date-time
+                          type: string
+                        state:
+                          description: ProwJobState specifies whether the job is running
+                          enum:
+                          - triggered
+                          - pending
+                          - success
+                          - failure
+                          - aborted
+                          - error
+                          type: string
+                        url:
+                          type: string
+                      type: object
+                  required:
+                  - jobName
+                  - prowJob
+                  type: object
+                type: array
+            type: object
+        required:
+        - metadata
+        - spec
+        type: object
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

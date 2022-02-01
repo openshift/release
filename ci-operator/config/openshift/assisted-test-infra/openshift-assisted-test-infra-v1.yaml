@@ -1,0 +1,143 @@
+base_images:
+  assisted-installer:
+    name: ocm-2.5
+    namespace: edge-infrastructure
+    tag: assisted-installer
+  assisted-installer-agent:
+    name: ocm-2.5
+    namespace: edge-infrastructure
+    tag: assisted-installer-agent
+  assisted-installer-controller:
+    name: ocm-2.5
+    namespace: edge-infrastructure
+    tag: assisted-installer-controller
+  assisted-service:
+    name: ocm-2.5
+    namespace: edge-infrastructure
+    tag: assisted-service
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.16
+images:
+- dockerfile_path: Dockerfile.test-infra
+  from: src
+  inputs:
+    assisted-service:
+      as:
+      - quay.io/ocpmetal/assisted-service:latest
+  to: assisted-test-infra
+releases:
+  initial:
+    integration:
+      name: "4.9"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.9"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-metal-assisted
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE|Jenkinsfile.*)$
+  steps:
+    cluster_profile: packet-assisted
+    workflow: baremetalds-assisted
+- as: e2e-metal-assisted-multi-version
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=""
+    workflow: baremetalds-assisted
+- as: e2e-metal-assisted-olm
+  optional: true
+  run_if_changed: .*operator.*
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        TEST_FUNC=test_olm_operator
+    workflow: baremetalds-assisted
+- as: e2e-metal-assisted-kube-api-late-binding-single-node
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      POST_INSTALL_COMMANDS: |
+        export TEST=./discovery-infra/tests/test_kube_api.py
+        export TEST_FUNC=test_kube_api_late_binding_ipv4_single_node
+        export KUBECONFIG=$(find ${KUBECONFIG} -type f)
+        make deploy_assisted_operator test_parallel
+    workflow: baremetalds-assisted
+- as: e2e-metal-assisted-ipv6
+  optional: true
+  run_if_changed: ^(terraform_files/.*|.*/controllers/.*)$
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        IPv6=yes
+        IPv4=no
+    workflow: baremetalds-assisted
+- as: e2e-metal-assisted-none
+  optional: true
+  run_if_changed: ^(terraform_files/.*|.*/controllers/.*)$
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        PLATFORM=none
+    workflow: baremetalds-assisted
+- as: e2e-metal-assisted-none-ipv6
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        IPv6=yes
+        IPv4=no
+        VIP_DHCP_ALLOCATION=no
+        PROXY=yes
+        PLATFORM=none
+    workflow: baremetalds-assisted
+- as: e2e-metal-assisted-single-node
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        NUM_MASTERS=1
+    workflow: baremetalds-assisted
+- as: e2e-metal-assisted-kube-api
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE|Jenkinsfile.*)$
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        NUM_MASTERS=1
+        NUM_WORKERS=0
+        IPv6=yes
+        IPv4=no
+        PROXY=yes
+        ADDITIONAL_PARAMS="--with-static-network-config"
+        ISO_IMAGE_TYPE=minimal-iso
+        KUBE_API=yes
+        ENABLE_KUBE_API=true
+        MAKEFILE_TARGET=all
+    workflow: baremetalds-assisted
+zz_generated_metadata:
+  branch: v1
+  org: openshift
+  repo: assisted-test-infra

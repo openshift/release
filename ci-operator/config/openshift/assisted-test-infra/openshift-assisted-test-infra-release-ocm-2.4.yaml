@@ -1,37 +1,34 @@
 base_images:
   assisted-installer:
-    name: "2.4"
-    namespace: open-cluster-management
+    name: ocm-2.4
+    namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: "2.4"
-    namespace: open-cluster-management
+    name: ocm-2.4
+    namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: "2.4"
-    namespace: open-cluster-management
+    name: ocm-2.4
+    namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: "2.4"
-    namespace: open-cluster-management
+    name: ocm-2.4
+    namespace: edge-infrastructure
     tag: assisted-service
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.16
+  from_repository: true
 images:
-- dockerfile_path: Dockerfile.test-infra
+- dockerfile_literal: |
+    FROM base
+    COPY . .
   from: src
-  inputs:
-    assisted-service:
-      as:
-      - quay.io/ocpmetal/assisted-service:latest
   to: assisted-test-infra
+- dockerfile_path: Dockerfile.assisted-test-infra
+  to: assisted-test-infra-internal
 promotion:
   name: ocm-2.4
   namespace: edge-infrastructure
@@ -58,8 +55,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=release-ocm-2.4
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-periodic
   cron: '@daily'
   steps:
@@ -76,9 +72,8 @@ tests:
     env:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=release-ocm-2.4
-        OPENSHIFT_VERSION=""
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+        OPENSHIFT_VERSION="all"
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-olm
   optional: true
   run_if_changed: .*operator.*
@@ -88,22 +83,8 @@ tests:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=release-ocm-2.4
         TEST_FUNC=test_olm_operator
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
-- as: system-test-operator
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.4
-      POST_INSTALL_COMMANDS: |
-        export TEST=./discovery-infra/tests/test_kube_api.py
-        export TEST_FUNC=test_kube_api_ipv4
-        export KUBECONFIG=$(find ${KUBECONFIG} -type f)
-        make deploy_assisted_operator test_parallel
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+      PACKET_PLAN: m2.xlarge.x86
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-kube-api-late-binding-single-node
   optional: true
   steps:
@@ -116,8 +97,7 @@ tests:
         export TEST_FUNC=test_kube_api_late_binding_ipv4_single_node
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
         make deploy_assisted_operator test_parallel
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-ipv6
   optional: true
   run_if_changed: ^(terraform_files/.*|.*/controllers/.*)$
@@ -128,8 +108,7 @@ tests:
         SERVICE_BASE_REF=release-ocm-2.4
         IPv6=yes
         IPv4=no
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-ipv4v6
   optional: true
   run_if_changed: ^(terraform_files/.*|.*/controllers/.*)$
@@ -140,8 +119,7 @@ tests:
         SERVICE_BASE_REF=release-ocm-2.4
         IPv6=yes
         IPv4=yes
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-none
   optional: true
   run_if_changed: ^(terraform_files/.*|.*/controllers/.*)$
@@ -151,8 +129,7 @@ tests:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=release-ocm-2.4
         PLATFORM=none
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-none-ipv6
   optional: true
   steps:
@@ -165,8 +142,7 @@ tests:
         VIP_DHCP_ALLOCATION=no
         PROXY=yes
         PLATFORM=none
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-single-node
   optional: true
   steps:
@@ -175,8 +151,7 @@ tests:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=release-ocm-2.4
         NUM_MASTERS=1
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-kube-api
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE|Jenkinsfile.*)$
   steps:
@@ -194,9 +169,8 @@ tests:
         KUBE_API=yes
         ENABLE_KUBE_API=true
         MAKEFILE_TARGET=all
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
-- as: e2e-metal-assisted-networking
+    workflow: baremetalds-assisted
+- as: e2e-metal-assisted-static-ip-suite
   optional: true
   run_if_changed: ^(terraform_files/.*|.*/controllers/.*)$
   steps:
@@ -204,14 +178,9 @@ tests:
     env:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=release-ocm-2.4
+        STATIC_IPS=true
         TEST_FUNC=test_networking
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
-- as: e2e-metal-single-node-live-iso
-  optional: true
-  steps:
-    cluster_profile: packet-sno
-    workflow: baremetalds-sno
+    workflow: baremetalds-assisted
 zz_generated_metadata:
   branch: release-ocm-2.4
   org: openshift

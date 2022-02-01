@@ -1,7 +1,23 @@
 base_images:
+  assisted-installer:
+    name: ocm-2.5
+    namespace: edge-infrastructure
+    tag: assisted-installer
+  assisted-installer-agent:
+    name: ocm-2.5
+    namespace: edge-infrastructure
+    tag: assisted-installer-agent
+  assisted-installer-controller:
+    name: ocm-2.5
+    namespace: edge-infrastructure
+    tag: assisted-installer-controller
+  assisted-service:
+    name: ocm-2.5
+    namespace: edge-infrastructure
+    tag: assisted-service
   assisted-test-infra:
-    name: assisted-test
-    namespace: ocp-kni
+    name: ocm-2.5
+    namespace: edge-infrastructure
     tag: assisted-test-infra
   base:
     name: 4.8-priv
@@ -54,6 +70,9 @@ images:
     ocp_builder_rhel-8-golang-1.15-openshift-4.8:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
+    ocp_builder_rhel-8-golang-1.16-openshift-4.8:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
   to: installer-artifacts
 - dockerfile_path: images/libvirt/Dockerfile.ci
   from: base
@@ -269,7 +288,7 @@ tests:
     workflow: openshift-upgrade-gcp-latestinstaller
 - as: e2e-metal-ipi
   steps:
-    cluster_profile: packet
+    cluster_profile: equinix-ocp-metal
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4
@@ -278,7 +297,7 @@ tests:
 - as: e2e-metal-ipi-ovn-ipv6
   skip_if_only_changed: ^docs/
   steps:
-    cluster_profile: packet
+    cluster_profile: equinix-ocp-metal
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v6
@@ -286,7 +305,7 @@ tests:
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-ovn-dualstack
   steps:
-    cluster_profile: packet
+    cluster_profile: equinix-ocp-metal
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4v6
@@ -294,7 +313,7 @@ tests:
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-virtualmedia
   steps:
-    cluster_profile: packet
+    cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-virtualmedia
 - as: e2e-openstack
   optional: true
@@ -322,6 +341,7 @@ tests:
     workflow: openshift-manifests-openstack
 - as: e2e-vsphere
   optional: true
+  run_if_changed: (^(data/.*|pkg.*)/vsphere)|(^vendor/github.com/vmware/)
   steps:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere
@@ -343,7 +363,7 @@ tests:
     workflow: openshift-e2e-gcp-libvirt
 - as: e2e-metal-assisted
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     workflow: baremetalds-assisted
 - as: e2e-ovirt
   optional: true
@@ -351,10 +371,6 @@ tests:
   steps:
     cluster_profile: ovirt
     workflow: openshift-e2e-ovirt-minimal
-- as: e2e-kubevirt
-  steps:
-    cluster_profile: kubevirt
-    workflow: openshift-e2e-kubevirt
 - as: e2e-aws-single-node
   steps:
     cluster_profile: aws
@@ -362,7 +378,7 @@ tests:
 - as: e2e-metal-single-node-live-iso
   skip_if_only_changed: ^docs/
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-sno
     workflow: baremetalds-sno
 - as: e2e-aws-fips
   optional: true

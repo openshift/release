@@ -1,64 +1,54 @@
 base_images:
   base:
-    name: 4.10-priv
+    name: 4.11-priv
     namespace: ocp-private
     tag: base
   driver-operand:
-    name: 4.10-priv
+    name: 4.11-priv
     namespace: ocp-private
     tag: aws-efs-csi-driver
   livenessprobe-operand:
-    name: 4.10-priv
+    name: 4.11-priv
     namespace: ocp-private
     tag: csi-livenessprobe
-  ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.16-openshift-4.9
-  ocp_builder_rhel-8-golang-1.16-openshift-4.10:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.16-openshift-4.10
+    tag: rhel-8-golang-1.17-openshift-4.10
   operator-index:
     name: redhat-operator-index
     namespace: ci
     tag: v4.8
   provisioner-operand:
-    name: 4.10-priv
+    name: 4.11-priv
     namespace: ocp-private
     tag: csi-external-provisioner
   proxy-operand:
-    name: 4.10-priv
+    name: 4.11-priv
     namespace: ocp-private
     tag: kube-rbac-proxy
   registrar-operand:
-    name: 4.10-priv
+    name: 4.11-priv
     namespace: ocp-private
     tag: csi-node-driver-registrar
 binary_build_commands: make
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.16
+  from_repository: true
 canonical_go_repository: github.com/openshift/aws-efs-csi-driver-operator
 images:
 - dockerfile_path: Dockerfile
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
-    ocp_builder_rhel-8-golang-1.16-openshift-4.10:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.10
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
   to: aws-efs-csi-driver-operator
 - dockerfile_path: Dockerfile.create_efs
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
   to: aws-efs-csi-operator-create-efs
 operator:
   bundles:
@@ -81,17 +71,17 @@ operator:
   - pullspec: quay.io/openshift/origin-aws-efs-csi-driver-operator:latest
     with: pipeline:aws-efs-csi-driver-operator
 promotion:
-  name: 4.10-priv
+  name: 4.11-priv
   namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.10-priv
+      name: 4.11-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.10-priv
+      name: 4.11-priv
       namespace: ocp-private
 resources:
   '*':

@@ -1,4 +1,8 @@
 base_images:
+  jenkins-agent-maven:
+    name: "4.10"
+    namespace: ocp
+    tag: jenkins-agent-maven
   original_jenkins:
     name: "4.10"
     namespace: ocp
@@ -12,6 +16,9 @@ images:
 - dockerfile_path: Dockerfile
   from: original_jenkins
   inputs:
+    jenkins-agent-maven:
+      as:
+      - quay.io/openshift/origin-jenkins-agent-maven:4.9.0
     src:
       paths:
       - destination_dir: .
@@ -20,7 +27,6 @@ images:
 promotion:
   additional_images:
     jenkins-sync-plugin-e2e: src
-  disabled: true
   excluded_images:
   - jenkins
   name: "4.10"
@@ -41,11 +47,20 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-aws-jenkins
+- as: e2e-aws-jenkins-sync-plugin
   steps:
     cluster_profile: aws
-    workflow: openshift-e2e-aws-jenkins
-- as: e2e-aws-jenkins-sync-plugin
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-jenkins-sync-plugin-continuous
+  cron: 0 */12 * * *
   steps:
     cluster_profile: aws
     test:

@@ -6,14 +6,15 @@ build_root:
       RUN ln -s /cli/oc /usr/bin/kubectl
 releases:
   initial:
-    integration:
-      name: "4.9"
-      namespace: ocp
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.9"
   latest:
-    integration:
-      include_built_images: true
-      name: "4.9"
-      namespace: ocp
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.9"
 resources:
   '*':
     requests:
@@ -26,12 +27,13 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: "if [ \"$(echo -e $CLONEREFS_OPTIONS | jq -r '.refs[] | select(.org
-        == \"openshift\").repo')\" == \"release\" ]; then \n  OPERATOR_INDEX_IMAGE_REF=quay.io/redhat-developer/servicebinding-operator:index;\nelse
-        \n  OPERATOR_INDEX_IMAGE_REF=quay.io/redhat-developer/servicebinding-operator:pr-${PULL_NUMBER}-${PULL_PULL_SHA:0:8}-index;\nfi;
-        \nmake -k VERBOSE=2 OPERATOR_INDEX_IMAGE_REF=$OPERATOR_INDEX_IMAGE_REF CATSRC_NAME=sbo-pr-checks
-        SKIP_REGISTRY_LOGIN=true EXTRA_BEHAVE_ARGS=\"--tags=~@crdv1beta1\" -o registry-login
-        test-acceptance-with-bundle test-acceptance-artifacts\n"
+      commands: |
+        if [ "$(echo -e $CLONEREFS_OPTIONS | jq -r '.refs[] | select(.org == "openshift").repo')" == "release" ]; then
+          OPERATOR_INDEX_IMAGE_REF=quay.io/redhat-developer/servicebinding-operator:index;
+        else
+          OPERATOR_INDEX_IMAGE_REF=quay.io/redhat-developer/servicebinding-operator:pr-${PULL_NUMBER}-${PULL_PULL_SHA:0:8}-index;
+        fi;
+        make -k VERBOSE=2 OPERATOR_INDEX_IMAGE_REF=$OPERATOR_INDEX_IMAGE_REF CATSRC_NAME=sbo-pr-checks SKIP_REGISTRY_LOGIN=true EXTRA_BEHAVE_ARGS="--tags=~@crdv1beta1 --tags=~@disable-openshift-4.9" -o registry-login test-acceptance-with-bundle test-acceptance-artifacts
       from: src
       resources:
         requests:
@@ -44,8 +46,8 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: VERBOSE=2 make -k EXTRA_BEHAVE_ARGS="--tags=~@crdv1beta1" test-acceptance-with-bundle
-        test-acceptance-artifacts
+      commands: VERBOSE=2 make -k EXTRA_BEHAVE_ARGS="--tags=~@crdv1beta1 --tags=~@disable-openshift-4.9"
+        test-acceptance-with-bundle test-acceptance-artifacts
       from: src
       resources:
         requests:

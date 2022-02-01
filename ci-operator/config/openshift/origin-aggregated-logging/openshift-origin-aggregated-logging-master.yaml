@@ -11,6 +11,14 @@ base_images:
     name: "5.3"
     namespace: logging
     tag: cluster-logging-operator
+  cluster-logging-operator-5-4:
+    name: "5.4"
+    namespace: logging
+    tag: cluster-logging-operator
+  cluster-logging-operator-5-5:
+    name: "5.5"
+    namespace: logging
+    tag: cluster-logging-operator
   cluster-logging-operator-e2e-5-1:
     name: "5.1"
     namespace: logging
@@ -21,6 +29,14 @@ base_images:
     tag: cluster-logging-operator-e2e
   cluster-logging-operator-e2e-5-3:
     name: "5.3"
+    namespace: logging
+    tag: cluster-logging-operator-e2e
+  cluster-logging-operator-e2e-5-4:
+    name: "5.4"
+    namespace: logging
+    tag: cluster-logging-operator-e2e
+  cluster-logging-operator-e2e-5-5:
+    name: "5.5"
     namespace: logging
     tag: cluster-logging-operator-e2e
   cluster-logging-operator-registry-5-1:
@@ -35,6 +51,14 @@ base_images:
     name: "5.3"
     namespace: logging
     tag: cluster-logging-operator-registry
+  cluster-logging-operator-registry-5-4:
+    name: "5.4"
+    namespace: logging
+    tag: cluster-logging-operator-registry
+  cluster-logging-operator-registry-5-5:
+    name: "5.5"
+    namespace: logging
+    tag: cluster-logging-operator-registry
   elasticsearch-operator-5-1:
     name: "5.1"
     namespace: logging
@@ -45,6 +69,14 @@ base_images:
     tag: elasticsearch-operator
   elasticsearch-operator-5-3:
     name: "5.3"
+    namespace: logging
+    tag: elasticsearch-operator
+  elasticsearch-operator-5-4:
+    name: "5.4"
+    namespace: logging
+    tag: elasticsearch-operator
+  elasticsearch-operator-5-5:
+    name: "5.5"
     namespace: logging
     tag: elasticsearch-operator
   elasticsearch-operator-registry-5-1:
@@ -59,6 +91,14 @@ base_images:
     name: "5.3"
     namespace: logging
     tag: elasticsearch-operator-registry
+  elasticsearch-operator-registry-5-4:
+    name: "5.4"
+    namespace: logging
+    tag: elasticsearch-operator-registry
+  elasticsearch-operator-registry-5-5:
+    name: "5.5"
+    namespace: logging
+    tag: elasticsearch-operator-registry
   elasticsearch-operator-src-5-1:
     name: "5.1"
     namespace: logging
@@ -69,6 +109,14 @@ base_images:
     tag: elasticsearch-operator-src
   elasticsearch-operator-src-5-3:
     name: "5.3"
+    namespace: logging
+    tag: elasticsearch-operator-src
+  elasticsearch-operator-src-5-4:
+    name: "5.4"
+    namespace: logging
+    tag: elasticsearch-operator-src
+  elasticsearch-operator-src-5-5:
+    name: "5.5"
     namespace: logging
     tag: elasticsearch-operator-src
   elasticsearch-proxy:
@@ -83,6 +131,10 @@ base_images:
     name: 5.y
     namespace: logging
     tag: logging-eventrouter
+  nodejs10:
+    name: builder
+    namespace: ocp
+    tag: rhel8.2.els.nodejs.10
   oauth-proxy:
     name: "4.8"
     namespace: ocp
@@ -91,10 +143,6 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-base-openshift-4.6
-  ubi8-nodejs10:
-    name: builder
-    namespace: ocp
-    tag: ubi8.nodejs.10
   ubi8-python36:
     name: builder
     namespace: ocp
@@ -125,7 +173,7 @@ images:
   to: logging-elasticsearch6
 - context_dir: kibana
   dockerfile_path: Dockerfile.rhel8
-  from: ubi8-nodejs10
+  from: nodejs10
   to: logging-kibana6
 - context_dir: curator
   dockerfile_path: Dockerfile
@@ -161,7 +209,7 @@ tests:
     from: logging-test-unit
 - as: smoke-5-1
   steps:
-    cluster_profile: gcp
+    cluster_profile: aws
     test:
     - as: test
       cli: latest
@@ -196,10 +244,10 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-gcp
+    workflow: ipi-aws
 - as: smoke-5-2
   steps:
-    cluster_profile: gcp
+    cluster_profile: aws
     test:
     - as: test
       cli: latest
@@ -234,14 +282,15 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-gcp
+    workflow: ipi-aws
 - as: smoke-5-3
   steps:
-    cluster_profile: gcp
+    cluster_profile: aws
     test:
     - as: test
       cli: latest
-      commands: LOGGING_VERSION=5.3 CLO_BRANCH=master EO_BRANCH=master make test
+      commands: LOGGING_VERSION=5.3 CLO_BRANCH=release-5.3 EO_BRANCH=release-5.3 make
+        test
       dependencies:
       - env: IMAGE_ELASTICSEARCH_OPERATOR_REGISTRY
         name: pipeline:elasticsearch-operator-registry-5-3
@@ -271,10 +320,85 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-gcp
+    workflow: ipi-aws
+- as: smoke-5-4
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: LOGGING_VERSION=5.4 CLO_BRANCH=release-5.4 EO_BRANCH=release-5.4 make
+        test
+      dependencies:
+      - env: IMAGE_ELASTICSEARCH_OPERATOR_REGISTRY
+        name: pipeline:elasticsearch-operator-registry-5-4
+      - env: IMAGE_ELASTICSEARCH_OPERATOR
+        name: pipeline:elasticsearch-operator-5-4
+      - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
+        name: pipeline:cluster-logging-operator-registry-5-4
+      - env: IMAGE_CLUSTER_LOGGING_OPERATOR
+        name: pipeline:cluster-logging-operator-5-4
+      - env: IMAGE_OAUTH_PROXY
+        name: pipeline:oauth-proxy
+      - env: IMAGE_LOGGING_CURATOR5
+        name: pipeline:logging-curator5
+      - env: IMAGE_LOGGING_FLUENTD
+        name: pipeline:logging-fluentd
+      - env: IMAGE_ELASTICSEARCH_PROXY
+        name: pipeline:elasticsearch-proxy
+      - env: IMAGE_ELASTICSEARCH6
+        name: pipeline:logging-elasticsearch6
+      - env: IMAGE_LOGGING_KIBANA6
+        name: pipeline:logging-kibana6
+      - env: IMAGE_LOGGING_EVENTROUTER
+        name: pipeline:logging-eventrouter
+      - env: IMAGE_LOG_FILE_METRIC_EXPORTER
+        name: pipeline:log-file-metric-exporter
+      from: pipeline:origin-aggregated-logging-tests
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: smoke-5-5
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: LOGGING_VERSION=5.5 CLO_BRANCH=master EO_BRANCH=master make test
+      dependencies:
+      - env: IMAGE_ELASTICSEARCH_OPERATOR_REGISTRY
+        name: pipeline:elasticsearch-operator-registry-5-5
+      - env: IMAGE_ELASTICSEARCH_OPERATOR
+        name: pipeline:elasticsearch-operator-5-5
+      - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
+        name: pipeline:cluster-logging-operator-registry-5-5
+      - env: IMAGE_CLUSTER_LOGGING_OPERATOR
+        name: pipeline:cluster-logging-operator-5-5
+      - env: IMAGE_OAUTH_PROXY
+        name: pipeline:oauth-proxy
+      - env: IMAGE_LOGGING_CURATOR5
+        name: pipeline:logging-curator5
+      - env: IMAGE_LOGGING_FLUENTD
+        name: pipeline:logging-fluentd
+      - env: IMAGE_ELASTICSEARCH_PROXY
+        name: pipeline:elasticsearch-proxy
+      - env: IMAGE_ELASTICSEARCH6
+        name: pipeline:logging-elasticsearch6
+      - env: IMAGE_LOGGING_KIBANA6
+        name: pipeline:logging-kibana6
+      - env: IMAGE_LOGGING_EVENTROUTER
+        name: pipeline:logging-eventrouter
+      - env: IMAGE_LOG_FILE_METRIC_EXPORTER
+        name: pipeline:log-file-metric-exporter
+      from: pipeline:origin-aggregated-logging-tests
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: elastic-operator-e2e-5-1
   steps:
-    cluster_profile: gcp
+    cluster_profile: aws
     test:
     - as: test
       cli: latest
@@ -296,10 +420,10 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-gcp
+    workflow: ipi-aws
 - as: elastic-operator-e2e-5-2
   steps:
-    cluster_profile: gcp
+    cluster_profile: aws
     test:
     - as: test
       cli: latest
@@ -321,10 +445,10 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-gcp
+    workflow: ipi-aws
 - as: elastic-operator-e2e-5-3
   steps:
-    cluster_profile: gcp
+    cluster_profile: aws
     test:
     - as: test
       cli: latest
@@ -346,10 +470,60 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-gcp
+    workflow: ipi-aws
+- as: elastic-operator-e2e-5-4
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e-olm
+      dependencies:
+      - env: IMAGE_ELASTICSEARCH_OPERATOR_REGISTRY
+        name: pipeline:elasticsearch-operator-registry-5-4
+      - env: IMAGE_ELASTICSEARCH_OPERATOR
+        name: pipeline:elasticsearch-operator-5-4
+      - env: IMAGE_OAUTH_PROXY
+        name: pipeline:oauth-proxy
+      - env: IMAGE_ELASTICSEARCH_PROXY
+        name: pipeline:elasticsearch-proxy
+      - env: IMAGE_ELASTICSEARCH6
+        name: pipeline:logging-elasticsearch6
+      - env: IMAGE_LOGGING_KIBANA6
+        name: pipeline:logging-kibana6
+      from: pipeline:elasticsearch-operator-src-5-4
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: elastic-operator-e2e-5-5
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e-olm
+      dependencies:
+      - env: IMAGE_ELASTICSEARCH_OPERATOR_REGISTRY
+        name: pipeline:elasticsearch-operator-registry-5-5
+      - env: IMAGE_ELASTICSEARCH_OPERATOR
+        name: pipeline:elasticsearch-operator-5-5
+      - env: IMAGE_OAUTH_PROXY
+        name: pipeline:oauth-proxy
+      - env: IMAGE_ELASTICSEARCH_PROXY
+        name: pipeline:elasticsearch-proxy
+      - env: IMAGE_ELASTICSEARCH6
+        name: pipeline:logging-elasticsearch6
+      - env: IMAGE_LOGGING_KIBANA6
+        name: pipeline:logging-kibana6
+      from: pipeline:elasticsearch-operator-src-5-5
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: cluster-logging-operator-e2e-5-1
   steps:
-    cluster_profile: gcp
+    cluster_profile: aws
     test:
     - as: test
       cli: latest
@@ -360,14 +534,16 @@ tests:
         name: pipeline:cluster-logging-operator-registry-5-1
       - env: IMAGE_CLUSTER_LOGGING_OPERATOR
         name: pipeline:cluster-logging-operator-5-1
+      - env: IMAGE_ELASTICSEARCH_OPERATOR_REGISTRY
+        name: pipeline:elasticsearch-operator-registry-5-1
+      - env: IMAGE_ELASTICSEARCH_OPERATOR
+        name: pipeline:elasticsearch-operator-5-1
       - env: IMAGE_OAUTH_PROXY
         name: pipeline:oauth-proxy
       - env: IMAGE_LOGGING_CURATOR5
         name: pipeline:logging-curator5
       - env: IMAGE_LOGGING_FLUENTD
         name: pipeline:logging-fluentd
-      - env: IMAGE_ELASTICSEARCH_OPERATOR
-        name: pipeline:elasticsearch-operator-5-1
       - env: IMAGE_ELASTICSEARCH_PROXY
         name: pipeline:elasticsearch-proxy
       - env: IMAGE_ELASTICSEARCH6
@@ -383,10 +559,10 @@ tests:
         requests:
           cpu: 100m
       timeout: 3h0m0s
-    workflow: ipi-gcp
+    workflow: ipi-aws
 - as: cluster-logging-operator-e2e-5-2
   steps:
-    cluster_profile: gcp
+    cluster_profile: aws
     test:
     - as: test
       cli: latest
@@ -397,14 +573,16 @@ tests:
         name: pipeline:cluster-logging-operator-registry-5-2
       - env: IMAGE_CLUSTER_LOGGING_OPERATOR
         name: pipeline:cluster-logging-operator-5-2
+      - env: IMAGE_ELASTICSEARCH_OPERATOR_REGISTRY
+        name: pipeline:elasticsearch-operator-registry-5-2
+      - env: IMAGE_ELASTICSEARCH_OPERATOR
+        name: pipeline:elasticsearch-operator-5-2
       - env: IMAGE_OAUTH_PROXY
         name: pipeline:oauth-proxy
       - env: IMAGE_LOGGING_CURATOR5
         name: pipeline:logging-curator5
       - env: IMAGE_LOGGING_FLUENTD
         name: pipeline:logging-fluentd
-      - env: IMAGE_ELASTICSEARCH_OPERATOR
-        name: pipeline:elasticsearch-operator-5-2
       - env: IMAGE_ELASTICSEARCH_PROXY
         name: pipeline:elasticsearch-proxy
       - env: IMAGE_ELASTICSEARCH6
@@ -420,10 +598,10 @@ tests:
         requests:
           cpu: 100m
       timeout: 3h0m0s
-    workflow: ipi-gcp
+    workflow: ipi-aws
 - as: cluster-logging-operator-e2e-5-3
   steps:
-    cluster_profile: gcp
+    cluster_profile: aws
     test:
     - as: test
       cli: latest
@@ -434,14 +612,16 @@ tests:
         name: pipeline:cluster-logging-operator-registry-5-3
       - env: IMAGE_CLUSTER_LOGGING_OPERATOR
         name: pipeline:cluster-logging-operator-5-3
+      - env: IMAGE_ELASTICSEARCH_OPERATOR_REGISTRY
+        name: pipeline:elasticsearch-operator-registry-5-3
+      - env: IMAGE_ELASTICSEARCH_OPERATOR
+        name: pipeline:elasticsearch-operator-5-3
       - env: IMAGE_OAUTH_PROXY
         name: pipeline:oauth-proxy
       - env: IMAGE_LOGGING_CURATOR5
         name: pipeline:logging-curator5
       - env: IMAGE_LOGGING_FLUENTD
         name: pipeline:logging-fluentd
-      - env: IMAGE_ELASTICSEARCH_OPERATOR
-        name: pipeline:elasticsearch-operator-5-3
       - env: IMAGE_ELASTICSEARCH_PROXY
         name: pipeline:elasticsearch-proxy
       - env: IMAGE_ELASTICSEARCH6
@@ -457,10 +637,88 @@ tests:
         requests:
           cpu: 100m
       timeout: 3h0m0s
-    workflow: ipi-gcp
+    workflow: ipi-aws
+- as: cluster-logging-operator-e2e-5-4
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts
+        make test-e2e-olm
+      dependencies:
+      - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
+        name: pipeline:cluster-logging-operator-registry-5-4
+      - env: IMAGE_CLUSTER_LOGGING_OPERATOR
+        name: pipeline:cluster-logging-operator-5-4
+      - env: IMAGE_ELASTICSEARCH_OPERATOR_REGISTRY
+        name: pipeline:elasticsearch-operator-registry-5-4
+      - env: IMAGE_ELASTICSEARCH_OPERATOR
+        name: pipeline:elasticsearch-operator-5-4
+      - env: IMAGE_OAUTH_PROXY
+        name: pipeline:oauth-proxy
+      - env: IMAGE_LOGGING_CURATOR5
+        name: pipeline:logging-curator5
+      - env: IMAGE_LOGGING_FLUENTD
+        name: pipeline:logging-fluentd
+      - env: IMAGE_ELASTICSEARCH_PROXY
+        name: pipeline:elasticsearch-proxy
+      - env: IMAGE_ELASTICSEARCH6
+        name: pipeline:logging-elasticsearch6
+      - env: IMAGE_LOGGING_KIBANA6
+        name: pipeline:logging-kibana6
+      - env: IMAGE_LOGGING_EVENTROUTER
+        name: pipeline:logging-eventrouter
+      - env: IMAGE_LOG_FILE_METRIC_EXPORTER
+        name: pipeline:log-file-metric-exporter
+      from: pipeline:cluster-logging-operator-e2e-5-4
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: ipi-aws
+- as: cluster-logging-operator-e2e-5-5
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts
+        make test-e2e-olm
+      dependencies:
+      - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
+        name: pipeline:cluster-logging-operator-registry-5-5
+      - env: IMAGE_CLUSTER_LOGGING_OPERATOR
+        name: pipeline:cluster-logging-operator-5-4
+      - env: IMAGE_ELASTICSEARCH_OPERATOR_REGISTRY
+        name: pipeline:elasticsearch-operator-registry-5-5
+      - env: IMAGE_ELASTICSEARCH_OPERATOR
+        name: pipeline:elasticsearch-operator-5-5
+      - env: IMAGE_OAUTH_PROXY
+        name: pipeline:oauth-proxy
+      - env: IMAGE_LOGGING_CURATOR5
+        name: pipeline:logging-curator5
+      - env: IMAGE_LOGGING_FLUENTD
+        name: pipeline:logging-fluentd
+      - env: IMAGE_ELASTICSEARCH_PROXY
+        name: pipeline:elasticsearch-proxy
+      - env: IMAGE_ELASTICSEARCH6
+        name: pipeline:logging-elasticsearch6
+      - env: IMAGE_LOGGING_KIBANA6
+        name: pipeline:logging-kibana6
+      - env: IMAGE_LOGGING_EVENTROUTER
+        name: pipeline:logging-eventrouter
+      - env: IMAGE_LOG_FILE_METRIC_EXPORTER
+        name: pipeline:log-file-metric-exporter
+      from: pipeline:cluster-logging-operator-e2e-5-5
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: ipi-aws
 - as: clo-functional-5-1
   steps:
-    cluster_profile: gcp
+    cluster_profile: aws
     test:
     - as: test
       cli: latest
@@ -493,10 +751,10 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-gcp
+    workflow: ipi-aws
 - as: clo-functional-5-2
   steps:
-    cluster_profile: gcp
+    cluster_profile: aws
     test:
     - as: test
       cli: latest
@@ -530,10 +788,10 @@ tests:
         requests:
           cpu: 100m
       timeout: 3h0m0s
-    workflow: ipi-gcp
+    workflow: ipi-aws
 - as: clo-functional-5-3
   steps:
-    cluster_profile: gcp
+    cluster_profile: aws
     test:
     - as: test
       cli: latest
@@ -566,7 +824,79 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-gcp
+    workflow: ipi-aws
+- as: clo-functional-5-4
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts
+        make test-functional
+      dependencies:
+      - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
+        name: pipeline:cluster-logging-operator-registry-5-4
+      - env: IMAGE_CLUSTER_LOGGING_OPERATOR
+        name: pipeline:cluster-logging-operator-5-4
+      - env: IMAGE_OAUTH_PROXY
+        name: pipeline:oauth-proxy
+      - env: IMAGE_LOGGING_CURATOR5
+        name: pipeline:logging-curator5
+      - env: IMAGE_LOGGING_FLUENTD
+        name: pipeline:logging-fluentd
+      - env: IMAGE_ELASTICSEARCH_OPERATOR
+        name: pipeline:elasticsearch-operator-5-4
+      - env: IMAGE_ELASTICSEARCH_PROXY
+        name: pipeline:elasticsearch-proxy
+      - env: IMAGE_ELASTICSEARCH6
+        name: pipeline:logging-elasticsearch6
+      - env: IMAGE_LOGGING_KIBANA6
+        name: pipeline:logging-kibana6
+      - env: IMAGE_LOGGING_EVENTROUTER
+        name: pipeline:logging-eventrouter
+      - env: IMAGE_LOG_FILE_METRIC_EXPORTER
+        name: pipeline:log-file-metric-exporter
+      from: pipeline:cluster-logging-operator-e2e-5-4
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: clo-functional-5-5
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts
+        make test-functional
+      dependencies:
+      - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
+        name: pipeline:cluster-logging-operator-registry-5-5
+      - env: IMAGE_CLUSTER_LOGGING_OPERATOR
+        name: pipeline:cluster-logging-operator-5-5
+      - env: IMAGE_OAUTH_PROXY
+        name: pipeline:oauth-proxy
+      - env: IMAGE_LOGGING_CURATOR5
+        name: pipeline:logging-curator5
+      - env: IMAGE_LOGGING_FLUENTD
+        name: pipeline:logging-fluentd
+      - env: IMAGE_ELASTICSEARCH_OPERATOR
+        name: pipeline:elasticsearch-operator-5-5
+      - env: IMAGE_ELASTICSEARCH_PROXY
+        name: pipeline:elasticsearch-proxy
+      - env: IMAGE_ELASTICSEARCH6
+        name: pipeline:logging-elasticsearch6
+      - env: IMAGE_LOGGING_KIBANA6
+        name: pipeline:logging-kibana6
+      - env: IMAGE_LOGGING_EVENTROUTER
+        name: pipeline:logging-eventrouter
+      - env: IMAGE_LOG_FILE_METRIC_EXPORTER
+        name: pipeline:log-file-metric-exporter
+      from: pipeline:cluster-logging-operator-e2e-5-5
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: openshift

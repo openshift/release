@@ -40,17 +40,25 @@ source /root/config
 
 # Get sosreport including sar data
 sos report --batch --tmp-dir /tmp/artifacts \
-  -o container_log,filesys,kvm,libvirt,logs,networkmanager,networking,podman,processor,rpm,sar,virsh,yum \
+  -o memory,container_log,filesys,kvm,libvirt,logs,networkmanager,networking,podman,processor,rpm,sar,virsh,yum \
   -k podman.all -k podman.logs
 
 # TODO: remove when https://github.com/sosreport/sos/pull/2594 is available
 cp -v -r /var/lib/libvirt/dnsmasq /tmp/artifacts/libvirt-dnsmasq
 
-# Get assisted logs
-export LOGS_DEST=/tmp/artifacts
-export KUBECTL="kubectl --kubeconfig=\${HOME}/.kube/config"
+cp -v -r /var/log/swtpm/libvirt/qemu /tmp/artifacts/libvirt-qemu || true
+ls -ltr /var/lib/swtpm-localca/ >> /tmp/artifacts/libvirt-qemu/ls-swtpm-localca.txt || true
 
-make download_service_logs
+# Get assisted logs
+if [ -f "\${HOME}/.kube/config" ]; then
+  export LOGS_DEST=/tmp/artifacts
+  export KUBECTL="kubectl --kubeconfig=\${HOME}/.kube/config"
+
+  make download_service_logs
+  if [ "${GATHER_CAPI_LOGS}" == "true" ]; then
+    make download_capi_logs
+  fi
+fi
 
 export ADDITIONAL_PARAMS=""
 if [ "${SOSREPORT}" == "true" ]; then
@@ -70,5 +78,7 @@ for kubeconfig in \$(find \${KUBECONFIG} -type f); do
   export LOGS_DEST=/tmp/artifacts/new_cluster_\${name}
   make download_service_logs
 done
+
+
 
 EOF

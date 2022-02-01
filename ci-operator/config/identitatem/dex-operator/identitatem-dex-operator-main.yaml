@@ -3,25 +3,26 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  open-cluster-management_builder_go1.16-linux:
+  stolostron_builder_go1.17-linux:
     name: builder
-    namespace: open-cluster-management
-    tag: go1.16-linux
+    namespace: stolostron
+    tag: go1.17-linux
 binary_build_commands: make build
 build_root:
   image_stream_tag:
     name: builder
-    namespace: open-cluster-management
-    tag: go1.16-linux
+    namespace: stolostron
+    tag: go1.17-linux
 images:
 - dockerfile_path: Dockerfile
   from: base
   inputs:
-    open-cluster-management_builder_go1.16-linux:
+    stolostron_builder_go1.17-linux:
       as:
-      - registry.ci.openshift.org/open-cluster-management/builder:go1.16-linux
+      - registry.ci.openshift.org/stolostron/builder:go1.17-linux
   to: dex-operator
 promotion:
+  disabled: true
   name: stable
   namespace: identitatem
 resources:
@@ -39,6 +40,7 @@ tests:
 - as: sonar-pre-submit
   commands: |
     export SELF="make -f /opt/build-harness/Makefile.prow"
+    export SONAR_ORG=identitatem
     make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
     from: src
@@ -48,6 +50,7 @@ tests:
 - as: sonar-post-submit
   commands: |
     export SELF="make -f /opt/build-harness/Makefile.prow"
+    export SONAR_ORG=identitatem
     make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
     from: src
@@ -55,12 +58,6 @@ tests:
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
-- as: fast-forward
-  postsubmit: true
-  steps:
-    env:
-      DESTINATION_BRANCH: stable
-    workflow: ocm-ci-fastforward
 - as: pr-image-mirror
   steps:
     dependencies:

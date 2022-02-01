@@ -70,17 +70,16 @@ items:
           - --slack-token-path=/etc/slack/oauth_token
           - --slack-signing-secret-path=/etc/slack/signing_secret
           - --log-level=debug
-          - --jira-username=dptp-bot
-          - --jira-password-file=/etc/jira/password
+          - --jira-bearer-token-file=/etc/jira/token
           - --jira-endpoint=https://issues.redhat.com
           - --prow-config-path=/etc/prow-config/config.yaml
           - --supplemental-prow-config-dir=/etc/prow-config
           - --prow-job-config-path=/etc/job-config
           ports:
-            - name: main
-              containerPort: 8888
-            - name: metrics
-              containerPort: 9090
+          - name: main
+            containerPort: 8888
+          - name: metrics
+            containerPort: 9090
           volumeMounts:
           - name: slack
             mountPath: /etc/slack
@@ -91,50 +90,8 @@ items:
           - name: prow-config
             mountPath: /etc/prow-config
             readOnly: true
-          - name: job-config-misc
-            mountPath: /etc/job-config/misc
-            readOnly: true
-          - name: job-config-master-periodics
-            mountPath: /etc/job-config/master-periodics
-            readOnly: true
-          - name: job-config-master-postsubmits
-            mountPath: /etc/job-config/master-postsubmits
-            readOnly: true
-          - name: job-config-master-presubmits
-            mountPath: /etc/job-config/master-presubmits
-            readOnly: true
-          - name: job-config-3x
-            mountPath: /etc/job-config/3.x
-            readOnly: true
-          - name: job-config-41
-            mountPath: /etc/job-config/4.1
-            readOnly: true
-          - name: job-config-42
-            mountPath: /etc/job-config/4.2
-            readOnly: true
-          - name: job-config-43
-            mountPath: /etc/job-config/4.3
-            readOnly: true
-          - name: job-config-44
-            mountPath: /etc/job-config/4.4
-            readOnly: true
-          - name: job-config-45
-            mountPath: /etc/job-config/4.5
-            readOnly: true
-          - name: job-config-46
-            mountPath: /etc/job-config/4.6
-            readOnly: true
-          - name: job-config-47
-            mountPath: /etc/job-config/4.7
-            readOnly: true
-          - name: job-config-48
-            mountPath: /etc/job-config/4.8
-            readOnly: true
-          - name: job-config-49
-            mountPath: /etc/job-config/4.9
-            readOnly: true
-          - name: job-config-410
-            mountPath: /etc/job-config/4.10
+          - name: job-config
+            mountPath: /etc/job-config
             readOnly: true
           resources:
             requests:
@@ -146,52 +103,42 @@ items:
             secretName: slack-credentials-dptp-bot
         - name: jira
           secret:
-            secretName: jira-credentials-dptp-bot
+            secretName: jira-token-dptp-bot
         - name: prow-config
           configMap:
             name: config
-        - name: job-config-misc
-          configMap:
-            name: job-config-misc
-        - name: job-config-master-periodics
-          configMap:
-            name: job-config-master-periodics
-        - name: job-config-master-postsubmits
-          configMap:
-            name: job-config-master-postsubmits
-        - name: job-config-master-presubmits
-          configMap:
-            name: job-config-master-presubmits
-        - name: job-config-3x
-          configMap:
-            name: job-config-3.x
-        - name: job-config-41
-          configMap:
-            name: job-config-4.1
-        - name: job-config-42
-          configMap:
-            name: job-config-4.2
-        - name: job-config-43
-          configMap:
-            name: job-config-4.3
-        - name: job-config-44
-          configMap:
-            name: job-config-4.4
-        - name: job-config-45
-          configMap:
-            name: job-config-4.5
-        - name: job-config-46
-          configMap:
-            name: job-config-4.6
-        - name: job-config-47
-          configMap:
-            name: job-config-4.7
-        - name: job-config-48
-          configMap:
-            name: job-config-4.8
-        - name: job-config-49
-          configMap:
-            name: job-config-4.9
-        - name: job-config-410
-          configMap:
-            name: job-config-4.10
+        - name: job-config
+          projected:
+            sources:
+            - configMap:
+                name: job-config-misc
+            - configMap:
+                name: job-config-master-periodics
+            - configMap:
+                name: job-config-master-postsubmits
+            - configMap:
+                name: job-config-master-presubmits
+            - configMap:
+                name: job-config-3.x
+            - configMap:
+                name: job-config-4.1
+            - configMap:
+                name: job-config-4.2
+            - configMap:
+                name: job-config-4.3
+            - configMap:
+                name: job-config-4.4
+            - configMap:
+                name: job-config-4.5
+            - configMap:
+                name: job-config-4.6
+            - configMap:
+                name: job-config-4.7
+            - configMap:
+                name: job-config-4.8
+            - configMap:
+                name: job-config-4.9
+            - configMap:
+                name: job-config-4.10
+            - configMap:
+                name: job-config-4.11

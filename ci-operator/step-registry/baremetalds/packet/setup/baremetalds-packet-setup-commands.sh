@@ -6,6 +6,12 @@ set -o pipefail
 
 echo "************ baremetalds packet setup command ************"
 
+# Avoid requesting a bunch of servers at the same time so they
+# don't race each other for available resources in a facility
+SLEEPTIME=$(( RANDOM % 120 ))
+echo "Sleeping for $SLEEPTIME seconds"
+sleep $SLEEPTIME
+
 # Run Ansible playbook
 cd
 cat > packet-setup.yaml <<-EOF
@@ -24,7 +30,7 @@ cat > packet-setup.yaml <<-EOF
   - name: check cluster type
     fail:
       msg: "Unsupported CLUSTER_TYPE '{{ cluster_type }}'"
-    when: cluster_type != "packet"
+    when: "cluster_type is not regex('^packet.*$|^equinix.*$')"
 
   - name: create Packet host with error handling
     block:
@@ -34,7 +40,7 @@ cat > packet-setup.yaml <<-EOF
         project_id: "{{ packet_project_id }}"
         hostnames: "{{ packet_hostname }}"
         operating_system: centos_8
-        plan: m2.xlarge.x86
+        plan: ${PACKET_PLAN}
         facility: any
         wait_for_public_IPv: 4
         wait_timeout: 1200
@@ -53,7 +59,7 @@ cat > packet-setup.yaml <<-EOF
     - name: Send notification message via Slack in case of failure
       slack:
         token: "{{ 'T027F3GAJ/B011TAG710V/' + lookup('file', slackhook_path) }}"
-        msg: "Packet failure: *Setup*\nHostname: *{{ packet_hostname }}*\nError msg: {{ ansible_failed_result.msg }}\n"
+        msg: "<https://prow.ci.openshift.org/view/gs/origin-ci-test/logs/$JOB_NAME/$BUILD_ID|Packet failure>: *Setup*\nHostname: *{{ packet_hostname }}*\nError msg: {{ ansible_failed_result.msg }}\n"
         username: "OpenShift CI Packet"
         color: warning
         icon_emoji: ":failed:"
@@ -91,7 +97,7 @@ cat > packet-setup.yaml <<-EOF
         source "\${SHARED_DIR}/fix-uid.sh"
 
         # Initial check
-        if [ "\${CLUSTER_TYPE}" != "packet" ]; then
+        if [[ ! "\${CLUSTER_TYPE}" =~ ^packet.*$|^equinix.*$ ]]; then
             echo >&2 "Unsupported cluster type '\${CLUSTER_TYPE}'"
             exit 1
         fi
@@ -105,6 +111,22 @@ cat > packet-setup.yaml <<-EOF
             ssh "\${SSHOPTS[@]}" "root@\${IP}" hostname && break
             sleep 10
         done
+
+        ssh "\${SSHOPTS[@]}" "root@\${IP}" bash - << EOC
+            echo "Making sure we use vault mirror, as default CentOS repositories are already EOL..."
+
+            sed -i '/mirrorlist=.*/d' /etc/yum.repos.d/CentOS-AppStream.repo
+            grep -qF 'vault.centos.org' /etc/yum.repos.d/CentOS-AppStream.repo || \
+              echo 'baseurl=http://vault.centos.org/\\\$contentdir/\\\$releasever/AppStream/\\\$basearch/os/' >> /etc/yum.repos.d/CentOS-AppStream.repo
+
+            sed -i '/mirrorlist=.*/d' /etc/yum.repos.d/CentOS-Base.repo
+            grep -qF 'vault.centos.org' /etc/yum.repos.d/CentOS-Base.repo || \
+              echo 'baseurl=http://vault.centos.org/\\\$contentdir/\\\$releasever/BaseOS/\\\$basearch/os/' >> /etc/yum.repos.d/CentOS-Base.repo
+
+            sed -i '/mirrorlist=.*/d' /etc/yum.repos.d/CentOS-Extras.repo
+            grep -qF 'vault.centos.org' /etc/yum.repos.d/CentOS-Extras.repo || \
+              echo 'baseurl=http://vault.centos.org/\\\$contentdir/\\\$releasever/extras/\\\$basearch/os/' >> /etc/yum.repos.d/CentOS-Extras.repo
+        EOC
       dest: "${SHARED_DIR}/packet-conf.sh"
 EOF
 

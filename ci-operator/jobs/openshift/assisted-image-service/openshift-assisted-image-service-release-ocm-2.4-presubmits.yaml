@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-ocm-2\.4$
     - ^release-ocm-2\.4-
-    cluster: build01
+    cluster: build03
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -54,7 +54,7 @@ presubmits:
     branches:
     - ^release-ocm-2\.4$
     - ^release-ocm-2\.4-
-    cluster: build01
+    cluster: build03
     context: ci/prow/lint
     decorate: true
     decoration_config:
@@ -103,7 +103,58 @@ presubmits:
     branches:
     - ^release-ocm-2\.4$
     - ^release-ocm-2\.4-
-    cluster: build01
+    cluster: build03
+    context: ci/prow/stolostron-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: stolostron
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-assisted-image-service-release-ocm-2.4-stolostron-images
+    rerun_command: /test stolostron-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=stolostron
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )stolostron-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-ocm-2\.4$
+    - ^release-ocm-2\.4-
+    cluster: build03
     context: ci/prow/test
     decorate: true
     decoration_config:

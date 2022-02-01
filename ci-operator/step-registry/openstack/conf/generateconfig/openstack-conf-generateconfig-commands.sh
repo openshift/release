@@ -8,9 +8,11 @@ export OS_CLIENT_CONFIG_FILE=${SHARED_DIR}/clouds.yaml
 
 CLUSTER_NAME=$(<"${SHARED_DIR}/CLUSTER_NAME")
 OPENSTACK_EXTERNAL_NETWORK="${OPENSTACK_EXTERNAL_NETWORK:-$(<"${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK")}"
+OPENSTACK_CONTROLPLANE_FLAVOR="${OPENSTACK_CONTROLPLANE_FLAVOR:-$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR")}"
 OPENSTACK_COMPUTE_FLAVOR="${OPENSTACK_COMPUTE_FLAVOR:-$(<"${SHARED_DIR}/OPENSTACK_COMPUTE_FLAVOR")}"
 ZONES="${ZONES:-$(<"${SHARED_DIR}/ZONES")}"
 ZONES_COUNT="${ZONES_COUNT:-0}"
+WORKER_REPLICAS="${WORKER_REPLICAS:-3}"
 
 API_IP=$(<"${SHARED_DIR}"/API_IP)
 INGRESS_IP=$(<"${SHARED_DIR}"/INGRESS_IP)
@@ -71,7 +73,6 @@ cat >> "${CONFIG}" << EOF
 platform:
   openstack:
     cloud:             ${OS_CLOUD}
-    computeFlavor:     ${OPENSTACK_COMPUTE_FLAVOR}
 EOF
 if [[ "${CONFIG_TYPE}" == "minimal" ]]; then
 cat >> "${CONFIG}" << EOF
@@ -92,16 +93,34 @@ fi
 cat >> "${CONFIG}" << EOF
 compute:
 - name: worker
+  replicas: ${WORKER_REPLICAS}
   platform:
     openstack:
       type: ${OPENSTACK_COMPUTE_FLAVOR}
       zones: ${ZONES_STR}
-  replicas: 3
+EOF
+if [[ ${ADDITIONAL_WORKERS_NETWORKS} != "" ]]; then
+    cat >> "${CONFIG}" << EOF
+      additionalNetworkIDs:
+EOF
+    for network in $ADDITIONAL_WORKERS_NETWORKS; do
+        if ! openstack network show "${network}" > /dev/null 2>&1; then
+            echo "Network ${network} does not exist"
+            exit 1
+        fi
+        net_id=$(openstack network show -f value -c id "${network}")
+        cat >> "${CONFIG}" << EOF
+      - ${net_id}
+EOF
+    done
+fi
+
+cat >> "${CONFIG}" << EOF
 controlPlane:
   name: master
   platform:
     openstack:
-      type: ${OPENSTACK_COMPUTE_FLAVOR}
+      type: ${OPENSTACK_CONTROLPLANE_FLAVOR}
       zones: ${ZONES_STR}
   replicas: 3
 pullSecret: >
@@ -109,7 +128,7 @@ pullSecret: >
 sshKey: |
   ${SSH_PUB_KEY}
 EOF
-if [[ "${CONFIG_TYPE}" == "proxy" ]]; then
+if [[ "${CONFIG_TYPE}" == "proxy" && -f "${SHARED_DIR}"/PROXY_INTERFACE ]]; then
   PROXY_INTERFACE=$(<"${SHARED_DIR}"/PROXY_INTERFACE)
   SQUID_AUTH=$(<"${SHARED_DIR}"/SQUID_AUTH)
 cat >> "${CONFIG}" << EOF
@@ -128,10 +147,16 @@ fips: true
 EOF
 fi
 
-# Lets  check the syntax of yaml file by reading it.
+# Lets check the syntax of yaml file by reading it and print a redacted version
+# for debugging.
 python -c 'import yaml;
-import sys;
-data = yaml.safe_load(open(sys.argv[1]))' "${SHARED_DIR}/install-config.yaml"
+import sys
+data = yaml.safe_load(open(sys.argv[1]))
+data["pullSecret"] = "redacted"
+if "proxy" in data:
+    data["proxy"] = "redacted"
+print(yaml.dump(data))
+' "${SHARED_DIR}/install-config.yaml" > ${ARTIFACT_DIR}/install-config.yaml
 
 # This block will remove the ports created in openstack-provision-machinesubnet-commands.sh
 # since the installer will create them again, based on install-config.yaml.

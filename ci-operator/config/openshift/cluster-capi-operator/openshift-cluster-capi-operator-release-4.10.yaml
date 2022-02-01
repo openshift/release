@@ -3,14 +3,10 @@ base_images:
     name: "4.10"
     namespace: ocp
     tag: base
-  ocp_builder_rhel-8-golang-1.16-openshift-4.10:
+  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.16-openshift-4.10
-  openshift_release_golang-1.16:
-    name: release
-    namespace: openshift
-    tag: golang-1.16
+    tag: rhel-8-golang-1.17-openshift-4.10
 binary_build_commands: go build -o bin/cluster-capi-operator cmd/cluster-capi-operator
 build_root:
   image_stream_tag:
@@ -21,21 +17,11 @@ images:
 - dockerfile_path: Dockerfile.rhel
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.10:
+    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.10
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
   to: cluster-capi-operator
-- from: src
-  inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.10:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.10
-    openshift_release_golang-1.16:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.16
-  to: cluster-capi-operator-src
 promotion:
-  disabled: true
   name: "4.10"
   namespace: ocp
 releases:
@@ -75,6 +61,15 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
+- as: e2e-aws-serial
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-serial
+- as: e2e-aws-capi-techpreview
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-capi
 zz_generated_metadata:
   branch: release-4.10
   org: openshift

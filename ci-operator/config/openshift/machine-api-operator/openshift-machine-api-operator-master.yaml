@@ -1,16 +1,16 @@
 base_images:
   base:
-    name: "4.10"
+    name: "4.11"
     namespace: ocp
     tag: base
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.16-openshift-4.9
+    tag: rhel-8-golang-1.17-openshift-4.10
 binary_build_commands: NO_DOCKER=1 make build
 build_root:
   from_repository: true
@@ -18,22 +18,22 @@ images:
 - dockerfile_path: Dockerfile.rhel
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
   to: machine-api-operator
 promotion:
-  name: "4.10"
+  name: "4.11"
   namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.10"
+      name: "4.11"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.10"
+      name: "4.11"
       namespace: ocp
 resources:
   '*':
@@ -43,10 +43,6 @@ resources:
 tests:
 - as: unit
   commands: NO_DOCKER=1 make test
-  container:
-    from: src
-- as: generate
-  commands: IS_CONTAINER=TRUE NO_DOCKER=1 make generate
   container:
     from: src
 - as: goimports
@@ -59,6 +55,10 @@ tests:
     from: src
 - as: golint
   commands: IS_CONTAINER=TRUE make lint
+  container:
+    from: src
+- as: verify-crds-sync
+  commands: IS_CONTAINER=TRUE make verify-crds-sync
   container:
     from: src
 - as: e2e-aws
@@ -139,18 +139,20 @@ tests:
           cpu: 100m
     workflow: ipi-gcp
 - as: e2e-metal-ipi
+  optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: packet
+    cluster_profile: equinix-ocp-metal
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4
         NETWORK_TYPE=OpenShiftSDN
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-upgrade
+  optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: packet
+    cluster_profile: equinix-ocp-metal
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4
@@ -163,25 +165,27 @@ tests:
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: packet
+    cluster_profile: equinix-ocp-metal
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v6
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-ovn-dualstack
+  optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: packet
+    cluster_profile: equinix-ocp-metal
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4v6
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-virtualmedia
+  optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: packet
+    cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-virtualmedia
 - as: e2e-vsphere-serial
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$

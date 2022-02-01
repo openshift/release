@@ -1,16 +1,24 @@
 base_images:
   base:
-    name: 4.10-priv
+    name: 4.11-priv
     namespace: ocp-private
     tag: base
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
   metallb:
-    name: 4.10-priv
+    name: 4.11-priv
     namespace: ocp-private
     tag: metallb
-  ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+  metallb-frr:
+    name: 4.11-priv
+    namespace: ocp-private
+    tag: metallb-frr
+  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.16-openshift-4.9
+    tag: rhel-8-golang-1.17-openshift-4.10
 build_root:
   image_stream_tag:
     name: release
@@ -21,30 +29,32 @@ images:
 - dockerfile_path: Dockerfile.openshift
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
   to: metallb-operator
 operator:
   bundles:
   - dockerfile_path: bundleci.Dockerfile
   substitutions:
-  - pullspec: quay.io/openshift/origin-metallb:4.9
+  - pullspec: quay.io/openshift/origin-metallb:4.10
     with: pipeline:metallb
-  - pullspec: quay.io/openshift/origin-metallb-operator:4.9
+  - pullspec: quay.io/openshift/origin-metallb-operator:4.10
     with: pipeline:metallb-operator
+  - pullspec: quay.io/openshift/origin-metallb-frr:4.10
+    with: pipeline:metallb-frr
 promotion:
-  name: 4.10-priv
+  name: 4.11-priv
   namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.10-priv
+      name: 4.11-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.10-priv
+      name: 4.11-priv
       namespace: ocp-private
 resources:
   '*':
@@ -72,6 +82,40 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: optional-operators-ci-aws
+- as: metallb-e2e-metal-ipi
+  steps:
+    cluster_profile: packet
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OpenShiftSDN
+        ENABLE_METALLB=true
+        METALLB_REPO=https://github.com/openshift/metallb.git
+        METALLB_OPERATOR_REPO=https://github.com/openshift/metallb-operator.git
+        METALLB_OPERATOR_COMMIT=main
+        METALLB_OPERATOR_DOCKER_FILE=Dockerfile.openshift
+      E2E_TESTS_CONFIG: |
+        IP_STACK=v4
+        METALLB_REPO=https://github.com/openshift/metallb.git
+        METALLB_BRANCH=main
+    workflow: baremetalds-metallb-e2e
+- as: metallb-e2e-metal-ipi-ovn
+  steps:
+    cluster_profile: packet
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+        ENABLE_METALLB=true
+        METALLB_REPO=https://github.com/openshift/metallb.git
+        METALLB_OPERATOR_REPO=https://github.com/openshift/metallb-operator.git
+        METALLB_OPERATOR_COMMIT=main
+        METALLB_OPERATOR_DOCKER_FILE=Dockerfile.openshift
+      E2E_TESTS_CONFIG: |
+        IP_STACK=v4
+        METALLB_REPO=https://github.com/openshift/metallb.git
+        METALLB_BRANCH=main
+    workflow: baremetalds-metallb-e2e
 zz_generated_metadata:
   branch: main
   org: openshift-priv

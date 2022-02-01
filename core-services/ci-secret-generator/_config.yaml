@@ -8,6 +8,7 @@
     - build01
     - build02
     - build03
+    - build04
     - vsphere
     service_account:
     - config-updater
@@ -20,6 +21,7 @@
     - ci-operator
     - promoted-image-governor
     - github-ldap-user-group-creator
+    - cluster-display
 - fields:
   - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
       sa create-kubeconfig --namespace ci $(service_account) | sed "s/$(service_account)/$(cluster)/g"
@@ -37,6 +39,7 @@
     - prow-controller-manager
     - pj-rehearse
     - ci-operator
+    - cluster-display
 - fields:
   - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
       sa create-kubeconfig --namespace ci $(service_account) | sed "s/$(service_account)/$(cluster)/g"
@@ -55,6 +58,8 @@
     - release-controller-ocp-s390x-priv
     - release-controller-ocp-arm64
     - release-controller-ocp-arm64-priv
+    - release-controller-ocp-multi
+    - release-controller-ocp-multi-priv
 - fields:
   - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
       get secrets --sort-by=.metadata.creationTimestamp --namespace ci -o json | jq
@@ -71,6 +76,7 @@
     - build01
     - build02
     - build03
+    - build04
     - vsphere
 - fields:
   - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
@@ -95,6 +101,7 @@
     - build01
     - build02
     - build03
+    - build04
     - vsphere
     service_account:
     - ci-chat-bot
@@ -109,6 +116,7 @@
     - build01
     - build02
     - build03
+    - build04
     service_account:
     - pod-scaler
 - fields:
@@ -132,6 +140,7 @@
     service_account:
     - cluster-display
     - config-updater
+    - github-ldap-user-group-creator
     - hive
 - fields:
   - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
@@ -150,3 +159,20 @@
     - prow-controller-manager
     - ci-operator
     - github-ldap-user-group-creator
+    - cluster-display
+- fields:
+  - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.hive.config
+      sa get-token --namespace openshift-monitoring ci
+    name: hive-openshift-monitoring-ci-token
+  item_name: hive-openshift-monitoring-credentials
+- fields:
+  - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
+      sa create-kubeconfig --namespace ci $(service_account) | sed "s/$(service_account)/$(cluster)/g"
+    name: sa.$(service_account).$(cluster).config
+  item_name: build_farm
+  params:
+    cluster:
+    - build01
+    - build02
+    service_account:
+    - sprint-automation

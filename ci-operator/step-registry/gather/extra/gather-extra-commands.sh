@@ -16,8 +16,6 @@ function queue() {
   fi
 }
 
-export PATH=$PATH:/tmp/shared
-
 if test ! -f "${KUBECONFIG}"
 then
 	echo "No kubeconfig, so no point in gathering extra artifacts."
@@ -114,11 +112,79 @@ while IFS= read -r i; do
   FILTER=gzip queue ${ARTIFACT_DIR}/nodes/$i/audit.gz oc --insecure-skip-tls-verify adm node-logs $i --unify=false --path=audit/audit.log
 done < /tmp/nodes
 
-# Snapshot iptables-save on each node for debugging possible kube-proxy issues
-oc --insecure-skip-tls-verify get --request-timeout=20s -n openshift-sdn -l app=sdn pods --template '{{ range .items }}{{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/sdn-pods
-while IFS= read -r i; do
-  queue ${ARTIFACT_DIR}/network/iptables-save-$i oc --insecure-skip-tls-verify rsh --timeout=20 -n openshift-sdn -c sdn $i iptables-save -c
-done < /tmp/sdn-pods
+echo "INFO: gathering the audit logs for each master"
+paths=(openshift-apiserver kube-apiserver oauth-apiserver etcd)
+for path in "${paths[@]}" ; do
+  output_dir="${ARTIFACT_DIR}/audit_logs/$path"
+  mkdir -p "$output_dir"
+
+  # Skip downloading of .terminating and .lock files.
+  oc adm node-logs --role=master --path="$path" | \
+    grep -v ".terminating" | \
+    grep -v ".lock" | \
+  tee "${output_dir}.audit_logs_listing"
+
+  # The ${output_dir}.audit_logs_listing file contains lines with the node and filename
+  # separated by a space.
+  while IFS= read -r item; do
+    node=$(echo $item |cut -d ' ' -f 1)
+    fname=$(echo $item |cut -d ' ' -f 2)
+    echo "INFO: Queueing download/gzip of ${path}/${fname} from ${node}";
+    echo "INFO:   gziping to ${output_dir}/${node}-${fname}.gz";
+    FILTER=gzip queue ${output_dir}/${node}-${fname}.gz oc --insecure-skip-tls-verify adm node-logs ${node} --path=${path}/${fname}
+  done < ${output_dir}.audit_logs_listing
+done
+
+
+# If the tcpdump-service step was used, grab the pcap files.
+echo "INFO: gathering quay tcpdump packet headers if present"
+output_dir="${ARTIFACT_DIR}/tcpdump/"
+mkdir -p "$output_dir"
+
+# Skip downloading of .terminating and .lock files.
+oc adm node-logs --role=worker --path="/tcpdump" | \
+grep -v ".terminating" | \
+grep -v ".lock" | \
+tee "${output_dir}.tcpdump_listing"
+
+cat "${output_dir}.tcpdump_listing"
+
+# The ${output_dir}.tcpdump_listing file contains lines with the node and filename
+# separated by a space.
+while IFS= read -r item; do
+node=$(echo $item |cut -d ' ' -f 1)
+fname=$(echo $item |cut -d ' ' -f 2)
+echo "INFO: Queueing download/gzip of /tcpdump/${fname} from ${node}";
+echo "INFO:   gziping to ${output_dir}/${node}-${fname}.gz";
+FILTER=gzip queue ${output_dir}/${node}-${fname}.gz oc --insecure-skip-tls-verify adm node-logs ${node} --path=/tcpdump/${fname}
+done < ${output_dir}.tcpdump_listing
+
+function gather_network() {
+  local namespace=$1
+  local selector=$2
+  local container=$3
+
+  if ! oc --insecure-skip-tls-verify --request-timeout=20s get ns ${namespace}; then
+    echo "Namespace ${namespace} does not exist, skipping ${namespace} network pods"
+    return
+  fi
+
+  local podlist="/tmp/${namespace}-pods"
+
+  # Snapshot iptables-save on each node for debugging possible kube-proxy issues
+  oc --insecure-skip-tls-verify --request-timeout=20s get -n "${namespace}" -l "${selector}" pods --template '{{ range .items }}{{ .metadata.name }}{{ "\n" }}{{ end }}' > ${podlist}
+  while IFS= read -r i; do
+    queue ${ARTIFACT_DIR}/network/iptables-save-$i oc --insecure-skip-tls-verify --request-timeout=20s rsh -n ${namespace} -c ${container} $i iptables-save -c
+  done < ${podlist}
+  # Snapshot all used ports on each node.
+  while IFS= read -r i; do
+    queue ${ARTIFACT_DIR}/network/ss-$i oc --insecure-skip-tls-verify --request-timeout=20s rsh -n ${namespace} -c ${container} $i ss -apn
+  done < ${podlist}
+}
+
+# Gather network details both from SDN and OVN. One of them should succeed.
+gather_network openshift-sdn app=sdn sdn
+gather_network openshift-ovn-kubernetes app=ovnkube-node ovnkube-node
 
 while IFS= read -r i; do
   file="$( echo "$i" | cut -d ' ' -f 3 | tr -s ' ' '_' )"
@@ -132,26 +198,38 @@ while IFS= read -r i; do
   FILTER=gzip queue ${ARTIFACT_DIR}/pods/${file}_previous.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s -p $i
 done < /tmp/containers
 
-echo "Snapshotting prometheus (may take 15s) ..."
-# Use logs and data the "last" monitoring pod in order to catch issues that occur when the first prometheus pod upgrades
-monitoring_pod="$( oc --insecure-skip-tls-verify get pods -n openshift-monitoring -o name | grep prometheus-k8s- | tail -1 )"
-queue ${ARTIFACT_DIR}/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${monitoring_pod}" -- tar cvzf - -C /prometheus .
+# Snapshot the prometheus data from the replica that has the oldest
+# PVC. If persistent storage isn't enabled, it uses the last
+# prometheus instances by default to catch issues that occur when the
+# first prometheus pod upgrades.
+if [[ -n "$( oc --insecure-skip-tls-verify --request-timeout=20s get pvc -n openshift-monitoring -l app.kubernetes.io/name=prometheus --ignore-not-found )" ]]; then
+  pvc="$( oc --insecure-skip-tls-verify --request-timeout=20s get pvc -n openshift-monitoring -l app.kubernetes.io/name=prometheus --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[0].metadata.name}' )"
+  prometheus="${pvc##prometheus-data-}"
+else
+  prometheus="$( oc --insecure-skip-tls-verify --request-timeout=20s get pods -n openshift-monitoring -l app.kubernetes.io/name=prometheus --sort-by=.metadata.creationTimestamp --ignore-not-found -o jsonpath='{.items[0].metadata.name}')"
+fi
+if [[ -n "${prometheus}" ]]; then
+	echo "Snapshotting prometheus from ${prometheus} (may take 15s) ..."
+	queue ${ARTIFACT_DIR}/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prometheus}" -- tar cvzf - -C /prometheus .
 
-cat >> ${SHARED_DIR}/custom-links.txt << EOF
-<script>
-let a = document.createElement('a');
-a.href="https://promecieus.dptools.openshift.org/?search="+document.referrer;
-a.innerHTML="PromeCIeus";
-a.target="_blank";
-document.getElementById("wrapper").append(a);
-</script>
-EOF
+	cat >> ${SHARED_DIR}/custom-links.txt <<-EOF
+	<script>
+	let a = document.createElement('a');
+	a.href="https://promecieus.dptools.openshift.org/?search="+document.referrer;
+	a.innerHTML="PromeCIeus";
+	a.target="_blank";
+	document.getElementById("wrapper").append(a);
+	</script>
+	EOF
 
-FILTER=gzip queue ${ARTIFACT_DIR}/metrics/prometheus-target-metadata.json.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${monitoring_pod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/targets/metadata --data-urlencode 'match_target={instance!=\"\"}'"
-FILTER=gzip queue ${ARTIFACT_DIR}/metrics/prometheus-config.json.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${monitoring_pod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/config"
-queue ${ARTIFACT_DIR}/metrics/prometheus-tsdb-status.json oc --insecure-skip-tls-verify exec -n openshift-monitoring "${monitoring_pod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/tsdb"
-queue ${ARTIFACT_DIR}/metrics/prometheus-runtimeinfo.json oc --insecure-skip-tls-verify exec -n openshift-monitoring "${monitoring_pod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/runtimeinfo"
-queue ${ARTIFACT_DIR}/metrics/prometheus-targets.json oc --insecure-skip-tls-verify exec -n openshift-monitoring "${monitoring_pod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/targets"
+	FILTER=gzip queue ${ARTIFACT_DIR}/metrics/prometheus-target-metadata.json.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prometheus}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/targets/metadata --data-urlencode 'match_target={instance!=\"\"}'"
+	FILTER=gzip queue ${ARTIFACT_DIR}/metrics/prometheus-config.json.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prometheus}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/config"
+	queue ${ARTIFACT_DIR}/metrics/prometheus-tsdb-status.json oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prometheus}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/tsdb"
+	queue ${ARTIFACT_DIR}/metrics/prometheus-runtimeinfo.json oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prometheus}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/runtimeinfo"
+	queue ${ARTIFACT_DIR}/metrics/prometheus-targets.json oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prometheus}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/targets"
+else
+	echo "Unable to find a Prometheus pod to snapshot."
+fi
 
 # Calculate metrics suitable for apples-to-apples comparison across CI runs.
 # Load whatever timestamps we can, generate the metrics script, and then send it to the
@@ -253,6 +331,22 @@ ${t_all}     cluster:usage:cpu:control_plane:total:avg   avg(rate(container_cpu_
 ${t_install} cluster:usage:cpu:control_plane:install:avg avg(rate(container_cpu_usage_seconds_total{id="/"}[${d_install}]) * on(node) group_left() group by (node) (kube_node_role{role="master"}))
 ${t_test}    cluster:usage:cpu:control_plane:test:avg    avg(rate(container_cpu_usage_seconds_total{id="/"}[${d_test}]) * on(node) group_left() group by (node) (kube_node_role{role="master"}))
 
+${t_all}     cluster:usage:cpu:kube_apiserver:total:avg   avg(sum(rate(container_cpu_usage_seconds_total{pod=~"kube-apiserver-ip-.*", namespace="openshift-kube-apiserver"}[${d_all}])) by (pod))
+${t_install} cluster:usage:cpu:kube_apiserver:install:avg avg(sum(rate(container_cpu_usage_seconds_total{pod=~"kube-apiserver-ip-.*", namespace="openshift-kube-apiserver"}[${d_install}])) by (pod))
+${t_test}    cluster:usage:cpu:kube_apiserver:test:avg    avg(sum(rate(container_cpu_usage_seconds_total{pod=~"kube-apiserver-ip-.*", namespace="openshift-kube-apiserver"}[${d_test}])) by (pod))
+
+${t_all}     cluster:usage:cpu:etcd:total:avg   avg(sum(rate(container_cpu_usage_seconds_total{pod=~"etcd-ip-.*", namespace="openshift-etcd"}[${d_all}])) by (pod))
+${t_install} cluster:usage:cpu:etcd:install:avg avg(sum(rate(container_cpu_usage_seconds_total{pod=~"etcd-ip-.*", namespace="openshift-etcd"}[${d_install}])) by (pod))
+${t_test}    cluster:usage:cpu:etcd:test:avg    avg(sum(rate(container_cpu_usage_seconds_total{pod=~"etcd-ip-.*", namespace="openshift-etcd"}[${d_test}])) by (pod))
+
+${t_all}     cluster:usage:cpu:openshift_apiserver:total:avg   avg(sum(rate(container_cpu_usage_seconds_total{pod=~"apiserver-.*", namespace="openshift-apiserver"}[${d_all}])) by (pod))
+${t_install} cluster:usage:cpu:openshift_apiserver:install:avg avg(sum(rate(container_cpu_usage_seconds_total{pod=~"apiserver-.*", namespace="openshift-apiserver"}[${d_install}])) by (pod))
+${t_test}    cluster:usage:cpu:openshift_apiserver:test:avg    avg(sum(rate(container_cpu_usage_seconds_total{pod=~"apiserver-.*", namespace="openshift-apiserver"}[${d_test}])) by (pod))
+
+${t_all}     cluster:usage:cpu:oauth_apiserver:total:avg   avg(sum(rate(container_cpu_usage_seconds_total{pod=~"apiserver-.*", namespace="openshift-oauth-apiserver"}[${d_all}])) by (pod))
+${t_install} cluster:usage:cpu:oauth_apiserver:install:avg avg(sum(rate(container_cpu_usage_seconds_total{pod=~"apiserver-.*", namespace="openshift-oauth-apiserver"}[${d_install}])) by (pod))
+${t_test}    cluster:usage:cpu:oauth_apiserver:test:avg    avg(sum(rate(container_cpu_usage_seconds_total{pod=~"apiserver-.*", namespace="openshift-oauth-apiserver"}[${d_test}])) by (pod))
+
 ${t_all}     cluster:usage:mem:rss:control_plane:quantile label_replace(max(quantile_over_time(0.99, ((container_memory_rss{id="/"} * on(node) group_left() group by (node) (kube_node_role{role="master"})))[${d_all}:1s] )), "quantile", "0.99", "", "")
 ${t_all}     cluster:usage:mem:rss:control_plane:quantile label_replace(max(quantile_over_time(0.9, ((container_memory_rss{id="/"} * on(node) group_left() group by (node) (kube_node_role{role="master"})))[${d_all}:1s] )), "quantile", "0.9", "", "")
 ${t_all}     cluster:usage:mem:rss:control_plane:quantile label_replace(max(quantile_over_time(0.5, ((container_memory_rss{id="/"} * on(node) group_left() group by (node) (kube_node_role{role="master"})))[${d_all}:1s] )), "quantile", "0.5", "", "")
@@ -260,6 +354,22 @@ ${t_all}     cluster:usage:mem:rss:control_plane:quantile label_replace(max(quan
 ${t_all}     cluster:usage:mem:working_set:control_plane:quantile label_replace(max(quantile_over_time(0.99, ((container_memory_working_set_bytes{id="/"} * on(node) group_left() group by (node) (kube_node_role{role="master"})))[${d_all}:1s] )), "quantile", "0.99", "", "")
 ${t_all}     cluster:usage:mem:working_set:control_plane:quantile label_replace(max(quantile_over_time(0.9, ((container_memory_working_set_bytes{id="/"} * on(node) group_left() group by (node) (kube_node_role{role="master"})))[${d_all}:1s] )), "quantile", "0.9", "", "")
 ${t_all}     cluster:usage:mem:working_set:control_plane:quantile label_replace(max(quantile_over_time(0.5, ((container_memory_working_set_bytes{id="/"} * on(node) group_left() group by (node) (kube_node_role{role="master"})))[${d_all}:1s] )), "quantile", "0.5", "", "")
+
+${t_all}     cluster:usage:memory:kube_apiserver:total:avg   avg(sum(rate(container_memory_working_set_bytes{pod=~"kube-apiserver-ip.*", namespace="openshift-kube-apiserver"}[${d_all}])) by (pod))
+${t_install} cluster:usage:memory:kube_apiserver:install:avg avg(sum(rate(container_memory_working_set_bytes{pod=~"kube-apiserver-ip.*", namespace="openshift-kube-apiserver"}[${d_install}])) by (pod))
+${t_test}    cluster:usage:memory:kube_apiserver:test:avg    avg(sum(rate(container_memory_working_set_bytes{pod=~"kube-apiserver-ip.*", namespace="openshift-kube-apiserver"}[${d_test}])) by (pod))
+
+${t_all}     cluster:usage:memory:etcd:total:avg   avg(sum(rate(container_memory_working_set_bytes{pod=~"etcd-ip-.*", namespace="openshift-etcd"}[${d_all}])) by (pod))
+${t_install} cluster:usage:memory:etcd:install:avg avg(sum(rate(container_memory_working_set_bytes{pod=~"etcd-ip.*", namespace="openshift-etcd"}[${d_install}])) by (pod))
+${t_test}    cluster:usage:memory:etcd:test:avg    avg(sum(rate(container_memory_working_set_bytes{pod=~"etcd-ip.*", namespace"openshift-etcd"}[${d_test}])) by (pod))
+
+${t_all}     cluster:usage:memory:openshift_apiserver:total:avg   avg(sum(rate(container_memory_working_set_bytes{pod=~"apiserver-.*", namespace="openshift-apiserver"}[${d_all}])) by (pod))
+${t_install} cluster:usage:memory:openshift_apiserver:install:avg avg(sum(rate(container_memory_working_set_bytes{pod=~"apiserver-.*", namespace="openshift-apiserver"}[${d_install}])) by (pod))
+${t_test}    cluster:usage:memory:openshift_apiserver:test:avg    avg(sum(rate(container_memory_working_set_bytes{pod=~"apiserver-.*", namespace="openshift-apiserver"}[${d_test}])) by (pod))
+
+${t_all}     cluster:usage:memory:oauth_apiserver:total:avg   avg(sum(rate(container_memory_working_set_bytes{pod=~"apiserver-.*", namespace="openshift-oauth-apiserver"}[${d_all}])) by (pod))
+${t_install} cluster:usage:memory:oauth_apiserver:install:avg avg(sum(rate(container_memory_working_set_bytes{pod=~"apiserver-.*", namespace="openshift-oauth-apiserver"}[${d_install}])) by (pod))
+${t_test}    cluster:usage:memory:oauth_apiserver:test:avg    avg(sum(rate(container_memory_working_set_bytes{pod=~"apiserver-.*", namespace="openshift-oauth-apiserver"}[${d_test}])) by (pod))
 
 ${t_all}     cluster:alerts:total:firing:distinct:severity count by (severity) (count by (alertname,severity) (count_over_time(ALERTS{alertstate="firing",alertname!~"AlertmanagerReceiversNotConfigured|Watchdog"}[${d_all}])))
 
@@ -282,11 +392,39 @@ ${t_all}     cluster:api:write:total:requests sum(increase(apiserver_request_tot
 ${t_install} cluster:api:write:install:requests sum(increase(apiserver_request_total{verb!~"GET|LIST|WATCH"}[${d_install}]))
 ${t_test}    cluster:api:write:test:requests sum(increase(apiserver_request_total{verb!~"GET|LIST|WATCH"}[${d_test}]))
 
+${t_all}     cluster:api:read:requests:latency:total:quantile histogram_quantile(0.99, sum(rate(apiserver_request_duration_seconds_bucket{job="apiserver",scope!="",verb=~"GET|LIST"}[${d_all}])) by (le,scope))
+${t_install} cluster:api:read:requests:latency:install:quantile histogram_quantile(0.99, sum(rate(apiserver_request_duration_seconds_bucket{job="apiserver",scope!="",verb=~"GET|LIST"}[${d_install}])) by (le,scope))
+${t_test}    cluster:api:read:requests:latency:test:quantile histogram_quantile(0.99, sum(rate(apiserver_request_duration_seconds_bucket{job="apiserver",scope!="",verb=~"GET|LIST"}[${d_test}])) by (le,scope))
+${t_all}     cluster:api:write:requests:latency:total:quantile histogram_quantile(0.99, sum(rate(apiserver_request_duration_seconds_bucket{job="apiserver",scope!="",verb=~"POST|PUT|PATCH|DELETE"}[${d_all}])) by (le,scope))
+${t_install} cluster:api:write:requests:latency:install:quantile histogram_quantile(0.99, sum(rate(apiserver_request_duration_seconds_bucket{job="apiserver",scope!="",verb=~"POST|PUT|PATCH|DELETE"}[${d_install}])) by (le,scope))
+${t_test}    cluster:api:write:requests:latency:test:quantile histogram_quantile(0.99, sum(rate(apiserver_request_duration_seconds_bucket{job="apiserver",scope!="",verb=~"POST|PUT|PATCH|DELETE"}[${d_test}])) by (le,scope))
+
+${t_all}     cluster:api:read:requests:latency:total:avg sum(rate(apiserver_request_duration_seconds_sum{job="apiserver",scope!="",verb=~"GET|LIST"}[${d_all}])) by (le,scope) / sum(rate(apiserver_request_duration_seconds_count{job="apiserver",scope!="",verb=~"GET|LIST"}[${d_all}])) by (le,scope)
+${t_install} cluster:api:read:requests:latency:install:avg sum(rate(apiserver_request_duration_seconds_sum{job="apiserver",scope!="",verb=~"GET|LIST"}[${d_install}])) by (le,scope) / sum(rate(apiserver_request_duration_seconds_count{job="apiserver",scope!="",verb=~"GET|LIST"}[${d_install}])) by (le,scope)
+${t_test}    cluster:api:read:requests:latency:test:avg sum(rate(apiserver_request_duration_seconds_sum{job="apiserver",scope!="",verb=~"GET|LIST"}[${d_test}])) by (le,scope) / sum(rate(apiserver_request_duration_seconds_count{job="apiserver",scope!="",verb=~"GET|LIST"}[${d_test}])) by (le,scope)
+${t_all}     cluster:api:write:requests:latency:total:avg sum(rate(apiserver_request_duration_seconds_sum{job="apiserver",scope!="",verb=~"POST|PUT|PATCH|DELETE"}[${d_all}])) by (le,scope) / sum(rate(apiserver_request_duration_seconds_count{job="apiserver",scope!="",verb=~"POST|PUT|PATCH|DELETE"}[${d_all}])) by (le,scope)
+${t_install} cluster:api:write:requests:latency:install:avg sum(rate(apiserver_request_duration_seconds_sum{job="apiserver",scope!="",verb=~"POST|PUT|PATCH|DELETE"}[${d_install}])) by (le,scope) / sum(rate(apiserver_request_duration_seconds_count{job="apiserver",scope!="",verb=~"POST|PUT|PATCH|DELETE"}[${d_install}])) by (le,scope)
+${t_test}    cluster:api:write:requests:latency:test:avg sum(rate(apiserver_request_duration_seconds_sum{job="apiserver",scope!="",verb=~"POST|PUT|PATCH|DELETE"}[${d_test}])) by (le,scope) / sum(rate(apiserver_request_duration_seconds_count{job="apiserver",scope!="",verb=~"POST|PUT|PATCH|DELETE"}[${d_test}])) by (le,scope)
+
 ${t_all}     cluster:api:errors:total:requests sum(increase(apiserver_request_total{code=~"5\\\\d\\\\d|0"}[${d_all}]))
 ${t_install} cluster:api:errors:install:requests sum(increase(apiserver_request_total{code=~"5\\\\d\\\\d|0"}[${d_install}]))
 
 ${t_install} cluster:resource:install:count sort_desc(max by(resource) (etcd_object_counts)) > 1
 ${t_test}    cluster:resource:test:delta sort_desc(max by(resource) (delta(etcd_object_counts[${d_test}]))) != 0
+
+${t_all}     cluster:etcd:read:requests:latency:total:quantile histogram_quantile(0.99, sum(rate(etcd_request_duration_seconds_bucket{operation=~"get|list|listWithCount"}[${d_all}])) by (le,scope))
+${t_install} cluster:etcd:read:requests:latency:install:quantile histogram_quantile(0.99, sum(rate(etcd_request_duration_seconds_bucket{operation=~"get|list|listWithCount"}[${d_install}])) by (le,scope))
+${t_test}    cluster:etcd:read:requests:latency:test:quantile histogram_quantile(0.99, sum(rate(etcd_request_duration_seconds_bucket{operation=~"get|list|listWithCount"}[${d_test}])) by (le,scope))
+${t_all}     cluster:etcd:write:requests:latency:total:quantile histogram_quantile(0.99, sum(rate(etcd_request_duration_seconds_bucket{operation=~"create|update|delete"}[${d_all}])) by (le,scope))
+${t_install} cluster:etcd:write:requests:latency:install:quantile histogram_quantile(0.99, sum(rate(etcd_request_duration_seconds_bucket{operation=~"create|update|delete"}[${d_install}])) by (le,scope))
+${t_test}    cluster:etcd:write:requests:latency:test:quantile histogram_quantile(0.99, sum(rate(etcd_request_duration_seconds_bucket{operation=~"create|update|delete"}[${d_test}])) by (le,scope))
+
+${t_all}     cluster:etcd:read:requests:latency:total:avg sum(rate(etcd_request_duration_seconds_sum{operation=~"get|list|listWithCount"}[${d_all}])) by (le,scope) / sum(rate(etcd_request_duration_seconds_count{operation=~"get|list|listWithCount"}[${d_all}])) by (le,scope)
+${t_install} cluster:etcd:read:requests:latency:install:avg sum(rate(etcd_request_duration_seconds_sum{operation=~"get|list|listWithCount"}[${d_install}])) by (le,scope) / sum(rate(etcd_request_duration_seconds_count{operation=~"get|list|listWithCount"}[${d_install}])) by (le,scope)
+${t_test}    cluster:etcd:read:requests:latency:test:avg sum(rate(etcd_request_duration_seconds_sum{operation=~"get|list|listWithCount"}[${d_test}])) by (le,scope) / sum(rate(etcd_request_duration_seconds_count{operation=~"get|list|listWithCount"}[${d_test}])) by (le,scope)
+${t_all}     cluster:etcd:write:requests:latency:total:avg sum(rate(etcd_request_duration_seconds_sum{operation=~"create|update|delete"}[${d_all}])) by (le,scope) / sum(rate(etcd_request_duration_seconds_count{operation=~"create|update|delete"}[${d_all}])) by (le,scope)
+${t_install} cluster:etcd:write:requests:latency:install:avg sum(rate(etcd_request_duration_seconds_sum{operation=~"create|update|delete"}[${d_install}])) by (le,scope) / sum(rate(etcd_request_duration_seconds_count{operation=~"create|update|delete"}[${d_install}])) by (le,scope)
+${t_test}    cluster:etcd:write:requests:latency:test:avg sum(rate(etcd_request_duration_seconds_sum{operation=~"create|update|delete"}[${d_test}])) by (le,scope) / sum(rate(etcd_request_duration_seconds_count{operation=~"create|update|delete"}[${d_test}])) by (le,scope)
 
 ${t_all}     cluster:node:total:boots sum(increase(node_boots_total[${d_all}]))
 ${t_test}    cluster:node:test:boots sum(increase(node_boots_total[${d_test}]))
@@ -307,7 +445,7 @@ ${t_all}     cluster:version:info:total   topk(1, max by (version) (max_over_tim
 ${t_install} cluster:version:info:install topk(1, max by (version) (max_over_time(cluster_version{type="completed"}[${d_install}])))*0+1
 
 ${t_all}     cluster:version:current:seconds count_over_time(max by (version) ((cluster_version{type="current"}))[${d_all}:1s])
-${t_test}    cluster:version:updates:seconds count_over_time(max by (version) ((cluster_version{type="updating",from_version!=""}))[${d_test}:1s])
+${t_test}    cluster:version:updates:seconds max by (from_version,version) (max_over_time(((time() - cluster_version{type="updating",version!="",from_version!=""}))[${d_test}:1s]))
 
 ${t_all}     job:duration:total:seconds vector(${s_all})
 ${t_install} job:duration:install:seconds vector(${s_install})
@@ -316,6 +454,19 @@ ${t_test}    job:duration:test:seconds vector(${s_test})
 ${t_all}     cluster:promtail:failed_targets   sum by (pod) (promtail_targets_failed_total{reason!="exists"})
 ${t_all}     cluster:promtail:dropped_entries  sum by (pod) (promtail_dropped_entries_total)
 ${t_all}     cluster:promtail:request:duration sum by (status_code) (rate(promtail_request_duration_seconds_count[${d_all}]))
+
+${t_all}     cluster:rest:client:requests:latency:total:quantile sum by(type) (histogram_quantile(0.99, sum(rate(label_replace(rest_client_request_duration_seconds_bucket{verb="GET",url=~"https?://api-int.*"},"type","load_balancer","","")[${d_all}:30s])) by (le,type)) or histogram_quantile(0.99, sum(rate(label_replace(rest_client_request_duration_seconds_bucket{verb="GET",url!~"https?://(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"},"type","service","","")[${d_all}:30s])) by (le,type)) or histogram_quantile(0.99, sum(rate(label_replace(rest_client_request_duration_seconds_bucket{verb="GET",url=~"https?://(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"},"type","pod","","")[${d_all}:30s])) by (le,type)))
+${t_install} cluster:rest:client:requests:latency:install:quantile sum by(type) (histogram_quantile(0.99, sum(rate(label_replace(rest_client_request_duration_seconds_bucket{verb="GET",url=~"https?://api-int.*"},"type","load_balancer","","")[${d_install}:30s])) by (le,type)) or histogram_quantile(0.99, sum(rate(label_replace(rest_client_request_duration_seconds_bucket{verb="GET",url!~"https?://(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"},"type","service","","")[${d_install}:30s])) by (le,type)) or histogram_quantile(0.99, sum(rate(label_replace(rest_client_request_duration_seconds_bucket{verb="GET",url=~"https?://(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"},"type","pod","","")[${d_install}:30s])) by (le,type)))
+${t_test}    cluster:rest:client:requests:latency:test:quantile sum by(type) (histogram_quantile(0.99, sum(rate(label_replace(rest_client_request_duration_seconds_bucket{verb="GET",url=~"https?://api-int.*"},"type","load_balancer","","")[${d_test}:30s])) by (le,type)) or histogram_quantile(0.99, sum(rate(label_replace(rest_client_request_duration_seconds_bucket{verb="GET",url!~"https?://(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"},"type","service","","")[${d_test}:30s])) by (le,type)) or histogram_quantile(0.99, sum(rate(label_replace(rest_client_request_duration_seconds_bucket{verb="GET",url=~"https?://(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"},"type","pod","","")[${d_test}:30s])) by (le,type)))
+
+${t_all}     cluster:rest:client:requests:latency:total:avg sum by(type) (label_replace(sum(rate(rest_client_request_duration_seconds_sum{verb="GET",url=~"https?://api-int.*"}[${d_all}:30s])) / sum(rate(rest_client_request_duration_seconds_count{verb="GET",url=~"https?://api-int.*"}[${d_all}:30s])),"type","load_balancer","","") or label_replace(sum(rate(rest_client_request_duration_seconds_sum{verb="GET",url=~"https?://(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_all}:30s])) /sum(rate(rest_client_request_duration_seconds_count{verb="GET",url=~"https?://(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_all}:30s])),"type","service","","") or label_replace(sum(rate(rest_client_request_duration_seconds_sum{verb="GET",url=~"https?://(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_all}:30s])) / sum(rate(rest_client_request_duration_seconds_count{verb="GET",url=~"https?://(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_all}:30s])),"type","pod","",""))
+${t_install} cluster:rest:client:requests:latency:install:avg sum by(type) (label_replace(sum(rate(rest_client_request_duration_seconds_sum{verb="GET",url=~"https?://api-int.*"}[${d_install}:30s])) / sum(rate(rest_client_request_duration_seconds_count{verb="GET",url=~"https?://api-int.*"}[${d_install}:30s])),"type","load_balancer","","") or label_replace(sum(rate(rest_client_request_duration_seconds_sum{verb="GET",url=~"https?://(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_install}:30s])) /sum(rate(rest_client_request_duration_seconds_count{verb="GET",url=~"https?://(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_install}:30s])),"type","service","","") or label_replace(sum(rate(rest_client_request_duration_seconds_sum{verb="GET",url=~"https?://(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_install}:30s])) / sum(rate(rest_client_request_duration_seconds_count{verb="GET",url=~"https?://(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_install}:30s])),"type","pod","",""))
+${t_test}    cluster:rest:client:requests:latency:test:avg sum by(type) (label_replace(sum(rate(rest_client_request_duration_seconds_sum{verb="GET",url=~"https?://api-int.*"}[${d_test}:30s])) / sum(rate(rest_client_request_duration_seconds_count{verb="GET",url=~"https?://api-int.*"}[${d_test}:30s])),"type","load_balancer","","") or label_replace(sum(rate(rest_client_request_duration_seconds_sum{verb="GET",url=~"https?://(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_test}:30s])) /sum(rate(rest_client_request_duration_seconds_count{verb="GET",url=~"https?://(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_test}:30s])),"type","service","","") or label_replace(sum(rate(rest_client_request_duration_seconds_sum{verb="GET",url=~"https?://(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_test}:30s])) / sum(rate(rest_client_request_duration_seconds_count{verb="GET",url=~"https?://(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_test}:30s])),"type","pod","",""))
+
+${t_all}     cluster:rest:client:requests:error:total:rate sum by(type) (label_replace(sum(rate(rest_client_requests_total{code="<error>",host=~"api-int.*"}[${d_all}])) / sum(rate(rest_client_requests_total{host=~"api-int.*"}[${d_all}])),"type","load_balancer","","") or label_replace(sum(rate(rest_client_requests_total{code="<error>",host!~"(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_all}])) / sum(rate(rest_client_requests_total{host!~"(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_all}])),"type","service","","") orlabel_replace(sum(rate(rest_client_requests_total{code="<error>",host=~"(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_all}])) / sum(rate(rest_client_requests_total{host=~"(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_all}])),"type","pod","",""))
+${t_install} cluster:rest:client:requests:error:install:rate sum by(type) (label_replace(sum(rate(rest_client_requests_total{code="<error>",host=~"api-int.*"}[${d_install}])) / sum(rate(rest_client_requests_total{host=~"api-int.*"}[${d_install}])),"type","load_balancer","","") or label_replace(sum(rate(rest_client_requests_total{code="<error>",host!~"(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_install}])) / sum(rate(rest_client_requests_total{host!~"(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_install}])),"type","service","","") orlabel_replace(sum(rate(rest_client_requests_total{code="<error>",host=~"(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_install}])) / sum(rate(rest_client_requests_total{host=~"(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_install}])),"type","pod","",""))
+${t_test}    cluster:rest:client:requests:error:test:rate sum by(type) (label_replace(sum(rate(rest_client_requests_total{code="<error>",host=~"api-int.*"}[${d_test}])) / sum(rate(rest_client_requests_total{host=~"api-int.*"}[${d_test}])),"type","load_balancer","","") or label_replace(sum(rate(rest_client_requests_total{code="<error>",host!~"(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_test}])) / sum(rate(rest_client_requests_total{host!~"(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_test}])),"type","service","","") orlabel_replace(sum(rate(rest_client_requests_total{code="<error>",host=~"(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_test}])) / sum(rate(rest_client_requests_total{host=~"(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_test}])),"type","pod","",""))
+
 END
 
 # topk(1, max by (image, version) (max_over_time(cluster_version{type="completed"}[30m])))
@@ -403,4 +554,7 @@ cat >> ${REPORT} << EOF
 <link rel="stylesheet" href="https://code.getmdl.io/1.3.0/material.indigo-pink.min.css">
 <link rel="stylesheet" type="text/css" href="/static/spyglass/spyglass.css">
 EOF
-cat ${SHARED_DIR}/custom-links.txt >> ${REPORT}
+
+if [[ -f ${SHARED_DIR}/custom-links.txt ]]; then
+  cat ${SHARED_DIR}/custom-links.txt >> ${REPORT}
+fi

@@ -1,4 +1,8 @@
 base_images:
+  rox-ci:
+    name: rox-ci
+    namespace: stackrox
+    tag: 0.0.1
   ubi8:
     name: ubi
     namespace: ocp
@@ -6,9 +10,9 @@ base_images:
 binary_build_commands: ./scripts/ci/jobs/build.sh
 build_root:
   image_stream_tag:
-    name: rox-ci
+    name: rox-ci-main-builder
     namespace: stackrox
-    tag: rox-ci
+    tag: 0.0.1
 images:
 - context_dir: image/rhel
   dockerfile_path: Dockerfile
@@ -17,16 +21,34 @@ images:
     bin:
       paths:
       - destination_dir: .
-        source_path: /go
+        source_path: /go/src/github.com/stackrox/rox-openshift-ci-mirror
   to: main
+- context_dir: image
+  dockerfile_path: rox-ci.Dockerfile
+  from: rox-ci
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/stackrox/rox-openshift-ci-mirror
+  to: rox-ci-with-bin
 promotion:
-  name: main
   namespace: stackrox
+  tag: latest
+releases:
+  latest:
+    integration:
+      name: "4.8"
+      namespace: ocp
 resources:
   '*':
     requests:
       cpu: 2000m
       memory: 4000Mi
+  bin:
+    requests:
+      cpu: "4"
+      memory: 8Gi
 tests:
 - as: push-main-image
   steps:
@@ -35,8 +57,8 @@ tests:
       commands: |
         ./scripts/ci/jobs/push-main-image.sh
       credentials:
-      - mount_path: /test-secret
-        name: stackrox-test-secret
+      - mount_path: /tmp/secret/stackrox-rox-ci
+        name: stackrox-rox-ci
         namespace: test-credentials
       dependencies:
       - env: MAIN_IMAGE
@@ -46,6 +68,36 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+- as: e2e-test
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 4h0m0s
+    version: "4.8"
+  steps:
+    test:
+    - as: e2e-test
+      commands: |
+        cd /go/src/github.com/stackrox/rox-openshift-ci-mirror
+        ./scripts/ci/jobs/e2e-test.sh
+      credentials:
+      - mount_path: /tmp/secret/stackrox-rox-ci
+        name: stackrox-rox-ci
+        namespace: test-credentials
+      - mount_path: /tmp/secret/ci-pull-secret
+        name: ci-pull-credentials
+        namespace: test-credentials
+      dependencies:
+      - env: MAIN_IMAGE
+        name: main
+      from: rox-ci-with-bin
+      resources:
+        requests:
+          cpu: "4"
+          memory: 8Gi
+    workflow: generic-claim
 zz_generated_metadata:
   branch: master
   org: stackrox

@@ -52,6 +52,12 @@ spec:
         - --timeout=30m
         - /tmp/repos
         image: ' '
+        livenessProbe:
+          httpGet:
+            path: /rhel-server/repodata/repomd.xml
+            port: 8080
+          initialDelaySeconds: 120
+          periodSeconds: 120
         name: mirror
         ports:
         - containerPort: 8080
@@ -139,6 +145,12 @@ spec:
         - --timeout=30m
         - /tmp/repos
         image: ' '
+        livenessProbe:
+          httpGet:
+            path: /openstack-beta-rhel8/repodata/repomd.xml
+            port: 8080
+          initialDelaySeconds: 120
+          periodSeconds: 120
         name: mirror
         ports:
         - containerPort: 8080
@@ -226,6 +238,12 @@ spec:
         - --timeout=30m
         - /tmp/repos
         image: ' '
+        livenessProbe:
+          httpGet:
+            path: /openstack-16-rhel8/repodata/repomd.xml
+            port: 8080
+          initialDelaySeconds: 120
+          periodSeconds: 120
         name: mirror
         ports:
         - containerPort: 8080
@@ -313,6 +331,12 @@ spec:
         - --timeout=30m
         - /tmp/repos
         image: ' '
+        livenessProbe:
+          httpGet:
+            path: /rhel-server/repodata/repomd.xml
+            port: 8080
+          initialDelaySeconds: 120
+          periodSeconds: 120
         name: mirror
         ports:
         - containerPort: 8080
@@ -400,6 +424,12 @@ spec:
         - --timeout=30m
         - /tmp/repos
         image: ' '
+        livenessProbe:
+          httpGet:
+            path: /rhel-8-ironic-prevalidation/repodata/repomd.xml
+            port: 8080
+          initialDelaySeconds: 120
+          periodSeconds: 120
         name: mirror
         ports:
         - containerPort: 8080
@@ -425,6 +455,99 @@ spec:
           items:
           - key: ocp-4.10-rhel-8-ironic-prevalidation.repo
             path: ocp-4.10-rhel-8-ironic-prevalidation.repo
+          name: base-repos
+        name: repos
+      - name: key
+        secret:
+          secretName: mirror.openshift.com
+      - name: mirror-enterprise-basic-auth
+        secret:
+          defaultMode: 420
+          secretName: mirror-enterprise-basic-auth
+      - emptyDir: {}
+        name: cache
+      - emptyDir: {}
+        name: run
+---
+#---------------------------------------------------------------------------------
+# art_rpm_mirroring_services.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: base-4-10-rhel8-aarch64
+  namespace: ocp
+spec:
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: base-4-10-rhel8-aarch64
+  type: ClusterIP
+---
+#---------------------------------------------------------------------------------
+# art_rpm_mirroring_services.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"content-mirror:latest","namespace":"ci"},"fieldPath":"spec.template.spec.containers[?(@.name==\"mirror\")].image"}]'
+  labels:
+    app: base-4-10-rhel8-aarch64
+  name: base-4-10-rhel8-aarch64
+  namespace: ocp
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: base-4-10-rhel8-aarch64
+  template:
+    metadata:
+      labels:
+        app: base-4-10-rhel8-aarch64
+    spec:
+      containers:
+      - command:
+        - content-mirror
+        - --path=/tmp/config
+        - --max-size=5g
+        - --timeout=30m
+        - /tmp/repos
+        image: ' '
+        livenessProbe:
+          httpGet:
+            path: /rhel-8-baseos/repodata/repomd.xml
+            port: 8080
+          initialDelaySeconds: 120
+          periodSeconds: 120
+        name: mirror
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            memory: 500Mi
+        volumeMounts:
+        - mountPath: /tmp/repos
+          name: repos
+          readOnly: true
+        - mountPath: /tmp/key
+          name: key
+          readOnly: true
+        - mountPath: /tmp/mirror-enterprise-basic-auth
+          name: mirror-enterprise-basic-auth
+          readOnly: true
+        - mountPath: /tmp/cache
+          name: cache
+        workingDir: /tmp/repos
+      volumes:
+      - configMap:
+          items:
+          - key: ocp-4.10-rhel8-aarch64.repo
+            path: ocp-4.10-rhel8-aarch64.repo
           name: base-repos
         name: repos
       - name: key
@@ -487,6 +610,12 @@ spec:
         - --timeout=30m
         - /tmp/repos
         image: ' '
+        livenessProbe:
+          httpGet:
+            path: /rhel-8-baseos/repodata/repomd.xml
+            port: 8080
+          initialDelaySeconds: 120
+          periodSeconds: 120
         name: mirror
         ports:
         - containerPort: 8080
@@ -574,6 +703,12 @@ spec:
         - --timeout=30m
         - /tmp/repos
         image: ' '
+        livenessProbe:
+          httpGet:
+            path: /rhel-server/repodata/repomd.xml
+            port: 8080
+          initialDelaySeconds: 120
+          periodSeconds: 120
         name: mirror
         ports:
         - containerPort: 8080

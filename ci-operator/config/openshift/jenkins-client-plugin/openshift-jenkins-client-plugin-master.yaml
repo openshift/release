@@ -1,6 +1,6 @@
 base_images:
   original_jenkins:
-    name: "4.10"
+    name: "4.11"
     namespace: ocp
     tag: jenkins
 build_root:
@@ -18,19 +18,21 @@ images:
         source_path: /go/src/github.com/openshift/jenkins-client-plugin/.
   to: jenkins
 promotion:
+  additional_images:
+    jenkins-client-plugin-tests: src
   excluded_images:
   - jenkins
-  name: "4.10"
+  name: "4.11"
   namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.10"
+      name: "4.11"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.10"
+      name: "4.11"
       namespace: ocp
 resources:
   '*':
@@ -38,11 +40,20 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-aws-jenkins
+- as: e2e-aws-jenkins-client-plugin
   steps:
     cluster_profile: aws
-    workflow: openshift-e2e-aws-jenkins
-- as: e2e-aws-operator
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-jenkins-client-plugin-continuous
+  cron: 0 */12 * * *
   steps:
     cluster_profile: aws
     test:

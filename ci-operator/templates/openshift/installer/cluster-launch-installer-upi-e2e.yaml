@@ -1190,7 +1190,11 @@ objects:
             # Get user and password from TFVARS_PATH
             export VSPHERE_USER=$(grep -oP 'vsphere_user\s*=\s*"\K[^"]+' ${TFVARS_PATH})
             export VSPHERE_PASSWORD=$(grep -oP 'vsphere_password\s*=\s*"\K[^"]+' ${TFVARS_PATH})
-            export OVA_URL="$(jq -r '.baseURI + .images["vmware"].path' /var/lib/openshift-install/rhcos.json)"
+            if openshift-install coreos print-stream-json 2>/tmp/err.txt >/tmp/coreos-print-stream.json; then
+                    export OVA_URL="$(jq -r '.architectures.x86_64.artifacts.vmware.formats.ova.disk.location' /tmp/coreos-print-stream.json)"
+            else
+                    export OVA_URL="$(jq -r '.baseURI + .images["vmware"].path' /var/lib/openshift-install/rhcos.json)"
+            fi
             export VM_TEMPLATE="${OVA_URL##*/}"
             mkdir /tmp/rhcos
 
@@ -1305,7 +1309,12 @@ objects:
 
         # begin bootstrapping
         if [[ "${CLUSTER_TYPE}" == "aws" ]]; then
-          RHCOS_AMI="$(jq -r .amis[\"${AWS_REGION}\"].hvm /var/lib/openshift-install/rhcos.json)"
+
+          if openshift-install coreos print-stream-json 2>/tmp/err.txt >/tmp/coreos-print-stream.json; then
+              RHCOS_AMI="$(jq -r .architectures.x86_64.images.aws.regions[\"${AWS_REGION}\"].image /tmp/coreos-print-stream.json)"
+          else
+              RHCOS_AMI="$(jq -r .amis[\"${AWS_REGION}\"].hvm /var/lib/openshift-install/rhcos.json)"
+          fi
 
           export AWS_DEFAULT_REGION="${AWS_REGION}"  # CLI prefers the former
 
@@ -1795,7 +1804,11 @@ objects:
           gcloud iam service-accounts keys create service-account-key.json --iam-account=${MASTER_SERVICE_ACCOUNT}
 
           # Deploy bootstrap
-          export IMAGE_SOURCE=$(cat /var/lib/openshift-install/rhcos.json | jq -r .gcp.url)
+          if openshift-install coreos print-stream-json 2>/tmp/err.txt >/tmp/coreos-print-stream.json; then
+              export IMAGE_SOURCE=$(cat /tmp/coreos-print-stream.json | jq -r '.architectures.x86_64.artifacts.gcp.formats."tar.gz".disk.location')
+          else
+              export IMAGE_SOURCE=$(cat /var/lib/openshift-install/rhcos.json | jq -r .gcp.url)
+          fi
           gcloud compute images create "${INFRA_ID}-rhcos-image" --source-uri="${IMAGE_SOURCE}"
           export CLUSTER_IMAGE=$(gcloud compute images describe ${INFRA_ID}-rhcos-image --format json | jq -r .selfLink)
 
@@ -2012,7 +2025,11 @@ objects:
           az storage account create -g $RESOURCE_GROUP --location $AZURE_REGION --name $ACCOUNT_NAME --kind Storage --sku Standard_LRS
           ACCOUNT_KEY=$(az storage account keys list -g $RESOURCE_GROUP --account-name $ACCOUNT_NAME --query "[0].value" -o tsv)
 
-          VHD_URL="$(cat /var/lib/openshift-install/rhcos.json | jq -r .azure.url)"
+          if openshift-install coreos print-stream-json 2>/tmp/err.txt >/tmp/coreos-print-stream.json; then
+              VHD_URL=$(cat /tmp/coreos-print-stream.json | jq -r '.architectures.x86_64."rhel-coreos-extensions"."azure-disk".url')
+          else
+              VHD_URL="$(cat /var/lib/openshift-install/rhcos.json | jq -r .azure.url)"
+          fi
 
           echo "Copying VHD image from ${VHD_URL}"
           az storage container create --name vhd --account-name $ACCOUNT_NAME --auth-mode login
@@ -2367,7 +2384,7 @@ objects:
           # Snapshot iptables-save on each node for debugging possible kube-proxy issues
           oc --insecure-skip-tls-verify get --request-timeout=20s -n openshift-sdn -l app=sdn pods --template '{{ range .items }}{{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/sdn-pods
           while IFS= read -r i; do
-            queue ${ARTIFACT_DIR}/network/iptables-save-$i oc --insecure-skip-tls-verify rsh --timeout=20 -n openshift-sdn -c sdn $i iptables-save -c
+            queue ${ARTIFACT_DIR}/network/iptables-save-$i oc --insecure-skip-tls-verify --request-timeout=20s rsh -n openshift-sdn -c sdn $i iptables-save -c
           done < /tmp/sdn-pods
 
           while IFS= read -r i; do
@@ -2382,8 +2399,22 @@ objects:
             FILTER=gzip queue ${ARTIFACT_DIR}/pods/${file}_previous.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s -p $i
           done < /tmp/containers
 
-          echo "Snapshotting prometheus (may take 15s) ..."
-          queue ${ARTIFACT_DIR}/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring prometheus-k8s-0 -- tar cvzf - -C /prometheus .
+          # Snapshot the prometheus data from the replica that has the oldest
+          # PVC. If persistent storage isn't enabled, it uses the last
+          # prometheus instances by default to catch issues that occur when the
+          # first prometheus pod upgrades.
+          if [[ -n "$( oc --insecure-skip-tls-verify --request-timeout=20s get pvc -n openshift-monitoring -l app.kubernetes.io/name=prometheus --ignore-not-found )" ]]; then
+            pvc="$( oc --insecure-skip-tls-verify --request-timeout=20s get pvc -n openshift-monitoring -l app.kubernetes.io/name=prometheus --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[0].metadata.name}' )"
+            prometheus="${pvc##prometheus-data-}"
+          else
+            prometheus="$( oc --insecure-skip-tls-verify --request-timeout=20s get pods -n openshift-monitoring -l app.kubernetes.io/name=prometheus --sort-by=.metadata.creationTimestamp --ignore-not-found -o jsonpath='{.items[0].metadata.name}')"
+          fi
+          if [[ -n "${prometheus}" ]]; then
+          	echo "Snapshotting Prometheus from ${prometheus} (may take 15s) ..."
+          	queue ${ARTIFACT_DIR}/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prometheus}" -- tar cvzf - -C /prometheus .
+          else
+          	echo "Unable to find a Prometheus pod to snapshot."
+          fi
 
           echo "Running must-gather..."
           mkdir -p ${ARTIFACT_DIR}/must-gather

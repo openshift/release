@@ -5,13 +5,15 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-aws
     decorate: true
     decoration_config:
       skip_cloning: true
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-metallb-release-4.9-e2e-aws
@@ -69,10 +71,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
+        secret:
+          secretName: cluster-secrets-aws
       - name: github-credentials-openshift-ci-robot-private-git-cloner
         secret:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
@@ -88,7 +88,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build01
+    cluster: build04
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -146,18 +146,20 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build01
-    context: ci/prow/metallb-l2-e2e-metal-ipi
+    cluster: build04
+    context: ci/prow/metallb-e2e-metal-ipi
     decorate: true
     decoration_config:
       skip_cloning: true
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: packet
+      ci-operator.openshift.io/cloud-cluster-profile: packet
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-metallb-release-4.9-metallb-l2-e2e-metal-ipi
+    name: pull-ci-openshift-priv-metallb-release-4.9-metallb-e2e-metal-ipi
     path_alias: github.com/openshift/metallb
-    rerun_command: /test metallb-l2-e2e-metal-ipi
+    rerun_command: /test metallb-e2e-metal-ipi
     spec:
       containers:
       - args:
@@ -167,8 +169,8 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/metallb-l2-e2e-metal-ipi-cluster-profile
-        - --target=metallb-l2-e2e-metal-ipi
+        - --secret-dir=/usr/local/metallb-e2e-metal-ipi-cluster-profile
+        - --target=metallb-e2e-metal-ipi
         command:
         - ci-operator
         image: ci-operator:latest
@@ -184,7 +186,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/metallb-l2-e2e-metal-ipi-cluster-profile
+        - mountPath: /usr/local/metallb-e2e-metal-ipi-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -210,10 +212,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-packet
+        secret:
+          secretName: cluster-secrets-packet
       - name: github-credentials-openshift-ci-robot-private-git-cloner
         secret:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
@@ -223,24 +223,26 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )metallb-l2-e2e-metal-ipi,?($|\s.*)
+    trigger: (?m)^/test( | .* )metallb-e2e-metal-ipi,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build01
-    context: ci/prow/metallb-l2-e2e-metal-ipi-ovn
+    cluster: build04
+    context: ci/prow/metallb-e2e-metal-ipi-ovn
     decorate: true
     decoration_config:
       skip_cloning: true
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: packet
+      ci-operator.openshift.io/cloud-cluster-profile: packet
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-metallb-release-4.9-metallb-l2-e2e-metal-ipi-ovn
+    name: pull-ci-openshift-priv-metallb-release-4.9-metallb-e2e-metal-ipi-ovn
     path_alias: github.com/openshift/metallb
-    rerun_command: /test metallb-l2-e2e-metal-ipi-ovn
+    rerun_command: /test metallb-e2e-metal-ipi-ovn
     spec:
       containers:
       - args:
@@ -250,8 +252,8 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/metallb-l2-e2e-metal-ipi-ovn-cluster-profile
-        - --target=metallb-l2-e2e-metal-ipi-ovn
+        - --secret-dir=/usr/local/metallb-e2e-metal-ipi-ovn-cluster-profile
+        - --target=metallb-e2e-metal-ipi-ovn
         command:
         - ci-operator
         image: ci-operator:latest
@@ -267,7 +269,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/metallb-l2-e2e-metal-ipi-ovn-cluster-profile
+        - mountPath: /usr/local/metallb-e2e-metal-ipi-ovn-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -293,10 +295,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-packet
+        secret:
+          secretName: cluster-secrets-packet
       - name: github-credentials-openshift-ci-robot-private-git-cloner
         secret:
           secretName: github-credentials-openshift-ci-robot-private-git-cloner
@@ -306,4 +306,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )metallb-l2-e2e-metal-ipi-ovn,?($|\s.*)
+    trigger: (?m)^/test( | .* )metallb-e2e-metal-ipi-ovn,?($|\s.*)

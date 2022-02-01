@@ -33,40 +33,57 @@ gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
 gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
 gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
-cat > "${HOME}"/wait_for_node_ready.sh <<'EOF'
+cat > "${HOME}"/start_microshift.sh <<'EOF'
 #!/bin/bash
 set -xeuo pipefail
 
-export KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig
+trap "sudo journalctl -eu microshift" EXIT
 
-systemctl enable --now microshift.service
+sudo systemctl enable microshift --now
 
-start=$(date '+%s')
-to=300
-while :; do
-  if [ $(( $(date '+%s') - start )) -ge $to ]; then
-    echo "timed out waiting for node to start ($to seconds)" >&2
-    exit 1
-  fi
-  echo "waiting for node response" >&2
-  # get the condation where type == Ready, where condition.statusx == True.
-  node="$(oc get nodes -o jsonpath='{.items[*].status.conditions}' | jq '.[] | select(.type == "Ready") | select(.status == "True")')" || echo ''
-  if [ "$node" ]; then
-    echo "node posted ready status" >&2
-    break
-  fi
-  sleep 10
-done
+# If condition is true there is podman, it's not a rpm install.
+if [[ $(command -v podman) ]]; then
+  # podman is present so copy the config file
+  sudo mkdir -p /var/lib/microshift/resources/kubeadmin/
+  sudo podman cp microshift:/var/lib/microshift/resources/kubeadmin/kubeconfig /var/lib/microshift/resources/kubeadmin/kubeconfig  
+else
+  echo "This is rpm run";
+
+  # test if microshift is running
+  sudo systemctl status microshift;
+
+  # test if microshift created the kubeconfig under /var/lib/microshift/resources/kubeadmin/kubeconfig
+  while ! sudo test -f "/var/lib/microshift/resources/kubeadmin/kubeconfig";
+  do
+    echo "Waiting for kubeconfig..."
+    sleep 5;
+  done
+  sudo ls -la /var/lib/microshift
+  sudo ls -la /var/lib/microshift/resources/kubeadmin/kubeconfig
+  
+fi
 EOF
-chmod +x "${HOME}"/wait_for_node_ready.sh
+
+chmod +x "${HOME}"/start_microshift.sh
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \
   --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
-  --recurse "${HOME}"/wait_for_node_ready.sh rhel8user@"${INSTANCE_PREFIX}":~/wait_for_node_ready.sh
+  --recurse /tmp/validate-microshift rhel8user@"${INSTANCE_PREFIX}":~/validate-microshift
+
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+  --quiet \
+  --project "${GOOGLE_PROJECT_ID}" \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  --recurse "${HOME}"/start_microshift.sh rhel8user@"${INSTANCE_PREFIX}":~/start_microshift.sh
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
-  --command 'sudo ~/wait_for_node_ready.sh'
+  --command '/home/rhel8user/start_microshift.sh'
+
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  rhel8user@"${INSTANCE_PREFIX}" \
+  --command 'cd ~/validate-microshift  && sudo KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig ./kuttl-test.sh'

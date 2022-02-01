@@ -1,34 +1,34 @@
 base_images:
   base:
-    name: "4.10"
+    name: "4.11"
     namespace: ocp
     tag: base
-  ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.16-openshift-4.9
+    tag: rhel-8-golang-1.17-openshift-4.10
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile.rhel8
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
   to: docker-builder
 promotion:
-  name: "4.10"
+  name: "4.11"
   namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.10"
+      name: "4.11"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.10"
+      name: "4.11"
       namespace: ocp
 resources:
   '*':
@@ -73,6 +73,20 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-cgroupsv2
+- as: e2e-aws-builds-techpreview
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-builds-techpreview
+- as: e2e-aws-builds-rhel7
+  run_if_changed: (go\.mod|vendor/)
+  steps:
+    cluster_profile: aws
+    env:
+      PLATFORM_VERSION: "7.9"
+      TEST_SUITE: openshift/build
+    workflow: openshift-e2e-aws-workers-rhel
 zz_generated_metadata:
   branch: master
   org: openshift

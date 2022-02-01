@@ -17,17 +17,33 @@ ref:
     name: cluster-secrets-openstack-kuryr
     mount_path: /var/run/cluster-secrets/openstack-kuryr
   - namespace: test-credentials
+    name: cluster-secrets-openstack-nfv
+    mount_path: /var/run/cluster-secrets/openstack-nfv
+  - namespace: test-credentials
     name: cluster-secrets-openstack-vh-mecha-central
     mount_path: /var/run/cluster-secrets/openstack-vh-mecha-central
   - namespace: test-credentials
     name: cluster-secrets-openstack-vh-mecha-az0
     mount_path: /var/run/cluster-secrets/openstack-vh-mecha-az0
   env:
+  - name: APPLICATION_CREDENTIALS
+    default: ""
+    documentation: |-
+      If this variable is not empty, the provided clouds.yaml will contain
+      ephemeral application credentials.
+  - name: APPLICATION_CREDENTIALS_EXPIRATION
+    default: "5 hours"
+    documentation: |-
+      When to set the expiration of the application credentials.
+      Use a format that `date -d` would understand.
+      This variable has no effect if APPLICATION_CREDENTIALS is empty.
+  - name: OS_CLOUD
+    default: "openstack"
+    documentation: Name of cloud to use from the clouds.yaml file
   - name: CLUSTER_TYPE_OVERRIDE
     default: ''
     documentation: |-
       This will override CLUSTER_TYPE in the `commands` file if set.
   documentation: |-
-    The ipi-conf-openstack ref writes all the environmental variables required
-    to run an ipi installation of OpenShift on OpenStack to the ${SHARED_DIR}
-    directory.
+    The ipi-conf-openstack-clouds ref configures the required cloud credentials
+    and installs the required security certificates.

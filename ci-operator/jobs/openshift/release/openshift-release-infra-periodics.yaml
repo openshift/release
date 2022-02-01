@@ -127,9 +127,6 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           tests:
           - as: launch
             steps:
@@ -252,9 +249,6 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           tests:
           - as: launch
             steps:
@@ -280,6 +274,14 @@ periodics:
               test:
               - ref: clusterbot-wait
               workflow: openshift-e2e-aws-ovn
+          - as: launch-ovn-hybrid
+            steps:
+              cluster_profile: aws
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: ipi-aws-ovn-hybrid
           - as: launch-shared-vpc
             steps:
               cluster_profile: aws
@@ -316,6 +318,20 @@ periodics:
               test:
               - ref: clusterbot-wait
               workflow: openshift-e2e-aws-cgroupsv2
+          - as: launch-techpreview
+            steps:
+              cluster_profile: aws
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-aws-techpreview
+          - as: upgrade
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                TEST_SUITE: "all"
+              workflow: openshift-upgrade-$(CLUSTER_TYPE)
       - name: JOB_NAME_SAFE
         value: launch
       - name: TEST_COMMAND
@@ -577,9 +593,6 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           tests:
           - as: launch
             steps:
@@ -597,6 +610,14 @@ periodics:
               test:
               - ref: clusterbot-wait
               workflow: openshift-e2e-$(CLOUD_TYPE)-ovn
+          - as: launch-ovn-hybrid
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: ipi-$(CLOUD_TYPE)-ovn-hybrid
           - as: launch-shared-vpc
             steps:
               cluster_profile: $(CLUSTER_TYPE)
@@ -617,6 +638,20 @@ periodics:
               test:
               - ref: clusterbot-wait
               workflow: openshift-e2e-$(CLOUD_TYPE)
+          - as: launch-techpreview
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLOUD_TYPE)-techpreview
+          - as: upgrade
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                TEST_SUITE: "all"
+              workflow: openshift-upgrade-$(CLOUD_TYPE)
       - name: JOB_NAME_SAFE
         value: launch
       - name: TEST_COMMAND
@@ -878,9 +913,6 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           tests:
           - as: launch
             steps:
@@ -934,6 +966,20 @@ periodics:
               test:
               - ref: clusterbot-wait
               workflow: openshift-e2e-$(CLUSTER_TYPE)
+          - as: launch-techpreview
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-techpreview
+          - as: upgrade
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                TEST_SUITE: "all"
+              workflow: openshift-upgrade-$(CLUSTER_TYPE)
       - name: JOB_NAME_SAFE
         value: launch
       - name: TEST_COMMAND
@@ -1204,45 +1250,47 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           tests:
           - as: e2e-serial
             steps:
-              cluster_profile: packet
+              cluster_profile: equinix-ocp-metal
               workflow: baremetalds-e2e-serial-ipv4
           - as: e2e
             steps:
-              cluster_profile: packet
+              cluster_profile: equinix-ocp-metal
+              workflow: baremetalds-e2e-ipv4
+          - as: e2e-dualstack
+            steps:
+              cluster_profile: equinix-ocp-metal
+              workflow: baremetalds-e2e-ovn-dualstack
+          - as: e2e-ipv6
+            steps:
+              cluster_profile: equinix-ocp-metal
+              workflow: baremetalds-e2e-ovn-ipv6
+          - as: launch
+            steps:
+              cluster_profile: equinix-ocp-metal
               env:
                 DEVSCRIPTS_CONFIG: |
                   IP_STACK=v4
                   NETWORK_TYPE=OpenShiftSDN
-              workflow: baremetalds-e2e
-          - as: e2e-dualstack
+              post:
+                - chain: baremetalds-ipi-post
+              pre:
+                - ref: openshift-cluster-bot-rbac
+                - chain: baremetalds-ipi-pre
+              test:
+                - as: wait
+                  commands: sleep $(CLUSTER_DURATION) & wait
+                  from: cli
+                  resources: { requests: { cpu: 100m, memory: 100Mi } }
+          - as: launch-ovn
             steps:
-              cluster_profile: packet
-              env:
-                DEVSCRIPTS_CONFIG: |
-                  IP_STACK=v4v6
-                  NETWORK_TYPE=OVNKubernetes
-              workflow: baremetalds-e2e
-          - as: e2e-ipv6
-            steps:
-              cluster_profile: packet
+              cluster_profile: equinix-ocp-metal
               env:
                 DEVSCRIPTS_CONFIG: |
                   IP_STACK=v6
                   NETWORK_TYPE=OVNKubernetes
-              workflow: baremetalds-e2e
-          - as: launch
-            steps:
-              cluster_profile: packet
-              env:
-                DEVSCRIPTS_CONFIG: |
-                  IP_STACK=v4
-                  NETWORK_TYPE=OpenShiftSDN
               post:
                 - chain: baremetalds-ipi-post
               pre:
@@ -1327,6 +1375,8 @@ periodics:
       - name: RELEASE_IMAGE_INITIAL
       - name: RELEASE_IMAGE_LATEST
       - name: CLUSTER_VARIANT
+      - name: CLUSTER_PROFILE
+        value: vsphere-clusterbot
       - name: CLUSTER_DURATION
         value: "9000"
       - name: BRANCH
@@ -1335,6 +1385,11 @@ periodics:
         value: vsphere
       - name: UNRESOLVED_CONFIG
         value: |
+          base_images:
+            upi-installer:
+              name: "$(BRANCH)"
+              namespace: ocp
+              tag: upi-installer
           resources:
             '*':
               limits:
@@ -1342,13 +1397,10 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           tests:
           - as: launch
             steps:
-              cluster_profile: $(CLUSTER_TYPE)
+              cluster_profile: $(CLUSTER_PROFILE)
               env:
                 CLUSTER_DURATION: $(CLUSTER_DURATION)
               test:
@@ -1356,12 +1408,42 @@ periodics:
               workflow: openshift-e2e-$(CLUSTER_TYPE)
           - as: launch-ovn
             steps:
-              cluster_profile: $(CLUSTER_TYPE)
+              cluster_profile: $(CLUSTER_PROFILE)
               env:
                 CLUSTER_DURATION: $(CLUSTER_DURATION)
               test:
               - ref: clusterbot-wait
               workflow: openshift-e2e-$(CLUSTER_TYPE)-ovn
+          - as: launch-upi
+            steps:
+              cluster_profile: $(CLUSTER_PROFILE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: upi-$(CLUSTER_TYPE)-clusterbot
+          - as: launch-ovn-hybrid
+            steps:
+              cluster_profile: $(CLUSTER_PROFILE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: ipi-$(CLUSTER_TYPE)-ovn-hybrid-custom-vxlan-port
+          - as: launch-techpreview
+            steps:
+              cluster_profile: $(CLUSTER_PROFILE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-techpreview
+          - as: upgrade
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                TEST_SUITE: "all"
+              workflow: openshift-upgrade-$(CLUSTER_TYPE)
       - name: JOB_NAME_SAFE
         value: launch
       - name: TEST_COMMAND
@@ -1632,9 +1714,6 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           tests:
           - as: launch
             steps:
@@ -2192,6 +2271,8 @@ periodics:
   cluster: build01
   cron: '@yearly'
   decorate: true
+  decoration_config:
+    timeout: 6h0m0s
   name: release-openshift-release-analysis-aggregator
   spec:
     containers:
@@ -2314,6 +2395,11 @@ periodics:
       - name: NAMESPACE
       - name: UNRESOLVED_CONFIG
         value: |
+          base_images:
+            openstack-installer:
+              name: "$(BRANCH)"
+              namespace: ocp
+              tag: openstack-installer
           resources:
             '*':
               limits:
@@ -2321,25 +2407,58 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
           tests:
           - as: launch
             steps:
               cluster_profile: openstack-vexxhost
-              workflow: openshift-e2e-openstack-ipi
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-ipi
               test:
-              - as: e2e-test
-                commands: sleep $(CLUSTER_DURATION) & wait
-                from_image:
-                  namespace: origin
-                  name: centos
-                  tag: '8'
-                resources:
-                  requests:
-                    cpu: 100m
-                    memory: 200Mi
+              - ref: clusterbot-wait
+          - as: launch-nfv
+            steps:
+              cluster_profile: openstack-nfv
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-nfv
+          - as: launch-kuryr
+            steps:
+              cluster_profile: openstack-kuryr
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                CONFIG_TYPE: minimal
+                NETWORK_TYPE: Kuryr
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-ipi
+          - as: launch-ovn
+            steps:
+              cluster_profile: openstack-vexxhost
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                NETWORK_TYPE: OVNKubernetes
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-ipi
+          - as: launch-proxy
+            steps:
+              cluster_profile: openstack-vh-mecha-central
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-proxy
+          - as: launch-techpreview
+            steps:
+              cluster_profile: openstack-vexxhost
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-techpreview
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""

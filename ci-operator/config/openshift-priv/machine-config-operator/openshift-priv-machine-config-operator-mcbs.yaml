@@ -3,10 +3,14 @@ base_images:
     name: 4.10-priv
     namespace: ocp-private
     tag: base
-  ocp_builder_rhel-8-golang-1.16-openshift-4.10:
+  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.16-openshift-4.10
+    tag: rhel-8-golang-1.17-openshift-4.10
+  walters_moc:
+    name: walters-rhcos-ostreecontainer-oldformat
+    namespace: coreos
+    tag: latest
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/machine-config-operator
@@ -14,12 +18,17 @@ images:
 - dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.10:
+    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.10
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
   to: machine-config-operator
+- dockerfile_literal: FROM scratch
+  from: walters_moc
+  to: machine-os-content
 promotion:
   disabled: true
+  excluded_images:
+  - machine-os-content
   name: mcbs-priv
   namespace: ocp-private
 releases:
@@ -43,7 +52,7 @@ tests:
   container:
     from: src
 - as: e2e-aws
-  run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
+  skip_if_only_changed: ^docs/
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
@@ -58,7 +67,7 @@ tests:
     cluster_profile: gcp
     workflow: openshift-upgrade-gcp
 - as: e2e-gcp-op
-  run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
+  skip_if_only_changed: ^docs/
   steps:
     cluster_profile: gcp
     test:
@@ -71,13 +80,13 @@ tests:
           cpu: 100m
     workflow: ipi-gcp
 - as: e2e-agnostic-upgrade
-  run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
+  skip_if_only_changed: ^docs/
   steps:
     cluster_profile: azure4
     workflow: openshift-upgrade-azure
 - as: e2e-gcp-op-single-node
   optional: true
-  run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
+  skip_if_only_changed: ^docs/
   steps:
     cluster_profile: gcp
     test:

@@ -1,0 +1,108 @@
+kind: Namespace
+apiVersion: v1
+metadata:
+  name: stolostron
+  annotations:
+    purpose: "RedHat Advanced Cluster Management Build Artifacts"
+---
+# Service account for pushing images
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: image-pusher
+  namespace: stolostron
+---
+kind: Group
+apiVersion: v1
+metadata:
+  name: s8n-admins
+users:
+- arewm
+- gurnben
+- kyl-bempah
+- macdonem
+- ray-harris
+- schmidtd
+- smithbw88
+- tpouyer
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: admin
+  namespace: stolostron
+subjects:
+- kind: Group
+  apiGroup: rbac.authorization.k8s.io
+  name: s8n-admins
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: pull-secret-namespace-manager
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: image-tagger
+  namespace: stolostron
+rules:
+- apiGroups:
+  - ""
+  - image.openshift.io
+  attributeRestrictions: null
+  resources:
+  - imagestreamtags
+  - imagestreams
+  verbs:
+  - update
+  - patch
+  - get
+  - create
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: s8n-image-tagger
+  namespace: stolostron
+roleRef:
+  kind: Role
+  name: image-tagger
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+- kind: ServiceAccount
+  name: ci-operator
+  namespace: ci
+- kind: ServiceAccount
+  name: image-pusher
+  namespace: stolostron
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: s8n-image-pusher-role-binding-4afc7
+  namespace: stolostron
+roleRef:
+  kind: ClusterRole
+  name: system:image-builder
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+- kind: ServiceAccount
+  name: image-pusher
+  namespace: stolostron
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: image-puller
+  namespace: stolostron
+subjects:
+- kind: Group
+  apiGroup: rbac.authorization.k8s.io
+  name: system:unauthenticated
+- kind: Group
+  apiGroup: rbac.authorization.k8s.io
+  name: system:authenticated
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: system:image-puller

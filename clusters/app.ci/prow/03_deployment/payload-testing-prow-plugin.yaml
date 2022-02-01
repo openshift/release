@@ -1,0 +1,129 @@
+kind: List
+apiVersion: v1
+items:
+- apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    name: payload-testing-prow-plugin
+    namespace: ci
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: Role
+  metadata:
+    name: payload-testing-prow-plugin
+    namespace: ci
+  rules:
+  - apiGroups:
+    - "ci.openshift.io"
+    resources:
+    - pullrequestpayloadqualificationruns
+    verbs:
+    - create
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: RoleBinding
+  metadata:
+    name: payload-testing-prow-plugin
+    namespace: ci
+  subjects:
+  - kind: ServiceAccount
+    name: payload-testing-prow-plugin
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: Role
+    name: payload-testing-prow-plugin
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: payload-testing-prow-plugin
+    namespace: ci
+  spec:
+    selector:
+      app: prow
+      component: payload-testing-prow-plugin
+    ports:
+    - port: 80
+      targetPort: 8888
+    type: ClusterIP
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: payload-testing-prow-plugin
+    labels:
+      app: prow
+      component: payload-testing-prow-plugin
+    annotations:
+      image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"payload-testing-prow-plugin:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"payload-testing-prow-plugin\")].image"}]'
+    namespace: ci
+  spec:
+    replicas: 1
+    revisionHistoryLimit: 2
+    selector:
+      matchLabels:
+        app: prow
+        component: payload-testing-prow-plugin
+    template:
+      metadata:
+        labels:
+          app: prow
+          component: payload-testing-prow-plugin
+      spec:
+        containers:
+        - name: payload-testing-prow-plugin
+          image: ' '
+          args:
+          - --endpoint=/
+          - --hmac-secret-file=/etc/webhook/hmac.yaml
+          - --github-endpoint=http://ghproxy
+          - --github-endpoint=https://api.github.com
+          - --github-graphql-endpoint=http://ghproxy/graphql
+          - --github-app-id=$(GITHUB_APP_ID)
+          - --github-app-private-key-path=/etc/github/cert
+          - --ci-op-config-dir=/etc/configs/master
+          - --log-level=debug
+          env:
+          - name: GITHUB_APP_ID
+            valueFrom:
+              secretKeyRef:
+                name: openshift-prow-github-app
+                key: appid
+          ports:
+            - name: http
+              containerPort: 8888
+          volumeMounts:
+          - name: hmac
+            mountPath: /etc/webhook
+            readOnly: true
+          - name: github-app-credentials
+            mountPath: /etc/github
+            readOnly: true
+          - name: master
+            mountPath: /etc/configs/master
+            readOnly: true
+          - name: tmp
+            mountPath: /tmp
+          resources:
+            requests:
+              memory: "300Mi"
+              cpu: "50m"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 20
+            periodSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz/ready
+              port: 8081
+        serviceAccountName: payload-testing-prow-plugin
+        volumes:
+        - name: hmac
+          secret:
+            secretName: github-webhook-credentials
+        - name: github-app-credentials
+          secret:
+            secretName: openshift-prow-github-app
+        - name: master
+          configMap:
+            name: ci-operator-master-configs
+        - name: tmp
+          emptyDir: {}

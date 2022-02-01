@@ -3,8 +3,16 @@ base_images:
     name: "4.8"
     namespace: ocp
     tag: base
+  elasticsearch-operator:
+    name: "5.5"
+    namespace: logging
+    tag: elasticsearch-operator
+  elasticsearch-operator-registry:
+    name: "5.5"
+    namespace: logging
+    tag: elasticsearch-operator-registry
   elasticsearch-operator-src:
-    name: "5.3"
+    name: "5.5"
     namespace: logging
     tag: elasticsearch-operator-src
   elasticsearch-proxy:
@@ -85,7 +93,7 @@ operator:
   - pullspec: quay.io/openshift-logging/log-file-metric-exporter:latest
     with: pipeline:log-file-metric-exporter
 promotion:
-  name: "5.3"
+  name: "5.5"
   namespace: logging
 releases:
   latest:
@@ -106,9 +114,9 @@ tests:
   commands: make test-unit
   container:
     from: src
-- as: e2e-gcp
+- as: e2e
   steps:
-    cluster_profile: gcp
+    cluster_profile: aws
     test:
     - as: test
       cli: latest
@@ -119,6 +127,10 @@ tests:
         name: pipeline:cluster-logging-operator-registry
       - env: IMAGE_CLUSTER_LOGGING_OPERATOR
         name: pipeline:cluster-logging-operator
+      - env: IMAGE_ELASTICSEARCH_OPERATOR
+        name: pipeline:elasticsearch-operator
+      - env: IMAGE_ELASTICSEARCH_OPERATOR_REGISTRY
+        name: pipeline:elasticsearch-operator-registry
       - env: IMAGE_OAUTH_PROXY
         name: pipeline:oauth-proxy
       - env: IMAGE_LOGGING_CURATOR5
@@ -140,10 +152,10 @@ tests:
         requests:
           cpu: 100m
       timeout: 3h0m0s
-    workflow: openshift-e2e-gcp-hosted-loki
+    workflow: openshift-e2e-aws-hosted-loki
 - as: functional
   steps:
-    cluster_profile: gcp
+    cluster_profile: aws
     test:
     - as: test
       cli: latest
@@ -174,7 +186,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: openshift-e2e-gcp
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: master
   org: openshift

@@ -8,8 +8,8 @@ base_images:
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: assisted-test
-    namespace: ocp-kni
+    name: ocm-2.5
+    namespace: edge-infrastructure
     tag: assisted-test-infra
   coreos-centos-stream8:
     name: stream8
@@ -63,6 +63,65 @@ test_binary_build_commands: |
   go mod vendor
   mkdir /.cache && chmod 775 -R /.cache ${GOPATH}
 tests:
+- as: mirror-nightly-image
+  cron: '@daily'
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-installer
+    env:
+      IMAGE_REPO: assisted-installer
+    test:
+    - ref: baremetalds-assisted-images-publish
+- as: mirror-nightly-image-controller
+  cron: '@daily'
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-installer-controller
+    env:
+      IMAGE_REPO: assisted-installer-controller
+    test:
+    - ref: baremetalds-assisted-images-publish
+- as: mirror-vcsref-image
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-installer
+    env:
+      IMAGE_REPO: assisted-installer
+    test:
+    - ref: baremetalds-assisted-images-publish
+- as: mirror-vcsref-image-controller
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-installer-controller
+    env:
+      IMAGE_REPO: assisted-installer-controller
+    test:
+    - ref: baremetalds-assisted-images-publish
+- as: ocm-publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-installer
+    env:
+      IMAGE_REPO: assisted-installer
+      OSCI_ENV_CONFIG: |
+        OSCI_PUBLISH_DELAY=0
+      RELEASE_REF: release-2.5
+    workflow: ocm-ci-manifest-update
+- as: ocm-publish-controller
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-installer-controller
+    env:
+      IMAGE_REPO: assisted-installer-controller
+      OSCI_ENV_CONFIG: |
+        OSCI_COMPONENT_NAME=assisted-installer-controller
+        OSCI_PUBLISH_DELAY=0
+      RELEASE_REF: release-2.5
+    workflow: ocm-ci-manifest-update
 - as: lint
   commands: |
     export GOLANGCI_LINT_CACHE=/tmp/.cache
@@ -82,7 +141,7 @@ tests:
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: packet-assisted
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-ipv6
   optional: true
   steps:
@@ -91,8 +150,7 @@ tests:
       ASSISTED_CONFIG: |
         IPv6=yes
         IPv4=no
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-single-node
   optional: true
   steps:
@@ -100,8 +158,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-olm
   optional: true
   run_if_changed: ^(src/assisted_installer_controller/.*)$
@@ -110,8 +167,8 @@ tests:
     env:
       ASSISTED_CONFIG: |
         TEST_FUNC=test_olm_operator
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+      PACKET_PLAN: m2.xlarge.x86
+    workflow: baremetalds-assisted
 zz_generated_metadata:
   branch: master
   org: openshift

@@ -477,13 +477,23 @@ objects:
         cp -r /var/lib/openshift-install/upi/metal/* ${TMP_SHARED}/terraform/
         cp /bin/terraform-provider-matchbox ${TMP_SHARED}/terraform/
 
-        BASE_URI="$(jq -r '.baseURI' /var/lib/openshift-install/rhcos.json | sed 's|https://|http://|' | sed 's|rhcos-redirector.apps.art.xq1c.p1.openshiftapps.com|releases-art-rhcos.svc.ci.openshift.org|')"
+        if openshift-install coreos print-stream-json 2>/tmp/err.txt >/tmp/coreos-print-stream.json; then
+                RHCOS_JSON_FILE="/tmp/coreos-print-stream.json"
 
-        PXE_INITRD_URL="${BASE_URI}$(jq -r '.images["live-initramfs"].path // .images["initramfs"].path' /var/lib/openshift-install/rhcos.json)"
-        PXE_KERNEL_URL="${BASE_URI}$(jq -r '.images["live-kernel"].path // .images["kernel"].path' /var/lib/openshift-install/rhcos.json)"
-        # 4.3 unified 'metal-bios' and 'metal-uefi' into just 'metal'
-        PXE_OS_IMAGE_URL="${BASE_URI}$(jq -r '.images["metal-bios"].path // .images["metal"].path' /var/lib/openshift-install/rhcos.json)"
-        PXE_ROOTFS_URL="${BASE_URI}$(jq -r '.images["live-rootfs"].path' /var/lib/openshift-install/rhcos.json)"
+                PXE_INITRD_URL="$(jq -r '.architectures.x86_64.artifacts.metal.formats.pxe.initramfs.location' "${RHCOS_JSON_FILE}")"
+                PXE_KERNEL_URL="$(jq -r '.architectures.x86_64.artifacts.metal.formats.pxe.kernel.location' "${RHCOS_JSON_FILE}")"
+                PXE_OS_IMAGE_URL="$(jq -r '.architectures.x86_64.artifacts.metal.formats."raw.gz".disk.location' "${RHCOS_JSON_FILE}")"
+                PXE_ROOTFS_URL="$(jq -r '.architectures.x86_64.artifacts.metal.formats.pxe.rootfs.location' "${RHCOS_JSON_FILE}")"
+        else
+                RHCOS_JSON_FILE="/var/lib/openshift-install/rhcos.json"
+                BASE_URI="$(jq -r '.baseURI' "${RHCOS_JSON_FILE}" | sed 's|https://|http://|' | sed 's|rhcos-redirector.apps.art.xq1c.p1.openshiftapps.com|releases-art-rhcos.svc.ci.openshift.org|')"
+
+                PXE_INITRD_URL="${BASE_URI}$(jq -r '.images["live-initramfs"].path // .images["initramfs"].path' "${RHCOS_JSON_FILE}")"
+                PXE_KERNEL_URL="${BASE_URI}$(jq -r '.images["live-kernel"].path // .images["kernel"].path' "${RHCOS_JSON_FILE}")"
+                # 4.3 unified 'metal-bios' and 'metal-uefi' into just 'metal'
+                PXE_OS_IMAGE_URL="${BASE_URI}$(jq -r '.images["metal-bios"].path // .images["metal"].path' "${RHCOS_JSON_FILE}")"
+                PXE_ROOTFS_URL="${BASE_URI}$(jq -r '.images["live-rootfs"].path' "${RHCOS_JSON_FILE}")"
+        fi
         if [[ $PXE_KERNEL_URL =~ "live" ]]; then
           PXE_KERNEL_ARGS="coreos.live.rootfs_url=${PXE_ROOTFS_URL}"
         else
@@ -673,7 +683,7 @@ objects:
           # Snapshot iptables-save on each node for debugging possible kube-proxy issues
           oc --insecure-skip-tls-verify get --request-timeout=20s -n openshift-sdn -l app=sdn pods --template '{{ range .items }}{{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/sdn-pods
           while IFS= read -r i; do
-            queue ${ARTIFACT_DIR}/network/iptables-save-$i oc --insecure-skip-tls-verify rsh --timeout=20 -n openshift-sdn -c sdn $i iptables-save -c
+            queue ${ARTIFACT_DIR}/network/iptables-save-$i oc --insecure-skip-tls-verify --request-timeout=20s rsh -n openshift-sdn -c sdn $i iptables-save -c
           done < /tmp/sdn-pods
 
           while IFS= read -r i; do
@@ -688,8 +698,22 @@ objects:
             FILTER=gzip queue ${ARTIFACT_DIR}/pods/${file}_previous.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s -p $i
           done < /tmp/containers
 
-          echo "Snapshotting prometheus (may take 15s) ..."
-          queue ${ARTIFACT_DIR}/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring prometheus-k8s-0 -- tar cvzf - -C /prometheus .
+          # Snapshot the prometheus data from the replica that has the oldest
+          # PVC. If persistent storage isn't enabled, it uses the last
+          # prometheus instances by default to catch issues that occur when the
+          # first prometheus pod upgrades.
+          if [[ -n "$( oc --insecure-skip-tls-verify --request-timeout=20s get pvc -n openshift-monitoring -l app.kubernetes.io/name=prometheus --ignore-not-found )" ]]; then
+            pvc="$( oc --insecure-skip-tls-verify --request-timeout=20s get pvc -n openshift-monitoring -l app.kubernetes.io/name=prometheus --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[0].metadata.name}' )"
+            prometheus="${pvc##prometheus-data-}"
+          else
+            prometheus="$( oc --insecure-skip-tls-verify --request-timeout=20s get pods -n openshift-monitoring -l app.kubernetes.io/name=prometheus --sort-by=.metadata.creationTimestamp --ignore-not-found -o jsonpath='{.items[0].metadata.name}')"
+          fi
+          if [[ -n "${prometheus}" ]]; then
+          	echo "Snapshotting Prometheus from ${prometheus} (may take 15s) ..."
+          	queue ${ARTIFACT_DIR}/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prometheus}" -- tar cvzf - -C /prometheus .
+          else
+          	echo "Unable to find a Prometheus pod to snapshot."
+          fi
 
           echo "Running must-gather..."
           mkdir -p ${ARTIFACT_DIR}/must-gather

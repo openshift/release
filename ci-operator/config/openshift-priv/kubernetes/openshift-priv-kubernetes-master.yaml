@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: 4.10-priv
+    name: 4.11-priv
     namespace: ocp-private
     tag: base
   base-machine:
@@ -8,7 +8,7 @@ base_images:
     namespace: openshift
     tag: "29"
   cli:
-    name: 4.10-priv
+    name: 4.11-priv
     namespace: ocp-private
     tag: cli
   dev-scripts:
@@ -16,49 +16,39 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   machine-os-content-base:
-    name: 4.10-priv
+    name: 4.11-priv
     namespace: ocp-private
     tag: machine-os-content
   oc-rpms:
-    name: 4.10-priv
+    name: 4.11-priv
     namespace: ocp-private
     tag: oc-rpms
-  ocp_builder_rhel-8-golang-1.16-openshift-4.8:
+  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.16-openshift-4.8
-  ocp_builder_rhel-8-golang-1.16-openshift-4.9:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.16-openshift-4.9
+    tag: rhel-8-golang-1.17-openshift-4.10
   tools:
-    name: 4.10-priv
+    name: 4.11-priv
     namespace: ocp-private
     tag: tools
 binary_build_commands: openshift-hack/build-go.sh
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: rhel-8-release-golang-1.16-openshift-4.8
+  from_repository: true
 canonical_go_repository: k8s.io/kubernetes
 images:
 - dockerfile_path: openshift-hack/images/hyperkube/Dockerfile.rhel
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.8:
+    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
-    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
   to: hyperkube
 - dockerfile_path: openshift-hack/images/tests/Dockerfile.rhel
   from: tools
   inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.8:
+    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
   to: kubernetes-tests
 - context_dir: openshift-hack/images/os/
   from: base
@@ -74,16 +64,16 @@ images:
   dockerfile_path: Dockerfile.Rhel
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
   to: pod
 promotion:
   additional_images:
     artifacts: artifacts
   excluded_images:
   - machine-os-content
-  name: 4.10-priv
+  name: 4.11-priv
   namespace: ocp-private
 raw_steps:
 - pipeline_image_cache_step:
@@ -125,12 +115,12 @@ raw_steps:
 releases:
   initial:
     integration:
-      name: 4.10-priv
+      name: 4.11-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.10-priv
+      name: 4.11-priv
       namespace: ocp-private
 resources:
   '*':
@@ -192,7 +182,7 @@ tests:
   container:
     from: src
     memory_backed_volume:
-      size: 4Gi
+      size: 6Gi
 - as: integration
   commands: ARTIFACTS="${ARTIFACT_DIR}" TMPDIR=/tmp/volume openshift-hack/test-integration.sh
   container:
@@ -304,7 +294,7 @@ tests:
     cluster_profile: vsphere
     env:
       TEST_SUITE: openshift/conformance/parallel
-    workflow: openshift-e2e-vsphere-upi
+    workflow: openshift-e2e-vsphere
 - as: k8s-e2e-conformance-aws
   steps:
     cluster_profile: aws
@@ -377,6 +367,7 @@ tests:
     workflow: openshift-e2e-aws-csi-migration
 - as: e2e-openstack
   optional: true
+  run_if_changed: ^(staging/src/k8s.io/legacy-cloud-providers/openstack)
   steps:
     cluster_profile: openstack-vexxhost
     env:
@@ -387,13 +378,23 @@ tests:
 - as: e2e-openstack-csi-cinder
   optional: true
   steps:
-    cluster_profile: openstack-vexxhost
+    cluster_profile: openstack-vh-mecha-central
     workflow: openshift-e2e-openstack-csi-cinder
 - as: e2e-openstack-csi-manila
   optional: true
   steps:
     cluster_profile: openstack-vh-mecha-central
     workflow: openshift-e2e-openstack-csi-manila
+- as: e2e-aws-cgroupsv2
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-cgroupsv2
+- as: e2e-aws-crun
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-crun
 zz_generated_metadata:
   branch: master
   org: openshift-priv

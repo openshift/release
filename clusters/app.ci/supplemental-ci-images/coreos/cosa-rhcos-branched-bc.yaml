@@ -7,6 +7,33 @@ items:
   apiVersion: v1
   metadata:
     namespace: coreos
+    name: coreos-assembler-4.10
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: coreos-assembler:4.10
+    source:
+      git:
+        ref: rhcos-4.10
+        uri: https://github.com/coreos/coreos-assembler.git
+      type: Git
+    strategy:
+      dockerStrategy:
+        imageOptimizationPolicy: SkipLayers
+      type: Docker
+    triggers:
+    - type: ImageChange
+    - type: ConfigChange
+    - type: "GitHub"
+      github:
+        secret: "secret101"
+- kind: BuildConfig
+  apiVersion: v1
+  metadata:
+    namespace: coreos
     name: coreos-assembler-4.9
   spec:
     successfulBuildsHistoryLimit: 1
@@ -22,10 +49,6 @@ items:
       type: Git
     strategy:
       dockerStrategy:
-        from:
-          kind: ImageStreamTag
-          name: fedora:34
-          namespace: coreos
         imageOptimizationPolicy: SkipLayers
       type: Docker
     triggers:
@@ -53,10 +76,6 @@ items:
       type: Git
     strategy:
       dockerStrategy:
-        from:
-          kind: ImageStreamTag
-          name: fedora:33
-          namespace: coreos
         imageOptimizationPolicy: SkipLayers
       type: Docker
     triggers:
@@ -84,10 +103,6 @@ items:
       type: Git
     strategy:
       dockerStrategy:
-        from:
-          kind: ImageStreamTag
-          name: fedora:33
-          namespace: coreos
         imageOptimizationPolicy: SkipLayers
       type: Docker
     triggers:

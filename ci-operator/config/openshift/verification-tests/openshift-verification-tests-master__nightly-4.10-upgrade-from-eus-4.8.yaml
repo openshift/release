@@ -1,0 +1,46 @@
+releases:
+  initial:
+    release:
+      channel: stable
+      version: "4.8"
+  intermediate:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.9"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.10"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: aws-ipi
+  interval: 48h
+  steps:
+    cluster_profile: aws-2
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      E2E_RUN_INTERMEDIATE_TAGS: '@4.9 and @aws-ipi and @upgrade-sanity'
+      E2E_RUN_LATEST_TAGS: '@4.10 and @aws-ipi and @upgrade-sanity'
+      UPGRADE_CHECK_RUN_TAGS: '@4.8 and @aws-ipi and @upgrade-check'
+      UPGRADE_PRE_RUN_TAGS: '@4.8 and @aws-ipi and @upgrade-prepare'
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - ref: ipi-install-hosted-loki
+    - chain: ipi-aws-pre-stableinitial
+    - ref: cucushift-pre
+    - ref: cucushift-upgrade-pre
+    workflow: cucushift-upgrade-paused
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: verification-tests
+  variant: nightly-4.10-upgrade-from-eus-4.8

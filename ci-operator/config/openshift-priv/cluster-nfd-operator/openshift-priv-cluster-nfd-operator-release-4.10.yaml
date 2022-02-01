@@ -5,12 +5,12 @@ base_images:
     tag: base
   ci-artifacts:
     name: master
-    namespace: openshift-psap
+    namespace: psap
     tag: ci-artifacts
-  ocp_builder_rhel-8-golang-1.16-openshift-4.10:
+  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.16-openshift-4.10
+    tag: rhel-8-golang-1.17-openshift-4.10
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-nfd-operator
@@ -18,16 +18,15 @@ images:
 - dockerfile_path: Dockerfile
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.10:
+    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.10
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
   to: cluster-nfd-operator
 operator:
   bundles:
   - context_dir: manifests/4.10
     dockerfile_path: bundle.Dockerfile
 promotion:
-  disabled: true
   name: 4.10-priv
   namespace: ocp-private
 releases:
@@ -62,7 +61,7 @@ tests:
     env:
       OO_CHANNEL: stable
       OO_INSTALL_NAMESPACE: '!create'
-      OO_PACKAGE: node-feature-discovery-operator
+      OO_PACKAGE: nfd
       OO_TARGET_NAMESPACES: '!install'
     workflow: optional-operators-ci-aws
 zz_generated_metadata:

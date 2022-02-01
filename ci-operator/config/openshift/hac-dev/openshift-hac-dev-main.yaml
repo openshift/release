@@ -1,0 +1,33 @@
+binary_build_commands: ./build.sh
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: tectonic-console-builder-v23
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: test
+  commands: "export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN) \n./test.sh\n"
+  container:
+    from: src
+  secret:
+    mount_path: /tmp/secret
+    name: hac-dev-codecov-token
+- as: test-periodic
+  commands: "export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN) \n./test.sh\n"
+  container:
+    from: src
+  cron: 0 */24 * * *
+  secret:
+    mount_path: /tmp/secret
+    name: hac-dev-codecov-token
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: hac-dev

@@ -1,29 +1,29 @@
 base_images:
   base:
-    name: 4.10-priv
+    name: 4.11-priv
     namespace: ocp-private
     tag: base
-  ocp_builder_rhel-8-golang-1.16-openshift-4.10:
+  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.16-openshift-4.10
+    tag: rhel-8-golang-1.17-openshift-4.10
 binary_build_commands: make binaries
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.16
+    tag: golang-1.17
 canonical_go_repository: github.com/kubernetes/cloud-provider-vsphere
 images:
 - dockerfile_path: openshift-hack/images/cloud-controller-manager-openshift.Dockerfile
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.10:
+    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.10
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
   to: vsphere-cloud-controller-manager
 promotion:
-  name: 4.10-priv
+  name: 4.11-priv
   namespace: ocp-private
 resources:
   '*':
@@ -33,7 +33,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: 4.10-priv
+  name: 4.11-priv
   namespace: ocp-private
 tests:
 - as: unit
@@ -44,10 +44,23 @@ tests:
   commands: make verify-history
   container:
     from: src
+  optional: true
 - as: verify
   commands: make verify
   container:
     from: src
+- as: e2e-vsphere-ccm
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: vsphere
+    workflow: openshift-e2e-vsphere-ccm
+- as: e2e-vsphere-ccm-install
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: vsphere
+    workflow: openshift-e2e-vsphere-ccm-install
 zz_generated_metadata:
   branch: master
   org: openshift-priv

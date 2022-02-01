@@ -4,6 +4,17 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# For disconnected or otherwise unreachable environments, we want to
+# have steps use an HTTP(S) proxy to reach the API server. This proxy
+# configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
+# environment variables, as well as their lowercase equivalents (note
+# that libcurl doesn't recognize the uppercase variables).
+if test -f "${SHARED_DIR}/proxy-conf.sh"
+then
+	# shellcheck disable=SC1090
+	source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 # In upgrade tests, the subscribe step installs the initial version of the operator, so
 # it needs to install from the INITIAL_CHANNEL
 if [ -n "${INITIAL_CHANNEL}" ]; then
@@ -24,6 +35,7 @@ echo "OO_PACKAGE:           $OO_PACKAGE"
 echo "OO_CHANNEL:           $OO_CHANNEL"
 echo "OO_INSTALL_NAMESPACE: $OO_INSTALL_NAMESPACE"
 echo "OO_TARGET_NAMESPACES: $OO_TARGET_NAMESPACES"
+echo "TEST_MODE: $TEST_MODE"
 
 if [[ -f "${SHARED_DIR}/operator-install-namespace.txt" ]]; then
     OO_INSTALL_NAMESPACE=$(cat "$SHARED_DIR"/operator-install-namespace.txt)
@@ -72,7 +84,11 @@ elif [[ -n "$OPERATORGROUP" ]]; then
 else
     echo "OperatorGroup does not exist: creating it"
     OG_OPERATION=create
-    OG_NAMESTANZA="generateName: oo-"
+    if [[ "${TEST_MODE}" == "msp" ]]; then
+      OG_NAMESTANZA="name: redhat-layered-product-og"
+    else
+      OG_NAMESTANZA="generateName: oo-"
+    fi
 fi
 
 OPERATORGROUP=$(
@@ -90,13 +106,21 @@ EOF
 echo "OperatorGroup name is \"$OPERATORGROUP\""
 echo "Creating CatalogSource"
 
+if [[ "${TEST_MODE}" == "msp" ]]; then
+  CS_NAMESTANZA="name: addon-$OO_PACKAGE-catalog"
+  CS_NAMESPACE="openshift-marketplace"
+else
+  CS_NAMESTANZA="generateName: oo-"
+  CS_NAMESPACE="${OO_INSTALL_NAMESPACE}"
+fi
+
 CATSRC=$(
     oc create -f - -o jsonpath='{.metadata.name}' <<EOF
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
-  generateName: oo-
-  namespace: $OO_INSTALL_NAMESPACE
+  $CS_NAMESTANZA
+  namespace: $CS_NAMESPACE
 spec:
   sourceType: grpc
   image: "$OO_INDEX"
@@ -108,7 +132,7 @@ echo "CatalogSource name is \"$CATSRC\""
 IS_CATSRC_CREATED=false
 # Wait for 10 minutes until the Catalog source state is 'READY'
 for i in $(seq 1 120); do
-    CATSRC_STATE=$(oc get catalogsources/"$CATSRC" -n "$OO_INSTALL_NAMESPACE" -o jsonpath='{.status.connectionState.lastObservedState}')
+    CATSRC_STATE=$(oc get catalogsources/"$CATSRC" -n "$CS_NAMESPACE" -o jsonpath='{.status.connectionState.lastObservedState}')
     echo $CATSRC_STATE
     if [ "$CATSRC_STATE" = "READY" ] ; then
         echo "Catalogsource created successfully after waiting $((5*i)) seconds"
@@ -131,17 +155,23 @@ echo "Set the deployment start time: ${DEPLOYMENT_START_TIME}"
 
 echo "Creating Subscription"
 
+if [[ "${TEST_MODE}" == "msp" ]]; then
+  SUB_NAMESTANZA="name: addon-$OO_PACKAGE"
+else
+  SUB_NAMESTANZA="generateName: oo-"
+fi
+
 SUB_MANIFEST=$(cat <<EOF
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
-  generateName: oo-
+  $SUB_NAMESTANZA
   namespace: $OO_INSTALL_NAMESPACE
 spec:
   name: $OO_PACKAGE
   channel: "$OO_CHANNEL"
   source: $CATSRC
-  sourceNamespace: $OO_INSTALL_NAMESPACE
+  sourceNamespace: $CS_NAMESPACE
   installPlanApproval: Manual
 EOF
 )

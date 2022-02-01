@@ -1,0 +1,149 @@
+kind: ImageStream
+apiVersion: image.openshift.io/v1
+metadata:
+  namespace: ocp
+  name: centos
+spec:
+  tags:
+  - name: "stream8"
+    from:
+      kind: DockerImage
+      name: quay.io/centos/centos:stream8
+    importPolicy:
+      scheduled: false
+    referencePolicy:
+      type: Local
+---
+kind: ImageStream
+apiVersion: image.openshift.io/v1
+metadata:
+  namespace: ocp
+  name: ubi
+spec:
+  tags:
+  - name: "8"
+    from:
+      kind: DockerImage
+      name: registry.access.redhat.com/ubi8/ubi:latest
+    importPolicy:
+      scheduled: false
+    referencePolicy:
+      type: Local
+---
+kind: ImageStream
+apiVersion: image.openshift.io/v1
+metadata:
+  namespace: ocp
+  name: ubi-minimal
+spec:
+  tags:
+  - name: "8"
+    from:
+      kind: DockerImage
+      name: registry.access.redhat.com/ubi8/ubi-minimal:latest
+    importPolicy:
+      scheduled: false
+    referencePolicy:
+      type: Local
+---
+kind: ImageStream
+apiVersion: image.openshift.io/v1
+metadata:
+  namespace: ocp
+  name: builder
+spec:
+  tags:
+  - name: rhel-8-golang-1.16-openshift-4.10.art-arm64
+    from:
+      kind: DockerImage
+      name: registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.10.art-arm64
+    importPolicy:
+      scheduled: true
+    referencePolicy:
+      type: Local
+---
+kind: ImageStream
+apiVersion: image.openshift.io/v1
+metadata:
+  namespace: ocp
+  name: "4.10"
+spec:
+  tags:
+  - name: rhel-8-openshift-enterprise-base-4.10.art-arm64
+    from:
+      kind: DockerImage
+      name: registry.ci.openshift.org/ocp/builder:rhel-8-openshift-enterprise-base-4.10.art-arm64
+    importPolicy:
+      scheduled: true
+    referencePolicy:
+      type: Local
+---
+kind: BuildConfig
+apiVersion: v1
+metadata:
+  namespace: ci
+  name: builder-4.10-repo-transform
+spec:
+  successfulBuildsHistoryLimit: 1
+  failedBuildsHistoryLimit: 2
+  output:
+    to:
+      kind: ImageStreamTag
+      name: builder:golang-1.16-openshift-4.10-arm64
+      namespace: ocp
+  source:
+    dockerfile: |
+      FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.10.art-arm64
+      RUN rm -rf /etc/yum.repos.d/* && \
+            curl http://base-4-10-rhel8-aarch64.ocp.svc > /etc/yum.repos.d/base-4-10-rhel8-aarch64.repo
+    type: Dockerfile
+  strategy:
+    dockerStrategy:
+      from:
+        kind: ImageStreamTag
+        name: "builder:golang-1.16-openshift-4.10.art-arm64"
+        namespace: ocp
+    type: Docker
+  triggers:
+  - type: ConfigChange
+  - imageChange:
+      from:
+        kind: ImageStreamTag
+        name: "builder:golang-1.16-openshift-4.10.art-arm64"
+        namespace: ocp
+    type: ImageChange
+---
+kind: BuildConfig
+apiVersion: v1
+metadata:
+  namespace: ci
+  name: base-4.10-repo-transform
+spec:
+  successfulBuildsHistoryLimit: 1
+  failedBuildsHistoryLimit: 2
+  output:
+    to:
+      kind: ImageStreamTag
+      name: "4.10:base-arm64"
+      namespace: ocp
+  source:
+    dockerfile: |
+      FROM registry.ci.openshift.org/ocp/builder:rhel-8-openshift-enterprise-base-4.10.art-arm64
+      RUN rm -rf /etc/yum.repos.d/* && \
+            curl http://base-4-10-rhel8-aarch64.ocp.svc > /etc/yum.repos.d/base-4-10-rhel8-aarch64.repo
+    type: Dockerfile
+  strategy:
+    dockerStrategy:
+      from:
+        kind: ImageStreamTag
+        name: "4.10:rhel-8-openshift-enterprise-base-4.10.art-arm64"
+        namespace: ocp
+    type: Docker
+  triggers:
+  - type: ConfigChange
+  - imageChange:
+      from:
+        kind: ImageStreamTag
+        name: "4.10:rhel-8-openshift-enterprise-base-4.10.art-arm64"
+        namespace: ocp
+    type: ImageChange

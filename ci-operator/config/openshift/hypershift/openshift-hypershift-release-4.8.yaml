@@ -4,29 +4,29 @@ base_images:
     namespace: ocp
     tag: base
   latest-hypershift:
-    name: hypershift
-    namespace: hypershift
-    tag: latest
+    name: "4.10"
+    namespace: ocp
+    tag: hypershift-operator
   main-e2e:
     name: e2e-bin
     namespace: hypershift
     tag: latest
-  openshift_release_golang-1.16:
+  openshift_release_golang-1.17:
     name: release
     namespace: openshift
-    tag: golang-1.16
+    tag: golang-1.17
 binary_build_commands: make build
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.16
+    tag: golang-1.17
 images:
 - from: base
   inputs:
-    openshift_release_golang-1.16:
+    openshift_release_golang-1.17:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.16
+      - registry.ci.openshift.org/openshift/release:golang-1.17
   to: hypershift
 promotion:
   namespace: hypershift
@@ -72,54 +72,15 @@ tests:
     test:
     - as: install-hypershift
       cli: latest
-      commands: bin/hypershift install --hypershift-image "${HYPERSHIFT_RELEASE_LATEST}"
+      commands: make ci-install-hypershift
+      credentials:
+      - mount_path: /etc/hypershift-pool-aws-credentials
+        name: hypershift-pool-aws-credentials
+        namespace: test-credentials
       dependencies:
       - env: HYPERSHIFT_RELEASE_LATEST
         name: latest-hypershift
-      from: latest-hypershift
-      grace_period: 1m0s
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 5m0s
-    - as: test-e2e
-      cli: latest
-      commands: |-
-        bin/test-e2e \
-          -test.v \
-          -test.timeout=0 \
-          --e2e.aws-credentials-file=${CLUSTER_PROFILE_DIR}/.awscred \
-          --e2e.pull-secret-file=${CLUSTER_PROFILE_DIR}/pull-secret \
-          --e2e.latest-release-image=${OCP_IMAGE_LATEST} \
-          --e2e.previous-release-image=${OCP_IMAGE_PREVIOUS} \
-          --e2e.control-plane-operator-image=${HYPERSHIFT_IMAGE_UNDER_TEST} \
-          --e2e.additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)"
-      dependencies:
-      - env: OCP_IMAGE_LATEST
-        name: release:hosted-ocp-latest
-      - env: OCP_IMAGE_PREVIOUS
-        name: release:hosted-ocp-previous
-      - env: HYPERSHIFT_IMAGE_UNDER_TEST
-        name: hypershift
       from: main-e2e
-      grace_period: 15m0s
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 2h0m0s
-    workflow: ipi-aws
-- as: e2e-aws-periodic
-  cron: 0 */6 * * *
-  steps:
-    cluster_profile: aws
-    test:
-    - as: install-hypershift
-      cli: latest
-      commands: bin/hypershift install --hypershift-image "${HYPERSHIFT_RELEASE_LATEST}"
-      dependencies:
-      - env: HYPERSHIFT_RELEASE_LATEST
-        name: latest-hypershift
-      from: latest-hypershift
       grace_period: 1m0s
       resources:
         requests:
@@ -159,73 +120,20 @@ tests:
     product: ocp
     timeout: 1h30m0s
     version: "4.8"
+  optional: true
   steps:
     test:
     - as: install-hypershift
       cli: latest
-      commands: bin/hypershift install --hypershift-image "${HYPERSHIFT_RELEASE_LATEST}"
-      dependencies:
-      - env: HYPERSHIFT_RELEASE_LATEST
-        name: latest-hypershift
-      from: latest-hypershift
-      grace_period: 1m0s
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 5m0s
-    - as: test-e2e
-      cli: latest
-      commands: |-
-        bin/test-e2e \
-          -test.v \
-          -test.timeout=0 \
-          -test.run=TestUpgradeControlPlane \
-          --e2e.aws-credentials-file=/etc/hypershift-pool-aws-credentials/credentials \
-          --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson \
-          --e2e.base-domain=ci.hypershift.devcluster.openshift.com \
-          --e2e.latest-release-image=${OCP_IMAGE_LATEST} \
-          --e2e.previous-release-image=${OCP_IMAGE_PREVIOUS} \
-          --e2e.control-plane-operator-image=${HYPERSHIFT_IMAGE_UNDER_TEST} \
-          --e2e.additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)"
+      commands: make ci-install-hypershift
       credentials:
       - mount_path: /etc/hypershift-pool-aws-credentials
         name: hypershift-pool-aws-credentials
         namespace: test-credentials
-      - mount_path: /etc/ci-pull-credentials
-        name: ci-pull-credentials
-        namespace: test-credentials
-      dependencies:
-      - env: OCP_IMAGE_LATEST
-        name: release:hosted-ocp-latest
-      - env: OCP_IMAGE_PREVIOUS
-        name: release:hosted-ocp-previous
-      - env: HYPERSHIFT_IMAGE_UNDER_TEST
-        name: hypershift
-      from: main-e2e
-      grace_period: 15m0s
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 1h0m0s
-    workflow: generic-claim
-- as: e2e-aws-pooled-periodic
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: hypershift
-    product: ocp
-    timeout: 1h30m0s
-    version: "4.8"
-  cron: 0 */6 * * *
-  steps:
-    test:
-    - as: install-hypershift
-      cli: latest
-      commands: bin/hypershift install --hypershift-image "${HYPERSHIFT_RELEASE_LATEST}"
       dependencies:
       - env: HYPERSHIFT_RELEASE_LATEST
         name: latest-hypershift
-      from: latest-hypershift
+      from: main-e2e
       grace_period: 1m0s
       resources:
         requests:

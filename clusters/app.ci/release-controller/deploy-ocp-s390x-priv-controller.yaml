@@ -24,7 +24,7 @@ spec:
   tags:
   - from:
       kind: DockerImage
-      name: image-registry.openshift-image-registry.svc:5000/ocp/4.9:tests
+      name: image-registry.openshift-image-registry.svc:5000/ocp/4.10:tests
     importPolicy:
       scheduled: true
     name: tests
@@ -47,7 +47,7 @@ spec:
     termination: Reencrypt
   to:
     kind: Service
-    name: release-controller-ocp-s390x-priv
+    name: release-controller-api-ocp-s390x-priv
 ---
 #---------------------------------------------------------------------------------
 # osd_rc_deployments.py added the following resource
@@ -74,6 +74,27 @@ spec:
 # osd_rc_deployments.py added the following resource
 #---------------------------------------------------------------------------------
 
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    service.alpha.openshift.io/serving-cert-secret-name: release-controller-api-s390x-priv-tls
+  labels:
+    app: release-controller-api-ocp-s390x-priv
+  name: release-controller-api-ocp-s390x-priv
+  namespace: ci
+spec:
+  ports:
+  - name: main
+    port: 443
+    targetPort: 8443
+  selector:
+    app: release-controller-api-ocp-s390x-priv
+---
+#---------------------------------------------------------------------------------
+# osd_rc_deployments.py added the following resource
+#---------------------------------------------------------------------------------
+
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
@@ -91,6 +112,28 @@ spec:
   selector:
     matchLabels:
       app: release-controller-ocp-s390x-priv
+---
+#---------------------------------------------------------------------------------
+# osd_rc_deployments.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  annotations: {}
+  name: release-controller-api-ocp-s390x-priv
+  namespace: prow-monitoring
+spec:
+  endpoints:
+  - interval: 30s
+    port: main
+    scheme: http
+  namespaceSelector:
+    matchNames:
+    - ci
+  selector:
+    matchLabels:
+      app: release-controller-api-ocp-s390x-priv
 ---
 #---------------------------------------------------------------------------------
 # osd_rc_deployments.py added the following resource
@@ -120,7 +163,7 @@ spec:
         - -http-address=
         - -email-domain=*
         - -upstream=http://localhost:8080
-        - -client-id=system:serviceaccount:ci:release-controller
+        - -client-id=system:serviceaccount:ci:release-controller-ocp-s390x-priv
         - -openshift-ca=/etc/pki/tls/cert.pem
         - -openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
         - '-openshift-sar={"verb": "get", "resource": "imagestreams", "namespace": "ocp-private"}'
@@ -129,7 +172,7 @@ spec:
         - -cookie-secret-file=/etc/proxy/secrets/session_secret
         - -tls-cert=/etc/tls/private/tls.crt
         - -tls-key=/etc/tls/private/tls.key
-        image: openshift/oauth-proxy:latest
+        image: quay.io/openshift/origin-oauth-proxy:4.8
         imagePullPolicy: IfNotPresent
         name: oauth-proxy
         ports:
@@ -149,7 +192,6 @@ spec:
         - --prow-config=/etc/config/config.yaml
         - --supplemental-prow-config-dir=/etc/config
         - --job-config=/etc/job-config
-        - --artifacts=openshift-release-artifacts-s390x-priv.apps.ci.l2s4.p1.openshiftapps.com
         - --listen=127.0.0.1:8080
         - --prow-namespace=ci
         - --non-prow-job-kubeconfig=/etc/kubeconfig/kubeconfig
@@ -169,7 +211,20 @@ spec:
         - --verify-bugzilla
         - --authentication-message=Pulling these images requires <a href="https://docs.ci.openshift.org/docs/how-tos/use-registries-in-build-farm/">authenticating to the app.ci cluster</a>.
         image: release-controller:latest
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 3
+          periodSeconds: 3
         name: controller
+        readinessProbe:
+          httpGet:
+            path: /healthz/ready
+            port: 8081
+          initialDelaySeconds: 10
+          periodSeconds: 3
+          timeoutSeconds: 600
         resources:
           requests:
             memory: 2Gi
@@ -177,53 +232,8 @@ spec:
         - mountPath: /etc/config
           name: config
           readOnly: true
-        - mountPath: /etc/job-config/misc
-          name: job-config-misc
-          readOnly: true
-        - mountPath: /etc/job-config/master-periodics
-          name: job-config-master-periodics
-          readOnly: true
-        - mountPath: /etc/job-config/master-postsubmits
-          name: job-config-master-postsubmits
-          readOnly: true
-        - mountPath: /etc/job-config/master-presubmits
-          name: job-config-master-presubmits
-          readOnly: true
-        - mountPath: /etc/job-config/3.x
-          name: job-config-3x
-          readOnly: true
-        - mountPath: /etc/job-config/4.1
-          name: job-config-41
-          readOnly: true
-        - mountPath: /etc/job-config/4.10
-          name: job-config-410
-          readOnly: true
-        - mountPath: /etc/job-config/4.2
-          name: job-config-42
-          readOnly: true
-        - mountPath: /etc/job-config/4.3
-          name: job-config-43
-          readOnly: true
-        - mountPath: /etc/job-config/4.4
-          name: job-config-44
-          readOnly: true
-        - mountPath: /etc/job-config/4.5
-          name: job-config-45
-          readOnly: true
-        - mountPath: /etc/job-config/4.6
-          name: job-config-46
-          readOnly: true
-        - mountPath: /etc/job-config/4.7
-          name: job-config-47
-          readOnly: true
-        - mountPath: /etc/job-config/4.8
-          name: job-config-48
-          readOnly: true
-        - mountPath: /etc/job-config/4.9
-          name: job-config-49
-          readOnly: true
-        - mountPath: /etc/kubeconfig
-          name: release-controller-kubeconfigs
+        - mountPath: /etc/job-config
+          name: job-config
           readOnly: true
         - mountPath: /etc/github
           name: oauth
@@ -234,85 +244,50 @@ spec:
         - mountPath: /etc/plugins
           name: plugins
           readOnly: true
+        - mountPath: /etc/kubeconfig
+          name: release-controller-kubeconfigs
+          readOnly: true
       serviceAccountName: release-controller-ocp-s390x-priv
       volumes:
       - configMap:
           defaultMode: 420
           name: config
         name: config
-      - configMap:
-          defaultMode: 420
-          name: job-config-misc
-        name: job-config-misc
-      - configMap:
-          defaultMode: 420
-          name: job-config-master-periodics
-        name: job-config-master-periodics
-      - configMap:
-          defaultMode: 420
-          name: job-config-master-postsubmits
-        name: job-config-master-postsubmits
-      - configMap:
-          defaultMode: 420
-          name: job-config-master-presubmits
-        name: job-config-master-presubmits
-      - configMap:
-          defaultMode: 420
-          name: job-config-3.x
-        name: job-config-3x
-      - name: internal-tls
-        secret:
-          secretName: release-controller-s390x-priv-tls
-      - name: session-secret
-        secret:
-          secretName: release-controller-session-secret
-      - configMap:
-          defaultMode: 420
-          name: job-config-4.1
-        name: job-config-41
-      - configMap:
-          defaultMode: 420
-          name: job-config-4.10
-        name: job-config-410
-      - configMap:
-          defaultMode: 420
-          name: job-config-4.2
-        name: job-config-42
-      - configMap:
-          defaultMode: 420
-          name: job-config-4.3
-        name: job-config-43
-      - configMap:
-          defaultMode: 420
-          name: job-config-4.4
-        name: job-config-44
-      - configMap:
-          defaultMode: 420
-          name: job-config-4.5
-        name: job-config-45
-      - configMap:
-          defaultMode: 420
-          name: job-config-4.6
-        name: job-config-46
-      - configMap:
-          defaultMode: 420
-          name: job-config-4.7
-        name: job-config-47
-      - configMap:
-          defaultMode: 420
-          name: job-config-4.8
-        name: job-config-48
-      - configMap:
-          defaultMode: 420
-          name: job-config-4.9
-        name: job-config-49
-      - name: release-controller-kubeconfigs
-        secret:
-          defaultMode: 420
-          items:
-          - key: sa.release-controller-ocp-s390x-priv.app.ci.config
-            path: kubeconfig
-          secretName: release-controller-kubeconfigs
+      - name: job-config
+        projected:
+          sources:
+          - configMap:
+              name: job-config-misc
+          - configMap:
+              name: job-config-master-periodics
+          - configMap:
+              name: job-config-master-postsubmits
+          - configMap:
+              name: job-config-master-presubmits
+          - configMap:
+              name: job-config-3.x
+          - configMap:
+              name: job-config-4.1
+          - configMap:
+              name: job-config-4.10
+          - configMap:
+              name: job-config-4.11
+          - configMap:
+              name: job-config-4.2
+          - configMap:
+              name: job-config-4.3
+          - configMap:
+              name: job-config-4.4
+          - configMap:
+              name: job-config-4.5
+          - configMap:
+              name: job-config-4.6
+          - configMap:
+              name: job-config-4.7
+          - configMap:
+              name: job-config-4.8
+          - configMap:
+              name: job-config-4.9
       - name: oauth
         secret:
           defaultMode: 420
@@ -325,6 +300,119 @@ spec:
           defaultMode: 420
           name: plugins
         name: plugins
+      - name: internal-tls
+        secret:
+          secretName: release-controller-s390x-priv-tls
+      - name: session-secret
+        secret:
+          secretName: release-controller-session-secret
+      - name: release-controller-kubeconfigs
+        secret:
+          defaultMode: 420
+          items:
+          - key: sa.release-controller-ocp-s390x-priv.app.ci.config
+            path: kubeconfig
+          secretName: release-controller-kubeconfigs
+---
+#---------------------------------------------------------------------------------
+# osd_rc_deployments.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"release-controller-api:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"controller\")].image"}]'
+  name: release-controller-api-ocp-s390x-priv
+  namespace: ci
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: release-controller-api-ocp-s390x-priv
+  template:
+    metadata:
+      labels:
+        app: release-controller-api-ocp-s390x-priv
+    spec:
+      containers:
+      - args:
+        - -provider=openshift
+        - -https-address=:8443
+        - -http-address=
+        - -email-domain=*
+        - -upstream=http://localhost:8080
+        - -client-id=system:serviceaccount:ci:release-controller-ocp-s390x-priv
+        - -openshift-ca=/etc/pki/tls/cert.pem
+        - -openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        - '-openshift-sar={"verb": "get", "resource": "imagestreams", "namespace": "ocp-private"}'
+        - '-openshift-delegate-urls={"/": {"verb": "get", "group": "image.openshift.io", "resource": "imagestreams", "namespace": "ocp-private"}}'
+        - -client-secret-file=/var/run/secrets/kubernetes.io/serviceaccount/token
+        - -cookie-secret-file=/etc/proxy/secrets/session_secret
+        - -tls-cert=/etc/tls/private/tls.crt
+        - -tls-key=/etc/tls/private/tls.key
+        image: quay.io/openshift/origin-oauth-proxy:4.8
+        imagePullPolicy: IfNotPresent
+        name: oauth-proxy
+        ports:
+        - containerPort: 8443
+          name: web
+        resources:
+          requests:
+            memory: 50Mi
+        volumeMounts:
+        - mountPath: /etc/tls/private
+          name: internal-tls
+        - mountPath: /etc/proxy/secrets
+          name: session-secret
+      - command:
+        - /usr/bin/release-controller-api
+        - --release-namespace=ocp-s390x-priv
+        - --artifacts=openshift-release-artifacts-s390x-priv.apps.ci.l2s4.p1.openshiftapps.com
+        - --prow-namespace=ci
+        - --non-prow-job-kubeconfig=/etc/kubeconfig/kubeconfig
+        - --job-namespace=ci-release-s390x-priv
+        - --tools-image-stream-tag=release-controller-bootstrap:tests
+        - --release-architecture=s390x
+        - -v=6
+        - --authentication-message=Pulling these images requires <a href="https://docs.ci.openshift.org/docs/how-tos/use-registries-in-build-farm/">authenticating to the app.ci cluster</a>.
+        image: release-controller-api:latest
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 3
+          periodSeconds: 3
+        name: controller
+        readinessProbe:
+          httpGet:
+            path: /healthz/ready
+            port: 8081
+          initialDelaySeconds: 10
+          periodSeconds: 3
+          timeoutSeconds: 600
+        resources:
+          requests:
+            memory: 2Gi
+        volumeMounts:
+        - mountPath: /etc/kubeconfig
+          name: release-controller-kubeconfigs
+          readOnly: true
+      serviceAccountName: release-controller-ocp-s390x-priv
+      volumes:
+      - name: internal-tls
+        secret:
+          secretName: release-controller-api-s390x-priv-tls
+      - name: session-secret
+        secret:
+          secretName: release-controller-session-secret
+      - name: release-controller-kubeconfigs
+        secret:
+          defaultMode: 420
+          items:
+          - key: sa.release-controller-ocp-s390x-priv.app.ci.config
+            path: kubeconfig
+          secretName: release-controller-kubeconfigs
 ---
 #---------------------------------------------------------------------------------
 # osd_files_cache_rbac.py added the following resource
@@ -466,7 +554,7 @@ spec:
         - -cookie-secret-file=/etc/proxy/secrets/session_secret
         - -tls-cert=/etc/tls/private/tls.crt
         - -tls-key=/etc/tls/private/tls.key
-        image: openshift/oauth-proxy:latest
+        image: quay.io/openshift/origin-oauth-proxy:4.8
         imagePullPolicy: IfNotPresent
         name: oauth-proxy
         ports:

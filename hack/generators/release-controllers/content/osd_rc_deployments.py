@@ -1,5 +1,5 @@
 
-from content.utils import get_rc_volumes, get_rc_volume_mounts
+from content.utils import get_rc_volumes, get_rc_volume_mounts, get_kubeconfig_volumes, get_kubeconfig_volume_mounts
 
 
 def _add_osd_rc_bootstrap(gendoc):
@@ -25,7 +25,7 @@ def _add_osd_rc_bootstrap(gendoc):
                 {
                     'from': {
                         'kind': 'DockerImage',
-                        'name': 'image-registry.openshift-image-registry.svc:5000/ocp/4.9:tests'
+                        'name': 'image-registry.openshift-image-registry.svc:5000/ocp/4.10:tests'
                     },
                     'importPolicy': {
                         'scheduled': True
@@ -56,7 +56,7 @@ def _add_osd_rc_route(gendoc):
             },
             'to': {
                 'kind': 'Service',
-                'name': context.rc_service_name,
+                'name': context.rc_api_service_name,
             }
         }
     })
@@ -64,10 +64,12 @@ def _add_osd_rc_route(gendoc):
 
 def _add_osd_rc_service(gendoc):
     annotations = {}
+    annotationsAPI = {}
     context = gendoc.context
 
     if context.private:
         annotations['service.alpha.openshift.io/serving-cert-secret-name'] = context.secret_name_tls
+        annotationsAPI['service.alpha.openshift.io/serving-cert-secret-name'] = context.secret_name_tls_api
 
     gendoc.append({
         'apiVersion': 'v1',
@@ -88,6 +90,28 @@ def _add_osd_rc_service(gendoc):
             }],
             'selector': {
                 'app': context.rc_service_name
+            }
+        }
+    })
+    gendoc.append({
+        'apiVersion': 'v1',
+        'kind': 'Service',
+        'metadata': {
+            'name': context.rc_api_service_name,
+            'namespace': context.config.rc_deployment_namespace,
+            'annotations': annotationsAPI,
+            'labels': {
+                'app': context.rc_api_service_name
+            }
+        },
+        'spec': {
+            'ports': [{
+                'name': 'main',
+                'port': 443 if context.private else 80,
+                'targetPort': 8443 if context.private else 8080
+            }],
+            'selector': {
+                'app': context.rc_api_service_name
             }
         }
     })
@@ -121,6 +145,30 @@ def _add_osd_rc_servicemonitor(gendoc):
             }
         }
     })
+    gendoc.append({
+        'apiVersion': 'monitoring.coreos.com/v1',
+        'kind': 'ServiceMonitor',
+        'metadata': {
+            'name': context.rc_api_service_name,
+            'namespace': 'prow-monitoring',
+            'annotations': annotations,
+        },
+        'spec': {
+            'endpoints': [{
+                'interval': '30s',
+                'port': 'main',
+                'scheme': 'http',
+            }],
+            'namespaceSelector': {
+                'matchNames': ['ci'],
+            },
+            'selector': {
+                'matchLabels': {
+                    'app': context.rc_api_service_name,
+                }
+            }
+        }
+    })
 
 
 def _get_osd_rc_deployment_sidecars(context):
@@ -138,7 +186,7 @@ def _get_osd_rc_deployment_sidecars(context):
                      '-http-address=',
                      '-email-domain=*',
                      '-upstream=http://localhost:8080',
-                     f'-client-id=system:serviceaccount:{context.config.rc_deployment_namespace}:release-controller',
+                     f'-client-id=system:serviceaccount:{context.config.rc_deployment_namespace}:release-controller-{context.is_namespace}',
                      '-openshift-ca=/etc/pki/tls/cert.pem',
                      '-openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt',
                      '-openshift-sar={"verb": "get", "resource": "imagestreams", "namespace": "ocp-private"}',
@@ -147,7 +195,7 @@ def _get_osd_rc_deployment_sidecars(context):
                      '-cookie-secret-file=/etc/proxy/secrets/session_secret',
                      '-tls-cert=/etc/tls/private/tls.crt',
                      '-tls-key=/etc/tls/private/tls.key'],
-            'image': 'openshift/oauth-proxy:latest',
+            'image': 'quay.io/openshift/origin-oauth-proxy:4.8',
             'imagePullPolicy': 'IfNotPresent',
             'name': 'oauth-proxy',
             'ports': [{
@@ -178,7 +226,7 @@ def _add_osd_rc_deployment(gendoc):
 
     # Creating Cluster Groups for the AMD64 jobs...
     if context.arch == 'x86_64':
-        extra_rc_args.append('--cluster-group=build01,build02')
+        extra_rc_args.append('--cluster-group=build01,build03')
         extra_rc_args.append('--cluster-group=vsphere')
 
     gendoc.append({
@@ -214,12 +262,10 @@ def _add_osd_rc_deployment(gendoc):
                                 },
                             },
                             'command': ['/usr/bin/release-controller',
-                                        # '--to=release',  # Removed according to release controller help
                                         *extra_rc_args,
                                         '--prow-config=/etc/config/config.yaml',
                                         '--supplemental-prow-config-dir=/etc/config',
                                         '--job-config=/etc/job-config',
-                                        f'--artifacts={context.fc_app_url}',
                                         '--listen=' + ('127.0.0.1:8080' if context.private else ':8080'),
                                         f'--prow-namespace={context.config.rc_deployment_namespace}',
                                         '--non-prow-job-kubeconfig=/etc/kubeconfig/kubeconfig',
@@ -240,10 +286,98 @@ def _add_osd_rc_deployment(gendoc):
                                         '--authentication-message=Pulling these images requires <a href="https://docs.ci.openshift.org/docs/how-tos/use-registries-in-build-farm/">authenticating to the app.ci cluster</a>.'],
                             'image': 'release-controller:latest',
                             'name': 'controller',
-                            'volumeMounts': get_rc_volume_mounts(context)
+                            'volumeMounts': get_rc_volume_mounts(),
+                            'livenessProbe': {
+                                'httpGet': {
+                                  'path': '/healthz',
+                                  'port': 8081
+                                },
+                                'initialDelaySeconds': 3,
+                                'periodSeconds': 3,
+                            },
+                            'readinessProbe': {
+                                'httpGet': {
+                                  'path': '/healthz/ready',
+                                  'port': 8081
+                                },
+                                'initialDelaySeconds': 10,
+                                'periodSeconds': 3,
+                                'timeoutSeconds': 600,
+                            },
                         }],
                     'serviceAccountName': f'release-controller-{context.is_namespace}',
                     'volumes': get_rc_volumes(context, context.is_namespace)
+                }
+            }
+        }
+    })
+
+    gendoc.append({
+        'apiVersion': 'apps/v1',
+        'kind': 'Deployment',
+        'metadata': {
+            'annotations': {
+                'image.openshift.io/triggers': '[{"from":{"kind":"ImageStreamTag","name":"release-controller-api:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\\"controller\\")].image"}]'
+            },
+            'name': f'release-controller-api-{context.is_namespace}',
+            'namespace': context.config.rc_deployment_namespace,
+        },
+        'spec': {
+            'replicas': 3,
+            'selector': {
+                'matchLabels': {
+                    'app': context.rc_api_service_name
+                }
+            },
+            'template': {
+                'metadata': {
+                    'labels': {
+                        'app': context.rc_api_service_name
+                    }
+                },
+                'spec': {
+                    'containers': [
+                        *_get_osd_rc_deployment_sidecars(context),
+                        {
+                            "resources": {
+                                "requests": {
+                                    "memory": "2Gi"
+                                },
+                            },
+                            'command': ['/usr/bin/release-controller-api',
+                                        # '--to=release',  # Removed according to release controller help
+                                        f'--release-namespace={context.is_namespace}',
+                                        f'--artifacts={context.fc_app_url}',
+                                        f'--prow-namespace={context.config.rc_deployment_namespace}',
+                                        '--non-prow-job-kubeconfig=/etc/kubeconfig/kubeconfig',
+                                        f'--job-namespace={context.jobs_namespace}',
+                                        '--tools-image-stream-tag=release-controller-bootstrap:tests',
+                                        f'--release-architecture={context.get_supported_architecture_name()}',
+                                        '-v=6',
+                                        '--authentication-message=Pulling these images requires <a href="https://docs.ci.openshift.org/docs/how-tos/use-registries-in-build-farm/">authenticating to the app.ci cluster</a>.'],
+                            'image': 'release-controller-api:latest',
+                            'name': 'controller',
+                            'volumeMounts': get_kubeconfig_volume_mounts(),
+                            'livenessProbe': {
+                                'httpGet': {
+                                  'path': '/healthz',
+                                  'port': 8081
+                                },
+                                'initialDelaySeconds': 3,
+                                'periodSeconds': 3,
+                            },
+                            'readinessProbe': {
+                                'httpGet': {
+                                  'path': '/healthz/ready',
+                                  'port': 8081
+                                },
+                                'initialDelaySeconds': 10,
+                                'periodSeconds': 3,
+                                'timeoutSeconds': 600,
+                            },
+                        }],
+                    'serviceAccountName': f'release-controller-{context.is_namespace}',
+                    'volumes': get_kubeconfig_volumes(context, namespace=context.is_namespace, secret_name=context.secret_name_tls_api)
                 }
             }
         }

@@ -3,10 +3,10 @@ base_images:
     name: "4.10"
     namespace: ocp
     tag: base
-  ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.16-openshift-4.9
+    tag: rhel-8-golang-1.17-openshift-4.10
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
@@ -14,12 +14,11 @@ images:
 - dockerfile_path: Dockerfile.rhel
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
   to: openshift-controller-manager
 promotion:
-  disabled: true
   name: "4.10"
   namespace: ocp
 releases:
@@ -72,6 +71,12 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-proxy
+- as: openshift-e2e-aws-builds-techpreview
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-builds-techpreview
 - as: e2e-gcp
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:

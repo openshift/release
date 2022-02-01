@@ -9,4 +9,5 @@ job-run-aggregator analyze-job-runs \
   --job=${VERIFICATION_JOB_NAME} \
   --payload-tag=${PAYLOAD_TAG} \
   --job-start-time=${JOB_START_TIME} \
-  --working-dir=${WORKING_DIR}
+  --working-dir=${WORKING_DIR} \
+  --timeout=4h40m

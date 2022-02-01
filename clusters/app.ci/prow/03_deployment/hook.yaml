@@ -112,7 +112,7 @@ items:
         serviceAccountName: hook
         containers:
         - name: hook
-          image: gcr.io/k8s-prow/hook:v20211019-5763223177
+          image: gcr.io/k8s-prow/hook:v20220201-09a8a0acae
           args:
           - --config-path=/etc/config/config.yaml
           - --supplemental-prow-config-dir=/etc/config
@@ -128,8 +128,7 @@ items:
           - --bugzilla-api-key-path=/etc/bugzilla/api
           - --bugzilla-auth-method=bearer
           - --jira-endpoint=https://issues.redhat.com
-          - --jira-username=dptp-bot
-          - --jira-password-file=/etc/jira/password
+          - --jira-bearer-token-file=/etc/jira/token
           - --projected-token-file=/var/sa-token/token
           - --supplemental-plugin-config-dir=/etc/plugins
           - --kubeconfig-dir=/etc/build-farm-credentials
@@ -167,50 +166,8 @@ items:
             readOnly: true
           - name: tmp
             mountPath: /tmp
-          - name: job-config-misc
-            mountPath: /etc/job-config/misc
-            readOnly: true
-          - name: job-config-master-periodics
-            mountPath: /etc/job-config/master-periodics
-            readOnly: true
-          - name: job-config-master-postsubmits
-            mountPath: /etc/job-config/master-postsubmits
-            readOnly: true
-          - name: job-config-master-presubmits
-            mountPath: /etc/job-config/master-presubmits
-            readOnly: true
-          - name: job-config-3x
-            mountPath: /etc/job-config/3.x
-            readOnly: true
-          - name: job-config-41
-            mountPath: /etc/job-config/4.1
-            readOnly: true
-          - name: job-config-42
-            mountPath: /etc/job-config/4.2
-            readOnly: true
-          - name: job-config-43
-            mountPath: /etc/job-config/4.3
-            readOnly: true
-          - name: job-config-44
-            mountPath: /etc/job-config/4.4
-            readOnly: true
-          - name: job-config-45
-            mountPath: /etc/job-config/4.5
-            readOnly: true
-          - name: job-config-46
-            mountPath: /etc/job-config/4.6
-            readOnly: true
-          - name: job-config-47
-            mountPath: /etc/job-config/4.7
-            readOnly: true
-          - name: job-config-48
-            mountPath: /etc/job-config/4.8
-            readOnly: true
-          - name: job-config-49
-            mountPath: /etc/job-config/4.9
-            readOnly: true
-          - name: job-config-410
-            mountPath: /etc/job-config/4.10
+          - name: job-config
+            mountPath: /etc/job-config
             readOnly: true
           - mountPath: /etc/build-farm-credentials
             name: build-farm-credentials
@@ -243,7 +200,7 @@ items:
             secretName: bugzilla-credentials-openshift-bugzilla-robot
         - name: jira
           secret:
-            secretName: jira-credentials-dptp-bot
+            secretName: jira-token-dptp-bot
         - name: unsplash-api
           secret:
             secretName: unsplash-api-key
@@ -253,51 +210,41 @@ items:
         - name: plugins
           configMap:
             name: plugins
-        - name: job-config-misc
-          configMap:
-            name: job-config-misc
-        - name: job-config-master-periodics
-          configMap:
-            name: job-config-master-periodics
-        - name: job-config-master-postsubmits
-          configMap:
-            name: job-config-master-postsubmits
-        - name: job-config-master-presubmits
-          configMap:
-            name: job-config-master-presubmits
-        - name: job-config-3x
-          configMap:
-            name: job-config-3.x
-        - name: job-config-41
-          configMap:
-            name: job-config-4.1
-        - name: job-config-42
-          configMap:
-            name: job-config-4.2
-        - name: job-config-43
-          configMap:
-            name: job-config-4.3
-        - name: job-config-44
-          configMap:
-            name: job-config-4.4
-        - name: job-config-45
-          configMap:
-            name: job-config-4.5
-        - name: job-config-46
-          configMap:
-            name: job-config-4.6
-        - name: job-config-47
-          configMap:
-            name: job-config-4.7
-        - name: job-config-48
-          configMap:
-            name: job-config-4.8
-        - name: job-config-49
-          configMap:
-            name: job-config-4.9
-        - name: job-config-410
-          configMap:
-            name: job-config-4.10
+        - name: job-config
+          projected:
+            sources:
+            - configMap:
+                name: job-config-misc
+            - configMap:
+                name: job-config-master-periodics
+            - configMap:
+                name: job-config-master-postsubmits
+            - configMap:
+                name: job-config-master-presubmits
+            - configMap:
+                name: job-config-3.x
+            - configMap:
+                name: job-config-4.1
+            - configMap:
+                name: job-config-4.2
+            - configMap:
+                name: job-config-4.3
+            - configMap:
+                name: job-config-4.4
+            - configMap:
+                name: job-config-4.5
+            - configMap:
+                name: job-config-4.6
+            - configMap:
+                name: job-config-4.7
+            - configMap:
+                name: job-config-4.8
+            - configMap:
+                name: job-config-4.9
+            - configMap:
+                name: job-config-4.10
+            - configMap:
+                name: job-config-4.11
         - name: build-farm-credentials
           secret:
             secretName: hook

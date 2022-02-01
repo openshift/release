@@ -1,0 +1,75 @@
+# this is the Namespace in which your ServiceAccount will live
+apiVersion: v1
+kind: Namespace
+metadata:
+  annotations:
+    openshift.io/description: Automation ServiceAccounts for continuous-release-jobs
+    openshift.io/display-name: continuous-release-jobs CI
+  name: continuous-release-jobs
+---
+# this is the ServiceAccount whose credentials you will use
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: image-puller
+  namespace: continuous-release-jobs
+---
+# this grants your ServiceAccount rights to pull images
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: continuous-release-jobs-image-puller-binding
+  # the namespace from which you will pull images
+  namespace: continuous-release-jobs
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: system:image-puller
+subjects:
+  - kind: ServiceAccount
+    namespace: continuous-release-jobs
+    name: image-puller
+---
+# the Group of people who should be able to manage this ServiceAccount
+kind: Group
+apiVersion: v1
+metadata:
+  name: continuous-release-jobs-admins
+users:
+  # these names are GitHub usernames
+  - bradmwilliams
+  - jupierce
+  - AlexNPavel
+---
+# this adds the admins to the project.
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: continuous-release-jobs-viewer-binding
+  namespace: continuous-release-jobs
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: view
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: continuous-release-jobs-admins
+    namespace: continuous-release-jobs
+---
+# this grants the right to read the ServiceAccount's credentials and pull
+# images to the admins.
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: continuous-release-jobs-admins-binding
+  namespace: continuous-release-jobs
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: pull-secret-namespace-manager
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: continuous-release-jobs-admins
+    namespace: continuous-release-jobs

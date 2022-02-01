@@ -1,19 +1,19 @@
 base_images:
   assisted-installer:
-    name: "2.4"
-    namespace: open-cluster-management
+    name: ocm-2.4
+    namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-controller:
-    name: "2.4"
-    namespace: open-cluster-management
+    name: ocm-2.4
+    namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: "2.4"
-    namespace: open-cluster-management
+    name: ocm-2.4
+    namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: assisted-test
-    namespace: ocp-kni
+    name: ocm-2.4
+    namespace: edge-infrastructure
     tag: assisted-test-infra
   coreos-centos-centos8:
     name: centos8
@@ -39,8 +39,8 @@ images:
       - registry.ci.openshift.org/openshift/release:golang-1.16
   to: assisted-installer-agent
 promotion:
-  name: "2.4"
-  namespace: open-cluster-management
+  name: ocm-2.4
+  namespace: edge-infrastructure
 releases:
   initial:
     integration:
@@ -60,6 +60,24 @@ test_binary_build_commands: |
   go mod vendor
   mkdir /.cache && chmod 775 -R /.cache ${GOPATH}
 tests:
+- as: mirror-nightly-image
+  cron: '@daily'
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-installer-agent
+    env:
+      RELEASE_TAG_PREFIX: ocm-2.4
+    test:
+    - ref: baremetalds-assisted-images-publish
+- as: mirror-vcsref-image
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-installer-agent
+    env:
+      RELEASE_TAG_PREFIX: ocm-2.4
+    test:
+    - ref: baremetalds-assisted-images-publish
 - as: ocm-publish
   postsubmit: true
   steps:
@@ -69,7 +87,6 @@ tests:
       IMAGE_REPO: assisted-installer-agent
       OSCI_ENV_CONFIG: |
         OSCI_PUBLISH_DELAY=0
-      REGISTRY_ORG: open-cluster-management
       RELEASE_REF: release-2.4
     workflow: ocm-ci-manifest-update
 - as: lint
@@ -90,8 +107,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=release-ocm-2.4
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-ipv6
   optional: true
   steps:
@@ -100,8 +116,7 @@ tests:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=release-ocm-2.4
         IPv6=yes
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-single-node
   optional: true
   steps:
@@ -110,8 +125,7 @@ tests:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=release-ocm-2.4
         NUM_MASTERS=1
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-olm
   optional: true
   steps:
@@ -120,8 +134,8 @@ tests:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=release-ocm-2.4
         TEST_FUNC=test_olm_operator
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+      PACKET_PLAN: m2.xlarge.x86
+    workflow: baremetalds-assisted
 zz_generated_metadata:
   branch: release-ocm-2.4
   org: openshift

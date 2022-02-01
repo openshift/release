@@ -1,11 +1,19 @@
 import glob
 import os
-
+import configparser
 
 def add_rpm_mirror_service(gendoc, clone_dir, major_minor):
     hyphened_version = f'{major_minor.replace(".", "-")}'
     for repo_file in sorted(glob.glob(f'{clone_dir}/core-services/release-controller/_repos/ocp-{major_minor}-*.repo')):
         bn = os.path.splitext(os.path.basename(repo_file))[0]  # e.g. ocp-4.7-default
+
+        # ngnix will create an endpoint in each pod, named after each repo
+        # entry in the .repo file. We need to find one of these names
+        # in order to formulate a good livenessProbe check which
+        # will actually hit the upstream repos.
+        repo_config = configparser.ConfigParser()
+        repo_config.read(repo_file, encoding='utf-8')
+        first_section_id = repo_config.sections()[0]
 
         # Unfortunately, there is a legacy mapping from .repo file to service name.
         # Perform that mapping now.
@@ -103,7 +111,16 @@ def add_rpm_mirror_service(gendoc, clone_dir, major_minor):
                                     'memory': "500Mi"
                                 },
                             },
-                            'workingDir': '/tmp/repos'
+                            'workingDir': '/tmp/repos',
+                            'livenessProbe': {
+                                'httpGet': {
+                                    # All repos have repomd.xml, so we should be able to read it.
+                                    'path': f'/{first_section_id}/repodata/repomd.xml',
+                                    'port': 8080,
+                                },
+                                'initialDelaySeconds': 120,
+                                'periodSeconds': 120,
+                            }
                         }],
                         'volumes': [
                             {

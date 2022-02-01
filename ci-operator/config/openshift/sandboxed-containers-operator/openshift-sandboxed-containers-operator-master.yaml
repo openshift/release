@@ -3,6 +3,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: golang-1.13
+  ocp_builder_rhel-8-golang-1.16-openshift-4.10:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.16-openshift-4.10
 build_root:
   image_stream_tag:
     name: release
@@ -10,6 +14,10 @@ build_root:
     tag: golang-1.13
 images:
 - from: ocp_builder_golang-1.13
+  inputs:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.10:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.10
   to: sandboxed-containers-operator
 operator:
   bundles:
@@ -35,12 +43,13 @@ resources:
       memory: 200Mi
 tests:
 - as: sandboxed-containers-operator-e2e
+  optional: true
   steps:
     cluster_profile: azure4
     dependencies:
       OO_INDEX: ci-index-sandboxed-containers-operator-bundle
     env:
-      OO_CHANNEL: preview-1.0
+      OO_CHANNEL: candidate
       OO_INSTALL_NAMESPACE: openshift-sandboxed-containers-operator
       OO_PACKAGE: sandboxed-containers-operator
       OO_TARGET_NAMESPACES: openshift-sandboxed-containers-operator

@@ -3,10 +3,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_builder_rhel-8-golang-1.16-openshift-4.10:
+  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.16-openshift-4.10
+    tag: rhel-8-golang-1.17-openshift-4.10
   ubi8:
     name: ubi
     namespace: ocp
@@ -18,12 +18,11 @@ images:
 - dockerfile_path: Dockerfile.openshift
   from: base-os
   inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.10:
+    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.10
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
   to: baremetal-runtimecfg
 promotion:
-  disabled: true
   name: 4.10-priv
   namespace: ocp-private
 raw_steps:
@@ -64,29 +63,17 @@ tests:
 - as: e2e-metal-ipi
   optional: true
   steps:
-    cluster_profile: packet
-    env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4
-        NETWORK_TYPE=OpenShiftSDN
-    workflow: baremetalds-e2e
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ipv4
 - as: e2e-metal-ipi-ovn-ipv6
   steps:
-    cluster_profile: packet
-    env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v6
-        NETWORK_TYPE=OVNKubernetes
-    workflow: baremetalds-e2e
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-ipv6
 - as: e2e-metal-ipi-ovn-dualstack
   optional: true
   steps:
-    cluster_profile: packet
-    env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4v6
-        NETWORK_TYPE=OVNKubernetes
-    workflow: baremetalds-e2e
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-dualstack
 - as: e2e-openstack
   optional: true
   steps:

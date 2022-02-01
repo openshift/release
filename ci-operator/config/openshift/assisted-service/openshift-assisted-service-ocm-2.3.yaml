@@ -1,24 +1,20 @@
 base_images:
   assisted-installer:
     name: ocm-2.3
-    namespace: openshift
+    namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
     name: ocm-2.3
-    namespace: openshift
+    namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
     name: ocm-2.3
-    namespace: openshift
+    namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service-scripts:
-    name: assisted
-    namespace: ocp-kni
-    tag: assisted-service-scripts
-  assisted-test-infra:
-    name: ocm-2.3
+    name: ocm-2.4
     namespace: edge-infrastructure
-    tag: assisted-test-infra
+    tag: assisted-service-scripts
   coreos_centos:
     name: coreos-centos8-buildroot
     namespace: coreos
@@ -63,11 +59,8 @@ operator:
   - pullspec: quay.io/ocpmetal/postgresql-12-centos7:latest
     with: postgresql-12-centos7
 promotion:
-  additional_images:
-    assisted-service-index: ci-index
-    assisted-service-operator-bundle: ci-bundle0
   name: ocm-2.3
-  namespace: openshift
+  namespace: edge-infrastructure
 releases:
   candidate:
     release:
@@ -211,26 +204,6 @@ tests:
       IP_STACK: v4
       NUM_EXTRA_WORKERS: "1"
     workflow: baremetalds-assisted-operator-ztp
-- as: e2e-metal-assisted-kube-api
-  run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=ocm-2.3
-        NUM_MASTERS=1
-        NUM_WORKERS=0
-        IPv6=yes
-        IPv4=no
-        PROXY=yes
-        ADDITIONAL_PARAMS="--with-static-network-config"
-        ISO_IMAGE_TYPE=minimal-iso
-        KUBE_API=yes
-        OPENSHIFT_VERSION=4.8
-        ENABLE_KUBE_API=true
-        MAKEFILE_TARGET=all
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
 zz_generated_metadata:
   branch: ocm-2.3
   org: openshift

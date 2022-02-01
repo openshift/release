@@ -3,22 +3,21 @@ base_images:
     name: 4.10-priv
     namespace: ocp-private
     tag: base
-  ocp_builder_rhel-8-golang-1.16-openshift-4.10:
+  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.16-openshift-4.10
+    tag: rhel-8-golang-1.17-openshift-4.10
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-storage-operator
 images:
 - from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.10:
+    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.10
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
   to: cluster-storage-operator
 promotion:
-  disabled: true
   name: 4.10-priv
   namespace: ocp-private
 releases:
@@ -94,6 +93,18 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-csi
+- as: e2e-azure-file-csi
+  optional: true
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-csi-file
+- as: e2e-aws-shared-resources
+  optional: true
+  steps:
+    cluster_profile: aws
+    test:
+    - ref: csi-driver-shared-resource-e2e
+    workflow: csi-driver-shared-resource-e2e-techpreview
 - as: e2e-openstack
   optional: true
   steps:

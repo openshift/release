@@ -17,7 +17,7 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
 fi
 
 openshift_install_path="/var/lib/openshift-install"
-third_octet=$(grep -oP 'ci-segment-\K[[:digit:]]+' <(echo "${LEASED_RESOURCE}"))
+third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${LEASED_RESOURCE}"))
 
 export HOME=/tmp
 export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${RELEASE_IMAGE_LATEST}
@@ -93,7 +93,16 @@ source "${SHARED_DIR}/govc.sh"
 
 echo "$(date -u --rfc-3339=seconds) - Extend install-config.yaml ..."
 
-cat >> "${install_config}" << EOF
+# If platform none is present in the install-config, extension is skipped.
+declare platform_none="none: {}"
+platform_required=true
+if grep -F "${platform_none}" "${install_config}"
+then
+        echo "platform none present, install-config will not be extended"
+        platform_required=false
+fi
+
+${platform_required} && cat >> "${install_config}" << EOF
 baseDomain: $base_domain
 controlPlane:
   name: "master"
@@ -112,6 +121,15 @@ platform:
     username: "${GOVC_USERNAME}"
     folder: "/${vsphere_datacenter}/vm/${cluster_name}"
 EOF
+
+#set machine cidr if proxy is enabled
+if grep 'httpProxy' "${install_config}" ; then
+  cat >> "${install_config}" << EOF
+networking:
+  machineNetwork:
+  - cidr: "192.168.${third_octet}.0/25"
+EOF
+fi
 
 echo "$(date -u --rfc-3339=seconds) - Create terraform.tfvars ..."
 cat > "${SHARED_DIR}/terraform.tfvars" <<-EOF
@@ -164,6 +182,9 @@ if [ $ret -ne 0 ]; then
   cp "${dir}/.openshift_install.log" "${ARTIFACT_DIR}/.openshift_install.log"
   exit "$ret"
 fi
+
+# remove channel from CVO
+sed -i '/^  channel:/d' "manifests/cvo-overrides.yaml"
 
 ### Remove control plane machines
 echo "Removing control plane machines..."

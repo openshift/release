@@ -1,0 +1,116 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.43.0
+  stolostron_builder_go1.17-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.17-linux
+binary_build_commands: make build --warn-undefined-variables
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: go1.17-linux
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  inputs:
+    stolostron_builder_go1.17-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.17-linux
+  to: submariner-addon
+promotion:
+  name: "2.5"
+  namespace: stolostron
+releases:
+  initial:
+    integration:
+      name: "4.6"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.6"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 100m
+      memory: 300Mi
+test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
+tests:
+- as: build
+  commands: |
+    true
+  container:
+    from: bin
+- as: verify
+  commands: |
+    make verify -k --warn-undefined-variables
+  container:
+    from: bin
+- as: verify-deps
+  commands: |
+    make update-deps-overrides
+    make verify-deps -k --warn-undefined-variables
+  container:
+    from: bin
+- as: integration
+  commands: make test-integration
+  container:
+    from: test-bin
+- as: unit
+  commands: |
+    make test --warn-undefined-variables
+  container:
+    from: test-bin
+- as: sonarcloud
+  steps:
+    test:
+    - as: test
+      commands: |
+        export SELF="make -f /opt/build-harness/Makefile.prow"
+        make -f /opt/build-harness/Makefile.prow sonar/go/prow
+      credentials:
+      - mount_path: /etc/sonarcloud/
+        name: acm-sonarcloud-token
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+- as: pr-merge-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: submariner-addon
+    env:
+      IMAGE_REPO: submariner-addon
+      IMAGE_TAG: latest
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: fast-forward
+  postsubmit: true
+  steps:
+    env:
+      DESTINATION_BRANCH: release-2.5
+    workflow: ocm-ci-fastforward
+- as: golangci-lint
+  commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    make golangci-lint SHELL=/bin/bash
+  container:
+    from: golangci-lint
+zz_generated_metadata:
+  branch: main
+  org: stolostron
+  repo: submariner-addon

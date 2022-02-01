@@ -169,7 +169,7 @@ periodics:
           attempts=3
           for attempt in $( seq $attempts ); do
             echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
-            if oc -v8 image mirror --keep-manifest-list -a /tmp/config.json -f="$mapping" --skip-multiple-scopes; then
+            if oc image mirror --keep-manifest-list -a /tmp/config.json -f="$mapping" --skip-multiple-scopes; then
               break
             fi
             if [[ $attempt -eq $attempts ]]; then
@@ -403,7 +403,7 @@ periodics:
   labels:
     ci.openshift.io/area: openshift-container-storage
     ci.openshift.io/role: image-mirroring
-  name: periodic-image-mirroring-ocs-operator
+  name: periodic-image-mirroring-red-hat-storage
   spec:
     containers:
     - args:
@@ -411,7 +411,7 @@ periodics:
       - |
         set -o errexit
         failures=0
-        for mapping in /etc/imagemirror/mapping_ocs-operator*; do
+        for mapping in /etc/imagemirror/mapping_red-hat-storage_*; do
           echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
           if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
             echo "ERROR: Failed to mirror images from $mapping"
@@ -803,7 +803,8 @@ periodics:
   reporter_config:
     slack:
       channel: '#announce-logging'
-      job_states_to_report: null
+      job_states_to_report:
+      - failure
       report_template: Job {{.Spec.Job}} failed
   spec:
     containers:
@@ -947,7 +948,7 @@ periodics:
   decorate: true
   labels:
     ci.openshift.io/area: supplemental-ci-images
-    ci.openshift.io/role: image-mirroring
+    ci.openshift.io/role: infra
   name: periodic-image-mirroring-supplemental-ci-images
   spec:
     containers:
@@ -958,10 +959,16 @@ periodics:
         failures=0
         for mapping in /etc/imagemirror/mapping_supplemental_ci_images_*; do
           echo "Running: oc image mirror -f=$mapping --skip-multiple-scopes"
-          if ! oc image mirror -f="$mapping" --skip-multiple-scopes; then
-            echo "ERROR: Failed to mirror images from $mapping"
-            failures=$((failures+1))
-          fi
+          attempts=3
+          for attempt in $( seq $attempts ); do
+            if oc image mirror -f="$mapping" --skip-multiple-scopes; then
+              break
+            fi
+            if [[ $attempt -eq $attempts ]]; then
+              echo "ERROR: Failed to mirror images from $mapping after $attempts attempts"
+              failures=$((failures+1))
+            fi
+          done
         done
         exit $failures
       command:
@@ -995,7 +1002,7 @@ periodics:
   decorate: true
   labels:
     ci.openshift.io/area: supplemental-ci-private-images-redhat
-    ci.openshift.io/role: image-mirroring
+    ci.openshift.io/role: infra
   name: periodic-image-mirroring-supplemental-ci-private-images-redhat
   spec:
     containers:
@@ -1045,6 +1052,14 @@ periodics:
     ci.openshift.io/area: edge-infrastructure
     ci.openshift.io/role: image-mirroring
   name: periodic-image-mirroring-edge-infrastructure
+  reporter_config:
+    slack:
+      channel: '#forum-edge-infra-alerts'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: '@here :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended
+        with *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
   spec:
     containers:
     - args:
@@ -1082,6 +1097,57 @@ periodics:
     - name: push
       secret:
         secretName: registry-push-credentials-quay-openshift-edge-infrastructure
+    - configMap:
+        name: image-mirror-mappings
+      name: config
+- agent: kubernetes
+  cluster: app.ci
+  cron: '@hourly'
+  decorate: true
+  labels:
+    ci.openshift.io/area: hypershift
+    ci.openshift.io/role: image-mirroring
+  name: periodic-image-mirroring-hypershift
+  spec:
+    automountServiceAccountToken: true
+    containers:
+    - args:
+      - -c
+      - |
+        set -o errexit
+        cp ~/.docker/config.json /tmp/config.json
+        oc registry login --to /tmp/config.json
+        failures=0
+        for mapping in /etc/imagemirror/mapping_hypershift*; do
+          echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
+          if ! oc image mirror --keep-manifest-list -a /tmp/config.json -f="$mapping" --skip-multiple-scopes; then
+            echo "ERROR: Failed to mirror images from $mapping"
+            failures=$((failures+1))
+          fi
+        done
+        exit $failures
+      command:
+      - /bin/bash
+      env:
+      - name: HOME
+        value: /home/mirror
+      image: registry.ci.openshift.org/ocp/4.9:cli
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /home/mirror/.docker/config.json
+        name: push
+        readOnly: true
+        subPath: config.json
+      - mountPath: /etc/imagemirror
+        name: config
+    volumes:
+    - name: push
+      secret:
+        secretName: registry-push-credentials-quayio-hypershift
     - configMap:
         name: image-mirror-mappings
       name: config

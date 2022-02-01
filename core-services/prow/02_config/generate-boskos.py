@@ -48,6 +48,12 @@ CONFIG = {
     'azurestack-quota-slice': {
         'ppe3': 2
     },
+    'azuremag-quota-slice': {
+        'usgovvirginia': 5
+    },
+    'equinix-ocp-metal-quota-slice': {
+        'default': 40,
+    },
     'gcp-quota-slice': {
         'us-central1': 70,
     },
@@ -65,13 +71,16 @@ CONFIG = {
         'default': 7,
     },
     'openstack-vexxhost-quota-slice': {
-        'default': 12,
+        'default': 18,
     },
     'openstack-kuryr-quota-slice': {
         'default': 2,
     },
+    'openstack-nfv-quota-slice': {
+        'default': 5,
+    },
     'openstack-vh-mecha-central-quota-slice': {
-        'default': 7,
+        'default': 5,
     },
     'openstack-vh-mecha-az0-quota-slice': {
         'default': 5,
@@ -88,9 +97,10 @@ CONFIG = {
     'packet-edge-quota-slice': {
         'default': 50,
     },
-    'kubevirt-quota-slice':{},
     'vsphere-quota-slice':{},
     'vsphere-discon-quota-slice':{},
+    'vsphere-clusterbot-quota-slice':{},
+    'vsphere-platform-none-quota-slice':{},
     'osd-ephemeral-quota-slice': {
         'default': 15,
     },
@@ -105,15 +115,15 @@ CONFIG = {
         'default': 15,
     },
     'ibmcloud-quota-slice': {
-        'default': 15,
+        'default': 7,
     },
-    'alibaba-quota-slice': {
+    'alibabacloud-quota-slice': {
         'us-east-1': 10,
     },
 }
 
-for i in range(2):
-    for j in range(5):
+for i in range(3):
+    for j in range(4):
         CONFIG['libvirt-s390x-quota-slice']['libvirt-s390x-{}-{}'.format(i, j)] = 1
 
 for i in range(3):
@@ -134,14 +144,17 @@ for i in range(10, 24):
 for i in range(1, 7):
     CONFIG['ovirt-upgrade-quota-slice']['ovirt-upgrade-{}'.format(i)] = 1
 
-for i in range(1, 3):
-    CONFIG['kubevirt-quota-slice']['tenant-cluster-{}'.format(i)] = 1
-
-for i in range(75,100):
+for i in range(88,103):
     CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
+
+for i in range(56,60):
+    CONFIG['vsphere-platform-none-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 for i in range(60,62):
     CONFIG['vsphere-discon-quota-slice']['qe-discon-segment-{}'.format(i)] = 1
+
+for i in range(50,54):
+    CONFIG['vsphere-clusterbot-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 config = {
     'resources': [],

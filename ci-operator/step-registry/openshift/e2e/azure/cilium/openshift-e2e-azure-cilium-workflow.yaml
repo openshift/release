@@ -15,8 +15,9 @@ workflow:
       # 5) known Cilium issue
       #    https://github.com/cilium/cilium/issues/10002
       # 6) skip maxUnavailable test as openshift-kube-proxy doesn't pass it
-      # 7) skip router idling test as the feature is not supported by Cilium yet (pending investigation)
-      # 8) skip /config/master test (peding investigation)
+      # 7) skip /config/master test (pending investigation)
+      # 8,9,10,11) pending investigation from Cilium team
+      # 12) regression - openshift-test should skip unidling tests on non-OpenshiftSDN CNIs
       TEST_SKIPS: >-
         NetworkPolicy between server and client should not allow access by TCP when a policy specifies only SCTP\|
         NetworkPolicy between server and client should allow egress access to server in CIDR block\|
@@ -24,8 +25,11 @@ workflow:
         NetworkPolicy between server and client should deny ingress access to updated pod\|
         Services should be rejected when no endpoints exist\|
         Managed cluster should only include cluster daemonsets that have maxUnavailable update of 10 or 33 percent\|
-        The HAProxy router should be able to connect to a service that is idled because a GET on the route will unidle it\|
-        Pods cannot access the /config/master API endpoint
+        Pods cannot access the /config/master API endpoint\|
+        Services should be able to update service type to NodePort listening on same port number but different protocols\|
+        Services should respect internalTrafficPolicy=Local Pod to Pod\|
+        Networking IPerf2\|
+        Unidling should work
     post:
     - chain: gather-network
     - chain: gather-core-dump

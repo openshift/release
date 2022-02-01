@@ -4,15 +4,15 @@ base_images:
     namespace: ocp
     tag: base
   cluster-logging-operator:
-    name: "5.3"
+    name: "5.5"
     namespace: logging
     tag: cluster-logging-operator
   cluster-logging-operator-e2e:
-    name: "5.3"
+    name: "5.5"
     namespace: logging
     tag: cluster-logging-operator-e2e
   cluster-logging-operator-registry:
-    name: "5.3"
+    name: "5.5"
     namespace: logging
     tag: cluster-logging-operator-registry
   elasticsearch-proxy:
@@ -98,7 +98,7 @@ operator:
   - pullspec: quay.io/openshift-logging/curator5
     with: pipeline:logging-curator5
 promotion:
-  name: "5.3"
+  name: "5.5"
   namespace: logging
 releases:
   latest:
@@ -121,11 +121,11 @@ tests:
     from: src
 - as: e2e-operator
   steps:
-    cluster_profile: gcp
+    cluster_profile: aws
     dependencies:
       OO_INDEX: ci-index-elasticsearch-operator-bundle
     env:
-      OO_CHANNEL: stable-5.3
+      OO_CHANNEL: stable
       OO_INSTALL_NAMESPACE: openshift-operators-redhat
       OO_PACKAGE: elasticsearch-operator
       OO_TARGET_NAMESPACES: '!all'
@@ -138,14 +138,14 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: optional-operators-ci-gcp
+    workflow: optional-operators-ci-aws
 - as: cluster-logging-operator-e2e
   steps:
-    cluster_profile: gcp
+    cluster_profile: aws
     dependencies:
       OO_INDEX: ci-index-elasticsearch-operator-bundle
     env:
-      OO_CHANNEL: stable-5.3
+      OO_CHANNEL: stable-5.4
       OO_INSTALL_NAMESPACE: openshift-operators-redhat
       OO_PACKAGE: elasticsearch-operator
       OO_TARGET_NAMESPACES: '!all'
@@ -173,11 +173,11 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: optional-operators-ci-gcp
+    workflow: optional-operators-ci-aws
 - as: e2e-upgrade
   optional: true
   steps:
-    cluster_profile: gcp
+    cluster_profile: aws
     test:
     - as: test
       cli: latest
@@ -203,7 +203,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-gcp
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: openshift

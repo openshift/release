@@ -27,21 +27,20 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_builder_rhel-8-golang-1.16-openshift-4.10:
+  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.16-openshift-4.10
+    tag: rhel-8-golang-1.17-openshift-4.10
 build_root:
   from_repository: true
 images:
 - from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.10:
+    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.10
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
   to: cluster-baremetal-operator
 promotion:
-  disabled: true
   name: "4.10"
   namespace: ocp
 releases:
@@ -95,17 +94,17 @@ tests:
 - as: e2e-metal-ipi
   skip_if_only_changed: (^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
-    cluster_profile: packet
+    cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ipv4
 - as: e2e-metal-ipi-serial-ipv4
   skip_if_only_changed: (^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
-    cluster_profile: packet
+    cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-serial-ipv4
 - as: e2e-metal-ipi-upgrade
   optional: true
   steps:
-    cluster_profile: packet
+    cluster_profile: equinix-ocp-metal
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4
@@ -115,20 +114,27 @@ tests:
       TEST_SUITE: ""
       TEST_TYPE: upgrade
     workflow: baremetalds-e2e-upgrade
+- as: e2e-metal-ipi-upgrade-ovn-ipv6
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      TEST_TYPE: upgrade
+    workflow: baremetalds-e2e-upgrade-ovn-ipv6
 - as: e2e-metal-ipi-ovn-ipv6
   skip_if_only_changed: (^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
-    cluster_profile: packet
+    cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
 - as: e2e-metal-ipi-ovn-dualstack
   optional: true
   steps:
-    cluster_profile: packet
+    cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-dualstack
 - as: e2e-metal-ipi-virtualmedia
   optional: true
   steps:
-    cluster_profile: packet
+    cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-virtualmedia
 - as: e2e-metal-assisted
   optional: true

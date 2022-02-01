@@ -28,7 +28,6 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.10
   to: ovn-kubernetes
 promotion:
-  disabled: true
   name: "4.10"
   namespace: ocp
 releases:
@@ -56,29 +55,17 @@ tests:
     workflow: openshift-e2e-aws-ovn
 - as: e2e-metal-ipi-ovn-ipv6
   steps:
-    cluster_profile: packet
-    env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v6
-        NETWORK_TYPE=OVNKubernetes
-    workflow: baremetalds-e2e
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-ipv6
 - as: e2e-metal-ipi-ovn-dualstack
   steps:
-    cluster_profile: packet
-    env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4v6
-        NETWORK_TYPE=OVNKubernetes
-    workflow: baremetalds-e2e
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-dualstack
 - as: e2e-metal-ipi-ovn-dualstack-periodic
   cron: 0 0 * * *
   steps:
-    cluster_profile: packet
-    env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4v6
-        NETWORK_TYPE=OVNKubernetes
-    workflow: baremetalds-e2e
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-dualstack
 - as: e2e-ovn-hybrid-step-registry
   optional: true
   steps:
@@ -104,6 +91,12 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-ovn
+- as: e2e-aws-ovn-upgrade
+  steps:
+    cluster_profile: aws
+    env:
+      TEST_TYPE: upgrade-conformance
+    workflow: openshift-upgrade-aws-ovn
 - as: e2e-gcp-ovn
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
@@ -125,6 +118,21 @@ tests:
       NETWORK_TYPE: OVNKubernetes
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
+- as: e2e-ibmcloud-ipi-ovn-periodic
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: ibmcloud
+    workflow: openshift-e2e-ibmcloud-ovn
+- as: e2e-aws-ovn-shared-to-local-gateway-mode-migration
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
+- as: e2e-aws-ovn-local-to-shared-gateway-mode-migration
+  steps:
+    cluster_profile: aws
+    env:
+      GATEWAY_MODE: local
+    workflow: openshift-e2e-aws-ovn-local-to-shared-gateway-mode-migration
 zz_generated_metadata:
   branch: release-4.10
   org: openshift

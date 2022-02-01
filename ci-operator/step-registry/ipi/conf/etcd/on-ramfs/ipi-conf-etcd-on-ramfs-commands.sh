@@ -20,6 +20,7 @@ spec:
         - contents: |
             [Unit]
             Description=Mount etcd as a ramdisk
+            After=ostree-remount.service var.mount
             Before=local-fs.target
             [Mount]
             What=none

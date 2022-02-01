@@ -1,8 +1,8 @@
 base_images:
-  ocp_builder_rhel-8-golang-1.16-openshift-4.8:
+  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.16-openshift-4.8
+    tag: rhel-8-golang-1.17-openshift-4.10
 binary_build_commands: make build
 build_root:
   from_repository: true
@@ -11,9 +11,9 @@ canonical_go_repository: github.com/openshift/windows-machine-config-operator
 images:
 - dockerfile_path: build/Dockerfile.ci
   inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.8:
+    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
   to: windows-machine-config-operator-test
 operator:
   bundles:
@@ -23,7 +23,6 @@ operator:
   - pullspec: REPLACE_IMAGE
     with: pipeline:windows-machine-config-operator-test
 promotion:
-  disabled: true
   name: 4.10-priv
   namespace: ocp-private
 releases:
@@ -71,6 +70,13 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: aws-e2e-ccm-install
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: openshift-e2e-aws-ccm-ovn-hybrid-install
 - as: aws-e2e-operator
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
@@ -85,6 +91,13 @@ tests:
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-azure-ovn-hybrid
+- as: azure-e2e-ccm-install
+  optional: true
+  steps:
+    cluster_profile: azure4
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: openshift-e2e-azure-ccm-ovn-hybrid-install
 - as: vsphere-e2e-operator
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
@@ -121,6 +134,12 @@ tests:
           cpu: 1000m
           memory: 400Mi
     workflow: optional-operators-ci-aws-ovn-hybrid
+- as: platform-none-vsphere-e2e-operator
+  steps:
+    cluster_profile: vsphere
+    test:
+    - ref: windows-e2e-operator-test-with-custom-vxlan-port
+    workflow: upi-vsphere-platform-none-ovn
 zz_generated_metadata:
   branch: release-4.10
   org: openshift-priv

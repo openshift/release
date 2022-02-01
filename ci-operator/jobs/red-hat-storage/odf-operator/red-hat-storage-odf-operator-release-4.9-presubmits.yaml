@@ -6,22 +6,22 @@ presubmits:
     - ^release-4\.9$
     - ^release-4\.9-
     cluster: build01
-    context: ci/prow/ci-index-fixed-dependencies
+    context: ci/prow/ci-index-odf-operator-static-deps
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-red-hat-storage-odf-operator-release-4.9-ci-index-fixed-dependencies
-    rerun_command: /test ci-index-fixed-dependencies
+    name: pull-ci-red-hat-storage-odf-operator-release-4.9-ci-index-odf-operator-static-deps
+    rerun_command: /test ci-index-odf-operator-static-deps
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=ci-index-fixed-dependencies
+        - --target=ci-index-odf-operator-static-deps
         command:
         - ci-operator
         image: ci-operator:latest
@@ -48,7 +48,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ci-index-fixed-dependencies,?($|\s.*)
+    trigger: (?m)^/test( | .* )ci-index-odf-operator-static-deps,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -110,6 +110,8 @@ presubmits:
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-red-hat-storage-odf-operator-release-4.9-odf-operator-bundle-e2e-aws
@@ -163,10 +165,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
+        secret:
+          secretName: cluster-secrets-aws
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -174,52 +174,3 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )odf-operator-bundle-e2e-aws,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-4\.9$
-    - ^release-4\.9-
-    cluster: build01
-    context: ci/prow/unit-tests
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-red-hat-storage-odf-operator-release-4.9-unit-tests
-    rerun_command: /test unit-tests
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=unit-tests
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )unit-tests,?($|\s.*)

@@ -1,6 +1,7 @@
 periodics:
 - agent: kubernetes
-  cluster: build01
+  cluster: build04
+  cron: 0 0 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -8,20 +9,37 @@ periodics:
   - base_ref: main
     org: redhat-et
     repo: microshift
-  interval: 20m
   labels:
-    ci-operator.openshift.io/is-promotion: "true"
-  max_concurrency: 1
-  name: periodic-redhat-et-microshift-main-nightly-build
+    ci-operator.openshift.io/cloud: gcp
+    ci-operator.openshift.io/cloud-cluster-profile: gcp
+    ci-operator.openshift.io/variant: periodics
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-redhat-et-microshift-main-periodics-copr-rpm-health-check
+  reporter_config:
+    slack:
+      channel: '#microshift-alerts'
+      job_states_to_report:
+      - pending
+      - success
+      - failure
+      - aborted
+      - error
+      report_template: '{{define "status_icon"}} {{if eq . "success"}}:green_jenkins_circle:
+        {{else if eq . "pending"}}:yellow_jenkins_circle: {{else if eq . "failed"
+        "aborted" "error"}}:red_jenkins_circle:@here {{else}}:question:{{end -}} {{end}}
+        {{- template "status_icon" .Status.State }} Job {{.Spec.Job}} entered state:
+        {{printf "%q" .Status.State}}. See logs: <{{.Status.URL}}|View>'
   spec:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
-      - --promote
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --target=[images]
+      - --secret-dir=/usr/local/copr-rpm-health-check-cluster-profile
+      - --target=copr-rpm-health-check
+      - --variant=periodics
       command:
       - ci-operator
       image: ci-operator:latest
@@ -31,26 +49,38 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/copr-rpm-health-check-cluster-profile
+        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
       - mountPath: /etc/pull-secret
         name: pull-secret
         readOnly: true
-      - mountPath: /etc/push-secret
-        name: push-secret
-        readOnly: true
       - mountPath: /etc/report
         name: result-aggregator
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-gcp
+        - configMap:
+            name: cluster-profile-gcp
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
-    - name: push-secret
-      secret:
-        secretName: registry-push-credentials-ci-central
     - name: result-aggregator
       secret:
         secretName: result-aggregator

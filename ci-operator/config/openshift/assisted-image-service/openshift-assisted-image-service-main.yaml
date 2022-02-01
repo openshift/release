@@ -50,6 +50,31 @@ test_binary_build_commands: |
   make build-openshift-ci-test-bin
   go mod vendor
 tests:
+- as: mirror-nightly-image
+  cron: '@daily'
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-image-service
+    test:
+    - ref: baremetalds-assisted-images-publish
+- as: mirror-vcsref-image
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-image-service
+    test:
+    - ref: baremetalds-assisted-images-publish
+- as: ocm-publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-image-service
+    env:
+      IMAGE_REPO: assisted-image-service
+      OSCI_ENV_CONFIG: |
+        OSCI_PUBLISH_DELAY=0
+      RELEASE_REF: release-2.5
+    workflow: ocm-ci-manifest-update
 - as: lint
   commands: |
     export GOCACHE=/tmp/

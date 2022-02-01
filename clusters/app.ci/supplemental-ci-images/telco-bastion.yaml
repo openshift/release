@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: List
+items:
+- kind: ImageStream
+  apiVersion: v1
+  metadata:
+    namespace: ci
+    name: telco-bastion
+- kind: BuildConfig
+  apiVersion: v1
+  metadata:
+    namespace: ci
+    name: telco-bastion
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: telco-bastion:latest
+    source:
+      dockerfile: |
+        FROM registry.ci.openshift.org/openshift/release:golang-1.14
+        ENV HOME /output
+        RUN yum install -y ansible && \
+            yum clean all && \
+            rm -rf /var/cache/yum/* && \
+            mkdir /output && \
+            chmod -R g+rwx /output && \
+            chmod g+w /etc/passwd && \
+            echo 'echo default:x:$(id -u):$(id -g):Default Application User:/output:/sbin/nologin\ >> /etc/passwd' > /output/fix_uid.sh && \
+            chmod g+rwx /output/fix_uid.sh
+      type: Dockerfile
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: registry.ci.openshift.org/openshift/release:golang-1.17
+        imageOptimizationPolicy: SkipLayers
+      type: Docker

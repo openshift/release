@@ -18,6 +18,11 @@ postsubmits:
         command:
         - applyconfig
         env:
+        - name: OPENSHIFT_MONITORING_CI_TOKEN_ON_HIVE
+          valueFrom:
+            secretKeyRef:
+              key: hive-openshift-monitoring-ci-token
+              name: hive-openshift-monitoring-credentials
         - name: OPENSHIFT_PROMETHEUS_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -42,7 +47,7 @@ postsubmits:
       serviceAccountName: config-updater
   - agent: kubernetes
     branches:
-    - master
+    - ^master$
     cluster: app.ci
     decorate: true
     labels:
@@ -85,7 +90,7 @@ postsubmits:
           secretName: config-updater
   - agent: kubernetes
     branches:
-    - master
+    - ^master$
     cluster: app.ci
     decorate: true
     labels:
@@ -139,7 +144,7 @@ postsubmits:
           secretName: config-updater
   - agent: kubernetes
     branches:
-    - master
+    - ^master$
     cluster: app.ci
     decorate: true
     labels:
@@ -193,7 +198,7 @@ postsubmits:
           secretName: config-updater
   - agent: kubernetes
     branches:
-    - master
+    - ^master$
     cluster: app.ci
     decorate: true
     labels:
@@ -235,6 +240,44 @@ postsubmits:
     cluster: app.ci
     decorate: true
     labels:
+      ci.openshift.io/cluster: build04
+      ci.openshift.io/generator: cluster-init
+      ci.openshift.io/role: infra
+    max_concurrency: 1
+    name: branch-ci-openshift-release-master-build04-apply
+    spec:
+      containers:
+      - args:
+        - --config-dir=clusters/build-clusters/build04
+        - --as=
+        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+        - --confirm=true
+        command:
+        - applyconfig
+        image: registry.ci.openshift.org/ci/applyconfig:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+      serviceAccountName: config-updater
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.build04.config
+            path: kubeconfig
+          secretName: config-updater
+  - agent: kubernetes
+    branches:
+    - ^master$
+    cluster: app.ci
+    decorate: true
+    labels:
       ci.openshift.io/role: infra
     max_concurrency: 1
     name: branch-ci-openshift-release-master-config-change-trigger
@@ -267,7 +310,7 @@ postsubmits:
           secretName: github-credentials-openshift-ci-robot
   - agent: kubernetes
     branches:
-    - master
+    - ^master$
     cluster: app.ci
     decorate: true
     labels:
@@ -325,7 +368,7 @@ postsubmits:
         - --debug
         command:
         - /app/label_sync/app.binary
-        image: gcr.io/k8s-prow/label_sync:v20211019-5763223177
+        image: gcr.io/k8s-prow/label_sync:v20220201-09a8a0acae
         imagePullPolicy: Always
         name: ""
         resources:
@@ -361,7 +404,7 @@ postsubmits:
       serviceAccountName: config-updater
   - agent: kubernetes
     branches:
-    - master
+    - ^master$
     cluster: app.ci
     decorate: true
     labels:

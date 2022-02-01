@@ -13,12 +13,12 @@ promotion:
 releases:
   initial:
     integration:
-      name: "4.9"
+      name: "4.10"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.9"
+      name: "4.10"
       namespace: ocp
 resources:
   '*':
@@ -29,16 +29,12 @@ tests:
 - as: e2e-metal-ipi
   skip_if_only_changed: (^(docs|.github)/)|(\.md$)|((^|/)OWNERS$)
   steps:
-    cluster_profile: packet
-    env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4
-        NETWORK_TYPE=OpenShiftSDN
-    workflow: baremetalds-e2e
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ipv4
 - as: e2e-metal-ipi-upgrade
   optional: true
   steps:
-    cluster_profile: packet
+    cluster_profile: equinix-ocp-metal
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4
@@ -48,27 +44,38 @@ tests:
       TEST_TYPE: upgrade
     workflow: baremetalds-e2e-upgrade
 - as: e2e-metal-ipi-ovn-ipv6
-  skip_if_only_changed: (^(docs|.github)/)|(\.md$)|((^|/)OWNERS$)
+  skip_if_only_changed: (^(docs|.github)/)|\.md$|^(DCO|LICENSE|OWNERS)$
   steps:
-    cluster_profile: packet
-    env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v6
-        NETWORK_TYPE=OVNKubernetes
-    workflow: baremetalds-e2e
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-ipv6
 - as: e2e-metal-ipi-ovn-dualstack
   optional: true
+  skip_if_only_changed: (^(docs|.github)/)|\.md$|^(DCO|LICENSE|OWNERS)$
   steps:
-    cluster_profile: packet
-    env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4v6
-        NETWORK_TYPE=OVNKubernetes
-    workflow: baremetalds-e2e
-- as: e2e-metal-ipi-virtualmedia
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-dualstack
+- as: e2e-metal-ipi-upgrade-ovn-ipv6
   optional: true
   steps:
-    cluster_profile: packet
+    cluster_profile: equinix-ocp-metal
+    env:
+      TEST_TYPE: upgrade
+    workflow: baremetalds-e2e-upgrade-ovn-ipv6
+- as: e2e-metal-ipi-serial-ipv4
+  skip_if_only_changed: (^(docs|.github)/)|\.md$|^(DCO|LICENSE|OWNERS)$
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-serial-ipv4
+- as: e2e-metal-ipi-serial-ovn-ipv6
+  skip_if_only_changed: (^(docs|.github)/)|\.md$|^(DCO|LICENSE|OWNERS)$
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-serial-ovn-ipv6
+- as: e2e-metal-ipi-virtualmedia
+  optional: true
+  skip_if_only_changed: (^(docs|.github)/)|\.md$|^(DCO|LICENSE|OWNERS)$
+  steps:
+    cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-virtualmedia
 zz_generated_metadata:
   branch: master

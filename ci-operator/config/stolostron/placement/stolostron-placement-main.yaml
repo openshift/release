@@ -1,0 +1,55 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+  stolostron_builder_go1.17-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.17-linux
+binary_build_commands: make build --warn-undefined-variables
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: go1.17-linux
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  inputs:
+    stolostron_builder_go1.17-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.17-linux
+  to: placement
+promotion:
+  name: "2.5"
+  namespace: stolostron
+releases:
+  initial:
+    integration:
+      name: "4.7"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.7"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
+tests:
+- as: backplane-fast-forward
+  postsubmit: true
+  steps:
+    env:
+      DESTINATION_BRANCH: backplane-2.0
+    workflow: ocm-ci-fastforward
+zz_generated_metadata:
+  branch: main
+  org: stolostron
+  repo: placement

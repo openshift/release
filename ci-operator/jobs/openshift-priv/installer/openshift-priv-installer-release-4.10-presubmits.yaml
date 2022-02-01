@@ -1,11 +1,94 @@
 presubmits:
   openshift-priv/installer:
   - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.10$
+    - ^release-4\.10-
+    cluster: build04
+    context: ci/prow/e2e-alibaba
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+    hidden: true
+    labels:
+      ci-operator.openshift.io/cloud: alibabacloud
+      ci-operator.openshift.io/cloud-cluster-profile: alibabacloud
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-installer-release-4.10-e2e-alibaba
+    optional: true
+    path_alias: github.com/openshift/installer
+    rerun_command: /test e2e-alibaba
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-alibaba-cluster-profile
+        - --target=e2e-alibaba
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-alibaba-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-alibabacloud
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-alibaba,?($|\s.*)
+  - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-aws
     decorate: true
     decoration_config:
@@ -14,12 +97,14 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-installer-release-4.10-e2e-aws
     path_alias: github.com/openshift/installer
     rerun_command: /test e2e-aws
-    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(azure|baremetal|gcp|kubevirt|libvirt|openstack|ovirt|vsphere)/)
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(azure|baremetal|gcp|libvirt|openstack|ovirt|vsphere)/)
     spec:
       containers:
       - args:
@@ -72,10 +157,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
+        secret:
+          secretName: cluster-secrets-aws
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -88,7 +171,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-aws-disruptive
     decorate: true
     decoration_config:
@@ -97,6 +180,8 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-installer-release-4.10-e2e-aws-disruptive
@@ -155,10 +240,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
+        secret:
+          secretName: cluster-secrets-aws
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -171,7 +254,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-aws-fips
     decorate: true
     decoration_config:
@@ -180,13 +263,15 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-installer-release-4.10-e2e-aws-fips
     optional: true
     path_alias: github.com/openshift/installer
     rerun_command: /test e2e-aws-fips
-    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(azure|baremetal|gcp|kubevirt|libvirt|openstack|ovirt|vsphere)/)
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(azure|baremetal|gcp|libvirt|openstack|ovirt|vsphere)/)
     spec:
       containers:
       - args:
@@ -239,10 +324,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
+        secret:
+          secretName: cluster-secrets-aws
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -255,7 +338,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-aws-proxy
     decorate: true
     decoration_config:
@@ -264,6 +347,8 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-installer-release-4.10-e2e-aws-proxy
@@ -322,10 +407,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
+        secret:
+          secretName: cluster-secrets-aws
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -338,7 +421,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-aws-shared-vpc
     decorate: true
     decoration_config:
@@ -347,6 +430,8 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-installer-release-4.10-e2e-aws-shared-vpc
@@ -405,10 +490,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
+        secret:
+          secretName: cluster-secrets-aws
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -417,11 +500,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-shared-vpc,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-aws-single-node
     decorate: true
     decoration_config:
@@ -430,12 +513,15 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-installer-release-4.10-e2e-aws-single-node
     optional: true
     path_alias: github.com/openshift/installer
     rerun_command: /test e2e-aws-single-node
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(azure|baremetal|gcp|libvirt|openstack|ovirt|vsphere)/)
     spec:
       containers:
       - args:
@@ -488,10 +574,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
+        secret:
+          secretName: cluster-secrets-aws
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -504,7 +588,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-aws-upgrade
     decorate: true
     decoration_config:
@@ -513,12 +597,14 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-installer-release-4.10-e2e-aws-upgrade
     path_alias: github.com/openshift/installer
     rerun_command: /test e2e-aws-upgrade
-    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(azure|baremetal|gcp|kubevirt|libvirt|openstack|ovirt|vsphere)/)
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(azure|baremetal|gcp|libvirt|openstack|ovirt|vsphere)/)
     spec:
       containers:
       - args:
@@ -571,10 +657,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
+        secret:
+          secretName: cluster-secrets-aws
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -587,7 +671,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-aws-upi
     decorate: true
     decoration_config:
@@ -658,10 +742,8 @@ presubmits:
             path: credentials
           secretName: boskos-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
+        secret:
+          secretName: cluster-secrets-aws
       - configMap:
           name: prow-job-cluster-launch-installer-upi-e2e
         name: job-definition
@@ -677,7 +759,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-aws-workers-rhel7
     decorate: true
     decoration_config:
@@ -686,13 +768,15 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-installer-release-4.10-e2e-aws-workers-rhel7
     optional: true
     path_alias: github.com/openshift/installer
     rerun_command: /test e2e-aws-workers-rhel7
-    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(azure|baremetal|gcp|kubevirt|libvirt|openstack|ovirt|vsphere)/)
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(azure|baremetal|gcp|libvirt|openstack|ovirt|vsphere)/)
     spec:
       containers:
       - args:
@@ -745,10 +829,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
+        secret:
+          secretName: cluster-secrets-aws
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -757,11 +839,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-workers-rhel7,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-aws-workers-rhel8
     decorate: true
     decoration_config:
@@ -770,12 +852,15 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-installer-release-4.10-e2e-aws-workers-rhel8
     optional: true
     path_alias: github.com/openshift/installer
     rerun_command: /test e2e-aws-workers-rhel8
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(azure|baremetal|gcp|libvirt|openstack|ovirt|vsphere)/)
     spec:
       containers:
       - args:
@@ -828,10 +913,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-aws
+        secret:
+          secretName: cluster-secrets-aws
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -844,7 +927,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-azure
     decorate: true
     decoration_config:
@@ -853,6 +936,8 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: azure4
+      ci-operator.openshift.io/cloud-cluster-profile: azure4
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-installer-release-4.10-e2e-azure
@@ -911,10 +996,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-azure4
+        secret:
+          secretName: cluster-secrets-azure4
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -927,7 +1010,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-azure-resourcegroup
     decorate: true
     decoration_config:
@@ -936,6 +1019,8 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: azure4
+      ci-operator.openshift.io/cloud-cluster-profile: azure4
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-installer-release-4.10-e2e-azure-resourcegroup
@@ -994,10 +1079,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-azure4
+        secret:
+          secretName: cluster-secrets-azure4
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -1010,7 +1093,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-azure-shared-vpc
     decorate: true
     decoration_config:
@@ -1019,6 +1102,8 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: azure4
+      ci-operator.openshift.io/cloud-cluster-profile: azure4
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-installer-release-4.10-e2e-azure-shared-vpc
@@ -1077,10 +1162,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-azure4
+        secret:
+          secretName: cluster-secrets-azure4
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -1089,11 +1172,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-azure-shared-vpc,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-azure-upi
     decorate: true
     decoration_config:
@@ -1102,12 +1185,15 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: azure4
+      ci-operator.openshift.io/cloud-cluster-profile: azure4
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-installer-release-4.10-e2e-azure-upi
     optional: true
     path_alias: github.com/openshift/installer
     rerun_command: /test e2e-azure-upi
+    skip_if_only_changed: (^(docs|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|upi/.*|pkg/.*|images)/(alibabacloud|aws|baremetal|gcp|ibmcloud|libvirt|openstack|ovirt|vsphere)/)
     spec:
       containers:
       - args:
@@ -1116,18 +1202,11 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --secret-dir=/usr/local/e2e-azure-upi-cluster-profile
         - --target=e2e-azure-upi
-        - --template=/usr/local/e2e-azure-upi
         command:
         - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: azure4
-        - name: JOB_NAME_SAFE
-          value: e2e-azure-upi
-        - name: TEST_COMMAND
-          value: TEST_SUITE=openshift/conformance/parallel run-tests
         image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
@@ -1138,6 +1217,9 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
         - mountPath: /usr/local/e2e-azure-upi-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
@@ -1146,9 +1228,6 @@ presubmits:
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
-        - mountPath: /usr/local/e2e-azure-upi
-          name: job-definition
-          subPath: cluster-launch-installer-upi-e2e.yaml
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -1163,14 +1242,12 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-azure4
-      - configMap:
-          name: prow-job-cluster-launch-installer-upi-e2e
-        name: job-definition
+        secret:
+          secretName: cluster-secrets-azure4
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -1183,7 +1260,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-azurestack
     decorate: true
     decoration_config:
@@ -1192,9 +1269,12 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: azurestack
+      ci-operator.openshift.io/cloud-cluster-profile: azurestack
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-installer-release-4.10-e2e-azurestack
+    optional: true
     path_alias: github.com/openshift/installer
     rerun_command: /test e2e-azurestack
     spec:
@@ -1249,10 +1329,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-azurestack
+        secret:
+          secretName: cluster-secrets-azurestack
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -1265,7 +1343,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-azurestack-upi
     decorate: true
     decoration_config:
@@ -1274,9 +1352,12 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: azurestack
+      ci-operator.openshift.io/cloud-cluster-profile: azurestack
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-installer-release-4.10-e2e-azurestack-upi
+    optional: true
     path_alias: github.com/openshift/installer
     rerun_command: /test e2e-azurestack-upi
     spec:
@@ -1331,10 +1412,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-azurestack
+        secret:
+          secretName: cluster-secrets-azurestack
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -1347,7 +1426,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-crc
     decorate: true
     decoration_config:
@@ -1356,13 +1435,15 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-installer-release-4.10-e2e-crc
     optional: true
     path_alias: github.com/openshift/installer
     rerun_command: /test e2e-crc
-    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(aws|azure|baremetal|gcp|kubevirt|openstack|ovirt|vsphere)/)
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(aws|azure|baremetal|gcp|openstack|ovirt|vsphere)/)
     spec:
       containers:
       - args:
@@ -1433,7 +1514,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-gcp
     decorate: true
     decoration_config:
@@ -1442,6 +1523,8 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-installer-release-4.10-e2e-gcp
@@ -1518,7 +1601,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-gcp-shared-vpc
     decorate: true
     decoration_config:
@@ -1527,6 +1610,8 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-installer-release-4.10-e2e-gcp-shared-vpc
@@ -1603,7 +1688,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-gcp-upgrade
     decorate: true
     decoration_config:
@@ -1612,6 +1697,8 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-installer-release-4.10-e2e-gcp-upgrade
@@ -1687,7 +1774,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-gcp-upi
     decorate: true
     decoration_config:
@@ -1696,6 +1783,8 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-installer-release-4.10-e2e-gcp-upi
@@ -1772,7 +1861,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-gcp-upi-xpn
     decorate: true
     decoration_config:
@@ -1781,6 +1870,8 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-installer-release-4.10-e2e-gcp-upi-xpn
@@ -1857,8 +1948,8 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
-    context: ci/prow/e2e-kubevirt
+    cluster: build04
+    context: ci/prow/e2e-ibmcloud
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -1866,12 +1957,14 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: ibmcloud
+      ci-operator.openshift.io/cloud-cluster-profile: ibmcloud
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-installer-release-4.10-e2e-kubevirt
+    name: pull-ci-openshift-priv-installer-release-4.10-e2e-ibmcloud
     optional: true
     path_alias: github.com/openshift/installer
-    rerun_command: /test e2e-kubevirt
+    rerun_command: /test e2e-ibmcloud
     spec:
       containers:
       - args:
@@ -1881,8 +1974,8 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-kubevirt-cluster-profile
-        - --target=e2e-kubevirt
+        - --secret-dir=/usr/local/e2e-ibmcloud-cluster-profile
+        - --target=e2e-ibmcloud
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1898,7 +1991,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-kubevirt-cluster-profile
+        - mountPath: /usr/local/e2e-ibmcloud-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -1924,23 +2017,21 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-kubevirt
+        secret:
+          secretName: cluster-secrets-ibmcloud
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-kubevirt,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-ibmcloud,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-libvirt
     decorate: true
     decoration_config:
@@ -1949,13 +2040,15 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-installer-release-4.10-e2e-libvirt
     optional: true
     path_alias: github.com/openshift/installer
     rerun_command: /test e2e-libvirt
-    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(aws|azure|baremetal|gcp|kubevirt|openstack|ovirt|vsphere)/)
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(aws|azure|baremetal|gcp|openstack|ovirt|vsphere)/)
     spec:
       containers:
       - args:
@@ -2026,7 +2119,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-metal-assisted
     decorate: true
     decoration_config:
@@ -2035,6 +2128,8 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: packet
+      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-installer-release-4.10-e2e-metal-assisted
@@ -2093,10 +2188,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-packet
+        secret:
+          secretName: cluster-secrets-packet-assisted
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -2109,7 +2202,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-metal-ipi
     decorate: true
     decoration_config:
@@ -2118,6 +2211,8 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: equinix-ocp-metal
+      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-installer-release-4.10-e2e-metal-ipi
@@ -2177,10 +2272,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-packet
+        secret:
+          secretName: cluster-secrets-equinix-ocp-metal
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -2193,7 +2286,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-metal-ipi-ovn-dualstack
     decorate: true
     decoration_config:
@@ -2202,6 +2295,8 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: equinix-ocp-metal
+      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-installer-release-4.10-e2e-metal-ipi-ovn-dualstack
@@ -2261,10 +2356,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-packet
+        secret:
+          secretName: cluster-secrets-equinix-ocp-metal
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -2277,7 +2370,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-metal-ipi-ovn-ipv6
     decorate: true
     decoration_config:
@@ -2286,13 +2379,15 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: equinix-ocp-metal
+      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-installer-release-4.10-e2e-metal-ipi-ovn-ipv6
     optional: true
     path_alias: github.com/openshift/installer
     rerun_command: /test e2e-metal-ipi-ovn-ipv6
-    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(aws|azure|baremetal|gcp|kubevirt|libvirt|openstack|ovirt|vsphere)/)|(^vendor/github.com/metal3-io/)
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(aws|azure|baremetal|gcp|libvirt|openstack|ovirt|vsphere)/)|(^vendor/github.com/metal3-io/)
     spec:
       containers:
       - args:
@@ -2345,10 +2440,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-packet
+        secret:
+          secretName: cluster-secrets-equinix-ocp-metal
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -2361,7 +2454,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-metal-ipi-ovn-ipv6-required
     decorate: true
     decoration_config:
@@ -2370,6 +2463,8 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: equinix-ocp-metal
+      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-installer-release-4.10-e2e-metal-ipi-ovn-ipv6-required
@@ -2428,10 +2523,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-packet
+        secret:
+          secretName: cluster-secrets-equinix-ocp-metal
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -2444,7 +2537,91 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build04
+    context: ci/prow/e2e-metal-ipi-swapped-hosts
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+    hidden: true
+    labels:
+      ci-operator.openshift.io/cloud: equinix-ocp-metal
+      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-installer-release-4.10-e2e-metal-ipi-swapped-hosts
+    optional: true
+    path_alias: github.com/openshift/installer
+    rerun_command: /test e2e-metal-ipi-swapped-hosts
+    run_if_changed: (^(data/.*|pkg/.*|images)/baremetal/)|(^vendor/github.com/metal3-io/)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-metal-ipi-swapped-hosts-cluster-profile
+        - --target=e2e-metal-ipi-swapped-hosts
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-metal-ipi-swapped-hosts-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-equinix-ocp-metal
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-metal-ipi-swapped-hosts,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.10$
+    - ^release-4\.10-
+    cluster: build04
     context: ci/prow/e2e-metal-ipi-virtualmedia
     decorate: true
     decoration_config:
@@ -2453,6 +2630,8 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: equinix-ocp-metal
+      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-installer-release-4.10-e2e-metal-ipi-virtualmedia
@@ -2512,10 +2691,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-packet
+        secret:
+          secretName: cluster-secrets-equinix-ocp-metal
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -2528,7 +2705,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-metal-single-node-live-iso
     decorate: true
     decoration_config:
@@ -2537,13 +2714,15 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: packet
+      ci-operator.openshift.io/cloud-cluster-profile: packet-sno
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-installer-release-4.10-e2e-metal-single-node-live-iso
     optional: true
     path_alias: github.com/openshift/installer
     rerun_command: /test e2e-metal-single-node-live-iso
-    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(aws|azure|gcp|kubevirt|libvirt|openstack|ovirt|vsphere)/)
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(aws|azure|gcp|libvirt|openstack|ovirt|vsphere)/)
     spec:
       containers:
       - args:
@@ -2596,10 +2775,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-packet
+        secret:
+          secretName: cluster-secrets-packet-sno
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -2612,7 +2789,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-openstack
     decorate: true
     decoration_config:
@@ -2621,13 +2798,15 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: openstack-vexxhost
+      ci-operator.openshift.io/cloud-cluster-profile: openstack-vexxhost
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-installer-release-4.10-e2e-openstack
     optional: true
     path_alias: github.com/openshift/installer
     rerun_command: /test e2e-openstack
-    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(aws|azure|baremetal|gcp|kubevirt|libvirt|ovirt|vsphere)/)
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(aws|azure|baremetal|gcp|libvirt|ovirt|vsphere)/)
     spec:
       containers:
       - args:
@@ -2680,10 +2859,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-openstack-vexxhost
+        secret:
+          secretName: cluster-secrets-openstack-vexxhost
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -2696,7 +2873,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-openstack-kuryr
     decorate: true
     decoration_config:
@@ -2705,13 +2882,15 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: openstack-kuryr
+      ci-operator.openshift.io/cloud-cluster-profile: openstack-kuryr
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-installer-release-4.10-e2e-openstack-kuryr
     optional: true
     path_alias: github.com/openshift/installer
     rerun_command: /test e2e-openstack-kuryr
-    skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(aws|azure|baremetal|gcp|kubevirt|libvirt|ovirt|vsphere)/)
+    skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(aws|azure|baremetal|gcp|libvirt|ovirt|vsphere)/)
     spec:
       containers:
       - args:
@@ -2764,10 +2943,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-openstack-kuryr
+        secret:
+          secretName: cluster-secrets-openstack-kuryr
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -2780,7 +2957,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-openstack-parallel
     decorate: true
     decoration_config:
@@ -2789,6 +2966,8 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: openstack-vexxhost
+      ci-operator.openshift.io/cloud-cluster-profile: openstack-vexxhost
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-installer-release-4.10-e2e-openstack-parallel
@@ -2847,10 +3026,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-openstack-vexxhost
+        secret:
+          secretName: cluster-secrets-openstack-vexxhost
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -2863,7 +3040,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-openstack-proxy
     decorate: true
     decoration_config:
@@ -2872,13 +3049,15 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: openstack-vh-mecha-central
+      ci-operator.openshift.io/cloud-cluster-profile: openstack-vh-mecha-central
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-installer-release-4.10-e2e-openstack-proxy
     optional: true
     path_alias: github.com/openshift/installer
     rerun_command: /test e2e-openstack-proxy
-    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(aws|azure|baremetal|gcp|kubevirt|libvirt|ovirt|vsphere)/)
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(aws|azure|baremetal|gcp|libvirt|ovirt|vsphere)/)
     spec:
       containers:
       - args:
@@ -2931,10 +3110,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-openstack-vh-mecha-central
+        secret:
+          secretName: cluster-secrets-openstack-vh-mecha-central
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -2947,7 +3124,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-ovirt
     decorate: true
     decoration_config:
@@ -2956,13 +3133,15 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: ovirt
+      ci-operator.openshift.io/cloud-cluster-profile: ovirt
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-installer-release-4.10-e2e-ovirt
     optional: true
     path_alias: github.com/openshift/installer
     rerun_command: /test e2e-ovirt
-    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(aws|azure|baremetal|gcp|kubevirt|libvirt|openstack|vsphere)/)
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(aws|azure|baremetal|gcp|libvirt|openstack|vsphere)/)
     spec:
       containers:
       - args:
@@ -3029,7 +3208,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-ovirt,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
@@ -3042,12 +3221,15 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: vsphere
+      ci-operator.openshift.io/cloud-cluster-profile: vsphere
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-installer-release-4.10-e2e-vsphere
     optional: true
     path_alias: github.com/openshift/installer
     rerun_command: /test e2e-vsphere
+    run_if_changed: (^(data/.*|pkg.*)/vsphere)|(^vendor/github.com/vmware/)
     spec:
       containers:
       - args:
@@ -3100,10 +3282,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-vsphere
+        secret:
+          secretName: cluster-secrets-vsphere
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -3125,6 +3305,8 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: vsphere
+      ci-operator.openshift.io/cloud-cluster-profile: vsphere
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-installer-release-4.10-e2e-vsphere-upi
@@ -3183,10 +3365,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-vsphere
+        secret:
+          secretName: cluster-secrets-vsphere
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -3199,7 +3379,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build04
     context: ci/prow/gofmt
     decorate: true
     decoration_config:
@@ -3257,7 +3437,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build04
     context: ci/prow/golint
     decorate: true
     decoration_config:
@@ -3315,7 +3495,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build04
     context: ci/prow/govet
     decorate: true
     decoration_config:
@@ -3373,7 +3553,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build04
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -3430,7 +3610,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build04
     context: ci/prow/openstack-manifests
     decorate: true
     decoration_config:
@@ -3439,12 +3619,14 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
+      ci-operator.openshift.io/cloud: openstack-vexxhost
+      ci-operator.openshift.io/cloud-cluster-profile: openstack-vexxhost
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-installer-release-4.10-openstack-manifests
     path_alias: github.com/openshift/installer
     rerun_command: /test openstack-manifests
-    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(aws|azure|baremetal|gcp|kubevirt|libvirt|ovirt|vsphere)/)
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(aws|azure|baremetal|gcp|libvirt|ovirt|vsphere)/)
     spec:
       containers:
       - args:
@@ -3497,10 +3679,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-openstack-vexxhost
+        secret:
+          secretName: cluster-secrets-openstack-vexxhost
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -3513,7 +3693,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build04
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -3571,7 +3751,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build04
     context: ci/prow/verify-codegen
     decorate: true
     decoration_config:
@@ -3628,7 +3808,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build01
+    cluster: build04
     context: ci/prow/verify-vendor
     decorate: true
     decoration_config:

@@ -39,6 +39,40 @@ function set_test_provider() {
     fi
 }
 
+function mirror_release_image_for_disconnected_upgrade() {
+    # All IPv6 clusters are disconnected and
+    # release image should be mirrored for upgrades.
+    if [[ "${DS_IP_STACK}" == "v6" ]]; then
+      # shellcheck disable=SC2087
+      ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
+MIRRORED_RELEASE_IMAGE=${DS_REGISTRY}/localimages/local-upgrade-image
+DIGEST=\$(oc adm release info --registry-config ${DS_WORKING_DIR}/pull_secret.json ${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE} --output=jsonpath="{.digest}")
+RELEASE_TAG=\$(sed -e "s/^sha256://" <<< \${DIGEST})
+MIRROR_RESULT_LOG=/tmp/image_mirror-\${RELEASE_TAG}.log
+
+echo "Mirroring release images for disconnected environment"
+oc adm release mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json \
+  --from=${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE} \
+  --to=\${MIRRORED_RELEASE_IMAGE} \
+  --to-release-image=\${MIRRORED_RELEASE_IMAGE}:\${RELEASE_TAG}  2>&1 | tee \${MIRROR_RESULT_LOG}
+
+echo "Create ImageContentSourcePolicy to use mirrored registry in upgrade"
+UPGRADE_ICS=\$(cat \${MIRROR_RESULT_LOG} | sed -n '/repositoryDigestMirrors/,//p')
+
+cat <<EOF1 | oc apply -f -
+apiVersion: operator.openshift.io/v1alpha1
+kind: ImageContentSourcePolicy
+metadata:
+  name: disconnected-upgrade-ics
+spec:
+\${UPGRADE_ICS}
+EOF1
+EOF
+
+      TEST_UPGRADE_ARGS="--from-repository ${DS_REGISTRY}/localimages/local-test-image"
+    fi
+}
+
 function setup_proxy() {
     # For disconnected or otherwise unreachable environments, we want to
     # have steps use an HTTP(S) proxy to reach the API server. This proxy
@@ -57,7 +91,7 @@ function is_openshift_version_gte() {
 }
 
 case "${CLUSTER_TYPE}" in
-packet)
+packet|equinix*)
     # shellcheck source=/dev/null
     source "${SHARED_DIR}/packet-conf.sh"
     # shellcheck source=/dev/null
@@ -73,13 +107,6 @@ packet)
 
         # Mirroring test images is supported only for versions greater than or equal to 4.8
         mirror_test_images
-
-        # Skipping proxy related tests ([Skipped:Proxy]) is supported only for version  greater than or equal to 4.10
-        # For lower versions they must be skipped manually
-        if ! is_openshift_version_gte "4.10"; then
-            TEST_SKIPS="${TEST_SKIPS}
-${TEST_SKIPS_PROXY}"
-        fi
     else
         export TEST_PROVIDER='{"type":"skeleton"}'
         use_minimal_test_list
@@ -89,17 +116,19 @@ ${TEST_SKIPS_PROXY}"
 esac
 
 function upgrade() {
+    mirror_release_image_for_disconnected_upgrade
     set -x
     openshift-tests run-upgrade all \
         --to-image "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}" \
         --provider "${TEST_PROVIDER:-}" \
+        ${TEST_UPGRADE_ARGS:-} \
         -o "${ARTIFACT_DIR}/e2e.log" \
         --junit-dir "${ARTIFACT_DIR}/junit"
     set +x
 }
 
 function suite() {
-    if [[ -n "${TEST_SKIPS}" ]]; then       
+    if [[ -n "${TEST_SKIPS}" && "${TEST_SUITE}" == "openshift/conformance/parallel" ]]; then
         TESTS="$(openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")" &&
         echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests &&
         echo "Skipping tests:" &&
@@ -116,8 +145,87 @@ function suite() {
     set +x
 }
 
+# wait for all clusteroperators to reach progressing=false to ensure that we achieved the configuration specified at installation
+# time before we run our e2e tests.
+function check_clusteroperators_status() {
+    echo "$(date) - waiting for clusteroperators to finish progressing..."
+    oc wait clusteroperators --all --for=condition=Progressing=false --timeout=15m
+    echo "$(date) - all clusteroperators are done progressing."
+}
+
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_START"
 trap 'echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"' EXIT
+
+oc -n openshift-config patch cm admin-acks --patch '{"data":{"ack-4.8-kube-1.22-api-removals-in-4.9":"true"}}' --type=merge || echo 'failed to ack the 4.9 Kube v1beta1 removals; possibly API-server issue, or a pre-4.8 release image'
+
+# wait for ClusterVersion to level, until https://bugzilla.redhat.com/show_bug.cgi?id=2009845 makes it back to all 4.9 releases being installed in CI
+oc wait --for=condition=Progressing=False --timeout=2m clusterversion/version
+
+check_clusteroperators_status
+
+# wait up to 10m for the number of nodes to match the number of machines
+i=0
+while true
+do
+  MACHINECOUNT="$(kubectl get machines -A --no-headers | wc -l)"
+  NODECOUNT="$(kubectl get nodes --no-headers | wc -l)"
+  if [ "${MACHINECOUNT}" -le "${NODECOUNT}" ]
+  then
+    echo "$(date) - node count ($NODECOUNT) now matches or exceeds machine count ($MACHINECOUNT)"
+    break
+  fi
+  echo "$(date) - $MACHINECOUNT Machines - $NODECOUNT Nodes"
+  sleep 30
+  ((i++))
+  if [ $i -gt 20 ]; then
+    echo "Timed out waiting for node count ($NODECOUNT) to equal or exceed machine count ($MACHINECOUNT)."
+    exit 1
+  fi
+done
+
+# wait for all nodes to reach Ready=true to ensure that all machines and nodes came up, before we run
+# any e2e tests that might require specific workload capacity.
+echo "$(date) - waiting for nodes to be ready..."
+oc wait nodes --all --for=condition=Ready=true --timeout=10m
+echo "$(date) - all nodes are ready"
+
+# this works around a problem where tests fail because imagestreams aren't imported.  We see this happen for exec session.
+echo "$(date) - waiting for non-samples imagesteams to import..."
+count=0
+while :
+do
+
+  # The local image registry isn't working in 4.6 and isn't needed for the
+  # subset of tests we use for this version
+  if ! is_openshift_version_gte "4.7" ; then
+    echo "Skipping imagesteams wait"
+    break
+  fi
+
+  non_imported_imagestreams=$(oc -n openshift get is -o go-template='{{range .items}}{{$namespace := .metadata.namespace}}{{$name := .metadata.name}}{{range .status.tags}}{{if not .items}}{{$namespace}}/{{$name}}:{{.tag}}{{"\n"}}{{end}}{{end}}{{end}}')
+  if [ -z "${non_imported_imagestreams}" ]
+  then
+    break
+  fi
+  echo "The following image streams are yet to be imported (attempt #${count}):"
+  echo "${non_imported_imagestreams}"
+
+  count=$((count+1))
+  if (( count > 20 )); then
+    echo "Failed while waiting on imagestream import"
+    exit 1
+  fi
+
+  sleep 60
+done
+echo "$(date) - all imagestreams are imported."
+
+# In some cases the cluster events are processed slowly by the kube-apiservers,
+# producing a late revision updates that could be missed by the previous co check.
+echo "$(date) - Waiting 10 minutes before checking again clusteroperators"
+sleep 10m
+
+check_clusteroperators_status
 
 case "${TEST_TYPE}" in
 upgrade-conformance)

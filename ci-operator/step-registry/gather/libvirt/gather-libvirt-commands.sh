@@ -55,7 +55,6 @@ function queue() {
   fi
 }
 
-export PATH=$PATH:/tmp/shared
 echo "Gathering artifacts ..."
 mkdir -p ${ARTIFACT_DIR}/pods ${ARTIFACT_DIR}/nodes ${ARTIFACT_DIR}/metrics ${ARTIFACT_DIR}/bootstrap ${ARTIFACT_DIR}/network ${ARTIFACT_DIR}/oc_cmds
 
@@ -132,7 +131,7 @@ done < /tmp/nodes
 # Snapshot iptables-save on each node for debugging possible kube-proxy issues
 oc --insecure-skip-tls-verify get --request-timeout=20s -n openshift-sdn -l app=sdn pods --template '{{ range .items }}{{ .metadata.name }}{{ "\n" }}{{ end }}' > /tmp/sdn-pods
 while IFS= read -r i; do
-  queue ${ARTIFACT_DIR}/network/iptables-save-$i oc --insecure-skip-tls-verify rsh --timeout=20 -n openshift-sdn -c sdn $i iptables-save -c
+  queue ${ARTIFACT_DIR}/network/iptables-save-$i oc --insecure-skip-tls-verify --request-timeout=20s rsh -n openshift-sdn -c sdn $i iptables-save -c
 done < /tmp/sdn-pods
 
 while IFS= read -r i; do
@@ -147,10 +146,22 @@ while IFS= read -r i; do
   FILTER=gzip queue ${ARTIFACT_DIR}/pods/${file}_previous.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s -p $i
 done < /tmp/containers
 
-echo "Snapshotting prometheus (may take 15s) ..."
-# Use logs and data the "last" monitoring pod in order to catch issues that occur when the first prometheus pod upgrades
-monitoring_pod="$( oc --insecure-skip-tls-verify get pods -n openshift-monitoring -o name | grep prometheus-k8s- | tail -1 )"
-queue ${ARTIFACT_DIR}/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${monitoring_pod}" -- tar cvzf - -C /prometheus .
+# Snapshot the prometheus data from the replica that has the oldest
+# PVC. If persistent storage isn't enabled, it uses the last
+# prometheus instances by default to catch issues that occur when the
+# first prometheus pod upgrades.
+if [[ -n "$( oc --insecure-skip-tls-verify --request-timeout=20s get pvc -n openshift-monitoring -l app.kubernetes.io/name=prometheus --ignore-not-found )" ]]; then
+  pvc="$( oc --insecure-skip-tls-verify --request-timeout=20s get pvc -n openshift-monitoring -l app.kubernetes.io/name=prometheus --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[0].metadata.name}' )"
+  prometheus="${pvc##prometheus-data-}"
+else
+  prometheus="$( oc --insecure-skip-tls-verify --request-timeout=20s get pods -n openshift-monitoring -l app.kubernetes.io/name=prometheus --sort-by=.metadata.creationTimestamp --ignore-not-found -o jsonpath='{.items[0].metadata.name}')"
+fi
+if [[ -n "${prometheus}" ]]; then
+	echo "Snapshotting Prometheus from ${prometheus} (may take 15s) ..."
+	queue ${ARTIFACT_DIR}/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prometheus}" -- tar cvzf - -C /prometheus .
+else
+	echo "Unable to find a Prometheus pod to snapshot."
+fi
 
 cat >> ${SHARED_DIR}/custom-links.txt << EOF
 <script>
@@ -161,11 +172,11 @@ document.getElementById("wrapper").append(a);
 </script>
 EOF
 
-FILTER=gzip queue ${ARTIFACT_DIR}/metrics/prometheus-target-metadata.json.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${monitoring_pod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/targets/metadata --data-urlencode 'match_target={instance!=\"\"}'"
-FILTER=gzip queue ${ARTIFACT_DIR}/metrics/prometheus-config.json.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${monitoring_pod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/config"
-queue ${ARTIFACT_DIR}/metrics/prometheus-tsdb-status.json oc --insecure-skip-tls-verify exec -n openshift-monitoring "${monitoring_pod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/tsdb"
-queue ${ARTIFACT_DIR}/metrics/prometheus-runtimeinfo.json oc --insecure-skip-tls-verify exec -n openshift-monitoring "${monitoring_pod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/runtimeinfo"
-queue ${ARTIFACT_DIR}/metrics/prometheus-targets.json oc --insecure-skip-tls-verify exec -n openshift-monitoring "${monitoring_pod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/targets"
+FILTER=gzip queue ${ARTIFACT_DIR}/metrics/prometheus-target-metadata.json.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prometheus}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/targets/metadata --data-urlencode 'match_target={instance!=\"\"}'"
+FILTER=gzip queue ${ARTIFACT_DIR}/metrics/prometheus-config.json.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prometheus}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/config"
+queue ${ARTIFACT_DIR}/metrics/prometheus-tsdb-status.json oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prometheus}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/tsdb"
+queue ${ARTIFACT_DIR}/metrics/prometheus-runtimeinfo.json oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prometheus}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/runtimeinfo"
+queue ${ARTIFACT_DIR}/metrics/prometheus-targets.json oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prometheus}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/targets"
 
 # Calculate metrics suitable for apples-to-apples comparison across CI runs.
 # Load whatever timestamps we can, generate the metrics script, and then send it to the
@@ -297,7 +308,7 @@ ${t_test}    cluster:container:test:started  count(count_over_time((count withou
 ${t_all}     cluster:version:info:total   topk(1, max by (version) (max_over_time(cluster_version{type="completed"}[${d_all}])))*0+1
 ${t_install} cluster:version:info:install topk(1, max by (version) (max_over_time(cluster_version{type="completed"}[${d_install}])))*0+1
 ${t_all}     cluster:version:current:seconds count_over_time(max by (version) ((cluster_version{type="current"}))[${d_all}:1s])
-${t_test}    cluster:version:updates:seconds count_over_time(max by (version) ((cluster_version{type="updating",from_version!=""}))[${d_test}:1s])
+${t_test}    cluster:version:updates:seconds max by (from_version,version) (max_over_time(((time() - cluster_version{type="updating",version!="",from_version!=""}))[${d_test}:1s]))
 ${t_all}     job:duration:total:seconds vector(${s_all})
 ${t_install} job:duration:install:seconds vector(${s_install})
 ${t_test}    job:duration:test:seconds vector(${s_test})
@@ -387,4 +398,7 @@ cat >> ${REPORT} << EOF
 <link rel="stylesheet" href="https://code.getmdl.io/1.3.0/material.indigo-pink.min.css">
 <link rel="stylesheet" type="text/css" href="/static/spyglass/spyglass.css">
 EOF
-cat ${SHARED_DIR}/custom-links.txt >> ${REPORT}
+
+if [[ -f ${SHARED_DIR}/custom-links.txt ]]; then
+  cat ${SHARED_DIR}/custom-links.txt >> ${REPORT}
+fi

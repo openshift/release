@@ -1,0 +1,43 @@
+binary_build_commands: ./build.sh
+build_root:
+  image_stream_tag:
+    name: releaser
+    namespace: rh-cloud-services
+    tag: latest
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: test
+  commands: ./test.sh
+  container:
+    from: src
+- as: release-build-repo
+  postsubmit: true
+  steps:
+    test:
+    - as: release-build-repo
+      commands: |
+        cp /tmp/secret/SSH_PRIVATE_KEY /root/.ssh/ssh_key
+        chmod 600 /root/.ssh/ssh_key
+        ./build.sh
+        ./release-build-repo.sh
+      credentials:
+      - mount_path: /tmp/secret
+        name: hac-core-deploy-tokens
+        namespace: test-credentials
+      from: src
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: hac-core

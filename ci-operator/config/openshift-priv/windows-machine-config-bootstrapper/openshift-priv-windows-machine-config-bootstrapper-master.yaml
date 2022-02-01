@@ -1,21 +1,30 @@
+base_images:
+  openshift_release_golang-1.17:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/windows-machine-config-bootstrapper
 images:
 - dockerfile_path: Dockerfile.tools
+  inputs:
+    openshift_release_golang-1.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
   to: windows-machine-config-bootstrapper-tests
 promotion:
-  name: 4.10-priv
+  name: 4.11-priv
   namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.10-priv
+      name: 4.11-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.10-priv
+      name: 4.11-priv
       namespace: ocp-private
 resources:
   '*':
@@ -35,6 +44,33 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: aws-e2e-ccm-install
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    test:
+    - as: e2e-wmcb
+      commands: |-
+        #!/bin/bash
+
+        set -o nounset
+        set -o errexit
+        set -o pipefail
+
+        cluster_profile=/var/run/secrets/ci.openshift.io/cluster-profile
+        export AWS_SHARED_CREDENTIALS_FILE=${cluster_profile}/.awscred
+        export KUBE_SSH_KEY_PATH=${cluster_profile}/ssh-privatekey
+
+        make run-wmcb-ci-e2e-test
+      dependencies:
+      - env: WMCB_IMAGE
+        name: windows-machine-config-bootstrapper-tests
+      from: src
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 600Mi
+    workflow: openshift-e2e-aws-ccm-ovn-hybrid-install
 - as: e2e-wmcb
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:

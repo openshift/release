@@ -8,7 +8,7 @@ set -o pipefail
 users=""
 htpass_file=/tmp/users.htpasswd
 
-for i in $(seq 1 15);
+for i in $(seq 1 30);
 do
     username="testuser-${i}"
     password=$(< /dev/urandom tr -dc 'a-z0-9' | fold -w 12 | head -n 1 || true)
@@ -65,10 +65,10 @@ runtime_env=${SHARED_DIR}/runtime_env
 
 cat <<EOF >>"${runtime_env}"
 export USERS=${users}
-export TAG_VERSION="@${ver_cli}"
 export CUCUMBER_PUBLISH_QUIET=true
 export DISABLE_WAIT_PRINT=true
 export BUSHSLICER_DEFAULT_ENVIRONMENT=ocp4
+export BUSHSLICER_LOG_LEVEL=INFO
 export OPENSHIFT_ENV_OCP4_HOSTS="${hosts}:lb"
 export OPENSHIFT_ENV_OCP4_ADMIN_CREDS_SPEC=file:///tmp/kubeconfig
 export BUSHSLICER_CONFIG="{'environments': {'ocp4': {'version': '${ver_cli}'}}}"
