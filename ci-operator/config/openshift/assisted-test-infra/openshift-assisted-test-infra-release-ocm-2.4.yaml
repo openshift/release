@@ -72,7 +72,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=release-ocm-2.4
-        OPENSHIFT_VERSION=""
+        OPENSHIFT_VERSION="all"
     workflow: baremetalds-assisted
 - as: e2e-metal-assisted-olm
   optional: true
@@ -83,19 +83,7 @@ tests:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=release-ocm-2.4
         TEST_FUNC=test_olm_operator
-    workflow: baremetalds-assisted
-- as: system-test-operator
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.4
-      POST_INSTALL_COMMANDS: |
-        export TEST=./discovery-infra/tests/test_kube_api.py
-        export TEST_FUNC=test_kube_api_ipv4
-        export KUBECONFIG=$(find ${KUBECONFIG} -type f)
-        make deploy_assisted_operator test_parallel
+      PACKET_PLAN: m2.xlarge.x86
     workflow: baremetalds-assisted
 - as: e2e-metal-assisted-kube-api-late-binding-single-node
   optional: true
@@ -193,11 +181,6 @@ tests:
         STATIC_IPS=true
         TEST_FUNC=test_networking
     workflow: baremetalds-assisted
-- as: e2e-metal-single-node-live-iso
-  optional: true
-  steps:
-    cluster_profile: packet-sno
-    workflow: baremetalds-sno
 zz_generated_metadata:
   branch: release-ocm-2.4
   org: openshift
