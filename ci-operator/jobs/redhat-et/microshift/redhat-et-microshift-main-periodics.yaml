@@ -1022,3 +1022,61 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
+- agent: kubernetes
+  cluster: build04
+  cron: 0 0 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: redhat-et
+    repo: microshift
+  labels:
+    ci-operator.openshift.io/variant: periodics
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-redhat-et-microshift-main-periodics-test-unit
+  reporter_config:
+    slack:
+      channel: '#microshift-alerts'
+      job_states_to_report:
+      - failure
+      - aborted
+      - error
+      report_template: ':red_jenkins_circle:@here Job {{.Spec.Job}} entered state:
+        {{printf "%q" .Status.State}}. See logs: <{{.Status.URL}}|View>'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --target=test-unit
+      - --variant=periodics
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
