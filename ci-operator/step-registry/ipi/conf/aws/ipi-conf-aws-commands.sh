@@ -13,7 +13,7 @@ CONFIG="${SHARED_DIR}/install-config.yaml"
 
 expiration_date=$(date -d '8 hours' --iso=minutes --utc)
 
-created_data=$(date --iso=minutes --utc)
+created_date=$(date --iso=minutes --utc)
 
 function join_by { local IFS="$1"; shift; echo "$*"; }
 
