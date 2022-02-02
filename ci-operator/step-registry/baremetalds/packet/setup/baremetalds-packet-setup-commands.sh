@@ -113,19 +113,21 @@ cat > packet-setup.yaml <<-EOF
         done
 
         ssh "\${SSHOPTS[@]}" "root@\${IP}" bash - << EOC
-            echo "Making sure we use vault mirror, as default CentOS repositories are already EOL..."
+            if [[ ${PACKET_OS} == "centos_8" ]]; then
+              echo "Making sure we use vault mirror, as default CentOS repositories are already EOL..."
+              
+              sed -i '/mirrorlist=.*/d' /etc/yum.repos.d/CentOS-AppStream.repo
+              grep -qF 'vault.centos.org' /etc/yum.repos.d/CentOS-AppStream.repo || \
+                echo 'baseurl=http://vault.centos.org/\\\$contentdir/\\\$releasever/AppStream/\\\$basearch/os/' >> /etc/yum.repos.d/CentOS-AppStream.repo
 
-            sed -i '/mirrorlist=.*/d' /etc/yum.repos.d/CentOS-AppStream.repo
-            grep -qF 'vault.centos.org' /etc/yum.repos.d/CentOS-AppStream.repo || \
-              echo 'baseurl=http://vault.centos.org/\\\$contentdir/\\\$releasever/AppStream/\\\$basearch/os/' >> /etc/yum.repos.d/CentOS-AppStream.repo
+              sed -i '/mirrorlist=.*/d' /etc/yum.repos.d/CentOS-Base.repo
+              grep -qF 'vault.centos.org' /etc/yum.repos.d/CentOS-Base.repo || \
+                echo 'baseurl=http://vault.centos.org/\\\$contentdir/\\\$releasever/BaseOS/\\\$basearch/os/' >> /etc/yum.repos.d/CentOS-Base.repo
 
-            sed -i '/mirrorlist=.*/d' /etc/yum.repos.d/CentOS-Base.repo
-            grep -qF 'vault.centos.org' /etc/yum.repos.d/CentOS-Base.repo || \
-              echo 'baseurl=http://vault.centos.org/\\\$contentdir/\\\$releasever/BaseOS/\\\$basearch/os/' >> /etc/yum.repos.d/CentOS-Base.repo
-
-            sed -i '/mirrorlist=.*/d' /etc/yum.repos.d/CentOS-Extras.repo
-            grep -qF 'vault.centos.org' /etc/yum.repos.d/CentOS-Extras.repo || \
-              echo 'baseurl=http://vault.centos.org/\\\$contentdir/\\\$releasever/extras/\\\$basearch/os/' >> /etc/yum.repos.d/CentOS-Extras.repo
+              sed -i '/mirrorlist=.*/d' /etc/yum.repos.d/CentOS-Extras.repo
+              grep -qF 'vault.centos.org' /etc/yum.repos.d/CentOS-Extras.repo || \
+                echo 'baseurl=http://vault.centos.org/\\\$contentdir/\\\$releasever/extras/\\\$basearch/os/' >> /etc/yum.repos.d/CentOS-Extras.repo
+            fi
         EOC
       dest: "${SHARED_DIR}/packet-conf.sh"
 EOF
