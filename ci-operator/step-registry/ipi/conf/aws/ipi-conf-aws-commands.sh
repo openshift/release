@@ -13,6 +13,8 @@ CONFIG="${SHARED_DIR}/install-config.yaml"
 
 expiration_date=$(date -d '8 hours' --iso=minutes --utc)
 
+created_data=$(date --iso=minutes --utc)
+
 function join_by { local IFS="$1"; shift; echo "$*"; }
 
 REGION="${LEASED_RESOURCE}"
@@ -95,6 +97,8 @@ platform:
   aws:
     region: ${REGION}
     userTags:
+      createdDate: ${created_date}
+      updatedDate: ${created_date}
       expirationDate: ${expiration_date}
 controlPlane:
   architecture: ${architecture}
