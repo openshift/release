@@ -41,17 +41,6 @@ tests:
     make test
   container:
     from: src
-- as: sonarcloud
-  commands: |
-    export SONAR_GO_TEST_ARGS="$(go list ./... | awk '!/test\/e2e/ {printf $0" "}')"
-    export SELF="make -f Makefile.prow"
-    export HOME="/tmp"
-    make -f Makefile.prow sonar/go/prow
-  container:
-    from: src
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
 - as: latest-image-mirror
   postsubmit: true
   steps:
@@ -62,18 +51,6 @@ tests:
       IMAGE_TAG: latest-2.5
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
-- as: sonar-post-submit
-  commands: |
-    export SONAR_GO_TEST_ARGS="$(go list ./... | awk '!/test\/e2e/ {printf $0" "}')"
-    export SELF="make -f Makefile.prow"
-    export HOME="/tmp"
-    make -f Makefile.prow sonar/go/prow
-  container:
-    from: src
-  postsubmit: true
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
 - as: publish
   postsubmit: true
   steps:
