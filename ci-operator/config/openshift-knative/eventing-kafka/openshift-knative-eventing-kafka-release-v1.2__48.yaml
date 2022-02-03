@@ -218,7 +218,7 @@ tests:
     version: "4.8"
   steps:
     test:
-    - as: test-e2e
+    - as: test
       cli: latest
       commands: make test-e2e
       dependencies:
@@ -269,9 +269,21 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    - as: test-so-compatability
+    workflow: generic-claim
+- as: e2e-aws-ocp-48-continuous
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.8"
+  cron: 0 */12 * * 1-5
+  steps:
+    test:
+    - as: test
       cli: latest
-      commands: make test-compat
+      commands: make test-e2e
       dependencies:
       - env: KNATIVE_EVENTING_KAFKA_CONSOLIDATED_CONTROLLER
         name: knative-eventing-kafka-consolidated-controller
