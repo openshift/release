@@ -88,11 +88,6 @@ class Config:
 
         return suffix
 
-    def get_art_suffix(self, arch, private):
-        suffix = '-art-latest'
-        suffix += self.get_suffix(arch, private)
-        return suffix
-
 
 class Context:
     def __init__(self, config, arch, private):
@@ -101,7 +96,6 @@ class Context:
         self.private = private
 
         self.suffix = config.get_suffix(arch, private)
-        self.art_suffix = config.get_art_suffix(arch, private)
         self.jobs_namespace = f'ci-release{self.suffix}'
         self.rc_hostname = f'openshift-release{self.suffix}'
         self.rc_temp_hostname = f'openshift-release{self.suffix}-temp'
