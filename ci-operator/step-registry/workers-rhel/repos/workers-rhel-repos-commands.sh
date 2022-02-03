@@ -23,9 +23,14 @@ fi
 
 # Install an updated version of the client
 mkdir -p /tmp/client
-curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz | tar --directory=/tmp/client -xzf -
+curl https://mirror2.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz | tar --directory=/tmp/client -xzf -
 PATH=/tmp/client:$PATH
 oc version --client
+
+MIRROR_USERNAME="$(<'/var/run/mirror-repo-basic-auth/username')"
+export MIRROR_USERNAME
+MIRROR_PASSWORD="$(<'/var/run/mirror-repo-basic-auth/password')"
+export MIRROR_PASSWORD
 
 cat > prep.yaml <<-'EOF'
 ---
@@ -38,6 +43,8 @@ cat > prep.yaml <<-'EOF'
     kubeconfig_path: "{{ lookup('env', 'KUBECONFIG') }}"
     ops_mirror_path: "{{ lookup('env', 'OPS_MIRROR_KEY') }}"
     platform_version: "{{ lookup('env', 'PLATFORM_VERSION') }}"
+    mirror_username: "{{ lookup('env', 'MIRROR_USERNAME') }}"
+    mirror_password: "{{ lookup('env', 'MIRROR_PASSWORD') }}"
     major_platform_version: "{{ platform_version[:1] }}"
 
   tasks:
@@ -59,72 +66,68 @@ cat > prep.yaml <<-'EOF'
     wait_for_connection:
       timeout: 600
 
-  - name: Copy Atomic OpenShift yum repository certificate and key
-    copy:
-      src: "{{ ops_mirror_path }}"
-      dest: /var/lib/yum/
-
   - name: Create rhel-X-server-ose-rpms repo file
     template:
       src: "rhel-{{ major_platform_version }}-server-ose-devel-rpms.repo.j2"
       dest: "/etc/yum.repos.d/rhel-{{ major_platform_version }}-server-ose-rpms.repo"
 
   - name: Create rhel-X-server-rpms repo file
-    copy:
-      src: "rhel-{{ major_platform_version }}-server-rpms.repo"
-      dest: /etc/yum.repos.d/
+    template:
+      src: "rhel-{{ major_platform_version }}-server-rpms.repo.j2"
+      dest: "/etc/yum.repos.d/rhel-{{ major_platform_version }}-server-rpms.repo"
+
 EOF
 
 cat > rhel-7-server-ose-devel-rpms.repo.j2 <<-'EOF'
 [rhel-7-server-ose-{{ release_version }}-devel-rpms]
 name = A repository of dependencies for Atomic OpenShift {{ release_version }}
-baseurl = https://mirror.openshift.com/enterprise/reposync/{{ release_version }}/rhel-server-ose-rpms/
+baseurl = https://mirror2.openshift.com/enterprise/reposync/{{ release_version }}/rhel-server-ose-rpms/
+username = {{ mirror_username }}
+password = {{ mirror_password }}
 failovermethod = priority
 gpgcheck = 0
-sslclientcert = /var/lib/yum/ops-mirror.pem
-sslclientkey = /var/lib/yum/ops-mirror.pem
 sslverify = 0
 enabled = 1
 EOF
 
-cat > rhel-7-server-rpms.repo <<-'EOF'
+cat > rhel-7-server-rpms.repo.j2 <<-'EOF'
 [rhel-7-server-rpms]
 name = Red Hat Enterprise Linux 7 Server (RPMs)
-baseurl = https://mirror.openshift.com/enterprise/reposync/ci-deps/rhel-server-rpms/
+baseurl = https://mirror2.openshift.com/enterprise/reposync/ci-deps/rhel-server-rpms/
+username = {{ mirror_username }}
+password = {{ mirror_password }}
 failovermethod = priority
 gpgcheck = 0
-sslclientcert = /var/lib/yum/ops-mirror.pem
-sslclientkey = /var/lib/yum/ops-mirror.pem
 sslverify = 0
 enabled = 1
 
 [rhel-7-server-optional-rpms]
 name = Red Hat Enterprise Linux 7 Server - Optional (RPMs)
-baseurl = https://mirror.openshift.com/enterprise/reposync/ci-deps/rhel-server-optional-rpms/
+baseurl = https://mirror2.openshift.com/enterprise/reposync/ci-deps/rhel-server-optional-rpms/
+username = {{ mirror_username }}
+password = {{ mirror_password }}
 failovermethod = priority
 gpgcheck = 0
-sslclientcert = /var/lib/yum/ops-mirror.pem
-sslclientkey = /var/lib/yum/ops-mirror.pem
 sslverify = 0
 enabled = 1
 
 [rhel-7-server-extras-rpms]
 name = Red Hat Enterprise Linux 7 Server - Extras (RPMs)
-baseurl = https://mirror.openshift.com/enterprise/reposync/ci-deps/rhel-server-extras-rpms/
+baseurl = https://mirror2.openshift.com/enterprise/reposync/ci-deps/rhel-server-extras-rpms/
+username = {{ mirror_username }}
+password = {{ mirror_password }}
 failovermethod = priority
 gpgcheck = 0
-sslclientcert = /var/lib/yum/ops-mirror.pem
-sslclientkey = /var/lib/yum/ops-mirror.pem
 sslverify = 0
 enabled = 1
 
 [rhel-7-fast-datapath-rpms]
 name = Red Hat Enterprise Linux 7 Server - Fast Datapath (RPMs)
-baseurl = https://mirror.openshift.com/enterprise/reposync/ci-deps/rhel-fast-datapath-rpms/
+baseurl = https://mirror2.openshift.com/enterprise/reposync/ci-deps/rhel-fast-datapath-rpms/
+username = {{ mirror_username }}
+password = {{ mirror_password }}
 failovermethod = priority
 gpgcheck = 0
-sslclientcert = /var/lib/yum/ops-mirror.pem
-sslclientkey = /var/lib/yum/ops-mirror.pem
 sslverify = 0
 enabled = 1
 EOF
@@ -132,34 +135,34 @@ EOF
 cat > rhel-8-server-ose-devel-rpms.repo.j2 <<-'EOF'
 [rhel-8-server-ose-{{ release_version }}-devel-rpms]
 name = A repository of dependencies for OpenShift Container Platform {{ release_version }}
-baseurl = https://mirror.openshift.com/enterprise/reposync/{{ release_version }}/rhel-8-server-ose-rpms/
+baseurl = https://mirror2.openshift.com/enterprise/reposync/{{ release_version }}/rhel-8-server-ose-rpms/
+username = {{ mirror_username }}
+password = {{ mirror_password }}
 failovermethod = priority
 gpgcheck = 0
-sslclientcert = /var/lib/yum/ops-mirror.pem
-sslclientkey = /var/lib/yum/ops-mirror.pem
-sslverify = 0
 enabled = 1
+sslverify = 0
 module_hotfixes = 1
 
 [rhel-8-fast-datapath-{{ release_version }}-devel-rpms]
 name = A repository of dependencies for OpenShift Container Platform {{ release_version }}
-baseurl = https://mirror.openshift.com/enterprise/reposync/{{ release_version }}/rhel-8-fast-datapath-rpms/
+baseurl = https://mirror2.openshift.com/enterprise/reposync/{{ release_version }}/rhel-8-fast-datapath-rpms/
+username = {{ mirror_username }}
+password = {{ mirror_password }}
 failovermethod = priority
 gpgcheck = 0
-sslclientcert = /var/lib/yum/ops-mirror.pem
-sslclientkey = /var/lib/yum/ops-mirror.pem
 sslverify = 0
 enabled = 1
 module_hotfixes = 1
 EOF
 
-cat > rhel-8-server-rpms.repo <<-'EOF'
+cat > rhel-8-server-rpms.repo.j2 <<-'EOF'
 [rhel-8-for-x86_64-baseos-rpms]
 name = Red Hat Enterprise Linux 8 for x86_64 - BaseOS (RPMs)
-baseurl = https://mirror.openshift.com/enterprise/reposync/ci-deps/rhel-8-baseos-rpms/
+baseurl = https://mirror2.openshift.com/enterprise/reposync/ci-deps/rhel-8-baseos-rpms/
+username = {{ mirror_username }}
+password = {{ mirror_password }}
 gpgcheck = 0
-sslclientcert = /var/lib/yum/ops-mirror.pem
-sslclientkey = /var/lib/yum/ops-mirror.pem
 sslverify = 0
 enabled = 1
 metadata_expire = 86400
@@ -168,10 +171,10 @@ module_hotfixes = 1
 
 [rhel-8-for-x86_64-appstream-rpms]
 name = Red Hat Enterprise Linux 8 for x86_64 - AppStream (RPMs)
-baseurl = https://mirror.openshift.com/enterprise/reposync/ci-deps/rhel-8-appstream-rpms/
+baseurl = https://mirror2.openshift.com/enterprise/reposync/ci-deps/rhel-8-appstream-rpms/
+username = {{ mirror_username }}
+password = {{ mirror_password }}
 gpgcheck = 0
-sslclientcert = /var/lib/yum/ops-mirror.pem
-sslclientkey = /var/lib/yum/ops-mirror.pem
 sslverify = 0
 enabled = 1
 metadata_expire = 86400
