@@ -116,6 +116,11 @@ if [ "${PROVIDER_IMAGE}" != "${ASSISTED_CONTROLLER_IMAGE}" ];
 then
   echo "export PROVIDER_IMAGE=${PROVIDER_IMAGE}" >> /root/config
 fi
+# Most jobs and tests don't require this image, so this allows it as optional
+if [ "${HYPERSHIFT_IMAGE}" != "${ASSISTED_CONTROLLER_IMAGE}" ];
+then
+  echo "export HYPERSHIFT_IMAGE=${HYPERSHIFT_IMAGE}" >> /root/config
+fi
 
 # expr command's return value is 1 in case of a false expression. We don't want to exit in this case.
 set +e
