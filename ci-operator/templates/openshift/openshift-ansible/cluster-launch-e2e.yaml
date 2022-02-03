@@ -171,6 +171,9 @@ objects:
       image: ${IMAGE_ANSIBLE}
       terminationMessagePolicy: FallbackToLogsOnError
       volumeMounts:
+      - name: mirror-enterprise-basic-auth
+        mountPath: /tmp/mirror-enterprise-basic-auth
+        readOnly: true
       - name: shared-tmp
         mountPath: /tmp
       - name: cluster-profile
@@ -195,6 +198,12 @@ objects:
         ansible-playbook -vv \
           -e openshift_test_repo=${RPM_REPO_OPENSHIFT_ORIGIN} -e 'oreg_url=${IMAGE_FORMAT}' \
           playbooks/${CLUSTER_TYPE}/openshift-cluster/launch.yml
+
+    volumes:
+    - name: mirror-enterprise-basic-auth
+      secret:
+        defaultMode: 420
+        secretName: mirror-enterprise-basic-auth
 
     # Performs cleanup of all created resources
     - name: teardown
