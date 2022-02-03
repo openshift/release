@@ -50,11 +50,7 @@ set -xeuo pipefail
 # about the Packet provisioner, remove the file if it's present.
 test -f /usr/config && rm -f /usr/config || true
 
-echo 'baseurl=http://vault.centos.org/\$contentdir/\$releasever/BaseOS/\$basearch/os/' >> /etc/yum.repos.d/CentOS-Linux-BaseOS.repo
-echo 'baseurl=http://vault.centos.org/\$contentdir/\$releasever/extras/\$basearch/os/' >> /etc/yum.repos.d/CentOS-Linux-Extras.repo
-echo 'baseurl=http://vault.centos.org/\$contentdir/\$releasever/AppStream/\$basearch/os/' >> /etc/yum.repos.d/CentOS-Linux-AppStream.repo
-
-dnf install -y git sysstat sos
+dnf install -y git sysstat sos make
 systemctl start sysstat
 
 mkdir -p /tmp/artifacts
