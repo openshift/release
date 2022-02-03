@@ -283,7 +283,9 @@ def _add_osd_rc_deployment(gendoc):
                                         '--plugin-config=/etc/plugins/plugins.yaml',
                                         '--supplemental-plugin-config-dir=/etc/plugins',
                                         '--verify-bugzilla',
-                                        '--authentication-message=Pulling these images requires <a href="https://docs.ci.openshift.org/docs/how-tos/use-registries-in-build-farm/">authenticating to the app.ci cluster</a>.'],
+                                        '--authentication-message=Pulling these images requires <a href="https://docs.ci.openshift.org/docs/how-tos/use-registries-in-build-farm/">authenticating to the app.ci cluster</a>.',
+                                        f'--art-suffix={context.art_suffix}'
+                                        ],
                             'image': 'release-controller:latest',
                             'name': 'controller',
                             'volumeMounts': get_rc_volume_mounts(),
@@ -354,7 +356,9 @@ def _add_osd_rc_deployment(gendoc):
                                         '--tools-image-stream-tag=release-controller-bootstrap:tests',
                                         f'--release-architecture={context.get_supported_architecture_name()}',
                                         '-v=6',
-                                        '--authentication-message=Pulling these images requires <a href="https://docs.ci.openshift.org/docs/how-tos/use-registries-in-build-farm/">authenticating to the app.ci cluster</a>.'],
+                                        '--authentication-message=Pulling these images requires <a href="https://docs.ci.openshift.org/docs/how-tos/use-registries-in-build-farm/">authenticating to the app.ci cluster</a>.',
+                                        f'--art-suffix={context.art_suffix}'
+                                        ],
                             'image': 'release-controller-api:latest',
                             'name': 'controller',
                             'volumeMounts': get_kubeconfig_volume_mounts(),
