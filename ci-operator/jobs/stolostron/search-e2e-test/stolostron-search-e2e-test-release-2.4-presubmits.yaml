@@ -105,23 +105,22 @@ presubmits:
     - ^release-2\.4$
     - ^release-2\.4-
     cluster: build01
-    context: ci/prow/sonar-pre-submit
+    context: ci/prow/lint
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stolostron-search-e2e-test-release-2.4-sonar-pre-submit
-    rerun_command: /test sonar-pre-submit
+    name: pull-ci-stolostron-search-e2e-test-release-2.4-lint
+    rerun_command: /test lint
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/acm-sonarcloud-token
-        - --target=sonar-pre-submit
+        - --target=lint
         command:
         - ci-operator
         image: ci-operator:latest
@@ -131,9 +130,6 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /secrets/acm-sonarcloud-token
-          name: acm-sonarcloud-token
-          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -145,13 +141,10 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: acm-sonarcloud-token
-        secret:
-          secretName: acm-sonarcloud-token
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )sonar-pre-submit,?($|\s.*)
+    trigger: (?m)^/test( | .* )lint,?($|\s.*)
