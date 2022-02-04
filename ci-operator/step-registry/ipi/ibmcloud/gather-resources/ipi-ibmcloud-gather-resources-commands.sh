@@ -86,7 +86,7 @@ function gather_cis {
     DOMAIN_ID=$("${IBMCLOUD_CLI}" cis domains --per-page 50 | awk '/ci-ibmcloud.devcluster.openshift.com/{print $1}')
     {
         echo -e "# ibmcloud cis domains\n"
-        "${IBMCLOUD_CLI}" cis domains --per-page 50 | awk -v domain="Openshift-CI-IPI-CIS" '$0 ~ filter {print $1}'
+        "${IBMCLOUD_CLI}" cis domains --per-page 50 | awk -v filter="${DOMAIN_ID}" '$0 ~ filter {print $1}'
 	echo -e "## ibmcloud cis dns-records ${DOMAIN_ID}\n"
 	"${IBMCLOUD_CLI}" cis dns-records "${DOMAIN_ID}" | grep "${CLUSTER_FILTER}"
 	echo -e "## ibmcloud cis dns-record ${DOMAIN_ID} <dns-record>\n"
