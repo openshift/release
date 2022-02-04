@@ -51,6 +51,12 @@ images:
       as:
       - registry.centos.org/centos/centos:7
   to: deploy
+- dockerfile_path: e2e/tests/testdata/Dockerfile
+  inputs:
+    ubi:
+      as:
+      - registry.access.redhat.com/ubi8/ubi:latest
+  to: graph-data
 - dockerfile_path: dist/Dockerfile.e2e/Dockerfile
   inputs:
     base:
@@ -61,6 +67,8 @@ images:
       - registry.ci.openshift.org/openshift/release:golang-1.13
   to: e2e-test
 promotion:
+  additional_images:
+    graph-data: graph-data
   name: cincinnati-build-root
   namespace: cincinnati-ci
 raw_steps:
@@ -178,6 +186,8 @@ tests:
       dependencies:
       - env: CINCINNATI_IMAGE
         name: deploy
+      - env: GRAPHDATA_IMAGE
+        name: graph-data
       from: e2e-test
       resources:
         requests:
