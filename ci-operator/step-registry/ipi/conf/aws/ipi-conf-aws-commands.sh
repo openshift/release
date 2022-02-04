@@ -13,6 +13,8 @@ CONFIG="${SHARED_DIR}/install-config.yaml"
 
 expiration_date=$(date -d '8 hours' --iso=minutes --utc)
 
+# Extra user tags to enable testing of updateable user tags
+# This value is going to be modified as part of the tests
 created_date=$(date --iso=minutes --utc)
 
 function join_by { local IFS="$1"; shift; echo "$*"; }
