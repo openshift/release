@@ -264,9 +264,9 @@ serviceaccount-secret-rotation:
 	make job JOB=periodic-rotate-serviceaccount-secrets
 
 # generate the manifets for cluster pools admins
-# example: make TEAM=hypershift OWNERS=dmace,petr new-pool-admins
+# example: make TEAM=hypershift new-pool-admins
 new-pool-admins:
-	hack/generate_new_pool_admins.sh $(TEAM) $(OWNERS)
+	hack/generate_new_pool_admins.sh $(TEAM)
 .PHONY: new-pool-admins
 
 openshift-image-mirror-mappings:
