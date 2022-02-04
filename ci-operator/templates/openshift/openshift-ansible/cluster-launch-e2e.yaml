@@ -192,6 +192,11 @@ objects:
         trap 'rc=$?; if [[ $rc -ne 0 ]]; then touch /tmp/setup-failed; fi; exit $rc' EXIT
         trap 'jobs -p | xargs -r kill || true; exit 0' TERM
 
+        MIRROR_USERNAME="$(<'/usr/share/ansible/openshift-ansible/inventory/dynamic/injected/repository-credentials-username')"
+        export MIRROR_USERNAME
+        MIRROR_PASSWORD="$(<'/usr/share/ansible/openshift-ansible/inventory/dynamic/injected/repository-credentials-password')"
+        export MIRROR_PASSWORD
+
         ansible-playbook -vv \
           -e openshift_test_repo=${RPM_REPO_OPENSHIFT_ORIGIN} -e 'oreg_url=${IMAGE_FORMAT}' \
           playbooks/${CLUSTER_TYPE}/openshift-cluster/launch.yml
