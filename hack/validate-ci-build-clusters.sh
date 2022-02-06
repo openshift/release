@@ -24,6 +24,7 @@ declare -a files=(
               "/core-services/ci-secret-bootstrap"
               "/core-services/ci-secret-generator"
               "/core-services/sanitize-prow-jobs"
+              "/core-services/sync-rover-groups"
 )
 exitCode=0
 for i in "${files[@]}"
