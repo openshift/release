@@ -69,8 +69,13 @@ def add_rpm_mirror_service(gendoc, clone_dir, major_minor):
                 },
                 'template': {
                     'metadata': {
+                        # Set safe-to-evict, otherwise this pods will inhibit autoscaling with
+                        # their local storage.
+                        'annotations': {
+                            'cluster-autoscaler.kubernetes.io/safe-to-evict': 'true'
+                        },
                         'labels': {
-                            'app': service_name
+                            'app': service_name,
                         }
                     },
                     'spec': {
