@@ -152,9 +152,6 @@ fi
 
 source /root/config
 
-# TODO: remove once we finished moving to the new dockerfile
-export TEST_INFRA_DOCKERFILE=Dockerfile.assisted-test-infra
-
 make \${MAKEFILE_TARGET:-create_full_environment run test_parallel}
 
 EOF
