@@ -134,9 +134,24 @@ tests:
   container:
     from: test-bin
 - as: unit-test
-  commands: make REPORTS=${ARTIFACT_DIR} unit-test
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
+    make REPORTS=${ARTIFACT_DIR} unit-test
   container:
     from: test-bin
+  secret:
+    mount_path: /tmp/secret
+    name: assisted-installer-codecov-token
+- as: unit-test-postsubmit
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
+    make REPORTS=${ARTIFACT_DIR} unit-test
+  container:
+    from: test-bin
+  postsubmit: true
+  secret:
+    mount_path: /tmp/secret
+    name: assisted-installer-codecov-token
 - as: e2e-metal-assisted
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:

@@ -469,6 +469,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/assisted-installer-codecov-token
         - --target=unit-test
         command:
         - ci-operator
@@ -479,6 +480,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/assisted-installer-codecov-token
+          name: assisted-installer-codecov-token
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -490,6 +494,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: assisted-installer-codecov-token
+        secret:
+          secretName: assisted-installer-codecov-token
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
