@@ -1,0 +1,67 @@
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: bparees
+  name: sippy-redirector
+spec:
+  selector:
+    app: sippy-redirector
+  ports:
+  - port: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: bparees
+  name: sippy-redirector
+  labels:
+    app: sippy-redirector
+spec:
+  replicas: 2
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: sippy-redirector
+  template:
+    metadata:
+      labels:
+        app: sippy-redirector
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - sippy-redirector
+            topologyKey: kubernetes.io/hostname
+      containers:
+      - name: sippy-redirector
+        image: registry.ci.openshift.org/ci/nginx-unprivileged:stable
+        resources:
+          requests:
+            memory: "250Mi"
+            cpu: "100m"
+        volumeMounts:
+        - mountPath: /etc/nginx/conf.d
+          name: config
+      volumes:
+      - name: config
+        configMap:
+          name: sippy-redirector-config
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sippy-redirector-config
+  namespace: bparees
+data:
+  "default.conf": |
+    server {
+      listen 8080;
+      location / {
+        proxy_pass https://sippy.dptools.openshift.org/;
+      }
+    }
