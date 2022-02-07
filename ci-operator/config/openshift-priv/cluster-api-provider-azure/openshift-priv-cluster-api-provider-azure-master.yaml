@@ -3,29 +3,22 @@ base_images:
     name: 4.11-priv
     namespace: ocp-private
     tag: base
-  ci-artifacts:
-    name: master
-    namespace: psap
-    tag: ci-artifacts
   ocp_builder_rhel-8-golang-1.17-openshift-4.11:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.17-openshift-4.11
+binary_build_commands: make manager
 build_root:
   from_repository: true
-canonical_go_repository: github.com/openshift/cluster-nfd-operator
+canonical_go_repository: sigs.k8s.io/cluster-api-provider-azure
 images:
-- dockerfile_path: Dockerfile
+- dockerfile_path: openshift/Dockerfile.openshift
   from: base
   inputs:
     ocp_builder_rhel-8-golang-1.17-openshift-4.11:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
-  to: cluster-nfd-operator
-operator:
-  bundles:
-  - context_dir: manifests/4.11
-    dockerfile_path: bundle.Dockerfile
+  to: azure-cluster-api-controllers
 promotion:
   name: 4.11-priv
   namespace: ocp-private
@@ -41,30 +34,28 @@ releases:
       namespace: ocp-private
 resources:
   '*':
+    limits:
+      memory: 4Gi
     requests:
       cpu: 100m
       memory: 200Mi
+test_binary_build_commands: openshift/unit-tests.sh
 tests:
 - as: unit
-  commands: make test
+  commands: openshift/unit-tests.sh
   container:
     from: src
-- as: verify
-  commands: make verify
-  container:
-    from: src
-- as: e2e-aws
+- as: e2e-azure
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
-    dependencies:
-      OO_INDEX: ci-index
-    env:
-      OO_CHANNEL: stable
-      OO_INSTALL_NAMESPACE: '!create'
-      OO_PACKAGE: nfd
-      OO_TARGET_NAMESPACES: '!install'
-    workflow: optional-operators-ci-aws
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure
+- as: e2e-azure-serial
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-serial
 zz_generated_metadata:
   branch: master
   org: openshift-priv
-  repo: cluster-nfd-operator
+  repo: cluster-api-provider-azure
