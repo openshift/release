@@ -1,12 +1,12 @@
 presubmits:
-  openshift-priv/cluster-api-provider-gcp:
+  openshift-priv/cluster-api-provider-azure:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-4\.11$
-    - ^release-4\.11-
-    cluster: build04
-    context: ci/prow/e2e-gcp
+    - ^master$
+    - ^master-
+    cluster: build01
+    context: ci/prow/e2e-azure
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -14,13 +14,13 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
-      ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/cloud: azure4
+      ci-operator.openshift.io/cloud-cluster-profile: azure4
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-cluster-api-provider-gcp-release-4.11-e2e-gcp
-    path_alias: sigs.k8s.io/cluster-api-provider-gcp
-    rerun_command: /test e2e-gcp
+    name: pull-ci-openshift-priv-cluster-api-provider-azure-master-e2e-azure
+    path_alias: sigs.k8s.io/cluster-api-provider-azure
+    rerun_command: /test e2e-azure
     skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
@@ -31,8 +31,8 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-gcp-cluster-profile
-        - --target=e2e-gcp
+        - --secret-dir=/usr/local/e2e-azure-cluster-profile
+        - --target=e2e-azure
         command:
         - ci-operator
         image: ci-operator:latest
@@ -48,7 +48,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-gcp-cluster-profile
+        - mountPath: /usr/local/e2e-azure-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -74,26 +74,22 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
+        secret:
+          secretName: cluster-secrets-azure4
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-gcp,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-azure,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-4\.11$
-    - ^release-4\.11-
-    cluster: build04
-    context: ci/prow/e2e-gcp-serial
+    - ^master$
+    - ^master-
+    cluster: build01
+    context: ci/prow/e2e-azure-serial
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -101,13 +97,13 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
-      ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/cloud: azure4
+      ci-operator.openshift.io/cloud-cluster-profile: azure4
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-cluster-api-provider-gcp-release-4.11-e2e-gcp-serial
-    path_alias: sigs.k8s.io/cluster-api-provider-gcp
-    rerun_command: /test e2e-gcp-serial
+    name: pull-ci-openshift-priv-cluster-api-provider-azure-master-e2e-azure-serial
+    path_alias: sigs.k8s.io/cluster-api-provider-azure
+    rerun_command: /test e2e-azure-serial
     skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
@@ -118,8 +114,8 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-gcp-serial-cluster-profile
-        - --target=e2e-gcp-serial
+        - --secret-dir=/usr/local/e2e-azure-serial-cluster-profile
+        - --target=e2e-azure-serial
         command:
         - ci-operator
         image: ci-operator:latest
@@ -135,7 +131,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-gcp-serial-cluster-profile
+        - mountPath: /usr/local/e2e-azure-serial-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -161,25 +157,21 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
+        secret:
+          secretName: cluster-secrets-azure4
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-gcp-serial,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-azure-serial,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.11$
-    - ^release-4\.11-
-    cluster: build04
+    - ^master$
+    - ^master-
+    cluster: build01
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -190,8 +182,8 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-cluster-api-provider-gcp-release-4.11-images
-    path_alias: sigs.k8s.io/cluster-api-provider-gcp
+    name: pull-ci-openshift-priv-cluster-api-provider-azure-master-images
+    path_alias: sigs.k8s.io/cluster-api-provider-azure
     rerun_command: /test images
     spec:
       containers:
@@ -234,9 +226,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.11$
-    - ^release-4\.11-
-    cluster: build04
+    - ^master$
+    - ^master-
+    cluster: build01
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -247,8 +239,8 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-cluster-api-provider-gcp-release-4.11-unit
-    path_alias: sigs.k8s.io/cluster-api-provider-gcp
+    name: pull-ci-openshift-priv-cluster-api-provider-azure-master-unit
+    path_alias: sigs.k8s.io/cluster-api-provider-azure
     rerun_command: /test unit
     spec:
       containers:
