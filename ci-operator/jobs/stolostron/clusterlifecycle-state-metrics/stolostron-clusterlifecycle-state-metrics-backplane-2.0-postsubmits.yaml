@@ -1,99 +1,9 @@
 postsubmits:
-  stolostron/cluster-curator-controller:
+  stolostron/clusterlifecycle-state-metrics:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^main$
-    cluster: build02
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stolostron-cluster-curator-controller-main-backplane-fast-forward
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=backplane-fast-forward
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^main$
-    cluster: build02
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stolostron-cluster-curator-controller-main-fast-forward
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=fast-forward
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^main$
+    - ^backplane-2\.0$
     cluster: build02
     decorate: true
     decoration_config:
@@ -102,7 +12,7 @@ postsubmits:
       ci-operator.openshift.io/is-promotion: "true"
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-stolostron-cluster-curator-controller-main-images
+    name: branch-ci-stolostron-clusterlifecycle-state-metrics-backplane-2.0-images
     spec:
       containers:
       - args:
@@ -147,7 +57,7 @@ postsubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^main$
+    - ^backplane-2\.0$
     cluster: build02
     decorate: true
     decoration_config:
@@ -155,13 +65,14 @@ postsubmits:
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-stolostron-cluster-curator-controller-main-pr-merge-image-mirror
+    name: branch-ci-stolostron-clusterlifecycle-state-metrics-backplane-2.0-pr-merge-image-mirror
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --target=pr-merge-image-mirror
         command:
         - ci-operator
@@ -172,6 +83,9 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -183,6 +97,9 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -190,41 +107,54 @@ postsubmits:
         secret:
           secretName: result-aggregator
   - agent: kubernetes
+    always_run: true
     branches:
-    - ^main$
+    - ^backplane-2\.0$
     cluster: build02
     decorate: true
+    decoration_config:
+      skip_cloning: true
     labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: branch-ci-stolostron-cluster-curator-controller-main-sonar
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-stolostron-clusterlifecycle-state-metrics-backplane-2.0-publish
     spec:
       containers:
       - args:
-        - -f
-        - /opt/build-harness/Makefile.prow
-        - sonar/go/prow
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=publish
         command:
-        - make
-        env:
-        - name: ARTIFACT_DIR
-          value: $(ARTIFACTS)
-        - name: SELF
-          value: make -f /opt/build-harness/Makefile.prow
-        - name: SONAR_GO_TEST_ARGS
-          value: -short ./...
-        image: registry.ci.openshift.org/stolostron/builder:go1.17-linux
+        - ci-operator
+        image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
         resources:
           requests:
-            cpu: 100m
-            memory: 200Mi
+            cpu: 10m
         volumeMounts:
-        - mountPath: /etc/sonarcloud
-          name: acm-sonarcloud-token
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: acm-sonarcloud-token
+      - name: ci-pull-credentials
         secret:
-          secretName: acm-sonarcloud-token
+          secretName: ci-pull-credentials
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator

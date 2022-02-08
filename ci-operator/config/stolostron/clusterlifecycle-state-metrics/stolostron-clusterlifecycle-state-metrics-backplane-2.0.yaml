@@ -27,7 +27,7 @@ images:
   from: clusterlifecycle-state-metrics
   to: clusterlifecycle-state-metrics-coverage
 promotion:
-  name: "2.5"
+  name: "2.0"
   namespace: stolostron
 releases:
   initial:
@@ -79,22 +79,38 @@ tests:
       SOURCE_IMAGE_REF: clusterlifecycle-state-metrics
     env:
       IMAGE_REPO: clusterlifecycle-state-metrics
-      IMAGE_TAG: latest
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
-- as: fast-forward
+- as: publish
   postsubmit: true
   steps:
+    dependencies:
+      SOURCE_IMAGE_REF: clusterlifecycle-state-metrics
     env:
-      DESTINATION_BRANCH: release-2.5
-    workflow: ocm-ci-fastforward
-- as: backplane-fast-forward
-  postsubmit: true
-  steps:
-    env:
-      DESTINATION_BRANCH: backplane-2.0
-    workflow: ocm-ci-fastforward
+      IMAGE_REPO: clusterlifecycle-state-metrics
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_COMPONENT_NAME=clusterlifecycle-state-metrics
+        export OSCI_COMPONENT_VERSION=2.0.0
+        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
+        export OSCI_PIPELINE_PRODUCT_PREFIX=backplane
+        export OSCI_PIPELINE_REPO=backplane-pipeline
+        export SELF="make -f /opt/build-harness/Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        make -f /opt/build-harness/Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: main
+  branch: backplane-2.0
   org: stolostron
   repo: clusterlifecycle-state-metrics
