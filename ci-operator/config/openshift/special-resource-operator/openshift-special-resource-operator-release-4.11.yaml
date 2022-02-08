@@ -23,7 +23,12 @@ images:
 - dockerfile_literal: |
     FROM src
     RUN ["yum", "update", "-y"]
-    RUN ["yum", "install", "-y", "ShellCheck"]
+    RUN export VERSION="stable" && \
+        URL="https://github.com/koalaman/shellcheck/releases/download" && \
+        export URL="${URL}/${VERSION}/shellcheck-${VERSION}.linux.x86_64.tar.xz" && \
+        wget -q -O - "${URL}" | tar -xJv && \
+        cp "shellcheck-${VERSION}/shellcheck" /usr/local/bin/ && \
+        rm -rf "shellcheck-${VERSION}"
     RUN mkdir /tmp/helm && \
         cd /tmp/helm && \
         curl https://get.helm.sh/helm-v3.6.0-linux-amd64.tar.gz -o helm.tar.gz && \
