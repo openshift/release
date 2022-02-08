@@ -483,7 +483,26 @@ tests:
         requests:
           cpu: "3"
           memory: 600Mi
-- as: e2e-kubevirt-all
+- as: capi-provider-agent-sanity
+  optional: true
+  run_if_changed: ^(api/.*|hypershift-operator/controllers/hostedcluster/internal/platform/agent/.*)$
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      HYPERSHIFT_IMAGE: pipeline:hypershift-operator
+    env:
+      ASSISTED_CONFIG: |
+        KUBE_API=yes
+        ENABLE_KUBE_API=true
+        MINIKUBE_DISK_SIZE=70g
+        MINIKUBE_RAM_MB=10240
+        TEST=./src/tests/test_kube_api.py
+        TEST_FUNC=test_capi_provider
+        MAKEFILE_TARGET="create_full_environment run deploy_capi_env test"
+      GATHER_CAPI_LOGS: "true"
+      TEST_SUITE: minimal
+    workflow: baremetalds-assisted
+- as: e2e-kubevirt-azure
   optional: true
   steps:
     cluster_profile: azure4
@@ -572,9 +591,27 @@ tests:
         requests:
           cpu: 500m
           memory: 1Gi
-    - as: install-hypershift
+    - as: kv-e2e
       cli: latest
-      commands: bin/hypershift install --hypershift-image ${HYPERSHIFT_RELEASE_LATEST}
+      commands: |-
+        # install hypershift
+        bin/hypershift install --hypershift-image ${HYPERSHIFT_RELEASE_LATEST}
+
+        export KUBEVIRT_PLATFORM_ENABLED=true
+        export RHCOS_CD_IMAGE="quay.io/containerdisks/rhcos:4.9"
+
+        # complie the e2e tests
+        make e2e
+
+        # run the test
+        bin/test-e2e \
+                  -test.v \
+                  -test.timeout=0 \
+                  -test.run=TestKubeVirtCreateCluster \
+                  -e2e.node-pool-replicas=1 \
+                  -e2e.base-domain="fake" \
+                  -e2e.kubevirt-container-disk-image="${RHCOS_CD_IMAGE}" \
+                  --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson
       credentials:
       - mount_path: /etc/ci-pull-credentials
         name: ci-pull-credentials
@@ -587,25 +624,128 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-azure
-- as: capi-provider-agent-sanity
+- as: e2e-kubevirt-gcp
   optional: true
-  run_if_changed: ^(api/.*|hypershift-operator/controllers/hostedcluster/internal/platform/agent/.*)$
   steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      HYPERSHIFT_IMAGE: pipeline:hypershift-operator
-    env:
-      ASSISTED_CONFIG: |
-        KUBE_API=yes
-        ENABLE_KUBE_API=true
-        MINIKUBE_DISK_SIZE=70g
-        MINIKUBE_RAM_MB=10240
-        TEST=./src/tests/test_kube_api.py
-        TEST_FUNC=test_capi_provider
-        MAKEFILE_TARGET="create_full_environment run deploy_capi_env test"
-      GATHER_CAPI_LOGS: "true"
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted
+    cluster_profile: gcp
+    test:
+    - as: deploy-cnv
+      cli: latest
+      commands: |-
+        oc apply -f - <<EOF
+        apiVersion: v1
+        kind: Namespace
+        metadata:
+          name: openshift-cnv
+        EOF
+
+        oc apply -f - <<EOF
+        apiVersion: operators.coreos.com/v1
+        kind: OperatorGroup
+        metadata:
+          name: openshift-cnv-group
+          namespace: openshift-cnv
+        spec:
+          targetNamespaces:
+          - openshift-cnv
+        EOF
+
+        cat <<EOF | oc apply -f -
+        apiVersion: operators.coreos.com/v1alpha1
+        kind: Subscription
+        metadata:
+          labels:
+            operators.coreos.com/kubevirt-hyperconverged.openshift-cnv: ''
+          name: kubevirt-hyperconverged
+          namespace: openshift-cnv
+        spec:
+          channel: stable
+          installPlanApproval: Automatic
+          name: kubevirt-hyperconverged
+          source: redhat-operators
+          sourceNamespace: openshift-marketplace
+        EOF
+
+        sleep 60
+
+        RETRIES=30
+        CSV=
+        for i in $(seq ${RETRIES}); do
+          if [[ -z ${CSV} ]]; then
+            CSV=$(oc get subscription -n openshift-cnv kubevirt-hyperconverged -o jsonpath='{.status.installedCSV}')
+          fi
+
+          if [[ -z ${CSV} ]]; then
+            echo "Try ${i}/${RETRIES}: can't get the CSV yet. Checking again in 30 seconds"
+            sleep 30
+          fi
+
+          if [[ $(oc get csv -n openshift-cnv ${CSV} -o jsonpath={.status.phase}) == "Succeeded" ]]; then
+            echo "CNV is deployed"
+            break
+          else
+            echo "Try ${i}/${RETRIES}: CNV is not deployed yet. Checking again in 30 seconds"
+            sleep 30
+          fi
+        done
+
+        if [[ $(oc get csv -n openshift-cnv ${CSV} -o jsonpath={.status.phase}) != "Succeeded" ]]; then
+          echo "Error: Failed to deploy CNV"
+          echo "CSV ${CSV} YAML"
+          oc get CSV ${CSV} -n openshift-cnv -o yaml
+          echo
+          echo "CSV ${CSV} Describe"
+          oc describe CSV ${CSV} -n openshift-cnv
+          exit 1
+        fi
+
+        oc create -f - <<EOF
+        apiVersion: hco.kubevirt.io/v1beta1
+        kind: HyperConverged
+        metadata:
+          name: kubevirt-hyperconverged
+          namespace: openshift-cnv
+        EOF
+
+        oc wait hyperconverged -n openshift-cnv kubevirt-hyperconverged --for=condition=Available --timeout=15m
+      from: bin
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    - as: kv-e2e
+      cli: latest
+      commands: |-
+        # install hypershift
+        bin/hypershift install --hypershift-image ${HYPERSHIFT_RELEASE_LATEST}
+
+        export KUBEVIRT_PLATFORM_ENABLED=true
+        export RHCOS_CD_IMAGE="quay.io/containerdisks/rhcos:4.9"
+
+        # complie the e2e tests
+        make e2e
+
+        # run the test
+        bin/test-e2e \
+                  -test.v \
+                  -test.timeout=0 \
+                  -test.run=TestKubeVirtCreateCluster \
+                  -e2e.node-pool-replicas=1 \
+                  -e2e.base-domain="fake" \
+                  -e2e.kubevirt-container-disk-image="${RHCOS_CD_IMAGE}" \
+                  --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson
+      credentials:
+      - mount_path: /etc/ci-pull-credentials
+        name: ci-pull-credentials
+        namespace: test-credentials
+      dependencies:
+      - env: HYPERSHIFT_RELEASE_LATEST
+        name: hypershift-operator
+      from: bin
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
 zz_generated_metadata:
   branch: main
   org: openshift-priv
