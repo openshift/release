@@ -9,6 +9,8 @@ build_root:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
 canonical_go_repository: knative.dev/eventing-kafka-broker
 images:
+- dockerfile_path: openshift/ci-operator/knative-images/dispatcher/Dockerfile
+  to: knative-eventing-kafka-broker-dispatcher
 - dockerfile_path: openshift/ci-operator/knative-images/kafka-controller/Dockerfile
   from: base
   inputs:
@@ -17,6 +19,8 @@ images:
       - destination_dir: .
         source_path: /go/bin/kafka-controller
   to: knative-eventing-kafka-broker-kafka-controller
+- dockerfile_path: openshift/ci-operator/knative-images/receiver/Dockerfile
+  to: knative-eventing-kafka-broker-receiver
 - dockerfile_path: openshift/ci-operator/knative-images/webhook-kafka/Dockerfile
   from: base
   inputs:
@@ -197,8 +201,12 @@ tests:
       cli: latest
       commands: make test-e2e
       dependencies:
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_DISPATCHER
+        name: knative-eventing-kafka-broker-dispatcher
       - env: KNATIVE_EVENTING_KAFKA_BROKER_KAFKA_CONTROLLER
         name: knative-eventing-kafka-broker-kafka-controller
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_RECEIVER
+        name: knative-eventing-kafka-broker-receiver
       - env: KNATIVE_EVENTING_KAFKA_BROKER_WEBHOOK_KAFKA
         name: knative-eventing-kafka-broker-webhook-kafka
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_COMMITTED_OFFSET
@@ -253,8 +261,12 @@ tests:
       cli: latest
       commands: make test-conformance
       dependencies:
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_DISPATCHER
+        name: knative-eventing-kafka-broker-dispatcher
       - env: KNATIVE_EVENTING_KAFKA_BROKER_KAFKA_CONTROLLER
         name: knative-eventing-kafka-broker-kafka-controller
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_RECEIVER
+        name: knative-eventing-kafka-broker-receiver
       - env: KNATIVE_EVENTING_KAFKA_BROKER_WEBHOOK_KAFKA
         name: knative-eventing-kafka-broker-webhook-kafka
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_COMMITTED_OFFSET
