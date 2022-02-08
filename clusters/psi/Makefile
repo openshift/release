@@ -4,7 +4,7 @@ all:
 
 TMPDIR ?= /tmp
 
-serviceaccounts = github-ldap-mapping-updater release-schedules-cm-updater sync-rover-groups-updater
+serviceaccounts = release-schedules-cm-updater sync-rover-groups-updater
 
 $(serviceaccounts):
 	oc --context app.ci sa create-kubeconfig -n ci $@ | sed 's/$@/app.ci/g' > "$(TMPDIR)/sa.$@.app.ci.config"
@@ -12,7 +12,7 @@ $(serviceaccounts):
 
 apply_credentials: $(serviceaccounts)
 
-cronjobs = github-ldap-mapping-update release-schedules-update sync-rover-groups-update
+cronjobs = release-schedules-update sync-rover-groups-update
 
 $(cronjobs):
 	oc --context psi apply -f $@_cronjob.yaml
