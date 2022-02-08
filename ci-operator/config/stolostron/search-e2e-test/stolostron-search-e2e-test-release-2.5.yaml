@@ -23,6 +23,14 @@ tests:
     make -f Makefile.prow lint
   container:
     from: bin
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: search-e2e-test
+    env:
+      IMAGE_REPO: search-e2e-test
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
 - as: publish
   postsubmit: true
   steps:
@@ -47,6 +55,16 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+    workflow: ocm-ci-image-mirror
+- as: latest-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: search-e2e-test
+    env:
+      IMAGE_REPO: search-e2e-test
+      IMAGE_TAG: latest-2.5
+      REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
 zz_generated_metadata:
   branch: release-2.5
