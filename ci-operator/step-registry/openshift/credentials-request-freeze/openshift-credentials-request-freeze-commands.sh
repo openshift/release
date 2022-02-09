@@ -18,5 +18,5 @@ echo "Comparing ${OPENSHIFT_LATEST_RELEASE_VERSION} ( ${OPENSHIFT_LATEST_RELEASE
 
 oc adm release extract --credentials-requests --cloud "${CLOUD:-}" --to frozen "${OPENSHIFT_FROZEN_RELEASE_IMAGE}"
 oc adm release extract --credentials-requests --cloud "${CLOUD:-}" --to latest "${OPENSHIFT_LATEST_RELEASE_IMAGE}"
-sha256sum frozen/* latest/*
 diff -ru frozen latest || fail
+sha256sum frozen/* latest/*
