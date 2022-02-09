@@ -54,7 +54,7 @@ release-controllers:
 	./hack/generators/release-controllers/generate-release-controllers.py .
 
 checkconfig:
-	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR):/release:z" gcr.io/k8s-prow/checkconfig:v20220107-463b53a7ed --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
+	$(CONTAINER_ENGINE) run --rm -v "$(CURDIR):/release:z" gcr.io/k8s-prow/checkconfig:v20220209-469dceee77 --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
 
 jobs: ci-operator-checkconfig
 	$(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/ci-operator-prowgen:latest
@@ -264,9 +264,9 @@ serviceaccount-secret-rotation:
 	make job JOB=periodic-rotate-serviceaccount-secrets
 
 # generate the manifets for cluster pools admins
-# example: make TEAM=hypershift OWNERS=dmace,petr new-pool-admins
+# example: make TEAM=hypershift new-pool-admins
 new-pool-admins:
-	hack/generate_new_pool_admins.sh $(TEAM) $(OWNERS)
+	hack/generate_new_pool_admins.sh $(TEAM)
 .PHONY: new-pool-admins
 
 openshift-image-mirror-mappings:

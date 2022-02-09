@@ -25,7 +25,6 @@ images:
     ADD validate-microshift /tmp/
     COPY microshift-containerized.service /tmp/microshift-containerized.service
     RUN bash -c 'sed -i "s/autoupdate=registry/autoupdate=local/g" /tmp/microshift-containerized.service'
-    COPY microshift-containerized /tmp/microshift-containerized
     COPY microshift.conf /tmp/microshift.conf
     COPY oc /usr/bin/oc
     COPY openshift-tests /usr/bin/openshift-tests
@@ -39,8 +38,6 @@ images:
       paths:
       - destination_dir: validate-microshift
         source_path: /go/src/github.com/redhat-et/microshift/validate-microshift/
-      - destination_dir: .
-        source_path: /go/src/github.com/redhat-et/microshift/packaging/systemd/microshift-containerized
       - destination_dir: .
         source_path: /go/src/github.com/redhat-et/microshift/packaging/systemd/microshift-containerized.service
       - destination_dir: .
@@ -65,7 +62,6 @@ images:
     RUN mkdir bin selinux
     COPY --from=builder /go/src/github.com/redhat-et/microshift/packaging/rpm/_rpmbuild/RPMS/x86_64/microshift-* bin/
     COPY --from=builder /go/src/github.com/redhat-et/microshift/packaging/rpm/_rpmbuild/RPMS/noarch/microshift-selinux-* selinux/
-    COPY microshift-containerized /tmp/microshift-containerized
     COPY microshift.conf /tmp/microshift.conf
     COPY openshift-tests /usr/bin/openshift-tests
     COPY oc /usr/bin/oc
@@ -82,8 +78,6 @@ images:
       as:
       - src
       paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/redhat-et/microshift/packaging/systemd/microshift-containerized
       - destination_dir: .
         source_path: /go/src/github.com/redhat-et/microshift/packaging/crio.conf.d/microshift.conf
     test-bin:

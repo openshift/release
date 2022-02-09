@@ -7,6 +7,10 @@ base_images:
     name: builder
     namespace: open-cluster-management
     tag: go1.17-linux
+  stolostron_builder_go1.17-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.17-linux
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
@@ -76,11 +80,12 @@ tests:
     - as: operator-e2e-test
       commands: |
         KUBECTL=oc
+        IMAGE_REGISTRY=quay.io/stolostron
         REGISTRATION_TAG=release-2.3
         WORK_TAG=release-2.3
         PLACEMENT_TAG=release-2.3
         PATH=.:$PATH
-        export KUBECTL PATH REGISTRATION_TAG WORK_TAG PLACEMENT_TAG
+        export KUBECTL PATH IMAGE_REGISTRY REGISTRATION_TAG WORK_TAG PLACEMENT_TAG
         make test-e2e
       dependencies:
       - env: IMAGE_NAME
@@ -103,7 +108,7 @@ tests:
     - as: publish
       commands: |-
         export OSCI_COMPONENT_NAME=registration-operator
-        export OSCI_COMPONENT_VERSION=release-2.3
+        export OSCI_COMPONENT_VERSION=2.3.0
         export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
         export SELF="make -f /opt/build-harness/Makefile.prow"
         export OSCI_PUBLISH_DELAY="0"

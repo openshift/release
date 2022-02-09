@@ -13,7 +13,7 @@ YQ_HASH=e70e482e7ddb9cf83b52f5e83b694a19e3aaf36acf6b82512cbe66e41d569201
 echo "${YQ_HASH} -" > /tmp/sum.txt
 if ! curl -Ls "${YQ_URI}" | tee /tmp/yq | sha256sum -c /tmp/sum.txt >/dev/null 2>/dev/null; then
   echo "Expected file at ${YQ_URI} to have checksum ${YQ_HASH} but instead got $(sha256sum </tmp/yq | cut -d' ' -f1)"
-  cat /tmp/yq
+  strings /tmp/yq
   exit 1
 fi
 echo "Downloaded yq; sha256 checksum matches expected ${YQ_HASH}."
@@ -44,6 +44,10 @@ data:
 EOF
 fi
 
+
+# Alibaba requires PVCs to be >= 20GB
+STORAGE="20Gi"
+
 # On top of setting up persistent storage for the platform Prometheus, we are
 # also annotating the PVCs so that the cluster-monitoring-operator can delete
 # the PVC if needed to prevent single point of failure. This is required to
@@ -58,7 +62,7 @@ prometheusK8s:
     spec:
       resources:
         requests:
-          storage: 10Gi
+          storage: ${STORAGE}
 EOF
 
 CONFIG_CONTENTS="$(echo "${CONFIG_CONTENTS}" | /tmp/yq m - "${PATCH}")"

@@ -148,6 +148,18 @@ tests:
       COMPUTE_NODE_TYPE: m6g.xlarge
       TEST_ARGS: --from-repository quay.io/multi-arch/community-e2e-images
     workflow: openshift-e2e-aws-image-ecosystem
+- as: ocp-jenkins-e2e-aws-arm64
+  interval: 24h
+  steps:
+    cluster_profile: aws-arm64
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: arm-ci.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      TEST_ARGS: --from-repository quay.io/multi-arch/community-e2e-images
+      TEST_SUITE: openshift/jenkins-e2e-rhel-only
+    workflow: openshift-e2e-aws
 - as: ocp-e2e-serial-aws-arm64
   interval: 48h
   steps:
@@ -269,7 +281,7 @@ tests:
     workflow: openshift-e2e-libvirt
 - as: ocp-installer-remote-libvirt-s390x
   cluster: build01
-  cron: '@weekly'
+  cron: 0 0 * * 5
   steps:
     cluster_profile: libvirt-s390x
     dependencies:

@@ -88,6 +88,11 @@ class Config:
 
         return suffix
 
+    def get_art_suffix(self, arch, private):
+        suffix = '-art-latest'
+        suffix += self.get_suffix(arch, private)
+        return suffix
+
 
 class Context:
     def __init__(self, config, arch, private):
@@ -96,6 +101,7 @@ class Context:
         self.private = private
 
         self.suffix = config.get_suffix(arch, private)
+        self.art_suffix = config.get_art_suffix(arch, private)
         self.jobs_namespace = f'ci-release{self.suffix}'
         self.rc_hostname = f'openshift-release{self.suffix}'
         self.rc_temp_hostname = f'openshift-release{self.suffix}-temp'
@@ -104,12 +110,10 @@ class Context:
         self.secret_name_tls_api = f'release-controller-api{self.suffix}-tls'
         self.is_namespace = f'ocp{self.suffix}'
         self.rc_serviceaccount_name = f'release-controller-{self.is_namespace}'
-        self.rc_api_serviceaccount_name = f'release-controller-api-{self.is_namespace}'
 
         self.rc_service_name = f'release-controller-{self.is_namespace}'
         self.rc_api_service_name = f'release-controller-api-{self.is_namespace}'
         self.rc_route_name = self.rc_service_name
-        self.rc_api_route_name = self.rc_api_service_name
 
         # Routes on the api.ci cluster
         # files-cache

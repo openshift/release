@@ -9,6 +9,12 @@ export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
 export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
 export HOME=/tmp/home
 export PATH=/usr/local/go/bin:/usr/libexec/origin:$PATH
+export REPORT_HANDLE_PATH="/usr/bin"
+
+# although we set this env var, but it does not exist if the CLUSTER_TYPE is not gcp.
+# so, currently some cases need to access gcp service whether the cluster_type is gcp or not
+# and they will fail, like some cvo cases, because /var/run/secrets/ci.openshift.io/cluster-profile/gce.json does not exist.
+export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
 
 # setup proxy
 if test -f "${SHARED_DIR}/proxy-conf.sh"
@@ -30,12 +36,30 @@ export GOPATH=/tmp/goproject
 export GOCACHE=/tmp/gocache
 export GOROOT=/usr/local/go
 
-# check if the image includes the exectable binary. we prepare it for late usage in case we need to compile it in the step.
-if [ -f "/usr/bin/extended-platform-tests" ]; then
-    echo "extended-platform-tests already exist, or else please try to compile it"
+# compile extended-platform-tests if it does not exist.
+export DEFAULT_EXTENDED_BIN=1
+# if [ -f "/usr/bin/extended-platform-tests" ]; then
+if ! [ -f "/usr/bin/extended-platform-tests" ]; then
+    echo "extended-platform-tests does not exist, and try to compile it"
+    mkdir -p /tmp/extendedbin
+    export PATH=/tmp/extendedbin:$PATH
+    cd /tmp/goproject
+    user_name=$(cat /var/run/tests-private-account/name)
+    user_token=$(cat /var/run/tests-private-account/token)
+    git clone https://${user_name}:${user_token}@github.com/openshift/openshift-tests-private.git
+    cd openshift-tests-private
+    make build
+    cp bin/extended-platform-tests /tmp/extendedbin
+    cp pipeline/handleresult.py /tmp/extendedbin
+    export REPORT_HANDLE_PATH="/tmp/extendedbin"
+    cd ..
+    rm -fr openshift-tests-private
+    export DEFAULT_EXTENDED_BIN=0
 fi
+which extended-platform-tests
 
 # configure enviroment for different cluster
+echo "CLUSTER_TYPE is ${CLUSTER_TYPE}"
 case "${CLUSTER_TYPE}" in
 gcp)
     export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
@@ -74,7 +98,7 @@ openstack*)
     source "${SHARED_DIR}/cinder_credentials.sh"
     export TEST_PROVIDER='{"type":"openstack"}';;
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
-packet)
+equinix-ocp-metal)
     export TEST_PROVIDER='{"type":"skeleton"}';;
 *) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"; exit 1;;
 esac
@@ -99,6 +123,7 @@ echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_START"
 trap 'echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"' EXIT
 
 # check if the cluster is ready
+oc version --client
 oc wait nodes --all --for=condition=Ready=true --timeout=10m
 oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
 
@@ -133,18 +158,29 @@ function run {
     cat ./case_selected
     echo "-----------------------------------------------------"
 
+    ret_value=0
     set -x
     if [ "W${TEST_PROVIDER}W" == "WnoneW" ]; then
-        extended-platform-tests run --max-parallel-tests 4 \
+        extended-platform-tests run --max-parallel-tests ${TEST_PARALLEL} \
         -o "${ARTIFACT_DIR}/extended.log" \
-        --timeout "${TEST_TIMEOUT}m" --junit-dir="${ARTIFACT_DIR}/junit" -f ./case_selected
+        --timeout "${TEST_TIMEOUT}m" --junit-dir="${ARTIFACT_DIR}/junit" -f ./case_selected || ret_value=$?
     else
-        extended-platform-tests run --max-parallel-tests 4 \
+        extended-platform-tests run --max-parallel-tests ${TEST_PARALLEL} \
         --provider "${TEST_PROVIDER}" -o "${ARTIFACT_DIR}/extended.log" \
-        --timeout "${TEST_TIMEOUT}m" --junit-dir="${ARTIFACT_DIR}/junit" -f ./case_selected
+        --timeout "${TEST_TIMEOUT}m" --junit-dir="${ARTIFACT_DIR}/junit" -f ./case_selected || ret_value=$?
     fi
     set +x
+    set +e
     rm -fr ./case_selected
+    echo "try to handle result"
+    handle_result
+    echo "done to handle result"
+    if [ "W${ret_value}W" == "W0W" ]; then
+        echo "success"
+        exit 0
+    fi
+    echo "fail"
+    exit ${DEFAULT_EXTENDED_BIN}
 }
 
 # select the cases per FILTERS
@@ -226,5 +262,34 @@ function handle_or_filter {
     else
         cat ./case_selected | grep -v -E "${value}" >> ./case_selected_or
     fi
+}
+function handle_result {
+    resultfile=`ls -rt -1 ${ARTIFACT_DIR}/junit/junit_e2e_* 2>&1 || true`
+    echo $resultfile
+    if (echo $resultfile | grep -E "no matches found") || (echo $resultfile | grep -E "No such file or directory") ; then
+        echo "there is no result file generated"
+        return
+    fi
+    current_time=`date "+%Y-%m-%d-%H-%M-%S"`
+    newresultfile="${ARTIFACT_DIR}/junit/junit_e2e_${current_time}.xml"
+    replace_ret=0
+    python3 ${REPORT_HANDLE_PATH}/handleresult.py -a replace -i ${resultfile} -o ${newresultfile} || replace_ret=$?
+    if ! [ "W${replace_ret}W" == "W0W" ]; then
+        echo "replacing file is not ok"
+        rm -fr ${resultfile}
+        return
+    fi 
+    rm -fr ${resultfile}
+
+    echo ${newresultfile}
+    split_ret=0
+    python3 ${REPORT_HANDLE_PATH}/handleresult.py -a split -i ${newresultfile} || split_ret=$?
+    if ! [ "W${split_ret}W" == "W0W" ]; then
+        echo "splitting file is not ok"
+        rm -fr ${newresultfile}
+        return
+    fi
+    cp -fr import-*.xml "${ARTIFACT_DIR}/junit/"
+    rm -fr ${newresultfile}
 }
 run

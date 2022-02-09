@@ -186,7 +186,7 @@ def _get_osd_rc_deployment_sidecars(context):
                      '-http-address=',
                      '-email-domain=*',
                      '-upstream=http://localhost:8080',
-                     f'-client-id=system:serviceaccount:{context.config.rc_deployment_namespace}:release-controller',
+                     f'-client-id=system:serviceaccount:{context.config.rc_deployment_namespace}:release-controller-{context.is_namespace}',
                      '-openshift-ca=/etc/pki/tls/cert.pem',
                      '-openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt',
                      '-openshift-sar={"verb": "get", "resource": "imagestreams", "namespace": "ocp-private"}',
@@ -226,7 +226,7 @@ def _add_osd_rc_deployment(gendoc):
 
     # Creating Cluster Groups for the AMD64 jobs...
     if context.arch == 'x86_64':
-        extra_rc_args.append('--cluster-group=build01,build02,build03')
+        extra_rc_args.append('--cluster-group=build01,build02,build03,build04')
         extra_rc_args.append('--cluster-group=vsphere')
 
     gendoc.append({
@@ -262,12 +262,10 @@ def _add_osd_rc_deployment(gendoc):
                                 },
                             },
                             'command': ['/usr/bin/release-controller',
-                                        # '--to=release',  # Removed according to release controller help
                                         *extra_rc_args,
                                         '--prow-config=/etc/config/config.yaml',
                                         '--supplemental-prow-config-dir=/etc/config',
                                         '--job-config=/etc/job-config',
-                                        f'--artifacts={context.fc_app_url}',
                                         '--listen=' + ('127.0.0.1:8080' if context.private else ':8080'),
                                         f'--prow-namespace={context.config.rc_deployment_namespace}',
                                         '--non-prow-job-kubeconfig=/etc/kubeconfig/kubeconfig',
@@ -285,7 +283,9 @@ def _add_osd_rc_deployment(gendoc):
                                         '--plugin-config=/etc/plugins/plugins.yaml',
                                         '--supplemental-plugin-config-dir=/etc/plugins',
                                         '--verify-bugzilla',
-                                        '--authentication-message=Pulling these images requires <a href="https://docs.ci.openshift.org/docs/how-tos/use-registries-in-build-farm/">authenticating to the app.ci cluster</a>.'],
+                                        '--authentication-message=Pulling these images requires <a href="https://docs.ci.openshift.org/docs/how-tos/use-registries-in-build-farm/">authenticating to the app.ci cluster</a>.',
+                                        f'--art-suffix={context.art_suffix}'
+                                        ],
                             'image': 'release-controller:latest',
                             'name': 'controller',
                             'volumeMounts': get_rc_volume_mounts(),
@@ -350,14 +350,15 @@ def _add_osd_rc_deployment(gendoc):
                                         # '--to=release',  # Removed according to release controller help
                                         f'--release-namespace={context.is_namespace}',
                                         f'--artifacts={context.fc_app_url}',
-                                        '--listen=' + ('127.0.0.1:8080' if context.private else ':8080'),
                                         f'--prow-namespace={context.config.rc_deployment_namespace}',
                                         '--non-prow-job-kubeconfig=/etc/kubeconfig/kubeconfig',
                                         f'--job-namespace={context.jobs_namespace}',
                                         '--tools-image-stream-tag=release-controller-bootstrap:tests',
                                         f'--release-architecture={context.get_supported_architecture_name()}',
                                         '-v=6',
-                                        '--authentication-message=Pulling these images requires <a href="https://docs.ci.openshift.org/docs/how-tos/use-registries-in-build-farm/">authenticating to the app.ci cluster</a>.'],
+                                        '--authentication-message=Pulling these images requires <a href="https://docs.ci.openshift.org/docs/how-tos/use-registries-in-build-farm/">authenticating to the app.ci cluster</a>.',
+                                        f'--art-suffix={context.art_suffix}'
+                                        ],
                             'image': 'release-controller-api:latest',
                             'name': 'controller',
                             'volumeMounts': get_kubeconfig_volume_mounts(),

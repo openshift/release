@@ -4,7 +4,7 @@
 #
 # The standard name for this image is openshift/origin-release
 #
-FROM        registry.centos.org/centos/centos:7
+FROM        quay.io/centos/centos:7
 
 ENV VERSION=1.13.8 \
     GOCACHE=/go/.cache \

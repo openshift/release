@@ -3,6 +3,14 @@ base_images:
     name: "4.11"
     namespace: ocp
     tag: base
+  cincinnati_operand_latest:
+    name: cincinnati-build-root
+    namespace: cincinnati-ci
+    tag: deploy
+  graphdata:
+    name: cincinnati-graph-data
+    namespace: cincinnati-ci-public
+    tag: stable
 build_root:
   image_stream_tag:
     name: release
@@ -16,6 +24,7 @@ images:
   from: base
   to: cincinnati-graph-data-container
 promotion:
+  disabled: true
   excluded_images:
   - cincinnati-operator
   name: "4.11"
@@ -49,9 +58,9 @@ tests:
     - as: e2e-test
       cli: initial
       commands: |
+        make func-test \
+        RELATED_IMAGE_OPERAND=quay.io/app-sre/cincinnati@sha256:921b7a2e579d4cfe0e58ecf3abcc2262b321b6d0f8be7f6ebcb700acfca5ba55 \
         OPENSHIFT_BUILD_NAMESPACE=
-        RELATED_IMAGE_OPERAND=quay.io/app-sre/cincinnati@sha256:921b7a2e579d4cfe0e58ecf3abcc2262b321b6d0f8be7f6ebcb700acfca5ba55
-        make func-test
       dependencies:
       - env: OPERATOR_IMAGE
         name: stable:cincinnati-operator
@@ -59,6 +68,28 @@ tests:
         name: stable:cincinnati-operator
       - env: GRAPH_DATA_IMAGE
         name: stable:cincinnati-graph-data-container
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-gcp
+- as: operator-e2e-latest-osus
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: e2e-test
+      cli: initial
+      commands: make func-test OPENSHIFT_BUILD_NAMESPACE=
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: stable:cincinnati-operator
+      - env: RELATED_IMAGE_OPERATOR
+        name: stable:cincinnati-operator
+      - env: GRAPH_DATA_IMAGE
+        name: graphdata
+      - env: RELATED_IMAGE_OPERAND
+        name: cincinnati_operand_latest
       from: src
       resources:
         requests:

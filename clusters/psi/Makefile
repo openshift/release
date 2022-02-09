@@ -4,19 +4,17 @@ all:
 
 TMPDIR ?= /tmp
 
-github-ldap-mapping-updater-credentials:
-	oc --context app.ci sa create-kubeconfig -n ci github-ldap-mapping-updater | sed 's/github-ldap-mapping-updater/app.ci/g' > "$(TMPDIR)/sa.github-ldap-mapping-updater.app.ci.config"
-	oc --context psi create secret generic -n ocp-test-platform github-ldap-mapping-updater-credentials --from-file=sa.github-ldap-mapping-updater.app.ci.config=$(TMPDIR)/sa.github-ldap-mapping-updater.app.ci.config --dry-run=client -o json | oc --context psi apply -f - 
-.PHONY: github-ldap-mapping-updater-credentials
+serviceaccounts = release-schedules-cm-updater sync-rover-groups-updater
 
-schedule-generator-credentials:
-	oc --context app.ci sa create-kubeconfig -n ci release-schedules-cm-updater | sed 's/release-schedules-cm-updater/app.ci/g' > "$(TMPDIR)/sa.release-schedules-cm-updater.app.ci.config"
-	oc --context psi create secret generic -n ocp-test-platform release-schedules-cm-updater-credentials --from-file=sa.release-schedules-cm-updater.app.ci.config=$(TMPDIR)/sa.release-schedules-cm-updater.app.ci.config --dry-run=client -o json | oc --context psi apply -f -
-.PHONY: schedule-generator-credentials
+$(serviceaccounts):
+	oc --context app.ci sa create-kubeconfig -n ci $@ | sed 's/$@/app.ci/g' > "$(TMPDIR)/sa.$@.app.ci.config"
+	oc --context psi create secret generic -n ocp-test-platform $@-credentials --from-file=sa.$@.app.ci.config=$(TMPDIR)/sa.$@.app.ci.config --dry-run=client -o json | oc --context psi apply -f - 
 
-cronjobs:
-	oc --context psi apply -f github-ldap-mapping-update_cronjob.yaml
-	oc --context psi apply -f release-schedules-update_cronjob.yaml
-.PHONY: cronjobs
+apply_credentials: $(serviceaccounts)
 
-applyconfig: github-ldap-mapping-updater-credentials cronjobs
+cronjobs = release-schedules-update sync-rover-groups-update
+
+$(cronjobs):
+	oc --context psi apply -f $@_cronjob.yaml
+
+apply_cronjobs: $(cronjobs)

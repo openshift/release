@@ -13,31 +13,10 @@ sysd_script=$(cat << EOF
 
 set -e
 
-# Build up a tcpdump filter for all quay.io and registry.ci IPs.
-# quay.io IPs change often so by doing the lookup before we launch
-# we increase our chances of dumping the packets we're after.
-# Use grep to filter out CNAME responses and get only the A records.
-registry_ip_lines=\$(dig +short quay.io registry.ci.openshift.org | grep -v "\.$")
-
-tcpdump_filter=""
-for i in \$registry_ip_lines
-do
-    if [ -z "\$tcpdump_filter" ]
-    then
-        tcpdump_filter+="(host \$i"
-    else
-        tcpdump_filter+=" or host \$i"
-    fi
-done
-# Close our tcpdump filter brace:
-tcpdump_filter+=")"
-
-echo "tcpdump filter: \$tcpdump_filter"
-echo
 echo "Running tcpdump:"
-echo
 
-/usr/sbin/tcpdump -nn -U -i any -s 256 -w '/var/log/tcpdump/tcpdump.pcap' \$tcpdump_filter
+# Grab all 443 traffic, all attempts to filter have caused us to miss what we need.
+/usr/sbin/tcpdump -nn -U -i any -s 256 -w "/var/log/tcpdump/tcpdump-\$(date +'%FT%H%M%S').pcap" tcp and port 443
 EOF
 )
 

@@ -34,8 +34,8 @@ images:
       - quay.io/ocpmetal/assisted-service:latest
   to: assisted-test-infra-internal
 promotion:
-  name: assisted-test
-  namespace: ocp-kni
+  name: ocm-2.5
+  namespace: edge-infrastructure
 releases:
   initial:
     integration:
@@ -134,24 +134,26 @@ tests:
         DISK_ENCRYPTION_MODE=tpmv2
       TEST_SUITE: full
     workflow: baremetalds-assisted
-- as: e2e-metal-assisted-multi-version
+- as: e2e-metal-assisted-multi-version-suite
   optional: true
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=""
+        OPENSHIFT_VERSION="all"
+      PACKET_PLAN: m2.xlarge.x86
     workflow: baremetalds-assisted
-- as: e2e-metal-assisted-multi-version-periodic
+- as: e2e-metal-assisted-multi-version-suite-periodic
   cron: '@daily'
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=""
+        OPENSHIFT_VERSION="all"
+      PACKET_PLAN: m2.xlarge.x86
       TEST_SUITE: full
     workflow: baremetalds-assisted
-- as: e2e-metal-assisted-olm
+- as: e2e-metal-assisted-olm-suite
   optional: true
   run_if_changed: .*operator.*
   steps:
@@ -159,19 +161,21 @@ tests:
     env:
       ASSISTED_CONFIG: |
         TEST_FUNC=test_olm_operator
+      PACKET_PLAN: m2.xlarge.x86
     workflow: baremetalds-assisted
-- as: e2e-metal-assisted-olm-periodic
+- as: e2e-metal-assisted-olm-suite-periodic
   cron: '@daily'
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         TEST_FUNC=test_olm_operator
+      PACKET_PLAN: m2.xlarge.x86
       TEST_SUITE: full
     workflow: baremetalds-assisted
 - as: e2e-metal-assisted-day2
   optional: true
-  run_if_changed: ^(day2/.*|.*/cluster/.*)$
+  run_if_changed: ^(.*/day2/.*|.*/cluster/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -187,34 +191,13 @@ tests:
         TEST_FUNC=test_deploy_day2_nodes_cloud
       TEST_SUITE: full
     workflow: baremetalds-assisted
-- as: system-test-operator
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      POST_INSTALL_COMMANDS: |
-        export TEST_FUNC=test_kube_api_ipv4
-        export KUBECONFIG=$(find ${KUBECONFIG} -type f)
-        make deploy_assisted_operator test_kube_api_parallel
-    workflow: baremetalds-assisted
-- as: system-test-operator-periodic
-  cron: '@daily'
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      POST_INSTALL_COMMANDS: |
-        export TEST_FUNC=test_kube_api_ipv4
-        export KUBECONFIG=$(find ${KUBECONFIG} -type f)
-        make deploy_assisted_operator test_kube_api_parallel
-      TEST_SUITE: full
-    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-kube-api-late-binding-single-node
   optional: true
   steps:
     cluster_profile: packet-assisted
     env:
       POST_INSTALL_COMMANDS: |
-        export TEST_FUNC=test_kube_api_late_binding_ipv4_single_node
+        export TEST_FUNC=test_late_binding_kube_api_sno
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
         make deploy_assisted_operator test_kube_api_parallel
     workflow: baremetalds-assisted
@@ -224,7 +207,8 @@ tests:
     cluster_profile: packet-assisted
     env:
       POST_INSTALL_COMMANDS: |
-        export TEST_FUNC=test_kube_api_late_unbinding_ipv4_single_node
+        export TEST_FUNC=test_late_binding_kube_api_sno
+        export HOLD_INSTALLATION=true
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
         make deploy_assisted_operator test_kube_api_parallel
     workflow: baremetalds-assisted
@@ -286,31 +270,6 @@ tests:
         PLATFORM=none
       TEST_SUITE: full
     workflow: baremetalds-assisted
-- as: e2e-metal-assisted-none-ipv6
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        IPv6=yes
-        IPv4=no
-        VIP_DHCP_ALLOCATION=no
-        PROXY=yes
-        PLATFORM=none
-    workflow: baremetalds-assisted
-- as: e2e-metal-assisted-none-ipv6-periodic
-  cron: '@daily'
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        IPv6=yes
-        IPv4=no
-        VIP_DHCP_ALLOCATION=no
-        PROXY=yes
-        PLATFORM=none
-      TEST_SUITE: full
-    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-single-node
   optional: true
   steps:
@@ -328,22 +287,19 @@ tests:
         NUM_MASTERS=1
       TEST_SUITE: full
     workflow: baremetalds-assisted
-- as: e2e-metal-assisted-kube-api
+- as: e2e-metal-assisted-kube-api-net-suite
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE|Jenkinsfile.*)$
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        NUM_MASTERS=1
-        NUM_WORKERS=0
-        IPv6=yes
-        IPv4=no
-        PROXY=yes
-        ADDITIONAL_PARAMS="--with-static-network-config"
-        ISO_IMAGE_TYPE=minimal-iso
-        KUBE_API=yes
+        KUBE_API=true
         ENABLE_KUBE_API=true
-        MAKEFILE_TARGET=all
+        NUM_MASTERS=1
+        ISO_IMAGE_TYPE=minimal-iso
+        STATIC_IPS=true
+        TEST_FUNC=test_kubeapi
+        MAKEFILE_TARGET="create_full_environment run test_kube_api_parallel"
     workflow: baremetalds-assisted
 - as: e2e-metal-assisted-capi
   optional: true
@@ -355,9 +311,8 @@ tests:
         ENABLE_KUBE_API=true
         MINIKUBE_DISK_SIZE=70g
         MINIKUBE_RAM_MB=10240
-        TEST=./src/tests/test_kube_api.py
         TEST_FUNC=test_capi_provider
-        MAKEFILE_TARGET="create_full_environment run deploy_capi_env test"
+        MAKEFILE_TARGET="create_full_environment run deploy_capi_env test_kube_api_parallel"
       GATHER_CAPI_LOGS: "true"
     workflow: baremetalds-assisted
 - as: e2e-metal-assisted-capi-periodic
@@ -370,45 +325,43 @@ tests:
         ENABLE_KUBE_API=true
         MINIKUBE_DISK_SIZE=70g
         MINIKUBE_RAM_MB=10240
-        TEST=./src/tests/test_kube_api.py
         TEST_FUNC=test_capi_provider
-        MAKEFILE_TARGET="create_full_environment run deploy_capi_env test"
+        MAKEFILE_TARGET="create_full_environment run deploy_capi_env test_kube_api_parallel"
       GATHER_CAPI_LOGS: "true"
       TEST_SUITE: full
     workflow: baremetalds-assisted
-- as: e2e-metal-assisted-kube-api-periodic
+- as: e2e-metal-assisted-kube-api-net-suite-periodic
   cron: '@daily'
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        NUM_MASTERS=1
-        NUM_WORKERS=0
-        IPv6=yes
-        IPv4=no
-        PROXY=yes
-        ADDITIONAL_PARAMS="--with-static-network-config"
-        ISO_IMAGE_TYPE=minimal-iso
-        KUBE_API=yes
+        KUBE_API=true
         ENABLE_KUBE_API=true
-        MAKEFILE_TARGET=all
+        NUM_MASTERS=1
+        ISO_IMAGE_TYPE=minimal-iso
+        STATIC_IPS=true
+        TEST_FUNC=test_kubeapi
+        MAKEFILE_TARGET="create_full_environment run test_kube_api_parallel"
       TEST_SUITE: full
     workflow: baremetalds-assisted
-- as: e2e-metal-assisted-networking
+- as: e2e-metal-assisted-static-ip-suite
   optional: true
   run_if_changed: ^(terraform_files/.*|.*/controllers/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
+        STATIC_IPS=true
         TEST_FUNC=test_networking
     workflow: baremetalds-assisted
-- as: e2e-metal-assisted-networking-periodic
+- as: e2e-metal-assisted-static-ip-suite-periodic
   cron: 0 */4 * * *
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
+        STATIC_IPS=true
         TEST_FUNC=test_networking
       TEST_SUITE: full
     workflow: baremetalds-assisted

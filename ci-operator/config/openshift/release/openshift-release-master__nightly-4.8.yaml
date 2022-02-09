@@ -3,6 +3,10 @@ base_images:
     name: "4.8"
     namespace: ocp
     tag: ansible
+  assisted-image-service:
+    name: ocm-2.5
+    namespace: edge-infrastructure
+    tag: assisted-image-service
   assisted-installer:
     name: ocm-2.5
     namespace: edge-infrastructure
@@ -20,8 +24,8 @@ base_images:
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: assisted-test
-    namespace: ocp-kni
+    name: ocm-2.5
+    namespace: edge-infrastructure
     tag: assisted-test-infra
   aws-ebs-csi-driver-operator-test:
     name: "4.8"
@@ -47,6 +51,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  driver-toolkit-tests:
+    name: "4.8"
+    namespace: ocp
+    tag: driver-toolkit-tests
   gcp-pd-csi-driver-operator-test:
     name: "4.8"
     namespace: ocp
@@ -86,7 +94,7 @@ releases:
   oldest-supported-z-rollback:
     release:
       channel: stable
-      version: 4.8.12
+      version: 4.8.22
 resources:
   '*':
     requests:
@@ -134,34 +142,34 @@ tests:
 - as: e2e-metal-ipi
   interval: 48h
   steps:
-    cluster_profile: packet
+    cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ipv4
 - as: e2e-metal-ipi-serial-ipv4
   interval: 48h
   steps:
-    cluster_profile: packet
+    cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-serial-ipv4
 - as: e2e-metal-ipi-upgrade
   cron: 0 0 1 1 *
   steps:
-    cluster_profile: packet
+    cluster_profile: equinix-ocp-metal
     env:
       TEST_TYPE: upgrade-conformance
     workflow: baremetalds-e2e-upgrade
 - as: e2e-metal-ipi-ovn-ipv6
   interval: 48h
   steps:
-    cluster_profile: packet
+    cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
 - as: e2e-metal-ipi-ovn-dualstack
   cron: 0 0 1 1 *
   steps:
-    cluster_profile: packet
+    cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-dualstack
 - as: e2e-metal-ipi-ovn-dualstack-local-gateway
   interval: 48h
   steps:
-    cluster_profile: packet
+    cluster_profile: equinix-ocp-metal
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4v6
@@ -171,7 +179,7 @@ tests:
 - as: e2e-metal-ipi-compact
   cron: 0 0 * * 1
   steps:
-    cluster_profile: packet
+    cluster_profile: equinix-ocp-metal
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v6
@@ -180,7 +188,7 @@ tests:
 - as: e2e-metal-ipi-virtualmedia
   cron: 0 0 * * 1
   steps:
-    cluster_profile: packet
+    cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-virtualmedia
 - as: e2e-aws-proxy
   cron: 0 0 */2 * *
@@ -233,7 +241,7 @@ tests:
       PLATFORM_VERSION: "7.9"
     workflow: openshift-e2e-aws-workers-rhel
 - as: e2e-ovirt
-  cron: 0 */6 * * *
+  cron: 0 7,19 * * *
   steps:
     cluster_profile: ovirt
     workflow: openshift-e2e-ovirt-conformance
@@ -496,6 +504,19 @@ tests:
           cpu: 100m
           memory: 600Mi
     workflow: ipi-azure
+- as: e2e-aws-driver-toolkit
+  cron: 0 */8 * * *
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: driver-toolkit-tests
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: openshift

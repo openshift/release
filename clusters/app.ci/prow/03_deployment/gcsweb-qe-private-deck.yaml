@@ -1,0 +1,128 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: gcsweb-qe-private-deck
+parameters:
+- description: The session secret for the component.
+  name: SESSION_SECRET
+  generate: expression
+  from: "[a-zA-Z0-9]{43}"
+- description: namespace
+  name: namespace
+  value: ci
+objects:
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    labels:
+      app: gcsweb-qe-private-deck
+    name: gcsweb-qe-private-deck
+    namespace: ${namespace}
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        component: gcsweb-qe-private-deck
+    template:
+      metadata:
+        labels:
+          app: prow
+          component: gcsweb-qe-private-deck
+      spec:
+        serviceAccountName: gcsweb-qe-private-deck
+        containers:
+        - name: oauth-proxy
+          image: quay.io/openshift/origin-oauth-proxy:4.8
+          imagePullPolicy: IfNotPresent
+          ports:
+          - containerPort: 8443
+            name: web
+          args:
+          - -provider=openshift
+          - -https-address=:8443
+          - -http-address=
+          - -email-domain=*
+          - -upstream=http://localhost:8080
+          - -client-id=system:serviceaccount:${namespace}:gcsweb-qe-private-deck
+          - -openshift-ca=/etc/pki/tls/cert.pem
+          - -openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+          - '-openshift-sar={"verb": "get", "resource": "secrets", "namespace": "qe-private-deck"}'
+          - '-openshift-delegate-urls={"/": {"verb": "get", "resource": "secrets", "namespace": "qe-private-deck"}}'
+          - -client-secret-file=/var/run/secrets/kubernetes.io/serviceaccount/token
+          - -cookie-secret-file=/etc/proxy/secrets/session_secret
+          - -tls-cert=/etc/tls/private/tls.crt
+          - -tls-key=/etc/tls/private/tls.key
+          volumeMounts:
+          - mountPath: /etc/tls/private
+            name: gcsweb-qe-private-deck-tls
+          - mountPath: /etc/proxy/secrets
+            name: session-secret
+        - image: gcr.io/k8s-prow/gcsweb:v20220209-469dceee77
+          name: gcsweb-qe-private-deck
+          args:
+          - "-b"
+          - "qe-private-deck"
+          - --gcs-credentials-file=/etc/sa/credentials.json
+          volumeMounts:
+          - mountPath: /etc/sa
+            name: gcs-credentials-file
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds:
+            periodSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz/ready
+              port: 8081
+        volumes:
+        - name: gcsweb-qe-private-deck-tls
+          secret:
+            secretName: gcsweb-qe-private-deck-tls
+        - name: session-secret
+          secret:
+            secretName: gcsweb-qe-private-deck-session-secret
+        - name: gcs-credentials-file
+          secret:
+            secretName: qe-private-deck-viewer
+- apiVersion: v1
+  kind: Service
+  metadata:
+    labels:
+      app: prow
+      component: gcsweb-qe-private-deck
+    name: gcsweb-qe-private-deck
+    namespace: ${namespace}
+    annotations:
+      service.alpha.openshift.io/serving-cert-secret-name: gcsweb-qe-private-deck-tls
+  spec:
+    selector:
+      app: prow
+      component: gcsweb-qe-private-deck
+    ports:
+    - name: web
+      protocol: TCP
+      port: 80
+      targetPort: 8443
+- apiVersion: v1
+  kind: Secret
+  metadata:
+    name: gcsweb-qe-private-deck-session-secret
+    namespace: ${namespace}
+  stringData:
+    session_secret: "${SESSION_SECRET}="
+- apiVersion: v1
+  kind: Route
+  metadata:
+    annotations:
+      haproxy.router.openshift.io/timeout: 1h
+    name: gcsweb-qe-private-deck
+    namespace: ${namespace}
+  spec:
+    to:
+      kind: Service
+      name: gcsweb-qe-private-deck
+    tls:
+      insecureEdgeTerminationPolicy: Redirect
+      termination: Reencrypt

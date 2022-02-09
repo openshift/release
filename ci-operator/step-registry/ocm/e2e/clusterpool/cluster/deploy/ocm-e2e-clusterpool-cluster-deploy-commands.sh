@@ -39,12 +39,16 @@ case "${PIPELINE_STAGE}" in
         ;;
 esac
 
-if [[ -z "$COMPONENT_IMAGE_REF" ]]; then
-    log "ERROR COMPONENT_IMAGE_REF is empty"
-    exit 1
+if [[ "$SKIP_COMPONENT_INSTALL" == "false" ]]; then
+    if [[ -z "$COMPONENT_IMAGE_REF" ]]; then
+        log "ERROR COMPONENT_IMAGE_REF is empty"
+        exit 1
+    fi
+    
+    log "Using COMPONENT_IMAGE_REF: $COMPONENT_IMAGE_REF"
+else
+    log "Skipping component install."
 fi
-
-log "Using COMPONENT_IMAGE_REF: $COMPONENT_IMAGE_REF"
 
 cp "$MAKEFILE" ./Makefile || {
     log "ERROR Could not find make file: $MAKEFILE"
@@ -144,9 +148,9 @@ release_url="https://${RELEASE_REPO}.git"
 deploy_url="https://${DEPLOY_REPO}.git"
 component_url="https://${COMPONENT_REPO}.git"
 
-# Get release branch. This is a Prow variable as described here:
+# Get release branch. PULL_BASE_REF is a Prow variable as described here:
 # https://github.com/kubernetes/test-infra/blob/master/prow/jobs.md#job-environment-variables
-release="${PULL_BASE_REF}"
+release=${ACM_RELEASE_VERSION:-"${PULL_BASE_REF}"}
 log "INFO This PR's base branch is $release"
 
 # See if we need to get release from the release repo.
@@ -219,47 +223,51 @@ cd "$ocm_dir" || exit 1
 
 # See if COMPONENT_NAME was provided.
 log "Checking COMPONENT_NAME"
-if [[ -z "$COMPONENT_NAME" ]]; then
-    # It wasn't, so get it from the COMPONENT_NAME file in the COMPONENT_REPO
-
-    # Clone the COMPONENT_REPO
-    log "COMPONENT_NAME not provided. Getting it from $COMPONENT_REPO"
-    component_dir="${ocm_dir}/component"
-    git clone -b "${PULL_BASE_REF}" "$component_url" "$component_dir" || {
-        log "ERROR Could not clone branch ${PULL_BASE_REF} of component repo $component_url"
-        exit 1
-    }
-
-    # Verify COMPONENT_NAME file exists
-    component_name_file="${component_dir}/COMPONENT_NAME"
-    if [[ ! -r "$component_name_file" ]]; then
-        log "ERROR COMPONENT_NAME file does not exist in branch ${PULL_BASE_REF} of component repo $component_url"
-        exit 1
-    fi
-
-    # Get COMPONENT_NAME
-    COMPONENT_NAME=$(cat "$component_name_file")
+if [[ "$SKIP_COMPONENT_INSTALL" == "false" ]]; then
     if [[ -z "$COMPONENT_NAME" ]]; then
-        log "ERROR COMPONENT_NAME file was empty in branch ${PULL_BASE_REF} of component repo $component_url"
+        # It wasn't, so get it from the COMPONENT_NAME file in the COMPONENT_REPO
+    
+        # Clone the COMPONENT_REPO
+        log ">>> COMPONENT_NAME not provided. Getting it from $COMPONENT_REPO"
+        component_dir="${ocm_dir}/component"
+        git clone -b "${PULL_BASE_REF}" "$component_url" "$component_dir" || {
+            log "ERROR Could not clone branch ${PULL_BASE_REF} of component repo $component_url"
+            exit 1
+        }
+    
+        # Verify COMPONENT_NAME file exists
+        component_name_file="${component_dir}/COMPONENT_NAME"
+        if [[ ! -r "$component_name_file" ]]; then
+            log "ERROR COMPONENT_NAME file does not exist in branch ${PULL_BASE_REF} of component repo $component_url"
+            exit 1
+        fi
+    
+        # Get COMPONENT_NAME
+        COMPONENT_NAME=$(cat "$component_name_file")
+        if [[ -z "$COMPONENT_NAME" ]]; then
+            log "ERROR COMPONENT_NAME file was empty in branch ${PULL_BASE_REF} of component repo $component_url"
+            exit 1
+        fi
+    fi
+    
+    log ">>> Using COMPONENT_NAME: $COMPONENT_NAME"
+    # Verify COMPONENT_NAME is in the manifest file
+    log ">>> Verifying COMPONENT_NAME is in the manifest file"
+    image_name_query=".[] | select(.[\"image-name\"]==\"${COMPONENT_NAME}\")"
+    IMAGE_NAME=$(jq -r "$image_name_query" "$snapshot_dir/$manifest_file" 2> >(tee -a "$log_file"))
+    if [[ -z "$IMAGE_NAME" ]]; then
+        log "ERROR Could not find image $COMPONENT_NAME in manifest $manifest_file"
+        log "Contents of manifest $manifest_file"
+        cat "$manifest_file" > >(tee -a "$log_file")
         exit 1
     fi
+    IMAGE_NAME="$COMPONENT_NAME"
+    log ">>> Using IMAGE_NAME: $IMAGE_NAME"
+    IMAGE_QUERY="quay.io/stolostron/${IMAGE_NAME}@sha256:[[:alnum:]]+"
+    log ">>> Using IMAGE_QUERY: $IMAGE_QUERY"
+else
+    log ">>> Skipping since we're not installing a component."
 fi
-
-log "Using COMPONENT_NAME: $COMPONENT_NAME"
-
-# Verify COMPONENT_NAME is in the manifest file
-image_name_query=".[] | select(.[\"image-name\"]==\"${COMPONENT_NAME}\")"
-IMAGE_NAME=$(jq -r "$image_name_query" "$snapshot_dir/$manifest_file" 2> >(tee -a "$log_file"))
-if [[ -z "$IMAGE_NAME" ]]; then
-    log "ERROR Could not find image $COMPONENT_NAME in manifest $manifest_file"
-    log "Contents of manifest $manifest_file"
-    cat "$manifest_file" > >(tee -a "$log_file")
-    exit 1
-fi
-IMAGE_NAME="$COMPONENT_NAME"
-log "Using IMAGE_NAME: $IMAGE_NAME"
-IMAGE_QUERY="quay.io/stolostron/${IMAGE_NAME}@sha256:[[:alnum:]]+"
-log "Using IMAGE_QUERY: $IMAGE_QUERY"
 
 # Set up Quay credentials.
 log "Setting up Quay credentials."
@@ -270,7 +278,8 @@ fi
 QUAY_TOKEN=$(cat "$QUAY_TOKEN_FILE")
 
 # Set up additional deploy variables
-NAMESPACE=stolostron
+NAMESPACE=open-cluster-management
+CATALOG_NAMESPACE=openshift-marketplace
 OPERATOR_DIR=acm-operator
 
 # Function to deploy ACM to a cluster.
@@ -411,7 +420,12 @@ deploy() {
 
         KUBECONFIG="$_kc" oc -n $NAMESPACE apply --openapi-patch=true -k prereqs/ \
             > >(tee -a "$_log") 2>&1 && {
-            logf "$_log" "Deploy $_cluster: YAML files from prereqs directory applied after ${_elapsed}s"
+            logf "$_log" "Deploy $_cluster: YAML files from prereqs directory applied to $NAMESPACE after ${_elapsed}s"
+        }
+
+        KUBECONFIG="$_kc" oc -n $CATALOG_NAMESPACE apply --openapi-patch=true -k prereqs/ \
+            > >(tee -a "$_log") 2>&1 && {
+            logf "$_log" "Deploy $_cluster: YAML files from prereqs directory applied to $CATALOG_NAMESPACE after ${_elapsed}s"
             break
         }
 
@@ -472,6 +486,14 @@ deploy() {
         fi
         logf "$_log" "INFO Deploy $_cluster: Elapsed time is ${_elapsed}/${_timeout}s"
 
+        # Check timeout
+        logf "$_log" "INFO Deploy $_cluster: Checking for timeout."
+        if (( _elapsed > _timeout )); then
+                logf "$_log" "ERROR Deploy $_cluster: Timeout (${_timeout}s) waiting for multiclusterhub-operator pod"
+                echo "ERROR WAIT_MCHO" > "${_status}"
+                return 1
+        fi
+
         # Get pod names
         logf "$_log" "INFO Deploy $_cluster: Getting pod names."
         KUBECONFIG="$_kc" oc -n $NAMESPACE get pods -o name > pod_names 2> >(tee -a "$_log") || {
@@ -518,14 +540,6 @@ deploy() {
         if (( _total > 0 && _ready == _total )); then
             logf "$_log" "Deploy $_cluster: multiclusterhub-operator pod is ready after ${_elapsed}s"
             break
-        fi
-
-        # Check timeout
-        logf "$_log" "INFO Deploy $_cluster: Checking for timeout."
-        if (( _elapsed > _timeout )); then
-                logf "$_log" "ERROR Deploy $_cluster: Timeout (${_timeout}s) waiting for multiclusterhub-operator pod"
-                echo "ERROR WAIT_MCHO" > "${_status}"
-                return 1
         fi
 
         logf "$_log" "WARN Deploy $_cluster: Not all containers ready ($_ready/$_total). Will retry (${_elapsed}/${_timeout}s)"
@@ -588,6 +602,13 @@ deploy() {
             _elapsed=$(( _elapsed + _step ))
         fi
 
+        # Check timeout
+        if (( _elapsed > _timeout )); then
+                logf "$_log" "ERROR Deploy $_cluster: Timeout (${_timeout}s) waiting for CSV"
+                echo "ERROR WAIT_CSV_1" > "${_status}"
+                return 1
+        fi
+
         # Get CSV name
         KUBECONFIG="$_kc" oc -n $NAMESPACE get csv -o name > csv_name 2> >(tee -a "$_log") || {
             logf "$_log" "WARN Deploy $_cluster: Error getting CSV name. Will retry (${_elapsed}/${_timeout}s)"
@@ -627,89 +648,87 @@ deploy() {
                 ;;
         esac
 
-        # Check timeout
-        if (( _elapsed > _timeout )); then
-                logf "$_log" "ERROR Deploy $_cluster: Timeout (${_timeout}s) waiting for CSV"
-                echo "ERROR WAIT_CSV_1" > "${_status}"
-                return 1
-        fi
-
         logf "$_log" "WARN Deploy $_cluster: Current CSV status is $_csv_status. Will retry (${_elapsed}/${_timeout}s)"
     done
 
-    # Update CSV
-    logf "$_log" "Deploy $_cluster: Updating CSV"
-    echo "UPDATE_CSV" > "${_status}"
-    # Rewrite CSV. CSV contents are in csv.json
-    sed -E "s,$IMAGE_QUERY,$COMPONENT_IMAGE_REF," csv.json > csv_update.json 2> >(tee -a "$_log")
-    jq 'del(.metadata.uid) | del(.metadata.resourceVersion)' csv_update.json > csv_clean.json 2> >(tee -a "$_log")
-    # Replace CSV on cluster
-    KUBECONFIG="$_kc" oc -n $NAMESPACE replace -f csv_clean.json > >(tee -a "$_log") 2>&1 || {
-        logf "$_log" "ERROR Deploy $_cluster: Failed to update CSV."
-        logf "$_log" "ERROR Deploy $_cluster: New CSV contents"
-        jq . csv_clean.json > >(tee -a "$_log") 2>&1
-        echo "ERROR_UPDATE_CSV" > "$_status"
-        return 1
-    }
-
-    # Wait for ClusterServiceVersion
-    logf "$_log" "Deploy $_cluster: Waiting up to 10 minutes for CSV"
-    echo "WAIT_CSV_2" > "${_status}"
-    local _timeout=600 _elapsed=0 _step=15
-    local _csv_name='' _csv_status=''
-    while true; do
-        # Wait for _step seconds, including first iteration
-        sleep $_step
-        _elapsed=$(( _elapsed + _step ))
-
-        # Get CSV name
-        KUBECONFIG="$_kc" oc -n $NAMESPACE get csv -o name > csv_name 2> >(tee -a "$_log") || {
-            logf "$_log" "WARN Deploy $_cluster: Error getting CSV name. Will retry (${_elapsed}/${_timeout}s)"
-            continue
+    # Check if we're installing a dev component
+    if [[ "$SKIP_COMPONENT_INSTALL" == "false" ]]; then
+        # Update CSV
+        logf "$_log" "Deploy $_cluster: Updating CSV"
+        echo "UPDATE_CSV" > "${_status}"
+        # Rewrite CSV. CSV contents are in csv.json
+        sed -E "s,$IMAGE_QUERY,$COMPONENT_IMAGE_REF," csv.json > csv_update.json 2> >(tee -a "$_log")
+        jq 'del(.metadata.uid) | del(.metadata.resourceVersion)' csv_update.json > csv_clean.json 2> >(tee -a "$_log")
+        # Replace CSV on cluster
+        KUBECONFIG="$_kc" oc -n $NAMESPACE replace -f csv_clean.json > >(tee -a "$_log") 2>&1 || {
+            logf "$_log" "ERROR Deploy $_cluster: Failed to update CSV."
+            logf "$_log" "ERROR Deploy $_cluster: New CSV contents"
+            jq . csv_clean.json > >(tee -a "$_log") 2>&1
+            echo "ERROR_UPDATE_CSV" > "$_status"
+            return 1
         }
-
-        # Check that CSV name isn't empty
-        _csv_name=$(cat csv_name)
-        if [[ -z "$_csv_name" ]]; then
-            logf "$_log" "WARN Deploy $_cluster: CSV not created yet. Will retry (${_elapsed}/${_timeout}s)"
-            continue
-        fi
-
-        # Get CSV status
-        KUBECONFIG="$_kc" oc -n $NAMESPACE get "$_csv_name" \
-            -o json > csv.json 2> >(tee -a "$_log") || {
-            logf "$_log" "WARN Deploy $_cluster: Error getting CSV status. Will retry (${_elapsed}/${_timeout}s)"
-            continue
-        }
-
-        # Check CSV status
-        _csv_status=$(jq -r .status.phase csv.json 2> >(tee -a "$_log"))
-        case "$_csv_status" in
-            Failed)
-                logf "$_log" "ERROR Deploy $_cluster: Error CSV install failed after ${_elapsed}s"
-                local _msg
-                _msg=$(jq -r .status.message csv.json 2> >(tee -a "$_log"))
-                logf "$_log" "ERROR Deploy $_cluster: Error message: $_msg"
-                logf "$_log" "ERROR Deploy $_cluster: Full CSV"
-                jq . csv.json > >(tee -a "$_log") 2>&1
-                echo "ERROR WAIT_CSV_2" > "$_status"
-                return 1
-                ;;
-            Succeeded)
-                logf "$_log" "Deploy $_cluster: CSV is ready after ${_elapsed}s"
-                break
-                ;;
-        esac
-
-        # Check timeout
-        if (( _elapsed > _timeout )); then
-                logf "$_log" "ERROR Deploy $_cluster: Timeout (${_timeout}s) waiting for CSV"
-                echo "ERROR WAIT_CSV_2" > "${_status}"
-                return 1
-        fi
-
-        logf "$_log" "WARN Deploy $_cluster: Current CSV status is $_csv_status. Will retry (${_elapsed}/${_timeout}s)"
-    done
+    
+        # Wait for ClusterServiceVersion
+        logf "$_log" "Deploy $_cluster: Waiting up to 10 minutes for CSV"
+        echo "WAIT_CSV_2" > "${_status}"
+        local _timeout=600 _elapsed=0 _step=15
+        local _csv_name='' _csv_status=''
+        while true; do
+            # Wait for _step seconds, including first iteration
+            sleep $_step
+            _elapsed=$(( _elapsed + _step ))
+    
+            # Check timeout
+            if (( _elapsed > _timeout )); then
+                    logf "$_log" "ERROR Deploy $_cluster: Timeout (${_timeout}s) waiting for CSV"
+                    echo "ERROR WAIT_CSV_2" > "${_status}"
+                    return 1
+            fi
+    
+            # Get CSV name
+            KUBECONFIG="$_kc" oc -n $NAMESPACE get csv -o name > csv_name 2> >(tee -a "$_log") || {
+                logf "$_log" "WARN Deploy $_cluster: Error getting CSV name. Will retry (${_elapsed}/${_timeout}s)"
+                continue
+            }
+    
+            # Check that CSV name isn't empty
+            _csv_name=$(cat csv_name)
+            if [[ -z "$_csv_name" ]]; then
+                logf "$_log" "WARN Deploy $_cluster: CSV not created yet. Will retry (${_elapsed}/${_timeout}s)"
+                continue
+            fi
+    
+            # Get CSV status
+            KUBECONFIG="$_kc" oc -n $NAMESPACE get "$_csv_name" \
+                -o json > csv.json 2> >(tee -a "$_log") || {
+                logf "$_log" "WARN Deploy $_cluster: Error getting CSV status. Will retry (${_elapsed}/${_timeout}s)"
+                continue
+            }
+    
+            # Check CSV status
+            _csv_status=$(jq -r .status.phase csv.json 2> >(tee -a "$_log"))
+            case "$_csv_status" in
+                Failed)
+                    logf "$_log" "ERROR Deploy $_cluster: Error CSV install failed after ${_elapsed}s"
+                    local _msg
+                    _msg=$(jq -r .status.message csv.json 2> >(tee -a "$_log"))
+                    logf "$_log" "ERROR Deploy $_cluster: Error message: $_msg"
+                    logf "$_log" "ERROR Deploy $_cluster: Full CSV"
+                    jq . csv.json > >(tee -a "$_log") 2>&1
+                    echo "ERROR WAIT_CSV_2" > "$_status"
+                    return 1
+                    ;;
+                Succeeded)
+                    logf "$_log" "Deploy $_cluster: CSV is ready after ${_elapsed}s"
+                    break
+                    ;;
+            esac
+    
+            logf "$_log" "WARN Deploy $_cluster: Current CSV status is $_csv_status. Will retry (${_elapsed}/${_timeout}s)"
+        done
+    else
+        logf "$_log" "Deploy $_cluster: Skipping updating CSV as we're not installing a dev component"
+    fi
 
     # Apply YAML files in multicluster hub directory
     logf "$_log" "Deploy $_cluster: Wait up to 5 minutes to apply YAML files from MCH directory"
@@ -755,6 +774,13 @@ deploy() {
             _elapsed=$(( _elapsed + _step ))
         fi
 
+        # Check timeout
+        if (( _elapsed > _timeout )); then
+                logf "$_log" "ERROR Deploy $_cluster: Timeout (${_timeout}s) waiting for MCH CR"
+                echo "ERROR WAIT_MCH" > "${_status}"
+                return 1
+        fi
+
         # Get MCH name
         KUBECONFIG="$_kc" oc -n $NAMESPACE get multiclusterhub -o name > mch_name 2> >(tee -a "$_log") || {
             logf "$_log" "WARN Deploy $_cluster: Error getting MCH name. Will retry (${_elapsed}/${_timeout}s)"
@@ -780,13 +806,6 @@ deploy() {
         if [[ "$_mch_status" == "Running" ]]; then
             logf "$_log" "Deploy $_cluster: MCH CR is ready after ${_elapsed}s"
             break
-        fi
-
-        # Check timeout
-        if (( _elapsed > _timeout )); then
-                logf "$_log" "ERROR Deploy $_cluster: Timeout (${_timeout}s) waiting for MCH CR"
-                echo "ERROR WAIT_MCH" > "${_status}"
-                return 1
         fi
 
         logf "$_log" "WARN Deploy $_cluster: Current MCH status is $_mch_status. Will retry (${_elapsed}/${_timeout}s)"

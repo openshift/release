@@ -75,5 +75,5 @@ dashboard.new(
 .addPanel(statePanel(iaas="openstack-vh-mecha-central", displayName="OpenStack VH Mecha Central"), gridPos={h: 9, w: 24, x: 0, y: 0})
 .addPanel(statePanel(iaas="openstack-vh-mecha-az0", displayName="OpenStack VH Mecha AZ0"), gridPos={h: 9, w: 24, x: 0, y: 0})
 .addPanel(statePanel(iaas="openstack-nfv", displayName="OpenStack NFV"), gridPos={h: 9, w: 24, x: 0, y: 0})
-
+.addPanel(statePanel(iaas="equinix-ocp-metal", displayName="Equinix OCP Metal"), gridPos={h: 9, w: 24, x: 0, y: 0})
 + dashboardConfig

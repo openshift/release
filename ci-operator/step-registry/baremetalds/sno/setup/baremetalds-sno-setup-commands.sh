@@ -45,18 +45,28 @@ timeout -s 9 175m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*
 
 set -xeuo pipefail
 
-yum install -y git sysstat sos
+# Some Packet images have a file /usr/config left from the provisioning phase.
+# The problem is that sos expects it to be a directory. Since we don't care
+# about the Packet provisioner, remove the file if it's present.
+test -f /usr/config && rm -f /usr/config || true
+
+echo 'baseurl=http://vault.centos.org/\$contentdir/\$releasever/BaseOS/\$basearch/os/' >> /etc/yum.repos.d/CentOS-Linux-BaseOS.repo
+echo 'baseurl=http://vault.centos.org/\$contentdir/\$releasever/extras/\$basearch/os/' >> /etc/yum.repos.d/CentOS-Linux-Extras.repo
+echo 'baseurl=http://vault.centos.org/\$contentdir/\$releasever/AppStream/\$basearch/os/' >> /etc/yum.repos.d/CentOS-Linux-AppStream.repo
+
+dnf install -y git sysstat sos
 systemctl start sysstat
 
 mkdir -p /tmp/artifacts
 
+REPO_DIR="/home/sno"
+mkdir -p "\${REPO_DIR}"
+
 # NVMe makes it faster
 NVME_DEVICE="/dev/nvme0n1"
-REPO_DIR="/home/sno"
 if [ -e "\$NVME_DEVICE" ];
 then
   mkfs.xfs -f "\${NVME_DEVICE}"
-  mkdir -p "\${REPO_DIR}"
   mount "\${NVME_DEVICE}" "\${REPO_DIR}"
 fi
 

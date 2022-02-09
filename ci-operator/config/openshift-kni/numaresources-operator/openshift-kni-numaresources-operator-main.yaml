@@ -55,12 +55,33 @@ tests:
   commands: make test-unit
   container:
     from: src
-- as: ci-e2e
+- as: ci-install-e2e
   steps:
     cluster_profile: aws
     env:
       OO_CHANNEL: alpha
       OO_INSTALL_NAMESPACE: numaresources-operator
+      OO_PACKAGE: numaresources-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: e2e-install-test
+      cli: latest
+      commands: make test-install-e2e
+      dependencies:
+      - env: OO_INDEX
+        name: ci-index
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-aws
+- as: ci-e2e
+  steps:
+    cluster_profile: aws
+    env:
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: openshift-numaresources
       OO_PACKAGE: numaresources-operator
       OO_TARGET_NAMESPACES: '!install'
     test:

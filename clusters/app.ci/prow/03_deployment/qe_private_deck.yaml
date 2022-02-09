@@ -1,0 +1,296 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: qe-private-deck
+parameters:
+  - description: The session secret for the component.
+    name: SESSION_SECRET
+    generate: expression
+    from: "[a-zA-Z0-9]{43}"
+  - description: "The namespace. Must come from a var or it will get stripped off"
+    name: NAMESPACE
+    value: ci
+objects:
+  - apiVersion: v1
+    kind: Route
+    metadata:
+      namespace: ${NAMESPACE}
+      name: qe-private-deck
+      annotations:
+        haproxy.router.openshift.io/timeout: "90s"
+    spec:
+      port:
+        targetPort: 8443
+      tls:
+        insecureEdgeTerminationPolicy: Redirect
+        termination: Reencrypt
+      to:
+        kind: Service
+        name: qe-private-deck
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      namespace: ${NAMESPACE}
+      name: qe-private-deck
+      labels:
+        app: prow
+        component: qe-private-deck
+      annotations:
+        service.alpha.openshift.io/serving-cert-secret-name: qe-private-deck-tls
+    spec:
+      selector:
+        app: prow
+        component: qe-private-deck
+      ports:
+        - name: main
+          port: 443
+          targetPort: 8443
+        - name: metrics
+          port: 9090
+          protocol: TCP
+          targetPort: 9090
+      type: ClusterIP
+  - kind: Deployment
+    apiVersion: apps/v1
+    metadata:
+      name: qe-private-deck
+      namespace: ci
+      labels:
+        app: prow
+        component: qe-private-deck
+    spec:
+      replicas: 2
+      revisionHistoryLimit: 2
+      selector:
+        matchLabels:
+          app: prow
+          component: qe-private-deck
+      template:
+        metadata:
+          labels:
+            app: prow
+            component: qe-private-deck
+        spec:
+          serviceAccountName: qe-private-deck
+          containers:
+            - name: oauth-proxy
+              image: quay.io/openshift/origin-oauth-proxy:4.8
+              imagePullPolicy: IfNotPresent
+              ports:
+                - containerPort: 8443
+                  name: web
+              args:
+                - -provider=openshift
+                - -https-address=:8443
+                - -http-address=
+                - -email-domain=*
+                - -upstream=http://localhost:8080
+                - -client-id=system:serviceaccount:ci:qe-private-deck
+                - -openshift-ca=/etc/pki/tls/cert.pem
+                - -openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+                - '-openshift-sar={"verb": "get", "resource": "secrets", "namespace": "qe-private-deck"}'
+                - '-openshift-delegate-urls={"/": {"verb": "get", "resource": "secrets", "namespace": "qe-private-deck"}}'
+                - -client-secret-file=/var/run/secrets/kubernetes.io/serviceaccount/token
+                - -cookie-secret-file=/etc/proxy/secrets/session_secret
+                - -cookie-samesite=none
+                - -tls-cert=/etc/tls/private/tls.crt
+                - -tls-key=/etc/tls/private/tls.key
+              volumeMounts:
+                - mountPath: /etc/tls/private
+                  name: qe-private-deck-tls
+                - mountPath: /etc/proxy/secrets
+                  name: session-secret
+            - name: deck
+              image: gcr.io/k8s-prow/deck:v20220209-469dceee77
+              args:
+                - --github-oauth-config-file=/etc/github/config.json
+                - --github-token-path=/etc/oauth/oauth
+                - --github-endpoint=http://ghproxy
+                - --github-endpoint=https://api.github.com
+                - --github-graphql-endpoint=http://ghproxy/graphql
+                - --oauth-url=/github-login
+                - --config-path=/etc/config/config.yaml
+                - --supplemental-prow-config-dir=/etc/config
+                - --job-config-path=/etc/job-config
+                - --tide-url=http://tide/
+                - --hook-url=http://hook:8888/plugin-help
+                - --spyglass=true
+                - --cookie-secret=/etc/proxy/secrets/session_secret
+                - --gcs-credentials-file=/etc/gce-sa-credentials-gcs-qe-private-deck/service-account.json
+                - --projected-token-file=/var/sa-token/token
+                - --rerun-creates-job=true
+                - --supplemental-plugin-config-dir=/etc/plugins
+                - --kubeconfig-dir=/etc/build-farm-credentials
+                - --tenant-id=qe-private
+              ports:
+                - name: main
+                  containerPort: 8080
+                - name: metrics
+                  containerPort: 9090
+              livenessProbe:
+                httpGet:
+                  path: /healthz
+                  port: 8081
+                initialDelaySeconds: 10
+                periodSeconds: 10
+              readinessProbe:
+                httpGet:
+                  path: /healthz/ready
+                  port: 8081
+                initialDelaySeconds: 30
+                periodSeconds: 10
+                timeoutSeconds: 600
+              volumeMounts:
+                - name: service-account-token
+                  mountPath: /var/sa-token
+                - name: gce-sa-credentials-gcs-qe-private-deck
+                  mountPath: /etc/gce-sa-credentials-gcs-qe-private-deck
+                  readOnly: true
+                - mountPath: /etc/proxy/secrets
+                  name: session-secret
+                - name: config
+                  mountPath: /etc/config
+                  readOnly: true
+                - name: extensions
+                  mountPath: /static/extensions
+                  readOnly: true
+                - name: oauth-config
+                  mountPath: /etc/github
+                  readOnly: true
+                - name: oauth
+                  mountPath: /etc/oauth
+                  readOnly: true
+                - name: job-config-misc
+                  mountPath: /etc/job-config/misc
+                  readOnly: true
+                - name: job-config-master-periodics
+                  mountPath: /etc/job-config/master-periodics
+                  readOnly: true
+                - name: job-config-master-postsubmits
+                  mountPath: /etc/job-config/master-postsubmits
+                  readOnly: true
+                - name: job-config-master-presubmits
+                  mountPath: /etc/job-config/master-presubmits
+                  readOnly: true
+                - name: job-config-3x
+                  mountPath: /etc/job-config/3.x
+                  readOnly: true
+                - name: job-config-41
+                  mountPath: /etc/job-config/4.1
+                  readOnly: true
+                - name: job-config-42
+                  mountPath: /etc/job-config/4.2
+                  readOnly: true
+                - name: job-config-43
+                  mountPath: /etc/job-config/4.3
+                  readOnly: true
+                - name: job-config-44
+                  mountPath: /etc/job-config/4.4
+                  readOnly: true
+                - name: job-config-45
+                  mountPath: /etc/job-config/4.5
+                  readOnly: true
+                - name: job-config-46
+                  mountPath: /etc/job-config/4.6
+                  readOnly: true
+                - name: job-config-47
+                  mountPath: /etc/job-config/4.7
+                  readOnly: true
+                - name: job-config-48
+                  mountPath: /etc/job-config/4.8
+                  readOnly: true
+                - name: job-config-49
+                  mountPath: /etc/job-config/4.9
+                  readOnly: true
+                - name: job-config-410
+                  mountPath: /etc/job-config/4.10
+                  readOnly: true
+                - mountPath: /etc/build-farm-credentials
+                  name: build-farm-credentials
+                  readOnly: true
+              resources:
+                requests:
+                  memory: "3Gi"
+                  cpu: "600m"
+          volumes:
+            - name: service-account-token
+              projected:
+                sources:
+                  - serviceAccountToken:
+                      path: token
+            - name: config
+              configMap:
+                name: config
+            - name: extensions
+              configMap:
+                name: qe-private-deck-extensions
+            - name: oauth
+              secret:
+                secretName: github-credentials-openshift-ci-robot
+            - name: oauth-config
+              secret:
+                secretName: github-app-qe-private-deck
+            - name: gce-sa-credentials-gcs-qe-private-deck
+              secret:
+                secretName: gce-sa-credentials-gcs-qe-private-deck
+            - name: session-secret
+              secret:
+                secretName: qe-private-deck-session-secret
+            - name: qe-private-deck-tls
+              secret:
+                secretName: qe-private-deck-tls
+            - name: job-config-misc
+              configMap:
+                name: job-config-misc
+            - name: job-config-master-periodics
+              configMap:
+                name: job-config-master-periodics
+            - name: job-config-master-postsubmits
+              configMap:
+                name: job-config-master-postsubmits
+            - name: job-config-master-presubmits
+              configMap:
+                name: job-config-master-presubmits
+            - name: job-config-3x
+              configMap:
+                name: job-config-3.x
+            - name: job-config-41
+              configMap:
+                name: job-config-4.1
+            - name: job-config-42
+              configMap:
+                name: job-config-4.2
+            - name: job-config-43
+              configMap:
+                name: job-config-4.3
+            - name: job-config-44
+              configMap:
+                name: job-config-4.4
+            - name: job-config-45
+              configMap:
+                name: job-config-4.5
+            - name: job-config-46
+              configMap:
+                name: job-config-4.6
+            - name: job-config-47
+              configMap:
+                name: job-config-4.7
+            - name: job-config-48
+              configMap:
+                name: job-config-4.8
+            - name: job-config-49
+              configMap:
+                name: job-config-4.9
+            - name: job-config-410
+              configMap:
+                name: job-config-4.10
+            - name: build-farm-credentials
+              secret:
+                secretName: deck
+  - apiVersion: v1
+    kind: Secret
+    metadata:
+      namespace: ${NAMESPACE}
+      name: qe-private-deck-session-secret
+    stringData:
+      session_secret: "${SESSION_SECRET}="

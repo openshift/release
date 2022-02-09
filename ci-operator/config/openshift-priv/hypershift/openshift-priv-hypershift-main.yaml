@@ -1,10 +1,42 @@
 base_images:
+  assisted-installer:
+    name: ocm-2.5
+    namespace: edge-infrastructure
+    tag: assisted-installer
+  assisted-installer-agent:
+    name: ocm-2.5
+    namespace: edge-infrastructure
+    tag: assisted-installer-agent
+  assisted-installer-controller:
+    name: ocm-2.5
+    namespace: edge-infrastructure
+    tag: assisted-installer-controller
+  assisted-service:
+    name: ocm-2.5
+    namespace: edge-infrastructure
+    tag: assisted-service
+  assisted-test-infra:
+    name: ocm-2.5
+    namespace: edge-infrastructure
+    tag: assisted-test-infra
   base:
-    name: 4.10-priv
+    name: 4.11-priv
     namespace: ocp-private
     tag: base
+  cli:
+    name: 4.11-priv
+    namespace: ocp-private
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp_builder_rhel-8-golang-1.17-openshift-4.11:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.17-openshift-4.11
   openshift-tests:
-    name: 4.10-priv
+    name: 4.11-priv
     namespace: ocp-private
     tag: tests
   openshift_release_golang-1.17:
@@ -21,32 +53,37 @@ images:
     openshift_release_golang-1.17:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.17
+  to: hypershift-operator
+- dockerfile_path: Dockerfile.control-plane
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.17-openshift-4.11:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
+    openshift_release_golang-1.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
   to: hypershift
 promotion:
-  name: 4.10-priv
+  name: 4.11-priv
   namespace: ocp-private
 releases:
-  hosted-ocp-410-ci:
-    candidate:
-      product: ocp
-      stream: ci
-      version: "4.10"
   hosted-ocp-latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.9"
+      version: "4.10"
   hosted-ocp-previous:
     candidate:
       product: ocp
       relative: 1
       stream: nightly
-      version: "4.9"
+      version: "4.10"
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.9"
+      version: "4.10"
 resources:
   '*':
     limits:
@@ -60,13 +97,16 @@ tests:
   commands: make verify
   container:
     from: src
+  skip_if_only_changed: (^(docs|examples|enhancements)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
 - as: unit
   commands: make test
   container:
     from: src
+  skip_if_only_changed: (^(docs|examples|enhancements)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
 - as: e2e-aws
   cluster_claim:
     architecture: amd64
+    as: not_latest
     cloud: aws
     owner: hypershift
     product: ocp
@@ -84,7 +124,7 @@ tests:
         namespace: test-credentials
       dependencies:
       - env: HYPERSHIFT_RELEASE_LATEST
-        name: hypershift
+        name: hypershift-operator
       from: bin
       grace_period: 1m0s
       resources:
@@ -99,6 +139,8 @@ tests:
           -test.timeout=0 \
           -test.run=TestUpgradeControlPlane \
           --e2e.aws-credentials-file=/etc/hypershift-pool-aws-credentials/credentials \
+          --e2e.aws-zones=us-east-1a,us-east-1b \
+          --e2e.node-pool-replicas=1 \
           --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson \
           --e2e.base-domain=ci.hypershift.devcluster.openshift.com \
           --e2e.latest-release-image=${OCP_IMAGE_LATEST} \
@@ -127,6 +169,7 @@ tests:
 - as: e2e-aws-all
   cluster_claim:
     architecture: amd64
+    as: not_latest
     cloud: aws
     owner: hypershift
     product: ocp
@@ -144,7 +187,7 @@ tests:
         namespace: test-credentials
       dependencies:
       - env: HYPERSHIFT_RELEASE_LATEST
-        name: hypershift
+        name: hypershift-operator
       from: bin
       grace_period: 1m0s
       resources:
@@ -158,6 +201,8 @@ tests:
           -test.v \
           -test.timeout=0 \
           --e2e.aws-credentials-file=/etc/hypershift-pool-aws-credentials/credentials \
+          --e2e.aws-zones=us-east-1a,us-east-1b \
+          --e2e.node-pool-replicas=1 \
           --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson \
           --e2e.base-domain=ci.hypershift.devcluster.openshift.com \
           --e2e.latest-release-image=${OCP_IMAGE_LATEST} \
@@ -185,6 +230,7 @@ tests:
 - as: e2e-aws-metrics
   cluster_claim:
     architecture: amd64
+    as: not_latest
     cloud: aws
     owner: hypershift
     product: ocp
@@ -218,7 +264,7 @@ tests:
         namespace: test-credentials
       dependencies:
       - env: HYPERSHIFT_RELEASE_LATEST
-        name: hypershift
+        name: hypershift-operator
       from: bin
       grace_period: 1m0s
       resources:
@@ -233,6 +279,8 @@ tests:
           -test.timeout=0 \
           -test.run=TestUpgradeControlPlane \
           --e2e.aws-credentials-file=/etc/hypershift-pool-aws-credentials/credentials \
+          --e2e.aws-zones=us-east-1a,us-east-1b \
+          --e2e.node-pool-replicas=1 \
           --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson \
           --e2e.base-domain=ci.hypershift.devcluster.openshift.com \
           --e2e.latest-release-image=${OCP_IMAGE_LATEST} \
@@ -366,7 +414,7 @@ tests:
         namespace: test-credentials
       dependencies:
       - env: HYPERSHIFT_RELEASE_LATEST
-        name: hypershift
+        name: hypershift-operator
       from: bin
       resources:
         requests:
@@ -407,7 +455,7 @@ tests:
         namespace: test-credentials
       dependencies:
       - env: OPENSHIFT_410_CI_RELEASE_IMAGE
-        name: release:hosted-ocp-410-ci
+        name: release:latest
       from: bin
       grace_period: 1m0s
       resources:
@@ -435,6 +483,117 @@ tests:
         requests:
           cpu: "3"
           memory: 600Mi
+- as: capi-provider-agent-sanity
+  optional: true
+  run_if_changed: ^(api/.*|hypershift-operator/controllers/hostedcluster/internal/platform/agent/.*)$
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      HYPERSHIFT_IMAGE: pipeline:hypershift-operator
+    env:
+      ASSISTED_CONFIG: |
+        KUBE_API=yes
+        ENABLE_KUBE_API=true
+        MINIKUBE_DISK_SIZE=70g
+        MINIKUBE_RAM_MB=10240
+        TEST=./src/tests/test_kube_api.py
+        TEST_FUNC=test_capi_provider
+        MAKEFILE_TARGET="create_full_environment run deploy_capi_env test"
+      GATHER_CAPI_LOGS: "true"
+      TEST_SUITE: minimal
+    workflow: baremetalds-assisted
+- as: e2e-kubevirt-azure
+  optional: true
+  steps:
+    cluster_profile: azure4
+    test:
+    - as: deploy-cnv
+      cli: latest
+      commands: ./hack/ci/install-cnv.sh
+      from: bin
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    - as: kv-e2e
+      cli: latest
+      commands: |-
+        # install hypershift
+        bin/hypershift install --hypershift-image ${HYPERSHIFT_RELEASE_LATEST}
+
+        export KUBEVIRT_PLATFORM_ENABLED=true
+        export RHCOS_CD_IMAGE="quay.io/containerdisks/rhcos:4.9"
+
+        # complie the e2e tests
+        make e2e
+
+        # run the test
+        bin/test-e2e \
+                  -test.v \
+                  -test.timeout=0 \
+                  -test.run=TestKubeVirtCreateCluster \
+                  -e2e.node-pool-replicas=1 \
+                  -e2e.base-domain="fake" \
+                  -e2e.kubevirt-container-disk-image="${RHCOS_CD_IMAGE}" \
+                  --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson
+      credentials:
+      - mount_path: /etc/ci-pull-credentials
+        name: ci-pull-credentials
+        namespace: test-credentials
+      dependencies:
+      - env: HYPERSHIFT_RELEASE_LATEST
+        name: hypershift-operator
+      from: bin
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-azure
+- as: e2e-kubevirt-gcp
+  optional: true
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: deploy-cnv
+      cli: latest
+      commands: ./hack/ci/install-cnv.sh
+      from: bin
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    - as: kv-e2e
+      cli: latest
+      commands: |-
+        # install hypershift
+        bin/hypershift install --hypershift-image ${HYPERSHIFT_RELEASE_LATEST}
+
+        export KUBEVIRT_PLATFORM_ENABLED=true
+        export RHCOS_CD_IMAGE="quay.io/containerdisks/rhcos:4.9"
+
+        # complie the e2e tests
+        make e2e
+
+        # run the test
+        bin/test-e2e \
+                  -test.v \
+                  -test.timeout=0 \
+                  -test.run=TestKubeVirtCreateCluster \
+                  -e2e.node-pool-replicas=1 \
+                  -e2e.base-domain="fake" \
+                  -e2e.kubevirt-container-disk-image="${RHCOS_CD_IMAGE}" \
+                  --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson
+      credentials:
+      - mount_path: /etc/ci-pull-credentials
+        name: ci-pull-credentials
+        namespace: test-credentials
+      dependencies:
+      - env: HYPERSHIFT_RELEASE_LATEST
+        name: hypershift-operator
+      from: bin
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
 zz_generated_metadata:
   branch: main
   org: openshift-priv

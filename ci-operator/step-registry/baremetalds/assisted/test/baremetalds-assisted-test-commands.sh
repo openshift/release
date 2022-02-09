@@ -34,7 +34,7 @@ timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
         name=\$(basename \${kubeconfig})
         openshift-tests run "openshift/conformance/parallel" --dry-run | \
             grep -Ff /tmp/test-list | \
-            openshift-tests run -o /tmp/artifacts/e2e_\${name}.log --junit-dir /tmp/artifacts/junit_\${name} -f -
+            openshift-tests run -o /tmp/artifacts/e2e_\${name}.log --junit-dir /tmp/artifacts/reports -f -
     done
 EOF
 

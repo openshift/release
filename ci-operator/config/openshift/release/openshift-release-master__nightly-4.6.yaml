@@ -3,6 +3,10 @@ base_images:
     name: "4.6"
     namespace: ocp
     tag: ansible
+  assisted-image-service:
+    name: ocm-2.5
+    namespace: edge-infrastructure
+    tag: assisted-image-service
   assisted-installer:
     name: ocm-2.5
     namespace: edge-infrastructure
@@ -20,8 +24,8 @@ base_images:
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: assisted-test
-    namespace: ocp-kni
+    name: ocm-2.5
+    namespace: edge-infrastructure
     tag: assisted-test-infra
   base:
     name: "4.6"
@@ -68,12 +72,12 @@ tests:
 - as: e2e-metal-ipi
   cron: 0 0 * * 1
   steps:
-    cluster_profile: packet-assisted
+    cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e
 - as: e2e-metal-assisted
   cron: 0 0 * * 1
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     dependencies:
       ASSISTED_AGENT_IMAGE: pipeline:assisted-installer-agent
       ASSISTED_CONTROLLER_IMAGE: pipeline:assisted-installer-controller
@@ -83,7 +87,7 @@ tests:
 - as: e2e-metal-ipi-upgrade
   cron: 0 0 1 1 *
   steps:
-    cluster_profile: packet
+    cluster_profile: equinix-ocp-metal
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4
@@ -93,12 +97,12 @@ tests:
 - as: e2e-metal-ipi-ipv4
   cron: 0 0 * * 1
   steps:
-    cluster_profile: packet
+    cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ipv4
 - as: e2e-metal-ipi-compact
   cron: 0 0 * * 1
   steps:
-    cluster_profile: packet
+    cluster_profile: equinix-ocp-metal
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v6
@@ -107,7 +111,7 @@ tests:
 - as: e2e-metal-ipi-virtualmedia
   cron: 0 0 * * 1
   steps:
-    cluster_profile: packet
+    cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-virtualmedia
 - as: e2e-aws-proxy
   cron: 0 0 */2 * *
@@ -115,22 +119,22 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws-proxy
 - as: e2e-vsphere
-  cron: 30 0,4,21,22 * * *
+  cron: 0 15 2-30/2 * *
   steps:
     cluster_profile: vsphere
-    workflow: openshift-e2e-vsphere
+    workflow: openshift-e2e-vsphere-release46
 - as: e2e-vsphere-serial
-  cron: 20 0,4,21,22 * * *
+  cron: 0 15 1-31/2 * *
   steps:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere-serial
 - as: e2e-vsphere-upi
-  cron: 10 0,4,21,22 * * *
+  cron: 0 3 2-30/2 * *
   steps:
     cluster_profile: vsphere
-    workflow: openshift-e2e-vsphere-upi
+    workflow: openshift-e2e-vsphere-upi-release46
 - as: e2e-vsphere-upi-serial
-  cron: 50 0,4,21,22 * * *
+  cron: 0 3 1-31/2 * *
   steps:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere-upi-serial
@@ -148,11 +152,6 @@ tests:
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-e2e-aws
-- as: e2e-ovirt
-  cron: 3 */6 * * *
-  steps:
-    cluster_profile: ovirt
-    workflow: openshift-e2e-ovirt-conformance-release-4.6-4.7
 - as: e2e-gcp-libvirt-cert-rotation
   cron: 0 9 * * 1,3,5
   steps:

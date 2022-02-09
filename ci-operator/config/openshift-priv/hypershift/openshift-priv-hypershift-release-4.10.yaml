@@ -3,6 +3,14 @@ base_images:
     name: 4.10-priv
     namespace: ocp-private
     tag: base
+  cli:
+    name: 4.10-priv
+    namespace: ocp-private
+    tag: cli
+  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.17-openshift-4.10
   openshift-tests:
     name: 4.10-priv
     namespace: ocp-private
@@ -21,33 +29,37 @@ images:
     openshift_release_golang-1.17:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.17
+  to: hypershift-operator
+- dockerfile_path: Dockerfile.control-plane
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
+    openshift_release_golang-1.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
   to: hypershift
 promotion:
-  disabled: true
   name: 4.10-priv
   namespace: ocp-private
 releases:
-  hosted-ocp-410-ci:
-    candidate:
-      product: ocp
-      stream: ci
-      version: "4.10"
   hosted-ocp-latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.9"
+      version: "4.10"
   hosted-ocp-previous:
     candidate:
       product: ocp
       relative: 1
       stream: nightly
-      version: "4.9"
+      version: "4.10"
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.9"
+      version: "4.10"
 resources:
   '*':
     limits:
@@ -68,6 +80,7 @@ tests:
 - as: e2e-aws
   cluster_claim:
     architecture: amd64
+    as: not_latest
     cloud: aws
     owner: hypershift
     product: ocp
@@ -85,7 +98,7 @@ tests:
         namespace: test-credentials
       dependencies:
       - env: HYPERSHIFT_RELEASE_LATEST
-        name: hypershift
+        name: hypershift-operator
       from: bin
       grace_period: 1m0s
       resources:
@@ -128,6 +141,7 @@ tests:
 - as: e2e-aws-all
   cluster_claim:
     architecture: amd64
+    as: not_latest
     cloud: aws
     owner: hypershift
     product: ocp
@@ -145,7 +159,7 @@ tests:
         namespace: test-credentials
       dependencies:
       - env: HYPERSHIFT_RELEASE_LATEST
-        name: hypershift
+        name: hypershift-operator
       from: bin
       grace_period: 1m0s
       resources:
@@ -186,6 +200,7 @@ tests:
 - as: e2e-aws-metrics
   cluster_claim:
     architecture: amd64
+    as: not_latest
     cloud: aws
     owner: hypershift
     product: ocp
@@ -219,7 +234,7 @@ tests:
         namespace: test-credentials
       dependencies:
       - env: HYPERSHIFT_RELEASE_LATEST
-        name: hypershift
+        name: hypershift-operator
       from: bin
       grace_period: 1m0s
       resources:
@@ -367,7 +382,7 @@ tests:
         namespace: test-credentials
       dependencies:
       - env: HYPERSHIFT_RELEASE_LATEST
-        name: hypershift
+        name: hypershift-operator
       from: bin
       resources:
         requests:
@@ -408,7 +423,7 @@ tests:
         namespace: test-credentials
       dependencies:
       - env: OPENSHIFT_410_CI_RELEASE_IMAGE
-        name: release:hosted-ocp-410-ci
+        name: release:latest
       from: bin
       grace_period: 1m0s
       resources:
@@ -436,6 +451,110 @@ tests:
         requests:
           cpu: "3"
           memory: 600Mi
+- as: e2e-kubevirt-all
+  optional: true
+  steps:
+    cluster_profile: azure4
+    test:
+    - as: deploy-cnv
+      cli: latest
+      commands: |-
+        oc apply -f - <<EOF
+        apiVersion: v1
+        kind: Namespace
+        metadata:
+          name: openshift-cnv
+        EOF
+
+        oc apply -f - <<EOF
+        apiVersion: operators.coreos.com/v1
+        kind: OperatorGroup
+        metadata:
+          name: openshift-cnv-group
+          namespace: openshift-cnv
+        spec:
+          targetNamespaces:
+          - openshift-cnv
+        EOF
+
+        cat <<EOF | oc apply -f -
+        apiVersion: operators.coreos.com/v1alpha1
+        kind: Subscription
+        metadata:
+          labels:
+            operators.coreos.com/kubevirt-hyperconverged.openshift-cnv: ''
+          name: kubevirt-hyperconverged
+          namespace: openshift-cnv
+        spec:
+          channel: stable
+          installPlanApproval: Automatic
+          name: kubevirt-hyperconverged
+          source: redhat-operators
+          sourceNamespace: openshift-marketplace
+        EOF
+
+        sleep 60
+
+        RETRIES=30
+        CSV=
+        for i in $(seq ${RETRIES}); do
+          if [[ -z ${CSV} ]]; then
+            CSV=$(oc get subscription -n openshift-cnv kubevirt-hyperconverged -o jsonpath='{.status.installedCSV}')
+          fi
+
+          if [[ -z ${CSV} ]]; then
+            echo "Try ${i}/${RETRIES}: can't get the CSV yet. Checking again in 30 seconds"
+            sleep 30
+          fi
+
+          if [[ $(oc get csv -n openshift-cnv ${CSV} -o jsonpath={.status.phase}) == "Succeeded" ]]; then
+            echo "CNV is deployed"
+            break
+          else
+            echo "Try ${i}/${RETRIES}: CNV is not deployed yet. Checking again in 30 seconds"
+            sleep 30
+          fi
+        done
+
+        if [[ $(oc get csv -n openshift-cnv ${CSV} -o jsonpath={.status.phase}) != "Succeeded" ]]; then
+          echo "Error: Failed to deploy CNV"
+          echo "CSV ${CSV} YAML"
+          oc get CSV ${CSV} -n openshift-cnv -o yaml
+          echo
+          echo "CSV ${CSV} Describe"
+          oc describe CSV ${CSV} -n openshift-cnv
+          exit 1
+        fi
+
+        oc create -f - <<EOF
+        apiVersion: hco.kubevirt.io/v1beta1
+        kind: HyperConverged
+        metadata:
+          name: kubevirt-hyperconverged
+          namespace: openshift-cnv
+        EOF
+
+        oc wait hyperconverged -n openshift-cnv kubevirt-hyperconverged --for=condition=Available --timeout=15m
+      from: bin
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    - as: install-hypershift
+      cli: latest
+      commands: bin/hypershift install --hypershift-image ${HYPERSHIFT_RELEASE_LATEST}
+      credentials:
+      - mount_path: /etc/ci-pull-credentials
+        name: ci-pull-credentials
+        namespace: test-credentials
+      dependencies:
+      - env: HYPERSHIFT_RELEASE_LATEST
+        name: hypershift-operator
+      from: bin
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-azure
 zz_generated_metadata:
   branch: release-4.10
   org: openshift-priv

@@ -45,16 +45,29 @@ function mirror_release_image_for_disconnected_upgrade() {
     if [[ "${DS_IP_STACK}" == "v6" ]]; then
       # shellcheck disable=SC2087
       ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
-MIRRORED_RELEASE_IMAGE=${DS_REGISTRY}/localimages/local-release-image
+MIRRORED_RELEASE_IMAGE=${DS_REGISTRY}/localimages/local-upgrade-image
 DIGEST=\$(oc adm release info --registry-config ${DS_WORKING_DIR}/pull_secret.json ${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE} --output=jsonpath="{.digest}")
-echo "Mirroring release images for disconnected environment"
-oc adm release mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json --from=${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE} --to=\${MIRRORED_RELEASE_IMAGE} --apply-release-image-signature
-echo "OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE=\${MIRRORED_RELEASE_IMAGE}@\${DIGEST}" >> /tmp/disconnected_mirror.conf
-EOF
+RELEASE_TAG=\$(sed -e "s/^sha256://" <<< \${DIGEST})
+MIRROR_RESULT_LOG=/tmp/image_mirror-\${RELEASE_TAG}.log
 
-      # shellcheck source=/dev/null
-      source <(ssh "${SSHOPTS[@]}" "root@${IP}" "cat /tmp/disconnected_mirror.conf")
-      echo "OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE is overridden to ${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"
+echo "Mirroring release images for disconnected environment"
+oc adm release mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json \
+  --from=${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE} \
+  --to=\${MIRRORED_RELEASE_IMAGE} \
+  --to-release-image=\${MIRRORED_RELEASE_IMAGE}:\${RELEASE_TAG}  2>&1 | tee \${MIRROR_RESULT_LOG}
+
+echo "Create ImageContentSourcePolicy to use mirrored registry in upgrade"
+UPGRADE_ICS=\$(cat \${MIRROR_RESULT_LOG} | sed -n '/repositoryDigestMirrors/,//p')
+
+cat <<EOF1 | oc apply -f -
+apiVersion: operator.openshift.io/v1alpha1
+kind: ImageContentSourcePolicy
+metadata:
+  name: disconnected-upgrade-ics
+spec:
+\${UPGRADE_ICS}
+EOF1
+EOF
 
       TEST_UPGRADE_ARGS="--from-repository ${DS_REGISTRY}/localimages/local-test-image"
     fi
@@ -78,7 +91,7 @@ function is_openshift_version_gte() {
 }
 
 case "${CLUSTER_TYPE}" in
-packet)
+packet|equinix*)
     # shellcheck source=/dev/null
     source "${SHARED_DIR}/packet-conf.sh"
     # shellcheck source=/dev/null
@@ -94,13 +107,6 @@ packet)
 
         # Mirroring test images is supported only for versions greater than or equal to 4.8
         mirror_test_images
-
-        # Skipping proxy related tests ([Skipped:Proxy]) is supported only for version  greater than or equal to 4.10
-        # For lower versions they must be skipped manually (only when running parallel suite)
-        if ! is_openshift_version_gte "4.10" && [[ "$TEST_SUITE" == "openshift/conformance/parallel" ]]; then
-            TEST_SKIPS="${TEST_SKIPS}
-${TEST_SKIPS_PROXY}"
-        fi
     else
         export TEST_PROVIDER='{"type":"skeleton"}'
         use_minimal_test_list
@@ -122,7 +128,7 @@ function upgrade() {
 }
 
 function suite() {
-    if [[ -n "${TEST_SKIPS}" ]]; then       
+    if [[ -n "${TEST_SKIPS}" && "${TEST_SUITE}" == "openshift/conformance/parallel" ]]; then
         TESTS="$(openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")" &&
         echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests &&
         echo "Skipping tests:" &&

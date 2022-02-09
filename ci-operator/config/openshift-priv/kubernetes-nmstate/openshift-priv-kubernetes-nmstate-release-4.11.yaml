@@ -15,10 +15,18 @@ base_images:
     name: 4.11-priv
     namespace: ocp-private
     tag: base
+  ocp_4.11_base:
+    name: 4.11-priv
+    namespace: ocp-private
+    tag: base
   ocp_builder_rhel-8-golang-1.17-openshift-4.10:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.17-openshift-4.10
+  ocp_builder_rhel-8-golang-1.17-openshift-4.11:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.17-openshift-4.11
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/kubernetes-nmstate
@@ -28,9 +36,15 @@ images:
     base:
       as:
       - registry.ci.openshift.org/ocp/4.10:base
+    ocp_4.11_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.11:base
     ocp_builder_rhel-8-golang-1.17-openshift-4.10:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
+    ocp_builder_rhel-8-golang-1.17-openshift-4.11:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
   to: kubernetes-nmstate-handler
 - dockerfile_path: build/Dockerfile.operator.openshift
   inputs:
@@ -53,6 +67,7 @@ images:
         source_path: /usr/bin/oc
   to: src-with-oc-and-kubectl
 promotion:
+  disabled: true
   excluded_images:
   - kubernetes-nmstate-handler
   - kubernetes-nmstate-operator
@@ -69,6 +84,15 @@ releases:
       include_built_images: true
       name: 4.11-priv
       namespace: ocp-private
+  nightly:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.10"
+  stable:
+    release:
+      channel: stable
+      version: "4.9"
 resources:
   '*':
     limits:
@@ -84,40 +108,13 @@ tests:
 - as: e2e-sdn-ipv4
   optional: true
   steps:
-    cluster_profile: packet
+    cluster_profile: equinix-ocp-metal
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4
         NETWORK_TYPE="OpenShiftSDN"
         MIRROR_IMAGES=false
-        EXTRA_NETWORK_NAMES="nmstate1 nmstate2"
-        NMSTATE1_NETWORK_SUBNET_V4="192.168.221.0/24"
-        NMSTATE1_NETWORK_SUBNET_V6="fd2e:6f44:5dd8:ca56::/120"
-        NMSTATE2_NETWORK_SUBNET_V4="192.168.222.0/24"
-        NMSTATE2_NETWORK_SUBNET_V6="fd2e:6f44:5dd8:cc56::/120"
-      SKIP_IMAGE_BUILD: "true"
-    post:
-    - chain: baremetalds-ipi-post
-    pre:
-    - chain: baremetalds-ipi-pre
-    test:
-    - as: e2e
-      commands: |
-        export KUBECONFIG=${SHARED_DIR}/kubeconfig
-        make test-e2e-ocp
-      dependencies:
-      - env: OPERATOR_IMAGE
-        name: pipeline:kubernetes-nmstate-operator
-      - env: HANDLER_IMAGE
-        name: pipeline:kubernetes-nmstate-handler
-      env:
-      - name: SKIP_IMAGE_BUILD
-      from: src-with-oc-and-kubectl
-      resources:
-        requests:
-          cpu: "2"
-          memory: 1Gi
-      timeout: 3h0m0s
+    workflow: kubernetes-nmstate-e2e
 zz_generated_metadata:
   branch: release-4.11
   org: openshift-priv

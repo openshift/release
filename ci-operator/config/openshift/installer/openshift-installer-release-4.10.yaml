@@ -16,8 +16,8 @@ base_images:
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: assisted-test
-    namespace: ocp-kni
+    name: ocm-2.5
+    namespace: edge-infrastructure
     tag: assisted-test-infra
   base:
     name: "4.10"
@@ -102,7 +102,6 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
   to: ovirt-installer
 promotion:
-  disabled: true
   name: "4.10"
   namespace: ocp
 releases:
@@ -207,6 +206,11 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
+- as: e2e-alibaba
+  optional: true
+  steps:
+    cluster_profile: alibabacloud
+    workflow: openshift-e2e-alibabacloud
 - as: e2e-gcp-shared-vpc
   optional: true
   steps:
@@ -263,6 +267,7 @@ tests:
     workflow: openshift-e2e-aws-workers-rhel
 - as: e2e-aws-workers-rhel8
   optional: true
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(azure|baremetal|gcp|libvirt|openstack|ovirt|vsphere)/)
   steps:
     cluster_profile: aws
     env:
@@ -281,7 +286,7 @@ tests:
   optional: true
   run_if_changed: (^(data/.*|pkg/.*|images)/baremetal/)|(^vendor/github.com/metal3-io/)
   steps:
-    cluster_profile: packet
+    cluster_profile: equinix-ocp-metal
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4
@@ -291,7 +296,7 @@ tests:
   optional: true
   run_if_changed: (^(data/.*|pkg/.*|images)/baremetal/)|(^vendor/github.com/metal3-io/)
   steps:
-    cluster_profile: packet
+    cluster_profile: equinix-ocp-metal
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4
@@ -302,7 +307,7 @@ tests:
   optional: true
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(aws|azure|baremetal|gcp|libvirt|openstack|ovirt|vsphere)/)|(^vendor/github.com/metal3-io/)
   steps:
-    cluster_profile: packet
+    cluster_profile: equinix-ocp-metal
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v6
@@ -311,7 +316,7 @@ tests:
 - as: e2e-metal-ipi-ovn-ipv6-required
   run_if_changed: (^(data/.*|pkg/.*|images)/baremetal/)|(^vendor/github.com/metal3-io/)
   steps:
-    cluster_profile: packet
+    cluster_profile: equinix-ocp-metal
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v6
@@ -321,7 +326,7 @@ tests:
   optional: true
   run_if_changed: (^(data/.*|pkg/.*|images)/baremetal/)|(^vendor/github.com/metal3-io/)
   steps:
-    cluster_profile: packet
+    cluster_profile: equinix-ocp-metal
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4v6
@@ -331,7 +336,7 @@ tests:
   optional: true
   run_if_changed: (^(data/.*|pkg/.*|images)/baremetal/)|(^vendor/github.com/metal3-io/)
   steps:
-    cluster_profile: packet
+    cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-virtualmedia
 - as: e2e-openstack
   optional: true
@@ -389,9 +394,7 @@ tests:
   optional: true
   steps:
     cluster_profile: packet-assisted
-    env:
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: baremetalds-assisted
 - as: e2e-ovirt
   optional: true
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(aws|azure|baremetal|gcp|libvirt|openstack|vsphere)/)
@@ -400,6 +403,7 @@ tests:
     workflow: openshift-e2e-ovirt-minimal
 - as: e2e-aws-single-node
   optional: true
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(azure|baremetal|gcp|libvirt|openstack|ovirt|vsphere)/)
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-single-node
@@ -407,7 +411,7 @@ tests:
   optional: true
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(aws|azure|gcp|libvirt|openstack|ovirt|vsphere)/)
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-sno
     workflow: baremetalds-sno
 - as: e2e-aws-fips
   optional: true

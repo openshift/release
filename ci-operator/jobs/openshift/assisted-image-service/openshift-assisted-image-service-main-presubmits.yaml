@@ -119,6 +119,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/assisted-image-service-codecov-token
         - --target=test
         command:
         - ci-operator
@@ -129,6 +130,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/assisted-image-service-codecov-token
+          name: assisted-image-service-codecov-token
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -140,6 +144,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: assisted-image-service-codecov-token
+        secret:
+          secretName: assisted-image-service-codecov-token
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials

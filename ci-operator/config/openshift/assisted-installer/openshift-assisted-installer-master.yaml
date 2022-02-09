@@ -8,8 +8,8 @@ base_images:
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: assisted-test
-    namespace: ocp-kni
+    name: ocm-2.5
+    namespace: edge-infrastructure
     tag: assisted-test-infra
   coreos-centos-stream8:
     name: stream8
@@ -99,6 +99,29 @@ tests:
       IMAGE_REPO: assisted-installer-controller
     test:
     - ref: baremetalds-assisted-images-publish
+- as: ocm-publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-installer
+    env:
+      IMAGE_REPO: assisted-installer
+      OSCI_ENV_CONFIG: |
+        OSCI_PUBLISH_DELAY=0
+      RELEASE_REF: release-2.5
+    workflow: ocm-ci-manifest-update
+- as: ocm-publish-controller
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-installer-controller
+    env:
+      IMAGE_REPO: assisted-installer-controller
+      OSCI_ENV_CONFIG: |
+        OSCI_COMPONENT_NAME=assisted-installer-controller
+        OSCI_PUBLISH_DELAY=0
+      RELEASE_REF: release-2.5
+    workflow: ocm-ci-manifest-update
 - as: lint
   commands: |
     export GOLANGCI_LINT_CACHE=/tmp/.cache
@@ -111,9 +134,24 @@ tests:
   container:
     from: test-bin
 - as: unit-test
-  commands: make REPORTS=${ARTIFACT_DIR} unit-test
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
+    make REPORTS=${ARTIFACT_DIR} unit-test
   container:
     from: test-bin
+  secret:
+    mount_path: /tmp/secret
+    name: assisted-installer-codecov-token
+- as: unit-test-postsubmit
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
+    make REPORTS=${ARTIFACT_DIR} unit-test
+  container:
+    from: test-bin
+  postsubmit: true
+  secret:
+    mount_path: /tmp/secret
+    name: assisted-installer-codecov-token
 - as: e2e-metal-assisted
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
@@ -136,7 +174,7 @@ tests:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
     workflow: baremetalds-assisted
-- as: e2e-metal-assisted-olm
+- as: e2e-metal-assisted-olm-suite
   optional: true
   run_if_changed: ^(src/assisted_installer_controller/.*)$
   steps:
@@ -144,6 +182,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         TEST_FUNC=test_olm_operator
+      PACKET_PLAN: m2.xlarge.x86
     workflow: baremetalds-assisted
 zz_generated_metadata:
   branch: master

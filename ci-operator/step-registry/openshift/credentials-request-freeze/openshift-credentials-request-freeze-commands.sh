@@ -11,8 +11,12 @@ fail() {
 
 cd /tmp
 oc registry login
-echo "Comparing ${OPENSHIFT_LATEST_RELEASE_IMAGE} credentials requests against the expected requests from ${OPENSHIFT_FROZEN_RELEASE_IMAGE}."
-oc adm release extract --credentials-requests --to frozen "${OPENSHIFT_FROZEN_RELEASE_IMAGE}"
-oc adm release extract --credentials-requests --to latest "${OPENSHIFT_LATEST_RELEASE_IMAGE}"
+OPENSHIFT_LATEST_RELEASE_VERSION="$(oc adm release info -o 'jsonpath={.metadata.version}{"\n"}' "${OPENSHIFT_LATEST_RELEASE_IMAGE}")"
+OPENSHIFT_FROZEN_RELEASE_VERSION="$(oc adm release info -o 'jsonpath={.metadata.version}{"\n"}' "${OPENSHIFT_FROZEN_RELEASE_IMAGE}")"
+echo "Comparing ${OPENSHIFT_LATEST_RELEASE_VERSION} ( ${OPENSHIFT_LATEST_RELEASE_IMAGE} ) credentials requests against the expected requests from ${OPENSHIFT_FROZEN_RELEASE_VERSION} ( ${OPENSHIFT_FROZEN_RELEASE_IMAGE} )."
+
+
+oc adm release extract --credentials-requests --cloud "${CLOUD:-}" --to frozen "${OPENSHIFT_FROZEN_RELEASE_IMAGE}"
+oc adm release extract --credentials-requests --cloud "${CLOUD:-}" --to latest "${OPENSHIFT_LATEST_RELEASE_IMAGE}"
 sha256sum frozen/* latest/*
 diff -ru frozen latest || fail

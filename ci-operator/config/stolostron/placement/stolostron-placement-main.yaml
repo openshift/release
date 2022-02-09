@@ -3,6 +3,10 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
+  stolostron_builder_go1.17-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.17-linux
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
@@ -12,6 +16,10 @@ build_root:
 images:
 - dockerfile_path: Dockerfile
   from: base
+  inputs:
+    stolostron_builder_go1.17-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.17-linux
   to: placement
 promotion:
   name: "2.5"
@@ -35,12 +43,6 @@ resources:
       memory: 200Mi
 test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
 tests:
-- as: fast-forward
-  postsubmit: true
-  steps:
-    env:
-      DESTINATION_BRANCH: release-2.5
-    workflow: ocm-ci-fastforward
 - as: backplane-fast-forward
   postsubmit: true
   steps:

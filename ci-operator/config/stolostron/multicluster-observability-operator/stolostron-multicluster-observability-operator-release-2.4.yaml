@@ -23,6 +23,9 @@ images:
     open-cluster-management_builder_go1.17-linux:
       as:
       - registry.ci.openshift.org/open-cluster-management/builder:go1.17-linux
+    stolostron_builder_go1.17-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.17-linux
   to: multicluster-observability-operator
 - dockerfile_path: proxy/Dockerfile
   from: base
@@ -30,6 +33,9 @@ images:
     open-cluster-management_builder_go1.17-linux:
       as:
       - registry.ci.openshift.org/open-cluster-management/builder:go1.17-linux
+    stolostron_builder_go1.17-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.17-linux
   to: rbac-query-proxy
 - dockerfile_path: operators/endpointmetrics/Dockerfile
   from: base
@@ -37,6 +43,9 @@ images:
     open-cluster-management_builder_go1.17-linux:
       as:
       - registry.ci.openshift.org/open-cluster-management/builder:go1.17-linux
+    stolostron_builder_go1.17-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.17-linux
   to: endpoint-monitoring-operator
 - dockerfile_path: tests/Dockerfile
   from: base
@@ -51,6 +60,9 @@ images:
     open-cluster-management_builder_go1.17-linux:
       as:
       - registry.ci.openshift.org/open-cluster-management/builder:go1.17-linux
+    stolostron_builder_go1.17-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.17-linux
   to: metrics-collector
 - dockerfile_path: loaders/dashboards/Dockerfile
   from: base
@@ -58,6 +70,9 @@ images:
     open-cluster-management_builder_go1.17-linux:
       as:
       - registry.ci.openshift.org/open-cluster-management/builder:go1.17-linux
+    stolostron_builder_go1.17-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.17-linux
   to: grafana-dashboard-loader
 promotion:
   name: "2.4"
@@ -83,8 +98,8 @@ test_binary_build_commands: "true"
 tests:
 - as: test-unit
   commands: |
-    export SELF="make -f Makefile"
-    make -f Makefile unit-tests
+    export SELF="make"
+    make unit-tests
   container:
     from: src
 - as: test-e2e
@@ -153,9 +168,11 @@ tests:
     - as: publish
       commands: |-
         export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
-        export SELF="make -f Makefile.prow"
+        export SELF="make"
+        export OSCI_COMPONENT_NAME="multicluster-observability-operator"
+        export OSCI_COMPONENT_VERSION="2.4"
         export OSCI_PUBLISH_DELAY="0"
-        make -f Makefile.prow osci/publish
+        make osci/publish
       credentials:
       - mount_path: /etc/github
         name: acm-cicd-github
@@ -168,7 +185,6 @@ tests:
     workflow: ocm-ci-image-mirror
 - as: publish-rbac-query-proxy
   postsubmit: true
-  run_if_changed: ^(proxy/.*|REMEDIATE.md|pkg/.*)$
   steps:
     dependencies:
       SOURCE_IMAGE_REF: rbac-query-proxy
@@ -179,9 +195,11 @@ tests:
     - as: publish
       commands: |-
         export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
-        export SELF="make -f Makefile.prow"
+        export SELF="make"
+        export OSCI_COMPONENT_NAME="rbac-query-proxy"
+        export OSCI_COMPONENT_VERSION="2.4"
         export OSCI_PUBLISH_DELAY="0"
-        make -f Makefile.prow osci/publish
+        make osci/publish
       credentials:
       - mount_path: /etc/github
         name: acm-cicd-github
@@ -205,9 +223,11 @@ tests:
     - as: publish
       commands: |-
         export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
-        export SELF="make -f Makefile.prow"
+        export SELF="make"
+        export OSCI_COMPONENT_NAME="endpoint-monitoring-operator"
+        export OSCI_COMPONENT_VERSION="2.4"
         export OSCI_PUBLISH_DELAY="0"
-        make -f Makefile.prow osci/publish
+        make osci/publish
       credentials:
       - mount_path: /etc/github
         name: acm-cicd-github
@@ -231,9 +251,11 @@ tests:
     - as: publish
       commands: |-
         export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
-        export SELF="make -f Makefile.prow"
+        export SELF="make"
+        export OSCI_COMPONENT_NAME="observability-e2e-test"
+        export OSCI_COMPONENT_VERSION="2.4"
         export OSCI_PUBLISH_DELAY="0"
-        make -f Makefile.prow osci/publish
+        make osci/publish
       credentials:
       - mount_path: /etc/github
         name: acm-cicd-github
@@ -257,9 +279,11 @@ tests:
     - as: publish
       commands: |-
         export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
-        export SELF="make -f Makefile.prow"
+        export SELF="make"
+        export OSCI_COMPONENT_NAME="metrics-collector"
+        export OSCI_COMPONENT_VERSION="2.4"
         export OSCI_PUBLISH_DELAY="0"
-        make -f Makefile.prow osci/publish
+        make osci/publish
       credentials:
       - mount_path: /etc/github
         name: acm-cicd-github
@@ -283,9 +307,11 @@ tests:
     - as: publish
       commands: |-
         export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
-        export SELF="make -f Makefile.prow"
+        export SELF="make"
+        export OSCI_COMPONENT_NAME="grafana-dashboard-loader"
+        export OSCI_COMPONENT_VERSION="2.4"
         export OSCI_PUBLISH_DELAY="0"
-        make -f Makefile.prow osci/publish
+        make osci/publish
       credentials:
       - mount_path: /etc/github
         name: acm-cicd-github

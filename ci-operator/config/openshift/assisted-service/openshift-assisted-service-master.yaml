@@ -16,8 +16,8 @@ base_images:
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-test-infra:
-    name: assisted-test
-    namespace: ocp-kni
+    name: ocm-2.5
+    namespace: edge-infrastructure
     tag: assisted-test-infra
   coreos_centos_stream8:
     name: stream8
@@ -39,7 +39,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.16
+    tag: golang-1.17
 images:
 - dockerfile_path: Dockerfile.assisted-service-build
   from: postgresql-12-centos7
@@ -117,6 +117,17 @@ tests:
       SOURCE_IMAGE_REF: assisted-service
     test:
     - ref: baremetalds-assisted-images-publish
+- as: ocm-publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-service
+    env:
+      IMAGE_REPO: assisted-service
+      OSCI_ENV_CONFIG: |
+        OSCI_PUBLISH_DELAY=0
+      RELEASE_REF: release-2.5
+    workflow: ocm-ci-manifest-update
 - as: operator-publish
   postsubmit: true
   steps:
@@ -127,14 +138,33 @@ tests:
     && make lint
   container:
     from: test-bin
+  skip_if_only_changed: ^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNER_ALIASES)$
 - as: unit-test
   commands: |
     export ROOT_DIR=/tmp
     export COVER_PROFILE=/tmp/reports/unit_coverage.out
+    export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
     export GINKGO_REPORTFILE=/tmp/junit_unit_test.xml
     make ci-unit-test
   container:
     from: assisted-service-unit-test
+  secret:
+    mount_path: /tmp/secret
+    name: assisted-service-codecov-token
+  skip_if_only_changed: ^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNER_ALIASES)$
+- as: unit-test-postsubmit
+  commands: |
+    export ROOT_DIR=/tmp
+    export COVER_PROFILE=/tmp/reports/unit_coverage.out
+    export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
+    export GINKGO_REPORTFILE=/tmp/junit_unit_test.xml
+    make ci-unit-test
+  container:
+    from: assisted-service-unit-test
+  postsubmit: true
+  secret:
+    mount_path: /tmp/secret
+    name: assisted-service-codecov-token
 - as: subsystem-aws
   cluster_claim:
     architecture: amd64
@@ -211,7 +241,6 @@ tests:
         export REPORTS=${ARTIFACT_DIR}
         export TARGET=oc
         export GENERATE_CRD=false
-
         make deploy-on-openshift-ci
         make enable-kube-api-for-subsystem
         make test-kube-api
@@ -325,6 +354,7 @@ tests:
     workflow: baremetalds-assisted-operator-ztp
 - as: e2e-ai-operator-ztp-ipv4v6-sno-ocp-49
   optional: true
+  run_if_changed: ^(deploy/.*)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -443,6 +473,7 @@ tests:
     workflow: baremetalds-assisted-operator-ztp
 - as: e2e-ai-operator-ztp-ipv4v6-3masters-ocp-49
   optional: true
+  run_if_changed: ^(deploy/.*)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -479,7 +510,7 @@ tests:
 - as: e2e-metal-assisted-operator-ztp-periodic-upgrade
   cron: '@daily'
   steps:
-    cluster_profile: packet
+    cluster_profile: packet-assisted
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
     env:
@@ -552,7 +583,7 @@ tests:
     workflow: baremetalds-assisted
 - as: e2e-metal-assisted-ipv4v6
   optional: true
-  run_if_changed: ^(data/.*)$
+  run_if_changed: ^(cmd/.*|data/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -577,31 +608,29 @@ tests:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
     workflow: baremetalds-assisted
-- as: e2e-metal-assisted-networking
+- as: e2e-metal-assisted-static-ip-suite
   optional: true
   run_if_changed: ^(data/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
+        STATIC_IPS=true
         TEST_FUNC=test_networking
     workflow: baremetalds-assisted
-- as: e2e-metal-assisted-kube-api
+- as: e2e-metal-assisted-kube-api-net-suite
   run_if_changed: ^(cmd/.*|data/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        NUM_MASTERS=1
-        NUM_WORKERS=0
-        IPv6=yes
-        IPv4=no
-        PROXY=yes
-        ADDITIONAL_PARAMS="--with-static-network-config"
-        ISO_IMAGE_TYPE=minimal-iso
-        KUBE_API=yes
+        KUBE_API=true
         ENABLE_KUBE_API=true
-        MAKEFILE_TARGET=all
+        NUM_MASTERS=1
+        ISO_IMAGE_TYPE=minimal-iso
+        STATIC_IPS=true
+        TEST_FUNC=test_kubeapi
+        MAKEFILE_TARGET="create_full_environment run test_kube_api_parallel"
     workflow: baremetalds-assisted
 - as: e2e-metal-assisted
   run_if_changed: ^(cmd/.*|data/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
@@ -616,22 +645,24 @@ tests:
       ASSISTED_CONFIG: |
         DEPLOY_TARGET=onprem
     workflow: baremetalds-assisted
-- as: e2e-metal-assisted-multi-version
+- as: e2e-metal-assisted-multi-version-suite
   optional: true
   run_if_changed: ^(data/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=""
+        OPENSHIFT_VERSION="all"
+      PACKET_PLAN: m2.xlarge.x86
     workflow: baremetalds-assisted
-- as: e2e-metal-assisted-olm
+- as: e2e-metal-assisted-olm-suite
   run_if_changed: ^(data/.*|internal/operators/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         TEST_FUNC=test_olm_operator
+      PACKET_PLAN: m2.xlarge.x86
     workflow: baremetalds-assisted
 - as: e2e-metal-assisted-day2
   optional: true
@@ -648,7 +679,7 @@ tests:
     cluster_profile: packet-assisted
     env:
       POST_INSTALL_COMMANDS: |
-        export TEST_FUNC=test_kube_api_late_binding_ipv4_single_node
+        export TEST_FUNC=test_late_binding_kube_api_sno
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
         make deploy_assisted_operator test_kube_api_parallel
       TEST_SUITE: full
@@ -659,7 +690,7 @@ tests:
     cluster_profile: packet-assisted
     env:
       POST_INSTALL_COMMANDS: |
-        export TEST_FUNC=test_kube_api_late_binding_ipv4_single_node
+        export TEST_FUNC=test_late_binding_kube_api_sno
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
         make deploy_assisted_operator test_kube_api_parallel
     workflow: baremetalds-assisted
@@ -669,13 +700,14 @@ tests:
     cluster_profile: packet-assisted
     env:
       POST_INSTALL_COMMANDS: |
-        export TEST_FUNC=test_kube_api_late_unbinding_ipv4_single_node
+        export TEST_FUNC=test_late_binding_kube_api_sno
+        export HOLD_INSTALLATION=true
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
         make deploy_assisted_operator test_kube_api_parallel
     workflow: baremetalds-assisted
-- as: e2e-assisted-capi-provider-agent-hypershift
+- as: e2e-metal-assisted-capi
   optional: true
-  run_if_changed: ^(data/.*|internal/.*)$
+  run_if_changed: ^(api/.*|internal/controller/controllers/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -684,9 +716,8 @@ tests:
         ENABLE_KUBE_API=true
         MINIKUBE_DISK_SIZE=70g
         MINIKUBE_RAM_MB=10240
-        TEST=./src/tests/test_kube_api.py
         TEST_FUNC=test_capi_provider
-        MAKEFILE_TARGET="create_full_environment run deploy_capi_env test"
+        MAKEFILE_TARGET="create_full_environment run deploy_capi_env test_kube_api_parallel"
       GATHER_CAPI_LOGS: "true"
     workflow: baremetalds-assisted
 zz_generated_metadata:

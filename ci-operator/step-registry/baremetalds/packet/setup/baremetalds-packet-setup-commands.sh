@@ -27,10 +27,15 @@ cat > packet-setup.yaml <<-EOF
     - packet_auth_token: "{{ lookup('file', lookup('env', 'CLUSTER_PROFILE_DIR') + '/packet-auth-token') }}"
 
   tasks:
+  - name: check deprecated cluster type
+    fail:
+      msg: "Deprecated CLUSTER_TYPE '{{ cluster_type }}'"
+    when: cluster_type == "packet"
+
   - name: check cluster type
     fail:
       msg: "Unsupported CLUSTER_TYPE '{{ cluster_type }}'"
-    when: cluster_type != "packet"
+    when: "cluster_type is not regex('^packet.*$|^equinix.*$')"
 
   - name: create Packet host with error handling
     block:
@@ -39,7 +44,7 @@ cat > packet-setup.yaml <<-EOF
         auth_token: "{{ packet_auth_token }}"
         project_id: "{{ packet_project_id }}"
         hostnames: "{{ packet_hostname }}"
-        operating_system: centos_8
+        operating_system: ${PACKET_OS}
         plan: ${PACKET_PLAN}
         facility: any
         wait_for_public_IPv: 4
@@ -97,7 +102,7 @@ cat > packet-setup.yaml <<-EOF
         source "\${SHARED_DIR}/fix-uid.sh"
 
         # Initial check
-        if [ "\${CLUSTER_TYPE}" != "packet" ]; then
+        if [[ ! "\${CLUSTER_TYPE}" =~ ^packet.*$|^equinix.*$ ]]; then
             echo >&2 "Unsupported cluster type '\${CLUSTER_TYPE}'"
             exit 1
         fi
@@ -111,6 +116,24 @@ cat > packet-setup.yaml <<-EOF
             ssh "\${SSHOPTS[@]}" "root@\${IP}" hostname && break
             sleep 10
         done
+
+        ssh "\${SSHOPTS[@]}" "root@\${IP}" bash - << EOC
+            if [[ ${PACKET_OS} == "centos_8" ]]; then
+              echo "Making sure we use vault mirror, as default CentOS repositories are already EOL..."
+              
+              sed -i '/mirrorlist=.*/d' /etc/yum.repos.d/CentOS-AppStream.repo
+              grep -qF 'vault.centos.org' /etc/yum.repos.d/CentOS-AppStream.repo || \
+                echo 'baseurl=http://vault.centos.org/\\\$contentdir/\\\$releasever/AppStream/\\\$basearch/os/' >> /etc/yum.repos.d/CentOS-AppStream.repo
+
+              sed -i '/mirrorlist=.*/d' /etc/yum.repos.d/CentOS-Base.repo
+              grep -qF 'vault.centos.org' /etc/yum.repos.d/CentOS-Base.repo || \
+                echo 'baseurl=http://vault.centos.org/\\\$contentdir/\\\$releasever/BaseOS/\\\$basearch/os/' >> /etc/yum.repos.d/CentOS-Base.repo
+
+              sed -i '/mirrorlist=.*/d' /etc/yum.repos.d/CentOS-Extras.repo
+              grep -qF 'vault.centos.org' /etc/yum.repos.d/CentOS-Extras.repo || \
+                echo 'baseurl=http://vault.centos.org/\\\$contentdir/\\\$releasever/extras/\\\$basearch/os/' >> /etc/yum.repos.d/CentOS-Extras.repo
+            fi
+        EOC
       dest: "${SHARED_DIR}/packet-conf.sh"
 EOF
 

@@ -1,37 +1,34 @@
 base_images:
   assisted-installer:
-    name: "2.4"
-    namespace: open-cluster-management
+    name: ocm-2.4
+    namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: "2.4"
-    namespace: open-cluster-management
+    name: ocm-2.4
+    namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: "2.4"
-    namespace: open-cluster-management
+    name: ocm-2.4
+    namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: "2.4"
-    namespace: open-cluster-management
+    name: ocm-2.4
+    namespace: edge-infrastructure
     tag: assisted-service
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.16
+  from_repository: true
 images:
-- dockerfile_path: Dockerfile.test-infra
+- dockerfile_literal: |
+    FROM base
+    COPY . .
   from: src
-  inputs:
-    assisted-service:
-      as:
-      - quay.io/ocpmetal/assisted-service:latest
   to: assisted-test-infra
+- dockerfile_path: Dockerfile.assisted-test-infra
+  to: assisted-test-infra-internal
 promotion:
   name: ocm-2.4
   namespace: edge-infrastructure
@@ -68,37 +65,15 @@ tests:
         SERVICE_BASE_REF=release-ocm-2.4
       TEST_SUITE: full
     workflow: baremetalds-assisted
-- as: e2e-metal-assisted-multi-version
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.4
-        OPENSHIFT_VERSION=""
-    workflow: baremetalds-assisted
 - as: e2e-metal-assisted-olm
   optional: true
-  run_if_changed: .*operator.*
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=release-ocm-2.4
         TEST_FUNC=test_olm_operator
-    workflow: baremetalds-assisted
-- as: system-test-operator
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.4
-      POST_INSTALL_COMMANDS: |
-        export TEST=./discovery-infra/tests/test_kube_api.py
-        export TEST_FUNC=test_kube_api_ipv4
-        export KUBECONFIG=$(find ${KUBECONFIG} -type f)
-        make deploy_assisted_operator test_parallel
+      PACKET_PLAN: m2.xlarge.x86
     workflow: baremetalds-assisted
 - as: e2e-metal-assisted-kube-api-late-binding-single-node
   optional: true
@@ -115,7 +90,6 @@ tests:
     workflow: baremetalds-assisted
 - as: e2e-metal-assisted-ipv6
   optional: true
-  run_if_changed: ^(terraform_files/.*|.*/controllers/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -123,39 +97,14 @@ tests:
         SERVICE_BASE_REF=release-ocm-2.4
         IPv6=yes
         IPv4=no
-    workflow: baremetalds-assisted
-- as: e2e-metal-assisted-ipv4v6
-  optional: true
-  run_if_changed: ^(terraform_files/.*|.*/controllers/.*)$
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.4
-        IPv6=yes
-        IPv4=yes
     workflow: baremetalds-assisted
 - as: e2e-metal-assisted-none
   optional: true
-  run_if_changed: ^(terraform_files/.*|.*/controllers/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=release-ocm-2.4
-        PLATFORM=none
-    workflow: baremetalds-assisted
-- as: e2e-metal-assisted-none-ipv6
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.4
-        IPv6=yes
-        IPv4=no
-        VIP_DHCP_ALLOCATION=no
-        PROXY=yes
         PLATFORM=none
     workflow: baremetalds-assisted
 - as: e2e-metal-assisted-single-node
@@ -175,31 +124,14 @@ tests:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=release-ocm-2.4
         NUM_MASTERS=1
-        NUM_WORKERS=0
         IPv6=yes
         IPv4=no
-        PROXY=yes
-        ADDITIONAL_PARAMS="--with-static-network-config"
         ISO_IMAGE_TYPE=minimal-iso
         KUBE_API=yes
         ENABLE_KUBE_API=true
-        MAKEFILE_TARGET=all
+        MAKEFILE_TARGET="create_full_environment run test_kube_api_parallel"
+        TEST_FUNC=test_kubeapi
     workflow: baremetalds-assisted
-- as: e2e-metal-assisted-networking
-  optional: true
-  run_if_changed: ^(terraform_files/.*|.*/controllers/.*)$
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.4
-        TEST_FUNC=test_networking
-    workflow: baremetalds-assisted
-- as: e2e-metal-single-node-live-iso
-  optional: true
-  steps:
-    cluster_profile: packet-sno
-    workflow: baremetalds-sno
 zz_generated_metadata:
   branch: release-ocm-2.4
   org: openshift

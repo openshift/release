@@ -61,21 +61,31 @@ timeout -s 9 175m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*
 
 set -xeuo pipefail
 
-yum install -y git sysstat sos jq
+# Some Packet images have a file /usr/config left from the provisioning phase.
+# The problem is that sos expects it to be a directory. Since we don't care
+# about the Packet provisioner, remove the file if it's present.
+test -f /usr/config && rm -f /usr/config || true
+
+echo 'baseurl=http://vault.centos.org/\$contentdir/\$releasever/BaseOS/\$basearch/os/' >> /etc/yum.repos.d/CentOS-Linux-BaseOS.repo
+echo 'baseurl=http://vault.centos.org/\$contentdir/\$releasever/extras/\$basearch/os/' >> /etc/yum.repos.d/CentOS-Linux-Extras.repo
+echo 'baseurl=http://vault.centos.org/\$contentdir/\$releasever/AppStream/\$basearch/os/' >> /etc/yum.repos.d/CentOS-Linux-AppStream.repo
+
+dnf install -y git sysstat sos jq
 systemctl start sysstat
 
 mkdir -p /tmp/artifacts
 
+REPO_DIR="/home/assisted"
+mkdir -p "\${REPO_DIR}"
+mkdir -p "\${REPO_DIR}"/minikube_home
+echo "export MINIKUBE_HOME=\${REPO_DIR}/minikube_home" >> /root/config
+
 # NVMe makes it faster
 NVME_DEVICE="/dev/nvme0n1"
-REPO_DIR="/home/assisted"
 if [ -e "\$NVME_DEVICE" ];
 then
   mkfs.xfs -f "\${NVME_DEVICE}"
-  mkdir -p "\${REPO_DIR}"
   mount "\${NVME_DEVICE}" "\${REPO_DIR}"
-  mkdir -p "\${REPO_DIR}"/minikube_home
-  echo "export MINIKUBE_HOME=\${REPO_DIR}/minikube_home" >> /root/config
 fi
 
 tar -xzvf assisted.tar.gz -C "\${REPO_DIR}"
@@ -106,6 +116,11 @@ if [ "${PROVIDER_IMAGE}" != "${ASSISTED_CONTROLLER_IMAGE}" ];
 then
   echo "export PROVIDER_IMAGE=${PROVIDER_IMAGE}" >> /root/config
 fi
+# Most jobs and tests don't require this image, so this allows it as optional
+if [ "${HYPERSHIFT_IMAGE}" != "${ASSISTED_CONTROLLER_IMAGE}" ];
+then
+  echo "export HYPERSHIFT_IMAGE=${HYPERSHIFT_IMAGE}" >> /root/config
+fi
 
 # expr command's return value is 1 in case of a false expression. We don't want to exit in this case.
 set +e
@@ -113,9 +128,6 @@ IS_REHEARSAL=\$(expr "${REPO_OWNER:-}" = "openshift" "&" "${REPO_NAME:-}" = "rel
 set -e
 
 if [ "${JOB_TYPE:-}" = "presubmit" ] && (( ! \${IS_REHEARSAL} )); then
-  # We would like to keep running a stable version for PRs
-  echo "export OPENSHIFT_VERSION=4.8" >> /root/config
-
   if [ "${REPO_NAME:-}" = "assisted-service" ]; then
     echo "export SERVICE_BRANCH=${PULL_PULL_SHA:-master}" >> /root/config
   fi
@@ -130,7 +142,6 @@ CI_REGISTRIES=\$(for image in \${IMAGES}; do echo \${image} | cut -d'/' -f1; don
 echo "export PUBLIC_CONTAINER_REGISTRIES=quay.io,\${CI_REGISTRIES}" >> /root/config
 echo "export ASSISTED_SERVICE_HOST=${IP}" >> /root/config
 echo "export CHECK_CLUSTER_VERSION=True" >> /root/config
-echo "export NUM_WORKERS=2" >> /root/config
 echo "export TEST_TEARDOWN=false" >> /root/config
 echo "export TEST_FUNC=test_install" >> /root/config
 echo "export INSTALLER_KUBECONFIG=\${REPO_DIR}/build/kubeconfig" >> /root/config
@@ -140,9 +151,6 @@ if [[ -e /root/assisted-additional-config ]]; then
 fi
 
 source /root/config
-
-# TODO: remove once we finished moving to the new dockerfile
-export TEST_INFRA_DOCKERFILE=Dockerfile.assisted-test-infra
 
 make \${MAKEFILE_TARGET:-create_full_environment run test_parallel}
 

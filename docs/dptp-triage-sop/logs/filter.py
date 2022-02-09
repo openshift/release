@@ -55,6 +55,8 @@ if mode == "warnings":
         ),
         lambda message: matches(message, "tide", error="non-200 OK status code: 403 Forbidden"),
         lambda message: matches(message, "tide", msg="GitHub status description needed to be truncated to fit GH API limit"),
+        # our automation doesn't have access to the repo
+        lambda message: matches(message, "hook", msg="Could not list labels on PR", error="the GitHub API request returns a 403"),
     ]
 elif mode == "errors":
     filters = [

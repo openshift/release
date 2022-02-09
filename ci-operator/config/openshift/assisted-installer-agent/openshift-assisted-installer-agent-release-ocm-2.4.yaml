@@ -1,22 +1,22 @@
 base_images:
   assisted-installer:
-    name: "2.4"
-    namespace: open-cluster-management
+    name: ocm-2.4
+    namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-controller:
-    name: "2.4"
-    namespace: open-cluster-management
+    name: ocm-2.4
+    namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: "2.4"
-    namespace: open-cluster-management
+    name: ocm-2.4
+    namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: assisted-test
-    namespace: ocp-kni
+    name: ocm-2.4
+    namespace: edge-infrastructure
     tag: assisted-test-infra
-  coreos-centos-centos8:
-    name: centos8
+  coreos-centos-stream8:
+    name: stream8
     namespace: coreos
     tag: "8"
   dev-scripts:
@@ -32,15 +32,15 @@ build_root:
     dockerfile_path: Dockerfile.assisted_installer_agent-build
 images:
 - dockerfile_path: Dockerfile.assisted_installer_agent
-  from: coreos-centos-centos8
+  from: coreos-centos-stream8
   inputs:
     openshift_release_golang-1.16:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.16
   to: assisted-installer-agent
 promotion:
-  name: "2.4"
-  namespace: open-cluster-management
+  name: ocm-2.4
+  namespace: edge-infrastructure
 releases:
   initial:
     integration:
@@ -87,7 +87,6 @@ tests:
       IMAGE_REPO: assisted-installer-agent
       OSCI_ENV_CONFIG: |
         OSCI_PUBLISH_DELAY=0
-      REGISTRY_ORG: open-cluster-management
       RELEASE_REF: release-2.4
     workflow: ocm-ci-manifest-update
 - as: lint
@@ -127,7 +126,7 @@ tests:
         SERVICE_BASE_REF=release-ocm-2.4
         NUM_MASTERS=1
     workflow: baremetalds-assisted
-- as: e2e-metal-assisted-olm
+- as: e2e-metal-assisted-olm-suite
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -135,6 +134,7 @@ tests:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=release-ocm-2.4
         TEST_FUNC=test_olm_operator
+      PACKET_PLAN: m2.xlarge.x86
     workflow: baremetalds-assisted
 zz_generated_metadata:
   branch: release-ocm-2.4

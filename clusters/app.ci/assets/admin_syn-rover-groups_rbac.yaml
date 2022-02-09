@@ -1,0 +1,40 @@
+---
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  annotations:
+    openshift.io/description: This SA is used to update the configmap sync-rover-groups in ci namespace
+  name: sync-rover-groups-updater
+  namespace: ci
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: sync-rover-groups-updater
+  namespace: ci
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  resourceNames:
+  - sync-rover-groups
+  verbs:
+  - get
+  - create
+  - patch
+  - update
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: sync-rover-groups-updater
+  namespace: ci
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: sync-rover-groups-updater
+subjects:
+- kind: ServiceAccount
+  name: sync-rover-groups-updater
+  namespace: ci

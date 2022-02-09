@@ -6,110 +6,6 @@ presubmits:
     - ^release-ocm-2\.4$
     - ^release-ocm-2\.4-
     cluster: build03
-    context: ci/prow/bundle-ci-index-assisted-service-bundle
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/variant: bundle
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-release-ocm-2.4-bundle-ci-index-assisted-service-bundle
-    rerun_command: /test bundle-ci-index-assisted-service-bundle
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=ci-index-assisted-service-bundle
-        - --variant=bundle
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )bundle-ci-index-assisted-service-bundle,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-ocm-2\.4$
-    - ^release-ocm-2\.4-
-    cluster: build03
-    context: ci/prow/bundle-images
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/variant: bundle
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-release-ocm-2.4-bundle-images
-    rerun_command: /test bundle-images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        - --target=assisted-service-bundle
-        - --target=ci-index-assisted-service-bundle
-        - --variant=bundle
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )bundle-images,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-ocm-2\.4$
-    - ^release-ocm-2\.4-
-    cluster: build03
     context: ci/prow/ci-index
     decorate: true
     decoration_config:
@@ -760,7 +656,7 @@ presubmits:
     - ^release-ocm-2\.4$
     - ^release-ocm-2\.4-
     cluster: build03
-    context: ci/prow/e2e-metal-assisted-multi-version
+    context: ci/prow/e2e-metal-assisted-multi-version-suite
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -769,8 +665,8 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-release-ocm-2.4-e2e-metal-assisted-multi-version
-    rerun_command: /test e2e-metal-assisted-multi-version
+    name: pull-ci-openshift-assisted-service-release-ocm-2.4-e2e-metal-assisted-multi-version-suite
+    rerun_command: /test e2e-metal-assisted-multi-version-suite
     run_if_changed: ^(data/.*)$
     spec:
       containers:
@@ -780,8 +676,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-multi-version-cluster-profile
-        - --target=e2e-metal-assisted-multi-version
+        - --secret-dir=/usr/local/e2e-metal-assisted-multi-version-suite-cluster-profile
+        - --target=e2e-metal-assisted-multi-version-suite
         command:
         - ci-operator
         image: ci-operator:latest
@@ -797,7 +693,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-multi-version-cluster-profile
+        - mountPath: /usr/local/e2e-metal-assisted-multi-version-suite-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -828,7 +724,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-assisted-multi-version,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-metal-assisted-multi-version-suite,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -910,7 +806,7 @@ presubmits:
     - ^release-ocm-2\.4$
     - ^release-ocm-2\.4-
     cluster: build03
-    context: ci/prow/e2e-metal-assisted-olm
+    context: ci/prow/e2e-metal-assisted-olm-suite
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -919,9 +815,9 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-release-ocm-2.4-e2e-metal-assisted-olm
+    name: pull-ci-openshift-assisted-service-release-ocm-2.4-e2e-metal-assisted-olm-suite
     optional: true
-    rerun_command: /test e2e-metal-assisted-olm
+    rerun_command: /test e2e-metal-assisted-olm-suite
     run_if_changed: ^(data/.*|internal/operators/.*)$
     spec:
       containers:
@@ -931,8 +827,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-olm-cluster-profile
-        - --target=e2e-metal-assisted-olm
+        - --secret-dir=/usr/local/e2e-metal-assisted-olm-suite-cluster-profile
+        - --target=e2e-metal-assisted-olm-suite
         command:
         - ci-operator
         image: ci-operator:latest
@@ -948,7 +844,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-olm-cluster-profile
+        - mountPath: /usr/local/e2e-metal-assisted-olm-suite-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -979,7 +875,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-assisted-olm,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-metal-assisted-olm-suite,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -1294,7 +1190,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: packet
-      ci-operator.openshift.io/cloud-cluster-profile: packet
+      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-release-ocm-2.4-e2e-metal-assisted-static-ip
@@ -1348,7 +1244,7 @@ presubmits:
           secretName: ci-pull-credentials
       - name: cluster-profile
         secret:
-          secretName: cluster-secrets-packet
+          secretName: cluster-secrets-packet-assisted
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -1454,6 +1350,57 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )lint,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-ocm-2\.4$
+    - ^release-ocm-2\.4-
+    cluster: build03
+    context: ci/prow/stolostron-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: stolostron
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-assisted-service-release-ocm-2.4-stolostron-images
+    rerun_command: /test stolostron-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=stolostron
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )stolostron-images,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:

@@ -1,16 +1,16 @@
 base_images:
   cli:
-    name: "4.8"
+    name: "4.10"
     namespace: ocp
     tag: cli
   golangci-lint:
     name: golangci-lint
     namespace: ci
-    tag: v1.37.1
+    tag: v1.43.0
   os:
     name: centos
     namespace: origin
-    tag: "8"
+    tag: stream8
 binary_build_commands: make production-install
 build_root:
   from_repository: true
@@ -145,7 +145,7 @@ images:
         source_path: /go/bin/dptp-controller-manager
   to: dptp-controller-manager
 - dockerfile_literal: |-
-    FROM centos:8
+    FROM quay.io/centos/centos:stream8
     ADD dptp-pools-cm /usr/bin/dptp-pools-cm
     ENTRYPOINT ["dptp-pools-cm"]
   from: os
@@ -156,7 +156,7 @@ images:
         source_path: /go/bin/dptp-pools-cm
   to: dptp-pools-cm
 - dockerfile_literal: |-
-    FROM centos:8
+    FROM quay.io/centos/centos:stream8
     RUN dnf install -y git && dnf clean all && rm -rf /var/cache/dnf
     ADD promoted-image-governor /usr/bin/promoted-image-governor
     ENTRYPOINT ["promoted-image-governor"]
@@ -168,7 +168,7 @@ images:
         source_path: /go/bin/promoted-image-governor
   to: promoted-image-governor
 - dockerfile_literal: |-
-    FROM centos:8
+    FROM quay.io/centos/centos:stream8
     RUN dnf install -y git && dnf clean all && rm -rf /var/cache/dnf
     ADD prcreator /usr/bin/prcreator
     ENTRYPOINT ["prcreator"]
@@ -448,7 +448,7 @@ images:
         source_path: /go/bin/ocp-build-data-enforcer
   to: ocp-build-data-enforcer
 - dockerfile_literal: |-
-    FROM centos:8
+    FROM quay.io/centos/centos:stream8
     ADD vault-subpath-proxy /usr/bin/vault-subpath-proxy
     ENTRYPOINT ["/usr/bin/vault-subpath-proxy"]
   from: os
@@ -459,7 +459,7 @@ images:
         source_path: /go/bin/vault-subpath-proxy
   to: vault-subpath-proxy
 - dockerfile_literal: |-
-    FROM centos:8
+    FROM quay.io/centos/centos:stream8
     ADD cluster-display /usr/bin/cluster-display
     ENTRYPOINT ["/usr/bin/cluster-display"]
   from: os
@@ -478,7 +478,7 @@ images:
         source_path: /go/bin/cluster-init
   to: cluster-init
 - dockerfile_literal: |-
-    FROM centos:8
+    FROM quay.io/centos/centos:stream8
     ADD vault-secret-collection-manager /usr/bin/vault-secret-collection-manager
     ENTRYPOINT ["/usr/bin/vault-secret-collection-manager"]
   from: os
@@ -489,7 +489,7 @@ images:
         source_path: /go/bin/vault-secret-collection-manager
   to: vault-secret-collection-manager
 - dockerfile_literal: |-
-    FROM centos:8
+    FROM quay.io/centos/centos:stream8
     ADD bugzilla-config-manager /usr/bin/bugzilla-config-manager
     ADD prcreator /usr/bin/prcreator
   from: os
@@ -502,7 +502,7 @@ images:
         source_path: /go/bin/prcreator
   to: bugzilla-config-manager
 - dockerfile_literal: |-
-    FROM centos:8
+    FROM quay.io/centos/centos:stream8
     RUN  dnf install -y git && dnf clean all && rm -rf /var/cache/dnf
     ADD ci-operator-yaml-creator /usr/bin/ci-operator-yaml-creator
     ENTRYPOINT ["ci-operator-yaml-creator"]
@@ -522,24 +522,7 @@ images:
         source_path: /go/bin/clusterimageset-updater
   to: clusterimageset-updater
 - dockerfile_literal: |-
-    FROM centos:8
-    RUN dnf install -y openldap-clients && dnf clean all && rm -rf /var/cache/dnf
-    ADD ldap-users-from-github-owners-files /usr/bin/ldap-users-from-github-owners-files
-    ADD usr/bin/oc /usr/bin/oc
-    ENTRYPOINT ["/usr/bin/ldap-users-from-github-owners-files"]
-  from: os
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/bin/ldap-users-from-github-owners-files
-    cli:
-      paths:
-      - destination_dir: usr/bin
-        source_path: /usr/bin/oc
-  to: ldap-users-from-github-owners-files
-- dockerfile_literal: |-
-    FROM centos:8
+    FROM quay.io/centos/centos:stream8
     ADD github-ldap-user-group-creator /usr/bin/github-ldap-user-group-creator
     ENTRYPOINT ["github-ldap-user-group-creator"]
   from: os
@@ -550,7 +533,7 @@ images:
         source_path: /go/bin/github-ldap-user-group-creator
   to: github-ldap-user-group-creator
 - dockerfile_literal: |-
-    FROM centos:8
+    FROM quay.io/centos/centos:stream8
     ADD payload-testing-prow-plugin /usr/bin/payload-testing-prow-plugin
     ENTRYPOINT ["/usr/bin/payload-testing-prow-plugin"]
   from: os
@@ -561,7 +544,7 @@ images:
         source_path: /go/bin/payload-testing-prow-plugin
   to: payload-testing-prow-plugin
 - dockerfile_literal: |-
-    FROM centos:8
+    FROM quay.io/centos/centos:stream8
     ADD schedule-generator /usr/bin/schedule-generator
     RUN yum install -y git && yum clean all && rm -rf /var/cache/yum
     ENTRYPOINT ["/usr/bin/schedule-generator"]
@@ -573,7 +556,7 @@ images:
         source_path: /go/bin/schedule-generator
   to: schedule-generator
 - dockerfile_literal: |-
-    FROM centos:8
+    FROM quay.io/centos/centos:stream8
     ADD job-trigger-controller-manager /usr/bin/job-trigger-controller-manager
     ENTRYPOINT ["/usr/bin/job-trigger-controller-manager"]
   from: os
@@ -599,6 +582,23 @@ images:
       - destination_dir: .
         source_path: /go/bin/job-run-aggregator
   to: job-run-aggregator
+- dockerfile_literal: |-
+    FROM quay.io/centos/centos:stream8
+    RUN dnf install -y git && dnf clean all && rm -rf /var/cache/dnf
+    ADD sync-rover-groups /usr/bin/sync-rover-groups
+    ADD usr/bin/oc /usr/bin/oc
+    ENTRYPOINT ["sync-rover-groups"]
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/sync-rover-groups
+    cli:
+      paths:
+      - destination_dir: usr/bin
+        source_path: /usr/bin/oc
+  to: sync-rover-groups
 promotion:
   namespace: ci
   tag: latest

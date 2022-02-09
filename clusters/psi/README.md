@@ -15,21 +15,12 @@ $ make applyconfig
 
 ## troubleshooting
 
-### version
-
 ```console
-$ oc --context psi get clusterversion
-NAME      VERSION   AVAILABLE   PROGRESSING   SINCE   STATUS
-version   4.7.31    True        False         15d     Cluster version is 4.7.31
-
-$ oc47 --context psi version
-Client Version: 4.7.31
-Kubernetes Version: v1.20.0+9689d22
-```
-
-Because of the version, `apiVersion: batch/v1beta1`, instead of `apiVersion: batch/v1`, has to be applied to `kind: CronJob`.
-For the same reason, a matching version of oc-cli has to be used for triggering a cronjob manually, e.g.,
-
-```
-$ oc47 --context psi -n ocp-test-platform create job github-ldap-mapping-update-test-job-$USER-$(echo $RANDOM | md5sum | head -c 8) --from=cronjob/github-ldap-mapping-update
+$ oc --context psi get cronjob
+NAME                         SCHEDULE    SUSPEND   ACTIVE   LAST SCHEDULE   AGE
+github-ldap-mapping-update   0 1 * * *   False     0        14h             88d
+release-schedules-update     0 1 * * *   False     0        14h             83d
+sync-rover-groups-update     0 1 * * *   False     0        <none>          20s
+$ cronjob_name=sync-rover-groups-update
+$ oc --context psi -n ocp-test-platform create job ${cronjob_name}-test-job-$USER-$(openssl rand -hex 6) --from=cronjob/${cronjob_name}
 ```

@@ -7,14 +7,14 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.16-linux
+    tag: go1.17-linux
 images:
 - dockerfile_path: Dockerfile.e2etest
   from: base
   inputs:
     root:
       as:
-      - golang:1.16
+      - golang:1.17
   to: grc-policy-framework-tests
 promotion:
   name: "2.5"
@@ -82,6 +82,33 @@ tests:
       IMAGE_TAG: latest
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
+- as: periodic-build
+  cron: 0 6 * * *
+  steps:
+    test:
+    - as: grc-pipeline-validation
+      commands: |
+        export SELF="make -f Makefile.prow"
+        export GITHUB_TOKEN=$(cat ${GITHUB_TOKEN_FILE})
+        ./build/periodic.sh
+      credentials:
+      - mount_path: /etc/acm-cicd-github
+        name: acm-cicd-github
+        namespace: test-credentials
+      env:
+      - default: acm-cicd-github
+        documentation: The GitHub user name.
+        name: GITHUB_USER
+      - default: /etc/acm-cicd-github/token
+        documentation: |-
+          The file that stores the GitHub token. Should match credentials stanza
+          mount path.
+        name: GITHUB_TOKEN_FILE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 zz_generated_metadata:
   branch: main
   org: stolostron

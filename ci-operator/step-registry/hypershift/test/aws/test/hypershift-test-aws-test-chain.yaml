@@ -1,0 +1,26 @@
+chain:
+  as: hypershift-test-aws-test
+  steps:
+  - as: conformance-tests
+    cli: latest
+    from_image:
+      namespace: ocp
+      name: "4.10"
+      tag: tests
+    commands: |-
+      CLUSTER_NAME="$(echo -n $PROW_JOB_ID|cut -d- -f-2)"
+      export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG="${KUBECONFIG}"
+      export HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE="clusters-${CLUSTER_NAME}"
+      export AWS_SHARED_CREDENTIALS_FILE=/etc/hypershift-pool-aws-credentials/credentials
+      export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
+      openshift-tests run openshift/conformance/parallel \
+        -o "${ARTIFACT_DIR}/e2e.log" \
+        --junit-dir "${ARTIFACT_DIR}/junit"
+    credentials:
+    - mount_path: /etc/hypershift-pool-aws-credentials
+      name: hypershift-pool-aws-credentials
+      namespace: test-credentials
+    resources:
+      requests:
+        cpu: "3"
+        memory: 600Mi
