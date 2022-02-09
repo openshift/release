@@ -64,8 +64,10 @@ case "${CLUSTER_TYPE}" in
 gcp)
     export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
     export KUBE_SSH_USER=core
+    export SSH_CLOUD_PRIV_GCP_USER=core
     mkdir -p ~/.ssh
     cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/google_compute_engine || true
+    eval export SSH_CLOUD_PRIV_KEY="~/.ssh/google_compute_engine"
     PROJECT="$(oc get -o jsonpath='{.status.platformStatus.gcp.projectID}' infrastructure cluster)"
     REGION="$(oc get -o jsonpath='{.status.platformStatus.gcp.region}' infrastructure cluster)"
     export TEST_PROVIDER="{\"type\":\"gce\",\"region\":\"${REGION}\",\"multizone\": true,\"multimaster\":true,\"projectid\":\"${PROJECT}\"}"
@@ -73,11 +75,13 @@ gcp)
 aws)
     mkdir -p ~/.ssh
     cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/kube_aws_rsa || true
+    eval export SSH_CLOUD_PRIV_KEY="~/.ssh/kube_aws_rsa"
     export PROVIDER_ARGS="-provider=aws -gce-zone=us-east-1"
     REGION="$(oc get -o jsonpath='{.status.platformStatus.aws.region}' infrastructure cluster)"
     ZONE="$(oc get -o jsonpath='{.items[0].metadata.labels.failure-domain\.beta\.kubernetes\.io/zone}' nodes)"
     export TEST_PROVIDER="{\"type\":\"aws\",\"region\":\"${REGION}\",\"zone\":\"${ZONE}\",\"multizone\":true,\"multimaster\":true}"
     export KUBE_SSH_USER=core
+    export SSH_CLOUD_PRIV_AWS_USER=core
     ;;
 azure4) export TEST_PROVIDER=azure;;
 azurestack)
