@@ -54,12 +54,26 @@ images:
       - registry.ci.openshift.org/coreos/built-cosa:latest
   to: machine-os-content-scratch-image
 - dockerfile_literal: |
+    FROM registry.ci.openshift.org/coreos/built-cosa:latest AS builder
+    WORKDIR /image
+    RUN skopeo copy docker://registry.fedoraproject.org/fedora:latest oci-archive:/image/fedora.oci
+  from: build-test-qemu-img
+  inputs:
+    built-test-qemu-img:
+      as:
+      - registry.ci.openshift.org/coreos/build-test-qemu-img:latest
+  to: skopeo-pull
+- dockerfile_literal: |
     FROM oci-archive:fedora.oci
     RUN cat /etc/os-release
+  from: skopeo-pull
   inputs:
-    skopeo-test:
+    skopeo-pull:
       as:
-      - ""
+        - registry.ci.openshift.org/coreos/skopeo-pull:latest
+      paths:
+      - destination_dir: .
+        source_path: /image/fedora.oci
   to: dependent-image
 promotion:
   excluded_images:
