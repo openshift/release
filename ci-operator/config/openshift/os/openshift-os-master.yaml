@@ -15,8 +15,6 @@ images:
       as:
       - registry.svc.ci.openshift.org/coreos/coreos-assembler:latest
   to: build-test-qemu-img
-- dockerfile_literal: FROM scratch
-  to: final-content
 promotion:
   excluded_images:
   - '*'
@@ -25,20 +23,28 @@ promotion:
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
-      skopeo copy docker://registry.fedoraproject.org/fedora:latest oci-archive:${SHARED_DIR}/fedora.oci
+      FROM build-test-qemu-img
+      WORKDIR /image
+      skopeo copy docker://registry.fedoraproject.org/fedora:latest oci-archive:/image/fedora.oci
     from: build-test-qemu-img
     to: skopeo-pull
 - project_directory_image_build_step:
     dockerfile_literal: |
       FROM oci-archive:fedora.oci
       LABEL built
-    from: final-content
     inputs:
       skopeo-pull:
         paths:
         - destination_dir: .
-          source_path: ${SHARED_DIR}/fedora.oci
-    to: base
+          source_path: /image/fedora.oci
+    to: final-content
+- output_image_tag_step:
+    from: final-content
+    optional: false
+    to:
+      name: stable
+      namespace: ""
+      tag: final-content
 releases:
   initial:
     integration:
