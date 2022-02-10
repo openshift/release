@@ -29,7 +29,6 @@ raw_steps:
 - project_directory_image_build_step:
     dockerfile_literal: |
       FROM oci-archive:fedora.oci
-      LABEL built
     inputs:
       skopeo-pull:
         paths:
@@ -66,16 +65,6 @@ resources:
       devices.kubevirt.io/kvm: "1"
       memory: 3Gi
 tests:
-- as: validate
-  commands: ./ci/validate.sh
-  container:
-    from: src
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: build-test-qemu
-  commands: /src/ci/build-test-qemu.sh
-  container:
-    from: build-test-qemu-img
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: final-content-test
   commands: cat /etc/os-release
   container:
