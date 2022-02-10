@@ -15,6 +15,8 @@ images:
       as:
       - registry.svc.ci.openshift.org/coreos/coreos-assembler:latest
   to: build-test-qemu-img
+- dockerfile_literal: FROM scratch
+  to: final-content
 promotion:
   excluded_images:
   - '*'
@@ -30,13 +32,13 @@ raw_steps:
     dockerfile_literal: |
       FROM oci-archive:fedora.oci
       LABEL built
-    from: skopeo-pull
+    from: final-content
     inputs:
       skopeo-pull:
         paths:
         - destination_dir: .
           source_path: ${SHARED_DIR}/fedora.oci
-    to: pulled
+    to: base
 releases:
   initial:
     integration:
