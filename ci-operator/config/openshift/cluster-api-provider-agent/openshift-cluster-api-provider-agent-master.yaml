@@ -1,4 +1,8 @@
 base_images:
+  assisted-image-service:
+    name: ocm-2.5
+    namespace: edge-infrastructure
+    tag: assisted-image-service
   assisted-installer:
     name: ocm-2.5
     namespace: edge-infrastructure
@@ -127,6 +131,21 @@ tests:
       GATHER_CAPI_LOGS: "true"
       TEST_SUITE: full
     workflow: baremetalds-assisted
+- as: e2e-capi-provider-hypershift-hive
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      DEVSCRIPTS_CONFIG: |
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=32768
+        EXTRA_WORKER_DISK=120
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      DISCONNECTED: "false"
+      IP_STACK: v4
+      NUM_EXTRA_WORKERS: "1"
+    workflow: baremetalds-capi-ztp
 zz_generated_metadata:
   branch: master
   org: openshift
