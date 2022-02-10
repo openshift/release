@@ -15,73 +15,28 @@ images:
       as:
       - registry.svc.ci.openshift.org/coreos/coreos-assembler:latest
   to: build-test-qemu-img
-- dockerfile_literal: |
-    FROM registry.ci.openshift.org/coreos/build-test-qemu-img:latest
-    RUN echo "in built-cosa" > /home/builder/in-container
-  from: build-test-qemu-img
-  inputs:
-    build-test-qemu-img:
-      as:
-      - registry.ci.openshift.org/coreos/build-test-qemu-img:latest
-  to: built-cosa
-- dockerfile_literal: |
-    FROM registry.ci.openshift.org/coreos/built-cosa:latest
-    RUN echo "in machine-os-oci-content" >> /home/builder/in-container
-  from: built-cosa
-  inputs:
-    built-cosa:
-      as:
-      - registry.ci.openshift.org/coreos/built-cosa:latest
-  to: machine-os-oci-content
-- dockerfile_literal: |
-    FROM registry.ci.openshift.org/coreos/built-cosa:latest
-    RUN echo "in machine-os-content" >> /home/builder/in-container
-  from: built-cosa
-  inputs:
-    built-cosa:
-      as:
-      - registry.ci.openshift.org/coreos/built-cosa:latest
-  to: machine-os-content
-- dockerfile_literal: |
-    FROM registry.ci.openshift.org/coreos/built-cosa:latest AS builder
-    RUN echo "in machine-os-content-scratch" >> /home/builder/in-container
-    FROM scratch AS final
-    COPY --from=builder /home/builder/in-container /in-container
-  from: machine-os-content
-  inputs:
-    built-cosa:
-      as:
-      - registry.ci.openshift.org/coreos/built-cosa:latest
-  to: machine-os-content-scratch-image
-- dockerfile_literal: |
-    FROM registry.ci.openshift.org/coreos/built-cosa:latest AS builder
-    WORKDIR /image
-    RUN skopeo copy docker://registry.fedoraproject.org/fedora:latest oci-archive:/image/fedora.oci
-  from: build-test-qemu-img
-  inputs:
-    built-test-qemu-img:
-      as:
-      - registry.ci.openshift.org/coreos/build-test-qemu-img:latest
-  to: skopeo-pull
-- dockerfile_literal: |
-    FROM oci-archive:fedora.oci
-    RUN cat /etc/os-release
-  from: skopeo-pull
-  inputs:
-    skopeo-pull:
-      as:
-        - registry.ci.openshift.org/coreos/skopeo-pull:latest
-      paths:
-      - destination_dir: .
-        source_path: /image/fedora.oci
-  to: dependent-image
 promotion:
   excluded_images:
   - '*'
-  - build-test-qemu-img
-  - built-cosa
   name: "4.11"
   namespace: ocp
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      skopeo copy docker://registry.fedoraproject.org/fedora:latest oci-archive:${SHARED_DIR}/fedora.oci
+    from: build-test-qemu-img
+    to: skopeo-pull
+- project_directory_image_build_step:
+    dockerfile_literal: |
+      FROM oci-archive:fedora.oci
+      LABEL built
+    from: skopeo-pull
+    inputs:
+      skopeo-pull:
+        paths:
+        - destination_dir: .
+          source_path: ${SHARED_DIR}/fedora.oci
+    to: pulled
 releases:
   initial:
     integration:
@@ -94,15 +49,15 @@ releases:
       namespace: ocp
 resources:
   '*':
-    requests:
-      cpu: 1000m
-      memory: 1Gi
-  build-test-qemu:
     limits:
       devices.kubevirt.io/kvm: "1"
     requests:
       cpu: 1000m
       devices.kubevirt.io/kvm: "1"
+      memory: 1Gi
+  build-test-qemu:
+    requests:
+      cpu: 1000m
       memory: 3Gi
 tests:
 - as: validate
@@ -112,26 +67,6 @@ tests:
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: build-test-qemu
   commands: /src/ci/build-test-qemu.sh
-  container:
-    from: build-test-qemu-img
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: built-cosa-test
-  commands: cat /home/builder/in-container && cat /etc/os-release
-  container:
-    from: built-cosa
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: machine-os-oci-content-test
-  commands: cat /home/builder/in-container && cat /etc/os-release
-  container:
-    from: machine-os-oci-content
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: machine-os-content-test
-  commands: cat /home/builder/in-container && cat /etc/os-release
-  container:
-    from: machine-os-content
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: skopeo-test
-  commands: skopeo copy docker://registry.fedoraproject.org/fedora:latest oci-archive:${SHARED_DIR}/fedora.oci
   container:
     from: build-test-qemu-img
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
