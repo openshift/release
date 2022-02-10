@@ -17,7 +17,7 @@ images:
   to: build-test-qemu-img
 - dockerfile_literal: |
     FROM registry.ci.openshift.org/coreos/build-test-qemu-img:latest
-    RUN echo "in built-cosa" > /home/build/in-container
+    RUN echo "in built-cosa" > /home/builder/in-container
   from: build-test-qemu-img
   inputs:
     build-test-qemu-img:
@@ -26,7 +26,7 @@ images:
   to: built-cosa
 - dockerfile_literal: |
     FROM registry.ci.openshift.org/coreos/built-cosa:latest
-    RUN echo "in machine-os-oci-content" >> /home/build/in-container
+    RUN echo "in machine-os-oci-content" >> /home/builder/in-container
   from: built-cosa
   inputs:
     built-cosa:
@@ -35,7 +35,7 @@ images:
   to: machine-os-oci-content
 - dockerfile_literal: |
     FROM registry.ci.openshift.org/coreos/built-cosa:latest
-    RUN echo "in machine-os-content" >> /home/build/in-container
+    RUN echo "in machine-os-content" >> /home/builder/in-container
   from: built-cosa
   inputs:
     built-cosa:
@@ -44,8 +44,9 @@ images:
   to: machine-os-content
 - dockerfile_literal: |
     FROM registry.ci.openshift.org/coreos/machine-os-content:latest AS builder
+    RUN echo "in machine-os-content-scratch" >> /home/builder/in-container
     FROM scratch
-    COPY --from=builder /home/build/in-container /in-container
+    COPY --from=builder /home/builder/in-container /in-container
   from: machine-os-content
   inputs:
     machine-os-content:
