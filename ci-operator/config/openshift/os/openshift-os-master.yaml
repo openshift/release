@@ -53,6 +53,9 @@ images:
       as:
       - registry.ci.openshift.org/coreos/built-cosa:latest
   to: machine-os-content-scratch-image
+- dockerfile_literal: |
+    FROM scratch
+  to: placeholder
 promotion:
   excluded_images:
   - '*'
@@ -107,6 +110,11 @@ tests:
   commands: cat /home/builder/in-container && cat /etc/os-release
   container:
     from: machine-os-content
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: push-to-placeholder
+  commands: skopeo copy docker://registry.fedoraproject.org/fedora:latest registry.ci.openshift.org/coreos/placeholder:latest
+  container:
+    from: build-test-qemu-img
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 zz_generated_metadata:
   branch: master
