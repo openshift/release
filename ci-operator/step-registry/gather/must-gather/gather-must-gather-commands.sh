@@ -37,3 +37,14 @@ oc --insecure-skip-tls-verify adm must-gather $MUST_GATHER_IMAGE --dest-dir ${AR
 [ -f "${ARTIFACT_DIR}/must-gather/event-filter.html" ] && cp "${ARTIFACT_DIR}/must-gather/event-filter.html" "${ARTIFACT_DIR}/event-filter.html"
 tar -czC "${ARTIFACT_DIR}/must-gather" -f "${ARTIFACT_DIR}/must-gather.tar.gz" .
 rm -rf "${ARTIFACT_DIR}"/must-gather
+
+cat >"${ARTIFACT_DIR}/test-junit.xml" <<EOF
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuites id="devansuite" name="Devans Fake Test Suite" tests="1" failures="1" time="0.001">
+<testcase id="fake.test.case" name="Devan testing something" time="0.001">
+<failure message="Something went wrong" type="WARNING">
+This is where we'd put the details.
+</failure>
+</testcase>
+</testsuites>
+EOF
