@@ -18,11 +18,6 @@ cat > packet-teardown.yaml <<-EOF
     - packet_project_id: "{{ lookup('file', lookup('env', 'CLUSTER_PROFILE_DIR') + '/packet-project-id') }}"
     - packet_auth_token: "{{ lookup('file', lookup('env', 'CLUSTER_PROFILE_DIR') + '/packet-auth-token') }}"
   tasks:
-  - name: check deprecated cluster type
-    fail:
-      msg: "Deprecated CLUSTER_TYPE '{{ cluster_type }}'"
-    when: cluster_type == "packet"
-
   - name: check cluster type
     fail:
       msg: "Unsupported CLUSTER_TYPE '{{ cluster_type }}'"
