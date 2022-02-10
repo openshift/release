@@ -43,19 +43,21 @@ images:
       - registry.ci.openshift.org/coreos/built-cosa:latest
   to: machine-os-content
 - dockerfile_literal: |
-    FROM registry.ci.openshift.org/coreos/machine-os-content:latest AS builder
+    FROM registry.ci.openshift.org/coreos/built-cosa:latest AS builder
     RUN echo "in machine-os-content-scratch" >> /home/builder/in-container
     FROM scratch
     COPY --from=builder /home/builder/in-container /in-container
   from: machine-os-content
   inputs:
-    machine-os-content:
+    built-cosa:
       as:
-      - registry.ci.openshift.org/coreos/machine-os-content:latest
+      - registry.ci.openshift.org/coreos/built-cosa:latest
   to: machine-os-content-scratch-image
 promotion:
   excluded_images:
   - '*'
+  - build-test-qemu-img
+  - built-cosa
   name: "4.11"
   namespace: ocp
 releases:
@@ -92,17 +94,17 @@ tests:
     from: build-test-qemu-img
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: built-cosa-test
-  commands: cat /etc/in-container && cat /etc/os-release
+  commands: cat /home/builder/in-container && cat /etc/os-release
   container:
     from: built-cosa
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: machine-os-oci-content-test
-  commands: cat /etc/in-container && cat /etc/os-release
+  commands: cat /home/builder/in-container && cat /etc/os-release
   container:
     from: machine-os-oci-content
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: machine-os-content-test
-  commands: cat /etc/in-container && cat /etc/os-release
+  commands: cat /home/builder/in-container && cat /etc/os-release
   container:
     from: machine-os-content
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
