@@ -38,7 +38,7 @@ oc --insecure-skip-tls-verify adm must-gather $MUST_GATHER_IMAGE --dest-dir ${AR
 tar -czC "${ARTIFACT_DIR}/must-gather" -f "${ARTIFACT_DIR}/must-gather.tar.gz" .
 rm -rf "${ARTIFACT_DIR}"/must-gather
 
-cat >"${ARTIFACT_DIR}/test-junit.xml" <<EOF
+cat >"${ARTIFACT_DIR}/junit_e2e_20220211-9871239.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8" ?>
 <testsuites id="devansuite" name="Devans Fake Test Suite" tests="1" failures="1" time="0.001">
 <testcase id="fake.test.case" name="Devan testing something" time="0.001">
