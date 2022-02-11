@@ -28,11 +28,24 @@ Image names should follow one the following segmentation orderings:
 
 `$cloudProvider-$component-$optionalModifier` - e.g. aws-ebs-csi-driver-operator
 
-
 `$technology-$component-$optionalModifier` - e.g. sriov-network-config-daemon
 
-`cluster-*` - e.g. cluster-storage-operator
+`cluster-*` - For CVO-managed operator images.  Also implies the operator manages infra related to the cluster it is running on.  e.g. cluster-storage-operator
+
+`kube-*` - For components more or less directly pulled from upstream.  e.g. kube-state-metrics
+
+`*-tests` - For images that represent tests for a component
 
 ## Acronyms/Initialisms
 
 Expand acronyms/initialisms unless they are extremely well known/commonly used in the Kubernetes community.
+
+## Known violations
+
+These names came in before we figured out the challenges around them, please don't copy them or point to them as reference examples.
+
+cluster-capi-operator - Should be something like cluster-openshift-cluster-api-operator.  This is a CVO managed operator for the openshift specific implementation of logic for managing cluster-api functionality.
+
+cluster-capi-controllers - should be cluster-api-controllers ($technology-$optionalModifier).  Unfortunately this collides with using `cluster-` to indicate a CVO operator but it's difficult to avoid in this case.  As the name does not end in -operator, hopefully the distinction is clear.
+
+cluster-api-actuator-pkg - Should be machine-api-actuators-tests.  It's not a cluster operator, and the component is machine-api, and the image contains tests, not product functionality.
