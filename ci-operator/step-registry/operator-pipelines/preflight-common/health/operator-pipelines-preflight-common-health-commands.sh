@@ -9,6 +9,8 @@ echo "Health endpoint and cluster operators check"
 
 export KUBECONFIG
 
+OPERATOR_HEALTH_TIMEOUT=${OPERATOR_HEALTH_TIMEOUT:-15}
+
 # For disconnected or otherwise unreachable environments, we want to
 # have steps use an HTTP(S) proxy to reach the API server. This proxy
 # configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
@@ -66,7 +68,7 @@ function checkoperators() {
     iscop="ok"
 }
 
-for (( n=1; n<=15; n++ ))
+for (( n=1; n<=OPERATOR_HEALTH_TIMEOUT; n++ ))
 do
     checkoperators
 
