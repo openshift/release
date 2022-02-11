@@ -25,12 +25,6 @@ install-dptp-managed-cluster:
 client_id := "change_me"
 client_secret := "change_me"
 
-.PHONY: set-up-github-oauth
-set-up-github-oauth:
-	@echo "set up github oauth ..."
-	@oc process -f ./assets/github-client-secret_secret_template.yaml -p github_client_secret=$(client_secret) | oc apply -n openshift-config -f -
-	@oc process -f ./assets/admin_cluster_oauth_template.yaml -p github_client_id=$(client_id) | oc apply -f -
-
 .PHONY: set-up-ci-admins
 set-up-ci-admins:
 	@echo "setting up ci-admins"
