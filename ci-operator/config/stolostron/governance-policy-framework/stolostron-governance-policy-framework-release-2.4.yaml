@@ -72,6 +72,30 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ocm-e2e-kind
+- as: test-e2e-grc-framework
+  steps:
+    dependencies:
+      COMPONENT_IMAGE_REF: grc-policy-framework-tests
+    env:
+      CLUSTERPOOL_GROUP_NAME: policy-grc
+      CLUSTERPOOL_HOST_NAMESPACE: acm-grc-security
+      CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-grc-clusterpool
+      CLUSTERPOOL_LIFETIME: 4h
+      CLUSTERPOOL_LIST_EXCLUSION_FILTER: dev\|autoclaims
+      CLUSTERPOOL_LIST_INCLUSION_FILTER: prow
+      SKIP_COMPONENT_INSTALL: "true"
+    test:
+    - as: e2e
+      commands: |
+        export SELF="make -f Makefile.prow"
+        export VERSION_TAG=latest-2.4
+        ./build/run-e2e-tests-policy-framework-prow.sh
+      from: grc-policy-framework-tests
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-e2e-clusterpool
 - as: latest-image-mirror
   postsubmit: true
   steps:
