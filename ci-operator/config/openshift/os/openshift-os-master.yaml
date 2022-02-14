@@ -21,10 +21,13 @@ promotion:
   name: "4.11"
   namespace: ocp
 raw_steps:
+- project_directory_image_build_step:
+    dockerfile_literal: |
+      FROM scratch
+    to: skopeo-push
 - pipeline_image_cache_step:
     commands: |
-      env
-      skopeo copy docker://registry.fedoraproject.org/fedora:latest oci-archive:/home/builder/fedora.oci
+      skopeo copy docker://registry.fedoraproject.org/fedora:latest docker://image-registry.openshift-image-registry.svc:5000/${OPENSHIFT_BUILD_NAMESPACE}/pipeline:skopeo-push
     from: build-test-qemu-img
     to: skopeo-pull
 - project_directory_image_build_step:
@@ -69,7 +72,7 @@ tests:
 - as: final-content-test
   commands: cat /etc/os-release
   container:
-    from: final-content
+    from: skopeo-push
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 zz_generated_metadata:
   branch: master
