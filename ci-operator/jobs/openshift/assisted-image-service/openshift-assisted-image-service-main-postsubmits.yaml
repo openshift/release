@@ -4,7 +4,7 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build01
+    cluster: build02
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -58,7 +58,7 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build01
+    cluster: build02
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -110,7 +110,7 @@ postsubmits:
     always_run: true
     branches:
     - ^main$
-    cluster: build01
+    cluster: build02
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -152,6 +152,58 @@ postsubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    cluster: build02
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-openshift-assisted-image-service-main-test-postsubmit
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/assisted-image-service-codecov-token
+        - --target=test-postsubmit
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/assisted-image-service-codecov-token
+          name: assisted-image-service-codecov-token
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: assisted-image-service-codecov-token
+        secret:
+          secretName: assisted-image-service-codecov-token
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials

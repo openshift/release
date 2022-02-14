@@ -3,10 +3,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_builder_rhel-8-base-openshift-4.10:
+  ocp_builder_rhel-8-base-openshift-4.11:
     name: builder
     namespace: ocp
-    tag: rhel-8-base-openshift-4.10
+    tag: rhel-8-base-openshift-4.11
 build_root:
   from_repository: true
 images:
@@ -15,32 +15,32 @@ images:
   inputs:
     base:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-base-openshift-4.10
+      - registry.ci.openshift.org/ocp/builder:rhel-8-base-openshift-4.11
   to: ironic
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
-      cat <<EOF> /etc/yum.repos.d/base-4-10-rhel-8-ironic-prevalidation.repo
-      [rhel-8-ironic-prevalidation-ocp410]
-      id = rhel-8-ironic-prevalidation-ocp410
-      name = rhel-8-ironic-prevalidation-ocp410
-      baseurl = http://base-4-10-rhel-8-ironic-prevalidation.ocp.svc/rhel-8-ironic-prevalidation
+      cat <<EOF> /etc/yum.repos.d/base-4-11-rhel-8-ironic-prevalidation.repo
+      [rhel-8-ironic-prevalidation-ocp411]
+      id = rhel-8-ironic-prevalidation-ocp411
+      name = rhel-8-ironic-prevalidation-ocp411
+      baseurl = http://base-4-11-rhel-8-ironic-prevalidation.ocp.svc/rhel-8-ironic-prevalidation
       enabled = 1
       gpgcheck = 0
       priority = 1
       skip_if_unavailable=FALSE
       EOF
-    from: ocp_builder_rhel-8-base-openshift-4.10
+    from: ocp_builder_rhel-8-base-openshift-4.11
     to: base
 releases:
   initial:
     integration:
-      name: "4.10"
+      name: "4.11"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.10"
+      name: "4.11"
       namespace: ocp
 resources:
   '*':
@@ -49,10 +49,12 @@ resources:
       memory: 200Mi
 tests:
 - as: e2e-metal-ipi-prevalidation
+  run_if_changed: .*packages-list.*
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ipv4
 - as: e2e-metal-ipi-virtualmedia-prevalidation
+  run_if_changed: .*packages-list.*
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-virtualmedia

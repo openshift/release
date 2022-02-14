@@ -3,10 +3,6 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  open-cluster-management_builder_go1.17-linux:
-    name: builder
-    namespace: open-cluster-management
-    tag: go1.17-linux
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
@@ -16,16 +12,11 @@ build_root:
 images:
 - dockerfile_path: Dockerfile
   from: base
-  inputs:
-    open-cluster-management_builder_go1.17-linux:
-      as:
-      - registry.ci.openshift.org/open-cluster-management/builder:go1.17-linux
   to: registration-operator
 promotion:
   additional_images:
     registration-operator-src: src
-  disabled: true
-  name: "2.5"
+  name: "2.0"
   namespace: stolostron
 releases:
   initial:
@@ -105,7 +96,7 @@ tests:
     - as: publish
       commands: |-
         export OSCI_COMPONENT_NAME=registration-operator
-        export OSCI_COMPONENT_VERSION=2.5.0
+        export OSCI_COMPONENT_VERSION=2.0.0
         export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
         export OSCI_PIPELINE_PRODUCT_PREFIX=backplane
         export OSCI_PIPELINE_REPO=backplane-pipeline

@@ -15,10 +15,18 @@ base_images:
     name: 4.11-priv
     namespace: ocp-private
     tag: base
+  ocp_4.11_base:
+    name: 4.11-priv
+    namespace: ocp-private
+    tag: base
   ocp_builder_rhel-8-golang-1.17-openshift-4.10:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.17-openshift-4.10
+  ocp_builder_rhel-8-golang-1.17-openshift-4.11:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.17-openshift-4.11
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/kubernetes-nmstate
@@ -28,9 +36,15 @@ images:
     base:
       as:
       - registry.ci.openshift.org/ocp/4.10:base
+    ocp_4.11_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.11:base
     ocp_builder_rhel-8-golang-1.17-openshift-4.10:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
+    ocp_builder_rhel-8-golang-1.17-openshift-4.11:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
   to: kubernetes-nmstate-handler
 - dockerfile_path: build/Dockerfile.operator.openshift
   inputs:
@@ -100,11 +114,6 @@ tests:
         IP_STACK=v4
         NETWORK_TYPE="OpenShiftSDN"
         MIRROR_IMAGES=false
-        EXTRA_NETWORK_NAMES="nmstate1 nmstate2"
-        NMSTATE1_NETWORK_SUBNET_V4="192.168.221.0/24"
-        NMSTATE1_NETWORK_SUBNET_V6="fd2e:6f44:5dd8:ca56::/120"
-        NMSTATE2_NETWORK_SUBNET_V4="192.168.222.0/24"
-        NMSTATE2_NETWORK_SUBNET_V6="fd2e:6f44:5dd8:cc56::/120"
     workflow: kubernetes-nmstate-e2e
 zz_generated_metadata:
   branch: release-4.11

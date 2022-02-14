@@ -134,24 +134,26 @@ tests:
         DISK_ENCRYPTION_MODE=tpmv2
       TEST_SUITE: full
     workflow: baremetalds-assisted
-- as: e2e-metal-assisted-multi-version
+- as: e2e-metal-assisted-multi-version-suite
   optional: true
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION="all"
+      PACKET_PLAN: m2.xlarge.x86
     workflow: baremetalds-assisted
-- as: e2e-metal-assisted-multi-version-periodic
+- as: e2e-metal-assisted-multi-version-suite-periodic
   cron: '@daily'
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION="all"
+      PACKET_PLAN: m2.xlarge.x86
       TEST_SUITE: full
     workflow: baremetalds-assisted
-- as: e2e-metal-assisted-olm
+- as: e2e-metal-assisted-olm-suite
   optional: true
   run_if_changed: .*operator.*
   steps:
@@ -161,7 +163,7 @@ tests:
         TEST_FUNC=test_olm_operator
       PACKET_PLAN: m2.xlarge.x86
     workflow: baremetalds-assisted
-- as: e2e-metal-assisted-olm-periodic
+- as: e2e-metal-assisted-olm-suite-periodic
   cron: '@daily'
   steps:
     cluster_profile: packet-assisted
@@ -173,7 +175,7 @@ tests:
     workflow: baremetalds-assisted
 - as: e2e-metal-assisted-day2
   optional: true
-  run_if_changed: ^(day2/.*|.*/cluster/.*)$
+  run_if_changed: ^(.*/day2/.*|.*/cluster/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -265,31 +267,6 @@ tests:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        PLATFORM=none
-      TEST_SUITE: full
-    workflow: baremetalds-assisted
-- as: e2e-metal-assisted-none-ipv6
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        IPv6=yes
-        IPv4=no
-        VIP_DHCP_ALLOCATION=no
-        PROXY=yes
-        PLATFORM=none
-    workflow: baremetalds-assisted
-- as: e2e-metal-assisted-none-ipv6-periodic
-  cron: '@daily'
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        IPv6=yes
-        IPv4=no
-        VIP_DHCP_ALLOCATION=no
-        PROXY=yes
         PLATFORM=none
       TEST_SUITE: full
     workflow: baremetalds-assisted

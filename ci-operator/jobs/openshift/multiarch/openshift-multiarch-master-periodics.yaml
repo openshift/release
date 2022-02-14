@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -75,7 +75,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -150,7 +150,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -225,7 +225,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -300,7 +300,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -344,6 +344,81 @@ periodics:
         name: ci-pull-credentials
         readOnly: true
       - mountPath: /usr/local/ocp-e2e-aws-ovn-arm64-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws-arm64
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build03
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: multiarch
+  interval: 24h
+  labels:
+    ci-operator.openshift.io/cloud: aws-arm64
+    ci-operator.openshift.io/cloud-cluster-profile: aws-arm64
+    ci-operator.openshift.io/variant: nightly-4.10
+    ci.openshift.io/generator: prowgen
+    job-release: "4.10"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-multiarch-master-nightly-4.10-ocp-e2e-aws-upi-arm64
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/ocp-e2e-aws-upi-arm64-cluster-profile
+      - --target=ocp-e2e-aws-upi-arm64
+      - --variant=nightly-4.10
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/ocp-e2e-aws-upi-arm64-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -679,7 +754,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -906,7 +981,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -1133,7 +1208,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -1360,7 +1435,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -1587,7 +1662,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -1814,7 +1889,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -1889,7 +1964,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -1964,7 +2039,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -2039,7 +2114,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -2114,7 +2189,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -2342,7 +2417,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
-  cron: 0 5,17 * * *
+  cron: 0 11,23 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -2493,7 +2568,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -2569,7 +2644,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
-  cron: 0 23 * * 0
+  cron: 0 19 * * 0
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -2720,7 +2795,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -2796,7 +2871,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
-  cron: 0 6,18 * * *
+  cron: 0 5,17 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -2947,7 +3022,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -3174,7 +3249,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -3250,7 +3325,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
-  cron: 0 3,15 * * *
+  cron: 0 2,14 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -3401,7 +3476,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -3477,7 +3552,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
-  cron: 0 10,22 * * *
+  cron: 0 7,19 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -5908,7 +5983,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -6591,7 +6666,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   decorate: true
   decoration_config:
     skip_cloning: true

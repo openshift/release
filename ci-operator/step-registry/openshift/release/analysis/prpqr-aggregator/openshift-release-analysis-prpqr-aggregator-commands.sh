@@ -5,9 +5,9 @@ set -o errexit
 set -o pipefail
 
 job-run-aggregator analyze-job-runs \
-  --google-service-account-credential-file ${GOOGLE_SA_CREDENTIAL_FILE} \
+  --google-service-account-credential-file=${GOOGLE_SA_CREDENTIAL_FILE} \
   --job=${VERIFICATION_JOB_NAME} \
-  --aggregation-id=a${AGGREGATION_ID} \
+  --aggregation-id=${AGGREGATION_ID} \
   --explicit-gcs-prefix=${EXPLICIT_GCS_PREFIX} \
   --job-start-time=${JOB_START_TIME} \
   --working-dir=${WORKING_DIR} \

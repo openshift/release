@@ -6,7 +6,7 @@ build_root:
     tag: nodejs14-linux
 images:
 - dockerfile_path: Dockerfile
-  to: search-e2e-test
+  to: search-e2e
 promotion:
   name: "2.4"
   namespace: stolostron
@@ -20,7 +20,7 @@ tests:
   skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$
   steps:
     dependencies:
-      COMPONENT_IMAGE_REF: search-e2e-test
+      COMPONENT_IMAGE_REF: search-e2e
     env:
       CLUSTERPOOL_CHECKOUT_TIMEOUT_MINUTES: "15"
       CLUSTERPOOL_GROUP_NAME: Search
@@ -46,40 +46,33 @@ tests:
       - mount_path: /etc/secret
         name: ocm-obs-usa-acmcreds
         namespace: test-credentials
-      from: search-e2e-test
+      from: search-e2e
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
     workflow: ocm-e2e-clusterpool
-- as: sonar-pre-submit
+- as: lint
   commands: |
     export SELF="make -f Makefile.prow"
-    make -f Makefile.prow sonar/js/jest-init
-    make -f Makefile.prow sonar/js/prow
+    make -f Makefile.prow lint
   container:
     from: bin
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
-- as: sonar-post-submit
-  commands: |
-    export SELF="make -f Makefile.prow"
-    make -f Makefile.prow sonar/js/jest-init
-    make -f Makefile.prow sonar/js/prow
-  container:
-    from: bin
-  postsubmit: true
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: search-e2e
+    env:
+      IMAGE_REPO: search-e2e
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
 - as: publish
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: search-e2e-test
+      SOURCE_IMAGE_REF: search-e2e
     env:
-      IMAGE_REPO: search-e2e-test
+      IMAGE_REPO: search-e2e
       REGISTRY_ORG: stolostron
     test:
     - as: publish
@@ -97,6 +90,16 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+    workflow: ocm-ci-image-mirror
+- as: latest-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: search-e2e
+    env:
+      IMAGE_REPO: search-e2e
+      IMAGE_TAG: latest-2.4
+      REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
 zz_generated_metadata:
   branch: release-2.4

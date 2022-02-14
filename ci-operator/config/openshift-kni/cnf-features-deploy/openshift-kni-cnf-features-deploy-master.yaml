@@ -1,12 +1,12 @@
 base_images:
   base:
-    name: "4.10"
+    name: "4.11"
     namespace: ocp
     tag: base
-  ocp_builder_rhel-8-golang-1.16-openshift-4.10:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.16-openshift-4.10
+  openshift_release_golang-1.17:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
 binary_build_commands: make build
 build_root:
   project_image:
@@ -16,27 +16,27 @@ images:
   dockerfile_path: cnf-tests/Dockerfile.openshift
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.10:
+    openshift_release_golang-1.17:
       as:
-      - openshift/origin-release:golang-1.16
+      - registry.ci.openshift.org/openshift/release:golang-1.17
   to: cnf-tests
 - context_dir: tools/s2i-dpdk/
   dockerfile_path: Dockerfile
   from: base
   to: dpdk
 promotion:
-  name: "4.10"
+  name: "4.11"
   namespace: ocp-kni
 releases:
   initial:
     integration:
-      name: "4.10"
+      name: "4.11"
       namespace: ocp
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.10"
+      version: "4.11"
 resources:
   '*':
     requests:
@@ -47,23 +47,12 @@ tests:
   commands: make ci-job
   container:
     from: src
-- as: e2e-gcp
-  skip_if_only_changed: ^ztp
-  steps:
-    cluster_profile: gcp
-    test:
-    - as: e2e-gcp
-      commands: FEATURES_ENVIRONMENT=ci SKIP_TESTS="ovs_qos" make functests-on-ci
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: openshift-e2e-gcp
 - as: e2e-gcp-ovn
   skip_if_only_changed: ^ztp
   steps:
     cluster_profile: gcp
+    env:
+      COMPUTE_NODE_TYPE: n1-standard-8
     test:
     - as: e2e-gcp-ovn
       commands: FEATURES_ENVIRONMENT=ci IPERF3_BITRATE_OVERRIDE="300000000" make functests-on-ci
@@ -74,6 +63,7 @@ tests:
           memory: 200Mi
     workflow: openshift-e2e-gcp-ovn
 - as: e2e-gcp-ran-profile
+  optional: true
   steps:
     cluster_profile: gcp
     test:
@@ -90,6 +80,8 @@ tests:
   cron: 0 */8 * * *
   steps:
     cluster_profile: gcp
+    env:
+      COMPUTE_NODE_TYPE: n1-standard-8
     test:
     - as: e2e-gcp-ovn-periodic
       commands: FEATURES_ENVIRONMENT=ci IPERF3_BITRATE_OVERRIDE="300000000" make functests-on-ci
@@ -99,19 +91,6 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: openshift-e2e-gcp-ovn
-- as: e2e-gcp-periodic
-  cron: 0 */8 * * *
-  steps:
-    cluster_profile: gcp
-    test:
-    - as: e2e-gcp-periodic
-      commands: FEATURES_ENVIRONMENT=ci SKIP_TESTS="ovs_qos" make functests-on-ci
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: openshift-e2e-gcp
 zz_generated_metadata:
   branch: master
   org: openshift-kni
