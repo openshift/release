@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: ci
+  name: better-retester
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"better-retester:shift-week"},"fieldPath":"spec.template.spec.containers[?(@.name==\"better-retester\")].image"}]'
+  labels:
+    app: prow
+    component: better-retester
+    shift-week: "true"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prow
+      component: better-retester
+      shift-week: "true"
+  template:
+    metadata:
+      labels:
+        app: prow
+        component: better-retester
+        shift-week: "true"
+    spec:
+      containers:
+      - image: better-retester:shift-week
+        name: better-retester
+        command:
+        - better-retester
+        args:
+        - --dry-run=true
+        - --github-endpoint=http://ghproxy
+        - --github-endpoint=https://api.github.com
+        - --github-graphql-endpoint=http://ghproxy/graphql
+        - --github-token-path=/etc/auth/token
+        volumeMounts:
+        # This is a temporary 7 day token for my personal GH account
+        - name: petr-muller-github-token
+          mountPath: /etc/auth
+          readOnly: true
+        - name: prow-config
+          mountPath: /etc/config
+          readOnly: true
+        resources:
+          requests:
+            memory: "500Mi"
+            cpu: "250m"
+      volumes:
+      - name: prow-config
+        configMap:
+          name: config
+      - name: petr-muller-github-token
+        secret:
+          secretName: petr-muller-github-token-shift-week
