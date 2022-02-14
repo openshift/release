@@ -24,14 +24,13 @@ fi
 cp "$(command -v openshift-install)" /tmp
 mkdir ${ARTIFACT_DIR}/installer
 
-echo "Installing from initial release ${RELEASE_IMAGE_LATEST}"
+echo "Installing from initial release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
 OPENSHIFT_INSTALL_INVOKER=openshift-internal-ci/${JOB_NAME}/${BUILD_ID}
 AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
 EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
 PULL_SECRET=${CLUSTER_PROFILE_DIR}/pull-secret
-OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${RELEASE_IMAGE_LATEST}"
 
 export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
 export PULL_SECRET_PATH
@@ -72,6 +71,9 @@ export BOOTSTRAP_URI
 # begin bootstrapping
 if openshift-install coreos print-stream-json 2>/tmp/err.txt >coreos.json; then
   RHCOS_AMI="$(jq -r --arg region "$AWS_REGION" '.architectures.x86_64.images.aws.regions[$region].image' coreos.json)"
+  if [[ "${CLUSTER_TYPE}" == "aws-arm64" ]]; then
+    RHCOS_AMI="$(jq -r --arg region "$AWS_REGION" '.architectures.aarch64.images.aws.regions[$region].image' coreos.json)"
+  fi
 else
   RHCOS_AMI="$(jq -r --arg region "$AWS_REGION" '.amis[$region].hvm' /var/lib/openshift-install/rhcos.json)"
 fi
@@ -93,7 +95,7 @@ aws s3 mb s3://"${CLUSTER_NAME}-infra"
 # If we are using a proxy, create a 'black-hole' private subnet vpc TODO
 # For now this is just a placeholder...
 aws cloudformation create-stack  --stack-name "${CLUSTER_NAME}-vpc" \
-  --template-body "$(cat "/var/lib/openshift-install/upi/${CLUSTER_TYPE}/cloudformation/01_vpc.yaml")" \
+  --template-body "$(cat "/var/lib/openshift-install/upi/aws/cloudformation/01_vpc.yaml")" \
   --tags "${TAGS}" \
   --parameters \
     ParameterKey=AvailabilityZoneCount,ParameterValue=3 &
@@ -113,7 +115,7 @@ PUBLIC_SUBNETS="$(echo "${VPC_JSON}" | jq '.[] | select(.OutputKey == "PublicSub
 
 aws cloudformation create-stack \
   --stack-name "${CLUSTER_NAME}-infra" \
-  --template-body "$(cat "/var/lib/openshift-install/upi/${CLUSTER_TYPE}/cloudformation/02_cluster_infra.yaml")" \
+  --template-body "$(cat "/var/lib/openshift-install/upi/aws/cloudformation/02_cluster_infra.yaml")" \
   --tags "${TAGS}" \
   --capabilities CAPABILITY_NAMED_IAM \
   --parameters \
@@ -139,7 +141,7 @@ PRIVATE_HOSTED_ZONE="$(echo "${INFRA_JSON}" | jq -r '.[] | select(.OutputKey == 
 
 aws cloudformation create-stack \
   --stack-name "${CLUSTER_NAME}-security" \
-  --template-body "$(cat "/var/lib/openshift-install/upi/${CLUSTER_TYPE}/cloudformation/03_cluster_security.yaml")" \
+  --template-body "$(cat "/var/lib/openshift-install/upi/aws/cloudformation/03_cluster_security.yaml")" \
   --tags "${TAGS}" \
   --capabilities CAPABILITY_NAMED_IAM \
   --parameters \
@@ -209,7 +211,7 @@ aws s3 cp ${ARTIFACT_DIR}/installer/bootstrap.ign "$S3_BOOTSTRAP_URI"
 
 aws cloudformation create-stack \
   --stack-name "${CLUSTER_NAME}-bootstrap" \
-  --template-body "$(cat "/var/lib/openshift-install/upi/${CLUSTER_TYPE}/cloudformation/04_cluster_bootstrap.yaml")" \
+  --template-body "$(cat "/var/lib/openshift-install/upi/aws/cloudformation/04_cluster_bootstrap.yaml")" \
   --tags "${TAGS}" \
   --capabilities CAPABILITY_NAMED_IAM \
   --parameters \
@@ -223,7 +225,8 @@ aws cloudformation create-stack \
     ParameterKey=RegisterNlbIpTargetsLambdaArn,ParameterValue="${NLB_IP_TARGETS_LAMBDA}" \
     ParameterKey=ExternalApiTargetGroupArn,ParameterValue="${EXTERNAL_API_TARGET_GROUP}" \
     ParameterKey=InternalApiTargetGroupArn,ParameterValue="${INTERNAL_API_TARGET_GROUP}" \
-    ParameterKey=InternalServiceTargetGroupArn,ParameterValue="${INTERNAL_SERVICE_TARGET_GROUP}" &
+    ParameterKey=InternalServiceTargetGroupArn,ParameterValue="${INTERNAL_SERVICE_TARGET_GROUP}" \
+    ParameterKey=BootstrapInstanceType,ParameterValue="${BOOTSTRAP_INSTANCE_TYPE}" &
 wait "$!"
 
 aws cloudformation wait stack-create-complete --stack-name "${CLUSTER_NAME}-bootstrap" &
@@ -235,7 +238,7 @@ GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --bootstrap ${BOOTSTRAP_IP}"
 
 aws cloudformation create-stack \
   --stack-name "${CLUSTER_NAME}-control-plane" \
-  --template-body "$(cat "/var/lib/openshift-install/upi/${CLUSTER_TYPE}/cloudformation/05_cluster_master_nodes.yaml")" \
+  --template-body "$(cat "/var/lib/openshift-install/upi/aws/cloudformation/05_cluster_master_nodes.yaml")" \
   --tags "${TAGS}" \
   --parameters \
     ParameterKey=InfrastructureName,ParameterValue="${INFRA_ID}" \
@@ -252,7 +255,8 @@ aws cloudformation create-stack \
     ParameterKey=RegisterNlbIpTargetsLambdaArn,ParameterValue="${NLB_IP_TARGETS_LAMBDA}" \
     ParameterKey=ExternalApiTargetGroupArn,ParameterValue="${EXTERNAL_API_TARGET_GROUP}" \
     ParameterKey=InternalApiTargetGroupArn,ParameterValue="${INTERNAL_API_TARGET_GROUP}" \
-    ParameterKey=InternalServiceTargetGroupArn,ParameterValue="${INTERNAL_SERVICE_TARGET_GROUP}" &
+    ParameterKey=InternalServiceTargetGroupArn,ParameterValue="${INTERNAL_SERVICE_TARGET_GROUP}" \
+    ParameterKey=MasterInstanceType,ParameterValue="${MASTER_INSTANCE_TYPE}" &
 wait "$!"
 
 aws cloudformation wait stack-create-complete --stack-name "${CLUSTER_NAME}-control-plane" &
@@ -270,7 +274,7 @@ do
   SUBNET="PRIVATE_SUBNET_${INDEX}"
   aws cloudformation create-stack \
     --stack-name "${CLUSTER_NAME}-compute-${INDEX}" \
-    --template-body "$(cat "/var/lib/openshift-install/upi/${CLUSTER_TYPE}/cloudformation/06_cluster_worker_node.yaml")" \
+    --template-body "$(cat "/var/lib/openshift-install/upi/aws/cloudformation/06_cluster_worker_node.yaml")" \
     --tags "${TAGS}" \
     --parameters \
       ParameterKey=InfrastructureName,ParameterValue="${INFRA_ID}" \
@@ -279,7 +283,7 @@ do
       ParameterKey=WorkerSecurityGroupId,ParameterValue="${WORKER_SECURITY_GROUP}" \
       ParameterKey=IgnitionLocation,ParameterValue="https://api-int.${CLUSTER_NAME}.${base_domain}:22623/config/worker" \
       ParameterKey=CertificateAuthorities,ParameterValue="${IGNITION_CA}" \
-      ParameterKey=WorkerInstanceType,ParameterValue=m4.xlarge \
+      ParameterKey=WorkerInstanceType,ParameterValue="${WORKER_INSTANCE_TYPE}" \
       ParameterKey=WorkerInstanceProfileName,ParameterValue="${WORKER_INSTANCE_PROFILE}" &
   wait "$!"
 
