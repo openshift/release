@@ -29,12 +29,14 @@ fi
 
 # Early validation of PIPELINE_STAGE
 case "${PIPELINE_STAGE}" in
+    dev)
+        ;;
     edge)
         ;;
     integration)
         ;;
     *)
-        log "ERROR Invalid PIPELINE_STAGE $PIPELINE_STAGE must be either edge or integration."
+        log "ERROR Invalid PIPELINE_STAGE $PIPELINE_STAGE must be dev, edge, or integration."
         exit 1
         ;;
 esac
