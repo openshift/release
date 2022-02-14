@@ -5,7 +5,7 @@ set -o nounset
 set -o pipefail
 
 if [[ "${CLUSTER_TYPE}" == "aws-arm64" ]]; then
-    SINGLE_NODE_AWS_INSTANCE_TYPE="m6gd.2xlarge"
+    SINGLE_NODE_AWS_INSTANCE_TYPE="m6gd.4xlarge"
 else
     SINGLE_NODE_AWS_INSTANCE_TYPE="m5d.2xlarge"
 fi
