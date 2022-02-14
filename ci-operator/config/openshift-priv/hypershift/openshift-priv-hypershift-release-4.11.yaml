@@ -135,7 +135,9 @@ tests:
     - as: test-e2e
       cli: latest
       commands: |-
-        bin/test-e2e \
+        # Compiled test binaries do not have a -json flag, ref:
+        # https://github.com/golang/go/issues/22996
+        $(go env GOROOT)/pkg/tool/linux_amd64/test2json bin/test-e2e \
           -test.v \
           -test.timeout=0 \
           -test.run=TestUpgradeControlPlane \
@@ -148,7 +150,8 @@ tests:
           --e2e.previous-release-image=${OCP_IMAGE_PREVIOUS} \
           --e2e.additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
           --e2e.control-plane-operator-image=${HYPERSHIFT_RELEASE_LATEST} \
-          --e2e.aws-endpoint-access=PublicAndPrivate
+          --e2e.aws-endpoint-access=PublicAndPrivate |tee /tmp/testout.json
+        bin/gotestsum --raw-command --junitfile=${ARTIFACT_DIR}/junit.xml cat /tmp/testout.json
       credentials:
       - mount_path: /etc/hypershift-pool-aws-credentials
         name: hypershift-pool-aws-credentials
