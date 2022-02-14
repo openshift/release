@@ -1,8 +1,4 @@
 base_images:
-  repo-brancher:
-    name: repo-brancher
-    namespace: ci
-    tag: latest
   stolostron_builder_nodejs14-linux:
     name: builder
     namespace: stolostron
@@ -18,15 +14,6 @@ build_root:
     namespace: stolostron
     tag: nodejs14-linux
 images:
-- dockerfile_path: Dockerfile.prow
-  inputs:
-    stolostron_builder_nodejs14-linux:
-      as:
-      - registry.ci.openshift.org/stolostron/builder:nodejs14-linux
-    stolostron_common-nodejs-parent_nodejs-14:
-      as:
-      - registry.ci.openshift.org/stolostron/common-nodejs-parent:nodejs-14
-  to: console
 - dockerfile_path: Dockerfile.mce.prow
   inputs:
     stolostron_builder_nodejs14-linux:
@@ -37,7 +24,8 @@ images:
       - registry.ci.openshift.org/stolostron/common-nodejs-parent:nodejs-14
   to: console-mce
 promotion:
-  name: main
+  disabled: true
+  name: backplane-2.0
   namespace: stolostron
 resources:
   '*':
@@ -50,6 +38,7 @@ tests:
     export SELF="make -f Makefile.prow"
     make -f Makefile.prow lint
     make -f Makefile.prow check
+    make -f Makefile.prow sonar/js/jest-init
     make -f Makefile.prow unit-tests
     make -f Makefile.prow sonar/js/prow
   container:
@@ -57,23 +46,22 @@ tests:
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
-- as: pr-image-mirror
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: console
-    workflow: ocm-ci-image-mirror
+- as: sonar-post-submit
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow sonar/js/jest-init
+    make -f Makefile.prow unit-tests
+    make -f Makefile.prow sonar/js/prow
+  container:
+    from: src
+  postsubmit: true
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
 - as: pr-image-mirror-mce
   steps:
     dependencies:
       SOURCE_IMAGE_REF: console-mce
-    workflow: ocm-ci-image-mirror
-- as: latest-image-mirror
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: console
-    env:
-      IMAGE_TAG: latest
     workflow: ocm-ci-image-mirror
 - as: latest-image-mirror-mce
   postsubmit: true
@@ -81,21 +69,34 @@ tests:
     dependencies:
       SOURCE_IMAGE_REF: console-mce
     env:
-      IMAGE_TAG: latest
+      IMAGE_TAG: latest-2.0
     workflow: ocm-ci-image-mirror
-- as: fast-forward
+- as: publish
   postsubmit: true
   steps:
+    dependencies:
+      SOURCE_IMAGE_REF: console-mce
     env:
-      DESTINATION_BRANCH: release-2.5
-    workflow: ocm-ci-fastforward
-- as: fast-forward-mce
-  postsubmit: true
-  steps:
-    env:
-      DESTINATION_BRANCH: backplane-2.0
-    workflow: ocm-ci-fastforward
+      IMAGE_REPO: console-mce
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
+        export OSCI_PUBLISH_DELAY="0"
+        export SELF="make -f Makefile.prow"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: main
+  branch: backplane-2.0
   org: stolostron
   repo: console
