@@ -1,3 +1,16 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  openstack-installer:
+    name: "4.8"
+    namespace: ocp
+    tag: openstack-installer
+  upi-installer:
+    name: "4.8"
+    namespace: ocp
+    tag: upi-installer
 releases:
   initial:
     release:
@@ -9,6 +22,10 @@ releases:
       stream: nightly
       version: "4.9"
   latest:
+    release:
+      channel: stable
+      version: "4.8"
+  target:
     candidate:
       product: ocp
       stream: nightly
@@ -56,6 +73,22 @@ tests:
     pre:
     - ref: ipi-install-hosted-loki
     - chain: ipi-azure-pre-stableinitial
+    - ref: cucushift-pre
+    - ref: cucushift-upgrade-pre
+    workflow: cucushift-upgrade-paused
+- as: azure-upi
+  interval: 48h
+  steps:
+    cluster_profile: azure4
+    env:
+      E2E_RUN_INTERMEDIATE_TAGS: '@4.9 and @azure-upi and @upgrade-sanity'
+      E2E_RUN_LATEST_TAGS: '@4.10 and @azure-upi and @upgrade-sanity'
+      UPGRADE_CHECK_RUN_TAGS: '@4.8 and @azure-upi and @upgrade-check'
+      UPGRADE_PRE_RUN_TAGS: '@4.8 and @azure-upi and @upgrade-prepare'
+    post:
+    - chain: upi-azure-post
+    pre:
+    - chain: upi-azure-pre
     - ref: cucushift-pre
     - ref: cucushift-upgrade-pre
     workflow: cucushift-upgrade-paused
