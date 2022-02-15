@@ -42,11 +42,13 @@ tests:
     from: src
 - as: sonarcloud
   commands: |
-    git log --no-color -8
+    git log --pretty=oneline --no-color -8
+    git status
     git remote add origin https://github.com/${REPO_OWNER}/${REPO_NAME}
     git fetch origin ${PULL_BASE_REF}
-    git reset --soft HEAD~1
-    git log --no-color -8
+    git rebase origin/${PULL_BASE_REF}
+    git log --pretty=oneline --no-color -8
+    git status
     export SONAR_GO_TEST_ARGS="$(go list ./... | awk '!/test\/e2e/ {printf $0" "}')"
     export HOME="/tmp"
     export SELF="make -f Makefile.prow"
