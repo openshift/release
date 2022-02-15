@@ -1,7 +1,7 @@
 periodics:
 - agent: kubernetes
   cluster: build01
-  cron: 0 */12 * * 1-5
+  cron: 0 5 * * 1-5
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -15,6 +15,17 @@ periodics:
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-knative-eventing-release-v1.0-49-e2e-aws-ocp-49-continuous
+  reporter_config:
+    slack:
+      channel: '#knative-eventing'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
