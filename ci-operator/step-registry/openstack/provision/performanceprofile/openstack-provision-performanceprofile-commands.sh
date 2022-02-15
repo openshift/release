@@ -9,7 +9,7 @@ function check_workers_updated() {
     INTERVAL=5
     CNT=24
 
-    old_config=$(oc get mcp worker | awk '{print $2}')
+    old_config=$(oc get mcp worker --no-headers | awk '{print $2}')
     while [ $((CNT)) -gt 0 ]; do
         READY=false
         while read -r i
