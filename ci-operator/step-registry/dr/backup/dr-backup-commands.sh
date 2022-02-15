@@ -15,7 +15,8 @@ fi
 #shellcheck source=${SHARED_DIR}/runtime_env
 #. .${SHARED_DIR}/runtime_env
 
-
-ls verification-tests
+oc version 
+go version
 oc get node
+
 
