@@ -20,7 +20,7 @@ function wait_for_worker_machines() {
             else
                 echo "Waiting for the worker to be ready"
             fi
-        done <<< "$(oc get node --no-headers -l node-role.kubernetes.io/worker 2>&1)"
+        done <<< "$(oc get node --no-headers -l node-role.kubernetes.io/worker | grep -v master)"
 
         if [[ ${READY} == "true" ]]; then
             echo "Worker is ready"
