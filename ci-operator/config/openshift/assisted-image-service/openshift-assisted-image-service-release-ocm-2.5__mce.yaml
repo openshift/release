@@ -1,0 +1,35 @@
+base_images:
+  coreos-centos-stream8:
+    name: stream8
+    namespace: coreos
+    tag: "8"
+  openshift_release_golang-1.16:
+    name: release
+    namespace: openshift
+    tag: golang-1.16
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.16
+images:
+- dockerfile_path: Dockerfile.image-service
+  from: coreos-centos-stream8
+  inputs:
+    openshift_release_golang-1.16:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.16
+  to: assisted-image-service
+promotion:
+  name: "2.0"
+  namespace: stolostron
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+zz_generated_metadata:
+  branch: release-ocm-2.5
+  org: openshift
+  repo: assisted-image-service
+  variant: mce
