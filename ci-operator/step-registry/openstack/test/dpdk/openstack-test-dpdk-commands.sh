@@ -145,7 +145,6 @@ else
     exit 1
 fi
 
-oc delete pod "${CNF_POD}" -n "${CNF_NAMESPACE}"
 oc delete namespace "${CNF_NAMESPACE}"
 
 echo "Successfully ran NFV DPDK tests"
