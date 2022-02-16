@@ -111,14 +111,6 @@ cat > packet-setup.yaml <<-EOF
             ssh "\${SSHOPTS[@]}" "root@\${IP}" hostname && break
             sleep 10
         done
-
-        ssh "\${SSHOPTS[@]}" "root@\${IP}" bash - << EOC
-            if [[ ${PACKET_OS} == "centos_8" && ! -f "/etc/yum.repos.d/centos-vault.repo" ]]; then
-              echo "Making sure we use vault mirror, as default CentOS repositories are already EOL..."              
-              sed -i '/mirrorlist=.*/d' /etc/yum.repos.d/CentOS-*
-              sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*
-            fi
-        EOC
       dest: "${SHARED_DIR}/packet-conf.sh"
 EOF
 
