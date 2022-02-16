@@ -45,8 +45,12 @@ tests:
     git log --pretty=oneline --no-color -8
     git status
     git remote add origin https://github.com/${REPO_OWNER}/${REPO_NAME}
-    git fetch origin ${PULL_BASE_REF}
+    git fetch origin
     git rebase origin/${PULL_BASE_REF}
+    BRANCH=$(curl -s "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${PULL_NUMBER}" | jq ".head.ref")
+    git branch ${BRANCH}
+    git reset --hard origin/${PULL_BASE_REF}
+    git checkout ${BRANCH}
     git log --pretty=oneline --no-color -8
     git status
     export SONAR_GO_TEST_ARGS="$(go list ./... | awk '!/test\/e2e/ {printf $0" "}')"
