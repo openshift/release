@@ -61,6 +61,25 @@ tests:
     make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
   container:
     from: src
+- as: e2e-operator
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-cert-manager-operator-bundle
+    env:
+      OO_CHANNEL: tech-preview
+      OO_INSTALL_NAMESPACE: openshift-cert-manager-operator
+      OO_PACKAGE: cert-manager-operator
+      OO_TARGET_NAMESPACES: '!all'
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: optional-operators-ci-aws
 zz_generated_metadata:
   branch: master
   org: openshift-priv
