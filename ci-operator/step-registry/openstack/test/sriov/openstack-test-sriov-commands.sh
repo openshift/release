@@ -35,8 +35,7 @@ function check_pod_status() {
     done
 }
 
-CNF_NAMESPACE="example-cnf"
-export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
+CNF_NAMESPACE="example-cnf-sriov"
 
 # For disconnected or otherwise unreachable environments, we want to
 # have steps use an HTTP(S) proxy to reach the API server. This proxy
@@ -59,41 +58,13 @@ EOF
 )
 echo "Created \"$CNF_NAMESPACE\" Namespace"
 
-if ! openstack network show "${OPENSTACK_PERFORMANCE_NETWORK}" >/dev/null 2>&1; then
-    echo "Network ${OPENSTACK_PERFORMANCE_NETWORK} doesn't exist"
-    exit 1
-fi
-
-cat <<EOF > "${SHARED_DIR}/additionalnetwork.yaml"
-spec:
-  additionalNetworks:
-  - name: ${OPENSTACK_PERFORMANCE_NETWORK}
-    namespace: ${CNF_NAMESPACE}
-    rawCNIConfig: '{ "cniVersion": "0.3.1", "name": "${OPENSTACK_PERFORMANCE_NETWORK}", "type": "host-device","pciBusId": "0000:00:04.0", "ipam": {}}'
-    type: Raw
-EOF
-oc patch network.operator cluster --patch "$(cat "${SHARED_DIR}/additionalnetwork.yaml")" --type=merge
-# Give the operator some time to apply the patch
-sleep 5
-
-NETWORK_ATTACHED=$(oc get network-attachment-definitions "${OPENSTACK_PERFORMANCE_NETWORK}" -n "${CNF_NAMESPACE}" -o jsonpath='{.metadata.name}')
-if [[ "${NETWORK_ATTACHED}" == "${OPENSTACK_PERFORMANCE_NETWORK}" ]]; then
-    echo "Successfully Added additional network to the Network Operator"
-else
-    echo "Failed to add additional network to the Network Operator"
-    echo "${NETWORK_ATTACHED}"
-    exit 1
-fi
-
 CNF_POD=$(
     oc create -f - -o jsonpath='{.metadata.name}' <<EOF
 apiVersion: v1
 kind: Pod
 metadata:
-  name: testpmd-host-device
+  name: testpmd-host-device-sriov
   namespace: ${CNF_NAMESPACE}
-  annotations:
-    k8s.v1.cni.cncf.io/networks: ${OPENSTACK_PERFORMANCE_NETWORK}
 spec:
   containers:
   - name: testpmd
@@ -109,10 +80,12 @@ spec:
         memory: 1000Mi
         hugepages-1Gi: 1Gi
         cpu: '2'
+        openshift.io/sriov1: "1"
       limits:
         hugepages-1Gi: 1Gi
         cpu: '2'
         memory: 1000Mi
+        openshift.io/sriov1: "1"
     volumeMounts:
       - mountPath: /dev/hugepages
         name: hugepage
@@ -136,7 +109,7 @@ else
     exit 1
 fi
 
-TESTPMD_OUTPUT=$(oc -n "${CNF_NAMESPACE}" rsh "${CNF_POD}" bash -c "yes | testpmd -l 2-3 --in-memory -w 00:04.0 --socket-mem 1024 -n 4 --proc-type auto --file-prefix pg  -- --disable-rss  --nb-cores=1 --rxq=1 --txq=1 --auto-start --forward-mode=mac")
+TESTPMD_OUTPUT=$(oc -n "${CNF_NAMESPACE}" rsh "${CNF_POD}" bash -c "yes | testpmd -l 2-3 --in-memory -w 00:06.0 --socket-mem 1024 -n 4 --proc-type auto --file-prefix pg  -- --disable-rss  --nb-cores=1 --rxq=1 --txq=1 --auto-start --forward-mode=mac")
 echo "${TESTPMD_OUTPUT}"
 if [[ "${TESTPMD_OUTPUT}" == *"forwards packets on 1 streams"* ]]; then
     echo "Testpmd could run successfully"
@@ -145,4 +118,6 @@ else
     exit 1
 fi
 
-echo "Successfully ran NFV tests"
+oc delete namespace "${CNF_NAMESPACE}"
+
+echo "Successfully ran SR-IOV tests"

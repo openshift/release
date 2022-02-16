@@ -5,9 +5,8 @@ set -o errexit
 set -o pipefail
 
 function check_workers_updated() {
-    # Wait up to 2 minutes for PAO to update the worker config
     INTERVAL=5
-    CNT=24
+    CNT=5
 
     old_config=$(oc get mcp worker --no-headers | awk '{print $2}')
     while [ $((CNT)) -gt 0 ]; do
@@ -43,19 +42,6 @@ function check_workers_updated() {
     done
 }
 
-export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
-
-if [[ ${OPENSTACK_DPDK_NETWORK} == "" ]]; then
-    echo "OPENSTACK_DPDK_NETWORK is not set"
-    exit 1
-fi
-
-NETWORK_ID=$(openstack network show "${OPENSTACK_DPDK_NETWORK}" -f value -c id)
-if [[ "${NETWORK_ID}" == "" ]]; then
-    echo "Failed to find network ${OPENSTACK_DPDK_NETWORK}"
-    exit 1
-fi
-
 # For disconnected or otherwise unreachable environments, we want to
 # have steps use an HTTP(S) proxy to reach the API server. This proxy
 # configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
@@ -67,58 +53,45 @@ then
 	source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-SCRIPT_BASE64=$(curl --retry 10 https://raw.githubusercontent.com/rh-nfv-int/shift-on-stack-vhostuser/master/roles/sos-vhostuser/files/vhostuser | base64 -w 0)
-SCRIPT_ARG_BASE64=$(echo "ARG=\"${NETWORK_ID}\"" | base64 -w 0)
-VHOSTUSER_MC=$(
+CONFIG_DRIVE=$(
     oc create -f - -o jsonpath='{.metadata.name}' <<EOF
-apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfig
+apiVersion: machineconfiguration.openshift.io/v1
 metadata:
+  name: 20-mount-config 
   labels:
     machineconfiguration.openshift.io/role: worker
-  name: 99-vhostuser-bind
 spec:
+  osImageURL: ''
   config:
     ignition:
       version: 2.2.0
     systemd:
       units:
-      - name: vhostuser-bind.service
-        enabled: true
-        contents: |
-          [Unit]
-          Description=Vhostuser Interface vfio-pci Bind
-          Wants=network-online.target
-          After=network-online.target ignition-firstboot-complete.service
-
-          [Service]
-          Type=oneshot
-          EnvironmentFile=/etc/vhostuser-bind.conf
-          ExecStart=/usr/local/bin/vhostuser \$ARG
-
-          [Install]
-          WantedBy=multi-user.target
-    storage:
-      files:
-      - contents:
-          source: data:text/plain;charset=utf-8;base64,dmZpby1wY2k=
-        filesystem: root
-        mode: 0644
-        path: /etc/modules-load.d/vfio-pci.conf
-      - contents:
-          source: data:text/plain;charset=utf-8;base64,${SCRIPT_BASE64}
-        filesystem: root
-        mode: 0744
-        path: //usr/local/bin/vhostuser
-      - contents:
-          source: data:text/plain;charset=utf-8;base64,${SCRIPT_ARG_BASE64}
-        filesystem: root
-        mode: 0644
-        path: /etc/vhostuser-bind.conf
+        - name: create-mountpoint-var-config.service
+          enabled: true
+          contents: |
+            [Unit]
+            Description=Create mountpoint /var/config
+            Before=kubelet.service
+            [Service]
+            ExecStart=/bin/mkdir -p /var/config
+            [Install]
+            WantedBy=var-config.mount
+        - name: var-config.mount
+          enabled: true
+          contents: |
+            [Unit]
+            Before=local-fs.target
+            [Mount]
+            Where=/var/config
+            What=/dev/disk/by-label/config-2
+            [Install]
+            WantedBy=local-fs.target
 EOF
 )
-echo "Created \"$VHOSTUSER_MC\" MachineConfig"
+echo "Created \"$CONFIG_DRIVE\" MachineConfig"
 
 check_workers_updated
 
-echo "MachineConfig for vhostuser was successfully applied to the worker config"
+echo "MachineConfig for config-drive was successfully applied to the worker config"
