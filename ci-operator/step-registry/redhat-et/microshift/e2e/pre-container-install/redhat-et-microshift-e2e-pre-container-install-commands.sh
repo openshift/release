@@ -16,6 +16,8 @@ mkdir -p "${HOME}"/.ssh
 
 mock-nss.sh
 
+echo 'retest ssh connection'
+
 # gcloud compute will use this key rather than create a new one
 cp "${CLUSTER_PROFILE_DIR}"/ssh-privatekey "${HOME}"/.ssh/google_compute_engine
 chmod 0600 "${HOME}"/.ssh/google_compute_engine
