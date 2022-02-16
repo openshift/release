@@ -59,7 +59,8 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-- as: operator-e2e
+- as: operator-e2e-gcp
+  optional: true
   steps:
     cluster_profile: gcp
     dependencies:
@@ -82,6 +83,54 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: optional-operators-ci-gcp
+- as: operator-e2e-aws
+  optional: true
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-adp
+      OO_PACKAGE: oadp-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: e2e
+      commands: make test-e2e
+      credentials:
+      - mount_path: /var/run/oadp-credentials
+        name: oadp-credentials
+        namespace: test-credentials
+      from: test-oadp-operator
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-aws
+- as: operator-e2e-azure
+  optional: true
+  steps:
+    cluster_profile: azure4
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-adp
+      OO_PACKAGE: oadp-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: e2e
+      commands: make test-e2e
+      credentials:
+      - mount_path: /var/run/oadp-credentials
+        name: oadp-credentials
+        namespace: test-credentials
+      from: test-oadp-operator
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-azure
 zz_generated_metadata:
   branch: ci-multi-cloud
   org: openshift
