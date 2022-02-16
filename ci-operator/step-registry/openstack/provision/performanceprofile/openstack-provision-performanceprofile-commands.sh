@@ -9,7 +9,6 @@ function check_workers_updated() {
     INTERVAL=5
     CNT=24
 
-    old_config=$(oc get mcp worker --no-headers | awk '{print $2}')
     while [ $((CNT)) -gt 0 ]; do
         READY=false
         while read -r i
@@ -57,6 +56,7 @@ fi
 HUGEPAGES="${HUGEPAGES:-4}"
 CPU_ISOLATED="${CPU_ISOLATED:-2-7}"
 CPU_RESERVED="${CPU_RESERVED:-0-1}"
+old_config=$(oc get mcp worker --no-headers | awk '{print $2}')
 
 cat >/tmp/performance_profile.yaml <<EOL
 apiVersion: performance.openshift.io/v2
