@@ -1,0 +1,53 @@
+kind: List
+apiVersion: v1
+items:
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: release-git-sync
+    namespace: ci
+  spec:
+    replicas: 1
+    strategy:
+      type: RollingUpdate
+    selector:
+      matchLabels:
+        app: release-git-sync
+    template:
+      metadata:
+        labels:
+          app: release-git-sync
+      spec:
+        containers:
+        - name: git-sync
+          command:
+          - /git-sync
+          args:
+          - --repo=https://github.com/openshift/release.git
+          - --branch=master
+          - --wait=30
+          - --root=/tmp/git-sync
+          env:
+          - name: GIT_SYNC_DEST
+            value: release
+          image: gcr.io/google_containers/git-sync:v3.1.6
+          volumeMounts:
+          - name: release
+            mountPath: /tmp/git-sync
+        volumes:
+        - name: release
+          persistentVolumeClaim:
+            claimName: release-git-sync
+- kind: PersistentVolumeClaim
+  apiVersion: v1
+  metadata:
+    labels:
+      app: release-git-sync
+    name: release-git-sync
+    namespace: ci
+  spec:
+    accessModes:
+      - ReadWriteOnce
+    resources:
+      requests:
+        storage: 5Gi
