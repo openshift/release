@@ -11,11 +11,10 @@ binary_build_commands: make all
 build_root:
   project_image:
     dockerfile_literal: |
-      FROM registry.fedoraproject.org/fedora:35
+      FROM registry.access.redhat.com/ubi8
       USER root
-      RUN dnf install -y ShellCheck yamllint asciidoctor && \
-          dnf install -y make go diffutils openssl && \
-          dnf clean all && rm -rf /var/cache/dnf/*
+      RUN yum install -y make go diffutils openssl git && \
+          yum clean all && rm -rf /var/cache/dnf/*
       RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 && \
           chmod 700 get_helm.sh && \
           ./get_helm.sh
@@ -76,10 +75,6 @@ tests:
   commands: |
     export TEST_ARGS='-progress -randomizeAllSpecs -nodes 1 -randomizeSuites -slowSpecThreshold 30 -cover -coverprofile cover.out -outputdir .'
     make test
-  container:
-    from: src
-- as: pre-commit
-  commands: ./.ci-scripts/pre-commit.sh
   container:
     from: src
 - as: e2e-openshift
