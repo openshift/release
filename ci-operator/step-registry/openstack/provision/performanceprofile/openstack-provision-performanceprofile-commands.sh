@@ -90,7 +90,7 @@ EOL
 oc_version=$(oc version -o json | jq -r '.openshiftVersion')
 # Once 4.10 is GA, we need to bump it to 4.11 and so on.
 if [[ "${oc_version}" == *"4.10"* ]]; then
-    git clone --branch origin/release-4.10 https://github.com/openshift-kni/performance-addon-operators /tmp/performance-addon-operators
+    git clone --branch release-4.10 https://github.com/openshift-kni/performance-addon-operators /tmp/performance-addon-operators
     pushd /tmp/performance-addon-operators
     if [[ ! -f cluster-setup/manual-cluster/performance/performance_profile.yaml ]]; then
         echo "performance_profile.yaml was not found in the PAO repository"
