@@ -37,6 +37,7 @@ spec:
         - --github-graphql-endpoint=http://ghproxy/graphql
         - --github-token-path=/etc/auth/token
         - --job-config-path=/etc/job-config
+        - --cache-file=/cache/backoff
         volumeMounts:
         # This is a temporary 7 day token for my personal GH account
         - name: petr-muller-github-token
@@ -48,6 +49,8 @@ spec:
         - name: job-config
           mountPath: /etc/job-config
           readOnly: true
+        - name: cache
+          mountPath: /cache
         resources:
           requests:
             memory: "500Mi"
@@ -94,3 +97,21 @@ spec:
               name: job-config-4.10
           - configMap:
               name: job-config-4.11
+      - name: cache
+        persistentVolumeClaim:
+          claimName: better-retester
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  labels:
+    app: prow
+    component: better-retester
+  name: better-retester
+  namespace: ci
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
