@@ -58,7 +58,7 @@ oc_version=$(oc version | cut -d ' ' -f 3 | cut -d '.' -f1,2 | sed -n '2p')
 dev_version="4.10"
 
 if [[ "${oc_version}" == *"${dev_version}"* ]]; then
-    git clone --branch origin/release-${dev_version} https://github.com/openshift/sriov-network-operator /tmp/sriov-network-operator
+    git clone --branch release-${dev_version} https://github.com/openshift/sriov-network-operator /tmp/sriov-network-operator
     pushd /tmp/sriov-network-operator
     # Until https://github.com/openshift/sriov-network-operator/pull/613 merges
     cp manifests/${oc_version}/supported-nic-ids_v1_configmap.yaml deploy/configmap.yaml
