@@ -10,6 +10,12 @@ build_root:
 canonical_go_repository: knative.dev/eventing-kafka-broker
 images:
 - dockerfile_path: openshift/ci-operator/knative-images/dispatcher/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/dispatcher
   to: knative-eventing-kafka-broker-dispatcher
 - dockerfile_path: openshift/ci-operator/knative-images/kafka-controller/Dockerfile
   from: base
@@ -19,7 +25,21 @@ images:
       - destination_dir: .
         source_path: /go/bin/kafka-controller
   to: knative-eventing-kafka-broker-kafka-controller
+- dockerfile_path: openshift/ci-operator/knative-images/post-install/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/post-install
+  to: knative-eventing-kafka-broker-post-install
 - dockerfile_path: openshift/ci-operator/knative-images/receiver/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/receiver
   to: knative-eventing-kafka-broker-receiver
 - dockerfile_path: openshift/ci-operator/knative-images/webhook-kafka/Dockerfile
   from: base
@@ -175,16 +195,16 @@ releases:
 resources:
   '*':
     limits:
-      memory: 6Gi
+      memory: 2Gi
     requests:
-      cpu: "4"
-      memory: 6Gi
+      cpu: 500m
+      memory: 2Gi
   bin:
     limits:
-      memory: 6Gi
+      memory: 2Gi
     requests:
-      cpu: "4"
-      memory: 6Gi
+      cpu: 500m
+      memory: 2Gi
 test_binary_build_commands: make test-install
 tests:
 - as: e2e-aws-ocp-49
@@ -205,6 +225,8 @@ tests:
         name: knative-eventing-kafka-broker-dispatcher
       - env: KNATIVE_EVENTING_KAFKA_BROKER_KAFKA_CONTROLLER
         name: knative-eventing-kafka-broker-kafka-controller
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_POST_INSTALL
+        name: knative-eventing-kafka-broker-post-install
       - env: KNATIVE_EVENTING_KAFKA_BROKER_RECEIVER
         name: knative-eventing-kafka-broker-receiver
       - env: KNATIVE_EVENTING_KAFKA_BROKER_WEBHOOK_KAFKA
@@ -265,6 +287,70 @@ tests:
         name: knative-eventing-kafka-broker-dispatcher
       - env: KNATIVE_EVENTING_KAFKA_BROKER_KAFKA_CONTROLLER
         name: knative-eventing-kafka-broker-kafka-controller
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_POST_INSTALL
+        name: knative-eventing-kafka-broker-post-install
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_RECEIVER
+        name: knative-eventing-kafka-broker-receiver
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_WEBHOOK_KAFKA
+        name: knative-eventing-kafka-broker-webhook-kafka
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_COMMITTED_OFFSET
+        name: knative-eventing-kafka-broker-test-committed-offset
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_CONSUMER_GROUP_LAG_PROVIDER_TEST
+        name: knative-eventing-kafka-broker-test-consumer-group-lag-provider-test
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_EVENT_FLAKER
+        name: knative-eventing-kafka-broker-test-event-flaker
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_EVENT_LIBRARY
+        name: knative-eventing-kafka-broker-test-event-library
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_EVENT_SENDER
+        name: knative-eventing-kafka-broker-test-event-sender
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_HEARTBEATS
+        name: knative-eventing-kafka-broker-test-heartbeats
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_KAFKA_CONSUMER
+        name: knative-eventing-kafka-broker-test-kafka-consumer
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_PARTITIONS_REPLICATION_VERIFIER
+        name: knative-eventing-kafka-broker-test-partitions-replication-verifier
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_PERFORMANCE
+        name: knative-eventing-kafka-broker-test-performance
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_PRINT
+        name: knative-eventing-kafka-broker-test-print
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_RECORDEVENTS
+        name: knative-eventing-kafka-broker-test-recordevents
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_REQUEST_SENDER
+        name: knative-eventing-kafka-broker-test-request-sender
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_FETCHER
+        name: knative-eventing-kafka-broker-test-wathola-fetcher
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_FORWARDER
+        name: knative-eventing-kafka-broker-test-wathola-forwarder
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_RECEIVER
+        name: knative-eventing-kafka-broker-test-wathola-receiver
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_SENDER
+        name: knative-eventing-kafka-broker-test-wathola-sender
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: generic-claim
+- as: reconciler-aws-ocp-49
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.8"
+  steps:
+    test:
+    - as: test
+      cli: latest
+      commands: make test-reconciler
+      dependencies:
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_DISPATCHER
+        name: knative-eventing-kafka-broker-dispatcher
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_KAFKA_CONTROLLER
+        name: knative-eventing-kafka-broker-kafka-controller
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_POST_INSTALL
+        name: knative-eventing-kafka-broker-post-install
       - env: KNATIVE_EVENTING_KAFKA_BROKER_RECEIVER
         name: knative-eventing-kafka-broker-receiver
       - env: KNATIVE_EVENTING_KAFKA_BROKER_WEBHOOK_KAFKA
@@ -326,6 +412,8 @@ tests:
         name: knative-eventing-kafka-broker-dispatcher
       - env: KNATIVE_EVENTING_KAFKA_BROKER_KAFKA_CONTROLLER
         name: knative-eventing-kafka-broker-kafka-controller
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_POST_INSTALL
+        name: knative-eventing-kafka-broker-post-install
       - env: KNATIVE_EVENTING_KAFKA_BROKER_RECEIVER
         name: knative-eventing-kafka-broker-receiver
       - env: KNATIVE_EVENTING_KAFKA_BROKER_WEBHOOK_KAFKA
