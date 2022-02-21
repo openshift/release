@@ -27,9 +27,20 @@ tests:
         curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"  | bash
         cp kustomize /tmp/bin/
         chmod ug+x /tmp/bin/kustomize
-        ls /usr/local/ci-secrets/redhat-appstudio-qe
-        export TEST=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github-ssh)
-        echo $TEST
+
+        mkdir -p ~/.ssh/
+        mv /usr/local/ci-secrets/redhat-appstudio-qe/github-ssh ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+
+        git config --global user.name 'redhat-appstudio-qe-bot'
+        git config --global user.email 'redhat-appstudio-qe-bot@redhat.com'
+        git remote add qe git@github.com:redhat-appstudio-qe/infra-deployments.git
+
+        export MY_GIT_FORK_REMOTE=qe
+        export MY_GITHUB_ORG="redhat-appstudio-qe"
+        export MY_GITHUB_TOKEN="test"
+        /bin/bash "$WORKSPACE"/hack/bootstrap-cluster.sh preview
+
         /bin/bash .ci/oci-e2e-deployment.sh
       credentials:
       - mount_path: /usr/local/ci-secrets/redhat-appstudio-qe
