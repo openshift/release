@@ -145,6 +145,10 @@ else
     exit 1
 fi
 
+echo "Cleaning ${CNF_NAMESPACE} namespace"
 oc delete namespace "${CNF_NAMESPACE}"
+
+echo "Removing additionalNetworks from network.operator"
+oc patch network.operator cluster --patch '{"spec":{"additionalNetworks": []}}' --type=merge
 
 echo "Successfully ran NFV DPDK tests"
