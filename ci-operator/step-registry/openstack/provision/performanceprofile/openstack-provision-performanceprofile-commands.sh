@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+sleep 5000
 set -o nounset
 set -o errexit
 set -o pipefail
