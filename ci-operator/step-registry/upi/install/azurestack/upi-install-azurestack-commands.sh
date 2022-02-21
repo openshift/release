@@ -65,7 +65,7 @@ SUFFIX_ENDPOINT=$(cat ${SHARED_DIR}/SUFFIX_ENDPOINT)
 az cloud register \
     -n PPE \
     --endpoint-resource-manager "${AZURESTACK_ENDPOINT}" \
-    --suffix-storage-endpoint "${SUFFIX_ENDPOINT}" 
+    --suffix-storage-endpoint "${SUFFIX_ENDPOINT}"
 az cloud set -n PPE
 az cloud update --profile 2019-03-01-hybrid
 az login --service-principal -u $APP_ID -p $AAD_CLIENT_SECRET --tenant $TENANT_ID > /dev/null
@@ -85,7 +85,7 @@ open(path, "w").write(yaml.dump(data, default_flow_style=False))'
 
 openshift-install create manifests
 
-# we don't want to create any machine* objects 
+# we don't want to create any machine* objects
 rm -f openshift/99_openshift-cluster-api_master-machines-*.yaml
 rm -f openshift/99_openshift-cluster-api_worker-machineset-*.yaml
 
@@ -97,6 +97,16 @@ for f in $files
 do
   SECRET_NAME=$(python3 -c 'import yaml;data = yaml.full_load(open("credentials-request/'${f}'"));print(data["spec"]["secretRef"]["name"])')
   SECRET_NAMESPACE=$(python3 -c 'import yaml;data = yaml.full_load(open("credentials-request/'${f}'"));print(data["spec"]["secretRef"]["namespace"])')
+  FEATURE_GATE=$(python3 -c 'import yaml;data = yaml.full_load(open("credentials-request/'${f}'"));print("release.openshift.io/feature-gate" in data["metadata"]["annotations"])')
+
+# 4.10 includes techpreview of CAPI which without the namespace: openshift-cluster-api
+# fails to bootstrap. Below checks if TechPreviewNoUpgrade is annotated and if so skips
+# creating that secret.
+
+  if [[ $FEATURE_GATE == *"True"* ]]; then
+      continue
+  fi
+
   filename=${f/request/secret}
   cat >> "manifests/$filename" << EOF
 apiVersion: v1
@@ -115,7 +125,7 @@ stringData:
 EOF
 done
 
-cat >> manifests/cco-configmap.yaml <<EOF 
+cat >> manifests/cco-configmap.yaml <<EOF
 apiVersion: v1
 kind: ConfigMap
 metadata:
