@@ -37,10 +37,18 @@ tests:
         ls -larth
         cat  ${HOME}/.ssh/id_rsa
         ssh-keyscan -H github.com >> ${HOME}/.ssh/known_hosts
-
+        cat << EOF > ~/.ssh/config
+        Host github.com
+        HostName github.com
+        IdentityFile ~/.ssh/id_rsa
+        EOF
+        chmod 600 ~/.ssh/config
         git config --global user.name 'redhat-appstudio-qe-bot'
         git config --global user.email 'redhat-appstudio-qe-bot@redhat.com'
-        git remote add qe https://github.com/redhat-appstudio-qe/infra-deployments.git
+        export GIT_COMMITTER_NAME="redhat-appstudio-qe-bot"
+        export GIT_COMMITTER_EMAIL="@redhat-appstudio-qe-bot@redhat.com"
+
+        git remote add qe git@github.com:redhat-appstudio-qe/infra-deployments.git
 
         export MY_GIT_FORK_REMOTE=qe
         export MY_GITHUB_ORG="redhat-appstudio-qe"
