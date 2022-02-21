@@ -8,7 +8,6 @@ The secrets have been uploaded to BitWarden item `build_farm_build02`:
 * the SSH key pair (`id_rsa` and `id_rsa.pub`)
 * install-config.yaml.001 (the one with the desired instance type)
 * The auth info for `kubeadmin` and the cert-based kubeconfig file (attachment `b02.admin.cert.kubeconfig`).
-* Github application for aouth: `github_client_id` and `github_client_secret`
 
 ## Installation
 
