@@ -3,7 +3,7 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-binary_build_commands: make generate fmt vet binary binary-rte
+binary_build_commands: make generate fmt vet binary binary-rte binary-e2e-all
 build_root:
   project_image:
     dockerfile_path: Dockerfile.tools
@@ -26,6 +26,14 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/exporter
   to: resource-topology-exporter
+- dockerfile_path: Dockerfile.openshift.tests
+  from: os-min8
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift-kni/numaresources-operator/bin/.
+  to: numaresources-operator-tests
 operator:
   bundles:
   - dockerfile_path: bundle.Dockerfile
