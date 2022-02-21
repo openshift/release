@@ -3,7 +3,7 @@
 Contributing documentation is served (together
 with other documentation related to CI) on [docs.ci.openshift.org][docs].
 It is maintained in the [`ci-docs`][ci-docs] repository.
-
+test2
 ## Useful shortcuts
 
 - [Pull Requests to `openshift/release`][contrib]
