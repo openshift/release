@@ -46,6 +46,9 @@ items:
     name: repo-init-apiserver
     annotations:
       image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"repo-init:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"repo-init-apiserver\")].image"}]'
+    labels:
+      app: prow
+      component: repo-init-apiserver
   spec:
     replicas: 2
     strategy:
@@ -80,8 +83,9 @@ items:
           - --mode=api
           - --port=8080
           - --github-token-path=/etc/github/oauth
-          - --github-endpoint=httpp://ghproxy
+          - --github-endpoint=http://ghproxy
           - --num-repos=4
+          - --disable-cors=true
           - --server-config-path=/etc/repo-init-config
           ports:
           - name: main
@@ -92,20 +96,22 @@ items:
             httpGet:
               path: /healthz
               port: 8081
-            initialDelaySeconds: 15
-            periodSeconds: 3
+            initialDelaySeconds: 120 # We need a long delay to allow for cloning multiple copies of the openshift/release repo
+            periodSeconds: 10
           readinessProbe:
             httpGet:
               path: /healthz/ready
               port: 8081
-            initialDelaySeconds: 30
-            periodSeconds: 3
+            initialDelaySeconds: 150
+            periodSeconds: 10
             timeoutSeconds: 600
           resources:
             requests:
               memory: "3Gi"
               cpu: "500m"
           volumeMounts:
+          - mountPath: /tmp
+            name: release-repos
           - mountPath: /etc/github
             name: token
             readOnly: true
@@ -113,16 +119,11 @@ items:
             name: repo-init-config
             readOnly: true
         volumes:
+        - name: release-repos
+          emptyDir: {}
         - name: token
           secret:
             secretName: github-credentials-openshift-bot
         - name: repo-init-config
-          projected:
-            sources:
-              - secret:
-                  name: repo-init-client
-                  items:
-                    - key: github-client-secret
-                      path: github-client-secret
-              - configMap:
-                  name: repo-init-config
+          secret:
+            secretName: repo-init-client
