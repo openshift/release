@@ -71,6 +71,6 @@ export -f execute
 
 
 applyFeatureGate
-waitFor 10m ClusterCAPIOperatorPodsCreated
+waitFor 20m ClusterCAPIOperatorPodsCreated
 waitForClusterCAPIOperatorPodsReadiness
 
