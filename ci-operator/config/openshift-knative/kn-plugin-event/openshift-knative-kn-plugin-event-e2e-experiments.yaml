@@ -1,0 +1,63 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+binary_build_commands: |-
+  export HOME=/tmp
+  export TEST_IMAGES_DIR=/usr/bin
+  ./mage build
+build_root:
+  project_image:
+    dockerfile_path: openshift/ci-operator/build-image/Dockerfile
+images:
+- dockerfile_path: openshift/ci-operator/test-images/kn-event-sender/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/kn-event-sender
+  to: client-plugin-event-sender
+- dockerfile_path: openshift/ci-operator/test-images/eventshub/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/eventshub
+  to: client-plugin-event-test-image-eventshub
+- dockerfile_path: openshift/ci-operator/test-images/wathola-forwarder/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/wathola-forwarder
+  to: client-plugin-event-test-image-wathola-forwarder
+promotion:
+  name: e2e-experiments
+  namespace: knative
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.9"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: |
+    export HOME=/tmp
+    ./mage test
+  container:
+    from: src
+zz_generated_metadata:
+  branch: e2e-experiments
+  org: openshift-knative
+  repo: kn-plugin-event
