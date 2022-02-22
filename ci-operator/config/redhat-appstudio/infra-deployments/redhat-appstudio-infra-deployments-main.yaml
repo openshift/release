@@ -17,7 +17,6 @@ resources:
 tests:
 - as: appstudio-e2e-deployment
   steps:
-    cluster_profile: aws
     test:
     - as: appstudio-e2e-deployment
       cli: latest
@@ -28,6 +27,8 @@ tests:
         curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"  | bash
         cp kustomize /tmp/bin/
         chmod ug+x /tmp/bin/kustomize
+        git config --global --unset-all user.name
+        git config --global --unset-all user.email
 
         git config --global --replace-all user.name "redhat-appstudio-qe-bot"
         git config --global --replace-all user.email "redhat-appstudio-qe-bot@redhat.com"
@@ -50,7 +51,7 @@ tests:
         IdentityFile ~/.ssh/id_rsa
         EOF
         chmod 600 ~/.ssh/config
-
+        git clone git@github.com:redhat-appstudio-qe/infra-deployments.git
         git remote add qe git@github.com:redhat-appstudio-qe/infra-deployments.git
 
         export MY_GIT_FORK_REMOTE=qe
@@ -59,7 +60,7 @@ tests:
 
         git config --list
 
-        /bin/bash ./hack/bootstrap-cluster.sh preview
+        #/bin/bash ./hack/bootstrap-cluster.sh preview
 
         #/bin/bash .ci/oci-e2e-deployment.sh
       credentials:
@@ -70,7 +71,6 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
 - as: appstudio-e2e-deployment-periodic
   cron: 0 */24 * * *
   steps:
