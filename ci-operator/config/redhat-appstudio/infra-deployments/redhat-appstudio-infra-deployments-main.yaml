@@ -49,13 +49,19 @@ tests:
 
         git config --list
         git init || true
-        
+
+        export GIT_USER=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/git-user)
+        export GIT_PASSWORD=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/git-token)
+        git config credential.helper '!f() { sleep 1; echo "username=${GIT_USER}"; echo "password=${GIT_PASSWORD}"; }; f'
+
         git config --replace-all user.name "redhat-appstudio-qe-bot"
         git config --replace-all user.email "redhat-appstudio-qe-bot@redhat.com"
         git config --list
         
-        git clone git@github.com:redhat-appstudio-qe/infra-deployments.git
-        git remote add qe git@github.com:redhat-appstudio-qe/infra-deployments.git
+        git clone https://github.com/redhat-appstudio-qe/infra-deployments.git
+        cd infra-deployments
+        git checkout -b test
+        git push git push --set-upstream origin test
 
         export MY_GIT_FORK_REMOTE=qe
         export MY_GITHUB_ORG="redhat-appstudio-qe"
