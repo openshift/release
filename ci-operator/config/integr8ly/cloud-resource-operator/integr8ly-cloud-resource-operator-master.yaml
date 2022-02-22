@@ -68,6 +68,25 @@ tests:
         requests:
           cpu: 100m
     workflow: generic-claim
+- as: coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  secret:
+    mount_path: /tmp/secret
+    name: cloud-resource-operator-codecov-token
+- as: publish-coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  postsubmit: true
+  secret:
+    mount_path: /tmp/secret
+    name: cloud-resource-operator-codecov-token
 zz_generated_metadata:
   branch: master
   org: integr8ly
