@@ -1,0 +1,49 @@
+base_images:
+  os:
+    name: ubi
+    namespace: ocp
+    tag: "8"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.16
+images:
+- dockerfile_path: build/Dockerfile
+  from: os
+  to: ci-artifacts
+resources:
+  '*':
+    limits:
+      memory: 2Gi
+    requests:
+      cpu: 2000m
+      memory: 2Gi
+tests:
+- as: e2e-master
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.9"
+  steps:
+    test:
+    - as: presubmit
+      commands: run ods ci-1
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from: ci-artifacts
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: master
+  org: openshift-psap
+  repo: ci-artifacts
+  variant: ods
