@@ -28,6 +28,9 @@ tests:
         cp kustomize /tmp/bin/
         chmod ug+x /tmp/bin/kustomize
 
+        git config --global --replace-all user.name "redhat-appstudio-qe-bot"
+        git config --global --replace-all user.email "redhat-appstudio-qe-bot@redhat.com"
+
         export GIT_COMMITTER_NAME="redhat-appstudio-qe-bot"
         export GIT_COMMITTER_EMAIL="redhat-appstudio-qe-bot@redhat.com"
 
@@ -47,20 +50,29 @@ tests:
         EOF
         chmod 600 ~/.ssh/config
 
-        git config --list
-        git config --replace-all user.name redhat-appstudio-qe-bot
-        git config --replace-all user.email redhat-appstudio-qe-bot@redhat.com
-       
-        git config --global user.name --replace-all 'redhat-appstudio-qe-bot'
-        git config --global user.email --replace-all 'redhat-appstudio-qe-bot@redhat.com'
+        GIT_USER=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/git-user)
+        GIT_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/git-token)
 
-        git remote add qe git@github.com:redhat-appstudio-qe/infra-deployments.git
-        git clone -v git@github.com:redhat-appstudio-qe/infra-deployments.git
+        mkdir -p ${HOME}/creds
+        GIT_CREDS_PATH="${HOME}/creds/file"
+
+        # Or you may choose to not specify GIT_CREDS_PATH at all.
+        # See https://git-scm.com/docs/git-credential-store#FILES for the defaults used
+
+        git config --global credential.helper "store --file ${GIT_CREDS_PATH}"
+        echo "https://${GIT_USER}:${GIT_TOKEN}@github.com" > ${GIT_CREDS_PATH}
+        
+        https://${GIT_USER}@github.com/redhat-appstudio-qe/infra-deployments.git
+
+        cd infra-deployments
+        git checkout -b test
+        git push --set-upstream origin test
 
         export MY_GIT_FORK_REMOTE=qe
         export MY_GITHUB_ORG="redhat-appstudio-qe"
         export MY_GITHUB_TOKEN="test"
-        cat .git/config
+
+        git config --list
         sleep 5m
         #/bin/bash ./hack/bootstrap-cluster.sh preview
 
