@@ -48,21 +48,9 @@ tests:
         chmod 600 ~/.ssh/config
 
         git config --list
-        git init || true
-
-        export GIT_USER=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/git-user)
-        export GIT_PASSWORD=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/git-token)
-        #git config credential.helper "!f() { echo \"username=${GIT_USER}\\npassword=${GIT_PASS}\"; }; f"
-        git config credential.helper '!f() { printf "%s\n" "username=$GIT_USER" "password=$GIT_PASS"; };f'
-
-        git config --replace-all user.name "redhat-appstudio-qe-bot"
-        git config --replace-all user.email "redhat-appstudio-qe-bot@redhat.com"
-        git config --list
-        
-        git clone https://github.com/redhat-appstudio-qe/infra-deployments.git
-        cd infra-deployments
-        git checkout -b test
-        git push -v --set-upstream origin test
+      
+        git remote add qe git@github.com:redhat-appstudio-qe/infra-deployments.git
+        git -v clone git@github.com:redhat-appstudio-qe/infra-deployments.git
 
         export MY_GIT_FORK_REMOTE=qe
         export MY_GITHUB_ORG="redhat-appstudio-qe"
