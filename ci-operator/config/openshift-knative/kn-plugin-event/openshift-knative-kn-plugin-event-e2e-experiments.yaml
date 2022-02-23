@@ -11,7 +11,7 @@ build_root:
   project_image:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
 images:
-- dockerfile_path: openshift/ci-operator/test-images/kn-event-sender/Dockerfile
+- dockerfile_path: openshift/ci-operator/images/kn-event-sender/Dockerfile
   from: base
   inputs:
     bin:
@@ -26,7 +26,7 @@ images:
       paths:
       - destination_dir: .
         source_path: /usr/bin/eventshub
-  to: client-plugin-event-test-image-eventshub
+  to: client-plugin-event-test-eventshub
 - dockerfile_path: openshift/ci-operator/test-images/wathola-forwarder/Dockerfile
   from: base
   inputs:
@@ -34,7 +34,7 @@ images:
       paths:
       - destination_dir: .
         source_path: /usr/bin/wathola-forwarder
-  to: client-plugin-event-test-image-wathola-forwarder
+  to: client-plugin-event-test-wathola-forwarder
 promotion:
   name: e2e-experiments
   namespace: knative
@@ -57,6 +57,31 @@ tests:
     ./mage test
   container:
     from: src
+- as: e2e-aws-ocp-49
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h30m0s
+    version: "4.9"
+  steps:
+    test:
+    - as: test
+      commands: openshift/e2e-tests.sh
+      dependencies:
+      - env: TEST_IMAGES_EVENTSHUB
+        name: client-plugin-event-test-eventshub
+      - env: TEST_IMAGES_WATHOLA_FORWARDER
+        name: client-plugin-event-test-wathola-forwarder
+      - env: IMAGES_KN_EVENT_SENDER
+        name: client-plugin-event-sender
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 30m0s
+    workflow: generic-claim
 zz_generated_metadata:
   branch: e2e-experiments
   org: openshift-knative
