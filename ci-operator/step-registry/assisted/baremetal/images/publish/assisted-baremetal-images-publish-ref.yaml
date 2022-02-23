@@ -1,0 +1,60 @@
+ref:
+  as: assisted-baremetal-images-publish
+  from_image:
+    name: builder
+    namespace: open-cluster-management
+    tag: go1.16-linux
+  commands: assisted-baremetal-images-publish-commands.sh
+  credentials:
+  - mount_path: /secrets/docker
+    name: edge-infrastructure-quay-push
+    namespace: test-credentials
+  dependencies:
+  - env: SOURCE_IMAGE_REF
+    name: src
+  env:
+  - name: SECRETS_PATH
+    default: /secrets
+    documentation: |-
+      The directory where credentials will be mounted.
+  - name: REGISTRY_SECRET
+    default: docker
+    documentation: |-
+      The name of the kube secret that contains the docker/config.json.
+  - name: REGISTRY_SECRET_FILE
+    default: config.json
+    documentation: |-
+      The name of the file in REGSITRY_SECRET with the contents of
+      the .docker/config.json file.
+  - name: REGISTRY_HOST
+    default: quay.io
+    documentation: |-
+      The hostname (and port) of the destination registry.
+  - name: REGISTRY_ORG
+    default: edge-infrastructure
+    documentation: |-
+      The organization of the destination image reference.
+  - name: IMAGE_REPO
+    default: ''
+    documentation: |-
+      The repository name of the destination image reference. If blank, the REPO_NAME 
+      will be used.
+  - name: IMAGE_TAG
+    default: ''
+    documentation: |-
+      The tag for the destination image reference. If blank, the tag for
+      a presubmit will be ${RELEASE_TAG_PREFIX}-PR{PULL_NUMBER}-{GIT_COMMIT}, for a
+      postsubmit will be ${RELEASE_TAG_PREFIX}-{GIT_COMMIT} and for a periodic will be
+      ${RELEASE_TAG_PREFIX}-{CURRENT_DATE}.
+  - name: RELEASE_TAG_PREFIX
+    default: latest
+    documentation: |-
+      The shorthand reference for the release image tag. Used to generate a unique image
+      tag used in $IMAGE_TAG. Defaults to latest.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: |-
+    This workflow mirrors an image from the CI Registry to a given
+    image ref.
