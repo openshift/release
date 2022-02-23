@@ -12,10 +12,7 @@ spec:
     rules:
     - alert: mirroring-failures
       annotations:
-        message: '@build-cop image mirroring jobs have failed. View failed jobs at
-          the <https://prow.ci.openshift.org/?job=periodic-image-mirroring-openshift|overview>.  If
-          there is a consistent issue, open a bugzilla bug against Test Infrastructure
-          and assign it to Clayton Coleman.'
+        message: '@build-cop image mirroring jobs have failed. View failed jobs at the <https://prow.ci.openshift.org/?job=periodic-image-mirroring-openshift|overview>.  If there is a consistent issue, open a bugzilla bug against Test Infrastructure and assign it to Clayton Coleman.'
       expr: |
         increase(prowjob_state_transitions{job_name="periodic-image-mirroring-openshift",state="failure"}[5m]) > 0
       for: 1m
@@ -187,9 +184,7 @@ spec:
     rules:
     - alert: ConfigMapFullInOneWeek
       annotations:
-        message: Based on recent sampling, the ConfigMap {{ $labels.name }} in Namespace
-          {{ $labels.namespace }} is expected to fill up within a week. Currently
-          {{ printf "%0.2f" $value }}% is available.
+        message: Based on recent sampling, the ConfigMap {{ $labels.name }} in Namespace {{ $labels.namespace }} is expected to fill up within a week. Currently {{ printf "%0.2f" $value }}% is available.
       expr: |
         100 * ((1048576 - prow_configmap_size_bytes) / 1048576) < 15
         and
@@ -201,8 +196,7 @@ spec:
     rules:
     - alert: ci-tools-postsubmit-failures
       annotations:
-        message: ci-tools postsubmit {{ $labels.job_name }} has failures. Check <https://prow.ci.openshift.org/?job={{
-          $labels.job_name }}|deck>.
+        message: ci-tools postsubmit {{ $labels.job_name }} has failures. Check <https://prow.ci.openshift.org/?job={{ $labels.job_name }}|deck>.
       expr: |
         sum by (job_name) (
           rate(
@@ -215,11 +209,7 @@ spec:
         severity: critical
     - alert: infrastructure-job-failures
       annotations:
-        message: Infrastructure CI job {{ $labels.job_name }} is failing. Investigate
-          the symptoms, assess the urgency and take appropriate action (<https://grafana-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/d/8ce131e226b7fd2901c2fce45d4e21c1/dptp-dashboard?orgId=1&fullscreen&viewPanel=4|Grafana
-          Dashboard> | <https://prow.ci.openshift.org/?job={{ $labels.job_name }}|Deck>
-          | <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/infrastructure-jobs.md#{{
-          $labels.job_name}}|SOP>).
+        message: Infrastructure CI job {{ $labels.job_name }} is failing. Investigate the symptoms, assess the urgency and take appropriate action (<https://grafana-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/d/8ce131e226b7fd2901c2fce45d4e21c1/dptp-dashboard?orgId=1&fullscreen&viewPanel=4|Grafana Dashboard> | <https://prow.ci.openshift.org/?job={{ $labels.job_name }}|Deck> | <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/infrastructure-jobs.md#{{ $labels.job_name}}|SOP>).
       expr: |
         sum by (job_name) (
           rate(
@@ -232,9 +222,7 @@ spec:
         severity: critical
     - alert: plank-job-with-infra-internal-role-failures
       annotations:
-        message: plank jobs {{ $labels.job_name }} with infra-internal role has failures.
-          Check on <https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/?job={{
-          $labels.job_name }}|deck-internal>.
+        message: plank jobs {{ $labels.job_name }} with infra-internal role has failures. Check on <https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/?job={{ $labels.job_name }}|deck-internal>.
       expr: |
         sum by (job_name) (
           rate(
@@ -249,10 +237,7 @@ spec:
     rules:
     - alert: component-failed-to-construct-a-client
       annotations:
-        message: Component {{ $labels.service }} failed to construct a client. Search
-          for "failed to construct {manager,client} for cluster <<clustername>>" in
-          the beginning of the pod log. If the cluster unavailability was transient,
-          a restart of the pod will fix the issue.
+        message: Component {{ $labels.service }} failed to construct a client. Search for "failed to construct {manager,client} for cluster <<clustername>>" in the beginning of the pod log. If the cluster unavailability was transient, a restart of the pod will fix the issue.
       expr: kubernetes_failed_client_creations > 0
       labels:
         severity: critical
@@ -260,8 +245,7 @@ spec:
     rules:
     - alert: high-ci-operator-infra-error-rate
       annotations:
-        message: An excessive amount of CI Operator executions are failing with {{
-          $labels.reason }}, which is an infrastructure issue.
+        message: An excessive amount of CI Operator executions are failing with {{ $labels.reason }}, which is an infrastructure issue.
       expr: |
         sum(rate(ci_operator_error_rate{state="failed",reason!~".*cloning_source",reason!~".*executing_template",reason!~".*executing_multi_stage_test",reason!~".*building_image_from_source",reason!~".*building_.*_image",reason!="executing_graph:interrupted"}[30m])) by (reason) > 0.02
       for: 1m
@@ -271,9 +255,7 @@ spec:
     rules:
     - alert: high-ci-operator-error-rate
       annotations:
-        message: An excessive amount of CI Operator executions are failing with {{
-          $labels.reason }}, which does not necessarily point to an infrastructure
-          issue but is happening at an excessive rate and should be investigated.
+        message: An excessive amount of CI Operator executions are failing with {{ $labels.reason }}, which does not necessarily point to an infrastructure issue but is happening at an excessive rate and should be investigated.
       expr: |
         sum(rate(ci_operator_error_rate{state="failed"}[30m])) by (reason) > 0.07
       for: 1m
@@ -283,8 +265,7 @@ spec:
     rules:
     - alert: jobs-failing-with-lease-acquire-timeout
       annotations:
-        message: Jobs on provider {{ $labels.provider }} fail because they were unable
-          to acquire a lease.
+        message: Jobs on provider {{ $labels.provider }} fail because they were unable to acquire a lease.
       expr: |
         label_replace((sum(increase(ci_operator_error_rate{state="failed",reason=~"executing_graph:step_failed:utilizing_lease:acquiring_lease:.*"}[15m])) by (reason)), "provider", "$1", "reason", "executing_graph:step_failed:utilizing_lease:acquiring_lease:(.*)-quota-slice") > 0
       for: 1m
@@ -294,8 +275,7 @@ spec:
     rules:
     - alert: SSLCertExpiringSoon
       annotations:
-        message: The SSL certificates for instance {{ $labels.instance }} are expiring
-          in 28 days.
+        message: The SSL certificates for instance {{ $labels.instance }} are expiring in 28 days.
       expr: |
         probe_ssl_earliest_cert_expiry{job="blackbox"} - time() < 86400 * 28
       for: 1m
@@ -303,8 +283,7 @@ spec:
         severity: critical
     - alert: ProbeFailing
       annotations:
-        message: Probing the instance {{ $labels.instance }} has been failing for
-          the past minute.
+        message: Probing the instance {{ $labels.instance }} has been failing for the past minute.
       expr: |
         up{job="blackbox"} == 0 or probe_success{job="blackbox"} == 0
       for: 1m
@@ -314,25 +293,21 @@ spec:
     rules:
     - alert: ghproxy-specific-status-code-abnormal
       annotations:
-        message: '{{ $value | humanize }}% of all requests for {{ $labels.path }}
-          through the GitHub proxy are errorring with code {{ $labels.status }}. Check
-          <https://grafana-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1&refresh=1m&fullscreen&viewPanel=9|grafana>'
+        message: '{{ $value | humanize }}% of all requests for {{ $labels.path }} through the GitHub proxy are errorring with code {{ $labels.status }}. Check <https://grafana-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1&refresh=1m&fullscreen&viewPanel=9|grafana>'
       expr: |
         sum(rate(github_request_duration_count{status=~"[45]..",status!="404",status!="410"}[5m])) by (status,path) / ignoring(status) group_left sum(rate(github_request_duration_count[5m])) by (path) * 100 > 10
       labels:
         severity: warning
     - alert: ghproxy-global-status-code-abnormal
       annotations:
-        message: '{{ $value | humanize }}% of all API requests through the GitHub
-          proxy are errorring with code {{ $labels.status }}. Check <https://grafana-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1&fullscreen&viewPanel=8|grafana>'
+        message: '{{ $value | humanize }}% of all API requests through the GitHub proxy are errorring with code {{ $labels.status }}. Check <https://grafana-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1&fullscreen&viewPanel=8|grafana>'
       expr: |
         sum(rate(github_request_duration_count{status=~"[45]..",status!="404",status!="410"}[5m])) by (status) / ignoring(status) group_left sum(rate(github_request_duration_count[5m])) * 100 > 3
       labels:
         severity: warning
     - alert: ghproxy-running-out-github-tokens-in-a-hour
       annotations:
-        message: '{{ $labels.login }} may run out of API quota before the next reset.
-          Check the <https://grafana-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1|dashboard>'
+        message: '{{ $labels.login }} may run out of API quota before the next reset. Check the <https://grafana-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1|dashboard>'
       expr: |
         github_token_usage * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login) + deriv(github_token_usage[20m]) * github_token_reset * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login) / 1e9 < 100
       for: 5m
@@ -340,8 +315,7 @@ spec:
         severity: critical
     - alert: ghproxy-running-out-github-tokens-in-a-hour
       annotations:
-        message: '{{ $labels.token_hash }} may run out of API quota before the next
-          reset. Check the <https://grafana-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1|dashboard>'
+        message: '{{ $labels.token_hash }} may run out of API quota before the next reset. Check the <https://grafana-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1|dashboard>'
       expr: |
         github_token_usage{token_hash=~"openshift-ci - .*"} + deriv(github_token_usage{token_hash=~"openshift-ci - .*"}[20m]) * github_token_reset  / 1e9 < 100
       for: 5m
@@ -365,8 +339,7 @@ spec:
     rules:
     - alert: SinkerNotRemovingPods
       annotations:
-        message: Sinker has not removed any Pods in the last hour, likely indicating
-          an outage in the service.
+        message: Sinker has not removed any Pods in the last hour, likely indicating an outage in the service.
       expr: |
         absent(sum(rate(sinker_pods_removed[1h]))) == 1
       for: 5m
@@ -374,8 +347,7 @@ spec:
         severity: critical
     - alert: SinkerNotRemovingProwJobs
       annotations:
-        message: Sinker has not removed any Prow jobs in the last hour, likely indicating
-          an outage in the service.
+        message: Sinker has not removed any Prow jobs in the last hour, likely indicating an outage in the service.
       expr: |
         absent(sum(rate(sinker_prow_jobs_cleaned[1h]))) == 1
       for: 5m
@@ -385,8 +357,7 @@ spec:
     rules:
     - alert: endurance-cluster-maintenance-aws-4.6-failures
       annotations:
-        message: '@bparees Prow job endurance-cluster-maintenance-aws-4.6 has failures.
-          Check on <https://prow.ci.openshift.org/?type=periodic&job=endurance-cluster-maintenance-aws-4.6|deck>'
+        message: '@bparees Prow job endurance-cluster-maintenance-aws-4.6 has failures. Check on <https://prow.ci.openshift.org/?type=periodic&job=endurance-cluster-maintenance-aws-4.6|deck>'
       expr: |
         rate(prowjob_state_transitions{job_name="endurance-cluster-maintenance-aws-4.6",state="failure"}[5m]) > 0
       for: 1m
@@ -395,8 +366,7 @@ spec:
         team: build-cop
     - alert: periodic-ci-kubevirt-hyperconverged-cluster-operator-release-4.5-hco-e2e-nightly-bundle-release-4-5-azure4-failures
       annotations:
-        message: '@build-officer Prow job periodic-ci-kubevirt-hyperconverged-cluster-operator-release-4.5-hco-e2e-nightly-bundle-release-4-5-azure4
-          has failures. Check on <https://prow.ci.openshift.org/?type=periodic&job=periodic-ci-kubevirt-hyperconverged-cluster-operator-release-4.5-hco-e2e-nightly-bundle-release-4-5-azure4|deck>'
+        message: '@build-officer Prow job periodic-ci-kubevirt-hyperconverged-cluster-operator-release-4.5-hco-e2e-nightly-bundle-release-4-5-azure4 has failures. Check on <https://prow.ci.openshift.org/?type=periodic&job=periodic-ci-kubevirt-hyperconverged-cluster-operator-release-4.5-hco-e2e-nightly-bundle-release-4-5-azure4|deck>'
       expr: |
         rate(prowjob_state_transitions{job_name="periodic-ci-kubevirt-hyperconverged-cluster-operator-release-4.5-hco-e2e-nightly-bundle-release-4-5-azure4",state="failure"}[5m]) > 0
       for: 1m
@@ -405,8 +375,7 @@ spec:
         team: openshift-virtualization
     - alert: periodic-ci-openshift-kni-cnf-features-deploy-master-cnf-e2e-gcp-periodic-failures
       annotations:
-        message: '@cnf-cop Prow job periodic-ci-openshift-kni-cnf-features-deploy-master-cnf-e2e-gcp-periodic
-          has failures. Check on <https://prow.ci.openshift.org/?type=periodic&job=periodic-ci-openshift-kni-cnf-features-deploy-master-cnf-e2e-gcp-periodic|deck>'
+        message: '@cnf-cop Prow job periodic-ci-openshift-kni-cnf-features-deploy-master-cnf-e2e-gcp-periodic has failures. Check on <https://prow.ci.openshift.org/?type=periodic&job=periodic-ci-openshift-kni-cnf-features-deploy-master-cnf-e2e-gcp-periodic|deck>'
       expr: |
         rate(prowjob_state_transitions{job_name="periodic-ci-openshift-kni-cnf-features-deploy-master-cnf-e2e-gcp-periodic",state="failure"}[5m]) > 0
       for: 1m
@@ -415,8 +384,7 @@ spec:
         team: cnf-cop
     - alert: periodic-ci-openshift-kni-cnf-features-deploy-release-4.4-cnf-e2e-gcp-periodic-failures
       annotations:
-        message: '@cnf-cop Prow job periodic-ci-openshift-kni-cnf-features-deploy-release-4.4-cnf-e2e-gcp-periodic
-          has failures. Check on <https://prow.ci.openshift.org/?type=periodic&job=periodic-ci-openshift-kni-cnf-features-deploy-release-4.4-cnf-e2e-gcp-periodic|deck>'
+        message: '@cnf-cop Prow job periodic-ci-openshift-kni-cnf-features-deploy-release-4.4-cnf-e2e-gcp-periodic has failures. Check on <https://prow.ci.openshift.org/?type=periodic&job=periodic-ci-openshift-kni-cnf-features-deploy-release-4.4-cnf-e2e-gcp-periodic|deck>'
       expr: |
         rate(prowjob_state_transitions{job_name="periodic-ci-openshift-kni-cnf-features-deploy-release-4.4-cnf-e2e-gcp-periodic",state="failure"}[5m]) > 0
       for: 1m
@@ -425,8 +393,7 @@ spec:
         team: cnf-cop
     - alert: periodic-ci-openshift-kni-cnf-features-deploy-release-4.5-cnf-e2e-gcp-periodic-failures
       annotations:
-        message: '@cnf-cop Prow job periodic-ci-openshift-kni-cnf-features-deploy-release-4.5-cnf-e2e-gcp-periodic
-          has failures. Check on <https://prow.ci.openshift.org/?type=periodic&job=periodic-ci-openshift-kni-cnf-features-deploy-release-4.5-cnf-e2e-gcp-periodic|deck>'
+        message: '@cnf-cop Prow job periodic-ci-openshift-kni-cnf-features-deploy-release-4.5-cnf-e2e-gcp-periodic has failures. Check on <https://prow.ci.openshift.org/?type=periodic&job=periodic-ci-openshift-kni-cnf-features-deploy-release-4.5-cnf-e2e-gcp-periodic|deck>'
       expr: |
         rate(prowjob_state_transitions{job_name="periodic-ci-openshift-kni-cnf-features-deploy-release-4.5-cnf-e2e-gcp-periodic",state="failure"}[5m]) > 0
       for: 1m
@@ -435,8 +402,7 @@ spec:
         team: cnf-cop
     - alert: release-openshift-ocp-installer-e2e-gcp-rt-4.4-failures
       annotations:
-        message: '@cnf-cop Prow job release-openshift-ocp-installer-e2e-gcp-rt-4.4
-          has failures. Check on <https://prow.ci.openshift.org/?type=periodic&job=release-openshift-ocp-installer-e2e-gcp-rt-4.4|deck>'
+        message: '@cnf-cop Prow job release-openshift-ocp-installer-e2e-gcp-rt-4.4 has failures. Check on <https://prow.ci.openshift.org/?type=periodic&job=release-openshift-ocp-installer-e2e-gcp-rt-4.4|deck>'
       expr: |
         rate(prowjob_state_transitions{job_name="release-openshift-ocp-installer-e2e-gcp-rt-4.4",state="failure"}[5m]) > 0
       for: 1m
@@ -445,8 +411,7 @@ spec:
         team: cnf-cop
     - alert: release-openshift-ocp-installer-e2e-gcp-rt-4.5-failures
       annotations:
-        message: '@cnf-cop Prow job release-openshift-ocp-installer-e2e-gcp-rt-4.5
-          has failures. Check on <https://prow.ci.openshift.org/?type=periodic&job=release-openshift-ocp-installer-e2e-gcp-rt-4.5|deck>'
+        message: '@cnf-cop Prow job release-openshift-ocp-installer-e2e-gcp-rt-4.5 has failures. Check on <https://prow.ci.openshift.org/?type=periodic&job=release-openshift-ocp-installer-e2e-gcp-rt-4.5|deck>'
       expr: |
         rate(prowjob_state_transitions{job_name="release-openshift-ocp-installer-e2e-gcp-rt-4.5",state="failure"}[5m]) > 0
       for: 1m
@@ -457,42 +422,33 @@ spec:
     rules:
     - alert: prow-pod-crashlooping
       annotations:
-        message: Pod {{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container}})
-          is restarting {{ printf "%.2f" $value }} times / 5 minutes.
-      expr: rate(kube_pod_container_status_restarts_total{namespace=~"ci|prow-monitoring",job="kube-state-metrics"}[15m])
-        * 60 * 5 > 0
+        message: Pod {{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container}}) is restarting {{ printf "%.2f" $value }} times / 5 minutes.
+      expr: rate(kube_pod_container_status_restarts_total{namespace=~"ci|prow-monitoring",job="kube-state-metrics"}[15m]) * 60 * 5 > 0
       for: 1m
       labels:
         severity: critical
     - alert: prow-job-backlog-growing
       annotations:
-        message: The number of the triggered Prow jobs that have not yet been running
-          has been increasing for the past hour.
-      expr: sum(rate(prowjob_state_transitions{state="triggered"}[5m])) - sum(rate(prowjob_state_transitions{state!="triggered"}[5m]))
-        > 0
+        message: The number of the triggered Prow jobs that have not yet been running has been increasing for the past hour.
+      expr: sum(rate(prowjob_state_transitions{state="triggered"}[5m])) - sum(rate(prowjob_state_transitions{state!="triggered"}[5m])) > 0
       for: 60m
       labels:
         severity: critical
     - alert: Controller backlog is not being drained
       annotations:
-        message: The backlog for {{ $labels.name }} is not getting drained. Check
-          <https://prometheus-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/graph?g0.range_input=1h&g0.expr=workqueue_depth%7Bname%3D~%22{{
-          $labels.name }}%22%7D%20%3E%20100&g0.tab=0|Prometheus>
+        message: The backlog for {{ $labels.name }} is not getting drained. Check <https://prometheus-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/graph?g0.range_input=1h&g0.expr=workqueue_depth%7Bname%3D~%22{{ $labels.name }}%22%7D%20%3E%20100&g0.tab=0|Prometheus>
       expr: workqueue_depth{name=~"crier.*|plank"} > 100
       for: 20m
       labels:
         severity: critical
-    - expr: count(label_replace(count(github_token_usage{token_hash =~ "openshift.*"})
-        by (token_hash), "login", "$1", "token_hash", "(.*)") or github_user_info{login=~"openshift-.*"})
-        by (login)
+    - expr: count(label_replace(count(github_token_usage{token_hash =~ "openshift.*"}) by (token_hash), "login", "$1", "token_hash", "(.*)") or github_user_info{login=~"openshift-.*"}) by (login)
       record: github:identity_names
   - name: release-controller-down
     rules:
     - alert: releaseControllerDown
       annotations:
         message: '{{ $labels.deployment }} has been down for 5 minutes.'
-      expr: kube_deployment_status_replicas_unavailable{namespace="ci", deployment=~"release-controller.*"}
-        >= 1
+      expr: kube_deployment_status_replicas_unavailable{namespace="ci", deployment=~"release-controller.*"} >= 1
       for: 5m
       labels:
         severity: critical
@@ -517,8 +473,7 @@ spec:
         severity: critical
     - alert: abnormal Tide status controller sync duration
       annotations:
-        message: The Tide status sync duration is abnormally high (>30 seconds). Check
-          <https://prometheus-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/graph?g0.range_input=1h&g0.expr=max(statusupdatedur%20and%20(changes(statusupdatedur%5B1h%5D)%20%3E%200))%20%3E%2030&g0.tab=1|Prometheus>
+        message: The Tide status sync duration is abnormally high (>30 seconds). Check <https://prometheus-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/graph?g0.range_input=1h&g0.expr=max(statusupdatedur%20and%20(changes(statusupdatedur%5B1h%5D)%20%3E%200))%20%3E%2030&g0.tab=1|Prometheus>
       expr: |
         max(statusupdatedur and (changes(statusupdatedur[1h]) > 0)) > 30
       for: 5m
