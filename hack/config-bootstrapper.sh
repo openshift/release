@@ -8,7 +8,7 @@ trap 'rm -f VERSION' EXIT
 
 if [[ "${CI:-}" ]]; then
     dir=$PWD
-    bin=/ko-app/config-bootstrapper
+    bin=/app/prow/cmd/config-bootstrapper/app.binary
 else
     dir=$(realpath "$(dirname "${BASH_SOURCE}")/..")
     bin=config-bootstrapper
