@@ -13,11 +13,11 @@ export ALIBABA_CLOUD_CREDENTIALS_FILE="${SHARED_DIR}/alibabacreds.ini"
 oc registry login
 CCO_IMAGE=$(oc adm release info --image-for='cloud-credential-operator' "${RELEASE_IMAGE_LATEST}")
 cd "/tmp"
-oc image extract "${CCO_IMAGE}" --file="/usr/bin/ccoctl"
+oc --loglevel 10 image extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "${CCO_IMAGE}" --file="/usr/bin/ccoctl"
 chmod 555 "/tmp/ccoctl"
 
 # extract alibabacloud credentials requests from the release image
-oc adm release extract --credentials-requests --cloud=alibabacloud --to="${CR_PATH}" "${RELEASE_IMAGE_LATEST}"
+oc --loglevel 10 adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" --credentials-requests --cloud=alibabacloud --to="${CR_PATH}" "${RELEASE_IMAGE_LATEST}"
 
 # create required credentials infrastructure and installer manifests for workload identity
 "/tmp/ccoctl" alibabacloud create-ram-users \
