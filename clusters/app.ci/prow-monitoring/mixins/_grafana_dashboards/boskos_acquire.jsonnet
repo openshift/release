@@ -31,7 +31,7 @@ local mytemplate(name, labelInQuery) = template.new(
     );
 
 dashboard.new(
-        'Boskos Acquire Dashboard',
+        'Boskos aaa Acquire Dashboard',
         time_from='now-1d',
         schemaVersion=18,
       )
