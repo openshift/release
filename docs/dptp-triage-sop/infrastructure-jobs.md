@@ -74,6 +74,52 @@ branch-protection:
           unmanaged: true
 ```
 
+### `openshift-priv` repository not synced yet
+
+### Symptom
+
+```json
+{
+  "component": "branchprotector",
+  "error": "update openshift-priv/cluster-api-operator: could not get repo to check for archival: status code 404 not one of [200], body: {\"message\":\"Not Found\",\"documentation_url\":\"https://docs.github.com/rest/reference/repos#get-a-repository\"}",
+  "file": "prow/cmd/branchprotector/protect.go:160",
+  "func": "main.main",
+  "level": "error",
+  "msg": "0",
+  "severity": "error",
+  "time": "2022-02-23T10:43:26Z"
+}
+```
+
+#### Culprit
+
+Repositories in `openshift-priv`
+are [created automatically](https://docs.ci.openshift.org/docs/architecture/private-repositories/#openshift-priv-organization)
+based on certain CI configuration presence, and CI configuration for them as well. CI configuration also makes
+branchprotector to start managing branch protection settings. So when a CI configuration is added for a new repo,
+various delays can cause the situation where branchprotector tries to interact with `openshift-priv` repository before
+it is created. The sequence looks like this:
+
+1. New repository in `openshift` organization
+   is [made eligible](https://prow.ci.openshift.org/?job=periodic-prow-auto-config-brancher) for having a fork
+   in `openshift-priv`
+2. `periodic-prow-auto-config-brancher` (runs hourly) creates CI configuration for the fork
+3. After 2), `periodic-branch-protector` (runs every six hours) starts managing branch protection on the fork
+4. Parallel to 2), `periodic-auto-private-org-peribolos-sync` (runs twice a day) adds the `openshift-priv` fork to
+   Peribolos config
+5. After 3), `periodic-org-sync` job (runs every two hours) actually creates the `openshift-priv`
+
+This means that after a repo is made eligible for having `openshift-priv` fork, branch-protector starts interacting with
+the fork on T+7 hours, but the repo can be created in T+14 hours.
+
+This issue is tracked in [DPTP-2216](https://issues.redhat.com/browse/DPTP-2216).
+
+#### Resolution
+
+Confirm that the source repository in `openshift` organization had recently added or changed its ci-operator config to
+become [eligible](https://docs.ci.openshift.org/docs/architecture/private-repositories/#involved-repositories) for
+an `openshift-priv` fork.
+
 ## `periodic-branch-protector-openshift-org`
 
 This job runs [Prow `branchprotector`](https://github.com/kubernetes/test-infra/tree/master/prow/cmd/branchprotector) to
