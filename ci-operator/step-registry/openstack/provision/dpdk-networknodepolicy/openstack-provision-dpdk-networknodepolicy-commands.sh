@@ -4,11 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-if ! test -f "${SHARED_DIR}/sriov-worker-node"; then
-  echo "${SHARED_DIR}/sriov-worker-node file not found, no worker node for SR-IOV was deployed"
-  exit 1
-fi
-
 export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
 
 # For disconnected or otherwise unreachable environments, we want to
@@ -22,31 +17,26 @@ then
 	source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-if ! openstack network show "${OPENSTACK_SRIOV_NETWORK}" >/dev/null 2>&1; then
-    echo "Network ${OPENSTACK_SRIOV_NETWORK} doesn't exist"
-    exit 1
-fi
-NETWORK_ID=$(openstack network show "${OPENSTACK_SRIOV_NETWORK}" -f value -c id)
-
 oc patch sriovoperatorconfig default --type=merge -n openshift-sriov-network-operator --patch '{ "spec": { "enableOperatorWebhook": false } }'
 sleep 5
 
-SRIOV_NETWORKNODEPOLICY=$(
+DPDK_NETWORKNODEPOLICY=$(
     oc create -f - -o jsonpath='{.metadata.name}' <<EOF
 apiVersion: sriovnetwork.openshift.io/v1
 kind: SriovNetworkNodePolicy
 metadata:
-  name: sriov1
+  name: dpdk1
   namespace: openshift-sriov-network-operator
 spec:
   deviceType: vfio-pci
   nicSelector:
-    netFilter: openstack/NetworkID:${NETWORK_ID}
+    rootDevices:
+    - "0000:00:04.0"
   nodeSelector:
     feature.node.kubernetes.io/network-sriov.capable: 'true'
   numVfs: 1
   priority: 99
-  resourceName: sriov1
+  resourceName: dpdk1
 EOF
 )
-echo "Created \"$SRIOV_NETWORKNODEPOLICY\" SriovNetworkNodePolicy"
+echo "Created \"$DPDK_NETWORKNODEPOLICY\" SriovNetworkNodePolicy"

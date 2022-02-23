@@ -59,32 +59,6 @@ EOF
 )
 echo "Created \"$CNF_NAMESPACE\" Namespace"
 
-if ! openstack network show "${OPENSTACK_DPDK_NETWORK}" >/dev/null 2>&1; then
-    echo "Network ${OPENSTACK_DPDK_NETWORK} doesn't exist"
-    exit 1
-fi
-
-cat <<EOF > "${SHARED_DIR}/additionalnetwork.yaml"
-spec:
-  additionalNetworks:
-  - name: ${OPENSTACK_DPDK_NETWORK}
-    namespace: ${CNF_NAMESPACE}
-    rawCNIConfig: '{ "cniVersion": "0.3.1", "name": "${OPENSTACK_DPDK_NETWORK}", "type": "host-device","pciBusId": "0000:00:04.0", "ipam": {}}'
-    type: Raw
-EOF
-oc patch network.operator cluster --patch "$(cat "${SHARED_DIR}/additionalnetwork.yaml")" --type=merge
-# Give the operator some time to apply the patch
-sleep 5
-
-NETWORK_ATTACHED=$(oc get network-attachment-definitions "${OPENSTACK_DPDK_NETWORK}" -n "${CNF_NAMESPACE}" -o jsonpath='{.metadata.name}')
-if [[ "${NETWORK_ATTACHED}" == "${OPENSTACK_DPDK_NETWORK}" ]]; then
-    echo "Successfully Added additional network to the Network Operator"
-else
-    echo "Failed to add additional network to the Network Operator"
-    echo "${NETWORK_ATTACHED}"
-    exit 1
-fi
-
 CNF_POD=$(
     oc create -f - -o jsonpath='{.metadata.name}' <<EOF
 apiVersion: v1
@@ -92,8 +66,6 @@ kind: Pod
 metadata:
   name: testpmd-host-device-dpdk
   namespace: ${CNF_NAMESPACE}
-  annotations:
-    k8s.v1.cni.cncf.io/networks: ${OPENSTACK_DPDK_NETWORK}
 spec:
   containers:
   - name: testpmd
@@ -109,10 +81,12 @@ spec:
         memory: 1000Mi
         hugepages-1Gi: 1Gi
         cpu: '2'
+        openshift.io/dpdk1: "1"
       limits:
         hugepages-1Gi: 1Gi
         cpu: '2'
         memory: 1000Mi
+        openshift.io/dpdk1: "1"
     volumeMounts:
       - mountPath: /dev/hugepages
         name: hugepage
