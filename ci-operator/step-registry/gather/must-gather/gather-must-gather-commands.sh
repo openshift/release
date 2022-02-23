@@ -39,12 +39,11 @@ tar -czC "${ARTIFACT_DIR}/must-gather" -f "${ARTIFACT_DIR}/must-gather.tar.gz" .
 rm -rf "${ARTIFACT_DIR}"/must-gather
 
 cat >"${ARTIFACT_DIR}/junit_e2e_20220211-9871239.xml" <<EOF
-<?xml version="1.0" encoding="UTF-8" ?>
-<testsuites id="devansuite" name="Devans Fake Test Suite" tests="1" failures="1" time="0.001">
-<testcase id="fake.test.case" name="Devan testing something" time="0.001">
-<failure message="Something went wrong" type="WARNING">
-This is where we'd put the details.
-</failure>
-</testcase>
-</testsuites>
+<testsuite name="dgoodwin test" tests="1" failures="0">
+<link type="text/css" rel="stylesheet" id="dark-mode-custom-link"/>
+<link type="text/css" rel="stylesheet" id="dark-mode-general-link"/>
+<style lang="en" type="text/css" id="dark-mode-custom-style"/>
+<style lang="en" type="text/css" id="dark-mode-native-style"/>
+<testcase name="this is a test"/>
+</testsuite>
 EOF
