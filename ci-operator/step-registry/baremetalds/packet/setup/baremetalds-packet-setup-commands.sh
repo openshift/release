@@ -41,7 +41,7 @@ cat > packet-setup.yaml <<-EOF
         hostnames: "{{ packet_hostname }}"
         operating_system: ${PACKET_OS}
         plan: ${PACKET_PLAN}
-        facility: ${PACKET_FACILITY}
+        facility: any
         wait_for_public_IPv: 4
         wait_timeout: 1200
         state: active
