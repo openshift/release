@@ -201,6 +201,22 @@ def generate_app_ci_content(config, git_clone_dir):
     with genlib.GenDoc(config.paths.path_rc_deployments.joinpath('deploy-ci-signer.yaml'), context) as gendoc:
         content.generate_signer_resources(gendoc)
 
+    # Development RBAC
+    generate_development_rbac(config)
+
+
+def generate_development_rbac(config):
+    for private in (False, True):
+        for arch in config.arches:
+            context = Context(config, arch, private)
+
+            with genlib.GenDoc(config.paths.path_rc_deployments.joinpath(f'admin-{context.is_namespace}-rbac.yaml'), context) as gendoc:
+                content.add_development_rbac(gendoc, context.is_namespace)
+                content.add_development_monitoring_rbac(gendoc)
+
+    with genlib.GenDoc(config.paths.path_rc_deployments.joinpath(f'admin-origin-rbac.yaml'), context) as gendoc:
+        content.add_development_rbac(gendoc, 'origin')
+
 
 def run(git_clone_dir, bump=False):
 
