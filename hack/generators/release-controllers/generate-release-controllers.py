@@ -214,7 +214,8 @@ def generate_development_rbac(config):
                 content.add_development_rbac(gendoc, context.is_namespace)
                 content.add_development_monitoring_rbac(gendoc)
 
-    with genlib.GenDoc(config.paths.path_rc_deployments.joinpath(f'admin-origin-rbac.yaml'), context) as gendoc:
+    context = Context(config, "x86_64", False)
+    with genlib.GenDoc(config.paths.path_rc_deployments.joinpath('admin-origin-rbac.yaml'), context) as gendoc:
         content.add_development_rbac(gendoc, 'origin')
 
 
