@@ -6,7 +6,7 @@ set -o pipefail
 # Every cluster that can should have a PV for prometheus data so that data is preserved
 # across reschedules of pods. This may need to be conditionally disabled in the future
 # if certain instance types are used that cannot access persistent volumes.
-
+ls -la "${CLUSTER_PROFILE_DIR}/pull-secret"
 # Use yq to create cluster monitoring config, as other steps may adjust it
 YQ_URI=https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64
 YQ_HASH=e70e482e7ddb9cf83b52f5e83b694a19e3aaf36acf6b82512cbe66e41d569201
@@ -68,3 +68,4 @@ EOF
 CONFIG_CONTENTS="$(echo "${CONFIG_CONTENTS}" | /tmp/yq m - "${PATCH}")"
 /tmp/yq w --style folded -i "${CONFIG}" 'data."config.yaml"' "${CONFIG_CONTENTS}"
 cat "${CONFIG}"
+ls -la "${CLUSTER_PROFILE_DIR}/pull-secret"

@@ -8,7 +8,6 @@ set -o pipefail
 cp /var/run/vault/alibaba/alibabacreds.ini ${SHARED_DIR}
 cp /var/run/vault/alibaba/config ${SHARED_DIR}
 cp /var/run/vault/alibaba/envvars ${SHARED_DIR}
-
 source /var/run/vault/alibaba/envvars
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
