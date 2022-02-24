@@ -33,11 +33,11 @@ def _add_namespace_read_only_rbac(gendoc, namespace):
             'kind': 'Role',
             'name': 'release-controller-developers-read-only'
         },
-        'subjects': {
+        'subjects': [{
             'apiGroup': 'rbac.authorization.k8s.io',
             'kind': 'Group',
             'name': 'openshift-release-controller-developers'
-        }
+        }]
     })
 
 
@@ -71,11 +71,11 @@ def _add_deployment_monitoring_rbac(gendoc):
             'kind': 'Role',
             'name': 'release-controller-developers-monitoring'
         },
-        'subjects': {
+        'subjects': [{
             'apiGroup': 'rbac.authorization.k8s.io',
             'kind': 'Group',
             'name': 'openshift-release-controller-developers'
-        }
+        }]
     })
 
 
@@ -119,11 +119,11 @@ def _add_cache_monitoring_rbac(gendoc):
             'kind': 'Role',
             'name': 'release-controller-developers-monitoring'
         },
-        'subjects': {
+        'subjects': [{
             'apiGroup': 'rbac.authorization.k8s.io',
             'kind': 'Group',
             'name': 'openshift-release-controller-developers'
-        }
+        }]
     })
 
 
