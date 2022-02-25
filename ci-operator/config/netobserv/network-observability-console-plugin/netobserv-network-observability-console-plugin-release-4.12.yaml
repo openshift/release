@@ -1,0 +1,53 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
+promotion:
+  name: "4.12"
+  namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.12"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.12"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: ci
+  commands: |
+    export HOME="/tmp"
+    export GOCACHE=/tmp/.cache
+    export XDG_CACHE_HOME=/tmp/.cache
+
+    nodejs_version=v14.17.5
+    nodejs_platform=linux-x64
+    nodejs="node-${nodejs_version}-${nodejs_platform}"
+    npm_version=8.2.0
+
+    cd /tmp
+    curl -LO "https://nodejs.org/download/release/${nodejs_version}/${nodejs}.tar.gz"
+    tar xf "${nodejs}.tar.gz"
+
+    export NODEJS_HOME="/tmp/${nodejs}"
+    export PATH=$PATH:$NODEJS_HOME/bin:/tmp/node_modules/.bin
+    npm install npm@${npm_version} -g
+    cd -
+
+    make build lint test && git diff --exit-code
+  container:
+    from: src
+zz_generated_metadata:
+  branch: release-4.12
+  org: netobserv
+  repo: network-observability-console-plugin

@@ -1,0 +1,61 @@
+base_images:
+  base:
+    name: 4.12-priv
+    namespace: ocp-private
+    tag: base
+  ocp_builder_rhel-8-golang-1.17-openshift-4.11:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.17-openshift-4.11
+binary_build_commands: make manager
+build_root:
+  from_repository: true
+canonical_go_repository: sigs.k8s.io/cluster-api-provider-aws
+images:
+- dockerfile_path: openshift/Dockerfile.openshift
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.17-openshift-4.11:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
+  to: aws-cluster-api-controllers
+promotion:
+  name: 4.12-priv
+  namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.12-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.12-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: openshift/unit-tests.sh
+tests:
+- as: unit
+  commands: openshift/unit-tests.sh
+  container:
+    from: src
+- as: e2e-aws
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- as: e2e-aws-serial
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-serial
+zz_generated_metadata:
+  branch: release-4.12
+  org: openshift-priv
+  repo: cluster-api-provider-aws

@@ -1,0 +1,168 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
+images:
+- dockerfile_path: Dockerfile
+  to: special-resource-operator
+- dockerfile_literal: |
+    FROM src
+    RUN ["yum", "update", "-y"]
+    RUN ["yum", "install", "-y", "ShellCheck"]
+    RUN mkdir /tmp/helm && \
+        cd /tmp/helm && \
+        curl https://get.helm.sh/helm-v3.6.0-linux-amd64.tar.gz -o helm.tar.gz && \
+        tar xvfpz helm.tar.gz && \
+        mv linux-amd64/helm /usr/local/bin && \
+        chmod +x /usr/local/bin/helm && \
+        rm -rf /tmp/helm
+    RUN mkdir /tmp/oc && \
+        cd /tmp/oc && \
+        curl -L https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz -o oc.tar.gz && \
+        tar xzvf oc.tar.gz && \
+        mv kubectl /usr/local/bin/ && \
+        cd - && \
+        rm -rf /tmp/oc
+  from: src
+  to: test-bin
+promotion:
+  excluded_images:
+  - test-bin
+  name: "4.12"
+  namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.12"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.12"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lint
+  commands: |
+    export XDG_CACHE_HOME=/tmp/.cache
+    make lint
+  container:
+    clone: true
+    from: test-bin
+- as: helm-lint
+  commands: |
+    make helm-lint
+  container:
+    clone: true
+    from: test-bin
+- as: kube-lint
+  commands: |
+    make kube-lint
+  container:
+    from: src
+- as: unit
+  commands: make unit-test
+  container:
+    from: src
+- as: verify
+  commands: make verify
+  container:
+    from: src
+- as: e2e-aws-ocp
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.9"
+  steps:
+    test:
+    - as: deploy-nfd
+      cli: latest
+      commands: |
+        git clone --branch release-4.9 https://github.com/openshift/cluster-nfd-operator
+        cd cluster-nfd-operator
+        make deploy VERSION=release-4.9
+        oc apply -f config/samples/nfd.openshift.io_v1_nodefeaturediscovery.yaml
+      from: test-bin
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+    - as: deploy-sro
+      cli: latest
+      commands: |
+        make deploy
+      dependencies:
+      - env: IMG
+        name: special-resource-operator
+      from: test-bin
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+    - as: test
+      cli: latest
+      commands: |
+        make e2e-test
+      from: src
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+    workflow: generic-claim
+- as: e2e-aws-ocp-4-8-periodic
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.8"
+  cron: 38 12 * * *
+  steps:
+    test:
+    - as: deploy-nfd
+      cli: latest
+      commands: |
+        git clone https://github.com/openshift/cluster-nfd-operator
+        cd cluster-nfd-operator
+        make deploy VERSION=4.8.0
+        oc apply -f config/samples/nfd.openshift.io_v1_nodefeaturediscovery.yaml
+      from: test-bin
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+    - as: deploy-sro
+      cli: latest
+      commands: |
+        make deploy
+      dependencies:
+      - env: IMG
+        name: special-resource-operator
+      from: test-bin
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+    - as: test
+      cli: latest
+      commands: |
+        make e2e-test
+      from: src
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: release-4.12
+  org: openshift-psap
+  repo: special-resource-operator
