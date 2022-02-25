@@ -1,7 +1,7 @@
 presubmits:
   openshift/installer:
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
@@ -147,7 +147,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
@@ -294,7 +294,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-fips,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
@@ -367,7 +367,127 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-proxy,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
+    branches:
+    - ^release-4.12$
+    - ^release-4.12-
+    cluster: build01
+    context: ci/prow/e2e-aws-rhel8
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    name: pull-ci-openshift-installer-release-4.12-e2e-aws-rhel8
+    optional: true
+    rerun_command: /test e2e-aws-rhel8
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --repo=installer
+        - --secret-dir=/usr/local/e2e-aws-rhel8-cluster-profile
+        - --target=e2e-aws-rhel8
+        - --template=/usr/local/e2e-aws-rhel8
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: aws
+        - name: CONFIG_SPEC
+          value: |
+            base_images:
+              base:
+                name: '4.4'
+                namespace: ocp
+                tag: base
+              machine-os-content:
+                name: machine-os-content
+                namespace: rhcos
+                tag: latest
+            build_root:
+              image_stream_tag:
+                name: release
+                namespace: openshift
+                tag: golang-1.13
+            canonical_go_repository: github.com/openshift/installer
+            images:
+            - dockerfile_path: images/installer/Dockerfile.ci
+              from: base
+              inputs:
+                root:
+                  as:
+                  - builder
+              to: installer
+            raw_steps:
+            - output_image_tag_step:
+                from: machine-os-content
+                to:
+                  name: stable
+                  tag: machine-os-content
+            resources:
+              '*':
+                limits:
+                  memory: 4Gi
+                requests:
+                  cpu: 100m
+                  memory: 200Mi
+            tag_specification:
+              name: '4.4'
+              namespace: ocp
+            tests:
+            - as: e2e-aws
+              commands: TEST_SUITE=openshift/conformance/parallel run-tests
+              openshift_installer:
+                cluster_profile: aws
+        - name: JOB_NAME_SAFE
+          value: e2e-aws-rhel8
+        - name: TEST_COMMAND
+          value: TEST_SUITE=openshift/conformance/parallel run-tests
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-aws-rhel8-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-aws-rhel8
+          name: job-definition
+          subPath: cluster-launch-installer-e2e.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-aws
+      - configMap:
+          name: prow-job-cluster-launch-installer-e2e
+        name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+    trigger: (?m)^/test( | .* )e2e-aws-rhel8,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
@@ -587,7 +707,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-upgrade,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
@@ -660,7 +780,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-upi,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
@@ -807,7 +927,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-workers-rhel8,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
@@ -880,7 +1000,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-azure,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
@@ -953,7 +1073,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-azure-resourcegroup,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
@@ -1100,7 +1220,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-azure-upi,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
@@ -1173,7 +1293,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-azurestack,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
@@ -1324,7 +1444,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-crc,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
@@ -1401,7 +1521,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-gcp,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
@@ -1478,7 +1598,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-gcp-shared-vpc,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
@@ -1554,7 +1674,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-gcp-upgrade,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
@@ -1631,7 +1751,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-gcp-upi,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
@@ -1708,7 +1828,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-gcp-upi-xpn,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
@@ -1723,6 +1843,7 @@ presubmits:
     name: pull-ci-openshift-installer-release-4.12-e2e-ibmcloud
     optional: true
     rerun_command: /test e2e-ibmcloud
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(aws|azure|baremetal|gcp|libvirt|openstack|ovirt|vsphere)/)
     spec:
       containers:
       - args:
@@ -1859,7 +1980,73 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-libvirt,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
+    branches:
+    - ^release-4.12$
+    - ^release-4.12-
+    cluster: build01
+    context: ci/prow/e2e-metal
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-release-4.12-e2e-metal
+    optional: true
+    rerun_command: /test e2e-metal
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --repo=installer
+        - --secret-dir=/usr/local/e2e-metal-cluster-profile
+        - --target=e2e-metal
+        - --template=/usr/local/e2e-metal
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: metal
+        - name: JOB_NAME_SAFE
+          value: e2e-metal
+        - name: TEST_COMMAND
+          value: TEST_SUITE=openshift/conformance/parallel run-tests
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /usr/local/e2e-metal-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-metal
+          name: job-definition
+          subPath: cluster-launch-installer-metal-e2e.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-metal
+      - configMap:
+          name: prow-job-cluster-launch-installer-metal-e2e
+        name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+    trigger: (?m)^/test( | .* )e2e-metal,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
@@ -2597,7 +2784,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-openstack-kuryr,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
@@ -2670,7 +2857,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-openstack-parallel,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
@@ -2742,6 +2929,82 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-openstack-proxy,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4.12$
+    - ^release-4.12-
+    cluster: build01
+    context: ci/prow/e2e-openstack-upi
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-release-4.12-e2e-openstack-upi
+    optional: true
+    rerun_command: /test e2e-openstack-upi
+    run_if_changed: (^upi/openstack/.*)|(^images/openstack/Dockerfile.ci$)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --give-pr-author-access-to-namespace=true
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --secret-dir=/usr/local/e2e-openstack-upi-cluster-profile
+        - --target=e2e-openstack-upi
+        - --template=/usr/local/e2e-openstack-upi
+        command:
+        - ci-operator
+        env:
+        - name: CLUSTER_TYPE
+          value: openstack
+        - name: JOB_NAME_SAFE
+          value: e2e-openstack-upi
+        - name: KURYR_ENABLED
+          value: "false"
+        - name: TEST_COMMAND
+          value: TEST_SUITE=openshift/conformance/parallel run-tests
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-openstack-upi-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-openstack-upi
+          name: job-definition
+          subPath: cluster-launch-installer-openstack-upi-e2e.yaml
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-openstack
+      - configMap:
+          name: prow-job-cluster-launch-installer-openstack-upi-e2e
+        name: job-definition
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+    trigger: (?m)^/test( | .* )e2e-openstack-upi,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -2895,7 +3158,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-vsphere,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
@@ -3112,7 +3375,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )govet,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
@@ -3124,6 +3387,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.12-images
     rerun_command: /test images
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
     spec:
       containers:
       - args:
@@ -3232,6 +3496,94 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )openstack-manifests,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4.12$
+    - ^release-4.12-
+    cluster: build01
+    context: ci/prow/shellcheck
+    decorate: true
+    labels:
+      ci.openshift.io/manually-branched: "true"
+    name: pull-ci-openshift-installer-release-4.12-shellcheck
+    rerun_command: /test shellcheck
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+    spec:
+      containers:
+      - args:
+        - ./hack/shellcheck.sh
+        command:
+        - sh
+        env:
+        - name: IS_CONTAINER
+          value: "TRUE"
+        image: quay.io/coreos/shellcheck-alpine:v0.5.0
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 500m
+    trigger: (?m)^/test shellcheck
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4.12$
+    - ^release-4.12-
+    cluster: build01
+    context: ci/prow/tf-fmt
+    decorate: true
+    labels:
+      ci.openshift.io/manually-branched: "true"
+    name: pull-ci-openshift-installer-release-4.12-tf-fmt
+    optional: true
+    rerun_command: /test tf-fmt
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+    spec:
+      containers:
+      - args:
+        - ./hack/tf-fmt.sh
+        command:
+        - sh
+        env:
+        - name: IS_CONTAINER
+          value: "TRUE"
+        image: quay.io/coreos/terraform-alpine:v0.12.0-rc1
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 500m
+    trigger: (?m)^/test( | .* )tf-fmt,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4.12$
+    - ^release-4.12-
+    cluster: build01
+    context: ci/prow/tf-lint
+    decorate: true
+    labels:
+      ci.openshift.io/manually-branched: "true"
+    name: pull-ci-openshift-installer-release-4.12-tf-lint
+    rerun_command: /test tf-lint
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+    spec:
+      containers:
+      - args:
+        - ./hack/tf-lint.sh
+        command:
+        - sh
+        env:
+        - name: IS_CONTAINER
+          value: "TRUE"
+        image: quay.io/coreos/tflint
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 500m
+    trigger: (?m)^/test tf-lint
   - agent: kubernetes
     always_run: false
     branches:
@@ -3375,3 +3727,32 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )verify-vendor,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4.12$
+    - ^release-4.12-
+    cluster: build01
+    context: ci/prow/yaml-lint
+    decorate: true
+    labels:
+      ci.openshift.io/manually-branched: "true"
+    name: pull-ci-openshift-installer-release-4.12-yaml-lint
+    rerun_command: /test yaml-lint
+    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+    spec:
+      containers:
+      - args:
+        - ./hack/yaml-lint.sh
+        command:
+        - sh
+        env:
+        - name: IS_CONTAINER
+          value: "TRUE"
+        image: quay.io/coreos/yamllint
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 500m
+    trigger: (?m)^/test yaml-lint
