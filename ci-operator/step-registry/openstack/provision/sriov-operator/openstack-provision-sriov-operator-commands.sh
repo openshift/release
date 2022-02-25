@@ -54,25 +54,35 @@ function wait_for_sriov_pods() {
 }
 
 oc_version=$(oc version | cut -d ' ' -f 3 | cut -d '.' -f1,2 | sed -n '2p')
-# Once 4.10 is GA, we need to bump it to 4.11 and so on.
-dev_version="4.10"
+case "${oc_version}" in
+    # Remove 4.10 once it's GA
+    4.10)
+        echo "OpenShift 4.10 was detected"
+        is_dev_version=1 ;;
+    4.11)
+        echo "OpenShift 4.11 was detected"
+        is_dev_version=1 ;;
+    *) ;;
+esac
 
-if [[ "${oc_version}" == *"${dev_version}"* ]]; then
-    git clone --branch release-${dev_version} https://github.com/openshift/sriov-network-operator /tmp/sriov-network-operator
+if [ -n "${is_dev_version:-}" ]; then
+    echo "The SR-IOV will be installed from Github using release-${oc_version} branch."
+    git clone --branch release-${oc_version} https://github.com/openshift/sriov-network-operator /tmp/sriov-network-operator
     pushd /tmp/sriov-network-operator
     # Until https://github.com/openshift/sriov-network-operator/pull/613 merges
-    cp manifests/${oc_version}/supported-nic-ids_v1_configmap.yaml deploy/configmap.yaml
+    # Also we need to hardcode 4.10 for now because 4.11 manifests are not here yet.
+    cp manifests/4.10/supported-nic-ids_v1_configmap.yaml deploy/configmap.yaml
 
     # We need to skip the bits where it tries to install Skopeo
     export SKIP_VAR_SET=1
     # We export the links of the images, since Skopeo can't be used in the CI container
-    export SRIOV_CNI_IMAGE=quay.io/openshift/origin-sriov-cni:${dev_version}
-    export SRIOV_INFINIBAND_CNI_IMAGE=quay.io/openshift/origin-sriov-infiniband-cni:${dev_version}
-    export SRIOV_DEVICE_PLUGIN_IMAGE=quay.io/openshift/origin-sriov-network-device-plugin:${dev_version}
-    export NETWORK_RESOURCES_INJECTOR_IMAGE=quay.io/openshift/origin-sriov-dp-admission-controller:${dev_version}
-    export SRIOV_NETWORK_CONFIG_DAEMON_IMAGE=quay.io/openshift/origin-sriov-network-config-daemon:${dev_version}
-    export SRIOV_NETWORK_WEBHOOK_IMAGE=quay.io/openshift/origin-sriov-network-webhook:${dev_version}
-    export SRIOV_NETWORK_OPERATOR_IMAGE=quay.io/openshift/origin-sriov-network-operator:${dev_version}
+    export SRIOV_CNI_IMAGE=quay.io/openshift/origin-sriov-cni:${oc_version}
+    export SRIOV_INFINIBAND_CNI_IMAGE=quay.io/openshift/origin-sriov-infiniband-cni:${oc_version}
+    export SRIOV_DEVICE_PLUGIN_IMAGE=quay.io/openshift/origin-sriov-network-device-plugin:${oc_version}
+    export NETWORK_RESOURCES_INJECTOR_IMAGE=quay.io/openshift/origin-sriov-dp-admission-controller:${oc_version}
+    export SRIOV_NETWORK_CONFIG_DAEMON_IMAGE=quay.io/openshift/origin-sriov-network-config-daemon:${oc_version}
+    export SRIOV_NETWORK_WEBHOOK_IMAGE=quay.io/openshift/origin-sriov-network-webhook:${oc_version}
+    export SRIOV_NETWORK_OPERATOR_IMAGE=quay.io/openshift/origin-sriov-network-operator:${oc_version}
     unset NAMESPACE
     # CLUSTER_TYPE is used by both openshift/release and the operator, so we need to unset it
     # to let the operator figure out which cluster type it is.
