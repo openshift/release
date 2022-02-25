@@ -1,0 +1,118 @@
+base_images:
+  base:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-base-openshift-4.6
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/console
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  to: console
+promotion:
+  additional_images:
+    console-tests: src
+  name: 4.12-priv
+  namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.12-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.12-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  analyze:
+    requests:
+      cpu: "1"
+      memory: 14Gi
+  console:
+    requests:
+      cpu: "1"
+      memory: 8Gi
+  frontend:
+    requests:
+      cpu: "1"
+      memory: 10Gi
+  test-bin:
+    requests:
+      cpu: "1"
+      memory: 10Gi
+test_binary_build_commands: ./build.sh
+tests:
+- as: backend
+  commands: ./test-backend.sh
+  container:
+    from: test-bin
+- as: frontend
+  commands: ./test-frontend.sh
+  container:
+    from: test-bin
+- as: analyze
+  commands: ./analyze.sh
+  container:
+    from: test-bin
+- as: e2e-gcp-console
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    test:
+    - as: test
+      cli: latest
+      commands: ./test-prow-e2e.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 2h30m0s
+    workflow: ipi-gcp
+- as: kubevirt-plugin
+  run_if_changed: frontend/packages/kubevirt-plugin
+  steps:
+    cluster_profile: azure4
+    test:
+    - as: test
+      cli: latest
+      commands: |2
+
+        # Deploy Kubevirt
+        source ./frontend/packages/kubevirt-plugin/integration-tests/deploy-kubevirt-gating.sh
+
+        # Run kubevirt-plugin gating suite
+        ./test-prow-e2e.sh kubevirt-gating
+      from: pipeline:src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-azure
+- as: ceph-storage-plugin
+  run_if_changed: frontend/packages/ceph-storage-plugin
+  steps:
+    cluster_profile: aws
+    env:
+      COMPUTE_NODE_TYPE: m4.2xlarge
+      ZONES_COUNT: "1"
+    test:
+    - as: test
+      cli: latest
+      commands: ./test-prow-e2e.sh ceph
+      credentials:
+      - mount_path: /var/run/operator-secret
+        name: operator-secret
+        namespace: test-credentials
+      from: pipeline:src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-4.12
+  org: openshift-priv
+  repo: console
