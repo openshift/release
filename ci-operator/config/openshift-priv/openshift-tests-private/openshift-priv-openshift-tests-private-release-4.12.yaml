@@ -1,0 +1,130 @@
+base_images:
+  cli:
+    name: 4.12-priv
+    namespace: ocp-private
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp_builder_rhel-8-golang-1.17-openshift-4.11:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.17-openshift-4.11
+  openstack-installer:
+    name: 4.12-priv
+    namespace: ocp-private
+    tag: openstack-installer
+  tools:
+    name: 4.12-priv
+    namespace: ocp-private
+    tag: tools
+  upi-installer:
+    name: 4.12-priv
+    namespace: ocp-private
+    tag: upi-installer
+binary_build_commands: make all
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
+canonical_go_repository: github.com/openshift/openshift-tests-private
+images:
+- dockerfile_path: images/Dockerfile
+  from: tools
+  inputs:
+    ocp_builder_rhel-8-golang-1.17-openshift-4.11:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
+  to: tests-private
+- dockerfile_literal: |
+    FROM src
+    RUN curl --silent --location https://rpm.nodesource.com/setup_lts.x | bash - && \
+        curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo | tee /etc/yum.repos.d/yarn.repo && \
+        PACKAGES="openssh-clients httpd-tools nodejs yarn xorg-x11-server-Xvfb gtk2-devel gtk3-devel libnotify-devel GConf2 nss libXScrnSaver alsa-lib" && \
+        yum install --setopt=tsflags=nodocs -y $PACKAGES && \
+        yum clean all && rm -rf /var/cache/yum/*
+  from: src
+  to: tests-private-ui
+promotion:
+  excluded_images:
+  - tests-private
+  - tests-private-ui
+  name: 4.12-priv
+  namespace: ocp-private
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.11"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 4Gi
+  bin:
+    requests:
+      cpu: "2"
+      memory: 8Gi
+  e2e-aws:
+    requests:
+      cpu: "4"
+      memory: 4Gi
+test_binary_build_commands: make test
+tests:
+- as: title-check
+  commands: make name-check
+  container:
+    from: src
+- as: e2e-aws
+  optional: true
+  skip_if_only_changed: frontend/
+  steps:
+    cluster_profile: aws
+    test:
+    - as: critical-test
+      cli: latest
+      commands: ./bin/extended-platform-tests run all --dry-run|grep -iv "VMonly"|grep
+        -E "OLM.*Critical"|./bin/extended-platform-tests run -f -
+      from: bin
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: "2"
+          memory: 600Mi
+    - as: pr-test
+      cli: latest
+      commands: make pr-test
+      from: bin
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: "2"
+          memory: 600Mi
+    workflow: ipi-aws
+- as: e2e-console
+  optional: true
+  run_if_changed: frontend/
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    test:
+    - as: console-test
+      cli: latest
+      commands: cd frontend;./console-test-frontend.sh
+      from: tests-private-ui
+      resources:
+        requests:
+          cpu: "2"
+          memory: 600Mi
+      timeout: 1h0m0s
+    workflow: ipi-gcp
+zz_generated_metadata:
+  branch: release-4.12
+  org: openshift-priv
+  repo: openshift-tests-private
