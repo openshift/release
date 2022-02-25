@@ -26,7 +26,7 @@ if [[ ! -d "$to_validate" ]]; then
     exit 1
 fi
 
-for subdir in $1/*/
+find $1 -type d -maxdepth 1 -mindepth 1 | while read subdir;
 do
     base="$(basename "$subdir")"
     if [[ "$base" != _* ]]; then
