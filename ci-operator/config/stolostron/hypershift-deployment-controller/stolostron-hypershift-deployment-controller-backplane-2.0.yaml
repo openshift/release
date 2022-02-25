@@ -1,8 +1,4 @@
 base_images:
-  open-cluster-management_builder_go1.17-linux:
-    name: builder
-    namespace: open-cluster-management
-    tag: go1.17-linux
   stolostron_builder_go1.17-linux:
     name: builder
     namespace: stolostron
@@ -15,13 +11,13 @@ build_root:
 images:
 - dockerfile_path: Dockerfile
   inputs:
-    open-cluster-management_builder_go1.17-linux:
+    stolostron_builder_go1.17-linux:
       as:
-      - registry.ci.openshift.org/open-cluster-management/builder:go1.17-linux
+      - registry.ci.openshift.org/stolostron/builder:go1.17-linux
   to: hypershift-deployment-controller
 promotion:
   disabled: true
-  name: "2.5"
+  name: "2.0"
   namespace: stolostron
 resources:
   '*':
@@ -47,6 +43,16 @@ tests:
       IMAGE_REPO: hypershift-deployment-controller
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
+- as: pr-merge-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: hypershift-deployment-controller
+    env:
+      IMAGE_REPO: hypershift-deployment-controller
+      IMAGE_TAG: latest
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
 - as: publish
   postsubmit: true
   steps:
@@ -59,8 +65,10 @@ tests:
     - as: publish
       commands: |-
         export OSCI_COMPONENT_NAME=hypershift-deployment-controller
-        export OSCI_COMPONENT_VERSION=2.5.0
+        export OSCI_COMPONENT_VERSION=2.0.0
         export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
+        export OSCI_PIPELINE_PRODUCT_PREFIX=backplane
+        export OSCI_PIPELINE_REPO=backplane-pipeline
         export SELF="make -f /opt/build-harness/Makefile.prow"
         export OSCI_PUBLISH_DELAY="0"
         make -f /opt/build-harness/Makefile.prow osci/publish
@@ -74,17 +82,7 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ocm-ci-image-mirror
-- as: pr-merge-image-mirror
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: hypershift-deployment-controller
-    env:
-      IMAGE_REPO: hypershift-deployment-controller
-      IMAGE_TAG: latest
-      REGISTRY_ORG: stolostron
-    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: release-2.5
+  branch: backplane-2.0
   org: stolostron
   repo: hypershift-deployment-controller
