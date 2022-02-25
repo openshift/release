@@ -31,7 +31,7 @@ NETWORK_ID=$(openstack network show "${OPENSTACK_SRIOV_NETWORK}" -f value -c id)
 # Re-enable the webhook on 4.9 when this PR is merged and released in 4.9z:
 # https://github.com/openshift/sriov-network-operator/pull/618
 oc_version=$(oc version -o json | jq -r '.openshiftVersion')
-if [[ "${oc_version}" == *"4.9"* ]]; then
+if [[ "${oc_version}" == *"4.8"* || "${oc_version}" == *"4.9"* ]]; then
     oc patch sriovoperatorconfig default --type=merge -n openshift-sriov-network-operator --patch '{ "spec": { "enableOperatorWebhook": false } }'
     sleep 5
 fi
