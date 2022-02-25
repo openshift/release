@@ -1,0 +1,43 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp_builder_rhel-8-base-openshift-4.10:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-base-openshift-4.10
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile.ocp
+  from: ocp_builder_rhel-8-base-openshift-4.10
+  to: ironic-hardware-inventory-recorder
+promotion:
+  name: "4.12"
+  namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.12"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.12"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-metal-ipi
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS)$
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ipv4
+zz_generated_metadata:
+  branch: release-4.12
+  org: openshift
+  repo: ironic-hardware-inventory-recorder-image

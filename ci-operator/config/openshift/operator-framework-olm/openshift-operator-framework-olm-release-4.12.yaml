@@ -1,0 +1,105 @@
+base_images:
+  base:
+    name: "4.12"
+    namespace: ocp
+    tag: base
+  ocp_builder_rhel-8-golang-1.16-openshift-4.10:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.16-openshift-4.10
+build_root:
+  project_image:
+    context_dir: .
+    dockerfile_path: base.Dockerfile
+images:
+- dockerfile_path: operator-lifecycle-manager.Dockerfile
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.10:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.10
+  to: operator-lifecycle-manager
+- dockerfile_path: operator-registry.Dockerfile
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.10:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.10
+  to: operator-registry
+promotion:
+  name: "4.12"
+  namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.12"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.12"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: verify
+  commands: make verify
+  container:
+    from: src
+- as: e2e-gcp
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp
+- as: unit-olm
+  commands: |
+    # Note(tflannag): Hacks for https://github.com/kubernetes-sigs/controller-runtime/commit/58c17f696263fc4a35ef5de198f99aa1717e7b87
+    # as we run into permission denied errors when attempting to create the ${HOME}/.cache directory in the unit test.
+    echo "Overriding the \$XDG_CACHE_HOME directory"
+    export XDG_CACHE_HOME=/tmp/.cache
+
+    make unit/olm
+  container:
+    from: src
+- as: unit-registry
+  commands: make unit/registry
+  container:
+    from: src
+- as: unit-api
+  commands: make unit/api
+  container:
+    from: src
+- as: e2e-aws-olm
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIRECTORY=${ARTIFACT_DIR} make e2e/olm
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-console-olm
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: ./test-prow-e2e.sh olmFull
+      from: stable:console-tests
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-upgrade
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-upgrade-azure
+zz_generated_metadata:
+  branch: release-4.12
+  org: openshift
+  repo: operator-framework-olm

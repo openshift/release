@@ -1,0 +1,193 @@
+base_images:
+  assisted-test-infra:
+    name: assisted-test
+    namespace: ocp-kni
+    tag: assisted-test-infra
+  base:
+    name: 4.12-priv
+    namespace: ocp-private
+    tag: base
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.17-openshift-4.10
+binary_build_commands: make build --warn-undefined-variables
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/cluster-etcd-operator
+images:
+- dockerfile_path: Dockerfile.rhel7
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
+  to: cluster-etcd-operator
+promotion:
+  name: 4.12-priv
+  namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.12-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.12-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: "3"
+      memory: 1Gi
+test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
+tests:
+- as: verify
+  commands: |
+    make verify -k --warn-undefined-variables
+  container:
+    from: bin
+- as: verify-deps
+  commands: |
+    make verify-deps -k --warn-undefined-variables
+  container:
+    from: src
+- as: unit
+  commands: |
+    make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+  container:
+    from: test-bin
+- as: e2e-agnostic
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-loki
+- as: e2e-agnostic-upgrade
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-upgrade-gcp
+- as: e2e-aws-disruptive
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-disruption
+- as: e2e-aws-disruptive-ovn
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-disruption-ovn
+- as: e2e-gcp-disruptive
+  optional: true
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-disruption
+- as: e2e-gcp-disruptive-five-control-plane-replicas
+  optional: true
+  steps:
+    cluster_profile: gcp
+    env:
+      CONTROL_PLANE_REPLICAS: "5"
+      TEST_REQUIRES_SSH: "yes"
+      TEST_SUITE: openshift/disruptive
+      TEST_TYPE: suite-conformance
+      TEST_UPGRADE_OPTIONS: ""
+    workflow: openshift-e2e-gcp-disruption
+- as: e2e-gcp-disruptive-ovn
+  optional: true
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-disruption-ovn
+- as: e2e-operator
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-loki
+- as: e2e-azure
+  optional: true
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure
+- as: e2e-gcp
+  optional: true
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp
+- as: e2e-metal-ipi
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OpenShiftSDN
+    workflow: baremetalds-e2e
+- as: e2e-metal-ipi-serial-ipv4
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-serial-ipv4
+- as: e2e-metal-ipi-ovn-ipv6
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        NETWORK_TYPE=OVNKubernetes
+    workflow: baremetalds-e2e
+- as: e2e-metal-assisted
+  optional: true
+  steps:
+    cluster_profile: packet
+    workflow: assisted-baremetal
+- as: e2e-aws-single-node
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-single-node
+- as: e2e-metal-single-node-live-iso
+  optional: true
+  steps:
+    cluster_profile: packet
+    workflow: baremetalds-sno
+- as: configmap-scale
+  steps:
+    cluster_profile: aws
+    workflow: openshift-perfscale-e2e-configmap-scale
+- as: e2e-gcp-five-control-plane-replicas
+  optional: true
+  steps:
+    cluster_profile: gcp
+    env:
+      CONTROL_PLANE_REPLICAS: "5"
+    workflow: openshift-e2e-gcp
+- as: e2e-gcp-upgrade-five-control-plane-replicas
+  optional: true
+  steps:
+    cluster_profile: gcp
+    env:
+      CONTROL_PLANE_REPLICAS: "5"
+      TEST_SUITE: ""
+      TEST_TYPE: upgrade
+      TEST_UPGRADE_OPTIONS: ""
+    workflow: openshift-upgrade-gcp
+zz_generated_metadata:
+  branch: release-4.12
+  org: openshift-priv
+  repo: cluster-etcd-operator
