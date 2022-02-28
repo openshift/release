@@ -40,6 +40,16 @@ images:
       as:
       - registry.ci.openshift.org/ocp/4.10:must-gather
   to: local-storage-mustgather
+operator:
+  bundles:
+  - as: local-storage-operator-bundle
+    context_dir: config
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/openshift/origin-local-storage-operator:latest
+    with: pipeline:local-storage-operator
+  - pullspec: quay.io/openshift/origin-local-storage-diskmaker:latest
+    with: pipeline:local-storage-diskmaker
 promotion:
   name: 4.10-priv
   namespace: ocp-private
@@ -66,6 +76,13 @@ tests:
 - as: e2e-operator
   steps:
     cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-local-storage-operator-bundle
+    env:
+      OO_CHANNEL: preview
+      OO_INSTALL_NAMESPACE: openshift-local-storage
+      OO_PACKAGE: local-storage-operator
+      OO_TARGET_NAMESPACES: '!install'
     test:
     - as: test
       cli: latest
@@ -74,7 +91,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    workflow: optional-operators-ci-aws
 zz_generated_metadata:
   branch: release-4.10
   org: openshift-priv
