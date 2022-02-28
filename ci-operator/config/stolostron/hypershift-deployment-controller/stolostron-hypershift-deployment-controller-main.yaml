@@ -1,8 +1,4 @@
 base_images:
-  open-cluster-management_builder_go1.17-linux:
-    name: builder
-    namespace: open-cluster-management
-    tag: go1.17-linux
   stolostron_builder_go1.17-linux:
     name: builder
     namespace: stolostron
@@ -15,12 +11,12 @@ build_root:
 images:
 - dockerfile_path: Dockerfile
   inputs:
-    open-cluster-management_builder_go1.17-linux:
+    stolostron_builder_go1.17-linux:
       as:
-      - registry.ci.openshift.org/open-cluster-management/builder:go1.17-linux
+      - registry.ci.openshift.org/stolostron/builder:go1.17-linux
   to: hypershift-deployment-controller
 promotion:
-  name: "2.5"
+  name: "2.0"
   namespace: stolostron
 resources:
   '*':
@@ -28,6 +24,12 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: fast-forward
+  postsubmit: true
+  steps:
+    env:
+      DESTINATION_BRANCH: backplane-2.0
+    workflow: ocm-ci-fastforward
 - as: unit-tests
   commands: make test
   container:
@@ -60,12 +62,6 @@ tests:
       IMAGE_TAG: latest
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
-- as: fast-forward
-  postsubmit: true
-  steps:
-    env:
-      DESTINATION_BRANCH: release-2.5
-    workflow: ocm-ci-fastforward
 zz_generated_metadata:
   branch: main
   org: stolostron
