@@ -1,0 +1,33 @@
+ref:
+  as: azure-provision-bastionhost
+  from_image:
+    namespace: ocp
+    name: "4.5"
+    tag: upi-installer
+  grace_period: 10m
+  commands: azure-provision-bastionhost-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  credentials:
+  - namespace: test-credentials
+    name: qe-proxy-creds
+    mount_path: /var/run/vault/qe-proxy
+  - namespace: test-credentials
+    name: openshift-custom-mirror-registry
+    mount_path: /var/run/vault/qe-mirror-registry
+  - namespace: test-credentials
+    name: qe-ssh-key
+    mount_path: /var/run/vault/qe-ssh-key
+  env:
+  - name: RESOURCE_GROUP
+    default: ""
+    documentation: |-
+      The resource group name that is already existing.
+  - name: VNET_NAME
+    default: ""
+    documentation: |-
+      The vnet name that is already existing.
+  documentation: |-
+    Provision a bastion in a provided resource group and vnet
