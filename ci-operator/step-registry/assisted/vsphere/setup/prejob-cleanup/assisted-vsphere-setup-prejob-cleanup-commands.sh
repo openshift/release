@@ -20,7 +20,6 @@ echo "$(date -u --rfc-3339=seconds) - Find virtual machines attached to ${LEASED
 # 3. list the path to the virtual machine via the managed object reference
 # 4. skip the templates with ova
 # 5. Power off and delete the virtual machine
-
 govc ls -json "/${GOVC_DATACENTER}/network/${LEASED_RESOURCE}" |\
     jq '.elements[]?.Object.Vm[]?.Value' |\
     xargs -I {} --no-run-if-empty govc ls -json -L VirtualMachine:{} |\
