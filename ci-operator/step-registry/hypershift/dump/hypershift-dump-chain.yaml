@@ -1,0 +1,20 @@
+chain:
+  as: hypershift-dump
+  steps:
+  - as: dump
+    cli: 4-11
+    commands: |-
+      set -exuo pipefail
+      bin/hypershift dump cluster --artifact-dir=$ARTIFACT_DIR \
+      --dump-guest-cluster=true \
+      --name="$(echo -n $PROW_JOB_ID|cut -d- -f-2)"
+      cd $ARTIFACT_DIR
+      tar -cvzf hostedcluster.tar.gz hostedcluster-*
+    from_image:
+      namespace: ocp
+      name: "4.11"
+      tag: hypershift-operator
+    resources:
+      requests:
+        cpu: 100m
+    timeout: 15m0s
