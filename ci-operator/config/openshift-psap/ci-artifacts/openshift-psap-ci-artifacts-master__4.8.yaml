@@ -52,19 +52,19 @@ tests:
         requests:
           cpu: 2000m
           memory: 2Gi
-    - as: presubmit-operatorhub-cleanup
-      commands: run prow gpu-operator cleanup_cluster
-      credentials:
-      - mount_path: /var/run/psap-entitlement-secret
-        name: psap-entitlement-secret
-        namespace: test-credentials
-      from: ci-artifacts
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 2Gi
-    - as: presubmit-master
-      commands: run prow gpu-operator test_master_branch
+    workflow: generic-claim
+- as: test-commit
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 3h0m0s
+    version: "4.8"
+  steps:
+    test:
+    - as: test-commit
+      commands: run test-commit
       credentials:
       - mount_path: /var/run/psap-entitlement-secret
         name: psap-entitlement-secret
@@ -75,49 +75,6 @@ tests:
           cpu: 2000m
           memory: 2Gi
     workflow: generic-claim
-- as: presubmit-gpu-operator-e2e-master-upgrade-to-4-9
-  steps:
-    cluster_profile: aws
-    test:
-    - as: 0-preupgrade
-      commands: run prow gpu-operator test_master_branch no_undeploy
-      credentials:
-      - mount_path: /var/run/psap-entitlement-secret
-        name: psap-entitlement-secret
-        namespace: test-credentials
-      from: ci-artifacts
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 2Gi
-    - as: 1-upgrade
-      commands: run prow cluster upgrade
-      credentials:
-      - mount_path: /var/run/psap-entitlement-secret
-        name: psap-entitlement-secret
-        namespace: test-credentials
-      dependencies:
-      - env: CLUSTER_UPGRADE_INITIAL_IMAGE
-        name: release:latest
-      - env: CLUSTER_UPGRADE_TARGET_IMAGE
-        name: release:target
-      from: ci-artifacts
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 2Gi
-    - as: 2-postupgrade
-      commands: run prow gpu-operator validate_deployment_post_upgrade
-      credentials:
-      - mount_path: /var/run/psap-entitlement-secret
-        name: psap-entitlement-secret
-        namespace: test-credentials
-      from: ci-artifacts
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 2Gi
-    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: openshift-psap
