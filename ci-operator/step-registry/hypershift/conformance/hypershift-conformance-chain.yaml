@@ -1,5 +1,5 @@
 chain:
-  as: hypershift-test-aws-test
+  as: hypershift-conformance
   steps:
   - as: conformance-tests
     cli: latest
@@ -12,6 +12,7 @@ chain:
       export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG="${KUBECONFIG}"
       export HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE="$(echo -n clusters-${CLUSTER_NAME}|sed 's#\.#-#g')"
       export AWS_SHARED_CREDENTIALS_FILE=/etc/hypershift-pool-aws-credentials/credentials
+      [[ -n ${CLUSTER_PROFILE_DIR:-} ]] && export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
       export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
       openshift-tests run openshift/conformance/parallel \
         -o "${ARTIFACT_DIR}/e2e.log" \
