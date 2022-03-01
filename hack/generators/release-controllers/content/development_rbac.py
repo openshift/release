@@ -1,3 +1,6 @@
+import genlib
+from config import Context
+
 
 def _add_namespace_read_only_rbac(gendoc, namespace):
     gendoc.append({
@@ -127,10 +130,16 @@ def _add_cache_monitoring_rbac(gendoc):
     })
 
 
-def add_development_monitoring_rbac(gendoc):
-    _add_deployment_monitoring_rbac(gendoc)
-    _add_cache_monitoring_rbac(gendoc)
+def generate_development_rbac(config):
+    for private in (False, True):
+        for arch in config.arches:
+            context = Context(config, arch, private)
 
+            with genlib.GenDoc(config.paths.path_rc_deployments.joinpath(f'admin-{context.is_namespace}-rbac.yaml'), context) as gendoc:
+                _add_namespace_read_only_rbac(gendoc, context.is_namespace)
+                _add_deployment_monitoring_rbac(gendoc)
+                _add_cache_monitoring_rbac(gendoc)
 
-def add_development_rbac(gendoc, namespace):
-    _add_namespace_read_only_rbac(gendoc, namespace)
+    context = Context(config, "x86_64", False)
+    with genlib.GenDoc(config.paths.path_rc_deployments.joinpath('admin-origin-rbac.yaml'), context) as gendoc:
+        _add_namespace_read_only_rbac(gendoc, 'origin')
