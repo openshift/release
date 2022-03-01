@@ -1,0 +1,64 @@
+base_images:
+  stolostron_builder_go1.17-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.17-linux
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: go1.17-linux
+images:
+- dockerfile_path: Dockerfile
+  inputs:
+    stolostron_builder_go1.17-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.17-linux
+  to: volsync-addon-controller
+promotion:
+  name: "2.5"
+  namespace: stolostron
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: |
+    export SELF="make -f Makefile"
+    export HOME="/tmp"
+    make -f Makefile test
+  container:
+    from: src
+- as: sonar-pre-submit
+  commands: |
+    export SELF="make -f Makefile.prow"
+    export HOME="/tmp"
+    make -f Makefile.prow sonar/go/prow
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+- as: sonar-post-submit
+  commands: |
+    export SELF="make -f Makefile.prow"
+    export HOME="/tmp"
+    make -f Makefile.prow sonar/go/prow
+  container:
+    from: src
+  postsubmit: true
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+- as: fast-forward
+  postsubmit: true
+  steps:
+    env:
+      DESTINATION_BRANCH: release-2.5
+    workflow: ocm-ci-fastforward
+zz_generated_metadata:
+  branch: main
+  org: stolostron
+  repo: volsync-addon-controller
