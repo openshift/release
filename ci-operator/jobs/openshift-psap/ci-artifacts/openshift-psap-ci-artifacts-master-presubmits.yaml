@@ -135,122 +135,6 @@ presubmits:
     - ^master$
     - ^master-
     cluster: build03
-    context: ci/prow/4.6-gpu-operator-e2e
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/variant: "4.6"
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-psap-ci-artifacts-master-4.6-gpu-operator-e2e
-    rerun_command: /test 4.6-gpu-operator-e2e
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=gpu-operator-e2e
-        - --variant=4.6
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: hive-hive-credentials
-        secret:
-          secretName: hive-hive-credentials
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.6-gpu-operator-e2e,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^master$
-    - ^master-
-    cluster: build03
-    context: ci/prow/4.6-images
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/variant: "4.6"
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-psap-ci-artifacts-master-4.6-images
-    rerun_command: /test 4.6-images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        - --variant=4.6
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.6-images,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^master$
-    - ^master-
-    cluster: build03
     context: ci/prow/4.7-gpu-operator-e2e
     decorate: true
     decoration_config:
@@ -364,34 +248,31 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )4.7-images,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^master$
     - ^master-
     cluster: build03
-    context: ci/prow/4.7-presubmit-gpu-operator-e2e-master-upgrade-to-4-8
+    context: ci/prow/4.7-test-commit
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
       ci-operator.openshift.io/variant: "4.7"
       ci.openshift.io/generator: prowgen
       job-release: "4.7"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-psap-ci-artifacts-master-4.7-presubmit-gpu-operator-e2e-master-upgrade-to-4-8
-    rerun_command: /test 4.7-presubmit-gpu-operator-e2e-master-upgrade-to-4-8
+    name: pull-ci-openshift-psap-ci-artifacts-master-4.7-test-commit
+    rerun_command: /test 4.7-test-commit
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/presubmit-gpu-operator-e2e-master-upgrade-to-4-8-cluster-profile
-        - --target=presubmit-gpu-operator-e2e-master-upgrade-to-4-8
+        - --target=test-commit
         - --variant=4.7
         command:
         - ci-operator
@@ -402,16 +283,14 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/presubmit-gpu-operator-e2e-master-upgrade-to-4-8-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -421,25 +300,19 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
+      - name: hive-hive-credentials
         secret:
-          secretName: cluster-secrets-aws
+          secretName: hive-hive-credentials
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.7-presubmit-gpu-operator-e2e-master-upgrade-to-4-8,?($|\s.*)
+    trigger: (?m)^/test( | .* )4.7-test-commit,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -559,34 +432,31 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )4.8-images,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^master$
     - ^master-
     cluster: build03
-    context: ci/prow/4.8-presubmit-gpu-operator-e2e-master-upgrade-to-4-9
+    context: ci/prow/4.8-test-commit
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
       ci-operator.openshift.io/variant: "4.8"
       ci.openshift.io/generator: prowgen
       job-release: "4.8"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-psap-ci-artifacts-master-4.8-presubmit-gpu-operator-e2e-master-upgrade-to-4-9
-    rerun_command: /test 4.8-presubmit-gpu-operator-e2e-master-upgrade-to-4-9
+    name: pull-ci-openshift-psap-ci-artifacts-master-4.8-test-commit
+    rerun_command: /test 4.8-test-commit
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/presubmit-gpu-operator-e2e-master-upgrade-to-4-9-cluster-profile
-        - --target=presubmit-gpu-operator-e2e-master-upgrade-to-4-9
+        - --target=test-commit
         - --variant=4.8
         command:
         - ci-operator
@@ -597,16 +467,14 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/presubmit-gpu-operator-e2e-master-upgrade-to-4-9-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -616,25 +484,19 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
+      - name: hive-hive-credentials
         secret:
-          secretName: cluster-secrets-aws
+          secretName: hive-hive-credentials
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.8-presubmit-gpu-operator-e2e-master-upgrade-to-4-9,?($|\s.*)
+    trigger: (?m)^/test( | .* )4.8-test-commit,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -754,97 +616,22 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )4.9-images,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^master$
     - ^master-
     cluster: build03
-    context: ci/prow/4.9-presubmit-gpu-operator-e2e-master-upgrade-to-4-10
+    context: ci/prow/4.9-test-commit
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
       ci-operator.openshift.io/variant: "4.9"
       ci.openshift.io/generator: prowgen
       job-release: "4.9"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-psap-ci-artifacts-master-4.9-presubmit-gpu-operator-e2e-master-upgrade-to-4-10
-    rerun_command: /test 4.9-presubmit-gpu-operator-e2e-master-upgrade-to-4-10
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/presubmit-gpu-operator-e2e-master-upgrade-to-4-10-cluster-profile
-        - --target=presubmit-gpu-operator-e2e-master-upgrade-to-4-10
-        - --variant=4.9
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/presubmit-gpu-operator-e2e-master-upgrade-to-4-10-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.9-presubmit-gpu-operator-e2e-master-upgrade-to-4-10,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^master$
-    - ^master-
-    cluster: build03
-    context: ci/prow/gpu-operator-commit
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-psap-ci-artifacts-master-gpu-operator-commit
-    rerun_command: /test gpu-operator-commit
+    name: pull-ci-openshift-psap-ci-artifacts-master-4.9-test-commit
+    rerun_command: /test 4.9-test-commit
     spec:
       containers:
       - args:
@@ -853,7 +640,8 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=gpu-operator-commit
+        - --target=test-commit
+        - --variant=4.9
         command:
         - ci-operator
         image: ci-operator:latest
@@ -892,7 +680,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )gpu-operator-commit,?($|\s.*)
+    trigger: (?m)^/test( | .* )4.9-test-commit,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -1416,132 +1204,3 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )test-commit,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^master$
-    - ^master-
-    cluster: build03
-    context: ci/prow/upgrade-images
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/variant: upgrade
-      ci.openshift.io/generator: prowgen
-      job-release: "4.9"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-psap-ci-artifacts-master-upgrade-images
-    rerun_command: /test upgrade-images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        - --variant=upgrade
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )upgrade-images,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^master$
-    - ^master-
-    cluster: build03
-    context: ci/prow/upgrade-presubmit-gpu-operator-e2e-master-upgrade
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
-      ci-operator.openshift.io/variant: upgrade
-      ci.openshift.io/generator: prowgen
-      job-release: "4.9"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-psap-ci-artifacts-master-upgrade-presubmit-gpu-operator-e2e-master-upgrade
-    rerun_command: /test upgrade-presubmit-gpu-operator-e2e-master-upgrade
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/presubmit-gpu-operator-e2e-master-upgrade-cluster-profile
-        - --target=presubmit-gpu-operator-e2e-master-upgrade
-        - --variant=upgrade
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/presubmit-gpu-operator-e2e-master-upgrade-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )upgrade-presubmit-gpu-operator-e2e-master-upgrade,?($|\s.*)
