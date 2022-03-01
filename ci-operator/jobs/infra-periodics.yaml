@@ -1351,38 +1351,6 @@ periodics:
         secretName: github-credentials-openshift-merge-robot
 - agent: kubernetes
   cluster: app.ci
-  decorate: true
-  decoration_config:
-    oauth_token_secret:
-      key: oauth
-      name: github-credentials-openshift-ci-robot-private-git-cloner
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: config
-    workdir: true
-  hidden: true
-  interval: 12h
-  labels:
-    ci.openshift.io/role: infra-internal
-  name: periodic-openshift-priv-group-update
-  spec:
-    containers:
-    - args:
-      - --peribolos-config=org/config.yaml
-      - --org=openshift-priv
-      - --group=openshift-priv-admins
-      command:
-      - group-auto-updater
-      image: group-auto-updater:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-    serviceAccountName: group-auto-updater
-- agent: kubernetes
-  cluster: app.ci
   cron: '@weekly'
   decorate: true
   decoration_config:
@@ -2180,10 +2148,17 @@ periodics:
       mediaTypes:
         log: text/plain
     gcs_credentials_secret: gce-sa-credentials-gcs-private
+    oauth_token_secret:
+      key: oauth
+      name: github-credentials-openshift-ci-robot-private-git-cloner
   extra_refs:
   - base_ref: master
     org: openshift
     repo: release
+    workdir: true
+  - base_ref: master
+    org: openshift
+    repo: config
   hidden: true
   interval: 24h
   labels:
@@ -2197,6 +2172,7 @@ periodics:
       - --mapping-file=/etc/sync-rover-groups/mapping.yaml
       - --groups-file=/etc/sync-rover-groups/groups.yaml
       - --config-file=./core-services/sync-rover-groups/_config.yaml
+      - --peribolos-config=../config/org/config.yaml
       - --log-level=debug
       - --dry-run=false
       image: registry.ci.openshift.org/ci/github-ldap-user-group-creator:latest
