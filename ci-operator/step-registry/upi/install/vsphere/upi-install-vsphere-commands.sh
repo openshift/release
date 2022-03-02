@@ -4,7 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+INSTALL_STAGE="initial"
+
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+#Save install status for must-gather to generate junit
+trap 'echo "$? $INSTALL_STAGE" > "${SHARED_DIR}/install-status.txt"' EXIT TERM
 
 export HOME=/tmp
 export SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
@@ -191,6 +195,8 @@ if [ $ret -ne 0 ]; then
   exit "$ret"
 fi
 
+INSTALL_STAGE="bootstrap_successful"
+
 ## Approving the CSR requests for nodes
 approve_csrs &
 
@@ -215,6 +221,7 @@ date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 touch /tmp/install-complete
 
 if test "${ret}" -eq 0 ; then
+  INSTALL_STAGE="cluster_creation_successful"
   touch  "${SHARED_DIR}/success"
   # Save console URL in `console.url` file so that ci-chat-bot could report success
   echo "https://$(env KUBECONFIG=${installer_dir}/auth/kubeconfig oc -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > "${SHARED_DIR}/console.url"
