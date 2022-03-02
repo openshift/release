@@ -333,9 +333,8 @@ vhd_data=${bastion_ignition_file}
 
 echo "Create a Storage Account for bastion vhd"
 # 'account_name' must have length less than 24, so hardcode the basion sa name
-#sa_name_prefix=$(echo "${bastion_name}" | sed 's/[-_]//g')
-#sa_name="${sa_name_prefix}sa"
-sa_name="${JOB_NAME_HASH}bastionsa"
+sa_name_prefix=$(echo "${NAMESPACE}" | sed "s/ci-op-//" | sed 's/[-_]//g')
+sa_name="${sa_name_prefix}${JOB_NAME_HASH}basa"
 run_command "az storage account create -g ${bastion_rg} --name ${sa_name} --kind Storage --sku Standard_LRS" &&
 account_key=$(az storage account keys list -g ${bastion_rg} --account-name ${sa_name} --query "[0].value" -o tsv) || exit 3
 
@@ -395,12 +394,7 @@ INTERNAL_PROXY_URL="http://${proxy_credential}@${bastion_internal_ip}:3128"
 
 
 echo "${INTERNAL_PROXY_URL}" > "${SHARED_DIR}/internal_proxy_url"
-
-cat > "${SHARED_DIR}/client_proxy_setting.sh" << EOF
-export http_proxy=${PUBLIC_PROXY_URL}
-export https_proxy=${PUBLIC_PROXY_URL}
-export no_proxy="localhost,127.0.0.1"
-EOF
+echo "${PUBLIC_PROXY_URL}" > "${SHARED_DIR}/public_proxy_url"
 
 #####################################
 ##############Clean Up###############
