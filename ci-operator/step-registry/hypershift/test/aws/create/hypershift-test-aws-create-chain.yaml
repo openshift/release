@@ -59,10 +59,9 @@ chain:
         --release-image ${RELEASE_IMAGE_LATEST} \
         --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)"
 
-             # TODO: Remove this and use --wait in the create cluster command after
-      # https://github.com/openshift/hypershift/pull/858 merges
+      # The timeout should be much lower, this is due to https://bugzilla.redhat.com/show_bug.cgi?id=2060091
       echo "Waiting for cluster to become available"
-      oc wait --timeout=20m --for=condition=Available --namespace=clusters hostedcluster/${CLUSTER_NAME}
+      oc wait --timeout=30m --for=condition=Available --namespace=clusters hostedcluster/${CLUSTER_NAME}
       echo "Cluster became available, creating kubeconfig"
       bin/hypershift create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
       echo "Waiting for clusteroperators to be ready"
