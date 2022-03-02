@@ -110,4 +110,29 @@ compute:
     aws:
       type: ${COMPUTE_NODE_TYPE}
 EOF
+
 /tmp/yq m -x -i "${CONFIG}" "${PATCH}"
+
+# custom rhcos ami for non-public regions
+RHCOS_AMI=
+if [ "$REGION" == "us-gov-west-1" ] || [ "$REGION" == "us-gov-east-1" ] || [ "$REGION" == "cn-north-1" ] || [ "$REGION" == "cn-northwest-1" ]; then
+  # TODO: move repo to a more appropriate location
+  curl -sL https://raw.githubusercontent.com/yunjiang29/ocp-test-data/main/coreos-for-non-public-regions/images.json -o /tmp/ami.json
+  oc registry login
+  # ocp_version=4.9 4.10 etc.
+  ocp_version=$(oc adm release info ${RELEASE_IMAGE_LATEST} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
+  RHCOS_AMI=$(jq -r .architectures.x86_64.images.aws.regions.\"${REGION}\".\"${ocp_version}\".image /tmp/ami.json)
+  echo "RHCOS_AMI: $RHCOS_AMI, ocp_version: $ocp_version"
+fi
+
+if [ ! -z ${RHCOS_AMI} ]; then
+  echo "patching rhcos ami to install-config.yaml"
+  CONFIG_PATCH_AMI="${SHARED_DIR}/install-config-ami.yaml.patch"
+  cat >> "${CONFIG_PATCH_AMI}" << EOF
+platform:
+  aws:
+    amiID: ${RHCOS_AMI}
+EOF
+  /tmp/yq m -x -i "${CONFIG}" "${CONFIG_PATCH_AMI}"  
+  cp "${SHARED_DIR}/install-config-ami.yaml.patch" "${ARTIFACT_DIR}/"
+fi
