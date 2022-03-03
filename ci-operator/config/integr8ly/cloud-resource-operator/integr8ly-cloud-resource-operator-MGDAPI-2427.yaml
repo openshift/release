@@ -1,0 +1,93 @@
+base_images:
+  os:
+    name: centos
+    namespace: openshift
+    tag: "7"
+binary_build_commands: unset GOFLAGS && make build COMPILE_TARGET="./build/_output/bin/cloud-resource-operator"
+  GO111MODULE=on
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
+images:
+- dockerfile_path: build/Dockerfile
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/integr8ly/cloud-resource-operator/build
+  to: cloud-resource-operator
+promotion:
+  name: MGDAPI-2427
+  namespace: integr8ly
+releases:
+  initial:
+    integration:
+      name: "4.9"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.9"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 250Mi
+tests:
+- as: vendor
+  commands: unset GOFLAGS && make vendor/check
+  container:
+    from: src
+- as: unit
+  commands: unset GOFLAGS && make test/unit
+  container:
+    from: src
+- as: format
+  commands: unset GOFLAGS && make code/check
+  container:
+    from: src
+- as: e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.9"
+  steps:
+    test:
+    - as: test
+      cli: latest
+      commands: unset GOFLAGS && make test/e2e/prow
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+- as: coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  secret:
+    mount_path: /tmp/secret
+    name: cloud-resource-operator-codecov-token
+- as: publish-coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  postsubmit: true
+  secret:
+    mount_path: /tmp/secret
+    name: cloud-resource-operator-codecov-token
+zz_generated_metadata:
+  branch: MGDAPI-2427
+  org: integr8ly
+  repo: cloud-resource-operator
