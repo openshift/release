@@ -20,6 +20,8 @@ az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIEN
 rg_file="${SHARED_DIR}/resouregroup"
 
 if [ -f "${rg_file}" ]; then
-    rg_name=$(cat "${rg_file}")
-    az group delete --name $rg_name --yes
+    existing_rg=$(cat "${rg_file}")
+    if [ "$(az group exists -n "${existing_rg}")" == "true" ]; then
+	az group delete -y -n "${existing_rg}"
+    fi
 fi
