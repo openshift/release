@@ -21,6 +21,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/hac-infra-codecov-token
         - --target=test
         command:
         - ci-operator
@@ -34,6 +35,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/hac-infra-codecov-token
+          name: hac-infra-codecov-token
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -42,6 +46,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: hac-infra-codecov-token
+        secret:
+          secretName: hac-infra-codecov-token
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
