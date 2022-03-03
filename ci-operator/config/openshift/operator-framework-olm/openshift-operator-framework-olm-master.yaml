@@ -24,9 +24,14 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
   to: operator-registry
+- dockerfile_path: base.Dockerfile
+  from: src
+  to: src-with-more-stuff
 promotion:
   name: "4.11"
   namespace: ocp
+  excluded_images:
+  - src-with-more-stuff
 releases:
   initial:
     integration:
@@ -46,7 +51,7 @@ tests:
 - as: verify
   commands: make verify
   container:
-    from: src
+    from: src-with-more-stuff
 - as: e2e-gcp
   steps:
     cluster_profile: gcp
@@ -60,15 +65,15 @@ tests:
 
     make unit/olm
   container:
-    from: src
+    from: src-with-more-stuff
 - as: unit-registry
   commands: make unit/registry
   container:
-    from: src
+    from: src-with-more-stuff
 - as: unit-api
   commands: make unit/api
   container:
-    from: src
+    from: src-with-more-stuff
 - as: e2e-aws-olm
   steps:
     cluster_profile: aws
@@ -76,7 +81,7 @@ tests:
     - as: test
       cli: latest
       commands: JUNIT_DIRECTORY=${ARTIFACT_DIR} make e2e/olm
-      from: src
+      from: src-with-more-stuff
       resources:
         requests:
           cpu: 100m
