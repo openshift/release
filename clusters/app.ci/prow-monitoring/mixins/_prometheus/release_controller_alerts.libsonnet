@@ -33,6 +33,38 @@
           }
         ],
       },
+      {
+        name: 'release-controller-git-cache-warning',
+        rules: [
+          {
+            alert: 'releaseControllerGitCacheWarning',
+            expr: '100 * kubelet_volume_stats_available_bytes{job="kubelet",namespace="ci-release",persistentvolumeclaim="git-git-cache-0"} / kubelet_volume_stats_capacity_bytes{job="kubelet",namespace="ci-release",persistentvolumeclaim="git-git-cache-0"} < 5',
+            labels: {
+              severity: 'warning',
+              team: 'release-controller',
+            },
+            annotations: {
+              message: 'The {{ $labels.persistentvolumeclaim }} PVC is only {{ $value | humanizePercentage }} free.'
+            },
+          }
+        ],
+      },
+      {
+        name: 'release-controller-git-cache-critical',
+        rules: [
+          {
+            alert: 'releaseControllerGitCacheCritical',
+            expr: '100 * kubelet_volume_stats_available_bytes{job="kubelet",namespace="ci-release",persistentvolumeclaim="git-git-cache-0"} / kubelet_volume_stats_capacity_bytes{job="kubelet",namespace="ci-release",persistentvolumeclaim="git-git-cache-0"} < 2',
+            labels: {
+              severity: 'critical',
+              team: 'release-controller',
+            },
+            annotations: {
+              message: 'The {{ $labels.persistentvolumeclaim }} PVC is only {{ $value | humanizePercentage }} free.'
+            },
+          }
+        ],
+      },
     ],
   },
 }
