@@ -1,0 +1,41 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
+images:
+- dockerfile_path: Dockerfile
+  to: redhat-appstudio-has-image
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: stable
+      version: "4.9"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: has-e2e
+  steps:
+    test:
+    - as: has-e2e
+      cli: latest
+      commands: |
+        echo $HAS_CONTROLLER_IMAGE | sed 's/\pipeline.*/pipeline/'
+        echo ${HAS_CONTROLLER_IMAGE%@*}
+      dependencies:
+      - env: HAS_CONTROLLER_IMAGE
+        name: redhat-appstudio-has-image
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+zz_generated_metadata:
+  branch: main
+  org: redhat-appstudio
+  repo: application-service
