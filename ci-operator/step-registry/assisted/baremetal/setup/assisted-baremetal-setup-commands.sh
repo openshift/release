@@ -17,6 +17,7 @@ tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/assisted.tar.gz"
 
 # Prepare configuration and run
 scp "${SSHOPTS[@]}" "${CLUSTER_PROFILE_DIR}/pull-secret" "root@${IP}:pull-secret"
+ssh "${SSHOPTS[@]}" "root@${IP}" "mkdir -p /root/.docker && cp /root/pull-secret /root/.docker/config.json"
 
 if [ "${ENVIRONMENT}" != "local" ]; then
 
