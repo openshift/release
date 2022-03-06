@@ -42,7 +42,7 @@ cat >> "${SHARED_DIR}/govc.sh" << EOF
 export GOVMOMI_HOME="${SHARED_DIR}/govc"
 export GOVC_URL="${vsphere_url}"
 export GOVC_USERNAME="${vsphere_user}"
-export GOVC_PASSWORD="${vsphere_password}"
+export GOVC_PASSWORD='${vsphere_password}'
 export GOVC_INSECURE=1
 export GOVC_DATACENTER="${vsphere_datacenter}"
 export GOVC_DATASTORE="${vsphere_datastore}"
