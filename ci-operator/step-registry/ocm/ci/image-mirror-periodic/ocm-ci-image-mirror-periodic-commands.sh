@@ -36,6 +36,19 @@ base64 -d < "$REGISTRY_TOKEN_FILE" > "$config_file" || {
     exit 1
 }
 
+password_file="$HOME/.docker/password"
+jq -r ".\"$REGISTRY_HOST\".password" > "$password_file" || {
+    log "ERROR Could not extract registry password from config file"
+    log "      From: $config_file"
+    log "      To  : $password_file"
+    exit 1
+}
+
+docker login -u serviceaccount --password-stdin < "$password_file" || {
+    log "ERROR Could not log in to registry"
+    exit 1
+}
+
 # Build destination image reference
 DESTINATION_IMAGE_REF="$REGISTRY_HOST/$REGISTRY_ORG/$IMAGE_REPO:$IMAGE_TAG"
 
