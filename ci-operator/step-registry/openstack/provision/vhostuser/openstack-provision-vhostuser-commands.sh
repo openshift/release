@@ -80,7 +80,7 @@ metadata:
 spec:
   config:
     ignition:
-      version: 2.2.0
+      version: 3.2.0
     systemd:
       units:
       - name: vhostuser-bind.service
@@ -109,7 +109,7 @@ spec:
           source: data:text/plain;charset=utf-8;base64,${SCRIPT_BASE64}
         filesystem: root
         mode: 0744
-        path: //usr/local/bin/vhostuser
+        path: /usr/local/bin/vhostuser
       - contents:
           source: data:text/plain;charset=utf-8;base64,${SCRIPT_ARG_BASE64}
         filesystem: root
