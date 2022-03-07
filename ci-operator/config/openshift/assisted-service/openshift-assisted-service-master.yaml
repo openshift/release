@@ -60,10 +60,6 @@ images:
     COPY . .
   from: src
   to: assisted-service-scripts
-- dockerfile_literal: |
-    FROM base
-  from: ci-index
-  to: assisted-service-bundle
 operator:
   bundles:
   - dockerfile_path: deploy/olm-catalog/bundle.Dockerfile
@@ -81,8 +77,6 @@ operator:
   - pullspec: quay.io/edge-infrastructure/postgresql-12-centos7:latest
     with: postgresql-12-centos7
 promotion:
-  additional_images:
-    assisted-service-bundle-wip: ci-index
   name: ocm-2.5
   namespace: edge-infrastructure
 releases:
@@ -121,6 +115,16 @@ tests:
   steps:
     dependencies:
       SOURCE_IMAGE_REF: assisted-service
+    test:
+    - ref: assisted-baremetal-images-publish
+- as: mirror-index-image
+  cron: '@daily'
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: ci-index
+    env:
+      IMAGE_REPO: assisted-service-ci-index
+      IMAGE_TAG: latest
     test:
     - ref: assisted-baremetal-images-publish
 - as: ocm-publish
