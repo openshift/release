@@ -29,23 +29,10 @@ if [[ -z "$IMAGE_REPO" ]]; then
 fi
 
 config_file="$HOME/.docker/config.json"
-base64 -d < "$REGISTRY_TOKEN_FILE" > "$config_file" || {
+base64 -d < "$REGISTRY_TOKEN_FILE" | jq '{"auths": .}' > "$config_file" || {
     log "ERROR Could not base64 decode registry secret file"
     log "      From: $REGISTRY_TOKEN_FILE"
     log "      To  : $config_file"
-    exit 1
-}
-
-password_file="$HOME/.docker/password"
-jq -r ".\"$REGISTRY_HOST\".password" > "$password_file" || {
-    log "ERROR Could not extract registry password from config file"
-    log "      From: $config_file"
-    log "      To  : $password_file"
-    exit 1
-}
-
-docker login -u serviceaccount --password-stdin < "$password_file" || {
-    log "ERROR Could not log in to registry"
     exit 1
 }
 
@@ -55,7 +42,7 @@ DESTINATION_IMAGE_REF="$REGISTRY_HOST/$REGISTRY_ORG/$IMAGE_REPO:$IMAGE_TAG"
 log "INFO Mirroring Image"
 log "     From: $SOURCE_IMAGE_REF"
 log "     To  : $DESTINATION_IMAGE_REF"
-oc image mirror "$SOURCE_IMAGE_REF" "$DESTINATION_IMAGE_REF" || {
+oc image mirror -a auth.json "$SOURCE_IMAGE_REF" "$DESTINATION_IMAGE_REF" || {
     log "ERROR Unable to mirror image"
     exit 1
 }
