@@ -97,7 +97,16 @@ tests:
     - as: build-test-and-push-img
       commands: |
         #!/bin/bash
-        set -euo pipefail
+        set -xeuo pipefail
+
+        # PULL_BASE_REF: https://github.com/kubernetes/test-infra/blob/master/prow/jobs.md
+        # But prefer OPENSHIFT_BUILD_REFERENCE if available, which is more correct in
+        # rehearsal jobs. If neither are set, default to master branch.
+        # See: https://github.com/coreos/coreos-assembler/commit/410b49d83482ea2824c84f84a3544afa27ac5493 for context
+        BRANCH="${OPENSHIFT_BUILD_REFERENCE:-${PULL_BASE_REF:-master}}"
+
+        # Strip release- from the branch so we're left with the number (e.g., release-4.11 -> 4.11).
+        BRANCH="${BRANCH/release-/}"
 
         # Ensure we have a known directory for cosa to build in
         export COSA_DIR="/tmp/cosa"
@@ -111,9 +120,12 @@ tests:
         cd "$COSA_DIR"
         # Tags with the cosa build ID / arch
         cosa push-container registry.ci.openshift.org/rhcos-devel/rhel-coreos
+        cosa push-container "registry.ci.openshift.org/rhcos-devel/rhel-coreos:${BRANCH}"
 
-        cosa push-container registry.ci.openshift.org/rhcos-devel/rhel-coreos:latest
-        cosa push-container registry.ci.openshift.org/rhcos-devel/rhel-coreos:4.11
+        # Only push latest tag on master branch
+        if [[ "$BRANCH" == "master"  ]]; then
+          cosa push-container registry.ci.openshift.org/rhcos-devel/rhel-coreos:latest
+        fi
       from: build-test-qemu-img
       resources:
         limits:
