@@ -29,23 +29,10 @@ if [[ -z "$IMAGE_REPO" ]]; then
 fi
 
 config_file="$HOME/.docker/config.json"
-base64 -d < "$REGISTRY_TOKEN_FILE" > "$config_file" || {
+base64 -d < "$REGISTRY_TOKEN_FILE" | jq '{"auths": .}' > "$config_file" || {
     log "ERROR Could not base64 decode registry secret file"
     log "      From: $REGISTRY_TOKEN_FILE"
     log "      To  : $config_file"
-    exit 1
-}
-
-password_file="$HOME/.docker/password"
-jq -r ".\"$REGISTRY_HOST\".password" > "$password_file" || {
-    log "ERROR Could not extract registry password from config file"
-    log "      From: $config_file"
-    log "      To  : $password_file"
-    exit 1
-}
-
-docker login -u serviceaccount --password-stdin < "$password_file" || {
-    log "ERROR Could not log in to registry"
     exit 1
 }
 
