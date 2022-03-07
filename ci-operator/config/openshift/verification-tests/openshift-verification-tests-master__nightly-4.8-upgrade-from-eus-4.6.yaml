@@ -1,0 +1,99 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  openstack-installer:
+    name: "4.6"
+    namespace: ocp
+    tag: openstack-installer
+  upi-installer:
+    name: "4.6"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  initial:
+    release:
+      channel: stable
+      version: "4.6"
+  intermediate:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.7"
+  latest:
+    release:
+      channel: stable
+      version: "4.6"
+  target:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.8"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: aws-ipi
+  interval: 48h
+  steps:
+    cluster_profile: aws-2
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      E2E_RUN_INTERMEDIATE_TAGS: '@4.7 and @aws-ipi and @upgrade-sanity'
+      E2E_RUN_LATEST_TAGS: '@4.8 and @aws-ipi and @upgrade-sanity'
+      UPGRADE_CHECK_RUN_TAGS: '@4.6 and @aws-ipi and @upgrade-check'
+      UPGRADE_PRE_RUN_TAGS: '@4.6 and @aws-ipi and @upgrade-prepare'
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - ref: ipi-install-hosted-loki
+    - chain: ipi-aws-pre-stableinitial
+    - ref: cucushift-pre
+    - ref: cucushift-upgrade-pre
+    workflow: cucushift-upgrade-paused
+- as: azure-ipi
+  interval: 48h
+  steps:
+    cluster_profile: azure-2
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+      E2E_RUN_INTERMEDIATE_TAGS: '@4.7 and @azure-ipi and @upgrade-sanity'
+      E2E_RUN_LATEST_TAGS: '@4.8 and @azure-ipi and @upgrade-sanity'
+      UPGRADE_CHECK_RUN_TAGS: '@4.6 and @azure-ipi and @upgrade-check'
+      UPGRADE_PRE_RUN_TAGS: '@4.6 and @azure-ipi and @upgrade-prepare'
+    post:
+    - chain: ipi-azure-post
+    pre:
+    - ref: ipi-install-hosted-loki
+    - chain: ipi-azure-pre-stableinitial
+    - ref: cucushift-pre
+    - ref: cucushift-upgrade-pre
+    workflow: cucushift-upgrade-paused
+- as: azure-upi
+  interval: 48h
+  steps:
+    cluster_profile: azure4
+    env:
+      E2E_RUN_INTERMEDIATE_TAGS: '@4.7 and @azure-upi and @upgrade-sanity'
+      E2E_RUN_LATEST_TAGS: '@4.8 and @azure-upi and @upgrade-sanity'
+      UPGRADE_CHECK_RUN_TAGS: '@4.6 and @azure-upi and @upgrade-check'
+      UPGRADE_PRE_RUN_TAGS: '@4.6 and @azure-upi and @upgrade-prepare'
+    post:
+    - chain: upi-azure-post
+    pre:
+    - chain: upi-azure-pre
+    - ref: cucushift-pre
+    - ref: cucushift-upgrade-pre
+    workflow: cucushift-upgrade-paused
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: verification-tests
+  variant: nightly-4.8-upgrade-from-eus-4.6
