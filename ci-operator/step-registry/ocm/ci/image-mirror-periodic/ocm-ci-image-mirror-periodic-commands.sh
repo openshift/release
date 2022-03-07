@@ -42,7 +42,7 @@ DESTINATION_IMAGE_REF="$REGISTRY_HOST/$REGISTRY_ORG/$IMAGE_REPO:$IMAGE_TAG"
 log "INFO Mirroring Image"
 log "     From: $SOURCE_IMAGE_REF"
 log "     To  : $DESTINATION_IMAGE_REF"
-oc image mirror -a auth.json "$SOURCE_IMAGE_REF" "$DESTINATION_IMAGE_REF" || {
+oc image mirror "$SOURCE_IMAGE_REF" "$DESTINATION_IMAGE_REF" || {
     log "ERROR Unable to mirror image"
     exit 1
 }
