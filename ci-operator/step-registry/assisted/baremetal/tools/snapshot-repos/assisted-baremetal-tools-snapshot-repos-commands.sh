@@ -21,7 +21,7 @@ python3 ./tools/check_ai_images.py
 
 git add assisted-installer.yaml
 
-if [ "$(git diff --cached --quiet)" ]; then
+if git diff --cached --quiet; then
     echo "Nothing to commit"
     exit 0
 fi
