@@ -610,7 +610,9 @@ tests:
       commands: |-
         CLUSTER_NAME="$(echo -n $PROW_JOB_ID|cut -d- -f-2)-mgmt"
         export KUBECONFIG=/etc/hypershift-kubeconfig/hypershift-ops-admin.kubeconfig
-        bin/hypershift dump cluster --artifact-dir=$ARTIFACT_DIR --name="${CLUSTER_NAME}"
+        bin/hypershift dump cluster --dump-guest-cluster=true --artifact-dir=$ARTIFACT_DIR --name="${CLUSTER_NAME}"
+        cd $ARTIFACT_DIR
+        tar -cvzf hostedcluster.tar.gz hostedcluster-*
       credentials:
       - mount_path: /etc/hypershift-kubeconfig
         name: hypershift-ci-1
