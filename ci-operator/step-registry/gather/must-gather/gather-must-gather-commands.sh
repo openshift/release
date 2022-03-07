@@ -4,6 +4,44 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+function createInstallJunit() {
+  if test -f "${SHARED_DIR}/install-status.txt"
+  then
+    EXIT_CODE=`cat ${SHARED_DIR}/install-status.txt | awk '{print $1}'`
+    INSTALL_STATUS=`cat ${SHARED_DIR}/install-status.txt | awk '{print $2}'`
+    if [ "$EXIT_CODE" ==  0  ]
+    then
+      cat >"${ARTIFACT_DIR}/junit_install.xml" <<EOF
+      <testsuite name="cluster install" tests="2" failures="0">
+        <testcase name="cluster bootstrap should succeed"/>
+        <testcase name="cluster install should succeed"/>
+      </testsuite>
+EOF
+    elif [ $INSTALL_STATUS == "bootstrap_successful" ] || [ $INSTALL_STATUS == "cluster_creation_successful" ]
+    then
+      cat >"${ARTIFACT_DIR}/junit_install.xml" <<EOF
+      <testsuite name="cluster install" tests="2" failures="1">
+        <testcase name="cluster bootstrap should succeed"/>
+        <testcase name="cluster install should succeed">
+          <failure message="">openshift cluster install failed after stage $INSTALL_STATUS with exit code $EXIT_CODE</failure>
+        </testcase>
+      </testsuite>
+EOF
+    else
+      cat >"${ARTIFACT_DIR}/junit_install.xml" <<EOF
+      <testsuite name="cluster install" tests="2" failures="2">
+        <testcase name="cluster bootstrap should succeed">
+          <failure message="">cluster bootstrap failed</failure>
+        </testcase>
+        <testcase name="cluster install should succeed">
+          <failure message="">openshift cluster install failed after stage $INSTALL_STATUS with exit code $EXIT_CODE</failure>
+        </testcase>
+      </testsuite>
+EOF
+    fi
+  fi
+}
+
 if test ! -f "${KUBECONFIG}"
 then
 	echo "No kubeconfig, so no point in calling must-gather."
@@ -30,6 +68,8 @@ then
 else
 	MUST_GATHER_IMAGE=${MUST_GATHER_IMAGE:-""}
 fi
+
+createInstallJunit
 
 echo "Running must-gather..."
 mkdir -p ${ARTIFACT_DIR}/must-gather

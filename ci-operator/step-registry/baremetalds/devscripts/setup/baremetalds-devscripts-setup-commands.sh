@@ -10,9 +10,12 @@ echo "************ baremetalds devscripts setup command ************"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
 
+INSTALL_STAGE="initial"
 # Get dev-scripts logs and other configuration
 finished()
 {
+  #Save install status for must-gather to generate junit
+  echo "$? $INSTALL_STAGE" > "${SHARED_DIR}/install-status.txt"
   set +e
 
   echo "Fetching kubeconfig, other credentials..."
@@ -138,3 +141,5 @@ EOF
 
 # Save console URL in `console.url` file so that ci-chat-bot could report success
 scp "${SSHOPTS[@]}" "root@${IP}:/tmp/console.url" "${SHARED_DIR}/"
+
+INSTALL_STAGE="cluster_creation_successful"
