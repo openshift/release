@@ -538,7 +538,7 @@ tests:
                   -test.v \
                   -test.timeout=0 \
                   -test.run=TestKubeVirtCreateCluster \
-                  -e2e.node-pool-replicas=1 \
+                  -e2e.node-pool-replicas=5 \
                   -e2e.base-domain="fake" \
                   -e2e.kubevirt-container-disk-image="${RHCOS_CD_IMAGE}" \
                   --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson
@@ -584,7 +584,7 @@ tests:
                   -test.v \
                   -test.timeout=0 \
                   -test.run=TestKubeVirtCreateCluster \
-                  -e2e.node-pool-replicas=1 \
+                  -e2e.node-pool-replicas=5 \
                   -e2e.base-domain="fake" \
                   -e2e.kubevirt-container-disk-image="${RHCOS_CD_IMAGE}" \
                   --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson
@@ -610,7 +610,9 @@ tests:
       commands: |-
         CLUSTER_NAME="$(echo -n $PROW_JOB_ID|cut -d- -f-2)-mgmt"
         export KUBECONFIG=/etc/hypershift-kubeconfig/hypershift-ops-admin.kubeconfig
-        bin/hypershift dump cluster --artifact-dir=$ARTIFACT_DIR --name="${CLUSTER_NAME}"
+        bin/hypershift dump cluster --dump-guest-cluster=true --artifact-dir=$ARTIFACT_DIR --name="${CLUSTER_NAME}"
+        cd $ARTIFACT_DIR
+        tar -cvzf hostedcluster.tar.gz hostedcluster-*
       credentials:
       - mount_path: /etc/hypershift-kubeconfig
         name: hypershift-ci-1
