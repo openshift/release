@@ -99,14 +99,12 @@ tests:
         #!/bin/bash
         set -xeuo pipefail
 
-        # PULL_BASE_REF: https://github.com/kubernetes/test-infra/blob/master/prow/jobs.md
-        # But prefer OPENSHIFT_BUILD_REFERENCE if available, which is more correct in
-        # rehearsal jobs. If neither are set, default to master branch.
-        # See: https://github.com/coreos/coreos-assembler/commit/410b49d83482ea2824c84f84a3544afa27ac5493 for context
-        BRANCH="${OPENSHIFT_BUILD_REFERENCE:-${PULL_BASE_REF:-master}}"
-
-        # Strip release- from the branch so we're left with the number (e.g., release-4.11 -> 4.11).
-        BRANCH="${BRANCH/release-/}"
+        # We can't use PULL_BASE_REF or OPENSHIFT_BUILD_REFERENCE to get the
+        # branch since this is a periodic job which originates from
+        # openshift/release, not the openshift/os repository. We then strip
+        # release- from the branch name so we're left with the number (e.g.,
+        # release-4.11 -> 4.11).
+        BRANCH="$(echo "$JOB_SPEC" | jq -r '.extra_refs[0].base_ref | sub("release-"; "")')"
 
         # Ensure we have a known directory for cosa to build in
         export COSA_DIR="/tmp/cosa"
