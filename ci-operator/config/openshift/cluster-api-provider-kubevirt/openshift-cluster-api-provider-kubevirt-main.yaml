@@ -75,19 +75,25 @@ images:
       paths:
       - destination_dir: .
         source_path: /usr/bin/oc
+    openshift_release_golang-1.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
   to: capk-oc-bin-image
 promotion:
-  namespace: hypershift
-  tag: main
+  excluded_images:
+  - capk-oc-bin-image
+  - cluster-api-kubevirt-controller
+  name: "4.11"
+  namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.10"
+      name: "4.11"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.10"
+      name: "4.11"
       namespace: ocp
 resources:
   '*':
@@ -220,119 +226,21 @@ tests:
         requests:
           cpu: 500m
           memory: 1Gi
-    - as: create-cluster
+    - as: run-tests
       commands: |-
         set -x
-        sed -i -E "/controlPlaneServiceTemplate:/{ n; /spec:/ { n; /type:/ { s/ClusterIP/LoadBalancer/; p; d;}}}" templates/cluster-template.yaml
-
-        export NODE_VM_IMAGE_TEMPLATE=quay.io/kubevirtci/fedora-kubeadm:35
-        export IMAGE_REPO=k8s.gcr.io
-        export CRI_PATH="/var/run/crio/crio.sock"
-        export CLUSTER_NAME=tenant-capk
-        clusterctl generate cluster ${CLUSTER_NAME} \
-                   --kubernetes-version v1.21.0 \
-                   --control-plane-machine-count=1 \
-                   --worker-machine-count=1 \
-                   --from templates/cluster-template.yaml \
-                   -n capk-system | oc apply -f -
-      from: capk-oc-bin-image
-      resources:
-        requests:
-          cpu: 500m
-          memory: 1Gi
-    - as: validate-cluster
-      commands: |-
-        set -x
-        export CLUSTER_NAME=tenant-capk
-        export CLUSTER_NS=capk-system
-
-        sleep 60
-
-        oc wait kubevirtcluster -l cluster.x-k8s.io/cluster-name=${CLUSTER_NAME} --for=condition=Ready -n ${CLUSTER_NS} --timeout=120s
-
-        RETRIES=20
-        VMS_EXISTS=false
-        for i in $(seq ${RETRIES}); do
-          if [[ $(oc get vm -n ${CLUSTER_NS} --no-headers | wc -l) -lt 2 ]]; then
-            sleep 30
-            echo "Try ${i}/${RETRIES}: not all the VMs were created, yet; trying again in 30 seconds"
-            continue
-          else
-            VMS_EXISTS=true
-            break
-          fi
-        done
-
-        if [[ ${VMS_EXISTS} == "false" ]]; then
-          echo "should create at least 2 VMs, but it didn't"
-          exit 1
-        fi
-
-        #check VMs
-        for VM in $(oc get vm -n ${CLUSTER_NS} -o custom-columns=NAME:.metadata.name --no-headers); do
-          oc wait vm -n ${CLUSTER_NS} ${VM} --for=condition=Ready
-        done
-
-        #check VMIs
-        for VMI in $(oc get vmi -n ${CLUSTER_NS} -o custom-columns=NAME:.metadata.name --no-headers); do
-          oc wait vmi -n ${CLUSTER_NS} ${VMI} --for=condition=Ready
-          [[ $(oc get vmi -n ${CLUSTER_NS} ${VMI} -o custom-columns=PHASE:.status.phase --no-headers) == "Running" ]]
-        done
-
-        oc get vmi -n ${CLUSTER_NS}
-
-        TENANT_CLUSTER_IP=$(oc get svc -n ${CLUSTER_NS} -l cluster.x-k8s.io/cluster-name=tenant-capk -o custom-columns=EXT_IP:.status.loadBalancer.ingress[0].ip --no-headers)
-        clusterctl get kubeconfig ${CLUSTER_NAME} -n ${CLUSTER_NS} > ${CLUSTER_NAME}-kubeconfig
-        sed -i -E "/certificate-authority-data/d;s|(server: https://)[^:]+|\1${TENANT_CLUSTER_IP}|;/^- cluster:/a\    insecure-skip-tls-verify: true" ${CLUSTER_NAME}-kubeconfig
-
-        # check the tenant cluster. Check if the API-Server is responsive
-        MNGMNT_KUBECONFI=${KUBECONFIG}
-        export KUBECONFIG=${CLUSTER_NAME}-kubeconfig
-
-        RETRIES=20
-        API_SERVER_IS_UP=false
-        for i in $(seq ${RETRIES}); do
-          if [[ $(oc get --raw='/readyz') ]]; then
-            API_SERVER_IS_UP=true
-            break
-          else
-            echo "Try ${i}/${RETRIES}: tenant API Server is not up, yet; trying again in 30 seconds"
-            sleep 30
-            continue
-          fi
-        done
-
-        if [[ ${API_SERVER_IS_UP} == "false" ]]; then
-          echo "Should have a responsive tenenat API server by now; aborting..."
-          exit 1
-        fi
-
-        RETRIES=20
-        NODES_ARE_UP=false
-        for i in $(seq ${RETRIES}); do
-          if [[ $(oc get nodes --no-headers | wc -l) -lt 2 ]]; then
-            echo "Try ${i}/${RETRIES}: not all the nodes are up, yet; trying again in 30 seconds"
-            sleep 30
-            continue
-          else
-            NODES_ARE_UP=true
-            break
-          fi
-        done
-
-        if [[ ${NODES_ARE_UP} == "false" ]]; then
-          echo "Should have two working nodes by now; aborting..."
-          exit 1
-        fi
-
-        oc get nodes -o wide
-
-        oc config set-context $(oc config current-context) --namespace=default
-
-        # create a workload on the tenant cluster
-        oc run testpod --image=nginx
-        oc wait pod testpod --for=condition=Ready --timeout=90s
-        oc get pods
+        go version
+        go install -mod=mod github.com/onsi/ginkgo/ginkgo@v1.16.5
+        go mod tidy
+        GOFLAGS="-mod=readonly" ginkgo build e2e-tests/
+        TESR_DIR=$(pwd)/test-dir
+        mkdir ${TESR_DIR}
+        e2e-tests/e2e-tests.test \
+          --kubectl-path=/usr/bin/oc \
+          --clusterctl-path=/usr/bin/clusterctl \
+          --working-dir=${TESR_DIR} \
+          --ginkgo.junit-report=${ARTIFACT_DIR}/junit_report.xml \
+          --ginkgo.label-filter="!persistentVMs"
       from: capk-oc-bin-image
       resources:
         requests:
