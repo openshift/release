@@ -5,6 +5,12 @@ set -o errexit
 set -o pipefail
 set -x
 
+
+if [ "${TEST_SUITE:-full}" == "none" ]; then
+    echo "No need to run tests"
+    exit 0
+fi
+
 echo "************ baremetalds assisted test command ************"
 
 # Fetch packet basic configuration
