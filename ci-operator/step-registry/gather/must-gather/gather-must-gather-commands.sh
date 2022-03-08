@@ -82,7 +82,8 @@ cat >> ${SHARED_DIR}/custom-links.txt << EOF
 <script>
 let a = document.createElement('a');
 a.href="https://kaas.dptools.openshift.org/?search="+document.referrer;
-a.innerHTML="<abbr title=\"KaaS is a service to spawn a fake API service that parses must-gather data. As a result, users can pass Prow CI URL to the service, fetch generated kubeconfig and use kubectl/oc/k9s/openshift-console to investigate the state of the cluster at the time must-gather was collected.\">KaaS</abbr>";
+a.title="KaaS is a service to spawn a fake API service that parses must-gather data. As a result, users can pass Prow CI URL to the service, fetch generated kubeconfig and use kubectl/oc/k9s/openshift-console to investigate the state of the cluster at the time must-gather was collected."
+a.innerHTML="KaaS";
 a.target="_blank";
 document.getElementById("wrapper").append(a);
 </script>
