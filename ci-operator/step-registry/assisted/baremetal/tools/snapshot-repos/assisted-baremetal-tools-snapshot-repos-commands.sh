@@ -16,6 +16,8 @@ cd /tmp/assisted-installer-deployment
 
 git reset --hard
 
+sleep 30m
+
 python3 ./tools/update_assisted_installer_yaml.py --full
 python3 ./tools/check_ai_images.py
 
