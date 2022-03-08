@@ -72,8 +72,7 @@ spec:
     image: registry.redhat.io/openshift4/dpdk-base-rhel8:v4.9
     securityContext:
       capabilities:
-        add: ["IPC_LOCK","SYS_ADMIN"]
-      privileged: true
+        add: ["CAP_SYS_RAWIO", "IPC_LOCK", "SYS_RESOURCE", "NET_RAW"]
       runAsUser: 0
     resources:
       requests:
