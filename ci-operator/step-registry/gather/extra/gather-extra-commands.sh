@@ -192,11 +192,16 @@ while IFS= read -r i; do
   queue ${ARTIFACT_DIR}/metrics/${file}-controllers-heap oc --insecure-skip-tls-verify exec $i -- /bin/bash -c 'oc --insecure-skip-tls-verify get --raw /debug/pprof/heap --server "https://$( hostname ):8444" --config /etc/origin/master/admin.kubeconfig'
 done < /tmp/pods-api
 
+set -x
+gzip --version
 while IFS= read -r i; do
   file="$( echo "$i" | cut -d ' ' -f 2,3,5 | tr -s ' ' '_' )"
   FILTER=gzip queue ${ARTIFACT_DIR}/pods/${file}.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s $i
+  file  ${ARTIFACT_DIR}/pods/${file}.log.gz
   FILTER=gzip queue ${ARTIFACT_DIR}/pods/${file}_previous.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s -p $i
+  file ${ARTIFACT_DIR}/pods/${file}_previous.log.gz
 done < /tmp/containers
+set +x
 
 # Snapshot the prometheus data from the replica that has the oldest
 # PVC. If persistent storage isn't enabled, it uses the last
