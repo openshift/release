@@ -198,8 +198,11 @@ while IFS= read -r i; do
   file="$( echo "$i" | cut -d ' ' -f 2,3,5 | tr -s ' ' '_' )"
   FILTER=gzip queue ${ARTIFACT_DIR}/pods/${file}.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s $i
   file  ${ARTIFACT_DIR}/pods/${file}.log.gz
+  ls -l ${ARTIFACT_DIR}/pods/${file}.log.gz
+
   FILTER=gzip queue ${ARTIFACT_DIR}/pods/${file}_previous.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s -p $i
   file ${ARTIFACT_DIR}/pods/${file}_previous.log.gz
+  ls -l ${ARTIFACT_DIR}/pods/${file}_previous.log.gz
 done < /tmp/containers
 set +x
 
