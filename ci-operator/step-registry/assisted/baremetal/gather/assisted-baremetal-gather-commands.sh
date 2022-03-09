@@ -49,9 +49,10 @@ cp -v -r /var/lib/libvirt/dnsmasq /tmp/artifacts/libvirt-dnsmasq
 cp -v -r /var/log/swtpm/libvirt/qemu /tmp/artifacts/libvirt-qemu || true
 ls -ltr /var/lib/swtpm-localca/ >> /tmp/artifacts/libvirt-qemu/ls-swtpm-localca.txt || true
 
+export LOGS_DEST=/tmp/artifacts
+
 # Get assisted logs
 if [ -f "\${HOME}/.kube/config" ]; then
-  export LOGS_DEST=/tmp/artifacts
   export KUBECTL="kubectl --kubeconfig=\${HOME}/.kube/config"
 
   make download_service_logs
