@@ -6,6 +6,9 @@ set -o pipefail
 
 base="$( dirname "${BASH_SOURCE[0]}" )/.."
 
+# The following is an array of all the 4.x releases that have ReleaseConfig definitions, sorted by version from Highest to Lowest:
+# [4.11, 4.10, 4.9, 4.8, ...]
+releases=( $(ls "${base}/core-services/release-controller/_releases/" | grep -Eo "4\.[0-9]+" | sort -Vr | uniq) )
 
 # Stolen from https://github.com/kubermatic/kubermatic/blob/00c0da788d618a4fbf3ddf1e9655c8a3a06d0a28/hack/lib.sh#L41 https://github.com/kubermatic/kubermatic/blob/00c0da788d618a4fbf3ddf1e9655c8a3a06d0a28/hack/lib.sh#L41
 retry() {
@@ -58,7 +61,17 @@ function annotate() {
 	fi
 }
 
-for release in $( ls "${base}/core-services/release-controller/_releases/" | grep -Eo "4\.[0-9]+" | sort | uniq ); do
+# It has been decided that the release-controller should no longer display information for the older, EOL, releases on the
+# Release Status page.  The following logic will iterate through the first 7 releases of the array and annotate the
+# imagestreams accordingly. The older imagestreams, that are no longer being annotated, will still remain on the Release
+# Status page until someone manually removes the "release.openshift.io/config" annotation from them.
+#
+# Currently, the "latest" release is 4.11.  So, the releases that will be annotated by this logic will be:
+#   4.11, 4.10, 4.9, 4.8, 4.7, 4.6, 4.5
+# At the point that 4.12 gets introduced, this logic will annotate the following releases:
+#   4.12, 4.11, 4.10, 4.9, 4.8, 4.7, 4.6
+# and so on.
+for release in ${releases[@]:0:7}; do
 	annotate "origin" "${release}" "okd-${release}.json"
 	annotate "ocp" "${release}" "ocp-${release}-ci.json"
 	annotate "ocp" "${release}-art-latest" "ocp-${release}.json"
