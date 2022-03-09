@@ -1,37 +1,7 @@
 chain:
-  as: hypershift-test-aws-create
+  as: hypershift-aws-create
   steps:
-  - ref: ipi-install-rbac
-  - as: install
-    cli: latest
-    from_image:
-      namespace: ocp
-      name: "4.11"
-      tag: hypershift-operator
-    env:
-    - name: HYPERSHIFT_AWS_REGION
-      default: "us-east-1"
-      documentation: "The AWS region of the cluster."
-    commands: |-
-      bin/hypershift install --hypershift-image ${HYPERSHIFT_RELEASE_LATEST} \
-        --oidc-storage-provider-s3-credentials=/etc/hypershift-pool-aws-credentials/credentials \
-        --oidc-storage-provider-s3-bucket-name=hypershift-ci-oidc \
-        --oidc-storage-provider-s3-region=us-east-1 \
-        --private-platform=AWS \
-        --aws-private-creds=/etc/hypershift-pool-aws-credentials/credentials \
-        --aws-private-region=${HYPERSHIFT_AWS_REGION}
-    credentials:
-    - mount_path: /etc/hypershift-pool-aws-credentials
-      name: hypershift-pool-aws-credentials
-      namespace: test-credentials
-    dependencies:
-    - env: HYPERSHIFT_RELEASE_LATEST
-      name: hypershift-operator
-    grace_period: 1m0s
-    resources:
-      requests:
-        cpu: 100m
-  - as: create
+  - as: create-hostedcluster
     cli: latest
     env:
     - name: HYPERSHIFT_NODE_COUNT
@@ -82,7 +52,7 @@ chain:
       requests:
         cpu: 100m
         memory: 100Mi
-    timeout: 15m0s
+    timeout: 30m0s
     credentials:
     - mount_path: /etc/hypershift-pool-aws-credentials
       name: hypershift-pool-aws-credentials
@@ -93,4 +63,3 @@ chain:
     dependencies:
     - name: "release:latest"
       env: RELEASE_IMAGE_LATEST
-
