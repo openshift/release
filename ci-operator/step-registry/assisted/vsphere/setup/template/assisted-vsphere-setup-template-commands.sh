@@ -22,8 +22,6 @@ fi
 printf 'Assisted service ci template does not exist - creating using packer\n'
 
 export vsphere_cluster=""
-export vsphere_datacenter=""
-export vsphere_datastore=""
 export vsphere_dev_network=""
 source $SHARED_DIR/vsphere_context.sh
 SSH_PUBLIC_KEY="$(cat /var/run/vault/sshkeys/public_key)"
@@ -37,9 +35,9 @@ cat >> vsphere-params.hcl << EOF
 vsphere_vcenter = "${GOVC_URL}"
 vsphere_username = "${GOVC_USERNAME}"
 vsphere_password = "${GOVC_PASSWORD}"
+vsphere_datacenter = "${GOVC_DATACENTER}"
+vsphere_datastore = "${GOVC_DATASTORE}"
 vsphere_cluster = "${vsphere_cluster}"
-vsphere_datacenter = "${vsphere_datacenter}"
-vsphere_datastore = "${vsphere_datastore}"
 vsphere_network = "${vsphere_dev_network}"
 vsphere_folder = "assisted-test-infra-ci"
 vm_name = "assisted-test-infra-machine-template"

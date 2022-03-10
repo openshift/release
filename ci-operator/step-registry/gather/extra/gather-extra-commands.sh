@@ -214,11 +214,12 @@ if [[ -n "${prometheus}" ]]; then
 
 	cat >> ${SHARED_DIR}/custom-links.txt <<-EOF
 	<script>
-	let a = document.createElement('a');
-	a.href="https://promecieus.dptools.openshift.org/?search="+document.referrer;
-	a.innerHTML="PromeCIeus";
-	a.target="_blank";
-	document.getElementById("wrapper").append(a);
+	let prom = document.createElement('a');
+	prom.href="https://promecieus.dptools.openshift.org/?search="+document.referrer;
+	prom.title="Creates a new prometheus deployment with data from this job run.";
+	prom.innerHTML="PromeCIeus";
+	prom.target="_blank";
+	document.getElementById("wrapper").append(prom);
 	</script>
 	EOF
 
@@ -548,13 +549,43 @@ curl -f https://gist.githubusercontent.com/smarterclayton/03b50c8f9b6351b2d9903d
 # Create custom-link-tools.html from custom-links.txt
 REPORT="${ARTIFACT_DIR}/custom-link-tools.html"
 cat >> ${REPORT} << EOF
-<link rel="stylesheet" type="text/css" href="/static/style.css">
-<link rel="stylesheet" type="text/css" href="/static/extensions/style.css">
-<link href="https://fonts.googleapis.com/css?family=Roboto:400,700" rel="stylesheet">
-<link rel="stylesheet" href="https://code.getmdl.io/1.3.0/material.indigo-pink.min.css">
-<link rel="stylesheet" type="text/css" href="/static/spyglass/spyglass.css">
+<html>
+<head>
+  <title>Debug tools</title>
+  <meta name="description" content="Contains links to OpenShift-specific tools like Loki log collection, PromeCIeus, etc.">
+  <link rel="stylesheet" type="text/css" href="/static/style.css">
+  <link rel="stylesheet" type="text/css" href="/static/extensions/style.css">
+  <link href="https://fonts.googleapis.com/css?family=Roboto:400,700" rel="stylesheet">
+  <link rel="stylesheet" href="https://code.getmdl.io/1.3.0/material.indigo-pink.min.css">
+  <link rel="stylesheet" type="text/css" href="/static/spyglass/spyglass.css">
+  <style>
+    a {
+        display: inline-block;
+        padding: 5px 20px 5px 20px;
+        margin: 10px;
+        border: 2px solid #4E9AF1;
+        border-radius: 1em;
+        text-decoration: none;
+        color: #FFFFFF !important;
+        text-align: center;
+        transition: all 0.2s;
+        background-color: #4E9AF1
+    }
+
+    a:hover {
+        border-color: #FFFFFF;
+    }
+  </style>
+</head>
+<body>
 EOF
 
 if [[ -f ${SHARED_DIR}/custom-links.txt ]]; then
   cat ${SHARED_DIR}/custom-links.txt >> ${REPORT}
 fi
+
+cat >> ${REPORT} << EOF
+</body>
+</html>
+EOF
+

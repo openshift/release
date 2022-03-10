@@ -55,6 +55,7 @@ cd "\${REPO_DIR}"
 
 # Get assisted logs
 export LOGS_DEST=/tmp/artifacts
+export DISCONNECTED="${DISCONNECTED:-}"
 deploy/operator/gather.sh
 
 EOF

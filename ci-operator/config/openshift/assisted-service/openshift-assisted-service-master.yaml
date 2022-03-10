@@ -31,6 +31,10 @@ base_images:
     name: release
     namespace: openshift
     tag: golang-1.17
+  opm-builder:
+    name: opm-builder
+    namespace: ci
+    tag: latest
   postgresql-12-centos7:
     name: postgresql-12-centos7
     namespace: edge-infrastructure
@@ -60,6 +64,30 @@ images:
     COPY . .
   from: src
   to: assisted-service-scripts
+- dockerfile_path: deploy/olm-catalog/bundle.Dockerfile
+  to: assisted-service-operator-bundle
+- dockerfile_literal: |
+    FROM quay.io/operator-framework/upstream-opm-builder:latest AS builder
+
+    ARG BUNDLE_IMGS=quay.io/edge-infrastructure/assisted-service-operator-bundle:latest
+
+    RUN opm index add \
+    --bundles "${BUNDLE_IMGS}" \
+    --out-dockerfile index.Dockerfile \
+    --generate
+
+    FROM quay.io/operator-framework/opm:latest
+    LABEL operators.operatorframework.io.index.database.v1=/database/index.db
+    COPY --from=builder database/index.db /database/index.db
+    EXPOSE 50051
+    ENTRYPOINT ["/bin/opm"]
+    CMD ["registry", "serve", "--database", "/database/index.db"]
+  from: opm-builder
+  inputs:
+    opm-builder:
+      as:
+      - quay.io/operator-framework/upstream-opm-builder:latest
+  to: assisted-service-index
 operator:
   bundles:
   - dockerfile_path: deploy/olm-catalog/bundle.Dockerfile
@@ -243,7 +271,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.8"
+    version: "4.10"
   run_if_changed: ^(cmd/.*|data/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     test:
@@ -273,7 +301,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.8"
+    version: "4.10"
   cron: 0 */6 * * *
   steps:
     test:

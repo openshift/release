@@ -29,7 +29,7 @@ if [[ -z "$IMAGE_REPO" ]]; then
 fi
 
 config_file="$HOME/.docker/config.json"
-base64 -d < "$REGISTRY_TOKEN_FILE" > "$config_file" || {
+base64 -d < "$REGISTRY_TOKEN_FILE" | jq '{"auths": .}' > "$config_file" || {
     log "ERROR Could not base64 decode registry secret file"
     log "      From: $REGISTRY_TOKEN_FILE"
     log "      To  : $config_file"
