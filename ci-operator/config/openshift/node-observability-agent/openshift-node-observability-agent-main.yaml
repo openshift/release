@@ -22,16 +22,20 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: unit
-  commands: make test
+- as: lint
+  commands: |
+    export GOLANGCI_LINT_CACHE=$(mktemp -d)
+    make lint
   container:
     from: src
 - as: verify-deps
   commands: make verify-deps
   container:
     from: src
-- as: verify-golint
-  commands: make verify-golint
+- as: unit
+  commands: |
+    export XDG_CACHE_HOME=$(mktemp -d)
+    make test
   container:
     from: src
 zz_generated_metadata:
