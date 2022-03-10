@@ -1,0 +1,254 @@
+base_images:
+  base:
+    name: 4.10-priv
+    namespace: ocp-private
+    tag: base
+  cli:
+    name: 4.10-priv
+    namespace: ocp-private
+    tag: cli
+  openshift_release_golang-1.17:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
+binary_build_commands: make manager
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
+canonical_go_repository: github.com/openshift/cluster-api-provider-kubevirt
+images:
+- build_args:
+  - name: ARCH
+    value: amd64
+  - name: ldflags
+  dockerfile_literal: |-
+    FROM registry.ci.openshift.org/openshift/release:golang-1.17 as toolchain
+
+    # Run this with docker build --build_arg $(go env GOPROXY) to override the goproxy
+    ARG goproxy=https://proxy.golang.org
+    ENV GOPROXY=$goproxy
+    ENV GOFLAGS="-mod=readonly"
+
+    FROM toolchain as builder
+    WORKDIR /workspace
+
+    # Copy the sources
+    COPY ./ ./
+    RUN go mod download
+
+    # Build
+    ARG package=.
+    ARG ARCH
+    ARG LDFLAGS
+    RUN CGO_ENABLED=0 GOOS=linux GOARCH=${ARCH} go build -ldflags "${LDFLAGS} -extldflags '-static'"  -o manager ${package}
+    ENTRYPOINT [ "/start.sh", "/workspace/manager" ]
+
+    # Copy the controller-manager into a thin image
+    FROM gcr.io/distroless/static:nonroot
+    WORKDIR /
+    COPY --from=builder /workspace/manager .
+    # Use uid of nonroot user (65532) because kubernetes expects numeric user when applying pod security policies
+    USER 65532
+    ENTRYPOINT ["/manager"]
+  from: base
+  inputs:
+    openshift_release_golang-1.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
+  to: cluster-api-kubevirt-controller
+- build_args:
+  - name: ARCH
+    value: amd64
+  - name: ldflags
+  dockerfile_literal: |-
+    FROM src
+
+    RUN yum install -y expect
+    COPY oc /usr/bin/oc
+
+    RUN curl -L https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.0.2/clusterctl-linux-amd64 -o /usr/bin/clusterctl && \
+        chmod +x /usr/bin/clusterctl
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+    openshift_release_golang-1.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
+  to: capk-oc-bin-image
+promotion:
+  excluded_images:
+  - capk-oc-bin-image
+  - cluster-api-kubevirt-controller
+  name: 4.12-priv
+  namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.12-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.12-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit-tests
+  commands: GOFLAGS="-mod=readonly" make test
+  container:
+    from: src
+- as: cluster-api-provider-kubevirt-e2e
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: deploy-cnv
+      commands: |-
+        oc apply -f - <<EOF
+        apiVersion: v1
+        kind: Namespace
+        metadata:
+          name: openshift-cnv
+        EOF
+
+        oc apply -f - <<EOF
+        apiVersion: operators.coreos.com/v1
+        kind: OperatorGroup
+        metadata:
+          name: openshift-cnv-group
+          namespace: openshift-cnv
+        spec:
+          targetNamespaces:
+          - openshift-cnv
+        EOF
+
+        cat <<EOF | oc apply -f -
+        apiVersion: operators.coreos.com/v1alpha1
+        kind: Subscription
+        metadata:
+          labels:
+            operators.coreos.com/kubevirt-hyperconverged.openshift-cnv: ''
+          name: kubevirt-hyperconverged
+          namespace: openshift-cnv
+        spec:
+          channel: stable
+          installPlanApproval: Automatic
+          name: kubevirt-hyperconverged
+          source: redhat-operators
+          sourceNamespace: openshift-marketplace
+        EOF
+
+        sleep 60
+
+        RETRIES=30
+        CSV=
+        for i in $(seq ${RETRIES}); do
+          if [[ -z ${CSV} ]]; then
+            CSV=$(oc get subscription -n openshift-cnv kubevirt-hyperconverged -o jsonpath='{.status.installedCSV}')
+          fi
+
+          if [[ -z ${CSV} ]]; then
+            echo "Try ${i}/${RETRIES}: can't get the CSV yet. Checking again in 30 seconds"
+            sleep 30
+          fi
+
+          if [[ $(oc get csv -n openshift-cnv ${CSV} -o jsonpath={.status.phase}) == "Succeeded" ]]; then
+            echo "CNV is deployed"
+            break
+          else
+            echo "Try ${i}/${RETRIES}: CNV is not deployed yet. Checking again in 30 seconds"
+            sleep 30
+          fi
+        done
+
+        if [[ $(oc get csv -n openshift-cnv ${CSV} -o jsonpath={.status.phase}) != "Succeeded" ]]; then
+          echo "Error: Failed to deploy CNV"
+          echo "CSV ${CSV} YAML"
+          oc get CSV ${CSV} -n openshift-cnv -o yaml
+          echo
+          echo "CSV ${CSV} Describe"
+          oc describe CSV ${CSV} -n openshift-cnv
+          exit 1
+        fi
+
+        oc create -f - <<EOF
+        apiVersion: hco.kubevirt.io/v1beta1
+        kind: HyperConverged
+        metadata:
+          name: kubevirt-hyperconverged
+          namespace: openshift-cnv
+        EOF
+
+        oc wait hyperconverged -n openshift-cnv kubevirt-hyperconverged --for=condition=Available --timeout=15m
+      from: capk-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    - as: deploy-capk
+      commands: |-
+        set -x
+        # Deploy cluster API
+        cat <<EOF > clusterctl_config.yaml
+        cert-manager:
+          url: "https://github.com/cert-manager/cert-manager/releases/latest/cert-manager.yaml"
+        EOF
+
+        clusterctl init -v 4 --config=clusterctl_config.yaml
+
+        oc adm policy add-scc-to-user privileged system:serviceaccount:capk-system:capk-manager
+
+        export MANIFEST_IMG=${CAPK_IMAGE%:*}
+        export MANIFEST_TAG=${CAPK_IMAGE/*:}
+        GOFLAGS="-mod=readonly" make generate-manifests
+
+        sed -i -E "s|(^ +- image: ).*$|\1${CAPK_IMAGE}|" config/default/manager_image_patch.yaml
+
+        oc kustomize config/default | oc apply -f -
+        sleep 60
+
+        # Validate capk manager was created successfully
+        oc wait pod --for=condition=Ready -l cluster.x-k8s.io/provider=infrastructure-kubevirt -n capk-system --timeout=120s
+      dependencies:
+      - env: CAPK_IMAGE
+        name: cluster-api-kubevirt-controller
+      from: capk-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    - as: run-tests
+      commands: |-
+        set -x
+        go version
+        go install -mod=mod github.com/onsi/ginkgo/ginkgo@v1.16.5
+        go mod tidy
+        GOFLAGS="-mod=readonly" ginkgo build e2e-tests/
+        TESR_DIR=$(pwd)/test-dir
+        mkdir ${TESR_DIR}
+        e2e-tests/e2e-tests.test \
+          --kubectl-path=/usr/bin/oc \
+          --clusterctl-path=/usr/bin/clusterctl \
+          --working-dir=${TESR_DIR} \
+          --ginkgo.junit-report=${ARTIFACT_DIR}/junit_report.xml \
+          --ginkgo.label-filter="!persistentVMs"
+      from: capk-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: ipi-gcp
+zz_generated_metadata:
+  branch: release-4.12
+  org: openshift-priv
+  repo: cluster-api-provider-kubevirt
