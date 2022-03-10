@@ -64,30 +64,6 @@ images:
     COPY . .
   from: src
   to: assisted-service-scripts
-- dockerfile_path: deploy/olm-catalog/bundle.Dockerfile
-  to: assisted-service-operator-bundle
-- dockerfile_literal: |
-    FROM quay.io/operator-framework/upstream-opm-builder:latest AS builder
-
-    ARG BUNDLE_IMGS=quay.io/edge-infrastructure/assisted-service-operator-bundle:latest
-
-    RUN opm index add \
-    --bundles "${BUNDLE_IMGS}" \
-    --out-dockerfile index.Dockerfile \
-    --generate
-
-    FROM quay.io/operator-framework/opm:latest
-    LABEL operators.operatorframework.io.index.database.v1=/database/index.db
-    COPY --from=builder database/index.db /database/index.db
-    EXPOSE 50051
-    ENTRYPOINT ["/bin/opm"]
-    CMD ["registry", "serve", "--database", "/database/index.db"]
-  from: opm-builder
-  inputs:
-    opm-builder:
-      as:
-      - quay.io/operator-framework/upstream-opm-builder:latest
-  to: assisted-service-index
 operator:
   bundles:
   - dockerfile_path: deploy/olm-catalog/bundle.Dockerfile
@@ -793,6 +769,11 @@ tests:
         MAKEFILE_TARGET="create_full_environment run deploy_capi_env test_kube_api_parallel"
       GATHER_CAPI_LOGS: "true"
     workflow: assisted-baremetal
+- as: operator-catalog-publish-to-quay
+  postsubmit: true
+  steps:
+    test:
+    - ref: assisted-baremetal-operator-catalog-publish
 zz_generated_metadata:
   branch: master
   org: openshift
