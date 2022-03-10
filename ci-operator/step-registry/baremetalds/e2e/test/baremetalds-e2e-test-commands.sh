@@ -171,13 +171,31 @@ do
   NODECOUNT="$(kubectl get nodes --no-headers | wc -l)"
   if [ "${MACHINECOUNT}" -le "${NODECOUNT}" ]
   then
+    cat >"${ARTIFACT_DIR}/junit_nodes.xml" <<EOF
+    <testsuite name="cluster nodes" tests="1" failures="0">
+      <testcase name="node count should match or exceed machine count"/>
+    </testsuite>
+EOF
     echo "$(date) - node count ($NODECOUNT) now matches or exceeds machine count ($MACHINECOUNT)"
     break
   fi
   echo "$(date) - $MACHINECOUNT Machines - $NODECOUNT Nodes"
   sleep 30
-  ((i++))
+  i=$((i+1))
   if [ $i -gt 20 ]; then
+    MACHINELIST="$(kubectl get machines -A)"
+    NODELIST="$(kubectl get nodes)"
+    cat >"${ARTIFACT_DIR}/junit_nodes.xml" <<EOF
+    <testsuite name="cluster nodes" tests="1" failures="1">
+      <testcase name="node count should match or exceed machine count">
+        <failure message="">
+          Timed out waiting for node count ($NODECOUNT) to equal or exceed machine count ($MACHINECOUNT).
+          $MACHINELIST
+          $NODELIST
+        </failure>
+      </testcase>
+    </testsuite>
+EOF
     echo "Timed out waiting for node count ($NODECOUNT) to equal or exceed machine count ($MACHINECOUNT)."
     exit 1
   fi
