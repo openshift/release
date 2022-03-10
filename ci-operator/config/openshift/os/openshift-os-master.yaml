@@ -75,6 +75,7 @@ tests:
   cluster: build02
   cron: '@daily'
   steps:
+    cluster_profile: gcp
     test:
     - as: oc-login
       cli: latest
@@ -100,36 +101,29 @@ tests:
           cpu: 1000m
           devices.kubevirt.io/kvm: "1"
           memory: 3Gi
-    - as: build-test-and-push-img
+    - as: build-and-test-img
       commands: |
         #!/bin/bash
         set -xeuo pipefail
 
-        # We can't use PULL_BASE_REF or OPENSHIFT_BUILD_REFERENCE to get the
-        # branch since this is a periodic job which originates from
-        # openshift/release, not the openshift/os repository. We then strip
-        # release- from the branch name so we're left with the number (e.g.,
-        # release-4.11 -> 4.11).
-        BRANCH="$(echo "$JOB_SPEC" | jq -r '.extra_refs[0].base_ref | sub("release-"; "")')"
-
         # Ensure we have a known directory for cosa to build in
         export COSA_DIR="/tmp/cosa"
         mkdir -p "$COSA_DIR"
-
         # Run the cosa build / test
         /src/ci/build-test-qemu.sh
-
         export REGISTRY_AUTH_FILE="$SHARED_DIR/dockercfg.json"
         # Ensure we're in the designated cosa directory so the push-container commands work
         cd "$COSA_DIR"
-        # Tags with the cosa build ID / arch
-        cosa push-container registry.ci.openshift.org/rhcos-devel/rhel-coreos
-        cosa push-container "registry.ci.openshift.org/rhcos-devel/rhel-coreos:${BRANCH}"
 
-        # Only push latest tag on master branch
-        if [[ "$BRANCH" == "master"  ]]; then
-          cosa push-container registry.ci.openshift.org/rhcos-devel/rhel-coreos:latest
-        fi
+        # Tags with the cosa build ID / arch - unique to this specific build
+        cosa push-container registry.ci.openshift.org/rhcos-devel/rhel-coreos
+
+        # Tag this with the Prow Build ID because we're not ready to overwrite
+        # our well-known tags yet, but we need to push this image someplace so
+        # our test cluster can ingest it. We use the BUILD_ID value because its
+        # unique to each job so they won't stomp on each other if running
+        # concurrently.
+        cosa push-container "registry.ci.openshift.org/rhcos-devel/rhel-coreos:$BUILD_ID"
       from: build-test-qemu-img
       resources:
         limits:
@@ -139,6 +133,53 @@ tests:
           devices.kubevirt.io/kvm: "1"
           memory: 3Gi
       timeout: 3h0m0s
+    - as: test-img-in-openshift
+      cli: latest
+      commands: |
+        #!/bin/bash
+        set -xeuo pipefail
+
+        # The layering test uses the env var BASE_IMAGE_TAG to determine which tag for the image to pull.
+        export BASE_IMAGE_TAG="$BUILD_ID"
+        /usr/local/bin/layering_test -test.v -test.failfast -test.timeout 35m -build-log="$ARTIFACT_DIR/derived-image-build.log"
+      from: build-test-qemu-img
+      resources:
+        limits:
+          devices.kubevirt.io/kvm: "1"
+        requests:
+          cpu: 1000m
+          devices.kubevirt.io/kvm: "1"
+          memory: 3Gi
+    - as: push-img
+      commands: |
+        #!/bin/bash
+        set -xeuo pipefail
+
+        # We've passed the tests, so we want to ovewrite our well-known tags with the latest image.
+
+        # We can't use PULL_BASE_REF or OPENSHIFT_BUILD_REFERENCE to get the
+        # branch since this is a periodic job which originates from
+        # openshift/release, not the openshift/os repository. We then strip
+        # release- from the branch name so we're left with the number (e.g.,
+        # release-4.11 -> 4.11).
+        BRANCH="$(echo "$JOB_SPEC" | jq -r '.extra_refs[0].base_ref | sub("release-"; "")')"
+        export REGISTRY_AUTH_FILE="$SHARED_DIR/dockercfg.json"
+
+        skopeo copy "docker://registry.ci.openshift.org/rhcos-devel/rhel-coreos:$BUILD_ID" "docker://registry.ci.openshift.org/rhcos-devel/rhel-coreos:$BRANCH"
+
+        # Only push latest tag on master branch
+        if [[ "$BRANCH" == "master"  ]]; then
+          skopeo copy "docker://registry.ci.openshift.org/rhcos-devel/rhel-coreos:$BUILD_ID" "docker://registry.ci.openshift.org/rhcos-devel/rhel-coreos:latest"
+        fi
+      from: build-test-qemu-img
+      resources:
+        limits:
+          devices.kubevirt.io/kvm: "1"
+        requests:
+          cpu: 1000m
+          devices.kubevirt.io/kvm: "1"
+          memory: 3Gi
+    workflow: ipi-gcp
 zz_generated_metadata:
   branch: master
   org: openshift
