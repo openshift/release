@@ -52,15 +52,39 @@ tests:
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE|Jenkinsfile.*)$
   steps:
     cluster_profile: packet-assisted
-    workflow: baremetalds-assisted
-- as: e2e-metal-assisted-multi-version
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-4-6
   optional: true
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=""
-    workflow: baremetalds-assisted
+        OPENSHIFT_VERSION=4.6
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-4-8
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.8
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-4-9
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.9
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-4-10
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.10
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-olm
   optional: true
   run_if_changed: .*operator.*
@@ -69,7 +93,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         TEST_FUNC=test_olm_operator
-    workflow: baremetalds-assisted
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-kube-api-late-binding-single-node
   optional: true
   steps:
@@ -80,7 +104,7 @@ tests:
         export TEST_FUNC=test_kube_api_late_binding_ipv4_single_node
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
         make deploy_assisted_operator test_parallel
-    workflow: baremetalds-assisted
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-ipv6
   optional: true
   run_if_changed: ^(terraform_files/.*|.*/controllers/.*)$
@@ -90,7 +114,7 @@ tests:
       ASSISTED_CONFIG: |
         IPv6=yes
         IPv4=no
-    workflow: baremetalds-assisted
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-none
   optional: true
   run_if_changed: ^(terraform_files/.*|.*/controllers/.*)$
@@ -99,7 +123,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         PLATFORM=none
-    workflow: baremetalds-assisted
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-single-node
   optional: true
   steps:
@@ -107,7 +131,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
-    workflow: baremetalds-assisted
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-kube-api
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE|Jenkinsfile.*)$
   steps:
@@ -124,7 +148,7 @@ tests:
         KUBE_API=yes
         ENABLE_KUBE_API=true
         MAKEFILE_TARGET=all
-    workflow: baremetalds-assisted
+    workflow: assisted-baremetal
 zz_generated_metadata:
   branch: v1
   org: openshift

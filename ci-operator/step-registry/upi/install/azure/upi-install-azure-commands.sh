@@ -1,6 +1,11 @@
 #!/bin/bash
 set -euo pipefail
+
+INSTALL_STAGE="initial"
+
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+#Save install status for must-gather to generate junit
+trap 'echo "$? $INSTALL_STAGE" > "${SHARED_DIR}/install-status.txt"' EXIT TERM
 
 # The oc binary is placed in the shared-tmp by the test container and we want to use
 # that oc for all actions.
@@ -250,6 +255,7 @@ echo "Waiting for bootstrap to complete"
 openshift-install --dir=${ARTIFACT_DIR}/installer wait-for bootstrap-complete &
 wait "$!" || gather_bootstrap_and_fail
 
+INSTALL_STAGE="bootstrap_successful"
 echo "Bootstrap complete, destroying bootstrap resources"
 az network nsg rule delete -g $RESOURCE_GROUP --nsg-name ${INFRA_ID}-nsg --name bootstrap_ssh_in
 az vm stop -g $RESOURCE_GROUP --name ${INFRA_ID}-bootstrap
@@ -300,6 +306,8 @@ set +x
 echo "Completing UPI setup"
 openshift-install --dir=${ARTIFACT_DIR}/installer wait-for install-complete 2>&1 | grep --line-buffered -v password &
 wait "$!"
+
+INSTALL_STAGE="cluster_creation_successful"
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 # Password for the cluster gets leaked in the installer logs and hence removing them.

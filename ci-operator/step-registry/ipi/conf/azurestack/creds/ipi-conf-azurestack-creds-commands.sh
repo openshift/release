@@ -30,7 +30,7 @@ yq --arg name "${RESOURCE_GROUP}" -i -y '.platform.azure.resourceGroupName=$name
 az cloud register \
     -n PPE \
     --endpoint-resource-manager "${AZURESTACK_ENDPOINT}" \
-    --suffix-storage-endpoint "${SUFFIX_ENDPOINT}" 
+    --suffix-storage-endpoint "${SUFFIX_ENDPOINT}"
 az cloud set -n PPE
 az cloud update --profile 2019-03-01-hybrid
 az login --service-principal -u "$APP_ID" -p "$AAD_CLIENT_SECRET" --tenant "$TENANT_ID" > /dev/null
@@ -46,6 +46,16 @@ for f in $files
 do
   SECRET_NAME=$(yq -r .spec.secretRef.name "/tmp/credentials-request/${f}")
   SECRET_NAMESPACE=$(yq -r .spec.secretRef.namespace "/tmp/credentials-request/${f}")
+  FEATURE_GATE=$(yq -r '.metadata.annotations."release.openshift.io/feature-gate"' "/tmp/credentials-request/${f}")
+
+# 4.10 includes techpreview of CAPI which without the namespace: openshift-cluster-api
+# fails to bootstrap. Below checks if TechPreviewNoUpgrade is annotated and if so skips
+# creating that secret.
+
+  if [[ $FEATURE_GATE == *"TechPreviewNoUpgrade"* ]]; then
+      continue
+  fi
+
   filename=manifest_${SECRET_NAMESPACE}_secret.yml
   cat >> "${SHARED_DIR}/${filename}" << EOF
 apiVersion: v1
@@ -62,4 +72,5 @@ stringData:
   azure_resourcegroup: ${RESOURCE_GROUP}
   azure_region: ${AZURE_REGION}
 EOF
+
 done

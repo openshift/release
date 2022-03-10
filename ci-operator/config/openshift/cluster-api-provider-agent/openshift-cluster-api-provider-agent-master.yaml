@@ -27,6 +27,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  hypershift-operator:
+    name: "4.11"
+    namespace: ocp
+    tag: hypershift-operator
   openshift_release_golang-1.16:
     name: release
     namespace: openshift
@@ -72,7 +76,7 @@ tests:
     dependencies:
       SOURCE_IMAGE_REF: cluster-api-provider-agent
     test:
-    - ref: baremetalds-assisted-images-publish
+    - ref: assisted-baremetal-images-publish
 - as: mirror-vcsref-image
   postsubmit: true
   steps:
@@ -81,7 +85,7 @@ tests:
     env:
       IMAGE_TAG: latest
     test:
-    - ref: baremetalds-assisted-images-publish
+    - ref: assisted-baremetal-images-publish
 - as: build
   commands: |
     export GOLANGCI_LINT_CACHE=/tmp/.cache
@@ -99,6 +103,7 @@ tests:
   steps:
     cluster_profile: packet-assisted
     dependencies:
+      HYPERSHIFT_IMAGE: hypershift-operator
       PROVIDER_IMAGE: pipeline:cluster-api-provider-agent
     env:
       ASSISTED_CONFIG: |
@@ -109,12 +114,13 @@ tests:
         TEST_FUNC=test_capi_provider
         MAKEFILE_TARGET="create_full_environment run deploy_capi_env test_kube_api_parallel"
       GATHER_CAPI_LOGS: "true"
-    workflow: baremetalds-assisted
+    workflow: assisted-baremetal
 - as: e2e-capi-provider-hypershift-periodic
   cron: '@daily'
   steps:
     cluster_profile: packet-assisted
     dependencies:
+      HYPERSHIFT_IMAGE: hypershift-operator
       PROVIDER_IMAGE: pipeline:cluster-api-provider-agent
     env:
       ASSISTED_CONFIG: |
@@ -126,7 +132,7 @@ tests:
         MAKEFILE_TARGET="create_full_environment run deploy_capi_env test_kube_api_parallel"
       GATHER_CAPI_LOGS: "true"
       TEST_SUITE: full
-    workflow: baremetalds-assisted
+    workflow: assisted-baremetal
 zz_generated_metadata:
   branch: master
   org: openshift

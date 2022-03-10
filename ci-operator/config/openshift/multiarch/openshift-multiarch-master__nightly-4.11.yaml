@@ -182,6 +182,20 @@ tests:
       COMPUTE_NODE_TYPE: m6g.xlarge
       TEST_ARGS: --from-repository quay.io/multi-arch/community-e2e-images
     workflow: openshift-e2e-aws-ovn
+- as: ocp-e2e-aws-upi-arm64
+  interval: 24h
+  steps:
+    cluster_profile: aws-arm64
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: arm-ci.devcluster.openshift.com
+      BOOTSTRAP_INSTANCE_TYPE: m6g.large
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      MASTER_INSTANCE_TYPE: m6g.xlarge
+      TEST_ARGS: --from-repository quay.io/multi-arch/community-e2e-images
+      WORKER_INSTANCE_TYPE: m6g.xlarge
+    workflow: openshift-e2e-aws-upi
 - as: ocp-e2e-aws-arm64-single-node
   interval: 48h
   steps:
@@ -216,7 +230,7 @@ tests:
     workflow: openshift-e2e-aws-techpreview-serial
 - as: ocp-e2e-remote-libvirt-s390x
   cluster: build01
-  cron: 0 5,17 * * *
+  cron: 0 8,20 * * *
   steps:
     cluster_profile: libvirt-s390x
     dependencies:
@@ -228,7 +242,7 @@ tests:
     workflow: openshift-e2e-libvirt
 - as: ocp-image-ecosystem-remote-libvirt-s390x
   cluster: build01
-  cron: 0 3 * * *
+  cron: 0 17 * * *
   steps:
     cluster_profile: libvirt-s390x
     dependencies:
@@ -240,7 +254,7 @@ tests:
     workflow: openshift-e2e-libvirt
 - as: ocp-jenkins-e2e-remote-libvirt-s390x
   cluster: build01
-  cron: 0 20 * * *
+  cron: 0 2 * * *
   steps:
     cluster_profile: libvirt-s390x
     dependencies:
@@ -279,20 +293,9 @@ tests:
       WORKER_MEMORY: "32768"
       WORKER_REPLICAS: "0"
     workflow: openshift-e2e-libvirt
-- as: ocp-installer-remote-libvirt-s390x
-  cluster: build01
-  cron: 0 0 * * 5
-  steps:
-    cluster_profile: libvirt-s390x
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:s390x-latest
-    env:
-      ARCH: s390x
-      BRANCH: "4.11"
-    workflow: ipi-libvirt
 - as: ocp-e2e-remote-libvirt-ppc64le
   cluster: build01
-  cron: 0 11,23 * * *
+  cron: 0 8,20 * * *
   steps:
     cluster_profile: libvirt-ppc64le
     dependencies:
@@ -304,7 +307,7 @@ tests:
     workflow: openshift-e2e-libvirt
 - as: ocp-image-ecosystem-remote-libvirt-ppc64le
   cluster: build01
-  cron: 0 5,17 * * *
+  cron: 0 17 * * *
   steps:
     cluster_profile: libvirt-ppc64le
     dependencies:
@@ -316,7 +319,7 @@ tests:
     workflow: openshift-e2e-libvirt
 - as: ocp-jenkins-e2e-remote-libvirt-ppc64le
   cluster: build01
-  cron: 0 2,14 * * *
+  cron: 0 2 * * *
   steps:
     cluster_profile: libvirt-ppc64le
     dependencies:
@@ -355,17 +358,6 @@ tests:
       WORKER_MEMORY: "32768"
       WORKER_REPLICAS: "0"
     workflow: openshift-e2e-libvirt
-- as: ocp-installer-remote-libvirt-ppc64le
-  cluster: build01
-  cron: '@weekly'
-  steps:
-    cluster_profile: libvirt-ppc64le
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ppc64le-latest
-    env:
-      ARCH: ppc64le
-      BRANCH: "4.11"
-    workflow: ipi-libvirt
 zz_generated_metadata:
   branch: master
   org: openshift

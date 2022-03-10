@@ -20,6 +20,13 @@ images:
       as:
       - registry.ci.openshift.org/stolostron/builder:go1.17-linux
   to: search-v2-operator
+- dockerfile_path: bundle.Dockerfile
+  from: base
+  inputs:
+    stolostron_builder_go1.17-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.17-linux
+  to: search-operator-bundle
 promotion:
   name: "2.5"
   namespace: stolostron
@@ -35,6 +42,14 @@ tests:
       SOURCE_IMAGE_REF: search-v2-operator
     env:
       IMAGE_REPO: search-v2-operator
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: pr-bundle-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: search-operator-bundle
+    env:
+      IMAGE_REPO: search-operator-bundle
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
 - as: release-fast-forward

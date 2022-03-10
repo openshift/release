@@ -4,6 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+INSTALL_STAGE="initial"
 function populate_artifact_dir() {
   set +e
   echo "Copying log bundle..."
@@ -24,6 +25,8 @@ function populate_artifact_dir() {
 }
 
 function prepare_next_steps() {
+  #Save install status for must-gather to generate junit
+  echo "$? $INSTALL_STAGE" > "${SHARED_DIR}/install-status.txt"
   set +e
   echo "Setup phase finished, prepare env for next steps"
   populate_artifact_dir
@@ -284,6 +287,7 @@ echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_END"
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 
 if test "${ret}" -eq 0 ; then
+  INSTALL_STAGE="cluster_creation_successful"
   touch  "${SHARED_DIR}/success"
   # Save console URL in `console.url` file so that ci-chat-bot could report success
   echo "https://$(env KUBECONFIG=${dir}/auth/kubeconfig oc -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > "${SHARED_DIR}/console.url"

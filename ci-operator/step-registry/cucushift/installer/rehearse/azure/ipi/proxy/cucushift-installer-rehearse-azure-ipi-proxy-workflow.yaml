@@ -1,0 +1,25 @@
+workflow:
+  as: cucushift-installer-rehearse-azure-ipi-proxy
+  steps: 
+    pre:
+    - ref: azure-provision-resourcegroup
+    - ref: azure-provision-vnet
+    - ref: azure-provision-bastionhost
+    - ref: ipi-conf
+    - ref: ipi-conf-azure
+    - ref: ipi-conf-azure-provisionednetwork
+    - ref: ipi-conf-azure-proxy
+    - ref: ipi-install-monitoringpvc
+    - ref: ipi-install-rbac
+    - ref: openshift-cluster-bot-rbac
+    - ref: ipi-install-install
+    - ref: ipi-install-times-collection
+    env:
+      DISCONNECTED_NETWORK: "yes"
+    post:
+    - chain: gather-network
+    - chain: gather-core-dump
+    - chain: ipi-deprovision
+    - ref: azure-deprovision-resourcegroup
+  documentation: |-
+    This is the workflow to trigger Prow's rehearsal test when submitting installer steps/chain/workflow

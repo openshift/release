@@ -11,10 +11,6 @@ base_images:
     name: "4.11"
     namespace: ocp
     tag: must-gather
-  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.17-openshift-4.10
   ocp_builder_rhel-8-golang-1.17-openshift-4.11:
     name: builder
     namespace: ocp
@@ -25,16 +21,13 @@ images:
 - dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
+    ocp_builder_rhel-8-golang-1.17-openshift-4.11:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
   to: local-storage-operator
 - dockerfile_path: Dockerfile.diskmaker.rhel7
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
     ocp_builder_rhel-8-golang-1.17-openshift-4.11:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
@@ -46,6 +39,16 @@ images:
       as:
       - registry.ci.openshift.org/ocp/4.11:must-gather
   to: local-storage-mustgather
+operator:
+  bundles:
+  - as: local-storage-operator-bundle
+    context_dir: config
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/openshift/origin-local-storage-operator:latest
+    with: pipeline:local-storage-operator
+  - pullspec: quay.io/openshift/origin-local-storage-diskmaker:latest
+    with: pipeline:local-storage-diskmaker
 promotion:
   disabled: true
   name: "4.11"
@@ -73,6 +76,13 @@ tests:
 - as: e2e-operator
   steps:
     cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-local-storage-operator-bundle
+    env:
+      OO_CHANNEL: preview
+      OO_INSTALL_NAMESPACE: openshift-local-storage
+      OO_PACKAGE: local-storage-operator
+      OO_TARGET_NAMESPACES: '!install'
     test:
     - as: test
       cli: latest
@@ -81,7 +91,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    workflow: optional-operators-ci-aws
 zz_generated_metadata:
   branch: release-4.11
   org: openshift

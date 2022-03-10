@@ -43,7 +43,7 @@ cat > packet-setup.yaml <<-EOF
         plan: ${PACKET_PLAN}
         facility: any
         wait_for_public_IPv: 4
-        wait_timeout: 1200
+        wait_timeout: 1800
         state: active
         tags: "{{ 'PR:', lookup('env', 'PULL_NUMBER'), 'Job name:', lookup('env', 'JOB_NAME'), 'Job id:', lookup('env', 'PROW_JOB_ID') }}"
       register: hosts

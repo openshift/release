@@ -7,6 +7,10 @@ base_images:
     name: release
     namespace: openshift
     tag: golang-1.17
+  os-min8:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
 binary_build_commands: make build
 build_root:
   project_image:
@@ -24,6 +28,14 @@ images:
   dockerfile_path: Dockerfile
   from: base
   to: dpdk
+- context_dir: .
+  dockerfile_path: ztp/resource-generator/Containerfile
+  from: os-min8
+  inputs:
+    openshift_release_golang-1.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
+  to: ztp-site-generator
 promotion:
   name: "4.11"
   namespace: ocp-kni

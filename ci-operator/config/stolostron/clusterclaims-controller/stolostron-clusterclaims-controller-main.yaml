@@ -1,8 +1,4 @@
 base_images:
-  repo-brancher:
-    name: repo-brancher
-    namespace: ci
-    tag: latest
   stolostron_builder_go1.17-linux:
     name: builder
     namespace: stolostron
@@ -20,7 +16,7 @@ images:
       - registry.ci.openshift.org/stolostron/builder:go1.17-linux
   to: clusterclaims-controller
 promotion:
-  name: "2.5"
+  name: "2.0"
   namespace: stolostron
 resources:
   '*':
@@ -59,22 +55,6 @@ tests:
       IMAGE_REPO: clusterclaims-controller
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
-- as: fast-forward
-  commands: |
-    git clone -b master https://github.com/openshift/release.git /tmp/release
-    repo-brancher --fast-forward --confirm \
-        --config-dir=/tmp/release/ci-operator/config/stolostron/clusterclaims-controller/ \
-        --username=acm-cicd \
-        --token-path=/etc/github/token \
-        --current-promotion-namespace=stolostron \
-        --current-release=2.5 \
-        --future-release=2.5
-  container:
-    from: repo-brancher
-  postsubmit: true
-  secrets:
-  - mount_path: /etc/github
-    name: acm-cicd-github
 - as: backplane-fast-forward
   postsubmit: true
   steps:

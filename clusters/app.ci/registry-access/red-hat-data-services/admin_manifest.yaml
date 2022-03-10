@@ -1,0 +1,63 @@
+# this is the Namespace in which your ServiceAccount will live
+apiVersion: v1
+kind: Namespace
+metadata:
+  annotations:
+    openshift.io/display-name: Red Hat OpenShift Data Science
+  name: red-hat-data-services
+---
+# this is the ServiceAccount whose credentials you will use
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: image-puller
+  namespace: red-hat-data-services
+---
+# this grants your ServiceAccount rights to pull images
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: red-hat-data-services-image-puller-binding
+  # the namespace from which you will pull images
+  namespace: red-hat-data-services
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: system:image-puller
+subjects:
+  - kind: ServiceAccount
+    namespace: red-hat-data-services
+    name: image-puller
+---
+# this adds the admins to the project.
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: red-hat-data-services-viewer-binding
+  namespace: red-hat-data-services
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: view
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: rhods # an existing Rover group
+    namespace: red-hat-data-services
+---
+# this grants the right to read the ServiceAccount's credentials and pull
+# images to the admins.
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: red-hat-data-services-admins-binding
+  namespace: red-hat-data-services
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: pull-secret-namespace-manager
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: rhods # an existing Rover group
+    namespace: red-hat-data-services

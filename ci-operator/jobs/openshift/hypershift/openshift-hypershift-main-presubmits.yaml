@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build03
     context: ci/prow/capi-provider-agent-sanity
     decorate: true
     labels:
@@ -80,7 +80,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build03
     context: ci/prow/e2e-aws
     decorate: true
     labels:
@@ -143,7 +143,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build03
     context: ci/prow/e2e-aws-all
     decorate: true
     labels:
@@ -206,7 +206,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build03
     context: ci/prow/e2e-aws-metrics
     decorate: true
     labels:
@@ -269,7 +269,64 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build03
+    context: ci/prow/e2e-aws-nested
+    decorate: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      job-release: "4.10"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-hypershift-main-e2e-aws-nested
+    optional: true
+    rerun_command: /test e2e-aws-nested
+    skip_if_only_changed: (^(docs|examples|enhancements)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-nested
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-nested,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
     context: ci/prow/e2e-conformance
     decorate: true
     labels:
@@ -325,7 +382,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build03
     context: ci/prow/e2e-kubevirt-azure
     decorate: true
     labels:
@@ -399,7 +456,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build03
     context: ci/prow/e2e-kubevirt-gcp
     decorate: true
     labels:
@@ -477,7 +534,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build03
     context: ci/prow/images
     decorate: true
     labels:
@@ -526,7 +583,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build03
     context: ci/prow/periodics-images
     decorate: true
     labels:
@@ -576,7 +633,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build03
     context: ci/prow/unit
     decorate: true
     labels:
@@ -625,7 +682,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build03
     context: ci/prow/verify
     decorate: true
     labels:

@@ -1,0 +1,20 @@
+workflow:
+  as: kubernetes-nmstate-e2e-handler
+  steps:
+    env:
+      SKIP_IMAGE_BUILD: "true"
+      EXTRA_NETWORK_CONFIG: |
+        EXTRA_NETWORK_NAMES="nmstate1 nmstate2"
+        NMSTATE1_NETWORK_SUBNET_V4="192.168.221.0/24"
+        NMSTATE1_NETWORK_SUBNET_V6="fd2e:6f44:5dd8:ca56::/120"
+        NMSTATE2_NETWORK_SUBNET_V4="192.168.222.0/24"
+        NMSTATE2_NETWORK_SUBNET_V6="fd2e:6f44:5dd8:cc56::/120"
+    pre:
+    - ref: baremetalds-devscripts-conf-extranetwork
+    - chain: baremetalds-ipi-pre
+    post:
+    - chain: baremetalds-ipi-post
+    test:
+    - ref: kubernetes-nmstate-e2e-handler
+  documentation: |-
+    Setup a baremetalds cluster and run kubernetes-nmstate handler e2e tests.

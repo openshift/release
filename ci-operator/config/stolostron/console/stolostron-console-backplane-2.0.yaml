@@ -24,8 +24,7 @@ images:
       - registry.ci.openshift.org/stolostron/common-nodejs-parent:nodejs-14
   to: console-mce
 promotion:
-  disabled: true
-  name: backplane-2.0
+  name: "2.0"
   namespace: stolostron
 resources:
   '*':
@@ -36,19 +35,21 @@ tests:
 - as: lint-check-unittests-sonarcloud
   commands: |
     export SELF="make -f Makefile.prow"
+    make -f Makefile.prow install
     make -f Makefile.prow lint
     make -f Makefile.prow check
     make -f Makefile.prow sonar/js/jest-init
     make -f Makefile.prow unit-tests
     make -f Makefile.prow sonar/js/prow
   container:
-    from: bin
+    from: src
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
 - as: sonar-post-submit
   commands: |
     export SELF="make -f Makefile.prow"
+    make -f Makefile.prow install
     make -f Makefile.prow sonar/js/jest-init
     make -f Makefile.prow unit-tests
     make -f Makefile.prow sonar/js/prow
@@ -85,7 +86,11 @@ tests:
     test:
     - as: publish
       commands: |-
+        export OSCI_COMPONENT_NAME=console-mce
+        export OSCI_COMPONENT_VERSION=2.0.0
         export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
+        export OSCI_PIPELINE_PRODUCT_PREFIX=backplane
+        export OSCI_PIPELINE_REPO=backplane-pipeline
         export OSCI_PUBLISH_DELAY="0"
         export SELF="make -f Makefile.prow"
         make -f Makefile.prow osci/publish

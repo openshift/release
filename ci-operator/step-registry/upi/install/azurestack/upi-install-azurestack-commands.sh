@@ -4,7 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+INSTALL_STAGE="initial"
+
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+#Save install status for must-gather to generate junit
+trap 'echo "$? $INSTALL_STAGE" > "${SHARED_DIR}/install-status.txt"' EXIT TERM
 export HOME=/tmp
 
 if [[ -z "$RELEASE_IMAGE_LATEST" ]]; then
@@ -65,7 +69,7 @@ SUFFIX_ENDPOINT=$(cat ${SHARED_DIR}/SUFFIX_ENDPOINT)
 az cloud register \
     -n PPE \
     --endpoint-resource-manager "${AZURESTACK_ENDPOINT}" \
-    --suffix-storage-endpoint "${SUFFIX_ENDPOINT}" 
+    --suffix-storage-endpoint "${SUFFIX_ENDPOINT}"
 az cloud set -n PPE
 az cloud update --profile 2019-03-01-hybrid
 az login --service-principal -u $APP_ID -p $AAD_CLIENT_SECRET --tenant $TENANT_ID > /dev/null
@@ -85,7 +89,7 @@ open(path, "w").write(yaml.dump(data, default_flow_style=False))'
 
 openshift-install create manifests
 
-# we don't want to create any machine* objects 
+# we don't want to create any machine* objects
 rm -f openshift/99_openshift-cluster-api_master-machines-*.yaml
 rm -f openshift/99_openshift-cluster-api_worker-machineset-*.yaml
 
@@ -97,6 +101,16 @@ for f in $files
 do
   SECRET_NAME=$(python3 -c 'import yaml;data = yaml.full_load(open("credentials-request/'${f}'"));print(data["spec"]["secretRef"]["name"])')
   SECRET_NAMESPACE=$(python3 -c 'import yaml;data = yaml.full_load(open("credentials-request/'${f}'"));print(data["spec"]["secretRef"]["namespace"])')
+  FEATURE_GATE=$(python3 -c 'import yaml;data = yaml.full_load(open("credentials-request/'${f}'"));print("release.openshift.io/feature-gate" in data["metadata"]["annotations"])')
+
+# 4.10 includes techpreview of CAPI which without the namespace: openshift-cluster-api
+# fails to bootstrap. Below checks if TechPreviewNoUpgrade is annotated and if so skips
+# creating that secret.
+
+  if [[ $FEATURE_GATE == *"True"* ]]; then
+      continue
+  fi
+
   filename=${f/request/secret}
   cat >> "manifests/$filename" << EOF
 apiVersion: v1
@@ -115,7 +129,7 @@ stringData:
 EOF
 done
 
-cat >> manifests/cco-configmap.yaml <<EOF 
+cat >> manifests/cco-configmap.yaml <<EOF
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -238,6 +252,8 @@ if [ "$ret" -ne 0 ]; then
   exit "$ret"
 fi
 
+INSTALL_STAGE="bootstrap_successful"
+
 az network nsg rule delete -g "$RESOURCE_GROUP" --nsg-name "${INFRA_ID}"-nsg --name bootstrap_ssh_in
 az vm stop -g "$RESOURCE_GROUP" --name "${INFRA_ID}"-bootstrap
 az vm deallocate -g "$RESOURCE_GROUP" --name "${INFRA_ID}"-bootstrap
@@ -293,6 +309,8 @@ sed 's/password: .*/password: REDACTED/' "${dir}/.openshift_install.log" >>"${AR
 if [ $ret -ne 0 ]; then
   exit "$ret"
 fi
+
+INSTALL_STAGE="cluster_creation_successful"
 
 cp -t "${SHARED_DIR}" \
     "${dir}/auth/kubeconfig"

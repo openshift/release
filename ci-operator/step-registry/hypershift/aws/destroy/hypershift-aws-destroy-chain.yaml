@@ -1,0 +1,37 @@
+chain:
+  as: hypershift-aws-destroy
+  steps:
+  - as: destroy
+    cli: latest
+    env:
+    - name: HYPERSHIFT_BASE_DOMAIN
+      default: "origin-ci-int-aws.dev.rhcloud.com"
+      documentation: "The cluster's FQDN will be a subdomain of the base domain."
+    - name: HYPERSHIFT_AWS_REGION
+      default: "us-east-1"
+      documentation: "The AWS region of the cluster."
+    commands: |-
+      set -exuo pipefail
+      CLUSTER_NAME="$(echo -n $PROW_JOB_ID|cut -d- -f-2)"
+      echo "$(date) Deleting HyperShift cluster ${CLUSTER_NAME}"
+      bin/hypershift destroy cluster aws \
+        --aws-creds=/etc/hypershift-pool-aws-credentials/credentials  \
+        --name ${CLUSTER_NAME} \
+        --region ${HYPERSHIFT_AWS_REGION} \
+        --base-domain ${HYPERSHIFT_BASE_DOMAIN} \
+        --cluster-grace-period 40m
+      echo "$(date) Finished deleting cluster"
+    from_image:
+      namespace: ocp
+      name: "4.11"
+      tag: hypershift-operator
+    grace_period: 5m0s
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    timeout: 15m0s
+    credentials:
+    - mount_path: /etc/hypershift-pool-aws-credentials
+      name: hypershift-pool-aws-credentials
+      namespace: test-credentials

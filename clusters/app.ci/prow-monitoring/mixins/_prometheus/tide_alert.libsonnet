@@ -8,14 +8,14 @@
             alert: 'abnormal Tide controller sync duration',
             // utc time
             expr: |||
-              max(syncdur and (changes(syncdur[1h]) > 0)) > 45
+              max(syncdur and (changes(syncdur[1h]) > 0)) > 75
             |||,
             'for': '5m',
             labels: {
               severity: 'critical',
             },
             annotations: {
-              message: 'The Tide sync duration is abnormally high (>45 seconds). Check <https://prometheus-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/graph?g0.range_input=1h&g0.expr=max(syncdur%20and%20(changes(syncdur%5B1h%5D)%20%3E%200))%20%3E%2045&g0.tab=0|Prometheus>',
+              message: 'The Tide sync duration is abnormally high (>75 seconds). Check <https://prometheus-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/graph?g0.range_input=1h&g0.expr=max(syncdur%20and%20(changes(syncdur%5B1h%5D)%20%3E%200))%20%3E%2075&g0.tab=0|Prometheus>',
             },
           },
           {
