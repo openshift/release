@@ -6,6 +6,14 @@ set -o pipefail
 
 echo "************ baremetalds packet teardown command ************"
 
+set -x
+CIRFILE=$SHARED_DIR/cir
+if [ -e $CIRFILE ] ; then
+    curl -kfX DELETE -H "Host: ofcir.apps.ostest.test.metalkube.org" "$(cat ${CLUSTER_PROFILE_DIR}/ofcir_url)/$(jq -r .name < $CIRFILE)" || true
+    exit 0
+fi
+set +x
+
 # Run Ansible playbook
 cd
 cat > packet-teardown.yaml <<-EOF
