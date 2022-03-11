@@ -28,7 +28,9 @@ base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
 machine_cidr=$(<"${SHARED_DIR}"/machinecidr.txt)
 
 RESOURCE_POOL_DEF=""
+set +o errexit
 VERSION=$(echo "${JOB_NAME}" | grep -o -E '4\.[0-9]+')
+set -o errexit
 if [ ! -z ${VERSION} ]; then
     Z_VERSION=$(echo ${VERSION} | cut -d'.' -f2)
     if [ ${Z_VERSION} -gt 9 ]; then
