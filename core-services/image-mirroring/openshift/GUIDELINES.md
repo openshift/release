@@ -1,7 +1,8 @@
 # Overview
 
 The final step of contributing a new image to the release stream is achieved by adding the mirroring
-configuration to the files in this directory.
+configuration to the files in this directory.  Mirroring may also be added for standalone images that
+should be published for external user consumption.
 
 Currently we also use this step as a final opportunity to ensure we got the image name correct.  That
 is why PRs that touch these files must be approved by a very limited set of individuals.
@@ -12,6 +13,16 @@ of things if their name choice needs to be changed at this step.  Fixing that pa
 is TBD.
 
 For more information on the process of enabling mirroring for an image, see the [CI documentation](https://docs.ci.openshift.org/docs/how-tos/mirroring-to-quay/#mirroring-images).
+
+# Which Images to Mirror
+
+Images that should be configured for mirroring are either:
+
+* Part of the release stream/payload
+* Standalone images images that should be published for external user consumption, e.g.:
+  * cli plugin binaries
+  * must-gather images
+  * images of test suites that you would expect a customer to run on their own cluster
 
 # Guidelines
 
