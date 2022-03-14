@@ -1,10 +1,10 @@
 base_images:
   base:
-    name: "4.8"
+    name: "4.11"
     namespace: ocp
     tag: base
   cli:
-    name: "4.9"
+    name: "4.11"
     namespace: ocp
     tag: cli
 binary_build_commands: make install
@@ -17,18 +17,15 @@ images:
 - dockerfile_path: Dockerfile
   from: base
   to: kubevirt-must-gather
-promotion:
-  name: "4.8"
-  namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.8"
+      name: "4.11"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.8"
+      name: "4.11"
       namespace: ocp
 resources:
   '*':
@@ -80,6 +77,44 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-azure
+- as: kubevirt-must-gather-e2e-gcp
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: deploy
+      cli: latest
+      commands: |
+        ./automation/deploy_hco.sh
+        ./automation/create_workloads.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - as: test-default
+      cli: latest
+      commands: |
+        oc adm must-gather --image="${KMG_IMAGE}" --dest-dir=${ARTIFACT_DIR}/must-gather-output
+        (cd ${ARTIFACT_DIR}; KUBECONFIG=${KUBECONFIG} ACK_GINKGO_DEPRECATIONS=1.16.4 /go/bin/must-gather.test --ginkgo.focus=level:product --junit-output=${ARTIFACT_DIR}/junit/report.xml --ginkgo.v)
+      dependencies:
+      - env: KMG_IMAGE
+        name: kubevirt-must-gather
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+    - as: test-targeted
+      cli: latest
+      commands: |
+        oc adm must-gather --image="${KMG_IMAGE}" --dest-dir=${ARTIFACT_DIR}/must-gather-output -- gather_vms_details
+        (cd ${ARTIFACT_DIR}; KUBECONFIG=${KUBECONFIG} ACK_GINKGO_DEPRECATIONS=1.16.4 /go/bin/must-gather.test --ginkgo.focus=level:workloads --junit-output=${ARTIFACT_DIR}/junit/report.xml --ginkgo.v)
+      dependencies:
+      - env: KMG_IMAGE
+        name: kubevirt-must-gather
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
 zz_generated_metadata:
   branch: main
   org: kubevirt
