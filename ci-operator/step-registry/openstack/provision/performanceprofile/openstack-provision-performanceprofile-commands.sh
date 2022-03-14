@@ -89,8 +89,7 @@ EOL
 
 oc_version=$(oc version | cut -d ' ' -f 3 | cut -d '.' -f1,2 | sed -n '2p')
 case "${oc_version}" in
-    # Remove 4.10 once it's GA
-    4.10) dev_version=release-4.10 ;;
+    # Remove 4.11 once it's GA
     4.11) dev_version=master ;;
     *) ;;
 esac
