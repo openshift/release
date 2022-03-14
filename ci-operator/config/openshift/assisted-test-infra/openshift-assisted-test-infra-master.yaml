@@ -198,24 +198,40 @@ tests:
         OPENSHIFT_VERSION=4.10
       TEST_SUITE: full
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-olm-suite
+- as: e2e-metal-assisted-cnv
   optional: true
   run_if_changed: .*operator.*
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        TEST_FUNC=test_olm_operator
-      PACKET_PLAN: m2.xlarge.x86
+        OLM_OPERATORS=cnv
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-olm-suite-periodic
+- as: e2e-metal-assisted-cnv-periodic
   cron: '@daily'
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        TEST_FUNC=test_olm_operator
-      PACKET_PLAN: m2.xlarge.x86
+        OLM_OPERATORS=cnv
+      TEST_SUITE: full
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-ocs
+  optional: true
+  run_if_changed: .*operator.*
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=ocs
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-ocs-periodic
+  cron: '@daily'
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=ocs
       TEST_SUITE: full
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-day2
