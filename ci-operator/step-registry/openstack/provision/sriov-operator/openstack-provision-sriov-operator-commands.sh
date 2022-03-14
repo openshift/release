@@ -55,10 +55,7 @@ function wait_for_sriov_pods() {
 
 oc_version=$(oc version | cut -d ' ' -f 3 | cut -d '.' -f1,2 | sed -n '2p')
 case "${oc_version}" in
-    # Remove 4.10 once it's GA
-    4.10)
-        echo "OpenShift 4.10 was detected"
-        is_dev_version=1 ;;
+    # Remove 4.11 once it's GA
     4.11)
         echo "OpenShift 4.11 was detected"
         is_dev_version=1 ;;
