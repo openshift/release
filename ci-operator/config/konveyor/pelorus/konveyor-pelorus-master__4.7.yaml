@@ -1,0 +1,72 @@
+base_images:
+  cli:
+    name: "4.7"
+    namespace: ocp
+    tag: cli
+  ubi_minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+binary_build_commands: make dev-env
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi8
+      USER root
+      RUN yum install -y python39 make diffutils openssl git && \
+          yum clean all && rm -rf /var/cache/dnf/*
+      ENV XDG_DATA_HOME=/.local
+      WORKDIR pelorus
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.7"
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+tests:
+- as: unit
+  commands: |
+    make lint
+  container:
+    from: src
+- as: e2e-openshift
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      FIPS_ENABLED: "false"
+    test:
+    - as: e2e
+      commands: |
+        # TODO: optimize this
+        set -x
+        make dev-env
+        source .venv/bin/activate
+        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        oc create namespace pelorus
+        timeout 30s bash -c 'until oc get project | grep pelorus; do sleep 10; done'
+        helm install operators charts/operators --namespace pelorus --debug
+        # check operators
+        timeout 5m bash -c 'until oc get svc grafana-operator-controller-manager-metrics-service --namespace pelorus; do sleep 10; done'
+        helm install pelorus charts/pelorus --namespace pelorus --debug
+        # check final deployment
+        timeout 10m bash -c 'until oc get svc grafana-service --namespace pelorus; do sleep 10; done'
+        timeout 10m bash -c 'until oc get svc prometheus-operated --namespace pelorus; do sleep 10; done'
+        timeout 10m bash -c 'until oc get svc prometheus-pelorus --namespace pelorus; do sleep 10; done'
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: openshift-e2e-aws
+zz_generated_metadata:
+  branch: master
+  org: konveyor
+  repo: pelorus
+  variant: "4.7"
