@@ -55,10 +55,7 @@ function wait_for_sriov_pods() {
 
 oc_version=$(oc version | cut -d ' ' -f 3 | cut -d '.' -f1,2 | sed -n '2p')
 case "${oc_version}" in
-    # Remove 4.10 once it's GA
-    4.10)
-        echo "OpenShift 4.10 was detected"
-        is_dev_version=1 ;;
+    # Remove 4.11 once it's GA
     4.11)
         echo "OpenShift 4.11 was detected"
         is_dev_version=1 ;;
@@ -70,8 +67,7 @@ if [ -n "${is_dev_version:-}" ]; then
     git clone --branch release-${oc_version} https://github.com/openshift/sriov-network-operator /tmp/sriov-network-operator
     pushd /tmp/sriov-network-operator
     # Until https://github.com/openshift/sriov-network-operator/pull/613 merges
-    # Also we need to hardcode 4.10 for now because 4.11 manifests are not here yet.
-    cp manifests/4.10/supported-nic-ids_v1_configmap.yaml deploy/configmap.yaml
+    cp manifests/stable/supported-nic-ids_v1_configmap.yaml deploy/configmap.yaml
 
     # We need to skip the bits where it tries to install Skopeo
     export SKIP_VAR_SET=1
