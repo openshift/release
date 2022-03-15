@@ -25,11 +25,22 @@ CONFIG = {
         'us-west-1': 35,
         'us-west-2': 40,
     },
-    'aws-china-quota-slice': {
+    'aws-qe-quota-slice': {
+        'us-west-2': 40,
+    },
+    'aws-china-qe-quota-slice': {
         'cn-north-1': 1,
         'cn-northwest-1': 1,
     },
-    'aws-usgov-quota-slice': {
+    'aws-c2s-qe-quota-slice': {
+        # C2S regions (us-iso-east-1, us-iso-west-1) are running on an emulator on us-east-1 region
+        'us-east-1': 5,
+    },
+    'aws-sc2s-qe-quota-slice': {
+        # SC2S region (us-isob-east-1) is running on an emulator on us-east-1 region
+        'us-east-1': 5,
+    },
+    'aws-usgov-qe-quota-slice': {
         'us-gov-west-1': 5,
         'us-gov-east-1': 5,
     },
