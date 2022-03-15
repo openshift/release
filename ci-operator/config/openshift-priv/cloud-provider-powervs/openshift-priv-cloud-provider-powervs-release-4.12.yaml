@@ -1,0 +1,61 @@
+base_images:
+  base:
+    name: 4.12-priv
+    namespace: ocp-private
+    tag: base
+  ocp_builder_rhel-8-golang-1.17-openshift-4.11:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.17-openshift-4.11
+binary_build_commands: go build .
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
+canonical_go_repository: github.com/openshift/cloud-provider-powervs
+images:
+- dockerfile_path: openshift-hack/images/Dockerfile.openshift
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.17-openshift-4.11:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
+  to: powervs-cloud-controller-manager
+promotion:
+  name: 4.12-priv
+  namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.12-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.12-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: vet
+  commands: go vet $(go list ./... | grep -v "/vendor/")
+  container:
+    from: src
+- as: test
+  commands: go test -v -race -covermode=atomic -coverprofile=cover.out $(go list ./...)
+  container:
+    from: src
+- as: fmt
+  commands: gofmt -l $(find . -type f -name '*.go'| grep -v "/vendor/")
+  container:
+    from: src
+zz_generated_metadata:
+  branch: release-4.12
+  org: openshift-priv
+  repo: cloud-provider-powervs
