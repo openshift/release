@@ -9,7 +9,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.16
+    tag: golang-1.17
 images:
 - dockerfile_path: build/Dockerfile
   from: os
@@ -25,12 +25,12 @@ promotion:
 releases:
   initial:
     integration:
-      name: "4.6"
+      name: "4.9"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.6"
+      name: "4.9"
       namespace: ocp
 resources:
   '*':
@@ -51,8 +51,14 @@ tests:
   container:
     from: src
 - as: e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.9"
   steps:
-    cluster_profile: aws
     test:
     - as: test
       cli: latest
@@ -61,7 +67,26 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    workflow: generic-claim
+- as: coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  secret:
+    mount_path: /tmp/secret
+    name: cloud-resource-operator-codecov-token
+- as: publish-coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  postsubmit: true
+  secret:
+    mount_path: /tmp/secret
+    name: cloud-resource-operator-codecov-token
 zz_generated_metadata:
   branch: master
   org: integr8ly

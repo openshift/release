@@ -3,32 +3,29 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_builder_rhel-8-base-openshift-4.10:
+  ocp_builder_rhel-8-base-openshift-4.11:
     name: builder
     namespace: ocp
-    tag: rhel-8-base-openshift-4.10
+    tag: rhel-8-base-openshift-4.11
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.15
+  from_repository: true
 canonical_go_repository: github.com/openshift/ironic-agent-image
 images:
 - dockerfile_path: Dockerfile.ocp
-  from: ocp_builder_rhel-8-base-openshift-4.10
+  from: ocp_builder_rhel-8-base-openshift-4.11
   to: ironic-agent
 promotion:
-  name: 4.10-priv
+  name: 4.11-priv
   namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.10-priv
+      name: 4.11-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.10-priv
+      name: 4.11-priv
       namespace: ocp-private
 resources:
   '*':
@@ -39,13 +36,29 @@ tests:
 - as: e2e-metal-ipi
   skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
   steps:
-    cluster_profile: packet
+    cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ipv4
+- as: e2e-metal-ipi-serial-ipv4
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-serial-ipv4
 - as: e2e-metal-ipi-virtualmedia
   skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
   steps:
-    cluster_profile: packet
+    cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-virtualmedia
+- as: e2e-metal-ipi-ovn-ipv6
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-ipv6
+- as: e2e-metal-ipi-ovn-dualstack
+  optional: true
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-dualstack
 zz_generated_metadata:
   branch: main
   org: openshift-priv

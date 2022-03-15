@@ -25,6 +25,14 @@ spec:
 EOF
 }
 
+function waitForClusterOperatorsRollout() {
+  echo "$(date -u --rfc-3339=seconds) - Wait for the operator to go available..."
+  waitFor 10m oc wait --all --for=condition=Available=True clusteroperators.config.openshift.io
+
+  echo "$(date -u --rfc-3339=seconds) - Waits for operators to finish rolling out..."
+  waitFor 30m oc wait --all --for=condition=Progressing=False clusteroperators.config.openshift.io
+}
+
 function ClusterCAPIOperatorPodsCreated() {
   while [ "$(oc get pods -n ${CAPI_NAMESPACE} -o name | wc -l)" == 0 ]; do
     echo "$(date -u --rfc-3339=seconds) - Wait for CAPI operands creation"
@@ -71,6 +79,6 @@ export -f execute
 
 
 applyFeatureGate
-waitFor 10m ClusterCAPIOperatorPodsCreated
+waitFor 20m ClusterCAPIOperatorPodsCreated
 waitForClusterCAPIOperatorPodsReadiness
-
+waitForClusterOperatorsRollout

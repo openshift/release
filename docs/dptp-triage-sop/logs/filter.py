@@ -52,7 +52,11 @@ if mode == "warnings":
             any(
                 s in message.get(m, "") for s in ["connect: connection refused", "i/o timeout"]
             ) for m in ["msg", "error"]
-        )
+        ),
+        lambda message: matches(message, "tide", error="non-200 OK status code: 403 Forbidden"),
+        lambda message: matches(message, "tide", msg="GitHub status description needed to be truncated to fit GH API limit"),
+        # our automation doesn't have access to the repo
+        lambda message: matches(message, "hook", msg="Could not list labels on PR", error="the GitHub API request returns a 403"),
     ]
 elif mode == "errors":
     filters = [
@@ -131,7 +135,6 @@ elif mode == "errors":
             "Failed to list collaborators while loading RepoOwners" in message.get("msg", "") or
             "return code not 2XX: 403 Forbidden" in message.get("error", ""),
         ),
-        lambda message: matches(message, "tide", error="non-200 OK status code: 403 Forbidden"),
 
         # DPTP-2613
         lambda message: matches(message, "dptp-controller-manager", error="failed to create namespace openshift-psap"),

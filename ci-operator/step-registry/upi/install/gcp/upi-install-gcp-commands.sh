@@ -4,7 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+INSTALL_STAGE="initial"
+
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+#Save install status for must-gather to generate junit
+trap 'echo "$? $INSTALL_STAGE" > "${SHARED_DIR}/install-status.txt"' EXIT TERM
 
 export HOME=/tmp
 
@@ -472,6 +476,8 @@ if [ "$ret" -ne 0 ]; then
   exit "$ret"
 fi
 
+INSTALL_STAGE="bootstrap_successful"
+
 ## Destroy bootstrap resources
 echo "$(date -u --rfc-3339=seconds) - Bootstrap complete, destroying bootstrap resources"
 gcloud compute backend-services remove-backend "${INFRA_ID}-api-internal-backend-service" "--region=${REGION}" "--instance-group=${BOOTSTRAP_INSTANCE_GROUP}" "--instance-group-zone=${ZONE_0}"
@@ -540,6 +546,8 @@ sed 's/password: .*/password: REDACTED/' "${dir}/.openshift_install.log" >>"${AR
 if [ $ret -ne 0 ]; then
   exit "$ret"
 fi
+
+INSTALL_STAGE="cluster_creation_successful"
 
 cp -t "${SHARED_DIR}" \
     "${dir}/auth/kubeconfig"

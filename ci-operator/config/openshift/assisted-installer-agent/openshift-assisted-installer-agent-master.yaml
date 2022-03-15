@@ -12,8 +12,8 @@ base_images:
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: assisted-test
-    namespace: ocp-kni
+    name: ocm-2.5
+    namespace: edge-infrastructure
     tag: assisted-test-infra
   coreos-centos-stream8:
     name: stream8
@@ -23,10 +23,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  openshift_release_golang-1.16:
+  openshift_release_golang-1.17:
     name: release
     namespace: openshift
-    tag: golang-1.16
+    tag: golang-1.17
 build_root:
   project_image:
     dockerfile_path: Dockerfile.assisted_installer_agent-build
@@ -34,9 +34,9 @@ images:
 - dockerfile_path: Dockerfile.assisted_installer_agent
   from: coreos-centos-stream8
   inputs:
-    openshift_release_golang-1.16:
+    openshift_release_golang-1.17:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.16
+      - registry.ci.openshift.org/openshift/release:golang-1.17
   to: assisted-installer-agent
 promotion:
   name: ocm-2.5
@@ -66,14 +66,38 @@ tests:
     dependencies:
       SOURCE_IMAGE_REF: assisted-installer-agent
     test:
-    - ref: baremetalds-assisted-images-publish
+    - ref: assisted-baremetal-images-publish
 - as: mirror-vcsref-image
   postsubmit: true
   steps:
     dependencies:
       SOURCE_IMAGE_REF: assisted-installer-agent
     test:
-    - ref: baremetalds-assisted-images-publish
+    - ref: assisted-baremetal-images-publish
+- as: ocm-publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-installer-agent
+    env:
+      IMAGE_REPO: assisted-installer-agent
+      OSCI_ENV_CONFIG: |
+        OSCI_PUBLISH_DELAY=0
+      RELEASE_REF: release-2.5
+    workflow: ocm-ci-manifest-update
+- as: mce-publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-installer-agent
+    env:
+      IMAGE_REPO: assisted-installer-agent
+      OSCI_ENV_CONFIG: |
+        OSCI_PUBLISH_DELAY=0
+        OSCI_PIPELINE_PRODUCT_PREFIX=backplane
+        OSCI_PIPELINE_REPO=backplane-pipeline
+      RELEASE_REF: backplane-2.0
+    workflow: ocm-ci-manifest-update
 - as: lint
   commands: |
     export GOLANGCI_LINT_CACHE=/tmp/.cache
@@ -82,14 +106,29 @@ tests:
   container:
     from: test-bin
 - as: unit-test
-  commands: make REPORTS=${ARTIFACT_DIR} unit-test
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
+    make REPORTS=${ARTIFACT_DIR} unit-test
   container:
     from: test-bin
+  secret:
+    mount_path: /tmp/secret
+    name: assisted-installer-agent-codecov-token
+- as: unit-test-postsubmit
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
+    make REPORTS=${ARTIFACT_DIR} unit-test
+  container:
+    from: test-bin
+  postsubmit: true
+  secret:
+    mount_path: /tmp/secret
+    name: assisted-installer-agent-codecov-token
 - as: e2e-metal-assisted
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: packet-assisted
-    workflow: baremetalds-assisted-install
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-ipv6
   optional: true
   steps:
@@ -98,8 +137,7 @@ tests:
       ASSISTED_CONFIG: |
         IPv6=yes
         IPv4=no
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-single-node
   optional: true
   steps:
@@ -107,17 +145,23 @@ tests:
     env:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
-- as: e2e-metal-assisted-olm
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-cnv
   optional: true
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        TEST_FUNC=test_olm_operator
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+        OLM_OPERATORS=cnv
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-ocs
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=ocs
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-day2
   optional: true
   steps:
@@ -125,8 +169,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         TEST_FUNC=test_deploy_day2_nodes_cloud
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: assisted-baremetal
 zz_generated_metadata:
   branch: master
   org: openshift

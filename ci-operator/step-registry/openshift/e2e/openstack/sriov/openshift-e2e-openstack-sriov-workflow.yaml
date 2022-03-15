@@ -1,0 +1,30 @@
+workflow:
+  as: openshift-e2e-openstack-sriov
+  steps:
+    pre:
+      - chain: ipi-openstack-pre
+      - ref: openstack-provision-performanceprofile
+      - ref: openstack-provision-vfio-noiommu
+      - ref: openstack-provision-config-drive
+      - ref: openstack-provision-sriov-worker
+      - ref: operator-pipelines-preflight-common-health
+      - ref: optional-operators-subscribe
+      - ref: openstack-provision-sriov-networknodepolicy
+    test:
+      - ref: openstack-test-sriov
+    post:
+      - chain: ipi-openstack-post
+    env:
+      ADDITIONAL_WORKERS_NETWORKS: "intel-dpdk"
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_TYPE: "minimal"
+      OO_INSTALL_NAMESPACE: openshift-sriov-network-operator
+      OO_CHANNEL: alpha
+      OO_PACKAGE: sriov-network-operator
+      OO_TARGET_NAMESPACES: '!install'
+      OPENSTACK_SRIOV_NETWORK: "intel-sriov"
+      OPERATOR_HEALTH_TIMEOUT: 30
+      WORKER_REPLICAS: 0
+  documentation: |-
+    The openshift-e2e-openstack-sriov workflow executes an installation of
+    OpenShift on OpenStack in NFV environment and run SR-IOV tests.

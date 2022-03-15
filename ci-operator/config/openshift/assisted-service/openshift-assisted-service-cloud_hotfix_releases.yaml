@@ -12,8 +12,8 @@ base_images:
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-test-infra:
-    name: assisted-test
-    namespace: ocp-kni
+    name: ocm-2.5
+    namespace: edge-infrastructure
     tag: assisted-test-infra
   coreos_centos_stream8:
     name: stream8
@@ -73,7 +73,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.8"
+    version: "4.10"
   steps:
     test:
     - as: subsystem-deploy-and-run
@@ -101,14 +101,21 @@ tests:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.8
         NUM_MASTERS=1
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
-- as: e2e-metal-assisted
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-onprem
   steps:
     cluster_profile: packet-assisted
     env:
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+      ASSISTED_CONFIG: |
+        DEPLOY_TARGET=onprem
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-day2
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        TEST_FUNC=test_deploy_day2_nodes_cloud
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-ipv4v6
   steps:
     cluster_profile: packet-assisted
@@ -116,34 +123,58 @@ tests:
       ASSISTED_CONFIG: |
         IPv6=yes
         IPv4=yes
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
-- as: e2e-metal-assisted-multi-version
-  optional: true
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-4-6
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=""
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+        OPENSHIFT_VERSION=4.6
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-4-8
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.8
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-4-9
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.9
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-4-10
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.10
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-networking
-  optional: true
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         TEST_FUNC=test_networking
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
-- as: e2e-metal-assisted-olm
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-cnv
+  optional: true
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        TEST_FUNC=test_olm_operator
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+        OLM_OPERATORS=cnv
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-ocs
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=ocs
+    workflow: assisted-baremetal
 zz_generated_metadata:
   branch: cloud_hotfix_releases
   org: openshift

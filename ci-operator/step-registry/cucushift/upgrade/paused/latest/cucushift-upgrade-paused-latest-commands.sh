@@ -120,10 +120,10 @@ then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST}"
-oc adm release info "${RELEASE_IMAGE_LATEST}"
+echo "RELEASE_IMAGE_TARGET: ${RELEASE_IMAGE_TARGET}"
+oc adm release info "${RELEASE_IMAGE_TARGET}"
 
-export TARGET_RELEASE="${RELEASE_IMAGE_LATEST}"
+export TARGET_RELEASE="${RELEASE_IMAGE_TARGET}"
 
 upgrade
 sleep "${SLEEP_TIME}"

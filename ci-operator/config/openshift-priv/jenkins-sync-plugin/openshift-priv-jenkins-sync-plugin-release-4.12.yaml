@@ -1,0 +1,66 @@
+base_images:
+  jenkins-agent-maven:
+    name: 4.12-priv
+    namespace: ocp-private
+    tag: jenkins-agent-maven
+  original_jenkins:
+    name: 4.12-priv
+    namespace: ocp-private
+    tag: jenkins
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.16
+canonical_go_repository: github.com/openshift/jenkins-sync-plugin
+images:
+- dockerfile_path: Dockerfile
+  from: original_jenkins
+  inputs:
+    jenkins-agent-maven:
+      as:
+      - quay.io/openshift/origin-jenkins-agent-maven:4.9.0
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/jenkins-sync-plugin/.
+  to: jenkins
+promotion:
+  additional_images:
+    jenkins-sync-plugin-e2e: src
+  excluded_images:
+  - jenkins
+  name: 4.12-priv
+  namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.12-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.12-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws-jenkins-sync-plugin
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-4.12
+  org: openshift-priv
+  repo: jenkins-sync-plugin

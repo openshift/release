@@ -14,7 +14,19 @@ fi
 
 mkdir -p "${HOME}"/.ssh
 BUNDLE_VERSION="$(crc version | grep -oP '^OpenShift version\s*:\s*\K\S+')"
-BUNDLE=crc_libvirt_"${BUNDLE_VERSION}".crcbundle
+ARCH=$(uname -m)
+case "${ARCH}" in
+    x86_64)
+        BUNDLE_ARCH="amd64"
+	;;
+    aarch64)
+        BUNDLE_ARCH="arm64"
+	;;
+    *)
+        BUNDLE_ARCH=${ARCH}
+	;;
+esac
+BUNDLE=crc_libvirt_"${BUNDLE_VERSION}"_"${BUNDLE_ARCH}".crcbundle
 
 mock-nss.sh
 
@@ -60,8 +72,7 @@ EOF
 chmod +x "${HOME}"/run-tests.sh
 
 # Get the bundle
-curl -L "https://storage.googleapis.com/crc-bundle-github-ci/crc_libvirt_${BUNDLE_VERSION}.zip" -o /tmp/bundle.zip
-unzip -P "$(cat /var/run/bundle-secret/secret.txt)"  /tmp/bundle.zip -d  /tmp
+curl -L "https://storage.googleapis.com/crc-bundle-github-ci/${BUNDLE}" -o /tmp/${BUNDLE}
 
 echo "${BUNDLE}" > "${HOME}"/bundle
 

@@ -7,10 +7,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
+  ocp_builder_rhel-8-golang-1.17-openshift-4.11:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.17-openshift-4.10
+    tag: rhel-8-golang-1.17-openshift-4.11
 binary_build_commands: NO_DOCKER=1 make build
 build_root:
   from_repository: true
@@ -19,11 +19,12 @@ images:
 - dockerfile_path: Dockerfile.rhel
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
+    ocp_builder_rhel-8-golang-1.17-openshift-4.11:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
   to: machine-api-operator
 promotion:
+  disabled: true
   name: 4.11-priv
   namespace: ocp-private
 releases:
@@ -143,7 +144,7 @@ tests:
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: packet
+    cluster_profile: equinix-ocp-metal
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4
@@ -153,7 +154,7 @@ tests:
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: packet
+    cluster_profile: equinix-ocp-metal
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4
@@ -166,7 +167,7 @@ tests:
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: packet
+    cluster_profile: equinix-ocp-metal
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v6
@@ -176,7 +177,7 @@ tests:
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: packet
+    cluster_profile: equinix-ocp-metal
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4v6
@@ -186,7 +187,7 @@ tests:
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: packet
+    cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-virtualmedia
 - as: e2e-vsphere-serial
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$

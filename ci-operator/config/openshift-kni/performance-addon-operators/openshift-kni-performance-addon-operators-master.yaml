@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.10"
+    name: "4.11"
     namespace: ocp
     tag: cli
   opm-builder:
@@ -67,7 +67,7 @@ images:
 operator:
   bundles:
   - dockerfile_path: openshift-ci/Dockerfile.bundle.ci
-  - dockerfile_path: openshift-ci/Dockerfile.bundle-4.9.ci
+  - dockerfile_path: openshift-ci/Dockerfile.bundle-4.10.ci
   substitutions:
   - pullspec: REPLACE_IMAGE
     with: performance-addon-operator
@@ -79,14 +79,15 @@ promotion:
   namespace: ocp-kni
 releases:
   initial:
-    integration:
-      name: "4.10"
-      namespace: ocp
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.11"
   latest:
-    integration:
-      include_built_images: true
-      name: "4.10"
-      namespace: ocp
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.11"
 resources:
   '*':
     requests:
@@ -100,7 +101,7 @@ tests:
 - as: ci-tools
   commands: make ci-tools-job
   container:
-    from: src
+    from: pao-src-oc
   optional: true
 - as: ci-ppc
   commands: make perf-profile-creator-tests
@@ -115,7 +116,7 @@ tests:
   steps:
     cluster_profile: gcp
     env:
-      OO_CHANNEL: "4.10"
+      OO_CHANNEL: "4.11"
       OO_INSTALL_NAMESPACE: openshift-performance-addon-operator
       OO_PACKAGE: performance-addon-operator
       OO_TARGET_NAMESPACES: '!all'
@@ -132,7 +133,7 @@ tests:
   steps:
     cluster_profile: gcp
     env:
-      OO_CHANNEL: "4.9"
+      OO_CHANNEL: "4.10"
       OO_INSTALL_NAMESPACE: openshift-performance-addon-operator
       OO_PACKAGE: performance-addon-operator
       OO_TARGET_NAMESPACES: '!all'

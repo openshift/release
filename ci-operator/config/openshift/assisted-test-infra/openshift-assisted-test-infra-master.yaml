@@ -22,16 +22,16 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.test-infra
+- dockerfile_literal: |
+    FROM base
+    COPY . .
   from: src
-  inputs:
-    assisted-service:
-      as:
-      - quay.io/ocpmetal/assisted-service:latest
   to: assisted-test-infra
+- dockerfile_path: Dockerfile.assisted-test-infra
+  to: assisted-test-infra-internal
 promotion:
-  name: assisted-test
-  namespace: ocp-kni
+  name: ocm-2.5
+  namespace: edge-infrastructure
 releases:
   initial:
     integration:
@@ -52,7 +52,7 @@ tests:
   commands: |
     make lint
   container:
-    from: assisted-test-infra
+    from: assisted-test-infra-internal
 - as: assisted-packet-check
   cron: 0 */2 * * *
   steps:
@@ -69,9 +69,7 @@ tests:
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE|Jenkinsfile.*)$
   steps:
     cluster_profile: packet-assisted
-    env:
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-prod
   optional: true
   steps:
@@ -79,8 +77,7 @@ tests:
     env:
       ENVIRONMENT: production
       GATHER_ALL_CLUSTERS: "false"
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-onprem
   optional: true
   steps:
@@ -88,8 +85,16 @@ tests:
     env:
       ASSISTED_CONFIG: |
         DEPLOY_TARGET=onprem
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-onprem-periodic
+  cron: '@daily'
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        DEPLOY_TARGET=onprem
+      TEST_SUITE: full
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-prod-periodic
   cron: '@daily'
   steps:
@@ -98,14 +103,14 @@ tests:
       ENVIRONMENT: production
       GATHER_ALL_CLUSTERS: "false"
       TEST_SUITE: full
-    workflow: baremetalds-assisted-install
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-periodic
   cron: '@daily'
   steps:
     cluster_profile: packet-assisted
     env:
       TEST_SUITE: full
-    workflow: baremetalds-assisted
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-tpmv2
   optional: true
   steps:
@@ -114,8 +119,7 @@ tests:
       ASSISTED_CONFIG: |
         DISK_ENCRYPTION_ROLES=all
         DISK_ENCRYPTION_MODE=tpmv2
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-tpmv2-periodic
   cron: '@daily'
   steps:
@@ -125,54 +129,120 @@ tests:
         DISK_ENCRYPTION_ROLES=all
         DISK_ENCRYPTION_MODE=tpmv2
       TEST_SUITE: full
-    workflow: baremetalds-assisted
-- as: e2e-metal-assisted-multi-version
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-4-6
   optional: true
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=""
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
-- as: e2e-metal-assisted-multi-version-periodic
+        OPENSHIFT_VERSION=4.6
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-4-6-periodic
+  cron: '@weekly'
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.6
+      TEST_SUITE: none
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-4-8
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.8
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-4-8-periodic
   cron: '@daily'
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=""
+        OPENSHIFT_VERSION=4.8
       TEST_SUITE: full
-    workflow: baremetalds-assisted-install
-- as: e2e-metal-assisted-olm
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-4-9
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.9
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-4-9-periodic
+  cron: '@daily'
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.9
+      TEST_SUITE: full
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-4-10
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.10
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-4-10-periodic
+  cron: '@daily'
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.10
+      TEST_SUITE: full
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-cnv
   optional: true
   run_if_changed: .*operator.*
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        TEST_FUNC=test_olm_operator
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
-- as: e2e-metal-assisted-olm-periodic
+        OLM_OPERATORS=cnv
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-cnv-periodic
   cron: '@daily'
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        TEST_FUNC=test_olm_operator
+        OLM_OPERATORS=cnv
       TEST_SUITE: full
-    workflow: baremetalds-assisted
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-ocs
+  optional: true
+  run_if_changed: .*operator.*
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=ocs
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-ocs-periodic
+  cron: '@daily'
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=ocs
+      TEST_SUITE: full
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-day2
   optional: true
-  run_if_changed: ^(day2/.*|.*/cluster/.*)$
+  run_if_changed: ^(.*/day2/.*|.*/cluster/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         TEST_FUNC=test_deploy_day2_nodes_cloud
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-day2-periodic
   cron: '@daily'
   steps:
@@ -181,51 +251,28 @@ tests:
       ASSISTED_CONFIG: |
         TEST_FUNC=test_deploy_day2_nodes_cloud
       TEST_SUITE: full
-    workflow: baremetalds-assisted-install
-- as: system-test-operator
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      POST_INSTALL_COMMANDS: |
-        export TEST_FUNC=test_kube_api_ipv4
-        export KUBECONFIG=$(find ${KUBECONFIG} -type f)
-        make deploy_assisted_operator test_kube_api_parallel
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
-- as: system-test-operator-periodic
-  cron: '@daily'
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      POST_INSTALL_COMMANDS: |
-        export TEST_FUNC=test_kube_api_ipv4
-        export KUBECONFIG=$(find ${KUBECONFIG} -type f)
-        make deploy_assisted_operator test_kube_api_parallel
-      TEST_SUITE: full
-    workflow: baremetalds-assisted
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-kube-api-late-binding-single-node
   optional: true
   steps:
     cluster_profile: packet-assisted
     env:
       POST_INSTALL_COMMANDS: |
-        export TEST_FUNC=test_kube_api_late_binding_ipv4_single_node
+        export TEST_FUNC=test_late_binding_kube_api_sno
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
         make deploy_assisted_operator test_kube_api_parallel
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-kube-api-late-unbinding-single-node
   optional: true
   steps:
     cluster_profile: packet-assisted
     env:
       POST_INSTALL_COMMANDS: |
-        export TEST_FUNC=test_kube_api_late_unbinding_ipv4_single_node
+        export TEST_FUNC=test_late_binding_kube_api_sno
+        export HOLD_INSTALLATION=true
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
         make deploy_assisted_operator test_kube_api_parallel
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-ipv6
   optional: true
   run_if_changed: ^(terraform_files/.*|.*/controllers/.*)$
@@ -235,8 +282,7 @@ tests:
       ASSISTED_CONFIG: |
         IPv6=yes
         IPv4=no
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-ipv6-periodic
   cron: '@daily'
   steps:
@@ -246,7 +292,7 @@ tests:
         IPv6=yes
         IPv4=no
       TEST_SUITE: full
-    workflow: baremetalds-assisted
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-ipv4v6
   optional: true
   run_if_changed: ^(terraform_files/.*|.*/controllers/.*)$
@@ -256,8 +302,7 @@ tests:
       ASSISTED_CONFIG: |
         IPv6=yes
         IPv4=yes
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-ipv4v6-periodic
   cron: '@daily'
   steps:
@@ -267,7 +312,7 @@ tests:
         IPv6=yes
         IPv4=yes
       TEST_SUITE: full
-    workflow: baremetalds-assisted
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-none
   optional: true
   run_if_changed: ^(terraform_files/.*|.*/controllers/.*)$
@@ -276,8 +321,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         PLATFORM=none
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-none-periodic
   cron: '@daily'
   steps:
@@ -286,33 +330,7 @@ tests:
       ASSISTED_CONFIG: |
         PLATFORM=none
       TEST_SUITE: full
-    workflow: baremetalds-assisted
-- as: e2e-metal-assisted-none-ipv6
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        IPv6=yes
-        IPv4=no
-        VIP_DHCP_ALLOCATION=no
-        PROXY=yes
-        PLATFORM=none
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
-- as: e2e-metal-assisted-none-ipv6-periodic
-  cron: '@daily'
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        IPv6=yes
-        IPv4=no
-        VIP_DHCP_ALLOCATION=no
-        PROXY=yes
-        PLATFORM=none
-      TEST_SUITE: full
-    workflow: baremetalds-assisted
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-single-node
   optional: true
   steps:
@@ -320,8 +338,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-single-node-periodic
   cron: '@daily'
   steps:
@@ -330,71 +347,94 @@ tests:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
       TEST_SUITE: full
-    workflow: baremetalds-assisted
-- as: e2e-metal-assisted-kube-api
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-kube-api-net-suite
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE|Jenkinsfile.*)$
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
+        KUBE_API=true
+        ENABLE_KUBE_API=true
         NUM_MASTERS=1
-        NUM_WORKERS=0
-        IPv6=yes
-        IPv4=no
-        PROXY=yes
-        ADDITIONAL_PARAMS="--with-static-network-config"
         ISO_IMAGE_TYPE=minimal-iso
+        STATIC_IPS=true
+        TEST_FUNC=test_kubeapi
+        MAKEFILE_TARGET="create_full_environment run test_kube_api_parallel"
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-capi
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
         KUBE_API=yes
         ENABLE_KUBE_API=true
-        MAKEFILE_TARGET=all
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
-- as: e2e-metal-assisted-kube-api-periodic
+        MINIKUBE_DISK_SIZE=70g
+        MINIKUBE_RAM_MB=10240
+        TEST_FUNC=test_capi_provider
+        MAKEFILE_TARGET="create_full_environment run deploy_capi_env test_kube_api_parallel"
+      GATHER_CAPI_LOGS: "true"
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-capi-periodic
   cron: '@daily'
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        NUM_MASTERS=1
-        NUM_WORKERS=0
-        IPv6=yes
-        IPv4=no
-        PROXY=yes
-        ADDITIONAL_PARAMS="--with-static-network-config"
-        ISO_IMAGE_TYPE=minimal-iso
         KUBE_API=yes
         ENABLE_KUBE_API=true
-        MAKEFILE_TARGET=all
+        MINIKUBE_DISK_SIZE=70g
+        MINIKUBE_RAM_MB=10240
+        TEST_FUNC=test_capi_provider
+        MAKEFILE_TARGET="create_full_environment run deploy_capi_env test_kube_api_parallel"
+      GATHER_CAPI_LOGS: "true"
       TEST_SUITE: full
-    workflow: baremetalds-assisted
-- as: e2e-metal-assisted-networking
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-kube-api-net-suite-periodic
+  cron: '@daily'
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        KUBE_API=true
+        ENABLE_KUBE_API=true
+        NUM_MASTERS=1
+        ISO_IMAGE_TYPE=minimal-iso
+        STATIC_IPS=true
+        TEST_FUNC=test_kubeapi
+        MAKEFILE_TARGET="create_full_environment run test_kube_api_parallel"
+      TEST_SUITE: full
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-static-ip-suite
   optional: true
   run_if_changed: ^(terraform_files/.*|.*/controllers/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
+        STATIC_IPS=true
         TEST_FUNC=test_networking
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
-- as: e2e-metal-assisted-networking-periodic
-  cron: 0 */4 * * *
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-static-ip-suite-periodic
+  cron: '@daily'
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
+        STATIC_IPS=true
         TEST_FUNC=test_networking
       TEST_SUITE: full
-    workflow: baremetalds-assisted
+    workflow: assisted-baremetal
 - as: e2e-metal-single-node-live-iso
   steps:
     cluster_profile: packet-sno
     workflow: baremetalds-sno
-- as: e2e-metal-single-node-live-iso-periodic
-  cron: '@daily'
+- as: e2e-vsphere-assisted
+  optional: true
   steps:
-    cluster_profile: packet-sno
-    workflow: baremetalds-sno
+    cluster_profile: vsphere
+    workflow: assisted-vsphere
 zz_generated_metadata:
   branch: master
   org: openshift

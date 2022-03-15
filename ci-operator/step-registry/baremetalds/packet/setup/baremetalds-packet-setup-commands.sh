@@ -30,7 +30,7 @@ cat > packet-setup.yaml <<-EOF
   - name: check cluster type
     fail:
       msg: "Unsupported CLUSTER_TYPE '{{ cluster_type }}'"
-    when: cluster_type != "packet"
+    when: "cluster_type is not regex('^packet.*$|^equinix.*$')"
 
   - name: create Packet host with error handling
     block:
@@ -39,11 +39,11 @@ cat > packet-setup.yaml <<-EOF
         auth_token: "{{ packet_auth_token }}"
         project_id: "{{ packet_project_id }}"
         hostnames: "{{ packet_hostname }}"
-        operating_system: centos_8
+        operating_system: ${PACKET_OS}
         plan: ${PACKET_PLAN}
         facility: any
         wait_for_public_IPv: 4
-        wait_timeout: 1200
+        wait_timeout: 1800
         state: active
         tags: "{{ 'PR:', lookup('env', 'PULL_NUMBER'), 'Job name:', lookup('env', 'JOB_NAME'), 'Job id:', lookup('env', 'PROW_JOB_ID') }}"
       register: hosts
@@ -97,7 +97,7 @@ cat > packet-setup.yaml <<-EOF
         source "\${SHARED_DIR}/fix-uid.sh"
 
         # Initial check
-        if [ "\${CLUSTER_TYPE}" != "packet" ]; then
+        if [[ ! "\${CLUSTER_TYPE}" =~ ^packet.*$|^equinix.*$ ]]; then
             echo >&2 "Unsupported cluster type '\${CLUSTER_TYPE}'"
             exit 1
         fi

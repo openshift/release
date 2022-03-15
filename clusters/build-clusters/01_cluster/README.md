@@ -31,14 +31,6 @@ Once we install the cluster, store the installation directory somewhere in case 
 Update password of `kubeadmin` in bitwarden (searching for item called `build_farm_build01 `).
 The cert-based kubeconfig file is also uploaded to the same BW item (attachement `b01.admin.cert.kubeconfig`).
 
-## OAuth provider: github
-
-[openshift.doc](https://docs.openshift.com/container-platform/4.1/authentication/identity_providers/configuring-github-identity-provider.html#configuring-github-identity-provider)
-
-```
-$ make set-up-github-oauth
-```
-
 ## Set up ci-admins
 
 ```

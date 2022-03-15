@@ -21,17 +21,7 @@ metadata:
     release.openshift.io/create-only: "true"
   name: cluster
 spec:
-  customNoUpgrade:
-    enabled:
-    - ExternalCloudProvider
-    - CSIMigrationAWS
-    - CSIMigrationOpenStack
-    - CSIMigrationAzureDisk
-    - CSIDriverAzureDisk
-    - CSIMigrationGCE
-    - CSIDriverVSphere
-    - CSIMigrationvSphere
-  featureSet: CustomNoUpgrade
+  featureSet: TechPreviewNoUpgrade
 EOF
 }
 
@@ -117,6 +107,6 @@ export -f execute
 
 
 applyFeatureGate
-waitFor 10m CCMPodsCreated
+waitFor 20m CCMPodsCreated
 waitForCCMPodsReadiness
 waitForKubeletAndKCMRollout

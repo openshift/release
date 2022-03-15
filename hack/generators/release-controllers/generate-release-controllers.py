@@ -11,12 +11,14 @@
 
 # Allow TOOD
 # pylint: disable=W0511
-
+import json
 import logging
 import sys
 import pathlib
 import os
 import argparse
+
+from config import Context, Config
 
 # Change python path so we can import genlib
 sys.path.append(str(pathlib.Path(__file__).absolute().parent.parent.joinpath('lib')))
@@ -26,103 +28,6 @@ import content
 
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s:%(levelname)-7s] %(message)s')
 logger = logging.getLogger()
-
-
-class RCPaths:
-    def __init__(self, git_clone_dir):
-        self.path_base = pathlib.Path(git_clone_dir)
-
-        # These paths remained consistent through migration:
-        self.path_ci_operator_config_release = self.path_base.joinpath('ci-operator/config/openshift/release')
-        self.path_ci_operator_jobs_release = self.path_base.joinpath('ci-operator/jobs/openshift/release')
-
-        # The original configuration and deployment files, to api.ci, are located here:
-        self.path_rc_release_resources = self.path_base.joinpath('core-services/release-controller')
-
-        self.path_rc_build_configs = self.path_rc_release_resources
-        self.path_rc_build_configs.mkdir(exist_ok=True)
-
-        self.path_rc_annotations = self.path_rc_release_resources.joinpath('_releases')
-        self.path_priv_rc_annotations = self.path_rc_annotations.joinpath('priv')  # location where priv release controller annotations are generated
-        self.path_priv_rc_annotations.mkdir(exist_ok=True)
-
-        # The updated configuration and deployment files, to app.ci, are located here:
-        self.path_rc_deployments = self.path_base.joinpath('clusters/app.ci/release-controller')
-        self.path_rc_rpms = self.path_base.joinpath('clusters/build-clusters/common/release-controller')
-
-
-class Config:
-
-    def __init__(self, git_clone_dir):
-        self.rc_deployment_domain = 'apps.ci.l2s4.p1.openshiftapps.com'
-        self.rc_release_domain = 'svc.ci.openshift.org'
-        self.rc_deployment_namespace = 'ci'
-        self.arches = ('x86_64', 's390x', 'ppc64le', 'arm64', 'multi')
-        self.paths = RCPaths(git_clone_dir)
-        self.releases = self._get_releases()
-
-    def _get_releases(self):
-        releases = []
-
-        # Collect the 4.x releases...
-        for name in self.paths.path_ci_operator_jobs_release.glob('openshift-release-release-4.*-periodics.yaml'):
-            bn = os.path.splitext(os.path.basename(name))[0]  # e.g. openshift-release-release-4.4-periodics
-            major_minor = bn.split('-')[-2]  # 4.4
-            releases.append(major_minor)
-
-        releases.sort()  # Glob does provide any guarantees on ordering, so force an order by sorting.
-        return releases
-
-    @staticmethod
-    def get_arch_suffix(arch):
-        suffix = ''
-        if arch not in ('amd64', 'x86_64'):
-            suffix += f'-{arch}'
-        return suffix
-
-    def get_suffix(self, arch, private):
-        suffix = self.get_arch_suffix(arch)
-
-        if private:
-            suffix += '-priv'
-
-        return suffix
-
-
-class Context:
-    def __init__(self, config, arch, private):
-        self.config = config
-        self.arch = arch
-        self.private = private
-
-        self.suffix = config.get_suffix(arch, private)
-        self.jobs_namespace = f'ci-release{self.suffix}'
-        self.rc_hostname = f'openshift-release{self.suffix}'
-        self.hostname_artifacts = f'openshift-release-artifacts{self.suffix}'
-        self.secret_name_tls = f'release-controller{self.suffix}-tls'
-        self.is_namespace = f'ocp{self.suffix}'
-        self.rc_serviceaccount_name = f'release-controller-{self.is_namespace}'
-
-        self.rc_route_name = f'release-controller-{self.is_namespace}'
-        self.rc_service_name = self.rc_route_name
-
-        # Routes on the api.ci cluster
-        # release-controller
-        self.rc_api_url = f'{self.rc_hostname}.{self.config.rc_release_domain}'
-        # files-cache
-        self.fc_api_url = f'{self.hostname_artifacts}.{self.config.rc_release_domain}'
-
-        # Routes on the app.ci cluster
-        # release-controller
-        self.rc_app_url = f'{self.rc_hostname}.{self.config.rc_deployment_domain}'
-        # files-cache
-        self.fc_app_url = f'{self.hostname_artifacts}.{self.config.rc_deployment_domain}'
-
-    def get_supported_architecture_name(self):
-        name = 'amd64'
-        if self.arch not in ('amd64', 'x86_64'):
-            name = self.arch
-        return name
 
 
 def generate_app_ci_content(config, git_clone_dir):
@@ -151,6 +56,35 @@ def generate_app_ci_content(config, git_clone_dir):
         with genlib.GenDoc(config.paths.path_rc_rpms.joinpath(f'rpms-ocp-{major_minor}.yaml'), context=config) as gendoc:
             content.add_rpm_mirror_service(gendoc, git_clone_dir, major_minor)
 
+    # If there is an annotation defined for the public release controller, use it as a template
+    # for the private annotations.
+    for annotation_path in config.paths.path_rc_annotations.glob('release-ocp-*.json'):
+        if annotation_path.name.endswith('ci.json'):  # There are no CI annotations for the private controllers
+            continue
+        if '-stable' in annotation_path.name:  # There are no stable streams in private release controllers
+            continue
+        annotation_filename = os.path.basename(annotation_path)
+        with open(annotation_path, mode='r', encoding='utf-8') as f:
+            pub_annotation = json.load(f)
+        print(str(annotation_path))
+        priv_annotation = dict(pub_annotation)
+        priv_annotation['name'] += '-priv'
+        priv_annotation['mirrorPrefix'] += '-priv'
+        # The "multi" release-controller purposefully does not use the "to" annotation:
+        if 'to' in pub_annotation:
+            priv_annotation['to'] += '-priv'
+        priv_annotation.pop('check', None)  # Don't worry about the state of other releases
+        priv_annotation.pop('publish', None)  # Don't publish these images anywhere
+        priv_annotation.pop('periodic', None)  # Don't configure periodics
+        priv_annotation['message'] = "<!-- GENERATED FROM PUBLIC ANNOTATION CONFIG - DO NOT EDIT. -->" + priv_annotation['message']
+        for _, test_config in priv_annotation['verify'].items():
+            test_config['prowJob']['name'] += '-priv'
+            # TODO: Private jobs are disabled until the -priv variants can be generated by prowgen
+            test_config['disabled'] = True
+
+        with config.paths.path_priv_rc_annotations.joinpath(annotation_filename).open(mode='w+', encoding='utf-8') as f:
+            json.dump(priv_annotation, f, sort_keys=True, indent=4)
+
     # Generate the release-controller one-offs...
     context = Context(config, "x86_64", False)
 
@@ -164,6 +98,12 @@ def generate_app_ci_content(config, git_clone_dir):
     # Signer
     with genlib.GenDoc(config.paths.path_rc_deployments.joinpath('deploy-ci-signer.yaml'), context) as gendoc:
         content.generate_signer_resources(gendoc)
+
+    # Development RBAC
+    content.generate_development_rbac(config)
+
+    # TRT RBAC
+    content.generate_trt_rbac(config)
 
 
 def run(git_clone_dir, bump=False):

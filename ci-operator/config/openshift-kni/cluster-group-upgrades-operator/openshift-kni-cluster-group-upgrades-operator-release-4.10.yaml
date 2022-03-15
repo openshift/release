@@ -1,0 +1,77 @@
+base_images:
+  base:
+    name: ubi
+    namespace: ocp
+    tag: "8"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.16
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  to: cluster-group-upgrades-operator
+- dockerfile_path: bundle.Dockerfile
+  to: cluster-group-upgrades-operator-bundle
+operator:
+  bundles:
+  - dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/openshift-kni/cluster-group-upgrades-operator:.*
+    with: pipeline:cluster-group-upgrades-operator
+promotion:
+  name: "4.10"
+  namespace: ocp-kni
+releases:
+  initial:
+    integration:
+      name: "4.10"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.10"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- as: ci-job
+  commands: make ci-job
+  container:
+    from: src
+- as: integration
+  steps:
+    cluster_profile: aws
+    env:
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: openshift-cluster-group-upgrades
+      OO_PACKAGE: cluster-group-upgrades-operator
+      OO_TARGET_NAMESPACES: '!all'
+    test:
+    - as: integration
+      cli: latest
+      commands: |
+        KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        export KUBECONFIG
+        cp $(echo "${KUBECONFIG}") /go/src/github.com/openshift-kni/cluster-group-upgrades-operator/kubeconfig
+        make complete-kuttl-test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-aws
+zz_generated_metadata:
+  branch: release-4.10
+  org: openshift-kni
+  repo: cluster-group-upgrades-operator

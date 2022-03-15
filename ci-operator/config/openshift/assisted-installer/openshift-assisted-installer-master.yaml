@@ -8,8 +8,8 @@ base_images:
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: assisted-test
-    namespace: ocp-kni
+    name: ocm-2.5
+    namespace: edge-infrastructure
     tag: assisted-test-infra
   coreos-centos-stream8:
     name: stream8
@@ -23,6 +23,10 @@ base_images:
     name: release
     namespace: openshift
     tag: golang-1.16
+  openshift_release_golang-1.17:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
 build_root:
   project_image:
     dockerfile_path: Dockerfile.assisted-installer-build
@@ -33,6 +37,9 @@ images:
     openshift_release_golang-1.16:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.16
+    openshift_release_golang-1.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
   to: assisted-installer
 - dockerfile_path: Dockerfile.assisted-installer-controller
   from: coreos-centos-stream8
@@ -71,7 +78,7 @@ tests:
     env:
       IMAGE_REPO: assisted-installer
     test:
-    - ref: baremetalds-assisted-images-publish
+    - ref: assisted-baremetal-images-publish
 - as: mirror-nightly-image-controller
   cron: '@daily'
   steps:
@@ -80,7 +87,7 @@ tests:
     env:
       IMAGE_REPO: assisted-installer-controller
     test:
-    - ref: baremetalds-assisted-images-publish
+    - ref: assisted-baremetal-images-publish
 - as: mirror-vcsref-image
   postsubmit: true
   steps:
@@ -89,7 +96,7 @@ tests:
     env:
       IMAGE_REPO: assisted-installer
     test:
-    - ref: baremetalds-assisted-images-publish
+    - ref: assisted-baremetal-images-publish
 - as: mirror-vcsref-image-controller
   postsubmit: true
   steps:
@@ -98,7 +105,57 @@ tests:
     env:
       IMAGE_REPO: assisted-installer-controller
     test:
-    - ref: baremetalds-assisted-images-publish
+    - ref: assisted-baremetal-images-publish
+- as: ocm-publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-installer
+    env:
+      IMAGE_REPO: assisted-installer
+      OSCI_ENV_CONFIG: |
+        OSCI_PUBLISH_DELAY=0
+      RELEASE_REF: release-2.5
+    workflow: ocm-ci-manifest-update
+- as: ocm-publish-controller
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-installer-controller
+    env:
+      IMAGE_REPO: assisted-installer-controller
+      OSCI_ENV_CONFIG: |
+        OSCI_COMPONENT_NAME=assisted-installer-controller
+        OSCI_PUBLISH_DELAY=0
+      RELEASE_REF: release-2.5
+    workflow: ocm-ci-manifest-update
+- as: mce-publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-installer
+    env:
+      IMAGE_REPO: assisted-installer
+      OSCI_ENV_CONFIG: |
+        OSCI_PUBLISH_DELAY=0
+        OSCI_PIPELINE_PRODUCT_PREFIX=backplane
+        OSCI_PIPELINE_REPO=backplane-pipeline
+      RELEASE_REF: backplane-2.0
+    workflow: ocm-ci-manifest-update
+- as: mce-publish-controller
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-installer-controller
+    env:
+      IMAGE_REPO: assisted-installer-controller
+      OSCI_ENV_CONFIG: |
+        OSCI_COMPONENT_NAME=assisted-installer-controller
+        OSCI_PUBLISH_DELAY=0
+        OSCI_PIPELINE_PRODUCT_PREFIX=backplane
+        OSCI_PIPELINE_REPO=backplane-pipeline
+      RELEASE_REF: backplane-2.0
+    workflow: ocm-ci-manifest-update
 - as: lint
   commands: |
     export GOLANGCI_LINT_CACHE=/tmp/.cache
@@ -111,14 +168,29 @@ tests:
   container:
     from: test-bin
 - as: unit-test
-  commands: make REPORTS=${ARTIFACT_DIR} unit-test
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
+    make REPORTS=${ARTIFACT_DIR} unit-test
   container:
     from: test-bin
+  secret:
+    mount_path: /tmp/secret
+    name: assisted-installer-codecov-token
+- as: unit-test-postsubmit
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
+    make REPORTS=${ARTIFACT_DIR} unit-test
+  container:
+    from: test-bin
+  postsubmit: true
+  secret:
+    mount_path: /tmp/secret
+    name: assisted-installer-codecov-token
 - as: e2e-metal-assisted
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: packet-assisted
-    workflow: baremetalds-assisted-install
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-ipv6
   optional: true
   steps:
@@ -127,8 +199,7 @@ tests:
       ASSISTED_CONFIG: |
         IPv6=yes
         IPv4=no
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-single-node
   optional: true
   steps:
@@ -136,18 +207,25 @@ tests:
     env:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
-- as: e2e-metal-assisted-olm
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-cnv
   optional: true
   run_if_changed: ^(src/assisted_installer_controller/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        TEST_FUNC=test_olm_operator
-      TEST_SUITE: minimal
-    workflow: baremetalds-assisted-install
+        OLM_OPERATORS=cnv
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-ocs
+  optional: true
+  run_if_changed: ^(src/assisted_installer_controller/.*)$
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=ocs
+    workflow: assisted-baremetal
 zz_generated_metadata:
   branch: master
   org: openshift

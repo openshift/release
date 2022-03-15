@@ -12,3 +12,5 @@ from content.art_rpm_mirroring_services import add_rpm_mirror_service
 from content.bump_versioned_resources import bump_versioned_resources
 from content.origin_resources import generate_origin_admin_resources, generate_origin_resources
 from content.signer_resources import generate_signer_resources
+from content.development_rbac import generate_development_rbac
+from content.trt_rbac import generate_trt_rbac

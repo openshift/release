@@ -1,8 +1,8 @@
 base_images:
-  ocp_builder_rhel-8-golang-1.16-openshift-4.8:
+  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.16-openshift-4.8
+    tag: rhel-8-golang-1.17-openshift-4.10
 binary_build_commands: make build
 build_root:
   from_repository: true
@@ -10,9 +10,9 @@ build_root:
 images:
 - dockerfile_path: build/Dockerfile.ci
   inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.8:
+    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
   to: windows-machine-config-operator-test
 operator:
   bundles:
@@ -22,7 +22,6 @@ operator:
   - pullspec: REPLACE_IMAGE
     with: pipeline:windows-machine-config-operator-test
 promotion:
-  disabled: true
   name: "4.10"
   namespace: ocp
 releases:
@@ -143,10 +142,10 @@ tests:
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
 - as: platform-none-vsphere-e2e-operator
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-platform-none
     test:
-    - ref: windows-e2e-operator-test-with-custom-vxlan-port
-    workflow: upi-vsphere-platform-none-ovn
+    - ref: windows-e2e-operator-test-byoh
+    workflow: windows-e2e-operator-test-platform-none-vsphere
 zz_generated_metadata:
   branch: release-4.10
   org: openshift

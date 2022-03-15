@@ -102,10 +102,6 @@ if [ -f "${OPERATOR_DIR}/tests/scorecard/config.yaml" ]; then
 
   # Use the json output format for cvp custom scorecard tests
   CUSTOM_SCORECARD_OUTPUT_FORMAT="json"
-  # Use the xunit output format for msp custom scorecard tests
-  if [ "${TEST_MODE}" == "msp" ]; then
-    CUSTOM_SCORECARD_OUTPUT_FORMAT="xunit"
-  fi
 
   echo "Running the operator-sdk scorecard test using the custom, bundle-provided configuration, json output and storing it in the artifacts directory"
   # Runs the custom scorecard tests using the user-provided configuration

@@ -5,7 +5,125 @@ presubmits:
     branches:
     - ^release-next$
     - ^release-next-
-    cluster: build01
+    cluster: build03
+    context: ci/prow/4.10-e2e-aws-ocp-410
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: "4.10"
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-serving-release-next-4.10-e2e-aws-ocp-410
+    path_alias: knative.dev/serving
+    rerun_command: /test 4.10-e2e-aws-ocp-410
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-ocp-410
+        - --variant=4.10
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.10-e2e-aws-ocp-410,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-next$
+    - ^release-next-
+    cluster: build03
+    context: ci/prow/4.10-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: "4.10"
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-serving-release-next-4.10-images
+    path_alias: knative.dev/serving
+    rerun_command: /test 4.10-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=4.10
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.10-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-next$
+    - ^release-next-
+    cluster: build03
     context: ci/prow/4.6-e2e-aws-ocp-46
     decorate: true
     decoration_config:
@@ -82,7 +200,7 @@ presubmits:
     branches:
     - ^release-next$
     - ^release-next-
-    cluster: build01
+    cluster: build03
     context: ci/prow/4.6-images
     decorate: true
     decoration_config:
@@ -134,7 +252,7 @@ presubmits:
     branches:
     - ^release-next$
     - ^release-next-
-    cluster: build01
+    cluster: build03
     context: ci/prow/4.7-e2e-aws-ocp-47
     decorate: true
     decoration_config:
@@ -211,7 +329,7 @@ presubmits:
     branches:
     - ^release-next$
     - ^release-next-
-    cluster: build01
+    cluster: build03
     context: ci/prow/4.7-images
     decorate: true
     decoration_config:
@@ -263,7 +381,7 @@ presubmits:
     branches:
     - ^release-next$
     - ^release-next-
-    cluster: build01
+    cluster: build03
     context: ci/prow/4.8-e2e-aws-ocp-48
     decorate: true
     decoration_config:
@@ -329,7 +447,7 @@ presubmits:
     branches:
     - ^release-next$
     - ^release-next-
-    cluster: build01
+    cluster: build03
     context: ci/prow/4.8-images
     decorate: true
     decoration_config:
@@ -381,7 +499,7 @@ presubmits:
     branches:
     - ^release-next$
     - ^release-next-
-    cluster: build01
+    cluster: build03
     context: ci/prow/4.9-e2e-aws-ocp-49
     decorate: true
     decoration_config:
@@ -447,7 +565,7 @@ presubmits:
     branches:
     - ^release-next$
     - ^release-next-
-    cluster: build01
+    cluster: build03
     context: ci/prow/4.9-images
     decorate: true
     decoration_config:

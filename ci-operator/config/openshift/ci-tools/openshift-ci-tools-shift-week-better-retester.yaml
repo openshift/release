@@ -1,0 +1,63 @@
+base_images:
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.43.0
+  os:
+    name: centos
+    namespace: origin
+    tag: stream8
+binary_build_commands: make production-install
+build_root:
+  from_repository: true
+images:
+- dockerfile_literal: |-
+    FROM quay.io/centos/centos:stream8
+    RUN dnf install -y git && dnf clean all && rm -rf /var/cache/dnf
+    ADD better-retester /usr/bin/better-retester
+    ENTRYPOINT ["/usr/bin/better-retester"]
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/better-retester
+  to: better-retester
+promotion:
+  namespace: ci
+  tag: shift-week
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: make race-install
+tests:
+- as: unit
+  commands: make test TESTFLAGS='-count=25'
+  container:
+    from: src
+- as: codegen
+  commands: make verify-gen
+  container:
+    from: src
+- as: format
+  commands: make format
+  container:
+    from: src
+- as: checkconfig
+  commands: make validate-checkconfig
+  container:
+    from: test-bin
+- as: validate-vendor
+  commands: make validate-vendor
+  container:
+    from: src
+- as: lint
+  commands: make lint
+  container:
+    from: golangci-lint
+zz_generated_metadata:
+  branch: shift-week-better-retester
+  org: openshift
+  repo: ci-tools

@@ -1,0 +1,105 @@
+base_images:
+  stolostron_common-nodejs-parent_nodejs-14:
+    name: common-nodejs-parent
+    namespace: stolostron
+    tag: nodejs-14
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: nodejs14-linux
+images:
+- dockerfile_path: Dockerfile
+  inputs:
+    stolostron_common-nodejs-parent_nodejs-14:
+      as:
+      - registry.ci.openshift.org/stolostron/common-nodejs-parent:nodejs-14
+  to: grc-ui
+- dockerfile_path: Dockerfile.e2etest
+  to: grc-ui-tests
+promotion:
+  name: "2.3"
+  namespace: stolostron
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: grc-ui
+    env:
+      IMAGE_REPO: grc-ui
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: pr-test-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: grc-ui-tests
+    env:
+      IMAGE_REPO: grc-ui-tests
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: lint-unittest-sonarcloud
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make install
+    make lint
+    make -f Makefile.prow sonar/js/jest-init
+    make unit-test
+    make -f Makefile.prow sonar/js/prow
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+- as: e2e-tests
+  steps:
+    dependencies:
+      COMPONENT_IMAGE_REF: grc-ui
+    env:
+      CLUSTERPOOL_GROUP_NAME: policy-grc
+      CLUSTERPOOL_HOST_NAMESPACE: acm-grc-security
+      CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-grc-clusterpool
+      CLUSTERPOOL_LIFETIME: 4h
+      CLUSTERPOOL_LIST_EXCLUSION_FILTER: dev\|autoclaims
+      CLUSTERPOOL_LIST_INCLUSION_FILTER: prow
+    test:
+    - as: e2e
+      commands: |
+        export SELF="make -f Makefile.prow"
+        export VERSION_TAG=latest-2.3
+        ./build/run-e2e-tests.sh
+      from: grc-ui-tests
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-e2e-clusterpool
+- as: latest-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: grc-ui
+    env:
+      IMAGE_REPO: grc-ui
+      IMAGE_TAG: latest-2.3
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: latest-test-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: grc-ui-tests
+    env:
+      IMAGE_REPO: grc-ui-tests
+      IMAGE_TAG: latest-2.3
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+zz_generated_metadata:
+  branch: release-2.3
+  org: stolostron
+  repo: grc-ui

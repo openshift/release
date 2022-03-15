@@ -13,6 +13,9 @@ images:
   from: base
   to: driver-toolkit
 promotion:
+  additional_images:
+    driver-toolkit-tests: src
+  disabled: true
   name: "4.11"
   namespace: ocp
 releases:
@@ -25,6 +28,11 @@ releases:
       include_built_images: true
       name: "4.11"
       namespace: ocp
+  nightly:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.10"
 resources:
   '*':
     limits:
@@ -41,9 +49,11 @@ tests:
   commands: cat /etc/driver-toolkit-release.json
   container:
     from: driver-toolkit
-- as: e2e-aws-driver-toolkit
+- as: e2e-aws-driver-toolkit-presubmit
   steps:
     cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:nightly
     test:
     - as: test
       cli: latest
