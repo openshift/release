@@ -6,14 +6,12 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-
+export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+echo "${KUBECONFIG}"
 
 if test -f "${KUBECONFIG}"
 then
-	oc --request-timeout=5s get nodes -o jsonpath --template '{range .items[*]}{.spec.providerID}{"\n"}{end}' | sed 's|.*/||' > "${TMPDIR}/node-provider-IDs.txt" &
-	wait "$!"
-
-	oc --request-timeout=5s -n openshift-machine-api get machines -o jsonpath --template '{range .items[*]}{.spec.providerID}{"\n"}{end}' | sed 's|.*/||' >> "${TMPDIR}/node-provider-IDs.txt" &
+    oc --request-timeout=5s -n openshift-machine-api get machines -o go-template='{{range .items}}{{.status.providerStatus.instanceId}}{{"\n"}}{{end}}' >> "${TMPDIR}/node-provider-IDs.txt" &
 	wait "$!"
 else
 	echo "No kubeconfig; skipping providerID extraction."
