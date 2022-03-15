@@ -38,6 +38,11 @@ images:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.17
   to: assisted-installer-agent
+- dockerfile_literal: |
+    FROM base
+    COPY . .
+  from: src
+  to: assisted-installer-agent-src
 promotion:
   name: ocm-2.5
   namespace: edge-infrastructure
@@ -170,6 +175,15 @@ tests:
       ASSISTED_CONFIG: |
         TEST_FUNC=test_deploy_day2_nodes_cloud
     workflow: assisted-baremetal
+- as: subsystem-test
+  steps:
+    cluster_profile: packet-assisted
+    workflow: assisted-agent
+- as: subsystem-test-periodic
+  cron: '@daily'
+  steps:
+    cluster_profile: packet-assisted
+    workflow: assisted-agent
 zz_generated_metadata:
   branch: master
   org: openshift
