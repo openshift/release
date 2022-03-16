@@ -1,0 +1,58 @@
+base_images:
+  base:
+    name: 4.8-priv
+    namespace: ocp-private
+    tag: base
+  openshift_release_golang-1.17:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
+canonical_go_repository: github.com/openshift/apiserver-network-proxy
+images:
+- dockerfile_path: Dockerfile.openshift
+  from: base
+  inputs:
+    openshift_release_golang-1.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
+  to: apiserver-network-proxy
+promotion:
+  disabled: true
+  name: 4.11-priv
+  namespace: ocp-private
+releases:
+  hosted-ocp-latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.8"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.8"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: verify
+  commands: go mod vendor && git diff --exit-code
+  container:
+    from: src
+- as: unit
+  commands: make test
+  container:
+    from: src
+zz_generated_metadata:
+  branch: release-4.11
+  org: openshift-priv
+  repo: apiserver-network-proxy
