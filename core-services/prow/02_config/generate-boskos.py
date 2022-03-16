@@ -25,6 +25,9 @@ CONFIG = {
         'us-west-1': 35,
         'us-west-2': 40,
     },
+    'aws-qe-quota-slice': {
+        'us-east-2': 50,
+    },
     'aws-china-quota-slice': {
         'cn-north-1': 1,
         'cn-northwest-1': 1,
