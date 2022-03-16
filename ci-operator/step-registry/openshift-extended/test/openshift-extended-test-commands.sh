@@ -8,7 +8,7 @@ export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
 export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
 export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
 export HOME=/tmp/home
-export PATH=/usr/local/go/bin:/usr/libexec/origin:$PATH
+export PATH=/usr/local/go/bin:/usr/libexec/origin:/opt/OpenShift4-tools:$PATH
 export REPORT_HANDLE_PATH="/usr/bin"
 
 # although we set this env var, but it does not exist if the CLUSTER_TYPE is not gcp.
