@@ -2,6 +2,27 @@
 
 set -Eeuo pipefail
 
+function wait_for_network() {
+    # Wait up to 2 minutes for the network to be ready
+    for _ in $(seq 1 12); do
+        NETWORK_ATTACHMENT_DEFINITIONS=$(oc get network-attachment-definitions "${OPENSTACK_DPDK_NETWORK}" -n "${CNF_NAMESPACE}" -o jsonpath='{.metadata.name}' || true)
+        if [ "${NETWORK_ATTACHMENT_DEFINITIONS}" == "${OPENSTACK_DPDK_NETWORK}" ]; then
+            FOUND_NAD=1
+            break
+        fi
+        echo "Waiting for network ${OPENSTACK_DPDK_NETWORK} to be attached"
+        sleep 10
+    done
+
+    if [ -n "${FOUND_NAD:-}" ] ; then
+        echo "Network ${OPENSTACK_DPDK_NETWORK} is attached"
+    else
+        echo "Network ${OPENSTACK_DPDK_NETWORK} is not attached after two minutes"
+        oc get network-attachment-definitions "${OPENSTACK_DPDK_NETWORK}" -n "${CNF_NAMESPACE}" -o jsonpath='{.metadata.name}'
+        exit 1
+    fi
+}
+
 function check_pod_status() {
     INTERVAL=60
     CNT=10
@@ -73,17 +94,7 @@ spec:
     type: Raw
 EOF
 oc patch network.operator cluster --patch "$(cat "${SHARED_DIR}/additionalnetwork.yaml")" --type=merge
-# Give the operator some time to apply the patch
-sleep 5
-
-NETWORK_ATTACHED=$(oc get network-attachment-definitions "${OPENSTACK_DPDK_NETWORK}" -n "${CNF_NAMESPACE}" -o jsonpath='{.metadata.name}')
-if [[ "${NETWORK_ATTACHED}" == "${OPENSTACK_DPDK_NETWORK}" ]]; then
-    echo "Successfully Added additional network to the Network Operator"
-else
-    echo "Failed to add additional network to the Network Operator"
-    echo "${NETWORK_ATTACHED}"
-    exit 1
-fi
+wait_for_network
 
 CNF_POD=$(
     oc create -f - -o jsonpath='{.metadata.name}' <<EOF
