@@ -1,0 +1,50 @@
+base_images:
+  cli:
+    name: "4.9"
+    namespace: ocp
+    tag: cli
+build_root:
+  from_repository: true
+images:
+- dockerfile_literal: |
+    FROM cli
+    RUN dnf install -y git make && dnf clean all && rm -rf /var/cache/dnf
+    RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 && \
+        chmod 700 get_helm.sh && \
+        ./get_helm.sh
+  from: cli
+  to: hybrid-cloud-patterns-cli
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: stable
+      version: "4.9"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: make test
+  container:
+    from: hybrid-cloud-patterns-cli
+- as: e2e-install
+  steps:
+    cluster_profile: aws
+    test:
+    - as: e2e-install
+      cli: latest
+      commands: make install
+      from: hybrid-cloud-patterns-cli
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: hybrid-cloud-patterns
+  repo: ci-testing
