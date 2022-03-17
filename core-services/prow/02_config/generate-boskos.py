@@ -28,11 +28,11 @@ CONFIG = {
     'aws-qe-quota-slice': {
         'us-east-2': 25,
     },
-    'aws-china-quota-slice': {
+    'aws-china-qe-quota-slice': {
         'cn-north-1': 1,
         'cn-northwest-1': 1,
     },
-    'aws-usgov-quota-slice': {
+    'aws-usgov-qe-quota-slice': {
         'us-gov-west-1': 5,
         'us-gov-east-1': 5,
     },
