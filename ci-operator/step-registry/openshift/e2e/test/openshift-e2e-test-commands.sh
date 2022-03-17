@@ -7,6 +7,7 @@ set -o pipefail
 export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
 export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
 export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
+export ALIBABA_CLOUD_CREDENTIALS_FILE=${SHARED_DIR}/alibabacreds.ini
 export HOME=/tmp/home
 export PATH=/usr/libexec/origin:$PATH
 
@@ -134,6 +135,15 @@ vsphere)
     sed -i "/secret-name \=/c user = \"${GOVC_USERNAME}\"" "$VSPHERE_CONF_FILE"
     sed -i "/secret-namespace \=/c password = \"${GOVC_PASSWORD}\"" "$VSPHERE_CONF_FILE"
     export TEST_PROVIDER=vsphere;;
+alibabacloud)
+    mkdir -p ~/.ssh
+    cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/kube_alibaba_rsa || true
+    export PROVIDER_ARGS="-provider=alibabacloud -gce-zone=us-east-1"
+    # TODO: make openshift-tests auto-discover this from cluster config
+    REGION="$(oc get -o jsonpath='{.status.platformStatus.alibabacloud.region}' infrastructure cluster)"
+    export TEST_PROVIDER="{\"type\":\"alibabacloud\",\"region\":\"${REGION}\",\"multizone\":true,\"multimaster\":true}"
+    export KUBE_SSH_USER=core
+;;
 openstack*)
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/cinder_credentials.sh"
@@ -282,6 +292,11 @@ do
     NODECOUNT="$(kubectl get nodes --no-headers | wc -l)"
     if [ "${MACHINECOUNT}" -le "${NODECOUNT}" ]
     then
+      cat >"${ARTIFACT_DIR}/junit_nodes.xml" <<EOF
+      <testsuite name="cluster nodes" tests="1" failures="0">
+        <testcase name="node count should match or exceed machine count"/>
+      </testsuite>
+EOF
         echo "$(date) - node count ($NODECOUNT) now matches or exceeds machine count ($MACHINECOUNT)"
         break
     fi
@@ -289,6 +304,20 @@ do
     sleep 30
     i=$((i+1))
     if [ $i -gt 20 ]; then
+      MACHINELIST="$(kubectl get machines -A)"
+      NODELIST="$(kubectl get nodes)"
+      cat >"${ARTIFACT_DIR}/junit_nodes.xml" <<EOF
+      <testsuite name="cluster nodes" tests="1" failures="1">
+        <testcase name="node count should match or exceed machine count">
+          <failure message="">
+            Timed out waiting for node count ($NODECOUNT) to equal or exceed machine count ($MACHINECOUNT).
+            $MACHINELIST
+            $NODELIST
+          </failure>
+        </testcase>
+      </testsuite>
+EOF
+
         echo "Timed out waiting for node count ($NODECOUNT) to equal or exceed machine count ($MACHINECOUNT)."
         # If we enabled the ssh bastion pod, attempt to gather journal logs from each machine, regardless
         # if it made it to a node or not.

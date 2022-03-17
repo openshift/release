@@ -1,0 +1,138 @@
+base_images:
+  coreos_coreos-assembler_latest:
+    name: coreos-assembler
+    namespace: coreos
+    tag: latest
+  fedora:
+    name: fedora
+    namespace: coreos
+    tag: "35"
+build_root:
+  image_stream_tag:
+    name: fcos-buildroot
+    namespace: coreos
+    tag: testing-devel
+images:
+- dockerfile_path: ci/Dockerfile
+  inputs:
+    coreos_coreos-assembler_latest:
+      as:
+      - registry.svc.ci.openshift.org/coreos/coreos-assembler:latest
+  to: build-test-qemu-img
+promotion:
+  excluded_images:
+  - '*'
+  name: "4.12"
+  namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.12"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.12"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+  build-test-qemu:
+    limits:
+      devices.kubevirt.io/kvm: "1"
+    requests:
+      cpu: 1000m
+      devices.kubevirt.io/kvm: "1"
+      memory: 3Gi
+  periodic-os-build:
+    limits:
+      devices.kubevirt.io/kvm: "1"
+    requests:
+      cpu: 1000m
+      devices.kubevirt.io/kvm: "1"
+      memory: 3Gi
+tests:
+- as: validate
+  commands: ./ci/validate.sh
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: build-test-qemu
+  commands: /src/ci/build-test-qemu.sh
+  container:
+    from: build-test-qemu-img
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: periodic-os-build
+  cluster: build02
+  cron: '@daily'
+  steps:
+    test:
+    - as: oc-login
+      cli: latest
+      commands: |
+        #!/bin/bash
+        set -euo pipefail
+        # To inject the oc CLI, ci-operator builds a new container from the
+        # provided container dependency (from:) and pushes it to the namespace
+        # Imagestream before creating a new pod to run the commands in. Because
+        # of the size of the coreos-assembler image, this adds quite some time
+        # to the process. So lets use a much smaller Fedora base image.
+        oc login https://api.ci.l2s4.p1.openshiftapps.com:6443 --token="$(cat /service-account-token/image-pusher-service-account-token)"
+        oc registry login --registry=registry.ci.openshift.org --to="$SHARED_DIR/dockercfg.json"
+      credentials:
+      - mount_path: /service-account-token
+        name: rhcos-devel-image-pusher-service-account-token
+        namespace: test-credentials
+      from: fedora
+      resources:
+        limits:
+          devices.kubevirt.io/kvm: "1"
+        requests:
+          cpu: 1000m
+          devices.kubevirt.io/kvm: "1"
+          memory: 3Gi
+    - as: build-test-and-push-img
+      commands: |
+        #!/bin/bash
+        set -xeuo pipefail
+
+        # We can't use PULL_BASE_REF or OPENSHIFT_BUILD_REFERENCE to get the
+        # branch since this is a periodic job which originates from
+        # openshift/release, not the openshift/os repository. We then strip
+        # release- from the branch name so we're left with the number (e.g.,
+        # release-4.11 -> 4.11).
+        BRANCH="$(echo "$JOB_SPEC" | jq -r '.extra_refs[0].base_ref | sub("release-"; "")')"
+
+        # Ensure we have a known directory for cosa to build in
+        export COSA_DIR="/tmp/cosa"
+        mkdir -p "$COSA_DIR"
+
+        # Run the cosa build / test
+        /src/ci/build-test-qemu.sh
+
+        export REGISTRY_AUTH_FILE="$SHARED_DIR/dockercfg.json"
+        # Ensure we're in the designated cosa directory so the push-container commands work
+        cd "$COSA_DIR"
+        # Tags with the cosa build ID / arch
+        cosa push-container registry.ci.openshift.org/rhcos-devel/rhel-coreos
+        cosa push-container "registry.ci.openshift.org/rhcos-devel/rhel-coreos:${BRANCH}"
+
+        # Only push latest tag on master branch
+        if [[ "$BRANCH" == "master"  ]]; then
+          cosa push-container registry.ci.openshift.org/rhcos-devel/rhel-coreos:latest
+        fi
+      from: build-test-qemu-img
+      resources:
+        limits:
+          devices.kubevirt.io/kvm: "1"
+        requests:
+          cpu: 1000m
+          devices.kubevirt.io/kvm: "1"
+          memory: 3Gi
+      timeout: 3h0m0s
+zz_generated_metadata:
+  branch: release-4.12
+  org: openshift
+  repo: os

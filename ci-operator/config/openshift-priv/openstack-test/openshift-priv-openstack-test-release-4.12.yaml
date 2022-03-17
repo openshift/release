@@ -1,0 +1,42 @@
+binary_build_commands: go build -o /bin/openstack-tests ./cmd/openshift-tests
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.16
+canonical_go_repository: github.com/openshift/openstack-test
+promotion:
+  additional_images:
+    openstack-tests: bin
+  name: 4.12-priv
+  namespace: ocp-private
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.12-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: build
+  commands: openstack-tests --help
+  container:
+    from: bin
+- as: test
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      CONFIG_TYPE: minimal
+    test:
+    - ref: openstack-test-openstack
+    workflow: openshift-e2e-openstack-ipi
+zz_generated_metadata:
+  branch: release-4.12
+  org: openshift-priv
+  repo: openstack-test

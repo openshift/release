@@ -11,11 +11,10 @@ binary_build_commands: make all
 build_root:
   project_image:
     dockerfile_literal: |
-      FROM registry.fedoraproject.org/fedora:35
+      FROM registry.access.redhat.com/ubi8
       USER root
-      RUN dnf install -y ShellCheck yamllint asciidoctor && \
-          dnf install -y make go diffutils openssl && \
-          dnf clean all && rm -rf /var/cache/dnf/*
+      RUN yum install -y make go diffutils openssl git && \
+          yum clean all && rm -rf /var/cache/dnf/*
       RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 && \
           chmod 700 get_helm.sh && \
           ./get_helm.sh
@@ -78,10 +77,6 @@ tests:
     make test
   container:
     from: src
-- as: pre-commit
-  commands: ./.ci-scripts/pre-commit.sh
-  container:
-    from: src
 - as: e2e-openshift
   optional: true
   steps:
@@ -100,6 +95,7 @@ tests:
         helm repo update
         # minio version should be kept in sync with https://github.com/backube/volsync/blob/main/hack/run-minio.sh
         helm install --create-namespace -n minio --set accessKey.password=access --set secretKey.password=password --set defaultBuckets=mybucket --set containerSecurityContext.enabled=false --set podSecurityContext.enabled=false --version 9.0.5 --wait --timeout=300s minio bitnami/minio
+        make cli
         make test-e2e
       from: src-oc
       resources:

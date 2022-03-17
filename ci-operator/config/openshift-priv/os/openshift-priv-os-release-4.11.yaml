@@ -3,6 +3,10 @@ base_images:
     name: coreos-assembler
     namespace: coreos
     tag: latest
+  fedora:
+    name: fedora
+    namespace: coreos
+    tag: "35"
 build_root:
   image_stream_tag:
     name: fcos-buildroot
@@ -17,6 +21,7 @@ images:
       - registry.svc.ci.openshift.org/coreos/coreos-assembler:latest
   to: build-test-qemu-img
 promotion:
+  disabled: true
   excluded_images:
   - '*'
   name: 4.11-priv
@@ -37,6 +42,13 @@ resources:
       cpu: 1000m
       memory: 1Gi
   build-test-qemu:
+    limits:
+      devices.kubevirt.io/kvm: "1"
+    requests:
+      cpu: 1000m
+      devices.kubevirt.io/kvm: "1"
+      memory: 3Gi
+  periodic-os-build:
     limits:
       devices.kubevirt.io/kvm: "1"
     requests:

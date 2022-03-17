@@ -1,0 +1,58 @@
+base_images:
+  ocp_4.10_jenkins-agent-maven:
+    name: 4.12-priv
+    namespace: ocp-private
+    tag: jenkins-agent-maven
+  original_jenkins:
+    name: 4.12-priv
+    namespace: ocp-private
+    tag: jenkins
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.10
+canonical_go_repository: github.com/openshift/jenkins-openshift-login-plugin
+images:
+- dockerfile_path: Dockerfile
+  from: original_jenkins
+  inputs:
+    ocp_4.10_jenkins-agent-maven:
+      as:
+      - registry.ci.openshift.org/ocp/4.10:jenkins-agent-maven
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/jenkins-openshift-login-plugin/.
+  to: jenkins
+promotion:
+  excluded_images:
+  - jenkins
+  name: 4.12-priv
+  namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.12-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.12-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws-jenkins-sync-plugin
+  steps:
+    cluster_profile: aws
+    test:
+    - ref: jenkins-sync-plugin-e2e
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-4.12
+  org: openshift-priv
+  repo: jenkins-openshift-login-plugin

@@ -27,6 +27,18 @@ CONFIG="${SHARED_DIR}/install-config.yaml"
 base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
 machine_cidr=$(<"${SHARED_DIR}"/machinecidr.txt)
 
+RESOURCE_POOL_DEF=""
+set +o errexit
+VERSION=$(echo "${JOB_NAME}" | grep -o -E '4\.[0-9]+')
+set -o errexit
+if [ ! -z ${VERSION} ]; then
+    Z_VERSION=$(echo ${VERSION} | cut -d'.' -f2)
+    if [ ${Z_VERSION} -gt 9 ]; then
+        echo "4.x installation is later than 4.9, will install with resource pool"
+        RESOURCE_POOL_DEF="resourcePool: /${vsphere_datacenter}/host/${vsphere_cluster}/Resources/ipi-ci-clusters"
+    fi
+fi
+
 cat >> "${CONFIG}" << EOF
 baseDomain: $base_domain
 controlPlane:
@@ -57,6 +69,7 @@ platform:
     username: "${GOVC_USERNAME}"
     apiVIP: "${vips[0]}"
     ingressVIP: "${vips[1]}"
+    ${RESOURCE_POOL_DEF}
 networking:
   machineNetwork:
   - cidr: "${machine_cidr}"

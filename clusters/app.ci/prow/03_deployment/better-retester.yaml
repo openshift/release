@@ -1,0 +1,119 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: ci
+  name: better-retester
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"better-retester:shift-week"},"fieldPath":"spec.template.spec.containers[?(@.name==\"better-retester\")].image"}]'
+  labels:
+    app: prow
+    component: better-retester
+    shift-week: "true"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prow
+      component: better-retester
+      shift-week: "true"
+  template:
+    metadata:
+      labels:
+        app: prow
+        component: better-retester
+        shift-week: "true"
+    spec:
+      containers:
+      - image: better-retester:shift-week
+        name: better-retester
+        command:
+        - better-retester
+        args:
+        - --config-path=/etc/config/config.yaml
+        - --supplemental-prow-config-dir=/etc/config
+        - --dry-run=true
+        - --github-endpoint=http://ghproxy
+        - --github-endpoint=https://api.github.com
+        - --github-graphql-endpoint=http://ghproxy/graphql
+        - --github-token-path=/etc/auth/token
+        - --job-config-path=/etc/job-config
+        - --cache-file=/cache/backoff
+        volumeMounts:
+        # This is a temporary 7 day token for my personal GH account
+        - name: petr-muller-github-token
+          mountPath: /etc/auth
+          readOnly: true
+        - name: prow-config
+          mountPath: /etc/config
+          readOnly: true
+        - name: job-config
+          mountPath: /etc/job-config
+          readOnly: true
+        - name: cache
+          mountPath: /cache
+        resources:
+          requests:
+            memory: "500Mi"
+            cpu: "250m"
+      volumes:
+      - name: prow-config
+        configMap:
+          name: config
+      - name: petr-muller-github-token
+        secret:
+          secretName: petr-muller-github-token-shift-week
+      - name: job-config
+        projected:
+          sources:
+          - configMap:
+              name: job-config-misc
+          - configMap:
+              name: job-config-master-periodics
+          - configMap:
+              name: job-config-master-postsubmits
+          - configMap:
+              name: job-config-master-presubmits
+          - configMap:
+              name: job-config-3.x
+          - configMap:
+              name: job-config-4.1
+          - configMap:
+              name: job-config-4.2
+          - configMap:
+              name: job-config-4.3
+          - configMap:
+              name: job-config-4.4
+          - configMap:
+              name: job-config-4.5
+          - configMap:
+              name: job-config-4.6
+          - configMap:
+              name: job-config-4.7
+          - configMap:
+              name: job-config-4.8
+          - configMap:
+              name: job-config-4.9
+          - configMap:
+              name: job-config-4.10
+          - configMap:
+              name: job-config-4.11
+          - configMap:
+              name: job-config-4.12
+      - name: cache
+        persistentVolumeClaim:
+          claimName: better-retester
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  labels:
+    app: prow
+    component: better-retester
+  name: better-retester
+  namespace: ci
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi

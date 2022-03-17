@@ -1,0 +1,23 @@
+kind: Ingress
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: sippy
+  namespace: bparees
+  annotations:
+    cert-manager.io/cluster-issuer: cert-issuer
+    haproxy.router.openshift.io/timeout: 2m
+spec:
+  tls:
+    - hosts:
+        - sippy.ci.openshift.org
+      secretName: sippy-tls
+  rules:
+    - host: sippy.ci.openshift.org
+      http:
+        paths:
+          - pathType: ImplementationSpecific
+            backend:
+              service:
+                name: sippy-redirector
+                port:
+                  number: 8080

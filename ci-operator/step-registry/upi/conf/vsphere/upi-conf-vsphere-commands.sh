@@ -198,6 +198,13 @@ rm -f openshift/99_openshift-cluster-api_worker-machineset-*.yaml
 echo "Making control-plane nodes unschedulable..."
 sed -i "s;mastersSchedulable: true;mastersSchedulable: false;g" manifests/cluster-scheduler-02-config.yml
 
+### Check hybrid network manifest
+if test -f "${SHARED_DIR}/manifest_cluster-network-03-config.yml"
+  then
+    echo "Applying hybrid network manifest..."
+    cp "${SHARED_DIR}/manifest_cluster-network-03-config.yml" manifests/cluster-network-03-config.yml
+fi
+
 ### Create Ignition configs
 echo "Creating Ignition configs..."
 openshift-install --dir="${dir}" create ignition-configs &

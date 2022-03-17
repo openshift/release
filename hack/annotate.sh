@@ -6,6 +6,9 @@ set -o pipefail
 
 base="$( dirname "${BASH_SOURCE[0]}" )/.."
 
+# The following is an array of all the 4.x releases that have ReleaseConfig definitions, sorted by version from Highest to Lowest:
+# [4.11, 4.10, 4.9, 4.8, ...]
+releases=( $(ls "${base}/core-services/release-controller/_releases/" | grep "ocp-" | grep -Eo "4\.[0-9]+" | sort -Vr | uniq) )
 
 # Stolen from https://github.com/kubermatic/kubermatic/blob/00c0da788d618a4fbf3ddf1e9655c8a3a06d0a28/hack/lib.sh#L41 https://github.com/kubermatic/kubermatic/blob/00c0da788d618a4fbf3ddf1e9655c8a3a06d0a28/hack/lib.sh#L41
 retry() {
@@ -58,7 +61,7 @@ function annotate() {
 	fi
 }
 
-for release in $( ls "${base}/core-services/release-controller/_releases/" | grep -Eo "4\.[0-9]+" | sort | uniq ); do
+for release in ${releases[@]}; do
 	annotate "origin" "${release}" "okd-${release}.json"
 	annotate "ocp" "${release}" "ocp-${release}-ci.json"
 	annotate "ocp" "${release}-art-latest" "ocp-${release}.json"

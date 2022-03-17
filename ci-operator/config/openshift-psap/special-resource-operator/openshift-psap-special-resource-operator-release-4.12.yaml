@@ -1,0 +1,79 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
+images:
+- dockerfile_path: Dockerfile
+  to: special-resource-operator
+- dockerfile_literal: |
+    FROM src
+    RUN ["yum", "update", "-y"]
+    RUN ["yum", "install", "-y", "ShellCheck"]
+    RUN mkdir /tmp/helm && \
+        cd /tmp/helm && \
+        curl https://get.helm.sh/helm-v3.6.0-linux-amd64.tar.gz -o helm.tar.gz && \
+        tar xvfpz helm.tar.gz && \
+        mv linux-amd64/helm /usr/local/bin && \
+        chmod +x /usr/local/bin/helm && \
+        rm -rf /tmp/helm
+    RUN mkdir /tmp/oc && \
+        cd /tmp/oc && \
+        curl -L https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz -o oc.tar.gz && \
+        tar xzvf oc.tar.gz && \
+        mv kubectl /usr/local/bin/ && \
+        cd - && \
+        rm -rf /tmp/oc
+  from: src
+  to: test-bin
+promotion:
+  excluded_images:
+  - test-bin
+  name: "4.12"
+  namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.12"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.12"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lint
+  commands: |
+    export XDG_CACHE_HOME=/tmp/.cache
+    make lint
+  container:
+    clone: true
+    from: test-bin
+- as: helm-lint
+  commands: |
+    make helm-lint
+  container:
+    clone: true
+    from: test-bin
+- as: kube-lint
+  commands: |
+    make kube-lint
+  container:
+    from: src
+- as: unit
+  commands: make unit-test
+  container:
+    from: src
+- as: verify
+  commands: make verify
+  container:
+    from: src
+zz_generated_metadata:
+  branch: release-4.12
+  org: openshift-psap
+  repo: special-resource-operator

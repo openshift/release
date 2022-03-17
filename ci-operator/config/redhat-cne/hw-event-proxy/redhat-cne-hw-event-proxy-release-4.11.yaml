@@ -1,9 +1,22 @@
+base_images:
+  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.17-openshift-4.10
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.16
+    tag: golang-1.17
+images:
+- dockerfile_path: Dockerfile
+  inputs:
+    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
+  to: baremetal-hardware-event-proxy
 promotion:
+  disabled: true
   name: "4.11"
   namespace: ocp
 releases:
@@ -38,12 +51,16 @@ tests:
         fi
         popd
         export VERSION=latest
+        export PROXY_IMG=${IMAGE_HW_EVENT_PROXY}
         make test-ci
+      dependencies:
+      - env: IMAGE_HW_EVENT_PROXY
+        name: pipeline:baremetal-hardware-event-proxy
       from: src
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: release-4.11
   org: redhat-cne

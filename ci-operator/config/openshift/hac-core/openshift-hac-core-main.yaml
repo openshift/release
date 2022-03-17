@@ -17,21 +17,26 @@ tests:
   container:
     from: src
 - as: release-build-repo
-  commands: |
-    chmod 600 /tmp/secret/SSH_PRIVATE_KEY
-    echo "Host github.com
-      HostName github.com
-      User git
-      AddKeysToAgent yes
-      IdentityFile /tmp/secret/SSH_PRIVATE_KEY" >> /root/.ssh/ssh_config
-    ./build.sh
-    ./release-build-repo.sh
-  container:
-    from: src
   postsubmit: true
-  secret:
-    mount_path: /tmp/secret
-    name: hac-core-deploy-tokens
+  steps:
+    test:
+    - as: release-build-repo
+      commands: |
+        cp /tmp/secret/SSH_PRIVATE_KEY /root/.ssh/ssh_key
+        chmod 600 /root/.ssh/ssh_key
+        ./build.sh
+        ./release-build-repo.sh
+      credentials:
+      - mount_path: /tmp/secret
+        name: hac-core-deploy-tokens
+        namespace: test-credentials
+      from: src
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
 zz_generated_metadata:
   branch: main
   org: openshift

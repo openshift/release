@@ -34,3 +34,11 @@ if [ ${FIPS_ENABLED} = "true" ]; then
 fips: true
 EOF
 fi
+
+if [ -n "${BASELINE_CAPABILITY_SET}" ]; then
+	echo "Adding 'capabilities: ...' to install-config.yaml"
+	cat >> "${out}" << EOF
+capabilities:
+  baselineCapabilitySet: ${BASELINE_CAPABILITY_SET}
+EOF
+fi

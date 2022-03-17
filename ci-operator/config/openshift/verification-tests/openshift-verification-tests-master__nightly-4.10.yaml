@@ -12,12 +12,6 @@ base_images:
     namespace: ocp
     tag: upi-installer
 releases:
-  initial:
-    candidate:
-      product: ocp
-      relative: 1
-      stream: nightly
-      version: "4.10"
   latest:
     candidate:
       product: ocp
@@ -29,7 +23,60 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-baremetal-cucushift-ipi
+- as: e2e-aws-ipi
+  interval: 24h
+  steps:
+    cluster_profile: aws
+    env:
+      E2E_RUN_TAGS: '@aws-ipi'
+      TAG_VERSION: '@4.10'
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - ref: cucushift-pre
+    workflow: cucushift-e2e
+- as: e2e-aws-ipi-destructive
+  interval: 168h
+  steps:
+    cluster_profile: aws
+    env:
+      E2E_RUN_TAGS: '@aws-ipi and @destructive'
+      TAG_VERSION: '@4.10'
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - ref: cucushift-pre
+    workflow: cucushift-e2e-destructive
+- as: e2e-azure-ipi
+  interval: 24h
+  steps:
+    cluster_profile: azure-2
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+      E2E_RUN_TAGS: '@azure-ipi'
+      TAG_VERSION: '@4.10'
+    post:
+    - chain: ipi-azure-post
+    pre:
+    - chain: ipi-azure-pre
+    - ref: cucushift-pre
+    workflow: cucushift-e2e
+- as: e2e-azure-upi
+  interval: 24h
+  steps:
+    cluster_profile: azure4
+    env:
+      E2E_RUN_TAGS: '@azure-upi'
+      TAG_VERSION: '@4.10'
+    post:
+    - chain: upi-azure-post
+    pre:
+    - chain: upi-azure-pre
+    - ref: cucushift-pre
+    workflow: cucushift-e2e
+- as: e2e-baremetal-ipi
   interval: 24h
   steps:
     cluster_profile: packet
@@ -44,47 +91,7 @@ tests:
     - chain: baremetalds-ipi-pre
     - ref: cucushift-pre
     workflow: cucushift-e2e
-- as: e2e-aws-cucushift-ipi
-  interval: 24h
-  steps:
-    cluster_profile: aws
-    env:
-      E2E_RUN_TAGS: '@aws-ipi'
-      TAG_VERSION: '@4.10'
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-aws-pre
-    - ref: cucushift-pre
-    workflow: cucushift-e2e
-- as: e2e-aws-cucushift-ipi-destructive
-  interval: 168h
-  steps:
-    cluster_profile: aws
-    env:
-      E2E_RUN_TAGS: '@aws-ipi and @destructive'
-      TAG_VERSION: '@4.10'
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-aws-pre
-    - ref: cucushift-pre
-    workflow: cucushift-e2e-destructive
-- as: e2e-azure-cucushift-ipi
-  interval: 24h
-  steps:
-    cluster_profile: azure-2
-    env:
-      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
-      E2E_RUN_TAGS: '@azure-ipi'
-      TAG_VERSION: '@4.10'
-    post:
-    - chain: ipi-azure-post
-    pre:
-    - chain: ipi-azure-pre
-    - ref: cucushift-pre
-    workflow: cucushift-e2e
-- as: e2e-gcp-cucushift-ipi
+- as: e2e-gcp-ipi
   interval: 24h
   steps:
     cluster_profile: gcp
@@ -97,7 +104,7 @@ tests:
     - chain: ipi-gcp-pre
     - ref: cucushift-pre
     workflow: cucushift-e2e
-- as: e2e-gcp-cucushift-upi
+- as: e2e-gcp-upi
   interval: 24h
   steps:
     cluster_profile: gcp
@@ -110,7 +117,7 @@ tests:
     - chain: upi-gcp-pre
     - ref: cucushift-pre
     workflow: cucushift-e2e
-- as: e2e-openstack-cucushift-ipi
+- as: e2e-openstack-ipi
   interval: 24h
   steps:
     cluster_profile: openstack
@@ -125,7 +132,7 @@ tests:
     - chain: ipi-openstack-pre
     - ref: cucushift-pre
     workflow: cucushift-e2e
-- as: e2e-vsphere-cucushift-ipi
+- as: e2e-vsphere-ipi
   interval: 24h
   steps:
     cluster_profile: vsphere
@@ -138,7 +145,7 @@ tests:
     - chain: ipi-vsphere-pre
     - ref: cucushift-pre
     workflow: cucushift-e2e
-- as: e2e-vsphere-cucushift-upi
+- as: e2e-vsphere-upi
   interval: 24h
   steps:
     cluster_profile: vsphere

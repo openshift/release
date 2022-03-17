@@ -65,10 +65,11 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-upgrade-gcp-ovn
-- as: e2e-agnostic-upgrade
+- as: e2e-aws-upgrade
+  optional: true
   steps:
-    cluster_profile: azure4
-    workflow: openshift-upgrade-azure
+    cluster_profile: aws
+    workflow: openshift-upgrade-aws
 - as: e2e-aws-sdn-multi
   steps:
     cluster_profile: aws
@@ -87,7 +88,7 @@ tests:
     workflow: openshift-e2e-aws-ovn-ipsec
 - as: e2e-metal-ipi-ovn-ipv6
   steps:
-    cluster_profile: packet
+    cluster_profile: equinix-ocp-metal
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v6
@@ -125,8 +126,10 @@ tests:
       BASE_DOMAIN: shiftstack.devcluster.openshift.com
       CONFIG_TYPE: minimal
       NETWORK_TYPE: Kuryr
-    test:
-    - ref: openstack-noop
+      TEST_SKIPS: NodePort \| session affinity \| Services should be able to change
+        the type from ExternalName to ClusterIP \| Kubectl client Guestbook application
+        should create and stop a working application
+      TEST_SUITE: kubernetes/conformance
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-openstack
   optional: true

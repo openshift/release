@@ -10,10 +10,16 @@ echo "************ baremetalds metallb e2e test command ************"
 source "${SHARED_DIR}/packet-conf.sh"
 
 METALLB_SRC_DIR="/go/src/github.com/openshift/metallb"
+METALLB_OPERATOR_SRC_DIR="/go/src/github.com/openshift/metallb-operator"
 
 if [ -d "${METALLB_SRC_DIR}" ]; then
   echo "### Copying metallb directory"
   scp "${SSHOPTS[@]}" -r "${METALLB_SRC_DIR}" "root@${IP}:/root/dev-scripts/metallb/"
+fi
+
+if [ -d "${METALLB_OPERATOR_SRC_DIR}" ]; then
+  echo "### Copying metallb-operator directory"
+  scp "${SSHOPTS[@]}" -r "${METALLB_OPERATOR_SRC_DIR}" "root@${IP}:/root/dev-scripts/metallb/"
 fi
 
 # Inject additional variables directly.

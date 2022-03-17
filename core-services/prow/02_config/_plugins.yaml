@@ -43,7 +43,7 @@ bugzilla:
         status: MODIFIED
       state_after_validation:
         status: POST
-      target_release: 4.10.0
+      target_release: 4.11.0
       valid_states:
       - status: NEW
       - status: ASSIGNED
@@ -62,7 +62,7 @@ bugzilla:
         status: MODIFIED
       state_after_validation:
         status: POST
-      target_release: 4.10.0
+      target_release: 4.11.0
       valid_states:
       - status: NEW
       - status: ASSIGNED
@@ -139,16 +139,13 @@ bugzilla:
     openshift-4.9:
       dependent_bug_target_releases:
       - 4.10.0
+      - 4.10.z
       target_release: 4.9.z
       validate_by_default: true
     openshift-4.10:
-      dependent_bug_states:
-      - status: MODIFIED
-      - status: ON_QA
-      - status: VERIFIED
       dependent_bug_target_releases:
       - 4.11.0
-      target_release: 4.10.0
+      target_release: 4.10.z
       validate_by_default: true
     openshift-4.11:
       dependent_bug_states:
@@ -158,6 +155,15 @@ bugzilla:
       dependent_bug_target_releases:
       - 4.12.0
       target_release: 4.11.0
+      validate_by_default: true
+    openshift-4.12:
+      dependent_bug_states:
+      - status: MODIFIED
+      - status: ON_QA
+      - status: VERIFIED
+      dependent_bug_target_releases:
+      - 4.13.0
+      target_release: 4.12.0
       validate_by_default: true
     release-3.11:
       add_external_link: true
@@ -230,16 +236,13 @@ bugzilla:
     release-4.9:
       dependent_bug_target_releases:
       - 4.10.0
+      - 4.10.z
       target_release: 4.9.z
       validate_by_default: true
     release-4.10:
-      dependent_bug_states:
-      - status: MODIFIED
-      - status: ON_QA
-      - status: VERIFIED
       dependent_bug_target_releases:
       - 4.11.0
-      target_release: 4.10.0
+      target_release: 4.10.z
       validate_by_default: true
     release-4.11:
       dependent_bug_states:
@@ -249,6 +252,15 @@ bugzilla:
       dependent_bug_target_releases:
       - 4.12.0
       target_release: 4.11.0
+      validate_by_default: true
+    release-4.12:
+      dependent_bug_states:
+      - status: MODIFIED
+      - status: ON_QA
+      - status: VERIFIED
+      dependent_bug_target_releases:
+      - 4.13.0
+      target_release: 4.12.0
       validate_by_default: true
 cat: {}
 cherry_pick_unapproved:
@@ -297,6 +309,12 @@ config_updater:
         - ci
       gzip: true
       name: ci-operator-misc-configs
+    ci-operator/config/**/*-layering.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
     ci-operator/config/**/*-logging*/openshift*-*-logging*-release-5.*.yaml:
       clusters:
         app.ci:
@@ -321,12 +339,6 @@ config_updater:
         - ci
       gzip: true
       name: ci-operator-master-configs
-    ci-operator/config/**/*-mcbs.yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: ci-operator-misc-configs
     ci-operator/config/**/*-ocp-ci-integration.yaml:
       clusters:
         app.ci:
@@ -334,6 +346,30 @@ config_updater:
       gzip: true
       name: ci-operator-misc-configs
     ci-operator/config/**/*branch-openshift*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
+    ci-operator/config/**/*che*/*-7.42.x*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
+    ci-operator/config/**/*che*/*-7.43.x*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
+    ci-operator/config/**/*che*/*-7.44.x*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
+    ci-operator/config/**/*che*/*-7.45.x*.yaml:
       clusters:
         app.ci:
         - ci
@@ -417,6 +453,12 @@ config_updater:
         - ci
       gzip: true
       name: ci-operator-4.11-configs
+    ci-operator/config/**/*openshift-4.12*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-4.12-configs
     ci-operator/config/**/*openshift-v4*.yaml:
       clusters:
         app.ci:
@@ -513,6 +555,12 @@ config_updater:
         - ci
       gzip: true
       name: ci-operator-4.11-configs
+    ci-operator/config/**/*release-4.12*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-4.12-configs
     ci-operator/config/**/*release-next*.yaml:
       clusters:
         app.ci:
@@ -579,6 +627,12 @@ config_updater:
         - ci
       gzip: true
       name: ci-operator-misc-configs
+    ci-operator/config/**/logging-fluentd/ViaQ-logging-fluentd-v*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
     ci-operator/config/**/oauth-proxy/openshift*-samples-operator-*.yaml:
       clusters:
         app.ci:
@@ -627,12 +681,6 @@ config_updater:
         - ci
       gzip: true
       name: ci-operator-misc-configs
-    ci-operator/config/che-incubator/chectl/*-7.yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: ci-operator-misc-configs
     ci-operator/config/code-ready/crc/*dev*.yaml:
       clusters:
         app.ci:
@@ -657,49 +705,19 @@ config_updater:
         - ci
       gzip: true
       name: ci-operator-misc-configs
-    ci-operator/config/eclipse-che/che-operator/*-7.40.x*.yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: ci-operator-misc-configs
-    ci-operator/config/eclipse-che/che-operator/*-7.41.x*.yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: ci-operator-misc-configs
-    ci-operator/config/eclipse-che/che-operator/*-7.42.x*.yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: ci-operator-misc-configs
-    ci-operator/config/eclipse-che/che-operator/*-7.43.x*.yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: ci-operator-misc-configs
-    ci-operator/config/eclipse-che/che-operator/*-7.44.x*.yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: ci-operator-misc-configs
-    ci-operator/config/eclipse-che/che-operator/*-7.45.x*.yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: ci-operator-misc-configs
-    ci-operator/config/eclipse-che/che-operator/*-main.yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: ci-operator-misc-configs
     ci-operator/config/identitatem/**/*-stable*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
+    ci-operator/config/identitatem/**/*-test*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
+    ci-operator/config/integr8ly/cloud-resource-operator/integr8ly-cloud-resource-operator-MGDAPI-*.yaml:
       clusters:
         app.ci:
         - ci
@@ -717,67 +735,13 @@ config_updater:
         - ci
       gzip: true
       name: ci-operator-misc-configs
+    ci-operator/config/integr8ly/integreatly-operator/integr8ly-integreatly-operator-mgdapi-*-*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
     ci-operator/config/kubevirt/**/*release-2.[4-9].yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: ci-operator-misc-configs
-    ci-operator/config/open-cluster-management/**/*-backplane-1.0*.yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: ci-operator-misc-configs
-    ci-operator/config/open-cluster-management/**/*-backplane-2.0*.yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: ci-operator-misc-configs
-    ci-operator/config/open-cluster-management/**/*-prow-experiment.yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: ci-operator-misc-configs
-    ci-operator/config/open-cluster-management/**/*-release-2.0*.yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: ci-operator-misc-configs
-    ci-operator/config/open-cluster-management/**/*-release-2.1*.yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: ci-operator-misc-configs
-    ci-operator/config/open-cluster-management/**/*-release-2.2*.yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: ci-operator-misc-configs
-    ci-operator/config/open-cluster-management/**/*-release-2.3*.yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: ci-operator-misc-configs
-    ci-operator/config/open-cluster-management/**/*-release-2.4*.yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: ci-operator-misc-configs
-    ci-operator/config/open-cluster-management/**/*-release-2.5*.yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: ci-operator-misc-configs
-    ci-operator/config/open-cluster-management/**/*-release-9.9*.yaml:
       clusters:
         app.ci:
         - ci
@@ -795,7 +759,19 @@ config_updater:
         - ci
       gzip: true
       name: ci-operator-misc-configs
+    ci-operator/config/openshift/ci-tools/openshift-ci-tools-shift-week-better-retester.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
     ci-operator/config/openshift/kubernetes/openshift-kubernetes-{oc,origin,sdn}-*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
+    ci-operator/config/openshift/oadp-operator/openshift-oadp-operator-ci-*.yaml:
       clusters:
         app.ci:
         - ci
@@ -820,6 +796,12 @@ config_updater:
       gzip: true
       name: ci-operator-misc-configs
     ci-operator/config/red-hat-data-services/**/*-v1*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
+    ci-operator/config/redhat-developer/odo/*-v2.yaml:
       clusters:
         app.ci:
         - ci
@@ -879,6 +861,60 @@ config_updater:
         - ci
       gzip: true
       name: ci-operator-misc-configs
+    ci-operator/config/stolostron/**/*-backplane-1.0*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
+    ci-operator/config/stolostron/**/*-backplane-2.0*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
+    ci-operator/config/stolostron/**/*-release-2.0*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
+    ci-operator/config/stolostron/**/*-release-2.1*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
+    ci-operator/config/stolostron/**/*-release-2.2*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
+    ci-operator/config/stolostron/**/*-release-2.3*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
+    ci-operator/config/stolostron/**/*-release-2.4*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
+    ci-operator/config/stolostron/**/*-release-2.5*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
+    ci-operator/config/stolostron/**/*-release-9.9*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
     ci-operator/jobs/**/*-branch-openshift-*.yaml:
       clusters:
         app.ci:
@@ -898,6 +934,12 @@ config_updater:
       gzip: true
       name: job-config-misc
     ci-operator/jobs/**/*-hive-ocm-*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
+    ci-operator/jobs/**/*-layering-*.yaml:
       clusters:
         app.ci:
         - ci
@@ -933,13 +975,31 @@ config_updater:
         - ci
       gzip: true
       name: job-config-master-presubmits
-    ci-operator/jobs/**/*-mcbs-*.yaml:
+    ci-operator/jobs/**/*-ocp-ci-integration*.yaml:
       clusters:
         app.ci:
         - ci
       gzip: true
       name: job-config-misc
-    ci-operator/jobs/**/*-ocp-ci-integration*.yaml:
+    ci-operator/jobs/**/*che*/*-7.42.x-*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
+    ci-operator/jobs/**/*che*/*-7.43.x-*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
+    ci-operator/jobs/**/*che*/*-7.44.x-*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
+    ci-operator/jobs/**/*che*/*-7.45.x-*.yaml:
       clusters:
         app.ci:
         - ci
@@ -1047,6 +1107,12 @@ config_updater:
         - ci
       gzip: true
       name: job-config-4.11
+    ci-operator/jobs/**/*openshift-4.12*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-4.12
     ci-operator/jobs/**/*openshift-v4*.yaml:
       clusters:
         app.ci:
@@ -1143,6 +1209,12 @@ config_updater:
         - ci
       gzip: true
       name: job-config-4.11
+    ci-operator/jobs/**/*release-4.12*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-4.12
     ci-operator/jobs/**/*release-next*.yaml:
       clusters:
         app.ci:
@@ -1221,6 +1293,12 @@ config_updater:
         - ci
       gzip: true
       name: job-config-misc
+    ci-operator/jobs/**/logging-fluentd/ViaQ-logging-fluentd-v*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
     ci-operator/jobs/**/oauth-proxy/openshift*-oauth-proxy-samples-operator-*.yaml:
       clusters:
         app.ci:
@@ -1269,12 +1347,6 @@ config_updater:
         - ci
       gzip: true
       name: job-config-misc
-    ci-operator/jobs/che-incubator/chectl/*7-presubmits.yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: job-config-misc
     ci-operator/jobs/code-ready/crc/*dev*.yaml:
       clusters:
         app.ci:
@@ -1299,49 +1371,19 @@ config_updater:
         - ci
       gzip: true
       name: job-config-misc
-    ci-operator/jobs/eclipse-che/che-operator/*-7.40.x-*.yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: job-config-misc
-    ci-operator/jobs/eclipse-che/che-operator/*-7.41.x-*.yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: job-config-misc
-    ci-operator/jobs/eclipse-che/che-operator/*-7.42.x-*.yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: job-config-misc
-    ci-operator/jobs/eclipse-che/che-operator/*-7.43.x-*.yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: job-config-misc
-    ci-operator/jobs/eclipse-che/che-operator/*-7.44.x-*.yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: job-config-misc
-    ci-operator/jobs/eclipse-che/che-operator/*-7.45.x-*.yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: job-config-misc
-    ci-operator/jobs/eclipse-che/che-operator/*-main.yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: job-config-misc
     ci-operator/jobs/identitatem/**/*-stable*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
+    ci-operator/jobs/identitatem/**/*-test*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
+    ci-operator/jobs/integr8ly/cloud-resource-operator/integr8ly-cloud-resource-operator-MGDAPI-*.yaml:
       clusters:
         app.ci:
         - ci
@@ -1359,61 +1401,7 @@ config_updater:
         - ci
       gzip: true
       name: job-config-misc
-    ci-operator/jobs/open-cluster-management/**/*-backplane-1.0*.yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: job-config-misc
-    ci-operator/jobs/open-cluster-management/**/*-backplane-2.0*.yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: job-config-misc
-    ci-operator/jobs/open-cluster-management/**/*-prow-experiment-*.yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: job-config-misc
-    ci-operator/jobs/open-cluster-management/**/*-release-2.0*.yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: job-config-misc
-    ci-operator/jobs/open-cluster-management/**/*-release-2.1*.yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: job-config-misc
-    ci-operator/jobs/open-cluster-management/**/*-release-2.2*.yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: job-config-misc
-    ci-operator/jobs/open-cluster-management/**/*-release-2.3*.yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: job-config-misc
-    ci-operator/jobs/open-cluster-management/**/*-release-2.4*.yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: job-config-misc
-    ci-operator/jobs/open-cluster-management/**/*-release-2.5*.yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: job-config-misc
-    ci-operator/jobs/open-cluster-management/**/*-release-9.9*.yaml:
+    ci-operator/jobs/integr8ly/integreatly-operator/integr8ly-integreatly-operator-mgdapi-*-*.yaml:
       clusters:
         app.ci:
         - ci
@@ -1431,7 +1419,19 @@ config_updater:
         - ci
       gzip: true
       name: job-config-misc
+    ci-operator/jobs/openshift/ci-tools/openshift-ci-tools-shift-week-better-retester-*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
     ci-operator/jobs/openshift/kubernetes/openshift-kubernetes-{oc,origin,sdn}-*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
+    ci-operator/jobs/openshift/oadp-operator/openshift-oadp-operator-ci-*.yaml:
       clusters:
         app.ci:
         - ci
@@ -1456,6 +1456,12 @@ config_updater:
       gzip: true
       name: job-config-misc
     ci-operator/jobs/red-hat-data-services/**/*-v1*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
+    ci-operator/jobs/redhat-developer/odo/*-v2*.yaml:
       clusters:
         app.ci:
         - ci
@@ -1510,6 +1516,60 @@ config_updater:
       gzip: true
       name: job-config-4.9
     ci-operator/jobs/redhat-openshift-ecosystem/preflight/*-preflight-ocp-*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
+    ci-operator/jobs/stolostron/**/*-backplane-1.0*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
+    ci-operator/jobs/stolostron/**/*-backplane-2.0*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
+    ci-operator/jobs/stolostron/**/*-release-2.0*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
+    ci-operator/jobs/stolostron/**/*-release-2.1*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
+    ci-operator/jobs/stolostron/**/*-release-2.2*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
+    ci-operator/jobs/stolostron/**/*-release-2.3*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
+    ci-operator/jobs/stolostron/**/*-release-2.4*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
+    ci-operator/jobs/stolostron/**/*-release-2.5*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
+    ci-operator/jobs/stolostron/**/*-release-9.9*.yaml:
       clusters:
         app.ci:
         - ci
@@ -1741,6 +1801,11 @@ config_updater:
         app.ci:
         - ci
       name: deck-internal-extensions
+    core-services/prow/02_config/qe-private-deck-extensions/*:
+      clusters:
+        app.ci:
+        - ci
+      name: qe-private-deck-extensions
     core-services/release-controller/_repos/*:
       cluster_groups:
       - build_farm_ocp
@@ -1785,6 +1850,12 @@ override:
   allow_top_level_owners: true
 owners:
   filenames:
+    openshift-kni/scheduler-plugins:
+      owners: DOWNSTREAM_OWNERS
+      owners_aliases: DOWNSTREAM_OWNERS_ALIASES
+    openshift/aws-load-balancer-controller:
+      owners: DOWNSTREAM_OWNERS
+      owners_aliases: DOWNSTREAM_OWNERS_ALIASES
     openshift/contour:
       owners: DOWNSTREAM_OWNERS
       owners_aliases: DOWNSTREAM_OWNERS_ALIASES

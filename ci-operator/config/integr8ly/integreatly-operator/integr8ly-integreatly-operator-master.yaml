@@ -1,8 +1,8 @@
 base_images:
-  openshift_release_golang-1.16:
+  openshift_release_golang-1.17:
     name: release
     namespace: openshift
-    tag: golang-1.16
+    tag: golang-1.17
   os:
     name: ubi
     namespace: ocp
@@ -23,16 +23,16 @@ images:
 - dockerfile_path: Dockerfile.osde2e
   from: os
   inputs:
-    openshift_release_golang-1.16:
+    openshift_release_golang-1.17:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.16
+      - registry.ci.openshift.org/openshift/release:golang-1.17
   to: integreatly-operator-test-harness-osde2e
 - dockerfile_path: Dockerfile.functional
   from: os
   inputs:
-    openshift_release_golang-1.16:
+    openshift_release_golang-1.17:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.16
+      - registry.ci.openshift.org/openshift/release:golang-1.17
   to: integreatly-operator-test-harness
 promotion:
   name: integreatly-operator
@@ -79,11 +79,15 @@ tests:
   container:
     from: src
 - as: rhoam-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.9"
   optional: true
   steps:
-    cluster_profile: aws
-    env:
-      COMPUTE_NODE_TYPE: m4.xlarge
     test:
     - as: test
       cli: latest
@@ -95,7 +99,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    workflow: generic-claim
 - as: multitenant-rhoam-e2e
   steps:
     cluster_profile: aws
@@ -122,6 +126,25 @@ tests:
   container:
     from: src
   run_if_changed: pkg/apis/integreatly/v1alpha1/rhmi_types.go
+- as: coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  secret:
+    mount_path: /tmp/secret
+    name: integreatly-operator-codecov-token
+- as: publish-coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  postsubmit: true
+  secret:
+    mount_path: /tmp/secret
+    name: integreatly-operator-codecov-token
 zz_generated_metadata:
   branch: master
   org: integr8ly

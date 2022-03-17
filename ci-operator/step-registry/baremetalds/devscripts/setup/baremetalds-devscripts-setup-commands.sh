@@ -10,9 +10,12 @@ echo "************ baremetalds devscripts setup command ************"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
 
+INSTALL_STAGE="initial"
 # Get dev-scripts logs and other configuration
 finished()
 {
+  #Save install status for must-gather to generate junit
+  echo "$? $INSTALL_STAGE" > "${SHARED_DIR}/install-status.txt"
   set +e
 
   echo "Fetching kubeconfig, other credentials..."
@@ -64,7 +67,15 @@ timeout -s 9 175m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*
 
 set -xeuo pipefail
 
-yum install -y git sysstat sos
+# Some Packet images have a file /usr/config left from the provisioning phase.
+# The problem is that sos expects it to be a directory. Since we don't care
+# about the Packet provisioner, remove the file if it's present.
+test -f /usr/config && rm -f /usr/config || true
+
+# TODO: remove this once rocky is marked as supported in dev-scripts
+sed -i -e 's/rocky/centos/g; s/Rocky/CentOS/g' /etc/os-release
+
+yum install -y git sysstat sos make
 systemctl start sysstat
 
 mkdir -p /tmp/artifacts
@@ -130,3 +141,5 @@ EOF
 
 # Save console URL in `console.url` file so that ci-chat-bot could report success
 scp "${SSHOPTS[@]}" "root@${IP}:/tmp/console.url" "${SHARED_DIR}/"
+
+INSTALL_STAGE="cluster_creation_successful"

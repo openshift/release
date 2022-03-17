@@ -1,0 +1,61 @@
+base_images:
+  cli:
+    name: 4.12-priv
+    namespace: ocp-private
+    tag: cli
+binary_build_commands: make all
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+canonical_go_repository: github.com/openshift/openshift-tests
+promotion:
+  name: 4.12-priv
+  namespace: ocp-private
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.8"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 4Gi
+  bin:
+    requests:
+      cpu: "2"
+      memory: 8Gi
+  e2e-aws:
+    requests:
+      cpu: "4"
+      memory: 4Gi
+test_binary_build_commands: make test
+tests:
+- as: unit
+  commands: make test
+  container:
+    from: src
+- as: e2e-aws
+  optional: true
+  steps:
+    cluster_profile: aws
+    test:
+    - as: bin-test
+      cli: latest
+      commands: ./bin/extended-platform-tests run all --dry-run|grep "Critical"|./bin/extended-platform-tests
+        run -f -
+      from: bin
+      resources:
+        requests:
+          cpu: "2"
+          memory: 4Gi
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-4.12
+  org: openshift-priv
+  repo: openshift-tests

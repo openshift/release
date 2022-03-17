@@ -8,7 +8,10 @@ if [[ -n "${GITHUB_TOKEN_PATH:-}" ]]; then
 	volume="--volume $( dirname "${GITHUB_TOKEN_PATH}" ):/secrets:z"
 	arg="--github-token-path /secrets/$( basename "${GITHUB_TOKEN_PATH}" )"
 fi
-docker run \
+
+CONTAINER_ENGINE=${CONTAINER_ENGINE:-docker}
+
+$CONTAINER_ENGINE run \
     --rm \
     --volume "$PWD:/tmp/release:z" \
     ${volume:-} \

@@ -35,11 +35,20 @@ fi
 
 # Set up local registry with long-lived certs with SAN
 HOSTNAME=$(curl "http://metadata.google.internal/computeMetadata/v1/instance/hostname" -H "Metadata-Flavor: Google")
-sudo dnf -y install podman httpd httpd-tools make
-go get -u github.com/cloudflare/cfssl/cmd/...
-make -C go/src/github.com/cloudflare/cfssl
-sudo cp go/src/github.com/cloudflare/cfssl/bin/cfssl /usr/local/bin
-sudo cp go/src/github.com/cloudflare/cfssl/bin/cfssljson /usr/local/bin
+sudo dnf -y install podman httpd httpd-tools wget
+
+# install cfssl
+CFSSL_VERSION=$(curl --silent "https://api.github.com/repos/cloudflare/cfssl/releases/latest" | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
+CFSSL_VNUMBER=${CFSSL_VERSION#"v"}
+wget https://github.com/cloudflare/cfssl/releases/download/${CFSSL_VERSION}/cfssl_${CFSSL_VNUMBER}_linux_amd64 -O cfssl
+chmod +x cfssl
+sudo mv cfssl /usr/local/bin
+
+# install cfssljson
+wget https://github.com/cloudflare/cfssl/releases/download/${CFSSL_VERSION}/cfssljson_${CFSSL_VNUMBER}_linux_amd64 -O cfssljson
+chmod +x cfssljson
+sudo mv cfssljson /usr/local/bin
+
 mkdir create-registry-certs
 pushd create-registry-certs
 cat > ca-config.json << EOF

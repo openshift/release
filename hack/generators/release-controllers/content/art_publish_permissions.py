@@ -64,6 +64,25 @@ in 3.11).''')
         }]
     }, comment='Allow ART to mirror images to the openshift namespace so ci-build-root "release" images can be pushed')
 
+    gendoc.append({
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
+        'kind': 'RoleBinding',
+        'metadata': {
+            'name': 'art-publish',
+            'namespace': 'ocp-private'
+        },
+        'roleRef': {
+            'apiGroup': 'rbac.authorization.k8s.io',
+            'kind': 'ClusterRole',
+            'name': 'system:image-builder'
+        },
+        'subjects': [{
+            'kind': 'ServiceAccount',
+            'name': 'art-publish',
+            'namespace': 'ocp'
+        }]
+    }, comment='Allow ART to mirror images to the ocp-private namespace so 4.x:base images can be pushed')
+
     gendoc.append_all([{
         'apiVersion': 'authorization.openshift.io/v1',
         'kind': 'Role',
