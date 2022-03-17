@@ -10,24 +10,31 @@ curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -
 CONFIG="${SHARED_DIR}/install-config.yaml"
 PATCH="/tmp/install-config-existingresourcegroup.yaml.patch"
 
-azure_region=$(/tmp/yq r "${CONFIG}" 'platform.azure.region')
-cluster_name=$(/tmp/yq r "${CONFIG}" 'metadata.name')
-existing_rg=${cluster_name}-exrg
+if [ X"${DISCONNECTED_NETWORK}" == X"yes" ]; then
+  echo "Disconnected network, getting RG info"
+  existing_rg=$(cat ${SHARED_DIR}/resouregroup)
+  echo "Resource Group already created ${existing_rg}"
 
-# az should already be there
-command -v az
+else
+  azure_region=$(/tmp/yq r "${CONFIG}" 'platform.azure.region')
+  cluster_name=$(/tmp/yq r "${CONFIG}" 'metadata.name')
+  existing_rg=${cluster_name}-exrg
 
-# set the parameters we'll need as env vars
-AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
-AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
-AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
-AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
+  # az should already be there
+  command -v az
 
-# log in with az
-az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
+  # set the parameters we'll need as env vars
+  AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+  AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
+  AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
+  AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
 
-# create resource group prior to installation
-az group create -l "${azure_region}" -n "${existing_rg}"
+  # log in with az
+  az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
+
+  # create resource group prior to installation
+  az group create -l "${azure_region}" -n "${existing_rg}"
+fi
 
 # create a patch with existing resource group configuration
 cat > "${PATCH}" << EOF
