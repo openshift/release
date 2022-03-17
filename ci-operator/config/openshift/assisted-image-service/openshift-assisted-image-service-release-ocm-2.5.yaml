@@ -11,6 +11,10 @@ base_images:
     name: release
     namespace: openshift
     tag: golang-1.16
+  ubi-minimal-8:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
 build_root:
   image_stream_tag:
     name: release
@@ -25,7 +29,7 @@ images:
       - registry.ci.openshift.org/openshift/release:golang-1.16
   to: assisted-image-service
 promotion:
-  name: ocm-2.6
+  name: ocm-2.5
   namespace: edge-infrastructure
 releases:
   candidate:
@@ -55,6 +59,8 @@ tests:
   steps:
     dependencies:
       SOURCE_IMAGE_REF: assisted-image-service
+    env:
+      RELEASE_TAG_PREFIX: ocm-2.5
     test:
     - ref: assisted-baremetal-images-publish
 - as: mirror-vcsref-image
@@ -62,6 +68,8 @@ tests:
   steps:
     dependencies:
       SOURCE_IMAGE_REF: assisted-image-service
+    env:
+      RELEASE_TAG_PREFIX: ocm-2.5
     test:
     - ref: assisted-baremetal-images-publish
 - as: ocm-publish
@@ -73,20 +81,7 @@ tests:
       IMAGE_REPO: assisted-image-service
       OSCI_ENV_CONFIG: |
         OSCI_PUBLISH_DELAY=0
-      RELEASE_REF: release-2.6
-    workflow: ocm-ci-manifest-update
-- as: mce-publish
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: assisted-image-service
-    env:
-      IMAGE_REPO: assisted-image-service
-      OSCI_ENV_CONFIG: |
-        OSCI_PUBLISH_DELAY=0
-        OSCI_PIPELINE_PRODUCT_PREFIX=backplane
-        OSCI_PIPELINE_REPO=backplane-pipeline
-      RELEASE_REF: backplane-2.0
+      RELEASE_REF: release-2.5
     workflow: ocm-ci-manifest-update
 - as: lint
   commands: |
@@ -117,6 +112,6 @@ tests:
     mount_path: /tmp/secret
     name: assisted-image-service-codecov-token
 zz_generated_metadata:
-  branch: main
+  branch: release-ocm-2.5
   org: openshift
   repo: assisted-image-service

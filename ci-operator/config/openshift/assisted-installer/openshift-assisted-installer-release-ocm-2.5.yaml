@@ -1,18 +1,14 @@
 base_images:
-  assisted-installer:
-    name: ocm-2.6
+  assisted-installer-agent:
+    name: ocm-2.5
     namespace: edge-infrastructure
-    tag: assisted-installer
-  assisted-installer-controller:
-    name: ocm-2.6
-    namespace: edge-infrastructure
-    tag: assisted-installer-controller
+    tag: assisted-installer-agent
   assisted-service:
-    name: ocm-2.6
+    name: ocm-2.5
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.6
+    name: ocm-2.5
     namespace: edge-infrastructure
     tag: assisted-test-infra
   coreos-centos-stream8:
@@ -29,22 +25,24 @@ base_images:
     tag: golang-1.17
 build_root:
   project_image:
-    dockerfile_path: Dockerfile.assisted_installer_agent-build
+    dockerfile_path: Dockerfile.assisted-installer-build
 images:
-- dockerfile_path: Dockerfile.assisted_installer_agent
+- dockerfile_path: Dockerfile.assisted-installer
   from: coreos-centos-stream8
   inputs:
     openshift_release_golang-1.17:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.17
-  to: assisted-installer-agent
-- dockerfile_literal: |
-    FROM base
-    COPY . .
-  from: src
-  to: assisted-installer-agent-src
+  to: assisted-installer
+- dockerfile_path: Dockerfile.assisted-installer-controller
+  from: coreos-centos-stream8
+  inputs:
+    openshift_release_golang-1.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
+  to: assisted-installer-controller
 promotion:
-  name: ocm-2.6
+  name: ocm-2.5
   namespace: edge-infrastructure
 releases:
   initial:
@@ -69,45 +67,74 @@ tests:
   cron: '@daily'
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: assisted-installer-agent
+      SOURCE_IMAGE_REF: assisted-installer
+    env:
+      IMAGE_REPO: assisted-installer
+      RELEASE_TAG_PREFIX: ocm-2.5
+    test:
+    - ref: assisted-baremetal-images-publish
+- as: mirror-nightly-image-controller
+  cron: '@daily'
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-installer-controller
+    env:
+      IMAGE_REPO: assisted-installer-controller
+      RELEASE_TAG_PREFIX: ocm-2.5
     test:
     - ref: assisted-baremetal-images-publish
 - as: mirror-vcsref-image
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: assisted-installer-agent
+      SOURCE_IMAGE_REF: assisted-installer
+    env:
+      IMAGE_REPO: assisted-installer
+      RELEASE_TAG_PREFIX: ocm-2.5
+    test:
+    - ref: assisted-baremetal-images-publish
+- as: mirror-vcsref-image-controller
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-installer-controller
+    env:
+      IMAGE_REPO: assisted-installer-controller
+      RELEASE_TAG_PREFIX: ocm-2.5
     test:
     - ref: assisted-baremetal-images-publish
 - as: ocm-publish
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: assisted-installer-agent
+      SOURCE_IMAGE_REF: assisted-installer
     env:
-      IMAGE_REPO: assisted-installer-agent
+      IMAGE_REPO: assisted-installer
       OSCI_ENV_CONFIG: |
         OSCI_PUBLISH_DELAY=0
-      RELEASE_REF: release-2.6
+      RELEASE_REF: release-2.5
     workflow: ocm-ci-manifest-update
-- as: mce-publish
+- as: ocm-publish-controller
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: assisted-installer-agent
+      SOURCE_IMAGE_REF: assisted-installer-controller
     env:
-      IMAGE_REPO: assisted-installer-agent
+      IMAGE_REPO: assisted-installer-controller
       OSCI_ENV_CONFIG: |
+        OSCI_COMPONENT_NAME=assisted-installer-controller
         OSCI_PUBLISH_DELAY=0
-        OSCI_PIPELINE_PRODUCT_PREFIX=backplane
-        OSCI_PIPELINE_REPO=backplane-pipeline
-      RELEASE_REF: backplane-2.0
+      RELEASE_REF: release-2.5
     workflow: ocm-ci-manifest-update
 - as: lint
   commands: |
     export GOLANGCI_LINT_CACHE=/tmp/.cache
     export GOPROXY=https://proxy.golang.org
     make lint
+  container:
+    from: test-bin
+- as: format-check
+  commands: make format-check
   container:
     from: test-bin
 - as: unit-test
@@ -118,7 +145,7 @@ tests:
     from: test-bin
   secret:
     mount_path: /tmp/secret
-    name: assisted-installer-agent-codecov-token
+    name: assisted-installer-codecov-token
 - as: unit-test-postsubmit
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
@@ -128,11 +155,14 @@ tests:
   postsubmit: true
   secret:
     mount_path: /tmp/secret
-    name: assisted-installer-agent-codecov-token
+    name: assisted-installer-codecov-token
 - as: e2e-metal-assisted
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=release-ocm-2.5
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-ipv6
   optional: true
@@ -140,8 +170,8 @@ tests:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=release-ocm-2.5
         IPv6=yes
-        IPv4=no
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-single-node
   optional: true
@@ -149,42 +179,31 @@ tests:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=release-ocm-2.5
+        IPv6=yes
         NUM_MASTERS=1
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-cnv
   optional: true
+  run_if_changed: ^(src/assisted_installer_controller/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=release-ocm-2.5
         OLM_OPERATORS=cnv
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-ocs
   optional: true
+  run_if_changed: ^(src/assisted_installer_controller/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=release-ocm-2.5
         OLM_OPERATORS=ocs
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-day2
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        TEST_FUNC=test_deploy_day2_nodes_cloud
-    workflow: assisted-baremetal
-- as: subsystem-test
-  steps:
-    cluster_profile: packet-assisted
-    workflow: assisted-agent
-- as: subsystem-test-periodic
-  cron: '@daily'
-  steps:
-    cluster_profile: packet-assisted
-    workflow: assisted-agent
 zz_generated_metadata:
-  branch: master
+  branch: release-ocm-2.5
   org: openshift
-  repo: assisted-installer-agent
+  repo: assisted-installer
