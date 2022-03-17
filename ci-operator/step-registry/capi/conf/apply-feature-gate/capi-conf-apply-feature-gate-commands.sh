@@ -33,6 +33,14 @@ function waitForClusterOperatorsRollout() {
   waitFor 30m oc wait --all --for=condition=Progressing=False clusteroperators.config.openshift.io
 }
 
+function CAPINamespaceCreated() {
+  while [ "$(oc get projects -n ${CAPI_NAMESPACE} -o name | wc -l)" == 0 ]; do
+    echo "$(date -u --rfc-3339=seconds) - Wait for CAPI namespaces to appear"
+    sleep 5
+  done
+}
+export -f CAPINamespaceCreated
+
 function ClusterCAPIOperatorPodsCreated() {
   while [ "$(oc get pods -n ${CAPI_NAMESPACE} -o name | wc -l)" == 0 ]; do
     echo "$(date -u --rfc-3339=seconds) - Wait for CAPI operands creation"
@@ -79,6 +87,7 @@ export -f execute
 
 
 applyFeatureGate
+waitFor 20m CAPINamespaceCreated
 waitFor 20m ClusterCAPIOperatorPodsCreated
 waitForClusterCAPIOperatorPodsReadiness
 waitForClusterOperatorsRollout
