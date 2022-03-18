@@ -140,15 +140,17 @@ do
   cp "${item}" "${dir}/manifests/${manifest##manifest_}"
 done <   <( find "${SHARED_DIR}" -name "manifest_*.yml" -print0)
 
+echo "***************** Creating worker manifest"
 
 if [[ "${ARCH}" == "s390x" ]]; then
-   cat >> ${dir}/manifests/master-worker-schedmigrationcostns.xml << EOF
+  echo "***************** executing if"
+   cat >> ${dir}/manifests/99-master-worker-schedmigrationcostns.yaml << EOF
    apiVersion: machineconfiguration.openshift.io/v1
    kind: MachineConfig
    metadata:
      labels:
-       machineconfiguration.openshift.io/role: worker
-       machineconfiguration.openshift.io/role: master
+       machineconfiguration.openshift.io/role: "worker"
+       machineconfiguration.openshift.io/role: "master"
      name: 99-sysctl-schedmigrationcost
    spec:
      config:
@@ -164,6 +166,16 @@ if [[ "${ARCH}" == "s390x" ]]; then
            path: /etc/sysctl.conf
 EOF
 fi
+
+echo "***************** printing for second time"
+
+#find "${SHARED_DIR}" -name "manifest_*.yml" -print0
+find ${dir}/manifests/ -name  "*.yaml" -print0
+echo "***************** printing the manifests"
+
+cat ${dir}/manifests/99-master-worker-schedmigrationcostns.yaml
+
+echo "***************** end"
 
 echo "Installing cluster"
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
