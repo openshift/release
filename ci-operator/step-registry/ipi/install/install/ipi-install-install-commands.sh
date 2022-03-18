@@ -291,6 +291,12 @@ if test "${ret}" -eq 0 ; then
   touch  "${SHARED_DIR}/success"
   # Save console URL in `console.url` file so that ci-chat-bot could report success
   echo "https://$(env KUBECONFIG=${dir}/auth/kubeconfig oc -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > "${SHARED_DIR}/console.url"
+else
+    # Troubleshooting vSphere OVA download issue
+    # failed to read ovf: archive/tar: invalid tar header
+    echo "image cache directory listing"
+    ls -alht ${HOME}/.cache/openshift-installer/image_cache/
+    sha256sum  ${HOME}/.cache/openshift-installer/image_cache/*.ova
 fi
 
 exit "$ret"
