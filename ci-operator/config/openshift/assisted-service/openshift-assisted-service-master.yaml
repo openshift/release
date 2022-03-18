@@ -4,19 +4,19 @@ base_images:
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.5
+    name: ocm-2.6
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.5
+    name: ocm-2.6
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.5
+    name: ocm-2.6
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-test-infra:
-    name: ocm-2.5
+    name: ocm-2.6
     namespace: edge-infrastructure
     tag: assisted-test-infra
   coreos_centos_stream8:
@@ -47,7 +47,7 @@ images:
     openshift_release_golang-1.17:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.17
-  to: assisted-service-unit-test
+  to: assisted-service-build
 - dockerfile_path: Dockerfile.assisted-service
   from: coreos_centos_stream8
   inputs:
@@ -77,7 +77,7 @@ operator:
   - pullspec: quay.io/edge-infrastructure/postgresql-12-centos7:latest
     with: postgresql-12-centos7
 promotion:
-  name: ocm-2.5
+  name: ocm-2.6
   namespace: edge-infrastructure
 releases:
   candidate:
@@ -103,6 +103,16 @@ test_binary_build_commands: |
   go mod vendor
   mkdir /.cache && chmod 775 -R /.cache && chmod 775 -R $GOPATH
 tests:
+- as: verify-generated-code
+  skip_if_only_changed: ^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNER_ALIASES)$
+  steps:
+    test:
+    - ref: assisted-verify-generated-code
+- as: verify-generated-code-postsubmit
+  postsubmit: true
+  steps:
+    test:
+    - ref: assisted-verify-generated-code
 - as: mirror-nightly-image
   cron: '@daily'
   steps:
@@ -126,7 +136,7 @@ tests:
       IMAGE_REPO: assisted-service
       OSCI_ENV_CONFIG: |
         OSCI_PUBLISH_DELAY=0
-      RELEASE_REF: release-2.5
+      RELEASE_REF: release-2.6
     workflow: ocm-ci-manifest-update
 - as: mce-publish
   postsubmit: true
@@ -160,7 +170,7 @@ tests:
     export GINKGO_REPORTFILE=/tmp/junit_unit_test.xml
     make ci-unit-test
   container:
-    from: assisted-service-unit-test
+    from: assisted-service-build
   secret:
     mount_path: /tmp/secret
     name: assisted-service-codecov-token
@@ -173,7 +183,7 @@ tests:
     export GINKGO_REPORTFILE=/tmp/junit_unit_test.xml
     make ci-unit-test
   container:
-    from: assisted-service-unit-test
+    from: assisted-service-build
   postsubmit: true
   secret:
     mount_path: /tmp/secret
