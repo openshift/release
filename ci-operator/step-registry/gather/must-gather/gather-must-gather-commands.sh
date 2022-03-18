@@ -44,6 +44,7 @@ EOF
 
 if test ! -f "${KUBECONFIG}"
 then
+  echo "Just testing rehearsals"
 	echo "No kubeconfig, so no point in calling must-gather."
 	exit 0
 fi
