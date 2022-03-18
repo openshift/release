@@ -56,6 +56,13 @@ fi
 NETWORK_ID=$(openstack network show "${OPENSTACK_SRIOV_NETWORK}" -f value -c id)
 SUBNET_ID=$(openstack network show "${OPENSTACK_SRIOV_NETWORK}" -f json -c subnets | jq '.subnets[0]' | sed 's/"//g')
 
+oc_version=$(oc version -o json | jq -r '.openshiftVersion')
+if [[ "${oc_version}" != *"4.9"* && "${oc_version}" != *"4.10"* ]]; then
+    CONFIG_DRIVE=false
+else
+    CONFIG_DRIVE=true
+fi
+
 echo "Downloading current MachineSet for workers"
 WORKER_MACHINESET=$(oc get machineset -n openshift-machine-api | grep worker | awk '{print $1}')
 oc get machineset -n openshift-machine-api "${WORKER_MACHINESET}" -o json > "${SHARED_DIR}/original-worker-machineset.json"
@@ -66,7 +73,7 @@ cat <<EOF > "${SHARED_DIR}/sriov_patch.json"
       "spec": {
         "providerSpec": {
           "value": {
-            "configDrive": true,
+            "configDrive": ${CONFIG_DRIVE},
             "ports": [
               {
                 "networkID": "${NETWORK_ID}",
