@@ -140,6 +140,31 @@ do
   cp "${item}" "${dir}/manifests/${manifest##manifest_}"
 done <   <( find "${SHARED_DIR}" -name "manifest_*.yml" -print0)
 
+
+if [[ "${ARCH}" == "s390x" ]]; then
+   cat >> ${dir}/manifests/master-worker-schedmigrationcostns.xml << EOF
+   apiVersion: machineconfiguration.openshift.io/v1
+   kind: MachineConfig
+   metadata:
+     labels:
+       machineconfiguration.openshift.io/role: worker
+       machineconfiguration.openshift.io/role: master
+     name: 99-sysctl-schedmigrationcost
+   spec:
+     config:
+       ignition:
+         version: 3.2.0
+       storage:
+         files:
+         - contents:
+             # kernel.sched_migration_cost_ns=25000
+             source: data:text/plain;charset=utf-8;base64,a2VybmVsLnNjaGVkX21pZ3JhdGlvbl9jb3N0X25zID0gMjUwMDA=
+           filesystem: root
+           mode: 0744
+           path: /etc/sysctl.conf
+EOF
+fi
+
 echo "Installing cluster"
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 
