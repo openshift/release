@@ -41,6 +41,13 @@ EOF
 
 terraform init .
 terraform apply -var-file=vsphere-params.hcl -auto-approve
+IP=$(terraform output ip_address)
+
 cd ..
 tar -cvzf terraform.tgz --exclude=".terraform" /home/assisted-test-infra/build/terraform
 cp terraform.tgz ${SHARED_DIR}
+
+cat >> "${SHARED_DIR}/ci-machine-config.sh" << EOF
+export IP="${IP}"
+export SSH_KEY_FILE=/var/run/vault/sshkeys/private_key
+EOF
