@@ -144,25 +144,51 @@ echo "***************** Creating worker manifest"
 
 if [[ "${ARCH}" == "s390x" ]]; then
   echo "***************** executing if"
-  cat >> ${dir}/manifests/99-master-worker-schedmigrationcostns.yaml << EOF
+  cat >> ${dir}/manifests/gl_98-sysctl.yaml << EOF
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfig
 metadata:
- labels:
-   machineconfiguration.openshift.io/role: "worker"
- name: 99-sysctl-schedmigrationcost
+  labels:
+    machineconfiguration.openshift.io/role: worker
+  name: gl-98-sysctl
 spec:
- config:
-   ignition:
-     version: 3.2.0
-   storage:
-     files:
-     - contents:
-         # kernel.sched_migration_cost_ns=25000
-         source: data:text/plain;charset=utf-8;base64,a2VybmVsLnNjaGVkX21pZ3JhdGlvbl9jb3N0X25zID0gMjUwMDA=
-       filesystem: root
-       mode: 0744
-       path: /etc/sysctl.conf
+  config:
+    ignition:
+      version: 3.2.0
+    storage:
+      files:
+      - contents:
+          # kernel.sched_migration_cost_ns=25000
+          source: data:text/plain;charset=utf-8;base64,a2VybmVsLnNjaGVkX21pZ3JhdGlvbl9jb3N0X25zID0gMjUwMDA=
+        filesystem: root
+        mode: 0644
+        overwrite: true
+        path: /etc/sysctl.conf
+EOF
+fi
+
+if [[ "${ARCH}" == "s390x" ]]; then
+  echo "***************** executing if"
+  cat >> ${dir}/manifests/gl_98-sysctl_master.yaml << EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: master
+  name: gl-98-sysctl-master
+spec:
+  config:
+    ignition:
+      version: 3.2.0
+    storage:
+      files:
+      - contents:
+          # kernel.sched_migration_cost_ns=25000
+          source: data:text/plain;charset=utf-8;base64,a2VybmVsLnNjaGVkX21pZ3JhdGlvbl9jb3N0X25zID0gMjUwMDA=
+        filesystem: root
+        mode: 0644
+        overwrite: true
+        path: /etc/sysctl.conf
 EOF
 fi
 
@@ -172,7 +198,9 @@ echo "***************** printing for second time"
 find ${dir}/manifests/ -name  "*.yaml" -print0
 echo "***************** printing the manifests"
 
-cat ${dir}/manifests/99-master-worker-schedmigrationcostns.yaml
+cat ${dir}/manifests/gl_98-sysctl.yaml
+
+cat ${dir}/manifests/gl_98-sysctl_master.yaml
 
 echo "***************** end"
 
