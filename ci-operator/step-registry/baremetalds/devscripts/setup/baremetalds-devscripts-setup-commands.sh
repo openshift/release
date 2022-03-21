@@ -38,6 +38,9 @@ finished()
 }
 trap finished EXIT TERM
 
+# Make sure this host hasn't been previously used
+ssh "${SSHOPTS[@]}" "root@${IP}" mkdir /root/nodesfirstuse
+
 # Copy dev-scripts source from current directory to the remote server
 tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/dev-scripts.tar.gz"
 
