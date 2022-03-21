@@ -63,7 +63,7 @@ if [ -e "${CLUSTER_PROFILE_DIR}/ofcir_url" ] ; then
     echo "Attempting to acquire a Host from OFCIR"
     IPFILE=$SHARED_DIR/server-ip
     CIRFILE=$SHARED_DIR/cir
-    if curl -kfX POST -H "Host: ofcir.apps.ostest.test.metalkube.org" "$(cat ${CLUSTER_PROFILE_DIR}/ofcir_url)?name=ipi-${NAMESPACE}-${JOB_NAME_HASH}-${BUILD_ID}" -o $CIRFILE ; then
+    if curl -kfX POST -H "Host: ofcir.apps.ostest.test.metalkube.org" "$(cat ${CLUSTER_PROFILE_DIR}/ofcir_url)?name=$JOB_NAME/$BUILD_ID" -o $CIRFILE ; then
         jq -r .ip < $CIRFILE > $IPFILE
         exit 0
     fi
