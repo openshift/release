@@ -150,7 +150,6 @@ kind: MachineConfig
 metadata:
  labels:
    machineconfiguration.openshift.io/role: "worker"
-   machineconfiguration.openshift.io/role: "master"
  name: 99-sysctl-schedmigrationcost
 spec:
  config:
