@@ -43,11 +43,6 @@ promotion:
   name: "4.10"
   namespace: ocp
 releases:
-  hosted-ocp-latest:
-    candidate:
-      product: ocp
-      stream: nightly
-      version: "4.10"
   hosted-ocp-previous:
     candidate:
       product: ocp
@@ -55,10 +50,10 @@ releases:
       stream: nightly
       version: "4.10"
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
-      version: "4.10"
+    integration:
+      include_built_images: true
+      name: "4.10"
+      namespace: ocp
 resources:
   '*':
     limits:
@@ -117,6 +112,7 @@ tests:
           --e2e.latest-release-image=${OCP_IMAGE_LATEST} \
           --e2e.previous-release-image=${OCP_IMAGE_PREVIOUS} \
           --e2e.additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
+          --e2e.control-plane-operator-image=${HYPERSHIFT_RELEASE_LATEST} \
           --e2e.aws-endpoint-access=PublicAndPrivate
       credentials:
       - mount_path: /etc/hypershift-pool-aws-credentials
@@ -127,9 +123,11 @@ tests:
         namespace: test-credentials
       dependencies:
       - env: OCP_IMAGE_LATEST
-        name: release:hosted-ocp-latest
+        name: release:latest
       - env: OCP_IMAGE_PREVIOUS
         name: release:hosted-ocp-previous
+      - env: HYPERSHIFT_RELEASE_LATEST
+        name: hypershift-operator
       from: test-bin
       grace_period: 30m0s
       resources:
@@ -176,7 +174,9 @@ tests:
           --e2e.base-domain=ci.hypershift.devcluster.openshift.com \
           --e2e.latest-release-image=${OCP_IMAGE_LATEST} \
           --e2e.previous-release-image=${OCP_IMAGE_PREVIOUS} \
-          --e2e.additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)"
+          --e2e.additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
+          --e2e.control-plane-operator-image=${HYPERSHIFT_RELEASE_LATEST} \
+          --e2e.aws-endpoint-access=PublicAndPrivate
       credentials:
       - mount_path: /etc/hypershift-pool-aws-credentials
         name: hypershift-pool-aws-credentials
@@ -186,9 +186,11 @@ tests:
         namespace: test-credentials
       dependencies:
       - env: OCP_IMAGE_LATEST
-        name: release:hosted-ocp-latest
+        name: release:latest
       - env: OCP_IMAGE_PREVIOUS
         name: release:hosted-ocp-previous
+      - env: HYPERSHIFT_RELEASE_LATEST
+        name: hypershift-operator
       from: test-bin
       grace_period: 15m0s
       resources:
@@ -252,7 +254,9 @@ tests:
           --e2e.base-domain=ci.hypershift.devcluster.openshift.com \
           --e2e.latest-release-image=${OCP_IMAGE_LATEST} \
           --e2e.previous-release-image=${OCP_IMAGE_PREVIOUS} \
-          --e2e.additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)"
+          --e2e.additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
+          --e2e.control-plane-operator-image=${HYPERSHIFT_RELEASE_LATEST} \
+          --e2e.aws-endpoint-access=PublicAndPrivate
       credentials:
       - mount_path: /etc/hypershift-pool-aws-credentials
         name: hypershift-pool-aws-credentials
@@ -262,9 +266,11 @@ tests:
         namespace: test-credentials
       dependencies:
       - env: OCP_IMAGE_LATEST
-        name: release:hosted-ocp-latest
+        name: release:latest
       - env: OCP_IMAGE_PREVIOUS
         name: release:hosted-ocp-previous
+      - env: HYPERSHIFT_RELEASE_LATEST
+        name: hypershift-operator
       from: test-bin
       grace_period: 15m0s
       resources:

@@ -16,10 +16,6 @@ if ! [[ -f ${KUBECONFIG} ]]; then
     exit 0
 fi
 
-echo "GGM start checking of JENKINS_IMAGE from pipeline:jenkins"
-echo ${JENKINS_IMAGE}
-echo "GGM end check JENKINS_IMAGE"
-
 make test-e2e
 
 echo "Step jenkins-sync-plugin-e2e completed."

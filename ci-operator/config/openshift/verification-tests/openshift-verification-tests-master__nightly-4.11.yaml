@@ -1,0 +1,57 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  openstack-installer:
+    name: "4.11"
+    namespace: ocp
+    tag: openstack-installer
+  upi-installer:
+    name: "4.11"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.11"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws-ipi
+  interval: 24h
+  steps:
+    cluster_profile: aws
+    env:
+      E2E_RUN_TAGS: '@aws-ipi'
+      TAG_VERSION: '@4.11'
+    post:
+    - chain: cucushift-installer-rehearse-aws-ipi-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-aws-ipi-provision
+    - ref: cucushift-pre
+    workflow: cucushift-e2e
+- as: e2e-azure-ipi
+  interval: 24h
+  steps:
+    cluster_profile: azure-2
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+      E2E_RUN_TAGS: '@azure-ipi'
+      TAG_VERSION: '@4.11'
+    post:
+    - chain: cucushift-installer-rehearse-azure-ipi-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-azure-ipi-provision
+    - ref: cucushift-pre
+    workflow: cucushift-e2e
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: verification-tests
+  variant: nightly-4.11

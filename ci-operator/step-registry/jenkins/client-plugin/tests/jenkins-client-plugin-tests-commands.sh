@@ -16,7 +16,6 @@ if ! [[ -f ${KUBECONFIG} ]]; then
     exit 0
 fi
 
-
 make test-e2e
 
 echo "Step jenkins-client-plugin-tests completed."

@@ -25,11 +25,14 @@ CONFIG = {
         'us-west-1': 35,
         'us-west-2': 40,
     },
-    'aws-china-quota-slice': {
+    'aws-qe-quota-slice': {
+        'us-east-2': 25,
+    },
+    'aws-china-qe-quota-slice': {
         'cn-north-1': 1,
         'cn-northwest-1': 1,
     },
-    'aws-usgov-quota-slice': {
+    'aws-usgov-qe-quota-slice': {
         'us-gov-west-1': 5,
         'us-gov-east-1': 5,
     },
@@ -59,6 +62,9 @@ CONFIG = {
     },
     'equinix-ocp-metal-quota-slice': {
         'default': 40,
+    },
+    'gcp-qe-quota-slice': {
+        'us-central1': 70,
     },
     'gcp-quota-slice': {
         'us-central1': 70,

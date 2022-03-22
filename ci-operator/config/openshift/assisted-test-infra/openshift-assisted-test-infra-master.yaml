@@ -1,18 +1,18 @@
 base_images:
   assisted-installer:
-    name: ocm-2.5
+    name: ocm-2.6
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.5
+    name: ocm-2.6
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.5
+    name: ocm-2.6
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.5
+    name: ocm-2.6
     namespace: edge-infrastructure
     tag: assisted-service
   dev-scripts:
@@ -27,10 +27,19 @@ images:
     COPY . .
   from: src
   to: assisted-test-infra
+- dockerfile_literal: |
+    FROM dev-scripts
+    RUN ansible-galaxy collection install community.general && ansible-galaxy collection install community.vmware
+    COPY . assisted-test-infra/
+    RUN chgrp -R 0 assisted-test-infra && \
+        chmod -R g=u assisted-test-infra
+    WORKDIR assisted-test-infra/
+  from: dev-scripts
+  to: assisted-test-infra-dev-script
 - dockerfile_path: Dockerfile.assisted-test-infra
   to: assisted-test-infra-internal
 promotion:
-  name: ocm-2.5
+  name: ocm-2.6
   namespace: edge-infrastructure
 releases:
   initial:
@@ -208,7 +217,7 @@ tests:
         OLM_OPERATORS=cnv
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-cnv-periodic
-  cron: 0 */3 * * *
+  cron: '@daily'
   steps:
     cluster_profile: packet-assisted
     env:
@@ -226,7 +235,7 @@ tests:
         OLM_OPERATORS=ocs
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-ocs-periodic
-  cron: 0 */3 * * *
+  cron: '@daily'
   steps:
     cluster_profile: packet-assisted
     env:
