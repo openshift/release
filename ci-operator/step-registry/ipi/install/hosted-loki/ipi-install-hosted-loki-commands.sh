@@ -416,9 +416,7 @@ spec:
       serviceAccountName: loki-promtail
       terminationGracePeriodSeconds: 180
       tolerations:
-      - effect: NoSchedule
-        key: node-role.kubernetes.io/master
-        operator: Exists
+      - operator: Exists
       priorityClassName: system-cluster-critical
       volumes:
       - configMap:
@@ -706,6 +704,8 @@ spec:
     spec:
       priorityClassName: system-cluster-critical
       serviceAccountName: event-exporter
+      tolerations:
+      - operator: Exists
       containers:
         - name: event-exporter
           image: ${KUBERNETES_EVENT_EXPORTER_IMAGE}:${KUBERNETES_EVENT_EXPORTER_VERSION}
