@@ -74,8 +74,8 @@ mkdir -p /tmp/artifacts
 
 REPO_DIR="/home/assisted"
 mkdir -p "\${REPO_DIR}"
-mkdir -p "\${REPO_DIR}"/minikube_home
-echo "export MINIKUBE_HOME=\${REPO_DIR}/minikube_home" >> /root/config
+# mkdir -p "\${REPO_DIR}"/minikube_home
+# echo "export MINIKUBE_HOME=\${REPO_DIR}/minikube_home" >> /root/config
 
 # NVMe makes it faster
 NVME_DEVICE="/dev/nvme0n1"
@@ -169,6 +169,8 @@ source /root/config
 
 echo "export KUBECONFIG=/home/assisted/build/kubeconfig" >> /root/.bashrc
 export KUBECONFIG=/home/assisted/build/kubeconfig
+
+mount
 
 if [[ -e "/root/assisted-post-install.sh" ]]; then
   source "/root/assisted-post-install.sh"
