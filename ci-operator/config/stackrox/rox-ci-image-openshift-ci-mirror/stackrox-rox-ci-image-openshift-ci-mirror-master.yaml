@@ -37,28 +37,31 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: push-and-check-quick-test
-  commands: .openshift-ci/dispatch.sh push-check quick-test
-  container:
-    from: src
-  credentials:
-  - mount_path: /tmp/secret/stackrox-rox-ci-image
-    name: stackrox-rox-ci-image
-    namespace: test-credentials
-  dependencies:
-  - env: IMAGE
-    name: quick-test
-- as: push-and-check-stackrox-build
-  commands: .openshift-ci/dispatch.sh push-check stackrox-build
-  container:
-    from: src
-  credentials:
-  - mount_path: /tmp/secret/stackrox-rox-ci-image
-    name: stackrox-rox-ci-image
-    namespace: test-credentials
-  dependencies:
-  - env: IMAGE
-    name: stackrox-build
+- as: push-and-check-images
+  steps:
+    test:
+    - as: push-and-check-quick-test
+      commands: .openshift-ci/dispatch.sh push-check quick-test
+      container:
+        from: src
+      credentials:
+      - mount_path: /tmp/secret/stackrox-rox-ci-image
+        name: stackrox-rox-ci-image
+        namespace: test-credentials
+      dependencies:
+      - env: IMAGE
+        name: quick-test
+    - as: push-and-check-stackrox-build
+      commands: .openshift-ci/dispatch.sh push-check stackrox-build
+      container:
+        from: src
+      credentials:
+      - mount_path: /tmp/secret/stackrox-rox-ci-image
+        name: stackrox-rox-ci-image
+        namespace: test-credentials
+      dependencies:
+      - env: IMAGE
+        name: stackrox-build
 zz_generated_metadata:
   branch: master
   org: stackrox
