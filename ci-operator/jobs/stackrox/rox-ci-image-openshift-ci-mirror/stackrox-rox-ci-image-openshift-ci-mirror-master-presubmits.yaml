@@ -62,15 +62,15 @@ presubmits:
     - ^master$
     - ^master-
     cluster: build04
-    context: ci/prow/push-check
+    context: ci/prow/push-and-check-quick-test
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-rox-ci-image-openshift-ci-mirror-master-push-check
-    rerun_command: /test push-check
+    name: pull-ci-stackrox-rox-ci-image-openshift-ci-mirror-master-push-and-check-quick-test
+    rerun_command: /test push-and-check-quick-test
     spec:
       containers:
       - args:
@@ -78,7 +78,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
-        - --target=push-check
+        - --target=push-and-check-quick-test
         command:
         - ci-operator
         image: ci-operator:latest
@@ -111,4 +111,60 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )push-check,?($|\s.*)
+    trigger: (?m)^/test( | .* )push-and-check-quick-test,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build04
+    context: ci/prow/push-and-check-stackrox-build
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-rox-ci-image-openshift-ci-mirror-master-push-and-check-stackrox-build
+    rerun_command: /test push-and-check-stackrox-build
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --target=push-and-check-stackrox-build
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )push-and-check-stackrox-build,?($|\s.*)
