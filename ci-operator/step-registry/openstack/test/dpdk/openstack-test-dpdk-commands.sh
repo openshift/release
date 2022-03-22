@@ -80,12 +80,16 @@ EOF
 )
 echo "Created \"$CNF_NAMESPACE\" Namespace"
 
-if ! openstack network show "${OPENSTACK_DPDK_NETWORK}" >/dev/null 2>&1; then
-    echo "Network ${OPENSTACK_DPDK_NETWORK} doesn't exist"
-    exit 1
-fi
-
-cat <<EOF > "${SHARED_DIR}/additionalnetwork.yaml"
+if oc get SriovNetworkNodePolicy/dpdk1 -n openshift-sriov-network-operator >/dev/null 2>&1; then
+    echo "DPDK network is managed by SriovNetworkNodePolicy/dpdk1, CNI won't be changed"
+    RESOURCE_REQUEST="openshift.io/dpdk1: \"1\""
+else
+    if ! openstack network show "${OPENSTACK_DPDK_NETWORK}" >/dev/null 2>&1; then
+        echo "Network ${OPENSTACK_DPDK_NETWORK} doesn't exist"
+        exit 1
+    fi
+    
+    cat <<EOF > "${SHARED_DIR}/additionalnetwork.yaml"
 spec:
   additionalNetworks:
   - name: ${OPENSTACK_DPDK_NETWORK}
@@ -93,8 +97,10 @@ spec:
     rawCNIConfig: '{ "cniVersion": "0.3.1", "name": "${OPENSTACK_DPDK_NETWORK}", "type": "host-device","pciBusId": "0000:00:04.0", "ipam": {}}'
     type: Raw
 EOF
-oc patch network.operator cluster --patch "$(cat "${SHARED_DIR}/additionalnetwork.yaml")" --type=merge
-wait_for_network
+    oc patch network.operator cluster --patch "$(cat "${SHARED_DIR}/additionalnetwork.yaml")" --type=merge
+    wait_for_network
+    ANNOTATIONS="k8s.v1.cni.cncf.io/networks: ${OPENSTACK_DPDK_NETWORK}"
+fi
 
 CNF_POD=$(
     oc create -f - -o jsonpath='{.metadata.name}' <<EOF
@@ -104,7 +110,7 @@ metadata:
   name: testpmd-host-device-dpdk
   namespace: ${CNF_NAMESPACE}
   annotations:
-    k8s.v1.cni.cncf.io/networks: ${OPENSTACK_DPDK_NETWORK}
+    ${ANNOTATIONS:-}
 spec:
   containers:
   - name: testpmd
@@ -120,10 +126,12 @@ spec:
         memory: 1000Mi
         hugepages-1Gi: 1Gi
         cpu: '2'
+        ${RESOURCE_REQUEST:-}
       limits:
         hugepages-1Gi: 1Gi
         cpu: '2'
         memory: 1000Mi
+        ${RESOURCE_REQUEST:-}
     volumeMounts:
       - mountPath: /dev/hugepages
         name: hugepage
