@@ -90,7 +90,7 @@ curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
-PROXY_IMAGE=registry.ci.openshift.org/origin/4.5:egress-http-proxy
+PROXY_IMAGE="registry.ci.openshift.org/origin/${OCP_RELEASE}:egress-http-proxy"
 
 export GCP_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/gce.json"
 sa_email=$(jq -r .client_email ${GCP_SHARED_CREDENTIALS_FILE})
