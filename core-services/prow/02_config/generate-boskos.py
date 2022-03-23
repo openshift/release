@@ -116,6 +116,9 @@ CONFIG = {
     'osd-ephemeral-quota-slice': {
         'default': 15,
     },
+    'awsosdmsp-quota-slice': {
+        'default': 10,
+    },
     'aws-cpaas-quota-slice': {
         'us-east-1': 8,
         'us-east-2': 8,
