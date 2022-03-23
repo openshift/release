@@ -1,0 +1,141 @@
+base_images:
+  assisted-image-service:
+    name: ocm-2.5
+    namespace: edge-infrastructure
+    tag: assisted-image-service
+  assisted-installer:
+    name: ocm-2.6
+    namespace: edge-infrastructure
+    tag: assisted-installer
+  assisted-installer-agent:
+    name: ocm-2.6
+    namespace: edge-infrastructure
+    tag: assisted-installer-agent
+  assisted-installer-controller:
+    name: ocm-2.6
+    namespace: edge-infrastructure
+    tag: assisted-installer-controller
+  assisted-service:
+    name: ocm-2.6
+    namespace: edge-infrastructure
+    tag: assisted-service
+  assisted-test-infra:
+    name: ocm-2.6
+    namespace: edge-infrastructure
+    tag: assisted-test-infra
+  coreos_centos_stream8:
+    name: stream8
+    namespace: coreos
+    tag: "8"
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  postgresql-12-centos7:
+    name: postgresql-12-centos7
+    namespace: edge-infrastructure
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
+operator:
+  bundles:
+  - dockerfile_path: deploy/olm-catalog/bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/edge-infrastructure/assisted-service:latest
+    with: assisted-service
+  - pullspec: quay.io/edge-infrastructure/assisted-installer:latest
+    with: assisted-installer
+  - pullspec: quay.io/edge-infrastructure/assisted-installer-agent:latest
+    with: assisted-installer-agent
+  - pullspec: quay.io/edge-infrastructure/assisted-installer-controller:latest
+    with: assisted-installer-controller
+  - pullspec: quay.io/edge-infrastructure/assisted-image-service:latest
+    with: assisted-image-service
+  - pullspec: quay.io/edge-infrastructure/postgresql-12-centos7:latest
+    with: postgresql-12-centos7
+releases:
+  candidate:
+    release:
+      channel: candidate
+      version: "4.8"
+  initial:
+    integration:
+      name: "4.9"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.9"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-metal-assisted-operator-ztp-multinode-spoke
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
+    env:
+      ASSISTED_ZTP_CONFIG: |
+        SPOKE_CONTROLPLANE_AGENTS=3
+      DEVSCRIPTS_CONFIG: |
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=32768
+        EXTRA_WORKER_DISK=120
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      DISCONNECTED: "false"
+      IP_STACK: v4
+      NUM_EXTRA_WORKERS: "3"
+    workflow: assisted-baremetal-operator-ztp
+- as: e2e-metal-assisted-operator-ztp-sno
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      DEVSCRIPTS_CONFIG: |
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=32768
+        EXTRA_WORKER_DISK=120
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      DISCONNECTED: "false"
+      IP_STACK: v4
+      NUM_EXTRA_WORKERS: "1"
+    workflow: assisted-baremetal-operator-ztp
+- as: e2e-metal-assisted-operator-ztp-sno-upgrade
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
+    env:
+      ASSISTED_STOP_AFTER_AGENT_DISCOVERY: "false"
+      ASSISTED_STOP_AFTER_AGENT_DISCOVERY_OVERRIDE: "true"
+      ASSISTED_UPGRADE_OPERATOR: "true"
+      ASSISTED_UPGRADE_OPERATOR_OVERRIDE: "false"
+      CATALOG_SOURCE_NAME: community-operators
+      CHANNEL_INSTALL_OVERRIDE: ocm-2.3
+      CHANNEL_UPGRADE_OVERRIDE: alpha
+      DEVSCRIPTS_CONFIG: |
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=32768
+        EXTRA_WORKER_DISK=120
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      IP_STACK: v4
+      NUM_EXTRA_WORKERS: "1"
+    workflow: assisted-baremetal-operator-ztp-upgrade
+zz_generated_metadata:
+  branch: master
+  org: openshift-metal3
+  repo: dev-scripts
+  variant: ai
