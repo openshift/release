@@ -28,6 +28,13 @@ images:
       as:
       - builder
   to: stackrox-build
+- context_dir: images
+  dockerfile_path: stackrox-test.Dockerfile
+  inputs:
+    stackrox-build:
+      as:
+      - base
+  to: stackrox-test
 promotion:
   namespace: stackrox
   tag: latest
@@ -49,21 +56,7 @@ tests:
       dependencies:
       - env: IMAGE
         name: quick-test
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: push-and-check-stackrox-build
-      commands: .openshift-ci/dispatch.sh push-check stackrox-build
-      credentials:
-      - mount_path: /tmp/secret/stackrox-rox-ci-image
-        name: stackrox-rox-ci-image
-        namespace: test-credentials
-      dependencies:
-      - env: IMAGE
-        name: stackrox-build
-      from: src
+      from: stackrox-test
       resources:
         requests:
           cpu: 100m
