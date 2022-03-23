@@ -5,9 +5,9 @@ base_images:
     tag: stream8
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.15
+    name: stackrox-test
+    namespace: stackrox
+    tag: latest
 images:
 - dockerfile_literal: |-
     FROM quay.io/centos/centos:stream8
@@ -35,17 +35,6 @@ images:
       as:
       - quay.io/rhacs-eng/apollo-ci:stackrox-build
   to: stackrox-test
-- context_dir: images
-  dockerfile_path: stackrox-test.Dockerfile
-  inputs:
-    src:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/stackrox/rox-ci-image-openshift-ci-mirror
-    stackrox-build:
-      as:
-      - quay.io/rhacs-eng/apollo-ci:stackrox-build
-  to: stackrox-test-with-src
 promotion:
   namespace: stackrox
   tag: latest
@@ -67,7 +56,7 @@ tests:
       dependencies:
       - env: IMAGE
         name: quick-test
-      from: stackrox-test-with-src
+      from: src
       resources:
         requests:
           cpu: 100m
