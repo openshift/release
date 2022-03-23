@@ -4,6 +4,63 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+wait_for_sriov_pods() {
+    # Wait up to 15 minutes for SNO to be installed
+    for _ in $(seq 1 90); do
+        SNO_REPLICAS=$(oc get Deployment/sriov-network-operator -n openshift-sriov-network-operator -o jsonpath='{.status.readyReplicas}' || true)
+        if [ "${SNO_REPLICAS}" == "1" ]; then
+            FOUND_SNO=1
+            break
+        fi
+        echo "Waiting for sriov-network-operator to be installed"
+        sleep 10
+    done
+
+    if [ -n "${FOUND_SNO:-}" ] ; then
+        # Wait for the pods to be started from the operator
+        for _ in $(seq 1 24); do
+            NOT_RUNNING_PODS=$(oc get pods --no-headers -n openshift-sriov-network-operator -o jsonpath='{.items[*].status.containerStatuses[*].ready}' | grep false | wc -l || true)
+            if [ "${NOT_RUNNING_PODS}" == "0" ]; then
+                OPERATOR_READY=true
+                break
+            fi
+            echo "Waiting for sriov-network-operator pods to be started and running"
+            sleep 60
+        done
+        if [ -n "${OPERATOR_READY:-}" ] ; then
+            echo "sriov-network-operator pods were installed successfully"
+        else
+            echo "sriov-network-operator pods were not installed after 4 minutes"
+            oc get pods -n openshift-sriov-network-operator
+            exit 1
+        fi
+    else
+        echo "sriov-network-operator was not installed after 15 minutes"
+        exit 1
+    fi
+}
+
+wait_for_webhook() {
+  # Even if the pods are ready, we need to wait for the webhook server to be
+  # actually started, which usually takes a few seconds.
+  for _ in $(seq 1 30); do
+      WEBHOOK_NAME=$(oc get validatingwebhookconfigurations.admissionregistration.k8s.io  sriov-operator-webhook-config -o jsonpath='{.metadata.name}')
+      if [ "${WEBHOOK_NAME}" == "sriov-operator-webhook-config" ]; then
+          WEBHOOK_READY=true
+          break
+      fi
+      echo "Waiting for webhook pods to be running"
+      sleep 2
+  done
+
+  if [ -n "${WEBHOOK_READY:-}" ] ; then
+      echo "webhook started succesfully"
+  else
+      echo "webhook did not start succesfully"
+      exit 1
+  fi
+}
+
 create_sriov_networknodepolicy() {
     local name="${1}"
     local network="${2}"
@@ -23,7 +80,7 @@ metadata:
   name: ${name}
   namespace: openshift-sriov-network-operator
 spec:
-  deviceType: ${driver} 
+  deviceType: ${driver}
   nicSelector:
     netFilter: openstack/NetworkID:${net_id}
   nodeSelector:
@@ -52,6 +109,13 @@ if test -f "${SHARED_DIR}/proxy-conf.sh"
 then
 	# shellcheck disable=SC1090
 	source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
+wait_for_sriov_pods
+
+WEBHOOK_ENABLED=$(oc get sriovoperatorconfig/default -n openshift-sriov-network-operator -o jsonpath='{.spec.enableOperatorWebhook}')
+if [ "${WEBHOOK_ENABLED}" == true ]; then
+  wait_for_webhook
 fi
 
 create_sriov_networknodepolicy "sriov1" "${OPENSTACK_SRIOV_NETWORK}" "vfio-pci"
