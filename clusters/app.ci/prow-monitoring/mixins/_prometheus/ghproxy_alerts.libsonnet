@@ -5,6 +5,18 @@
         name: 'ghproxy',
         rules: [
           {
+            alert: 'ghproxy-too-many-pending-alerts',
+            expr: |||
+                sum_over_time(pending_outbound_requests{container="ghproxy"}[5m]) / count_over_time(pending_outbound_requests{container="ghproxy"}[5m]) > 100
+            |||,
+            labels: {
+              severity: 'critical',
+            },
+            annotations: {
+              message: 'The average size of the pending GH API request queue in ghproxy is {{ $value | humanize }} over the last 5 minutes, which can indicate insufficient proxy throughput. Inspect <https://prometheus-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/graph?g0.range_input=1h&g0.end_input=2022-03-23%2016%3A22&g0.expr=sum_over_time(pending_outbound_requests%7Bcontainer%3D%22ghproxy%22%7D%5B5m%5D)%20%2F%20count_over_time(pending_outbound_requests%7Bcontainer%3D%22ghproxy%22%7D%5B5m%5D)%20%3E%20100&g0.tab=0|Prometheus> and if the metric is ramping up, consider whether changing ghproxy throttling parameters may be necessary',
+            },
+          },
+          {
             alert: 'ghproxy-specific-status-code-abnormal',
             expr: |||
               sum(rate(github_request_duration_count{status=~"[45]..",status!="404",status!="410"}[5m])) by (status,path) / ignoring(status) group_left sum(rate(github_request_duration_count[5m])) by (path) * 100 > 10
