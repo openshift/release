@@ -18,7 +18,7 @@ oc create -f - <<EOF
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfigPool
 metadata:
-  name: mccustompool
+  name: tuned
   labels:
     "pools.operator.machineconfiguration.openshift.io/tuned": ""
     machineconfiguration.openshift.io/role: tuned
