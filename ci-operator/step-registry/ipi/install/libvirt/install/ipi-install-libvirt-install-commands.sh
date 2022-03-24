@@ -56,6 +56,38 @@ function init_bootstrap() {
 	BASTION_SSH_PORTS=( 1033 1043 1053 1063 1073 1083 )
 }
 
+function init_worker() {
+  echo "***************** inside init_worker() function"
+
+  local DIR=$1
+  echo "***************** inside init_worker() setting up master done, now setting up worker"
+
+  cat >> ${DIR}/manifests/99-sysctl-worker.yaml << EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: worker
+  name: 99-sysctl-worker
+spec:
+  config:
+    ignition:
+      version: 3.2.0
+    storage:
+      files:
+      - contents:
+          # kernel.sched_migration_cost_ns=25000
+          source: data:text/plain;charset=utf-8;base64,a2VybmVsLnNjaGVkX21pZ3JhdGlvbl9jb3N0X25zID0gMjUwMDA=
+        filesystem: root
+        mode: 0644
+        overwrite: true
+        path: /etc/sysctl.conf
+EOF
+
+  echo "***************** setting up worker done"
+
+}
+
 function collect_bootstrap() {
 	local ID=$1
 	local FROM
@@ -139,6 +171,21 @@ do
   manifest="$( basename "${item}" )"
   cp "${item}" "${dir}/manifests/${manifest##manifest_}"
 done <   <( find "${SHARED_DIR}" -name "manifest_*.yml" -print0)
+
+echo "***************** Creating worker manifest ${ARCH} / ${NODE_TUNING}"
+
+if [[ "${ARCH}" == "s390x" && "${NODE_TUNING}" == "true" ]]; then
+  echo "***************** executing if NODE_TUNING is true"
+  init_worker ${dir}
+fi
+
+echo "***************** printing the manifests"
+find ${dir}/manifests/ -name  "*.yaml" -print0
+
+cat ${dir}/manifests/99-sysctl-master.yaml
+cat ${dir}/manifests/99-sysctl-worker.yaml
+
+echo "***************** end"
 
 echo "Installing cluster"
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
