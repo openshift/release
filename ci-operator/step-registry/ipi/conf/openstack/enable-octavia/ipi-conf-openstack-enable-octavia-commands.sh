@@ -15,6 +15,12 @@ sed -i '/^\[LoadBalancer\]/d' /tmp/config
 cat << EOF >> /tmp/config
 [LoadBalancer]
 use-octavia=true
+# The following settings are necessary for creating services with externalTrafficPolicy: Local
+# NOT compatible with lb-provider=ovn
+# create-monitor=true
+# monitor-delay=5s
+# monitor-timeout=3s
+# monitor-max-retries=1
 EOF
 
 oc delete configmap cloud-provider-config -n openshift-config
