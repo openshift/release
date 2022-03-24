@@ -241,6 +241,8 @@ spec:
           name: storage
       serviceAccountName: loki
       terminationGracePeriodSeconds: 4800
+      tolerations:
+      - operator: Exists
       volumes:
       - name: config
         secret:
@@ -650,9 +652,7 @@ spec:
         name: fetch-cluster-id
       serviceAccountName: loki-promtail
       tolerations:
-      - effect: NoSchedule
-        key: node-role.kubernetes.io/master
-        operator: Exists
+      - operator: Exists
       volumes:
       - configMap:
           name: loki-promtail
