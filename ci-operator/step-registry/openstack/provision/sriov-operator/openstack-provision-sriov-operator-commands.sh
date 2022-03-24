@@ -23,13 +23,13 @@ function wait_for_sriov_pods() {
             break
         fi
         echo "Waiting for sriov-network-operator to be installed"
-        sleep 10
+        sleep 60
     done
 
     if [ -n "${FOUND_SNO:-}" ] ; then
         # Wait for the pods to be started from the operator
         for _ in $(seq 1 24); do
-            NOT_RUNNING_PODS=$(oc get pods --no-headers -n openshift-sriov-network-operator | grep -Pv "(Completed|Running)" | wc -l || true)
+            NOT_RUNNING_PODS=$(oc get pods --no-headers -n openshift-sriov-network-operator -o jsonpath='{.items[*].status.containerStatuses[*].ready}' | grep false | wc -l || true)
             if [ "${NOT_RUNNING_PODS}" == "0" ]; then
                 OPERATOR_READY=true
                 break
@@ -39,9 +39,6 @@ function wait_for_sriov_pods() {
         done
         if [ -n "${OPERATOR_READY:-}" ] ; then
             echo "sriov-network-operator pods were installed successfully"
-            # Even if the pods are ready, we need to wait for the webhook server to be
-            # actually started, which usually takes a few seconds.
-            sleep 10
         else
             echo "sriov-network-operator pods were not installed after 4 minutes"
             oc get pods -n openshift-sriov-network-operator
@@ -98,7 +95,6 @@ metadata:
 EOF
     )
     echo "Created \"$SNO_NAMESPACE\" Namespace"
-    
     SNO_OPERATORGROUP=$(
         oc create -f - -o jsonpath='{.metadata.name}' <<EOF
 apiVersion: operators.coreos.com/v1
@@ -112,7 +108,6 @@ spec:
 EOF
     )
     echo "Created \"$SNO_OPERATORGROUP\" OperatorGroup"
-    
     channel=$(oc version -o yaml | grep openshiftVersion | grep -o '[0-9]*[.][0-9]*' | head -1)
     SNO_SUBSCRIPTION=$(
         oc create -f - -o jsonpath='{.metadata.name}' <<EOF
