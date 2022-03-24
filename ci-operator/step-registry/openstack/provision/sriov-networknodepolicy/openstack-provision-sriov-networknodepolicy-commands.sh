@@ -4,6 +4,38 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+create_sriov_networknodepolicy() {
+    local name="${1}"
+    local network="${2}"
+    local driver="${3}"
+
+    if ! openstack network show "${network}" >/dev/null 2>&1; then
+        echo "Network ${network} doesn't exist"
+        exit 1
+    fi
+    net_id=$(openstack network show "${network}" -f value -c id)
+
+    SRIOV_NETWORKNODEPOLICY=$(
+        oc create -f - -o jsonpath='{.metadata.name}' <<EOF
+apiVersion: sriovnetwork.openshift.io/v1
+kind: SriovNetworkNodePolicy
+metadata:
+  name: ${name}
+  namespace: openshift-sriov-network-operator
+spec:
+  deviceType: ${driver} 
+  nicSelector:
+    netFilter: openstack/NetworkID:${net_id}
+  nodeSelector:
+    feature.node.kubernetes.io/network-sriov.capable: 'true'
+  numVfs: 1
+  priority: 99
+  resourceName: ${name}
+EOF
+    )
+    echo "Created \"$SRIOV_NETWORKNODEPOLICY\" SriovNetworkNodePolicy"
+}
+
 if ! test -f "${SHARED_DIR}/sriov-worker-node"; then
   echo "${SHARED_DIR}/sriov-worker-node file not found, no worker node for SR-IOV was deployed"
   exit 1
@@ -22,28 +54,12 @@ then
 	source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-if ! openstack network show "${OPENSTACK_SRIOV_NETWORK}" >/dev/null 2>&1; then
-    echo "Network ${OPENSTACK_SRIOV_NETWORK} doesn't exist"
-    exit 1
-fi
-NETWORK_ID=$(openstack network show "${OPENSTACK_SRIOV_NETWORK}" -f value -c id)
+create_sriov_networknodepolicy "sriov1" "${OPENSTACK_SRIOV_NETWORK}" "vfio-pci"
 
-SRIOV_NETWORKNODEPOLICY=$(
-    oc create -f - -o jsonpath='{.metadata.name}' <<EOF
-apiVersion: sriovnetwork.openshift.io/v1
-kind: SriovNetworkNodePolicy
-metadata:
-  name: sriov1
-  namespace: openshift-sriov-network-operator
-spec:
-  deviceType: vfio-pci
-  nicSelector:
-    netFilter: openstack/NetworkID:${NETWORK_ID}
-  nodeSelector:
-    feature.node.kubernetes.io/network-sriov.capable: 'true'
-  numVfs: 1
-  priority: 99
-  resourceName: sriov1
-EOF
-)
-echo "Created \"$SRIOV_NETWORKNODEPOLICY\" SriovNetworkNodePolicy"
+if [[ "${OPENSTACK_DPDK_NETWORK}" != "" ]]; then
+    if oc get MachineConfig/99-vhostuser-bind >/dev/null 2>&1; then
+        echo "vhostuser is already bound to the ${OPENSTACK_DPDK_NETWORK} network."
+        exit 0
+    fi
+    create_sriov_networknodepolicy "dpdk1" "${OPENSTACK_DPDK_NETWORK}" "vfio-pci"
+fi
