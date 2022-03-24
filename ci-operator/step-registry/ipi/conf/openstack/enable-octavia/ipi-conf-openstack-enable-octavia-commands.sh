@@ -15,6 +15,7 @@ sed -i '/^\[LoadBalancer\]/d' /tmp/config
 cat << EOF >> /tmp/config
 [LoadBalancer]
 use-octavia=true
+lb-provider=octavia
 # The following settings are necessary for creating services with externalTrafficPolicy: Local
 # NOT compatible with lb-provider=ovn
 # create-monitor=true
