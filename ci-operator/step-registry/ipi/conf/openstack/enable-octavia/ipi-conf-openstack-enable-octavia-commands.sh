@@ -7,8 +7,15 @@ fi
 
 cp -Lrvf ${KUBECONFIG} /tmp/kubeconfig && export KUBECONFIG=/tmp/kubeconfig
 oc get configmap cloud-provider-config -n openshift-config -o jsonpath='{.data.config}' > /tmp/config
-echo "[LoadBalancer]" >> /tmp/config
-echo "use-octavia=true" >> /tmp/config
+
+# Delete the LoadBalancer section if it exists
+sed -i '/^\[LoadBalancer\]/,/^\[/{/^\[/!d}' /tmp/config
+sed -i '/^\[LoadBalancer\]/d' /tmp/config
+
+cat << EOF >> /tmp/config
+[LoadBalancer]
+use-octavia=true
+EOF
 
 oc delete configmap cloud-provider-config -n openshift-config
 oc create configmap cloud-provider-config -n openshift-config --from-file=config=/tmp/config
