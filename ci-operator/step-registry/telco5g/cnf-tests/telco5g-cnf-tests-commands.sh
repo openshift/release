@@ -10,7 +10,7 @@ cnf_dir=$(mktemp -d -t cnf-XXXXX)
 cd "$cnf_dir" || exit 1
 
 repo="https://github.com/openshift-kni/cnf-features-deploy.git"
-branch="${PULL_BASE_REF}"
+branch="${PULL_BASE_REF:-master}"
 dir="cnf-features-deploy"
 
 echo "cloning branch ${PULL_BASE_REF}"
