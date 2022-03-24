@@ -10,8 +10,8 @@ then
 	exit 0
 fi
 
-node_name=$(oc get nodes -l=node-role.kubernetes.io/worker="" -o=jsonpath={.items[0].metadata.name})
-oc label node "$node_name" "node-role.kubernetes.io/tuned"=""
+node_name=$(oc get nodes -l=node-role.kubernetes.io/worker="" -o="jsonpath={.items[0].metadata.name}")
+oc label node "$node_name" "node-role.kubernetes.io/tuned="
 
 # Create infra machineconfigpool
 oc create -f - <<EOF
@@ -21,6 +21,7 @@ metadata:
   name: mccustompool
   labels:
     "pools.operator.machineconfiguration.openshift.io/tuned": ""
+    machineconfiguration.openshift.io/role: tuned
 spec:
   machineConfigSelector:
     matchLabels:
