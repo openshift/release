@@ -167,7 +167,7 @@ do
   cp "${item}" "${dir}/manifests/${manifest##manifest_}"
 done <   <( find "${SHARED_DIR}" -name "manifest_*.yml" -print0)
 
-if [[ "${ARCH}" == "s390x" && "${NODE_TUNING}" == "true" ]]; then
+if [[ "${NODE_TUNING}" == "true" ]]; then
   init_worker ${dir}
 fi
 
