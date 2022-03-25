@@ -53,6 +53,7 @@ VARS
 
 source /root/config
 
+export CHANNEL="${CHANNEL_INSTALL_OVERRIDE}"
 source deploy/operator/upgrade/before_upgrade.sh
 
 deploy/operator/deploy.sh
