@@ -35,7 +35,7 @@ gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
-  --command 'sudo cd /var/lib/rpm && sudo rpm --rebuilddb && sudo dnf update -y'
+  --command 'sudo rpm --rebuilddb'
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
