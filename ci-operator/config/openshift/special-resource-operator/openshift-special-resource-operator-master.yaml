@@ -23,6 +23,7 @@ images:
 - dockerfile_literal: |
     FROM src
     RUN ["yum", "update", "-y"]
+    RUN ["yum", "install", "buildah", "-y"]
     RUN export VERSION="stable" && \
         URL="https://github.com/koalaman/shellcheck/releases/download" && \
         export URL="${URL}/${VERSION}/shellcheck-${VERSION}.linux.x86_64.tar.xz" && \
@@ -87,6 +88,13 @@ tests:
   commands: make verify
   container:
     from: src
+- as: buildah
+  commands: |
+    echo hello
+    whoami
+    buildah from fedora
+  container:
+    from: test-bin
 - as: e2e-aws-ocp
   cluster_claim:
     architecture: amd64
