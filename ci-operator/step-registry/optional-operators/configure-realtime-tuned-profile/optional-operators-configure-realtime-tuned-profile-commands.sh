@@ -36,7 +36,7 @@ spec:
   - data: |
       [main]
       summary=Openshift node optimized for deterministic performance at the cost of increased power consumption, focused on low latency network performance. Based on Tuned 2.11 and Cluster node tuning (oc 4.5)
-      include=openshift-node,cpu-partitioning
+      include=openshift-node,cpu-partitioning,realtime
 
       [variables]
       isolated_cores=$isolated_cpu-$(( max_cpu - 1))

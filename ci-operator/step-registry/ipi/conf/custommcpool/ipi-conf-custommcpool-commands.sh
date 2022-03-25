@@ -11,18 +11,7 @@ then
 fi
 node_role=tuned
 node_name=$(oc get nodes -l=node-role.kubernetes.io/worker="" -o="jsonpath={.items[0].metadata.name}")
-oc label node "$node_name" "apply-mc-config=tuned"
-
-oc create -f - <<EOF
-apiVersion: machineconfiguration.openshift.io/v1
-kind: MachineConfig
-metadata:
-  labels:
-    machineconfiguration.openshift.io/role: ${node_role}
-  name: realtime-worker
-spec:
-  kernelType: realtime
-EOF
+oc label node "$node_name" "node-role.kubernetes.io/worker-rt="
 
 # Create infra machineconfigpool
 oc create -f - <<EOF
@@ -34,16 +23,11 @@ metadata:
     machineconfiguration.openshift.io/role: ${node_role}
 spec:
   machineConfigSelector:
-    matchLabels:
-      machineconfiguration.openshift.io/role: ${node_role}
+    matchExpressions:
+      - {key: machineconfiguration.openshift.io/role, operator: In, values: [worker,${node_role}]}
   nodeSelector:
     matchLabels:
-      apply-mc-config: ${node_role}
+      node-role.kubernetes.io/worker-rt: ""
+      node-role.kubernetes.io/worker: ""
 EOF
 
-
-echo "waiting for mcp/${node_role} condition=Updating timeout=5m"
-oc wait mcp/${node_role} --for condition=Updating --timeout=5m
-
-echo "waiting for mcp/${node_role} condition=Updated timeout=30m"
-oc wait mcp/${node_role} --for condition=Updated --timeout=30m
