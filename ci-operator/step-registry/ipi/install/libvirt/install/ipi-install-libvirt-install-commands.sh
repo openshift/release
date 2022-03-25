@@ -57,11 +57,8 @@ function init_bootstrap() {
 }
 
 function init_worker() {
-  echo "***************** inside init_worker() function"
 
   local DIR=$1
-  echo "***************** inside init_worker() setting up master done, now setting up worker"
-
   cat >> ${DIR}/manifests/99-sysctl-worker.yaml << EOF
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfig
@@ -83,8 +80,6 @@ spec:
         overwrite: true
         path: /etc/sysctl.conf
 EOF
-
-  echo "***************** setting up worker done"
 
 }
 
@@ -172,20 +167,9 @@ do
   cp "${item}" "${dir}/manifests/${manifest##manifest_}"
 done <   <( find "${SHARED_DIR}" -name "manifest_*.yml" -print0)
 
-echo "***************** Creating worker manifest ${ARCH} / ${NODE_TUNING}"
-
 if [[ "${ARCH}" == "s390x" && "${NODE_TUNING}" == "true" ]]; then
-  echo "***************** executing if NODE_TUNING is true"
   init_worker ${dir}
 fi
-
-echo "***************** printing the manifests"
-find ${dir}/manifests/ -name  "*.yaml" -print0
-
-cat ${dir}/manifests/99-sysctl-master.yaml
-cat ${dir}/manifests/99-sysctl-worker.yaml
-
-echo "***************** end"
 
 echo "Installing cluster"
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
