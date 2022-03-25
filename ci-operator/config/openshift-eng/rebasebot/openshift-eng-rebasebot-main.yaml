@@ -100,6 +100,33 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+- as: cloud-provider-powervs
+  cron: 10 12 * * Mon,Thu
+  steps:
+    test:
+    - as: cloud-provider-powervs
+      commands: |
+        export BRANCH_NAME=release-1.24
+        rebasebot --source https://github.com/IBM-Cloud/cloud-provider-ibm:${BRANCH_NAME} \
+                  --dest openshift/cloud-provider-powervs:main \
+                  --rebase openshift-cloud-team/cloud-provider-powervs:rebase-bot-main \
+                  --update-go-modules \
+                  --slack-webhook /secrets/rebasebot/slack-webhook \
+                  --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
+                  --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
+                  --git-username cloud-team-rebase-bot \
+                  --git-email cloud-team-rebase-bot@redhat.com
+      credentials:
+      - mount_path: /secrets/rebasebot
+        name: rebase-bot-creds
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: cloud-provider-azure
   cron: 30 12 * * Mon,Thu
   steps:
