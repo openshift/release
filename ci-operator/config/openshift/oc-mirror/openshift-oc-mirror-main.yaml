@@ -18,10 +18,12 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
   to: oc-mirror
-- dockerfile_literal: |
-    FROM test-bin
-    RUN dnf -y install python39
-  from: test-bin
+- dockerfile_path: images/tests/Dockerfile.integration
+  from: base
+  inputs:
+    bin:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
   optional: true
   to: oc-mirror-integration
 promotion:
@@ -65,7 +67,7 @@ tests:
   steps:
     post:
     - as: test-integration-delete
-      commands: cd test/integration && make ci-delete PYTHON=python3.9
+      commands: cd test/integration && make ci-delete
       credentials:
       - mount_path: /etc/ci/aws-creds
         name: oc-mirror-ci-aws-creds
@@ -85,7 +87,7 @@ tests:
       timeout: 1h0m0s
     test:
     - as: test-integration
-      commands: cd test/integration && make ci PYTHON=python3.9
+      commands: cd test/integration && make ci
       credentials:
       - mount_path: /etc/ci/aws-creds
         name: oc-mirror-ci-aws-creds
