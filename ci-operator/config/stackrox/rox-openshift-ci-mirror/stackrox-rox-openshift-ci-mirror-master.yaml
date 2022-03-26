@@ -1,40 +1,8 @@
-base_images:
-  rox-ci:
-    name: rox-ci
-    namespace: stackrox
-    tag: 0.0.1
-  ubi8:
-    name: ubi
-    namespace: ocp
-    tag: "8"
-binary_build_commands: ./scripts/ci/jobs/build.sh
 build_root:
   image_stream_tag:
     name: stackrox-test
     namespace: stackrox
     tag: latest
-images:
-- context_dir: image/rhel
-  dockerfile_path: Dockerfile
-  from: ubi8
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/stackrox/rox-openshift-ci-mirror
-  to: main
-- context_dir: image
-  dockerfile_path: rox-ci.Dockerfile
-  from: rox-ci
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/stackrox/rox-openshift-ci-mirror
-  to: rox-ci-with-bin
-promotion:
-  namespace: stackrox
-  tag: latest
 releases:
   latest:
     integration:
@@ -45,59 +13,105 @@ resources:
     requests:
       cpu: 2000m
       memory: 4000Mi
-  bin:
-    requests:
-      cpu: "4"
-      memory: 8Gi
 tests:
-- as: push-main-image
+- as: style-checks
   steps:
     test:
-    - as: push-main-image
-      commands: |
-        ./scripts/ci/jobs/push-main-image.sh
+    - as: style-checks
+      commands: .openshift-ci/dispatch.sh style-checks
       credentials:
-      - mount_path: /tmp/secret/stackrox-rox-ci
-        name: stackrox-rox-ci
+      - mount_path: /tmp/secret/stackrox-stackrox-initial
+        name: stackrox-stackrox-initial
         namespace: test-credentials
-      dependencies:
-      - env: MAIN_IMAGE
-        name: main
       from: src
       resources:
         requests:
-          cpu: 100m
-          memory: 200Mi
-- as: e2e-test
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 4h0m0s
-    version: "4.8"
+          cpu: 2000m
+          memory: 4000Mi
+- as: go-unit-tests
   steps:
     test:
-    - as: e2e-test
-      commands: |
-        cd /go/src/github.com/stackrox/rox-openshift-ci-mirror
-        ./scripts/ci/jobs/e2e-test.sh
+    - as: go-unit-tests
+      commands: .openshift-ci/dispatch.sh go-unit-tests
       credentials:
-      - mount_path: /tmp/secret/stackrox-rox-ci
-        name: stackrox-rox-ci
+      - mount_path: /tmp/secret/stackrox-stackrox-initial
+        name: stackrox-stackrox-initial
         namespace: test-credentials
-      - mount_path: /tmp/secret/ci-pull-secret
-        name: ci-pull-credentials
-        namespace: test-credentials
-      dependencies:
-      - env: MAIN_IMAGE
-        name: main
-      from: rox-ci-with-bin
+      from: src
       resources:
         requests:
-          cpu: "4"
-          memory: 8Gi
-    workflow: generic-claim
+          cpu: 2000m
+          memory: 4000Mi
+- as: ui-unit-tests
+  steps:
+    test:
+    - as: ui-unit-tests
+      commands: .openshift-ci/dispatch.sh ui-unit-tests
+      credentials:
+      - mount_path: /tmp/secret/stackrox-stackrox-initial
+        name: stackrox-stackrox-initial
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+- as: gke-qa-e2e-tests
+  steps:
+    test:
+    - as: gke-qa-e2e-tests
+      commands: .openshift-ci/dispatch.sh gke-qa-e2e-tests
+      credentials:
+      - mount_path: /tmp/secret/stackrox-stackrox-e2e-tests
+        name: stackrox-stackrox-e2e-tests
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+- as: gke-upgrade-tests
+  steps:
+    test:
+    - as: gke-upgrade-tests
+      commands: .openshift-ci/dispatch.sh gke-upgrade-tests
+      credentials:
+      - mount_path: /tmp/secret/stackrox-stackrox-e2e-tests
+        name: stackrox-stackrox-e2e-tests
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+- as: gke-go-e2e-tests
+  steps:
+    test:
+    - as: gke-go-e2e-tests
+      commands: .openshift-ci/dispatch.sh gke-go-e2e-tests
+      credentials:
+      - mount_path: /tmp/secret/stackrox-stackrox-e2e-tests
+        name: stackrox-stackrox-e2e-tests
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+- as: gke-ui-e2e-tests
+  steps:
+    test:
+    - as: gke-ui-e2e-tests
+      commands: .openshift-ci/dispatch.sh gke-ui-e2e-tests
+      credentials:
+      - mount_path: /tmp/secret/stackrox-stackrox-e2e-tests
+        name: stackrox-stackrox-e2e-tests
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
 zz_generated_metadata:
   branch: master
   org: stackrox
