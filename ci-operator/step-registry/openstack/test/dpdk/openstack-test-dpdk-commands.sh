@@ -89,7 +89,7 @@ else
         exit 1
     fi
     
-    cat <<EOF > "${SHARED_DIR}/additionalnetwork.yaml"
+    cat <<EOF > "${SHARED_DIR}/additionalnetwork-dpdk.yaml"
 spec:
   additionalNetworks:
   - name: ${OPENSTACK_DPDK_NETWORK}
@@ -97,7 +97,7 @@ spec:
     rawCNIConfig: '{ "cniVersion": "0.3.1", "name": "${OPENSTACK_DPDK_NETWORK}", "type": "host-device","pciBusId": "0000:00:04.0", "ipam": {}}'
     type: Raw
 EOF
-    oc patch network.operator cluster --patch "$(cat "${SHARED_DIR}/additionalnetwork.yaml")" --type=merge
+    oc patch network.operator cluster --patch "$(cat "${SHARED_DIR}/additionalnetwork-dpdk.yaml")" --type=merge
     wait_for_network
     ANNOTATIONS="k8s.v1.cni.cncf.io/networks: ${OPENSTACK_DPDK_NETWORK}"
 fi
