@@ -6,26 +6,26 @@ set -o pipefail
 
 wait_for_sriov_pods() {
     # Wait up to 15 minutes for SNO to be installed
-    for _ in $(seq 1 90); do
+    for _ in $(seq 1 15); do
         SNO_REPLICAS=$(oc get Deployment/sriov-network-operator -n openshift-sriov-network-operator -o jsonpath='{.status.readyReplicas}' || true)
         if [ "${SNO_REPLICAS}" == "1" ]; then
             FOUND_SNO=1
             break
         fi
         echo "Waiting for sriov-network-operator to be installed"
-        sleep 10
+        sleep 60
     done
 
     if [ -n "${FOUND_SNO:-}" ] ; then
         # Wait for the pods to be started from the operator
-        for _ in $(seq 1 24); do
-            NOT_RUNNING_PODS=$(oc get pods --no-headers -n openshift-sriov-network-operator -o jsonpath='{.items[*].status.containerStatuses[*].ready}' | grep false | wc -l || true)
+        for _ in $(seq 1 8); do
+            NOT_RUNNING_PODS=$(oc get pods --no-headers -n openshift-sriov-network-operator | grep -Pv "(Completed|Running)" | wc -l || true)
             if [ "${NOT_RUNNING_PODS}" == "0" ]; then
                 OPERATOR_READY=true
                 break
             fi
             echo "Waiting for sriov-network-operator pods to be started and running"
-            sleep 60
+            sleep 30
         done
         if [ -n "${OPERATOR_READY:-}" ] ; then
             echo "sriov-network-operator pods were installed successfully"
