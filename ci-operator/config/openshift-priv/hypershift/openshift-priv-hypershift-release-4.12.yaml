@@ -369,12 +369,11 @@ tests:
           cpu: 100m
     test:
     - as: make-release-image-public
-      cli: latest
       commands: |-
         unset KUBECONFIG
         oc adm policy add-role-to-group system:image-puller system:authenticated --namespace "${NAMESPACE}"
         oc adm policy add-role-to-group system:image-puller system:unauthenticated --namespace "${NAMESPACE}"
-      from: bin
+      from: cli
       resources:
         requests:
           cpu: 100m
@@ -661,6 +660,28 @@ tests:
         requests:
           cpu: 100m
     test:
+    - as: make-release-image-public
+      commands: |-
+        #!/bin/bash
+        #
+        # Copy of the ip-install-rbac step as references are not allowed here. Make the images public, so we don't
+        # need a pull secret that covers all build clusters.
+        set -o nounset
+        set -o errexit
+        set -o pipefail
+
+        # This step wants to always talk to the build farm (via service account credentials) but ci-operator
+        # gives steps KUBECONFIG pointing to cluster under test under some circumstances, which is never
+        # the correct cluster to interact with for this step.
+        unset KUBECONFIG
+
+        # We want the test cluster to be able to access these images on the build farm
+        oc adm policy add-role-to-group system:image-puller system:authenticated --namespace "${NAMESPACE}"
+        oc adm policy add-role-to-group system:image-puller system:unauthenticated --namespace "${NAMESPACE}"
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
     - as: create-management-cluster
       cli: latest
       commands: |-
@@ -714,9 +735,6 @@ tests:
     - as: install-hypershift
       cli: latest
       commands: |-
-        unset KUBECONFIG
-        oc adm policy add-role-to-group system:image-puller system:authenticated --namespace "${NAMESPACE}"
-        oc adm policy add-role-to-group system:image-puller system:unauthenticated --namespace "${NAMESPACE}"
         export KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
         make ci-install-hypershift-private
       credentials:
@@ -726,29 +744,6 @@ tests:
       dependencies:
       - env: HYPERSHIFT_RELEASE_LATEST
         name: hypershift-operator
-      from: bin
-      resources:
-        requests:
-          cpu: 100m
-    - as: make-release-image-public
-      cli: latest
-      commands: |-
-        #!/bin/bash
-        #
-        # Copy of the ip-install-rbac step as references are not allowed here. Make the images public, so we don't
-        # need a pull secret that covers all build clusters.
-        set -o nounset
-        set -o errexit
-        set -o pipefail
-
-        # This step wants to always talk to the build farm (via service account credentials) but ci-operator
-        # gives steps KUBECONFIG pointing to cluster under test under some circumstances, which is never
-        # the correct cluster to interact with for this step.
-        unset KUBECONFIG
-
-        # We want the test cluster to be able to access these images on the build farm
-        oc adm policy add-role-to-group system:image-puller system:authenticated --namespace "${NAMESPACE}"
-        oc adm policy add-role-to-group system:image-puller system:unauthenticated --namespace "${NAMESPACE}"
       from: bin
       resources:
         requests:
