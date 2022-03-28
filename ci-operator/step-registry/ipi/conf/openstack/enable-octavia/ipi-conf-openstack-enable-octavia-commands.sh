@@ -1,14 +1,43 @@
 #!/usr/bin/env bash
-if test ! -f "${KUBECONFIG}"
-then
-  echo "No kubeconfig, can't fetch cloud config."
-  exit 0
-fi
 
-cp -Lrvf ${KUBECONFIG} /tmp/kubeconfig && export KUBECONFIG=/tmp/kubeconfig
-oc get configmap cloud-provider-config -n openshift-config -o jsonpath='{.data.config}' > /tmp/config
-echo "[LoadBalancer]" >> /tmp/config
-echo "use-octavia=true" >> /tmp/config
+set -euo pipefail
 
-oc delete configmap cloud-provider-config -n openshift-config
-oc create configmap cloud-provider-config -n openshift-config --from-file=config=/tmp/config
+export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
+
+# Create temporary directory
+TMP_DIR=$(mktemp -d)
+
+cp "${SHARED_DIR}/install-config.yaml" ${TMP_DIR}
+
+# Create manifests
+echo "Creating manifests"
+openshift-install create manifests --dir ${TMP_DIR}
+
+# Extract current cloud.conf
+yq -r .data.config ${TMP_DIR}/manifests/cloud-provider-config.yaml > ${TMP_DIR}/cloud.conf
+
+# Delete the LoadBalancer section if it exists
+sed -i '/^\[LoadBalancer\]/,/^\[/{/^\[/!d}' ${TMP_DIR}/cloud.conf
+sed -i '/^\[LoadBalancer\]/d' ${TMP_DIR}/cloud.conf
+
+cat << EOF >> ${TMP_DIR}/cloud.conf
+[LoadBalancer]
+use-octavia=true
+lb-provider=octavia
+# The following settings are necessary for creating services with externalTrafficPolicy: Local
+# NOT compatible with lb-provider=ovn
+# create-monitor=true
+# monitor-delay=5s
+# monitor-timeout=3s
+# monitor-max-retries=1
+EOF
+
+# We're only getting jq v1.5 in this image that doesn't support the `--rawfile` option.
+# Once we get jq 1.6, we'll be able to simplify to:
+# yq -Y --rawfile config ${TMP_DIR}/cloud.conf '.data.config |= $config' \
+#         ${TMP_DIR}/manifests/cloud-provider-config.yaml > ${SHARED_DIR}/manifest_cloud-provider-config.yaml
+yq -Y --argfile config <(jq -Rs '{config: .}' ${TMP_DIR}/cloud.conf) '.data.config |= $config.config' \
+        ${TMP_DIR}/manifests/cloud-provider-config.yaml > ${SHARED_DIR}/manifest_cloud-provider-config.yaml
+
+echo "Manifest was created with content:"
+cat ${SHARED_DIR}/manifest_cloud-provider-config.yaml
