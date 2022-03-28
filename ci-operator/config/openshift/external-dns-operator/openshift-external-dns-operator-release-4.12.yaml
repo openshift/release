@@ -123,6 +123,32 @@ tests:
         requests:
           cpu: 100m
     workflow: optional-operators-ci-azure
+- as: e2e-infoblox-operator
+  steps:
+    cluster_profile: gcp
+    dependencies:
+      OO_INDEX: ci-index-external-dns-operator-bundle
+    env:
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: external-dns-operator
+      OO_PACKAGE: external-dns-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export DNS_PROVIDER=INFOBLOX
+        export INFOBLOX_CONFIG_DIR=/var/run/infoblox-credentials
+        make test-e2e
+      credentials:
+      - mount_path: /var/run/infoblox-credentials
+        name: infoblox-credentials
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: optional-operators-ci-gcp
 zz_generated_metadata:
   branch: release-4.12
   org: openshift
