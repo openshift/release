@@ -6,7 +6,7 @@ presubmits:
     - ^release-4\.12$
     - ^release-4\.12-
     cluster: build03
-    context: ci/prow/e2e-aws-ansible
+    context: ci/prow/e2e-ansible
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -14,13 +14,13 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-ocp-release-operator-sdk-release-4.12-e2e-aws-ansible
+    name: pull-ci-openshift-priv-ocp-release-operator-sdk-release-4.12-e2e-ansible
     path_alias: github.com/openshift/ocp-release-operator-sdk
-    rerun_command: /test e2e-aws-ansible
+    rerun_command: /test e2e-ansible
     spec:
       containers:
       - args:
@@ -30,8 +30,8 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-aws-ansible-cluster-profile
-        - --target=e2e-aws-ansible
+        - --secret-dir=/usr/local/e2e-ansible-cluster-profile
+        - --target=e2e-ansible
         command:
         - ci-operator
         image: ci-operator:latest
@@ -47,7 +47,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-aws-ansible-cluster-profile
+        - mountPath: /usr/local/e2e-ansible-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -73,22 +73,26 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-ansible,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-ansible,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
     cluster: build03
-    context: ci/prow/e2e-aws-helm
+    context: ci/prow/e2e-helm
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -96,13 +100,13 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-ocp-release-operator-sdk-release-4.12-e2e-aws-helm
+    name: pull-ci-openshift-priv-ocp-release-operator-sdk-release-4.12-e2e-helm
     path_alias: github.com/openshift/ocp-release-operator-sdk
-    rerun_command: /test e2e-aws-helm
+    rerun_command: /test e2e-helm
     spec:
       containers:
       - args:
@@ -112,8 +116,8 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-aws-helm-cluster-profile
-        - --target=e2e-aws-helm
+        - --secret-dir=/usr/local/e2e-helm-cluster-profile
+        - --target=e2e-helm
         command:
         - ci-operator
         image: ci-operator:latest
@@ -129,7 +133,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-aws-helm-cluster-profile
+        - mountPath: /usr/local/e2e-helm-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -155,15 +159,19 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-helm,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-helm,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
