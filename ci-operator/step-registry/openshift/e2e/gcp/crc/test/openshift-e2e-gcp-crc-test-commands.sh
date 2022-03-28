@@ -40,7 +40,6 @@ set -euo pipefail
 export PATH=/home/packer:$PATH
 
 function run-tests() {
-  export MIRROR="https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp-dev-preview/"
   # clone the snc repo
   git clone https://github.com/code-ready/snc.git
   pushd snc
