@@ -9,11 +9,6 @@ build_root:
     namespace: stackrox
     tag: latest
 images:
-- dockerfile_literal: |-
-    FROM quay.io/centos/centos:stream8
-    RUN dnf upgrade -y && dnf clean all && rm -rf /var/cache/dnf
-  from: centos
-  to: quick-test
 - context_dir: images
   dockerfile_path: rocksdb.Dockerfile
   from: centos
@@ -47,15 +42,29 @@ tests:
 - as: push-and-check-images
   steps:
     test:
-    - as: push-and-check-quick-test
-      commands: .openshift-ci/dispatch.sh push-check  quick-test
+    - as: stackrox-build
+      commands: .openshift-ci/dispatch.sh push-check stackrox-build
       credentials:
       - mount_path: /tmp/secret/stackrox-rox-ci-image
         name: stackrox-rox-ci-image
         namespace: test-credentials
       dependencies:
       - env: IMAGE
-        name: quick-test
+        name: stackrox-build
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: stackrox-test
+      commands: .openshift-ci/dispatch.sh push-check stackrox-test
+      credentials:
+      - mount_path: /tmp/secret/stackrox-rox-ci-image
+        name: stackrox-rox-ci-image
+        namespace: test-credentials
+      dependencies:
+      - env: IMAGE
+        name: stackrox-test
       from: src
       resources:
         requests:
