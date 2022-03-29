@@ -134,6 +134,12 @@ tests:
       cli: latest
       commands: |-
         set -euo pipefail
+
+        # Required for signal propagation to work so
+        # the cleanup trap gets executed when a script
+        # receives a SIGINT
+        set -o monitor
+
         # Compiled test binaries do not have a -json flag, ref:
         # https://github.com/golang/go/issues/22996
         gotestsum --raw-command --junitfile=${ARTIFACT_DIR}/junit.xml --format=standard-verbose -- \
