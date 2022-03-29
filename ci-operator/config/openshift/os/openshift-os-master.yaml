@@ -98,6 +98,9 @@ tests:
         #!/bin/bash
         set -xeuo pipefail
 
+        # Verify we have oc
+        oc version
+
         # We can't use PULL_BASE_REF or OPENSHIFT_BUILD_REFERENCE to get the
         # branch since this is a periodic job which originates from
         # openshift/release, not the openshift/os repository. We then strip
@@ -113,15 +116,20 @@ tests:
         /src/ci/build-test-qemu.sh
 
         export REGISTRY_AUTH_FILE="$SHARED_DIR/dockercfg.json"
+        export DEST=registry.ci.openshift.org/rhcos-devel/rhel-coreos
         # Ensure we're in the designated cosa directory so the push-container commands work
         cd "$COSA_DIR"
         # Tags with the cosa build ID / arch
-        cosa push-container registry.ci.openshift.org/rhcos-devel/rhel-coreos
-        cosa push-container "registry.ci.openshift.org/rhcos-devel/rhel-coreos:${BRANCH}"
+        cosa push-container "${DEST}"
+        cosa push-container "${DEST}:${BRANCH}"
 
         # Only push latest tag on master branch
         if [[ "$BRANCH" == "master"  ]]; then
-          cosa push-container registry.ci.openshift.org/rhcos-devel/rhel-coreos:latest
+          cosa push-container "${DEST}":latest
+          oc adm release new -n ocp --from-image-stream 4.11 \
+            --to-image registry.ci.openshift.org/rhcos-devel/release-layering \
+            --include=rhel-coreos rhel-coreos="${DEST}:latest" \
+            machine-config-operator=registry.ci.openshift.org/rhcos-devel/machine-config-operator:layering
         fi
       from: build-test-qemu-img
       resources:
