@@ -17,6 +17,18 @@ function createWindowsInstanceFile() {
       echo "$(date -u --rfc-3339=seconds) - created ${windows_instance_file}"
 }
 
+# Creates a folder at the given path if it does not exist.
+# Will return error if the parent folder also does not exist.
+# Takes the folder's path as an argument.
+function ensureVMFolderExists() {
+      folder=$1;
+      if ! govc folder.info $folder; then
+          echo "$(date -u --rfc-3339=seconds) - creating folder $folder..."
+          govc folder.create $folder
+	  echo "${folder}" >> "${SHARED_DIR}/windows_vm_folders.txt"
+      fi
+}
+
 echo "$(date -u --rfc-3339=seconds) - provisioning Windows VM on vSphere..."
 
 echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..."
@@ -36,6 +48,9 @@ vm_template_username=$(<"${SHARED_DIR}"/windows_vm_template_username.txt)
 
 # set VM folder
 vm_folder="/${vsphere_datacenter}/vm/${cluster_name}"
+
+# ensure that the VM folder exists
+ensureVMFolderExists $vm_folder
 
 # WINDOWS_VM_COUNT holds the total number of Windows VM, read from env var to
 # allow configuration from the workflow definition. Otherwise, default to 1.
