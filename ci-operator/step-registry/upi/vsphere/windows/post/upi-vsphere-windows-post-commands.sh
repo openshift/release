@@ -23,3 +23,14 @@ do
         echo "$(date -u --rfc-3339=seconds) - $(rm -vf "${f}")"
     fi
 done
+
+# remove any created folders. Each line in the created_folders.txt file will contain the name of a folder
+folder_file="${SHARED_DIR}/windows_vm_folders.txt"
+if test -f "$folder_file"; then
+    while read -r line; do
+        echo "$(date -u --rfc-3339=seconds) - destroying folder ${line}..."
+        govc object.destroy "${line}"
+    done < $folder_file
+    # cleanup
+    echo "$(date -u --rfc-3339=seconds) - $(rm -vf "${folder_file}")"
+fi
