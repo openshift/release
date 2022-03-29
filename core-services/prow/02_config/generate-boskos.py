@@ -14,7 +14,10 @@ CONFIG = {
     },
     'aws-quota-slice': {
         # Wild guesses.  We'll see when we hit quota issues
-        'us-east-1': 1,
+        'us-east-1': 50,
+        'us-east-2': 35,
+        'us-west-1': 35,
+        'us-west-2': 35,
     },
     'aws-2-quota-slice': {
         'us-east-1': 40,
