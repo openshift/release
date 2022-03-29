@@ -66,6 +66,11 @@ fi
 echo "Downloading current MachineSet for workers"
 WORKER_MACHINESET=$(oc get machineset -n openshift-machine-api | grep worker | awk '{print $1}')
 oc get machineset -n openshift-machine-api "${WORKER_MACHINESET}" -o json > "${SHARED_DIR}/original-worker-machineset.json"
+
+if [[ "${OPENSTACK_SRIOV_NETWORK}" == *"hwoffload"* ]]; then
+    PROFILE="\"profile\": {\"capabilities\": \"[switchdev]\"},"
+fi
+
 cat <<EOF > "${SHARED_DIR}/sriov_patch.json"
 {
   "spec": {
@@ -87,6 +92,7 @@ cat <<EOF > "${SHARED_DIR}/sriov_patch.json"
                   "sriov"
                 ],
                 "vnicType": "direct",
+                ${PROFILE:-}
                 "portSecurity": false
               }
             ],
