@@ -120,7 +120,7 @@ if [ "${WEBHOOK_ENABLED}" == true ]; then
   wait_for_webhook
 fi
 
-if [[ "${OPENSTACK_SRIOV_NETWORK}" == "mellanox-sriov" ]]; then
+if [[ "${OPENSTACK_SRIOV_NETWORK}" == *"mellanox"* ]]; then
     SRIOV_DEVICE_TYPE="netdevice"
     IS_RDMA="true"
 else
