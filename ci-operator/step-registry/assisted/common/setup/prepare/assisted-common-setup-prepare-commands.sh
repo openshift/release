@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-echo "************ assisted common setup command ************"
+echo "************ assisted common setup prepare command ************"
 
 mkdir -p build/ansible
 cd build/ansible
@@ -32,7 +32,7 @@ ansible-playbook packing-test-infra.yaml
 # shellcheck source=/dev/null
 set +e
 source "${SHARED_DIR}/packet-conf.sh"
-source "$SHARED_DIR/ci-machine-config.sh"
+source "${SHARED_DIR}/ci-machine-config.sh"
 set -e
 
 # shellcheck disable=SC2034
@@ -48,10 +48,10 @@ ${IP} ansible_user=root ansible_ssh_user=root ansible_ssh_private_key_file=${SSH
 EOF
 
 cat << EOF > config.sh.j2
+export REPO_DIR={{ REPO_DIR }}
 export MINIKUBE_HOME={{ MINIKUBE_HOME }}
 export INSTALLER_KUBECONFIG={{ REPO_DIR }}/build/kubeconfig
-export PULL_SECRET='\$(cat /root/pull-secret)'
-export OFFLINE_TOKEN='\$(cat /root/offline-token)'
+export PULL_SECRET=\$(cat /root/pull-secret)
 export CI=true
 export OPENSHIFT_CI=true
 export REPO_NAME={{ lookup('env', 'REPO_NAME') }}
@@ -71,12 +71,11 @@ export PUBLIC_CONTAINER_REGISTRIES="{{ CI_REGISTRIES | join(',') }}"
 
 {% if ENVIRONMENT == "production" %}
 # Testing against the production AI parameters
-export PULL_SECRET='\$(cat /root/prod/pull-secret)'
-export OFFLINE_TOKEN='\$(cat /root/prod/offline-token)'
+export PULL_SECRET=\$(cat /root/prod/pull-secret)
+export OFFLINE_TOKEN=\$(cat /root/prod/offline-token)
 export REMOTE_SERVICE_URL=https://api.openshift.com
 export NO_MINIKUBE=true
 export MAKEFILE_TARGET='setup test_parallel'
-export WORKER_DISK="{{ disksize.stdout }}"
 {% endif %}
 
 {% if PROVIDER_IMAGE != ASSISTED_CONTROLLER_IMAGE %}
@@ -95,6 +94,15 @@ export SERVICE_BRANCH={{ PULL_PULL_SHA }}
 export OPENSHIFT_INSTALL_RELEASE_IMAGE={{ RELEASE_IMAGE_LATEST }}
 {% endif %}
 
+{% if PLATFORM == "vsphere" %}
+export PLATFORM=vsphere
+export VIP_DHCP_ALLOCATION=false
+export VSPHERE_PARENT_FOLDER=assisted-test-infra-ci
+export VSPHERE_FOLDER="build-{{ lookup('env', 'BUILD_ID') }}"
+export TEST_TEARDOWN=true
+source /root/vsphere_test_infra.sh
+{% endif %}
+
 {# Additional mechanism to inject assisted additional variables directly #}
 {% if ASSISTED_CONFIG is defined %}
 {# from a multistage step configuration. #}
@@ -110,6 +118,7 @@ cat > run_test_playbook.yaml <<-EOF
 - name: Prepare remote host
   hosts: all
   vars:
+    PLATFORM: "{{ lookup('env', 'PLATFORM') }}"
     PULL_PULL_SHA: "{{ lookup('env', 'PULL_PULL_SHA') | default('master', True) }}"
     JOB_TYPE: "{{ lookup('env', 'JOB_TYPE') }}"
     REPO_OWNER: "{{ lookup('env', 'REPO_OWNER') }}"
@@ -132,9 +141,6 @@ cat > run_test_playbook.yaml <<-EOF
       fail:
         msg: "Unsupported environment {{ ENVIRONMENT }}"
       when: ENVIRONMENT != "local" and ENVIRONMENT != "production"
-    - name : Get the default disk size
-      ansible.builtin.command: echo 120G | numfmt --from=iec
-      register: disksize
     # Some Packet images have a file /usr/config left from the provisioning phase.
     # The problem is that sos expects it to be a directory. Since we don't care
     # about the Packet provisioner, remove the file if it's present.
@@ -166,6 +172,11 @@ cat > run_test_playbook.yaml <<-EOF
       ansible.builtin.copy:
         src: "{{ CI_CREDENTIALS_DIR }}/prod-pull-secret"
         dest: /root/prod/pull-secret
+    - name: Copy vsphere credentials file
+      become: true
+      ansible.builtin.copy:
+        src: "{{ SHARED_DIR }}/vsphere_test_infra.sh"
+        dest: /root/vsphere_test_infra.sh
     - name: Install packages
       dnf:
         name:
@@ -226,34 +237,6 @@ cat > run_test_playbook.yaml <<-EOF
         owner: root
         group: root
         mode: 0755
-    - name: Run installation
-      ansible.builtin.shell: |
-        source /root/config.sh
 EOF
 
 ansible-playbook run_test_playbook.yaml -i inventory
-
-cat > run_post_playbook.yaml <<-EOF
-- name: Prepare remote host
-  hosts: all
-  vars:
-    POST_INSTALL_COMMANDS: "{{ lookup('env', 'POST_INSTALL_COMMANDS') | default('#empty script', True) }}"
-  tasks:
-  - name: create a config file
-    ansible.builtin.copy:
-      dest: /root/assisted-post-install.sh
-      content: |
-        {{ POST_INSTALL_COMMANDS }}
-        echo "Finish running post installation script"
-  - name: Run post installation command
-    ansible.builtin.shell: |
-        set -xeuo pipefail
-        cd /home/assisted
-        source /root/config.sh
-        echo "export KUBECONFIG=/home/assisted/build/kubeconfig" >> /root/.bashrc
-        export KUBECONFIG=/home/assisted/build/kubeconfig
-        source "/root/assisted-post-install.sh"
-EOF
-
-ansible-playbook run_post_playbook.yaml -i inventory
-
