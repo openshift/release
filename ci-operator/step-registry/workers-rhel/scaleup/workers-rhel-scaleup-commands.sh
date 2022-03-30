@@ -28,6 +28,11 @@ echo "$(date -u --rfc-3339=seconds) - Running RHEL worker scaleup"
 ansible-playbook -i "${SHARED_DIR}/ansible-hosts" playbooks/scaleup.yml -vvv
 
 
+if [[ "${REMOVE_RHCOS_WORKER}" == "no" ]]; then
+    echo "RHCOS worker will not be removed!"
+    exit 0
+fi
+
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
 # Remove CoreOS machine sets
