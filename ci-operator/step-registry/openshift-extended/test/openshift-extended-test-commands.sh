@@ -10,6 +10,7 @@ export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
 export HOME=/tmp/home
 export PATH=/usr/local/go/bin:/usr/libexec/origin:/opt/OpenShift4-tools:$PATH
 export REPORT_HANDLE_PATH="/usr/bin"
+export ENABLE_PRINT_EVENT_STDOUT=true
 
 # although we set this env var, but it does not exist if the CLUSTER_TYPE is not gcp.
 # so, currently some cases need to access gcp service whether the cluster_type is gcp or not
