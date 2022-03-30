@@ -7,7 +7,7 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 function queue() {
   local LIVE="$(jobs | wc -l)"
-  while [[ "${LIVE}" -ge 10 ]]; do
+  while [[ "${LIVE}" -ge 2 ]]; do
     sleep 1
     LIVE="$(jobs | wc -l)"
   done
@@ -24,7 +24,7 @@ function deprovision() {
     timeout --signal=SIGQUIT 30m hypershift destroy infra aws --aws-creds "${AWS_SHARED_CREDENTIALS_FILE}" --infra-id "${INFRA_ID}" --base-domain "${HYPERSHIFT_BASE_DOMAIN}" --region "${REGION}" || touch "${WORKDIR}/failure"
     timeout --signal=SIGQUIT 30m hypershift destroy iam aws --aws-creds "${AWS_SHARED_CREDENTIALS_FILE}" --infra-id "${INFRA_ID}" --region "${REGION}" || touch "${WORKDIR}/failure"
   fi
-  timeout --signal=SIGQUIT 30m openshift-install --dir "${WORKDIR}" --log-level error destroy cluster && touch "${WORKDIR}/success" || touch "${WORKDIR}/failure"
+  timeout --signal=SIGQUIT 60m openshift-install --dir "${WORKDIR}" --log-level error destroy cluster && touch "${WORKDIR}/success" || touch "${WORKDIR}/failure"
 }
 
 logdir="${ARTIFACTS}/deprovision"
