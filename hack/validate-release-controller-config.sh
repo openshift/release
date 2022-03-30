@@ -17,6 +17,7 @@ fi
 rcPaths=(
   "${base_dir}/core-services/release-controller"
   "${base_dir}/clusters/app.ci/release-controller"
+  "${base_dir}/clusters/app.ci/trt"
   "${base_dir}/clusters/build-clusters/common/release-controller"
 )
 

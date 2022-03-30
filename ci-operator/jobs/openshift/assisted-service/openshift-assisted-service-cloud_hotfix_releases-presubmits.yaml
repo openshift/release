@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
+    cluster: build04
     context: ci/prow/e2e-metal-assisted-4-10
     decorate: true
     decoration_config:
@@ -79,7 +79,7 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
+    cluster: build04
     context: ci/prow/e2e-metal-assisted-4-6
     decorate: true
     decoration_config:
@@ -153,7 +153,7 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
+    cluster: build04
     context: ci/prow/e2e-metal-assisted-4-8
     decorate: true
     decoration_config:
@@ -227,7 +227,7 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
+    cluster: build04
     context: ci/prow/e2e-metal-assisted-4-9
     decorate: true
     decoration_config:
@@ -301,7 +301,7 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
+    cluster: build04
     context: ci/prow/e2e-metal-assisted-cnv
     decorate: true
     decoration_config:
@@ -376,7 +376,7 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
+    cluster: build04
     context: ci/prow/e2e-metal-assisted-day2
     decorate: true
     decoration_config:
@@ -450,7 +450,7 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
+    cluster: build04
     context: ci/prow/e2e-metal-assisted-ipv4v6
     decorate: true
     decoration_config:
@@ -524,7 +524,7 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
+    cluster: build04
     context: ci/prow/e2e-metal-assisted-networking
     decorate: true
     decoration_config:
@@ -598,7 +598,7 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
+    cluster: build04
     context: ci/prow/e2e-metal-assisted-ocs
     decorate: true
     decoration_config:
@@ -673,7 +673,7 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
+    cluster: build04
     context: ci/prow/e2e-metal-assisted-onprem
     decorate: true
     decoration_config:
@@ -747,7 +747,7 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
+    cluster: build04
     context: ci/prow/e2e-metal-assisted-single-node
     decorate: true
     decoration_config:
@@ -821,7 +821,7 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
+    cluster: build04
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -870,7 +870,7 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
+    cluster: build04
     context: ci/prow/lint
     decorate: true
     decoration_config:
@@ -919,7 +919,7 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build03
+    cluster: build04
     context: ci/prow/subsystem-aws
     decorate: true
     decoration_config:
@@ -977,3 +977,117 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )subsystem-aws,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^cloud_hotfix_releases$
+    - ^cloud_hotfix_releases-
+    cluster: build04
+    context: ci/prow/unit-test
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-assisted-service-cloud_hotfix_releases-unit-test
+    rerun_command: /test unit-test
+    skip_if_only_changed: ^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNER_ALIASES)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/assisted-service-codecov-token
+        - --target=unit-test
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/assisted-service-codecov-token
+          name: assisted-service-codecov-token
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: assisted-service-codecov-token
+        secret:
+          secretName: assisted-service-codecov-token
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )unit-test,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^cloud_hotfix_releases$
+    - ^cloud_hotfix_releases-
+    cluster: build04
+    context: ci/prow/verify-generated-code
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-assisted-service-cloud_hotfix_releases-verify-generated-code
+    rerun_command: /test verify-generated-code
+    skip_if_only_changed: ^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNER_ALIASES)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=verify-generated-code
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )verify-generated-code,?($|\s.*)

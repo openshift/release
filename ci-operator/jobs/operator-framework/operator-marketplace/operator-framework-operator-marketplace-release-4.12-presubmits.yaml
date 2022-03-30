@@ -5,16 +5,16 @@ presubmits:
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
-    cluster: build03
-    context: ci/prow/e2e-aws
+    cluster: build04
+    context: ci/prow/e2e-gcp
     decorate: true
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-operator-framework-operator-marketplace-release-4.12-e2e-aws
-    rerun_command: /test e2e-aws
+    name: pull-ci-operator-framework-operator-marketplace-release-4.12-e2e-gcp
+    rerun_command: /test e2e-gcp
     spec:
       containers:
       - args:
@@ -23,8 +23,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-aws-cluster-profile
-        - --target=e2e-aws
+        - --secret-dir=/usr/local/e2e-gcp-cluster-profile
+        - --target=e2e-gcp
         command:
         - ci-operator
         image: ci-operator:latest
@@ -40,7 +40,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-aws-cluster-profile
+        - mountPath: /usr/local/e2e-gcp-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -63,30 +63,34 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-gcp,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
-    cluster: build03
-    context: ci/prow/e2e-aws-console-olm
+    cluster: build04
+    context: ci/prow/e2e-gcp-console-olm
     decorate: true
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-operator-framework-operator-marketplace-release-4.12-e2e-aws-console-olm
-    rerun_command: /test e2e-aws-console-olm
+    name: pull-ci-operator-framework-operator-marketplace-release-4.12-e2e-gcp-console-olm
+    rerun_command: /test e2e-gcp-console-olm
     spec:
       containers:
       - args:
@@ -95,8 +99,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-aws-console-olm-cluster-profile
-        - --target=e2e-aws-console-olm
+        - --secret-dir=/usr/local/e2e-gcp-console-olm-cluster-profile
+        - --target=e2e-gcp-console-olm
         command:
         - ci-operator
         image: ci-operator:latest
@@ -112,7 +116,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-aws-console-olm-cluster-profile
+        - mountPath: /usr/local/e2e-gcp-console-olm-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -135,30 +139,34 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-console-olm,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-gcp-console-olm,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
-    cluster: build03
-    context: ci/prow/e2e-aws-operator
+    cluster: build04
+    context: ci/prow/e2e-gcp-operator
     decorate: true
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-operator-framework-operator-marketplace-release-4.12-e2e-aws-operator
-    rerun_command: /test e2e-aws-operator
+    name: pull-ci-operator-framework-operator-marketplace-release-4.12-e2e-gcp-operator
+    rerun_command: /test e2e-gcp-operator
     spec:
       containers:
       - args:
@@ -167,8 +175,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-aws-operator-cluster-profile
-        - --target=e2e-aws-operator
+        - --secret-dir=/usr/local/e2e-gcp-operator-cluster-profile
+        - --target=e2e-gcp-operator
         command:
         - ci-operator
         image: ci-operator:latest
@@ -184,7 +192,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-aws-operator-cluster-profile
+        - mountPath: /usr/local/e2e-gcp-operator-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -207,30 +215,34 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-operator,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-gcp-operator,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
-    cluster: build03
-    context: ci/prow/e2e-aws-serial
+    cluster: build04
+    context: ci/prow/e2e-gcp-serial
     decorate: true
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-operator-framework-operator-marketplace-release-4.12-e2e-aws-serial
-    rerun_command: /test e2e-aws-serial
+    name: pull-ci-operator-framework-operator-marketplace-release-4.12-e2e-gcp-serial
+    rerun_command: /test e2e-gcp-serial
     spec:
       containers:
       - args:
@@ -239,8 +251,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-aws-serial-cluster-profile
-        - --target=e2e-aws-serial
+        - --secret-dir=/usr/local/e2e-gcp-serial-cluster-profile
+        - --target=e2e-gcp-serial
         command:
         - ci-operator
         image: ci-operator:latest
@@ -256,7 +268,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-aws-serial-cluster-profile
+        - mountPath: /usr/local/e2e-gcp-serial-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -279,30 +291,34 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-serial,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-gcp-serial,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
-    cluster: build03
-    context: ci/prow/e2e-aws-upgrade
+    cluster: build04
+    context: ci/prow/e2e-gcp-upgrade
     decorate: true
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-operator-framework-operator-marketplace-release-4.12-e2e-aws-upgrade
-    rerun_command: /test e2e-aws-upgrade
+    name: pull-ci-operator-framework-operator-marketplace-release-4.12-e2e-gcp-upgrade
+    rerun_command: /test e2e-gcp-upgrade
     spec:
       containers:
       - args:
@@ -311,8 +327,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-aws-upgrade-cluster-profile
-        - --target=e2e-aws-upgrade
+        - --secret-dir=/usr/local/e2e-gcp-upgrade-cluster-profile
+        - --target=e2e-gcp-upgrade
         command:
         - ci-operator
         image: ci-operator:latest
@@ -328,7 +344,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
+        - mountPath: /usr/local/e2e-gcp-upgrade-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -351,21 +367,25 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-upgrade,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-gcp-upgrade,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
-    cluster: build03
+    cluster: build04
     context: ci/prow/images
     decorate: true
     labels:
@@ -413,7 +433,7 @@ presubmits:
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
-    cluster: build03
+    cluster: build04
     context: ci/prow/unit
     decorate: true
     labels:

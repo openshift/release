@@ -48,3 +48,12 @@ parallel_cucumber -n "${PARALLEL}" --first-is-1 --type cucumber --serialize-stdo
 export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/serial"
 export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS="${USERS}"
 cucumber --tags "${E2E_RUN_TAGS} and @serial and ${E2E_SKIP_TAGS}" -p junit || true
+
+# summarize test results
+echo "Summarizing test result..."
+failures=$(grep '<testsuite failures="[1-9].*"' "${ARTIFACT_DIR}" -r | wc -l || true)
+if [ $((failures)) == 0 ]; then
+    echo "All tests have passed"
+else
+    echo "${failures} failures in cucushift-e2e" | tee -a "${SHARED_DIR}/cucushift-e2e-failures"
+fi

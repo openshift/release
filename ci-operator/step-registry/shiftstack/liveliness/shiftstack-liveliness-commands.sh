@@ -15,7 +15,7 @@ chmod 0600 shiftstack-ci
 eval "$(ssh-agent)"
 if ! whoami &> /dev/null; then
   if [ -w /etc/passwd ]; then
-    echo "${IMAGE_USER:-centos}:x:$(id -u):0:${IMAGE_USER:-centos} user:${HOME}:/sbin/nologin" >> /etc/passwd
+    echo "${IMAGE_USER:-cloud-user}:x:$(id -u):0:${IMAGE_USER:-cloud-user} user:${HOME}:/sbin/nologin" >> /etc/passwd
   fi
 fi
 ssh-add shiftstack-ci

@@ -72,19 +72,19 @@ releases:
   hosted-ocp-latest:
     candidate:
       product: ocp
-      stream: nightly
+      stream: ci
       version: "4.10"
   hosted-ocp-previous:
     candidate:
       product: ocp
       relative: 1
-      stream: nightly
+      stream: ci
       version: "4.10"
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
-      version: "4.10"
+    integration:
+      include_built_images: true
+      name: 4.11-priv
+      namespace: ocp-private
 resources:
   '*':
     limits:
@@ -136,6 +136,12 @@ tests:
       cli: latest
       commands: |-
         set -euo pipefail
+
+        # Required for signal propagation to work so
+        # the cleanup trap gets executed when a script
+        # receives a SIGINT
+        set -o monitor
+
         # Compiled test binaries do not have a -json flag, ref:
         # https://github.com/golang/go/issues/22996
         gotestsum --raw-command --junitfile=${ARTIFACT_DIR}/junit.xml --format=standard-verbose -- \
@@ -151,8 +157,8 @@ tests:
           --e2e.latest-release-image=${OCP_IMAGE_LATEST} \
           --e2e.previous-release-image=${OCP_IMAGE_PREVIOUS} \
           --e2e.additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
-          --e2e.control-plane-operator-image=${HYPERSHIFT_RELEASE_LATEST} \
-          --e2e.aws-endpoint-access=PublicAndPrivate
+          --e2e.aws-endpoint-access=PublicAndPrivate \
+          --e2e.external-dns-domain=service.ci.hypershift.devcluster.openshift.com
       credentials:
       - mount_path: /etc/hypershift-pool-aws-credentials
         name: hypershift-pool-aws-credentials
@@ -162,11 +168,9 @@ tests:
         namespace: test-credentials
       dependencies:
       - env: OCP_IMAGE_LATEST
-        name: release:hosted-ocp-latest
+        name: release:latest
       - env: OCP_IMAGE_PREVIOUS
         name: release:hosted-ocp-previous
-      - env: HYPERSHIFT_RELEASE_LATEST
-        name: hypershift-operator
       from: test-bin
       grace_period: 30m0s
       resources:
@@ -371,6 +375,15 @@ tests:
         requests:
           cpu: 100m
     test:
+    - as: make-release-image-public
+      commands: |-
+        unset KUBECONFIG
+        oc adm policy add-role-to-group system:image-puller system:authenticated --namespace "${NAMESPACE}"
+        oc adm policy add-role-to-group system:image-puller system:unauthenticated --namespace "${NAMESPACE}"
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
     - as: create-management-cluster
       cli: latest
       commands: |-
@@ -418,9 +431,6 @@ tests:
     - as: install-hypershift
       cli: latest
       commands: |-
-        unset KUBECONFIG
-        oc adm policy add-role-to-group system:image-puller system:authenticated --namespace "${NAMESPACE}"
-        oc adm policy add-role-to-group system:image-puller system:unauthenticated --namespace "${NAMESPACE}"
         export KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
         make ci-install-hypershift
       credentials:
@@ -537,7 +547,7 @@ tests:
         bin/hypershift install --hypershift-image ${HYPERSHIFT_RELEASE_LATEST}
 
         export KUBEVIRT_PLATFORM_ENABLED=true
-        export RHCOS_CD_IMAGE="quay.io/containerdisks/rhcos:4.9"
+        export RHCOS_CD_IMAGE="quay.io/containerdisks/rhcos:4.10"
 
         # complie the e2e tests
         make e2e
@@ -566,6 +576,7 @@ tests:
     workflow: ipi-azure
 - as: e2e-kubevirt-gcp
   optional: true
+  skip_if_only_changed: (^(docs|examples|enhancements)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: gcp
     test:
@@ -584,7 +595,7 @@ tests:
         bin/hypershift install --hypershift-image ${HYPERSHIFT_RELEASE_LATEST}
 
         export KUBEVIRT_PLATFORM_ENABLED=true
-        export RHCOS_CD_IMAGE="quay.io/containerdisks/rhcos:4.9"
+        export RHCOS_CD_IMAGE="quay.io/containerdisks/rhcos:4.10"
 
         # complie the e2e tests
         make e2e
@@ -656,6 +667,28 @@ tests:
         requests:
           cpu: 100m
     test:
+    - as: make-release-image-public
+      commands: |-
+        #!/bin/bash
+        #
+        # Copy of the ip-install-rbac step as references are not allowed here. Make the images public, so we don't
+        # need a pull secret that covers all build clusters.
+        set -o nounset
+        set -o errexit
+        set -o pipefail
+
+        # This step wants to always talk to the build farm (via service account credentials) but ci-operator
+        # gives steps KUBECONFIG pointing to cluster under test under some circumstances, which is never
+        # the correct cluster to interact with for this step.
+        unset KUBECONFIG
+
+        # We want the test cluster to be able to access these images on the build farm
+        oc adm policy add-role-to-group system:image-puller system:authenticated --namespace "${NAMESPACE}"
+        oc adm policy add-role-to-group system:image-puller system:unauthenticated --namespace "${NAMESPACE}"
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
     - as: create-management-cluster
       cli: latest
       commands: |-
@@ -665,6 +698,7 @@ tests:
           --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
           --aws-creds=/etc/hypershift-ci-jobs-awscreds/credentials \
           --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
+          --release-image=${OCP_410_LATEST} \
           --name=${CLUSTER_NAME} \
           --region=us-east-1 \
           --infra-id=${CLUSTER_NAME} \
@@ -696,6 +730,9 @@ tests:
       - mount_path: /etc/hypershift-kubeconfig
         name: hypershift-ci-1
         namespace: test-credentials
+      dependencies:
+      - env: OCP_410_LATEST
+        name: release:hosted-ocp-latest
       from: bin
       grace_period: 1m0s
       resources:
@@ -705,9 +742,6 @@ tests:
     - as: install-hypershift
       cli: latest
       commands: |-
-        unset KUBECONFIG
-        oc adm policy add-role-to-group system:image-puller system:authenticated --namespace "${NAMESPACE}"
-        oc adm policy add-role-to-group system:image-puller system:unauthenticated --namespace "${NAMESPACE}"
         export KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
         make ci-install-hypershift-private
       credentials:

@@ -23,22 +23,47 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  openshift_release_golang-1.16:
+  edge_infrastructure_swagger_codegen_cli:
+    name: edge-infrastructure-swagger-codegen-cli
+    namespace: ci
+    tag: 2.4.18
+  goswagger_swagger:
+    name: goswagger-swagger
+    namespace: ci
+    tag: v0.28.0
+  openshift_release_golang-1.17:
     name: release
     namespace: openshift
-    tag: golang-1.16
+    tag: golang-1.17
+  postgresql-12-centos7:
+    name: postgresql-12-centos7
+    namespace: edge-infrastructure
+    tag: latest
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.16
+    tag: golang-1.17
 images:
+- dockerfile_path: Dockerfile.assisted-service-build
+  from: postgresql-12-centos7
+  inputs:
+    edge_infrastructure_swagger_codegen_cli:
+      as:
+      - quay.io/edge-infrastructure/swagger-codegen-cli:2.4.18
+    goswagger_swagger:
+      as:
+      - quay.io/goswagger/swagger:v0.28.0
+    openshift_release_golang-1.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
+  to: assisted-service-build
 - dockerfile_path: Dockerfile.assisted-service
   from: coreos_centos_stream8
   inputs:
-    openshift_release_golang-1.16:
+    openshift_release_golang-1.17:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.16
+      - registry.ci.openshift.org/openshift/release:golang-1.17
   to: assisted-service
 releases:
   initial:
@@ -73,6 +98,24 @@ tests:
     && make lint
   container:
     from: test-bin
+- as: unit-test
+  commands: |
+    export ROOT_DIR=/tmp
+    export COVER_PROFILE=/tmp/reports/unit_coverage.out
+    export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
+    export GINKGO_REPORTFILE=/tmp/junit_unit_test.xml
+    make ci-unit-test
+  container:
+    from: assisted-service-build
+  secret:
+    mount_path: /tmp/secret
+    name: assisted-service-codecov-token
+  skip_if_only_changed: ^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNER_ALIASES)$
+- as: verify-generated-code
+  skip_if_only_changed: ^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNER_ALIASES)$
+  steps:
+    test:
+    - ref: assisted-verify-generated-code
 - as: subsystem-aws
   cluster_claim:
     architecture: amd64

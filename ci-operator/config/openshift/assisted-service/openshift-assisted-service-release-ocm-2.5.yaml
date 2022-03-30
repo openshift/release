@@ -27,6 +27,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  hypershift-operator:
+    name: "4.10"
+    namespace: ocp
+    tag: hypershift-operator
   openshift_release_golang-1.17:
     name: release
     namespace: openshift
@@ -769,10 +773,11 @@ tests:
   run_if_changed: ^(api/.*|internal/controller/controllers/.*)$
   steps:
     cluster_profile: packet-assisted
+    dependencies:
+      HYPERSHIFT_IMAGE: hypershift-operator
     env:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=release-ocm-2.5
-        ASSISTED_CONFIG: |
         KUBE_API=yes
         ENABLE_KUBE_API=true
         MINIKUBE_DISK_SIZE=70g
@@ -784,6 +789,10 @@ tests:
 - as: operator-catalog-publish-to-quay
   postsubmit: true
   steps:
+    env:
+      OPERATOR_MANIFESTS_TAG_TO_PIN: ocm-2.5
+      REGISTRY_BUNDLE_REPOSITORY_TAG: ocm-2.5
+      REGISTRY_CATALOG_REPOSITORY_TAG: ocm-2.5
     test:
     - ref: assisted-baremetal-operator-catalog-publish
 zz_generated_metadata:

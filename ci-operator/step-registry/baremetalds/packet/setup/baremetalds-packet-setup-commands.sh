@@ -6,6 +6,70 @@ set -o pipefail
 
 echo "************ baremetalds packet setup command ************"
 
+cd
+cat > packet-config.yaml <<-EOF
+- name: Create Config for host
+  hosts: localhost
+  collections:
+   - community.general
+  gather_facts: no
+  tasks:
+  - name: write fix uid file
+    copy:
+      content: |
+        # Ensure our UID, which is randomly generated, is in /etc/passwd. This is required
+        # to be able to SSH.
+        if ! whoami &> /dev/null; then
+            if [ -x "\$(command -v nss_wrapper.pl)" ]; then
+                grep -v -e ^default -e ^\$(id -u) /etc/passwd > "/tmp/passwd"
+                echo "\${USER_NAME:-default}:x:\$(id -u):0:\${USER_NAME:-default} user:\${HOME}:/sbin/nologin" >> "/tmp/passwd"
+                export LD_PRELOAD=libnss_wrapper.so
+                export NSS_WRAPPER_PASSWD=/tmp/passwd
+                export NSS_WRAPPER_GROUP=/etc/group
+            elif [[ -w /etc/passwd ]]; then
+                echo "\${USER_NAME:-default}:x:\$(id -u):0:\${USER_NAME:-default} user:\${HOME}:/sbin/nologin" >> "/etc/passwd"
+            else
+                echo "No nss wrapper, /etc/passwd is not writeable, and user matching this uid is not found."
+                exit 1
+            fi
+        fi
+      dest: "${SHARED_DIR}/fix-uid.sh"
+
+  - name: write Packet common configuration file
+    copy:
+      content: |
+        source "\${SHARED_DIR}/fix-uid.sh"
+
+        # Initial check
+        if [[ ! "\${CLUSTER_TYPE}" =~ ^packet.*$|^equinix.*$ ]]; then
+            echo >&2 "Unsupported cluster type '\${CLUSTER_TYPE}'"
+            exit 1
+        fi
+
+        IP=\$(cat "\${SHARED_DIR}/server-ip")
+        SSHOPTS=(-o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o LogLevel=ERROR -i "\${CLUSTER_PROFILE_DIR}/packet-ssh-key")
+
+        # Checkout packet server
+        for x in \$(seq 10) ; do
+            test "\${x}" -eq 10 && exit 1
+            ssh "\${SSHOPTS[@]}" "root@\${IP}" hostname && break
+            sleep 10
+        done
+      dest: "${SHARED_DIR}/packet-conf.sh"
+EOF
+ansible-playbook packet-config.yaml |& gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0; fflush(); }'
+
+if [ -e "${CLUSTER_PROFILE_DIR}/ofcir_url" ] ; then
+    echo "Attempting to acquire a Host from OFCIR"
+    IPFILE=$SHARED_DIR/server-ip
+    CIRFILE=$SHARED_DIR/cir
+    if curl -kfX POST -H "Host: ofcir.apps.ostest.test.metalkube.org" "$(cat ${CLUSTER_PROFILE_DIR}/ofcir_url)?name=$JOB_NAME/$BUILD_ID" -o $CIRFILE ; then
+        jq -r .ip < $CIRFILE > $IPFILE
+        exit 0
+    fi
+fi
+
+
 # Avoid requesting a bunch of servers at the same time so they
 # don't race each other for available resources in a facility
 SLEEPTIME=$(( RANDOM % 120 ))
@@ -13,7 +77,6 @@ echo "Sleeping for $SLEEPTIME seconds"
 sleep $SLEEPTIME
 
 # Run Ansible playbook
-cd
 cat > packet-setup.yaml <<-EOF
 - name: setup Packet host
   hosts: localhost
@@ -59,7 +122,7 @@ cat > packet-setup.yaml <<-EOF
     - name: Send notification message via Slack in case of failure
       slack:
         token: "{{ 'T027F3GAJ/B011TAG710V/' + lookup('file', slackhook_path) }}"
-        msg: "<https://prow.ci.openshift.org/view/gs/origin-ci-test/logs/$JOB_NAME/$BUILD_ID|Packet failure>: *Setup*\nHostname: *{{ packet_hostname }}*\nError msg: {{ ansible_failed_result.msg }}\n"
+        msg: "<https://prow.ci.openshift.org/view/gs/origin-ci-test/logs/$JOB_NAME/$BUILD_ID|Packet failure>: *Setup*\nHostname: *{{ packet_hostname }}*\nError msg: {{ ansible_failed_result.msg }}\nReason: {{ hosts }}\n"
         username: "OpenShift CI Packet"
         color: warning
         icon_emoji: ":failed:"
@@ -69,49 +132,6 @@ cat > packet-setup.yaml <<-EOF
 
   - name: save Packet IP
     local_action: copy content="{{ hosts.devices[0].public_ipv4 }}" dest="{{ lookup('env', 'SHARED_DIR') }}/server-ip"
-
-  - name: write fix uid file
-    copy:
-      content: |
-        # Ensure our UID, which is randomly generated, is in /etc/passwd. This is required
-        # to be able to SSH.
-        if ! whoami &> /dev/null; then
-            if [ -x "\$(command -v nss_wrapper.pl)" ]; then
-                grep -v -e ^default -e ^\$(id -u) /etc/passwd > "/tmp/passwd"
-                echo "\${USER_NAME:-default}:x:\$(id -u):0:\${USER_NAME:-default} user:\${HOME}:/sbin/nologin" >> "/tmp/passwd"
-                export LD_PRELOAD=libnss_wrapper.so
-                export NSS_WRAPPER_PASSWD=/tmp/passwd
-                export NSS_WRAPPER_GROUP=/etc/group
-            elif [[ -w /etc/passwd ]]; then
-                echo "\${USER_NAME:-default}:x:\$(id -u):0:\${USER_NAME:-default} user:\${HOME}:/sbin/nologin" >> "/etc/passwd"
-            else
-                echo "No nss wrapper, /etc/passwd is not writeable, and user matching this uid is not found."
-                exit 1
-            fi
-        fi
-      dest: "${SHARED_DIR}/fix-uid.sh"
-
-  - name: write Packet common configuration file
-    copy:
-      content: |
-        source "\${SHARED_DIR}/fix-uid.sh"
-
-        # Initial check
-        if [[ ! "\${CLUSTER_TYPE}" =~ ^packet.*$|^equinix.*$ ]]; then
-            echo >&2 "Unsupported cluster type '\${CLUSTER_TYPE}'"
-            exit 1
-        fi
-
-        IP=\$(cat "\${SHARED_DIR}/server-ip")
-        SSHOPTS=(-o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o LogLevel=ERROR -i "\${CLUSTER_PROFILE_DIR}/packet-ssh-key")
-
-        # Checkout packet server
-        for x in \$(seq 10) ; do
-            test "\${x}" -eq 10 && exit 1
-            ssh "\${SSHOPTS[@]}" "root@\${IP}" hostname && break
-            sleep 10
-        done
-      dest: "${SHARED_DIR}/packet-conf.sh"
 EOF
 
 ansible-playbook packet-setup.yaml -e "packet_hostname=ipi-${NAMESPACE}-${JOB_NAME_HASH}-${BUILD_ID}"  |& gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0; fflush(); }'

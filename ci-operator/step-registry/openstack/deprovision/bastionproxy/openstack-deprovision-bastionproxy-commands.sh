@@ -29,7 +29,7 @@ if [[ -f ${SHARED_DIR}"/BASTION_FIP" ]]; then
   # configure the local container environment to have the correct SSH configuration
   if ! whoami &> /dev/null; then
       if [[ -w /etc/passwd ]]; then
-          echo "${BASTION_USER}:x:$(id -u):0:${BASTION_USER:-centos} user:${HOME}:/sbin/nologin" >> /etc/passwd
+          echo "${BASTION_USER:-cloud-user}:x:$(id -u):0:${BASTION_USER:-cloud-user} user:${HOME}:/sbin/nologin" >> /etc/passwd
       fi
   fi
   # shellcheck disable=SC2140

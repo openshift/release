@@ -2,6 +2,27 @@
 
 set -Eeuo pipefail
 
+function wait_for_network() {
+    # Wait up to 2 minutes for the network to be ready
+    for _ in $(seq 1 12); do
+        NETWORK_ATTACHMENT_DEFINITIONS=$(oc get network-attachment-definitions "${OPENSTACK_SRIOV_NETWORK}" -n "${CNF_NAMESPACE}" -o jsonpath='{.metadata.name}' || true)
+        if [ "${NETWORK_ATTACHMENT_DEFINITIONS}" == "${OPENSTACK_SRIOV_NETWORK}" ]; then
+            FOUND_NAD=1
+            break
+        fi
+        echo "Waiting for network ${OPENSTACK_SRIOV_NETWORK} to be attached"
+        sleep 10
+    done
+
+    if [ -n "${FOUND_NAD:-}" ] ; then
+        echo "Network ${OPENSTACK_SRIOV_NETWORK} is attached"
+    else
+        echo "Network ${OPENSTACK_SRIOV_NETWORK} is not attached after two minutes"
+        oc get network-attachment-definitions "${OPENSTACK_SRIOV_NETWORK}" -n "${CNF_NAMESPACE}" -o jsonpath='{.metadata.name}'
+        exit 1
+    fi
+}
+
 function check_pod_status() {
     INTERVAL=60
     CNT=10
@@ -58,6 +79,23 @@ EOF
 )
 echo "Created \"$CNF_NAMESPACE\" Namespace"
 
+# Mellanox use Bifurcation driver so we need the host-device CNI to move the NIC into the namespace
+if [[ "${OPENSTACK_SRIOV_NETWORK}" == "mellanox-sriov" ]]; then
+    cat <<EOF > "${SHARED_DIR}/additionalnetwork-sriov.yaml"
+spec:
+  additionalNetworks:
+  - name: ${OPENSTACK_SRIOV_NETWORK}
+    namespace: ${CNF_NAMESPACE}
+    rawCNIConfig: '{ "cniVersion": "0.3.1", "name": "${OPENSTACK_SRIOV_NETWORK}", "type": "host-device","pciBusId": "0000:00:06.0", "ipam": {}}'
+    type: Raw
+EOF
+    oc patch network.operator cluster --patch "$(cat "${SHARED_DIR}/additionalnetwork-sriov.yaml")" --type=merge
+    wait_for_network
+    ANNOTATIONS="k8s.v1.cni.cncf.io/networks: ${OPENSTACK_SRIOV_NETWORK}"
+else
+    RESOURCE_REQUEST="openshift.io/sriov1: \"1\""
+fi
+
 CNF_POD=$(
     oc create -f - -o jsonpath='{.metadata.name}' <<EOF
 apiVersion: v1
@@ -65,6 +103,8 @@ kind: Pod
 metadata:
   name: testpmd-host-device-sriov
   namespace: ${CNF_NAMESPACE}
+  annotations:
+    ${ANNOTATIONS:-}
 spec:
   containers:
   - name: testpmd
@@ -80,12 +120,12 @@ spec:
         memory: 1000Mi
         hugepages-1Gi: 1Gi
         cpu: '2'
-        openshift.io/sriov1: "1"
+        ${RESOURCE_REQUEST:-}
       limits:
         hugepages-1Gi: 1Gi
         cpu: '2'
         memory: 1000Mi
-        openshift.io/sriov1: "1"
+        ${RESOURCE_REQUEST:-}
     volumeMounts:
       - mountPath: /dev/hugepages
         name: hugepage
@@ -118,6 +158,10 @@ else
     exit 1
 fi
 
+echo "Cleaning ${CNF_NAMESPACE} namespace"
 oc delete namespace "${CNF_NAMESPACE}"
+
+echo "Removing additionalNetworks from network.operator"
+oc patch network.operator cluster --patch '{"spec":{"additionalNetworks": []}}' --type=merge
 
 echo "Successfully ran SR-IOV tests"
