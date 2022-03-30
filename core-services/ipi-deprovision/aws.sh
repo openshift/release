@@ -36,7 +36,7 @@ echo "deprovisioning clusters with an expirationDate before ${aws_cluster_age_cu
 for region in $( aws ec2 describe-regions --region us-east-1 --query "Regions[].{Name:RegionName}" --output text ); do
   echo "deprovisioning in AWS region ${region} ..."
   for cluster in $( aws ec2 describe-vpcs --output json --region "${region}" | jq --arg date "${aws_cluster_age_cutoff}" -r -S '.Vpcs[] | select (.Tags[]? | (.Key == "expirationDate" and .Value < $date)) | .Tags[] | select (.Value == "owned") | .Key' ); do
-    workdir="${logdir}/${cluster:22:14}"
+    workdir="${logdir}/${cluster:22}"
     mkdir -p "${workdir}"
     cat <<EOF >"${workdir}/metadata.json"
 {
