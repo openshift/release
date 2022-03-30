@@ -102,18 +102,15 @@ fi
 
 CLUSTER_NAME="$(/tmp/yq r "${CONFIG}" 'metadata.name')"
 REGION="$(/tmp/yq r "${CONFIG}" 'platform.gcp.region')"
-echo Using region: ${REGION}
+echo "Using region: ${REGION}"
+echo "Cluster name: ${CLUSTER_NAME}"
 test -n "${REGION}"
 
 if [[ -z "${NETWORK}" || -z "${CONTROL_PLANE_SUBNET}" ]]; then
   NETWORK=$(/tmp/yq r "${CONFIG}" 'platform.gcp.network')
   CONTROL_PLANE_SUBNET=$(/tmp/yq r "${CONFIG}" 'platform.gcp.controlPlaneSubnet')
 
-  if [[ -z "${NETWORK}" && -s "${SHARED_DIR}/vpc-info.yaml" ]]; then
-    echo "Dumping the content of ${SHARED_DIR}/vpc-info.yaml" && cat "${SHARED_DIR}/vpc-info.yaml"
-    NETWORK=$(/tmp/yq r "${SHARED_DIR}/vpc-info.yaml" 'vpc.network')
-    CONTROL_PLANE_SUBNET=$(/tmp/yq r "${SHARED_DIR}/vpc-info.yaml" 'vpc.controlPlaneSubnet')
-  elif [[ -s "${SHARED_DIR}/xpn.json" ]]; then
+  if [[ -s "${SHARED_DIR}/xpn.json" ]]; then
     echo "Dumping the content of ${SHARED_DIR}/xpn.json" && cat "${SHARED_DIR}/xpn.json"
     NETWORK="$(jq -r '.clusterNetwork' "${SHARED_DIR}/xpn.json")"
     CONTROL_PLANE_SUBNET="$(jq -r '.controlSubnet' "${SHARED_DIR}/xpn.json")"
@@ -256,11 +253,9 @@ export http_proxy=${CLIENT_PROXY_URL}
 export https_proxy=${CLIENT_PROXY_URL}
 EOF
 
-  PATCH=/tmp/install-config-sharednetwork.yaml.patch
-  cat > "${PATCH}" << EOF
+  cat >> "${CONFIG}" << EOF
 publish: Internal
 EOF
-  /tmp/yq m -x -i "${CONFIG}" "${PATCH}"
 fi
 
 # DEBUG

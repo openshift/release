@@ -12,10 +12,8 @@ fi
 curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
-if [ -s ${CONFIG} ]; then
-  cat "${CONFIG}"
-else
-  echo "${CONFIG} not found!"
+if [ ! -s ${CONFIG} ]; then
+  echo "${CONFIG} not found or empty, abort." && exit 1
 fi
 
 export GCP_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/gce.json"
@@ -32,7 +30,6 @@ mkdir -p "${dir}"
 pushd "${dir}"
 cp -t "${dir}" \
     "/var/lib/openshift-install/upi/${CLUSTER_TYPE}"/*
-find .
 
 ## Create the VPC
 echo "$(date -u --rfc-3339=seconds) - Creating the VPC..."
@@ -60,12 +57,16 @@ cat > "${SHARED_DIR}/vpc-destroy.sh" << EOF
 gcloud deployment-manager deployments delete -q "${CLUSTER_NAME}-vpc"
 EOF
 
-# Save the VPC information in ${SHARED_DIR}, in case SSH bastion host needs it
-cat > "${SHARED_DIR}/vpc-info.yaml" << EOF
-vpc:
-  network: ${CLUSTER_NAME}-network
-  controlPlaneSubnet: ${CLUSTER_NAME}-master-subnet
-  computeSubnet: ${CLUSTER_NAME}-worker-subnet
+PATCH=/tmp/install-config-patch.yaml
+cat > "${PATCH}" << EOF
+platform:
+  gcp:
+    network: ${CLUSTER_NAME}-network
+    controlPlaneSubnet: ${CLUSTER_NAME}-master-subnet
+    computeSubnet: ${CLUSTER_NAME}-worker-subnet
 EOF
+/tmp/yq m -x -i "${CONFIG}" "${PATCH}"
+echo "$(date -u --rfc-3339=seconds) - ${CONFIG} is patched with VPC info."
 
+rm -f "${PATCH}"
 popd

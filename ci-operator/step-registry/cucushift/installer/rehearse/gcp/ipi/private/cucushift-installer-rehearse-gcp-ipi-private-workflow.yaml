@@ -2,15 +2,19 @@ workflow:
   as: cucushift-installer-rehearse-gcp-ipi-private
   steps: 
     pre:
-      - chain: ipi-conf-gcp-sharednetwork
-      - ref: gcp-bastion-pre
-      - chain: ipi-install
+      - chain: cucushift-installer-rehearse-gcp-ipi-private-pre
     post:
-      - chain: ipi-deprovision
-      - ref: gcp-bastion-post
+      - chain: cucushift-installer-rehearse-gcp-ipi-private-post
     env:
       CREATE_BASTION: "yes"
       DISCONNECTED_NETWORK: "no"
       PUBLISH_STRATEGY: "Internal"
   documentation: |-
-    This is the workflow to trigger Prow's rehearsal test when submitting installer steps/chain/workflow
+    The IPI workflow provides pre- and post- steps that provision and
+    deprovision an OpenShift private cluster with a default configuration 
+    on GCP, allowing job authors to inject their own end-to-end test logic.
+
+    All modifications to this workflow should be done by modifying the
+    `cucushift-installer-rehearse-gcp-ipi-private-{pre,post}` chains to 
+    allow other workflows to mimic and extend this base workflow without 
+    a need to backport changes.
