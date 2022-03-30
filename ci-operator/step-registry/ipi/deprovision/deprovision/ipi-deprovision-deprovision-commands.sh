@@ -41,6 +41,13 @@ if [[ "${CLUSTER_TYPE}" == "ovirt" ]]; then
   set -e
 fi
 
+# Check if proxy is set
+if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+  echo "Private cluster setting proxy"
+  # shellcheck disable=SC1090
+  source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 echo "Running the Installer's 'destroy cluster' command..."
 OPENSHIFT_INSTALL_REPORT_QUOTA_FOOTPRINT="true"; export OPENSHIFT_INSTALL_REPORT_QUOTA_FOOTPRINT
 openshift-install --dir /tmp/installer destroy cluster &
