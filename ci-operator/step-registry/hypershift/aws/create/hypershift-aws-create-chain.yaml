@@ -13,8 +13,15 @@ chain:
     - name: HYPERSHIFT_AWS_REGION
       default: "us-east-1"
       documentation: "The AWS region of the cluster."
+    - name: CONTROLPLANE_OPERATOR_IMAGE
+      default: ""
+      documentation: "The CPO image to use. Set to LATEST to use the latest one"
     commands: |-
       set -exuo pipefail
+
+      # We don't have the value of HYPERSHIFT_RELEASE_LATEST when we set CONTROLPLANE_OPERATOR_IMAGE so we
+      # have to use a hack like this.
+      [[ ${CONTROLPLANE_OPERATOR_IMAGE} = "LATEST" ]] && CONTROLPLANE_OPERATOR_IMAGE="${HYPERSHIFT_RELEASE_LATEST}"
 
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|cut -d- -f-2)"
       echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
@@ -27,6 +34,7 @@ chain:
         --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
         --aws-creds /etc/hypershift-pool-aws-credentials/credentials \
         --release-image ${RELEASE_IMAGE_LATEST} \
+        --control-plane-operator-image=${CONTROLPLANE_OPERATOR_IMAGE:-} \
         --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)"
 
       # The timeout should be much lower, this is due to https://bugzilla.redhat.com/show_bug.cgi?id=2060091
@@ -63,3 +71,5 @@ chain:
     dependencies:
     - name: "release:latest"
       env: RELEASE_IMAGE_LATEST
+    - name: hypershift-operator
+      env: HYPERSHIFT_RELEASE_LATEST
