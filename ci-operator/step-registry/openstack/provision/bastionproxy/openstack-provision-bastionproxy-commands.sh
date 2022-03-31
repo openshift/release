@@ -155,11 +155,7 @@ fi
 echo "Deploying squid on $SQUID_IP"
 
 >&2 cat << EOF > $WORK_DIR/deploy_squid.sh
-sudo dnf install -y squid dnsmasq
-
-sudo bash -c "cat << EOF >> /etc/dnsmasq.conf
-listen-address=${SQUID_IP}
-EOF"
+sudo dnf install -y squid
 
 sudo bash -c "cat << EOF > /etc/squid/squid.conf
 acl localnet src all
@@ -191,7 +187,6 @@ sudo yum install -y httpd-tools
 sudo htpasswd -bBc /etc/squid/htpasswd $CLUSTER_NAME $PASSWORD
 
 sudo systemctl start squid
-sudo systemctl start dnsmasq
 EOF
 
 if [[ $MACHINES_GATEWAY_IP != "" ]]; then
