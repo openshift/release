@@ -13,6 +13,7 @@ source ./venv_qe/bin/activate
 
 git clone https://github.com/cloud-bulldozer/e2e-benchmarking
 pushd e2e-benchmarking/workloads/kube-burner
+export WORKLOAD=node-density
 export NODE_COUNT=2
 export PODS_PER_NODE=100
-./run_nodedensity_test_fromgit.sh
+./run.sh
