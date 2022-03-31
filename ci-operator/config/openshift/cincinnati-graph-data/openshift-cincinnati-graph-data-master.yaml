@@ -48,12 +48,12 @@ raw_steps:
 releases:
   initial:
     integration:
-      name: "4.11"
+      name: "4.10"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.11"
+      name: "4.10"
       namespace: ocp
 resources:
   '*':
@@ -66,23 +66,42 @@ tests:
   container:
     from: graphdata-unittests
 - as: e2e-latest-cincinnati
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.10"
   optional: true
   steps:
-    cluster_profile: aws
     test:
     - as: openshift-e2e-test
-      commands: bash ./hack/e2e.sh --run-ignored
+      commands: |
+        cp -Lrvf $KUBECONFIG /tmp/kube
+        unset KUBECONFIG
+        # required to authenticate and pull images from the build cluster
+        oc adm policy add-role-to-group system:image-puller system:authenticated --namespace "${NAMESPACE}"
+        oc adm policy add-role-to-group system:image-puller system:unauthenticated --namespace "${NAMESPACE}"
+        export KUBECONFIG=/tmp/kube
+        bash ./hack/e2e.sh --run-ignored
+      credentials:
+      - mount_path: /tmp/secret/pull-secret
+        name: ci-pull-credentials
+        namespace: test-credentials
       dependencies:
       - env: CINCINNATI_IMAGE
         name: cincinnati-operand-latest
       - env: GRAPHDATA_IMAGE
         name: stable
+      env:
+      - default: /tmp/secret/pull-secret/.dockerconfigjson
+        name: PULL_SECRET
       from: cincinnati-e2e-latest
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: openshift-e2e-aws
 - as: errata-webhook-unittests
   commands: python3 -m unittest
   container:
