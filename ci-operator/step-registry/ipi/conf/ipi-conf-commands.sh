@@ -42,3 +42,10 @@ capabilities:
   baselineCapabilitySet: ${BASELINE_CAPABILITY_SET}
 EOF
 fi
+
+if [ -n "${PUBLISH}" ]; then
+        echo "Adding 'publish: ...' to install-config.yaml"
+        cat >> "${out}" << EOF
+publish: ${PUBLISH}
+EOF
+fi

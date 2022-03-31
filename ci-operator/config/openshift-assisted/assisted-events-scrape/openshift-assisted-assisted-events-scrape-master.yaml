@@ -1,8 +1,4 @@
 base_images:
-  assisted-service:
-    name: ocm-2.5
-    namespace: edge-infrastructure
-    tag: assisted-service
   coreos_centos_stream8:
     name: stream8
     namespace: coreos
@@ -19,17 +15,9 @@ build_root:
 images:
 - dockerfile_path: Dockerfile.build
   from: coreos_centos_stream8
-  inputs:
-    assisted-service:
-      as:
-      - quay.io/edge-infrastructure/assisted-service:latest
   to: assisted-events-scrape-build
 - dockerfile_path: Dockerfile
   from: ubi_minimal
-  inputs:
-    assisted-service:
-      as:
-      - quay.io/edge-infrastructure/assisted-service:latest
   to: assisted-events-scrape
 promotion:
   name: ocm-2.5
@@ -44,6 +32,11 @@ resources:
 tests:
 - as: lint
   commands: make lint
+  container:
+    clone: true
+    from: assisted-events-scrape-build
+- as: unit-test
+  commands: make unit-test
   container:
     clone: true
     from: assisted-events-scrape-build

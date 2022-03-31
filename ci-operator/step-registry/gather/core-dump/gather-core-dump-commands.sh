@@ -1,6 +1,13 @@
 #!/bin/bash
 set -x
 
+# Check if proxy is set
+if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+  echo "Private cluster setting proxy"
+  # shellcheck disable=SC1090
+  source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 if test ! -f "${KUBECONFIG}"
 then
 	echo "No kubeconfig, so no point in gathering extra artifacts."

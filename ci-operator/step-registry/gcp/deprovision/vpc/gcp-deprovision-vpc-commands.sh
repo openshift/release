@@ -20,4 +20,4 @@ fi
 
 ## Destroy the VPC
 echo "$(date -u --rfc-3339=seconds) - Destroying the VPC..."
-source "${SHARED_DIR}/vpc-destroy.sh"
+sh "${SHARED_DIR}/vpc-destroy.sh"

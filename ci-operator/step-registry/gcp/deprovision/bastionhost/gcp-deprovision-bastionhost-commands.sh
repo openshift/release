@@ -20,4 +20,4 @@ fi
 
 ## Destroy the SSH bastion
 echo "$(date -u --rfc-3339=seconds) - Destroying the bastion host..."
-source "${SHARED_DIR}/bastion-destroy.sh"
+sh "${SHARED_DIR}/bastion-destroy.sh"

@@ -15,6 +15,7 @@ read_profile_file() {
 
 CLUSTER_NAME=${CLUSTER_NAME:-$NAMESPACE}
 CLUSTER_VERSION=${CLUSTER_VERSION:-}
+CLUSTER_MULTI_AZ=${CLUSTER_MULTI_AZ:-false}
 SSO_CLIENT_ID=$(read_profile_file "sso-client-id")
 SSO_CLIENT_SECRET=$(read_profile_file "sso-client-secret")
 OCM_TOKEN=$(read_profile_file "ocm-token")
@@ -79,18 +80,25 @@ fi
 
 CLUSTER_INFO="${ARTIFACT_DIR}/ocm-cluster.txt"
 
+CLUSTER_MULTI_AZ_SWITCH=""
+if [[ "$CLUSTER_MULTI_AZ" == "true" ]]; then
+  CLUSTER_MULTI_AZ_SWITCH="--multi-az"
+fi
+
 echo "Parameters for cluster request:"
 echo "  Cluster name: ${CLUSTER_NAME}"
 echo "  Compute nodes: ${COMPUTE_NODES}"
 echo "  Cluster version: ${CLUSTER_VERSION}"
 echo "  Compute machine type: ${COMPUTE_MACHINE_TYPE}"
 echo "  Cloud provider region: ${CLOUD_PROVIDER_REGION}"
+echo "  Cluster multi-az: ${CLUSTER_MULTI_AZ}"
 ocm create cluster ${OCM_CREATE_ARGS} \
                    --ccs "${CLUSTER_NAME}" \
                    --compute-nodes "${COMPUTE_NODES}" \
                    --version "${CLUSTER_VERSION}" \
                    --compute-machine-type "${COMPUTE_MACHINE_TYPE}" \
                    --region "${CLOUD_PROVIDER_REGION}" \
+                   ${CLUSTER_MULTI_AZ_SWITCH} \
                    > "${CLUSTER_INFO}"
 
 CLUSTER_ID=$(cat "${CLUSTER_INFO}" | grep '^ID:' | tr -d '[:space:]' | cut -d ':' -f 2)
