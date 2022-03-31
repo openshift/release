@@ -117,7 +117,7 @@ echo -n "${CLUSTER_ID}" > "${HOME}/cluster-id"
 echo "Waiting for cluster ready..."
 while true; do
   sleep 60
-  CLUSTER_STATE=$(ocm cluster status "${CLUSTER_ID}" | grep 'State:' | tr -d '[:space:]' | cut -d ':' -f 2)
+  CLUSTER_STATE=$(ocm get cluster "${CLUSTER_ID}" | jq -r '.status.state')
   echo "Cluster state: ${CLUSTER_STATE}"
   if [[ "${CLUSTER_STATE}" == "ready" ]]; then
     echo "Cluster is reported as ready"
