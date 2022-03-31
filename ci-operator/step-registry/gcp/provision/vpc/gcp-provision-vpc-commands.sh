@@ -8,20 +8,12 @@ if [[ -s "${SHARED_DIR}/xpn.json" ]]; then
   echo "$(date -u --rfc-3339=seconds) - Using pre-existing XPN VPC..." && exit 0
 fi
 
-# TODO: move to image
-curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
-
-CONFIG="${SHARED_DIR}/install-config.yaml"
-if [ ! -s ${CONFIG} ]; then
-  echo "${CONFIG} not found or empty, abort." && exit 1
-fi
-
 export GCP_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/gce.json"
 sa_email=$(jq -r .client_email ${GCP_SHARED_CREDENTIALS_FILE})
 if ! gcloud auth list | grep -E "\*\s+${sa_email}"
 then
   gcloud auth activate-service-account --key-file="${GCP_SHARED_CREDENTIALS_FILE}"
-  gcloud config set project "$(/tmp/yq r "${CONFIG}" 'platform.gcp.projectID')"
+  gcloud config set project "${CLUSTER_PROFILE_DIR}/openshift_gcp_project"
 fi
 
 echo "$(date -u --rfc-3339=seconds) - Copying resource files from lib dir..."
@@ -34,8 +26,8 @@ cp -t "${dir}" \
 ## Create the VPC
 echo "$(date -u --rfc-3339=seconds) - Creating the VPC..."
 
-CLUSTER_NAME="$(/tmp/yq r "${CONFIG}" 'metadata.name')"
-REGION="$(/tmp/yq r "${CONFIG}" 'platform.gcp.region')"
+CLUSTER_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
+REGION="${LEASED_RESOURCE}"
 MASTER_SUBNET_CIDR='10.0.0.0/19'
 WORKER_SUBNET_CIDR='10.0.32.0/19'
 
@@ -57,16 +49,12 @@ cat > "${SHARED_DIR}/vpc-destroy.sh" << EOF
 gcloud deployment-manager deployments delete -q "${CLUSTER_NAME}-vpc"
 EOF
 
-PATCH=/tmp/install-config-patch.yaml
-cat > "${PATCH}" << EOF
+cat > "${SHARED_DIR}/customer_vpc_subnets.yaml" << EOF
 platform:
   gcp:
     network: ${CLUSTER_NAME}-network
     controlPlaneSubnet: ${CLUSTER_NAME}-master-subnet
     computeSubnet: ${CLUSTER_NAME}-worker-subnet
 EOF
-/tmp/yq m -x -i "${CONFIG}" "${PATCH}"
-echo "$(date -u --rfc-3339=seconds) - ${CONFIG} is patched with VPC info."
 
-rm -f "${PATCH}"
 popd

@@ -6,12 +6,12 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-if [ X"${CREATE_BASTION}" == X"no" ]; then
-  echo "CREATE_BASTION is set to 'no', so nothing to do." && exit 0
+if [[ ! -s "${SHARED_DIR}/customer_vpc_subnets.yaml" ]]; then
+  echo "Lack of VPC info, abort." && exit 1
 fi
 
 function generate_proxy_ignition() {
-cat > /tmp/proxy.ign << EOF
+  cat > /tmp/proxy.ign << EOF
 {
   "ignition": {
     "config": {},
@@ -88,7 +88,7 @@ EOF
 # TODO: move to image
 curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
 
-CONFIG="${SHARED_DIR}/install-config.yaml"
+VPC_CONFIG="${SHARED_DIR}/customer_vpc_subnets.yaml"
 
 PROXY_IMAGE="registry.ci.openshift.org/origin/${OCP_RELEASE}:egress-http-proxy"
 
@@ -97,29 +97,21 @@ sa_email=$(jq -r .client_email ${GCP_SHARED_CREDENTIALS_FILE})
 if ! gcloud auth list | grep -E "\*\s+${sa_email}"
 then
   gcloud auth activate-service-account --key-file="${GCP_SHARED_CREDENTIALS_FILE}"
-  gcloud config set project "$(/tmp/yq r "${CONFIG}" 'platform.gcp.projectID')"
+  gcloud config set project "${CLUSTER_PROFILE_DIR}/openshift_gcp_project"
 fi
 
-CLUSTER_NAME="$(/tmp/yq r "${CONFIG}" 'metadata.name')"
-REGION="$(/tmp/yq r "${CONFIG}" 'platform.gcp.region')"
+CLUSTER_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
+REGION="${LEASED_RESOURCE}"
 echo "Using region: ${REGION}"
 echo "Cluster name: ${CLUSTER_NAME}"
 test -n "${REGION}"
 
 if [[ -z "${NETWORK}" || -z "${CONTROL_PLANE_SUBNET}" ]]; then
-  NETWORK=$(/tmp/yq r "${CONFIG}" 'platform.gcp.network')
-  CONTROL_PLANE_SUBNET=$(/tmp/yq r "${CONFIG}" 'platform.gcp.controlPlaneSubnet')
-
-  if [[ -s "${SHARED_DIR}/xpn.json" ]]; then
-    echo "Dumping the content of ${SHARED_DIR}/xpn.json" && cat "${SHARED_DIR}/xpn.json"
-    NETWORK="$(jq -r '.clusterNetwork' "${SHARED_DIR}/xpn.json")"
-    CONTROL_PLANE_SUBNET="$(jq -r '.controlSubnet' "${SHARED_DIR}/xpn.json")"
-    REGION="$(echo "${CONTROL_PLANE_SUBNET}" | cut -d/ -f9)"
-  fi
+  NETWORK=$(/tmp/yq r "${VPC_CONFIG}" 'platform.gcp.network')
+  CONTROL_PLANE_SUBNET=$(/tmp/yq r "${VPC_CONFIG}" 'platform.gcp.controlPlaneSubnet')
 fi
 if [[ -z "${NETWORK}" || -z "${CONTROL_PLANE_SUBNET}" ]]; then
-  echo "Could not find VPC network and control-plane subnet" 1>&2
-  exit 1
+  echo "Could not find VPC network and control-plane subnet" && exit 1
 fi
 ZONE_0=$(gcloud compute regions describe ${REGION} --format=json | jq -r .zones[0] | cut -d "/" -f9)
 MACHINE_TYPE="n1-standard-1"
@@ -213,13 +205,6 @@ gcloud compute instances delete -q "${CLUSTER_NAME}-bastion" --zone=${ZONE_0}
 gcloud ${project_option} compute firewall-rules delete -q "${CLUSTER_NAME}-bastion-ingress-allow"
 EOF
 
-if [ X"${DISCONNECTED_NETWORK}" == X"yes" ]; then
-  gcloud ${project_option} compute firewall-rules create "${CLUSTER_NAME}-bastion-egress-allow" --allow='all' --direction=EGRESS --network="${NETWORK}" --target-tags="${CLUSTER_NAME}-bastion"
-  cat >> "${SHARED_DIR}/ssh-bastion-destroy.sh" << EOF
-gcloud ${project_option} compute firewall-rules delete -q "${CLUSTER_NAME}-bastion-egress-allow"
-EOF
-fi
-
 INSTANCE_ID="${CLUSTER_NAME}-bastion"
 echo "Instance ${INSTANCE_ID}"
 
@@ -229,45 +214,13 @@ echo "${INSTANCE_ID}" >> "${SHARED_DIR}/gcp-instance-ids.txt"
 
 gcloud compute instances list --filter="name=('${INSTANCE_ID}')" \
   --zones "${ZONE_0}" --format json > /tmp/${INSTANCE_ID}-bastion.json
-PRIVATE_PROXY_IP="$(jq -r '.[].networkInterfaces[0].networkIP' /tmp/${INSTANCE_ID}-bastion.json)"
-PUBLIC_PROXY_IP="$(jq -r '.[].networkInterfaces[0].accessConfigs[0].natIP' /tmp/${INSTANCE_ID}-bastion.json)"
+BASTION_PRIVATE_IP="$(jq -r '.[].networkInterfaces[0].networkIP' /tmp/${INSTANCE_ID}-bastion.json)"
+BASTION_PUBLIC_IP="$(jq -r '.[].networkInterfaces[0].accessConfigs[0].natIP' /tmp/${INSTANCE_ID}-bastion.json)"
 
 # echo proxy IP to ${SHARED_DIR}/proxyip
-echo "${PUBLIC_PROXY_IP}" >> "${SHARED_DIR}/proxyip"
-
-if [ X"${DISCONNECTED_NETWORK}" == X"yes" ]; then
-  PROXY_URL="http://${CLUSTER_NAME}:${PASSWORD}@${PRIVATE_PROXY_IP}:3128/"
-  # due to https://bugzilla.redhat.com/show_bug.cgi?id=1750650 we don't use a tls end point for squid
-
-  cat >> "${CONFIG}" << EOF
-proxy:
-  httpsProxy: ${PROXY_URL}
-  httpProxy: ${PROXY_URL}
-EOF
-fi
+echo "${BASTION_PUBLIC_IP}" >> "${SHARED_DIR}/proxyip"
 
 if [ X"${PUBLISH_STRATEGY}" == X"Internal" ]; then
-  CLIENT_PROXY_URL="http://${CLUSTER_NAME}:${PASSWORD}@${PUBLIC_PROXY_IP}:3128/"
-  cat > "${SHARED_DIR}/proxy-conf.sh" << EOF
-export http_proxy=${CLIENT_PROXY_URL}
-export https_proxy=${CLIENT_PROXY_URL}
-EOF
-
-  cat >> "${CONFIG}" << EOF
-publish: Internal
-EOF
+  CLIENT_PROXY_URL="http://${CLUSTER_NAME}:${PASSWORD}@${BASTION_PUBLIC_IP}:3128/"
+  echo "${CLIENT_PROXY_URL}" > "${SHARED_DIR}/public_proxy_url"
 fi
-
-# DEBUG
-echo ">>Trying to connect to the bastion's public IP..."
-MAX_ATTEMPTS=10; i=0
-while [ $i -le $MAX_ATTEMPTS ]
-do
-  if curl --proxy "${CLIENT_PROXY_URL}" -I www.google.com --max-time 10
-  then
-    break
-  else
-    sleep 10s
-  fi
-  i=`expr $i + 1`
-done
