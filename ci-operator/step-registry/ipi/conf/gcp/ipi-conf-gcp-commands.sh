@@ -60,4 +60,5 @@ fi
 
 if [[ -s "${SHARED_DIR}/customer_vpc_subnets.yaml" ]]; then
   /tmp/yq m -x -i "${CONFIG}" "${SHARED_DIR}/customer_vpc_subnets.yaml"
+  cat "${CONFIG}"
 fi

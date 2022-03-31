@@ -8,12 +8,13 @@ if [[ -s "${SHARED_DIR}/xpn.json" ]]; then
   echo "$(date -u --rfc-3339=seconds) - Using pre-existing XPN VPC..." && exit 0
 fi
 
+GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 export GCP_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/gce.json"
 sa_email=$(jq -r .client_email ${GCP_SHARED_CREDENTIALS_FILE})
 if ! gcloud auth list | grep -E "\*\s+${sa_email}"
 then
   gcloud auth activate-service-account --key-file="${GCP_SHARED_CREDENTIALS_FILE}"
-  gcloud config set project "${CLUSTER_PROFILE_DIR}/openshift_gcp_project"
+  gcloud config set project "${GOOGLE_PROJECT_ID}"
 fi
 
 echo "$(date -u --rfc-3339=seconds) - Copying resource files from lib dir..."

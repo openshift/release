@@ -92,12 +92,13 @@ VPC_CONFIG="${SHARED_DIR}/customer_vpc_subnets.yaml"
 
 PROXY_IMAGE="registry.ci.openshift.org/origin/${OCP_RELEASE}:egress-http-proxy"
 
+GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 export GCP_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/gce.json"
 sa_email=$(jq -r .client_email ${GCP_SHARED_CREDENTIALS_FILE})
 if ! gcloud auth list | grep -E "\*\s+${sa_email}"
 then
   gcloud auth activate-service-account --key-file="${GCP_SHARED_CREDENTIALS_FILE}"
-  gcloud config set project "${CLUSTER_PROFILE_DIR}/openshift_gcp_project"
+  gcloud config set project "${GOOGLE_PROJECT_ID}"
 fi
 
 CLUSTER_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
@@ -214,13 +215,13 @@ echo "${INSTANCE_ID}" >> "${SHARED_DIR}/gcp-instance-ids.txt"
 
 gcloud compute instances list --filter="name=('${INSTANCE_ID}')" \
   --zones "${ZONE_0}" --format json > /tmp/${INSTANCE_ID}-bastion.json
-BASTION_PRIVATE_IP="$(jq -r '.[].networkInterfaces[0].networkIP' /tmp/${INSTANCE_ID}-bastion.json)"
+#BASTION_PRIVATE_IP="$(jq -r '.[].networkInterfaces[0].networkIP' /tmp/${INSTANCE_ID}-bastion.json)"
 BASTION_PUBLIC_IP="$(jq -r '.[].networkInterfaces[0].accessConfigs[0].natIP' /tmp/${INSTANCE_ID}-bastion.json)"
 
 # echo proxy IP to ${SHARED_DIR}/proxyip
 echo "${BASTION_PUBLIC_IP}" >> "${SHARED_DIR}/proxyip"
 
-if [ X"${PUBLISH_STRATEGY}" == X"Internal" ]; then
+if [ X"${PUBLISH}" == X"Internal" ]; then
   CLIENT_PROXY_URL="http://${CLUSTER_NAME}:${PASSWORD}@${BASTION_PUBLIC_IP}:3128/"
   echo "${CLIENT_PROXY_URL}" > "${SHARED_DIR}/public_proxy_url"
 fi
