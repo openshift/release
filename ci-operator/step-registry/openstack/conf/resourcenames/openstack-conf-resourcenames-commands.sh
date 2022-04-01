@@ -10,6 +10,7 @@ declare -A external_network=(
 	['openstack-vh-mecha-central']='external'
 	['openstack-vh-mecha-az0']='external'
 	['openstack-nfv']='intel-dpdk'
+	['openstack-hwoffload']='external'
 	['openstack']='external'
 	)
 
@@ -19,6 +20,7 @@ declare -A controlplane_flavor=(
 	['openstack-vh-mecha-central']='m1.xlarge'
 	['openstack-vh-mecha-az0']='m1.xlarge'
 	['openstack-nfv']='m1.xlarge'
+	['openstack-hwoffload']='m1.xlarge'
 	['openstack']='m1.s2.xlarge'
 	)
 
@@ -28,6 +30,7 @@ declare -A compute_flavor=(
 	['openstack-vh-mecha-central']='m1.xlarge'
 	['openstack-vh-mecha-az0']='m1.xlarge'
 	['openstack-nfv']='m1.xlarge.nfv'
+	['openstack-hwoffload']='m1.xlarge.nfv'
 	['openstack']='m1.s2.xlarge'
 	)
 
@@ -37,6 +40,7 @@ declare -A compute_azs=(
 	['openstack-vh-mecha-central']=''
 	['openstack-vh-mecha-az0']='az0'
 	['openstack-nfv']=''
+	['openstack-hwoffload']=''
 	['openstack']=''
 	)
 
@@ -46,6 +50,7 @@ declare -A bastion_flavor=(
 	['openstack-vh-mecha-central']='m1.small'
 	['openstack-vh-mecha-az0']='m1.small'
 	['openstack-nfv']='m1.small'
+	['openstack-hwoffload']='m1.small'
 	['openstack']=''
 	)
 
