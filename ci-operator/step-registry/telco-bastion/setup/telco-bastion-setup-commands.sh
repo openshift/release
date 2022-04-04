@@ -28,7 +28,12 @@ cat << EOF > ~/ocp-install.yml
 ---
 - name: Grab and run kcli to install openshift cluster
   hosts: all
+  gather_facts: false
   tasks:
+  - name: Wait 300 seconds, but only start checking after 60 seconds
+    wait_for_connection:
+      delay: 60
+      timeout: 300
   - name: Clone repo
     git:
       repo: https://github.com/karmab/kcli-openshift4-baremetal.git
