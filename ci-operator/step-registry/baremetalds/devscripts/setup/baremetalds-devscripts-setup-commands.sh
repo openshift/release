@@ -38,14 +38,16 @@ finished()
 }
 trap finished EXIT TERM
 
-# Make sure this host hasn't been previously used
-ssh "${SSHOPTS[@]}" "root@${IP}" mkdir /root/nodesfirstuse
+# Running "mkdir" without "-p" ensures we don't accidently reuse a host twice
+ssh "${SSHOPTS[@]}" "root@${IP}" mkdir /root/extra_assets
 
 # Copy dev-scripts source from current directory to the remote server
 tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/dev-scripts.tar.gz"
 
 # Prepare configuration and run dev-scripts
 scp "${SSHOPTS[@]}" "${CLUSTER_PROFILE_DIR}/pull-secret" "root@${IP}:pull-secret"
+# TODO: update dev-scripts to support .yml as well as .yaml
+find ${SHARED_DIR} -name "manifest_*" -printf '%f\n' | tar -C ${SHARED_DIR} -czf - -T - | ssh "${SSHOPTS[@]}" "root@${IP}" tar -C /root/extra_assets --transform='s/yml$/yaml/' -xzf -
 
 # Additional mechanism to inject dev-scripts additional variables directly
 # from a multistage step configuration.
@@ -105,6 +107,7 @@ echo "export OPENSHIFT_CI=true" >> /root/dev-scripts/config_root.sh
 echo "export NUM_WORKERS=3" >> /root/dev-scripts/config_root.sh
 echo "export WORKER_MEMORY=16384" >> /root/dev-scripts/config_root.sh
 echo "export ENABLE_LOCAL_REGISTRY=true" >> /root/dev-scripts/config_root.sh
+echo "export ASSETS_EXTRA_FOLDER=/root/extra_assets" >> /root/dev-scripts/config_root.sh
 
 # Inject PR additional configuration, if available
 if [[ -e /root/dev-scripts/dev-scripts-additional-config ]]
