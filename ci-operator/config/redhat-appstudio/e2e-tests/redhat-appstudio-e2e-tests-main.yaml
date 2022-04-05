@@ -1,8 +1,6 @@
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.17
+  project_image:
+    dockerfile_path: .ci/openshift-ci/Dockerfile
 releases:
   latest:
     release:
@@ -19,7 +17,7 @@ resources:
 tests:
 - as: redhat-appstudio-e2e
   steps:
-    cluster_profile: gcp
+    cluster_profile: aws
     test:
     - as: redhat-appstudio-e2e
       cli: latest
@@ -34,6 +32,7 @@ tests:
         mkdir -p ${HOME}/creds
         GIT_CREDS_PATH="${HOME}/creds/file"
         git config --global credential.helper "store --file ${GIT_CREDS_PATH}"
+
         echo "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com" > ${GIT_CREDS_PATH}
 
         /bin/bash .ci/oci-launch-e2e.sh
@@ -45,7 +44,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-gcp
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: redhat-appstudio
