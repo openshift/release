@@ -7,6 +7,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.17-openshift-4.10
+  operator-index:
+    name: redhat-operator-index
+    namespace: ci
+    tag: v4.9
 build_root:
   image_stream_tag:
     name: release
@@ -20,6 +24,14 @@ images:
       as:
       - golang:1.17
   to: aws-load-balancer-operator
+operator:
+  bundles:
+  - as: aws-load-balancer-operator-bundle
+    base_index: operator-index
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: openshift.io/aws-load-balancer-operator:latest
+    with: pipeline:aws-load-balancer-operator
 releases:
   initial:
     integration:
@@ -49,6 +61,25 @@ tests:
     make test
   container:
     from: src
+- as: e2e-aws-operator
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-aws-load-balancer-operator-bundle
+    env:
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: aws-load-balancer-operator
+      OO_PACKAGE: aws-load-balancer-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: aws-load-balancer-install
 zz_generated_metadata:
   branch: main
   org: openshift
