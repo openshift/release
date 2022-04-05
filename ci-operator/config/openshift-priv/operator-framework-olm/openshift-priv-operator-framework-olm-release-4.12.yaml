@@ -79,6 +79,18 @@ tests:
   commands: make unit/psm
   container:
     from: ci-image
+- as: e2e-gcp-olm
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIRECTORY=${ARTIFACT_DIR} make e2e/olm SKIP='\[FLAKE\]'
+      from: ci-image
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
 - as: e2e-gcp-olm-flaky
   optional: true
   steps:
