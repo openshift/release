@@ -3,12 +3,12 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-internal_proxy_url_file="${SHARED_DIR}/internal_proxy_url"
-if [ ! -f "${internal_proxy_url_file}" ]; then
-    echo "Did not found proxy setting from ${internal_proxy_url_file}"
+proxy_private_url_file="${SHARED_DIR}/proxy_private_url"
+if [ ! -f "${proxy_private_url_file}" ]; then
+    echo "Did not found proxy setting from ${proxy_private_url_file}"
     exit 1
 else
-    PROXY_URL=$(< "${internal_proxy_url_file}")
+    PROXY_URL=$(< "${proxy_private_url_file}")
 fi
 
 if [ -z "${PROXY_URL}" ]; then
