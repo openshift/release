@@ -107,7 +107,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-aws-ocp-49-continuous
+- as: operator-e2e-aws-ocp-49
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -115,11 +115,11 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.9"
-  cron: 0 0,12 * * *
   steps:
+    allow_skip_on_success: true
     test:
-    - as: serverless-e2e
-      commands: make test-e2e-with-kafka test-upstream-e2e-no-upgrade
+    - as: operator-e2e
+      commands: make test-e2e-with-kafka
       dependencies:
       - env: KNATIVE_OPENSHIFT_INGRESS
         name: knative-openshift-ingress
@@ -135,7 +135,7 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
-- as: upgrade-tests-aws-ocp-49-continuous
+- as: upstream-e2e-aws-ocp-49
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -143,8 +143,36 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.9"
-  cron: 0 2,14 * * *
   steps:
+    allow_skip_on_success: true
+    test:
+    - as: serverless-e2e
+      commands: make test-upstream-e2e-no-upgrade
+      dependencies:
+      - env: KNATIVE_OPENSHIFT_INGRESS
+        name: knative-openshift-ingress
+      - env: KNATIVE_OPERATOR
+        name: knative-operator
+      - env: OPENSHIFT_KNATIVE_OPERATOR
+        name: openshift-knative-operator
+      from: serverless-operator-src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
+- as: upgrade-tests-aws-ocp-49
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.9"
+  steps:
+    allow_skip_on_success: true
     test:
     - as: serverless-e2e
       commands: make test-upgrade
@@ -162,62 +190,6 @@ tests:
         requests:
           cpu: "2"
           memory: 4Gi
-    workflow: generic-claim
-- as: e2e-mesh-ocp-49-continuous
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.9"
-  cron: 0 4,16 * * *
-  steps:
-    test:
-    - as: serverless-e2e
-      commands: make test-upstream-e2e-mesh
-      dependencies:
-      - env: KNATIVE_OPENSHIFT_INGRESS
-        name: knative-openshift-ingress
-      - env: KNATIVE_OPERATOR
-        name: knative-operator
-      - env: OPENSHIFT_KNATIVE_OPERATOR
-        name: openshift-knative-operator
-      from: serverless-operator-src
-      resources:
-        limits:
-          memory: 6Gi
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: generic-claim
-- as: ui-tests
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.9"
-  cron: 0 6,18 * * *
-  steps:
-    test:
-    - as: serverless-ui
-      commands: make test-ui-e2e
-      dependencies:
-      - env: KNATIVE_OPENSHIFT_INGRESS
-        name: knative-openshift-ingress
-      - env: KNATIVE_OPERATOR
-        name: knative-operator
-      - env: OPENSHIFT_KNATIVE_OPERATOR
-        name: openshift-knative-operator
-      from: serverless-operator-src
-      resources:
-        limits:
-          memory: 6Gi
-        requests:
-          cpu: 100m
-          memory: 200Mi
     workflow: generic-claim
 zz_generated_metadata:
   branch: release-1.22
