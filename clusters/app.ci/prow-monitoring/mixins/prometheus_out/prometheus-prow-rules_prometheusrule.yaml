@@ -109,6 +109,22 @@ spec:
       for: 5m
       labels:
         severity: critical
+    - alert: pod-scaler-producerDown
+      annotations:
+        message: The service pod-scaler-producer has been down for 5 minutes.
+      expr: |
+        absent(up{job="pod-scaler-producer"} == 1)
+      for: 5m
+      labels:
+        severity: critical
+    - alert: pod-scaler-uiDown
+      annotations:
+        message: The service pod-scaler-ui has been down for 5 minutes.
+      expr: |
+        absent(up{job="pod-scaler-ui"} == 1)
+      for: 5m
+      labels:
+        severity: critical
   - name: ci-absent-ghproxy
     rules:
     - alert: ghproxyDown
@@ -316,7 +332,7 @@ spec:
       annotations:
         message: '{{ $labels.login }} may run out of API quota before the next reset. Check the <https://grafana-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1|dashboard>'
       expr: |
-        github_token_usage * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login) + deriv(github_token_usage[20m]) * github_token_reset * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login) / 1e9 < 100
+        github_token_usage{ratelimit_resource="core"} * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login) + deriv(github_token_usage{ratelimit_resource="core"}[20m]) * github_token_reset{ratelimit_resource="core"} * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login) / 1e9 < 100
       for: 5m
       labels:
         severity: critical
@@ -324,7 +340,7 @@ spec:
       annotations:
         message: '{{ $labels.token_hash }} may run out of API quota before the next reset. Check the <https://grafana-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1|dashboard>'
       expr: |
-        github_token_usage{token_hash=~"openshift-ci - .*"} + deriv(github_token_usage{token_hash=~"openshift-ci - .*"}[20m]) * github_token_reset  / 1e9 < 100
+        github_token_usage{ratelimit_resource="core",token_hash=~"openshift-ci - .*"} + deriv(github_token_usage{ratelimit_resource="core",token_hash=~"openshift-ci - .*"}[20m]) * github_token_reset{ratelimit_resource="core"}  / 1e9 < 100
       for: 5m
       labels:
         severity: critical

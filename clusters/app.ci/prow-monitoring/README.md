@@ -88,7 +88,7 @@ We can `make mixins` at the root level of this repo, _or_
 * Edit `.jsonnet` in the [mixins](./mixins) folder. Add targets in [mixins/Makefile](./mixins/Makefile) to generate the targeting file in case of creating a new `.jsonnet`.
 
     ```
-    $ make generate-mixins
+    $ make mixins
     ```
 
 ## Add an alert on Prow job failures
