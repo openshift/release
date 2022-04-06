@@ -22,14 +22,14 @@ items:
       images:
       - from:
           kind: ImageStreamTag
-          name: 4.10:cli
+          name: 4.11:cli
           namespace: ocp
         paths:
         - destinationDir: .
           sourcePath: /usr/bin/oc
       - from:
           kind: ImageStreamTag
-          name: 4.10:installer
+          name: 4.11:installer
           namespace: ocp
         paths:
         - destinationDir: .
@@ -42,29 +42,27 @@ items:
         - destinationDir: .
           sourcePath: /bin/hypershift
       dockerfile: |
-        FROM centos:8
+        FROM quay.io/centos/centos:stream8
         LABEL maintainer="nmoraiti@redhat.com"
 
         ARG JQ_VERSION=1.6
 
-        RUN echo -e "[google-cloud-sdk]\nname=Google Cloud SDK\nbaseurl=https://packages.cloud.google.com/yum/repos/cloud-sdk-el7-x86_64\nenabled=1" > /etc/yum.repos.d/google-cloud-sdk.repo
+        RUN echo -e "[google-cloud-sdk]\nname=Google Cloud SDK\nbaseurl=https://packages.cloud.google.com/yum/repos/cloud-sdk-el8-x86_64\nenabled=1" > /etc/yum.repos.d/google-cloud-sdk.repo
 
         COPY ./oc /usr/bin/oc
         COPY ./openshift-install /usr/bin/openshift-install
         COPY ./hypershift /usr/bin/hypershift
 
-        RUN dnf install --nogpg -y google-cloud-sdk python3 jq less && \
+        RUN dnf install --nogpg -y google-cloud-sdk unzip jq less && \
               dnf clean all && \
-              curl -O https://bootstrap.pypa.io/get-pip.py && \
-              python3 get-pip.py && \
-              rm -fv get-pip.py && \
-              pip install awscli
+              curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
+              unzip awscliv2.zip && ./aws/install
       type: Dockerfile
     strategy:
       dockerStrategy:
         from:
           kind: ImageStreamTag
-          name: centos:8
+          name: centos:stream8
           namespace: origin
         imageOptimizationPolicy: SkipLayers
       type: Docker
@@ -76,13 +74,13 @@ items:
       imageChange:
         from:
           kind: ImageStreamTag
-          name: 4.10:cli
+          name: 4.11:cli
           namespace: ocp
     - type: ImageChange
       imageChange:
         from:
           kind: ImageStreamTag
-          name: 4.10:installer
+          name: 4.11:installer
           namespace: ocp
     - type: ImageChange
       imageChange:

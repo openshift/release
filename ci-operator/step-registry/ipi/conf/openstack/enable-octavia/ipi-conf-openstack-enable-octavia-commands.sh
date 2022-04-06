@@ -2,6 +2,11 @@
 
 set -euo pipefail
 
+if [[ "$NETWORK_TYPE" == "Kuryr" ]]; then
+    echo "Cloud provider load-balancer support shouldn't be enabled with $NETWORK_TYPE"
+    exit 0
+fi
+
 export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
 
 # Create temporary directory

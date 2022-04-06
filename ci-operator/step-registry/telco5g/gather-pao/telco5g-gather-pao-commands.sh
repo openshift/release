@@ -18,6 +18,7 @@ fi
 echo "************ telco5g gather-pao commands ************"
 
 pao_mg_tag="4.10" # pao must-gather does not have 'latest' tag - setting 4.10 as a workaround for now.
+PULL_BASE_REF=${PULL_BASE_REF:-"master"}
 if [ ${PULL_BASE_REF} != "master" ]
 then
         pao_mg_tag=${PULL_BASE_REF##release-}

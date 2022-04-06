@@ -7,10 +7,6 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.17-openshift-4.11
-  openshift-tests:
-    name: "4.10"
-    namespace: ocp
-    tag: tests
   openshift_release_golang-1.17:
     name: release
     namespace: openshift
@@ -36,15 +32,10 @@ images:
       - registry.ci.openshift.org/openshift/release:golang-1.17
   to: hypershift
 releases:
-  4-11:
-    candidate:
-      product: ocp
-      stream: ci
-      version: "4.11"
   hosted-ocp-latest:
     candidate:
       product: ocp
-      stream: nightly
+      stream: ci
       version: "4.10"
   hosted-ocp-previous:
     candidate:
@@ -147,118 +138,12 @@ tests:
       timeout: 1h0m0s
     workflow: generic-claim
 - as: e2e-aws-periodic-conformance-serial
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: hypershift
-    product: ocp
-    timeout: 1h30m0s
-    version: "4.9"
   cron: 0 */6 * * *
   steps:
-    post:
-    - as: destroy-cluster
-      cli: latest
-      commands: |-
-        bin/hypershift destroy cluster aws \
-        --aws-creds=/etc/hypershift-pool-aws-credentials/credentials  \
-        --name="$(echo -n $PROW_JOB_ID|cut -d- -f-2)"
-      credentials:
-      - mount_path: /etc/hypershift-pool-aws-credentials
-        name: hypershift-pool-aws-credentials
-        namespace: test-credentials
-      from: bin
-      grace_period: 15m0s
-      resources:
-        requests:
-          cpu: 100m
-    test:
-    - as: install-hypershift
-      cli: latest
-      commands: make ci-install-hypershift
-      credentials:
-      - mount_path: /etc/hypershift-pool-aws-credentials
-        name: hypershift-pool-aws-credentials
-        namespace: test-credentials
-      dependencies:
-      - env: HYPERSHIFT_RELEASE_LATEST
-        name: hypershift-operator
-      from: bin
-      grace_period: 1m0s
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 5m0s
-    - as: create-cluster
-      cli: latest
-      commands: |-
-        bin/hypershift create cluster aws \
-          --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
-          --aws-creds=/etc/hypershift-pool-aws-credentials/credentials \
-          --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
-          --name="$(echo -n $PROW_JOB_ID|cut -d- -f-2)" \
-          --region=us-east-1 \
-          --base-domain=ci.hypershift.devcluster.openshift.com \
-          --release-image=${OPENSHIFT_410_CI_RELEASE_IMAGE} \
-          --instance-type=m5.xlarge \
-          --node-pool-replicas=3
-        echo "Waiting for cluster to become available"
-        oc wait --timeout=10m --for=condition=Available --namespace=clusters hostedcluster/$(echo -n $PROW_JOB_ID|cut -d- -f-2)
-        echo "Cluster became available, creating kubeconfig"
-        bin/hypershift create kubeconfig --namespace=clusters --name=$(echo -n $PROW_JOB_ID|cut -d- -f-2) >${SHARED_DIR}/nested_kubeconfig
-        echo "Waiting for clusteroperators to be ready"
-        export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
-        until \
-          oc wait --all=true clusteroperator --for='condition=Available=True' >/dev/null && \
-          oc wait --all=true clusteroperator --for='condition=Progressing=False' >/dev/null && \
-          oc wait --all=true clusteroperator --for='condition=Degraded=False' >/dev/null;  do
-            echo "$(date --rfc-3339=seconds) Clusteroperators not yet ready"
-            sleep 1s
-        done
-      credentials:
-      - mount_path: /etc/hypershift-pool-aws-credentials
-        name: hypershift-pool-aws-credentials
-        namespace: test-credentials
-      - mount_path: /etc/ci-pull-credentials
-        name: ci-pull-credentials
-        namespace: test-credentials
-      dependencies:
-      - env: OPENSHIFT_410_CI_RELEASE_IMAGE
-        name: release:latest
-      from: bin
-      grace_period: 1m0s
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 25m0s
-    - as: conformance-tests
-      commands: |-
-        export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG="${KUBECONFIG}"
-        export HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE="clusters-$(echo -n $PROW_JOB_ID|cut -d- -f-2)"
-        export AWS_SHARED_CREDENTIALS_FILE=/etc/hypershift-pool-aws-credentials/credentials
-        export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
-        openshift-tests run openshift/conformance/serial \
-          -o "${ARTIFACT_DIR}/e2e.log" \
-          --junit-dir "${ARTIFACT_DIR}/junit"
-      credentials:
-      - mount_path: /etc/hypershift-pool-aws-credentials
-        name: hypershift-pool-aws-credentials
-        namespace: test-credentials
-      from: openshift-tests
-      resources:
-        requests:
-          cpu: "3"
-          memory: 600Mi
-    workflow: generic-claim
+    env:
+      TEST_SUITE: openshift/conformance/serial
+    workflow: hypershift-aws-conformance
 - as: e2e-aws-pooled-periodic-conformance
-  cluster_claim:
-    architecture: amd64
-    as: this-is-the-name-of-the-cluster-claim-release-which-defaults-to-latest-i-dont-want-that
-    cloud: aws
-    owner: hypershift
-    product: ocp
-    timeout: 1h30m0s
-    version: "4.9"
   cron: 0 */6 * * *
   steps:
     workflow: hypershift-aws-conformance
