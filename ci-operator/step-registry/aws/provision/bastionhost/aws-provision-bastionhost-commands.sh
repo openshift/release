@@ -429,10 +429,17 @@ echo "${INSTANCE_ID}" >> "${SHARED_DIR}/aws-instance-ids.txt"
 
 BASTION_HOST_PUBLIC_DNS="$(aws --region "${REGION}" cloudformation describe-stacks --stack-name "${stack_name}" \
   --query 'Stacks[].Outputs[?OutputKey == `PublicDnsName`].OutputValue' --output text)"
+BASTION_HOST_PRIVATE_DNS="$(aws --region "${REGION}" cloudformation describe-stacks --stack-name "${stack_name}" \
+  --query 'Stacks[].Outputs[?OutputKey == `PrivateDnsName`].OutputValue' --output text)"
 
-echo "${BASTION_HOST_PUBLIC_DNS}" > "${SHARED_DIR}/bastion_dns"
-PROXY_URL="http://${PROXY_CREDENTIAL}@${BASTION_HOST_PUBLIC_DNS}:3128"
-echo "${PROXY_URL}" > "${SHARED_DIR}/public_proxy_url"
+echo "${BASTION_HOST_PUBLIC_DNS}" > "${SHARED_DIR}/bastion_public_address"
+echo "${BASTION_HOST_PRIVATE_DNS}" > "${SHARED_DIR}/bastion_private_address"
+
+PROXY_PUBLIC_URL="http://${PROXY_CREDENTIAL}@${BASTION_HOST_PUBLIC_DNS}:3128"
+PROXY_PRIVATE_URL="http://${PROXY_CREDENTIAL}@${BASTION_HOST_PRIVATE_DNS}:3128"
+
+echo "${PROXY_PUBLIC_URL}" > "${SHARED_DIR}/proxy_public_url"
+echo "${PROXY_PRIVATE_URL}" > "${SHARED_DIR}/proxy_private_url"
 
 echo "Sleeping 5 mins, make sure that the bastion host is fully started."
 sleep 300
