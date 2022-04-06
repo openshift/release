@@ -215,13 +215,17 @@ echo "${INSTANCE_ID}" >> "${SHARED_DIR}/gcp-instance-ids.txt"
 
 gcloud compute instances list --filter="name=('${INSTANCE_ID}')" \
   --zones "${ZONE_0}" --format json > /tmp/${INSTANCE_ID}-bastion.json
-#BASTION_PRIVATE_IP="$(jq -r '.[].networkInterfaces[0].networkIP' /tmp/${INSTANCE_ID}-bastion.json)"
+BASTION_PRIVATE_IP="$(jq -r '.[].networkInterfaces[0].networkIP' /tmp/${INSTANCE_ID}-bastion.json)"
 BASTION_PUBLIC_IP="$(jq -r '.[].networkInterfaces[0].accessConfigs[0].natIP' /tmp/${INSTANCE_ID}-bastion.json)"
+
+echo ${BASTION_PUBLIC_IP} > "${SHARED_DIR}/bastion_public_address"
+echo ${BASTION_PRIVATE_IP} > "${SHARED_DIR}/bastion_private_address"
 
 # echo proxy IP to ${SHARED_DIR}/proxyip
 echo "${BASTION_PUBLIC_IP}" >> "${SHARED_DIR}/proxyip"
 
-if [ X"${PUBLISH}" == X"Internal" ]; then
-  CLIENT_PROXY_URL="http://${CLUSTER_NAME}:${PASSWORD}@${BASTION_PUBLIC_IP}:3128/"
-  echo "${CLIENT_PROXY_URL}" > "${SHARED_DIR}/public_proxy_url"
-fi
+PROXY_PUBLIC_URL="http://${CLUSTER_NAME}:${PASSWORD}@${BASTION_PUBLIC_IP}:3128/"
+PROXY_PRIVATE_URL="http://${CLUSTER_NAME}:${PASSWORD}@${BASTION_PRIVATE_IP}:3128/"
+
+echo "${PROXY_PUBLIC_URL}" > "${SHARED_DIR}/proxy_public_url"
+echo "${PROXY_PRIVATE_URL}" > "${SHARED_DIR}/proxy_private_url"
