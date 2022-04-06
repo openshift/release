@@ -331,6 +331,55 @@ tests:
       GATHER_CAPI_LOGS: "true"
       TEST_SUITE: minimal
     workflow: assisted-baremetal
+- as: e2e-agent
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        KUBE_API=yes
+        ENABLE_KUBE_API=true
+        MINIKUBE_DISK_SIZE=70g
+        MINIKUBE_RAM_MB=10240
+        TEST=./src/tests/test_kube_api.py
+        SPOKE_NAMESPACE=hypershiftnodes
+        CLUSTER_NAME=hypershift
+        TEST_FUNC=test_prepare_late_binding_kube_api_ipv4_workers
+        MAKEFILE_TARGET="create_full_environment run test"
+      GATHER_CAPI_LOGS: "true"
+      TEST_SUITE: minimal
+    test:
+    - as: agent-e2e
+      cli: latest
+      commands: |-
+        # install hypershift
+        bin/hypershift install --hypershift-image ${HYPERSHIFT_RELEASE_LATEST}
+
+        # complie the e2e tests
+        make e2e
+
+        # run the test
+        bin/test-e2e \
+                  -test.v \
+                  -test.timeout=0 \
+                  -test.run=TestAgentCreateCluster \
+                  -e2e.node-pool-replicas=5 \
+                  --e2e.agent-namespace=hypershiftnodes
+                  -e2e.base-domain="redhat.com" \
+                  --e2e.control-plane-operator-image=${HYPERSHIFT_RELEASE_LATEST} \
+                  --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson
+      credentials:
+      - mount_path: /etc/ci-pull-credentials
+        name: ci-pull-credentials
+        namespace: test-credentials
+      dependencies:
+      - env: HYPERSHIFT_RELEASE_LATEST
+        name: hypershift-operator
+      from: bin
+      resources:
+        requests:
+          cpu: 100m
+    workflow: assisted-baremetal
 - as: e2e-kubevirt-azure
   optional: true
   steps:
