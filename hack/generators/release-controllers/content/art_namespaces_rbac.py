@@ -29,7 +29,7 @@ def add_imagestream_namespace_rbac(gendoc):
         puller_subjects.append({
             'apiGroup': 'rbac.authorization.k8s.io',
             'kind': 'Group',
-            'name': 'openshift-priv-admins'
+            'name': 'openshift-private-release-admins'
         })
 
     resources.append({
