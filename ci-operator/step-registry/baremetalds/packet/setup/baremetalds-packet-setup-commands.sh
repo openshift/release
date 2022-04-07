@@ -105,33 +105,40 @@ cat > packet-setup.yaml <<-EOF
         operating_system: ${PACKET_OS}
         plan: ${PACKET_PLAN}
         facility: any
-        wait_for_public_IPv: 4
-        wait_timeout: 1800
-        state: active
         tags: "{{ 'PR:', lookup('env', 'PULL_NUMBER'), 'Job name:', lookup('env', 'JOB_NAME'), 'Job id:', lookup('env', 'PROW_JOB_ID') }}"
       register: hosts
       no_log: true
-    - name: wait for ssh
-      wait_for:
-        delay: 5
-        host: "{{ hosts.devices[0].public_ipv4 }}"
-        port: 22
-        state: started
-        timeout: 900
-    rescue:
-    - name: Send notification message via Slack in case of failure
-      slack:
-        token: "{{ 'T027F3GAJ/B011TAG710V/' + lookup('file', slackhook_path) }}"
-        msg: "<https://prow.ci.openshift.org/view/gs/origin-ci-test/logs/$JOB_NAME/$BUILD_ID|Packet failure>: *Setup*\nHostname: *{{ packet_hostname }}*\nError msg: {{ ansible_failed_result.msg }}\nReason: {{ hosts }}\n"
-        username: "OpenShift CI Packet"
-        color: warning
-        icon_emoji: ":failed:"
-    - name: fail the play
-      fail:
-        msg: "ERROR: Packet setup failed."
-
-  - name: save Packet IP
-    local_action: copy content="{{ hosts.devices[0].public_ipv4 }}" dest="{{ lookup('env', 'SHARED_DIR') }}/server-ip"
+    - name: write device info to file
+      copy:
+        content="{{ hosts }}"
+        dest="${SHARED_DIR}/hosts.json"
 EOF
 
+function send_slack(){
+    curl -X POST --data-urlencode\
+     "payload={\"text\":\"<https://prow.ci.openshift.org/view/gs/origin-ci-test/logs/$JOB_NAME/$BUILD_ID|Packet setup failed> $1\n\", \"blocks\": [ \
+]}" "https://hooks.slack.com/services/T027F3GAJ/B011TAG710V/${SLACK_AUTH_TOKEN}"
+}
+
+trap 'send_slack Failed to create equinix device: ipi-${NAMESPACE}-${JOB_NAME_HASH}-${BUILD_ID}' ERR
+
 ansible-playbook packet-setup.yaml -e "packet_hostname=ipi-${NAMESPACE}-${JOB_NAME_HASH}-${BUILD_ID}"  |& gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0; fflush(); }'
+
+DEVICEID=$(jq -r .devices[0].id < ${SHARED_DIR}/hosts.json)
+
+function refresh_device_info(){
+    curl -H "X-Auth-Token: $(cat ${CLUSTER_PROFILE_DIR}/packet-auth-token)"  "https://api.equinix.com/metal/v1/devices/$DEVICEID" > /tmp/device.json
+    STATE=$(jq -r .state < /tmp/device.json)
+    IP=$(jq -r .ip_addresses[0].address < /tmp/device.json)
+}
+
+for _ in $(seq 30) ; do
+    sleep 60
+    refresh_device_info || true
+    echo "Device info: ${DEVICEID} ${STATE} ${IP}"
+    if [ "$STATE" == "active" ] && [ -n "$IP" ] ; then
+        echo "$IP" >  "${SHARED_DIR}/server-ip"
+        # This also has 100 seconds worth of ssh retries
+        bash ${SHARED_DIR}/packet-conf.sh && exit 0 || exit 1
+    fi
+done
