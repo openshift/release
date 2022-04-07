@@ -17,4 +17,4 @@ echo "cloning branch ${branch}"
 git clone -b $branch $repo $dir
 
 cd $dir
-FEATURES_ENVIRONMENT="typical-baremetal" FEATURES="performance xt_u32 vrf sctp ovn" make functests-on-ci
+FEATURES_ENVIRONMENT="typical-baremetal" FEATURES="ovn" make functests-on-ci
