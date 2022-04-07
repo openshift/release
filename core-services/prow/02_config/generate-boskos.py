@@ -129,6 +129,9 @@ CONFIG = {
     'hypershift-quota-slice': {
         'default': 15,
     },
+    'powervs-quota-slice': {
+        'default': 1,
+    },
     'ibmcloud-quota-slice': {
         'default': 7,
     },
