@@ -1,9 +1,55 @@
-binary_build_commands: make build build-vgmanager
+base_images:
+  base:
+    name: "4.10"
+    namespace: ocp
+    tag: base
+  opm-builder:
+    name: opm-builder
+    namespace: ci
+    tag: v1.14.3
+binary_build_commands: make docker-build-combined
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: golang-1.17
+images:
+- dockerfile_path: Dockerfile.combined
+  from: base
+  to: lvm-operator
+- dockerfile_path: bundle.Dockerfile
+  from: base
+  to: lvm-operator-bundle
+- dockerfile_literal: |
+    FROM quay.io/operator-framework/upstream-opm-builder:v1.19.5 AS builder
+    RUN opm index add \
+    --bundles "${BUNDLE_IMGS}" \
+    --out-dockerfile index.Dockerfile \
+    --generate
+  from: opm-builder
+  to: lvm-operator-index-gen
+- dockerfile_literal: |
+    FROM quay.io/operator-framework/opm:latest
+    LABEL operators.operatorframework.io.index.database.v1=/database/index.db
+    COPY database/index.db /database/index.db
+    EXPOSE 50051
+    ENTRYPOINT ["/bin/opm"]
+    CMD ["registry", "serve", "--database", "/database/index.db"]
+  from: opm-builder
+  inputs:
+    lvm-operator-index-gen:
+      paths:
+      - destination_dir: .
+        source_path: /database
+  to: lvm-operator-deps-index
+operator:
+  bundles:
+  - as: lvm-operator-static-deps
+    base_index: lvm-operator-deps-index
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/ocs-dev/lvm-operator:latest
+    with: pipeline:lvm-operator
 promotion:
   name: lvm-operator-latest
   namespace: ocp
@@ -33,6 +79,38 @@ tests:
   commands: make test
   container:
     from: test-bin
+- as: e2e-operator
+  steps:
+    cluster_profile: aws
+    dependencies:
+      CATALOG_IMG: lvm-operator
+      OO_INDEX: ci-index-lvm-operator-static-deps
+    env:
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: openshift-topolvm
+      OO_PACKAGE: lvm-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: test
+      commands: make e2e-test
+      dependencies:
+      - env: CATALOG_IMG
+        name: lvm-operator
+      - env: CHANNELS
+        name: alpha
+      - env: OO_INDEX
+        name: ci-index
+      env:
+      - name: OO_CHANNEL
+      - name: OO_INSTALL_NAMESPACE
+      - name: OO_PACKAGE
+      - name: OO_TARGET_NAMESPACES
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-aws-single-node
 zz_generated_metadata:
   branch: main
   org: red-hat-storage
