@@ -16,6 +16,9 @@ chain:
     - name: CONTROLPLANE_OPERATOR_IMAGE
       default: ""
       documentation: "The CPO image to use. Set to LATEST to use the latest one"
+    - name: EXTRA_ARGS
+      default: ""
+      documentation: "Extra args to pass to the create cluster aws command"
     commands: |-
       set -exuo pipefail
 
@@ -26,6 +29,7 @@ chain:
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|cut -d- -f-2)"
       echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
       /usr/bin/hypershift create cluster aws \
+        ${EXTRA_ARGS} \
         --name ${CLUSTER_NAME} \
         --node-pool-replicas ${HYPERSHIFT_NODE_COUNT} \
         --instance-type=m5.xlarge \
