@@ -17,12 +17,12 @@ function run_command() {
 workdir=`mktemp -d`
 
 bastion_ignition_file="${workdir}/bastion.ign"
-ssh_pub_keys_file="/var/run/vault/qe-ssh-key/public_key"
-reg_cert_file="/var/run/vault/qe-mirror-registry/server_domain.crt"
-reg_key_file="/var/run/vault/qe-mirror-registry/server_domain.pem"
-src_proxy_creds_file="/var/run/vault/qe-proxy/proxy_creds"
-src_proxy_creds_encrypted_file="/var/run/vault/qe-proxy/proxy_creds_encrypted_apr1"
-src_registry_creds_encrypted_file="/var/run/vault/qe-mirror-registry/registry_creds_encrypted_htpasswd"
+ssh_pub_keys_file="${CLUSTER_PROFILE_DIR}/ssh-publickey"
+reg_cert_file="/var/run/vault/mirror-registry/server_domain.crt"
+reg_key_file="/var/run/vault/mirror-registry/server_domain.pem"
+src_proxy_creds_file="/var/run/vault/proxy/proxy_creds"
+src_proxy_creds_encrypted_file="/var/run/vault/proxy/proxy_creds_encrypted_apr1"
+src_registry_creds_encrypted_file="/var/run/vault/mirror-registry/registry_creds_encrypted_htpasswd"
 
 # dump out from 'openshift-install coreos print-stream-json' on 4.10.0-rc.1
 vhd_uri=https://rhcos.blob.core.windows.net/imagebucket/rhcos-410.84.202201251210-0-azure.x86_64.vhd
@@ -381,21 +381,23 @@ run_command "az vm create --resource-group ${bastion_rg} --name ${bastion_name} 
 #####################################
 #########Save Bastion Info###########
 #####################################
-bastion_internal_ip=$(az vm list-ip-addresses --name ${bastion_name} --resource-group ${bastion_rg} | jq -r ".[].virtualMachine.network.privateIpAddresses[]") &&
+bastion_private_ip=$(az vm list-ip-addresses --name ${bastion_name} --resource-group ${bastion_rg} | jq -r ".[].virtualMachine.network.privateIpAddresses[]") &&
 bastion_public_ip=$(az vm list-ip-addresses --name ${bastion_name} --resource-group ${bastion_rg} | jq -r ".[].virtualMachine.network.publicIpAddresses[].ipAddress") || exit 2
-if [ X"$bastion_public_ip" == X"" ] || [ X"$bastion_internal_ip" == X"" ] ; then
+if [ X"${bastion_public_ip}" == X"" ] || [ X"${bastion_private_ip}" == X"" ] ; then
     echo "Did not found public or internal IP!"
     exit 1
 fi
+echo ${bastion_public_ip} > "${SHARED_DIR}/bastion_public_address"
+echo ${bastion_private_ip} > "${SHARED_DIR}/bastion_private_address"
 
 proxy_credential=$(cat "${src_proxy_creds_file}")
-PUBLIC_PROXY_URL="http://${proxy_credential}@${bastion_public_ip}:3128"
-INTERNAL_PROXY_URL="http://${proxy_credential}@${bastion_internal_ip}:3128"
+proxy_public_url="http://${proxy_credential}@${bastion_public_ip}:3128"
+proxy_private_url="http://${proxy_credential}@${bastion_private_ip}:3128"
+echo "${proxy_public_url}" > "${SHARED_DIR}/proxy_public_url"
+echo "${proxy_private_url}" > "${SHARED_DIR}/proxy_private_url"
 
-
-echo "${INTERNAL_PROXY_URL}" > "${SHARED_DIR}/internal_proxy_url"
-echo "${PUBLIC_PROXY_URL}" > "${SHARED_DIR}/public_proxy_url"
-
+# echo proxy IP to ${SHARED_DIR}/proxyip
+echo "${bastion_public_ip}" >> "${SHARED_DIR}/proxyip"
 #####################################
 ##############Clean Up###############
 #####################################

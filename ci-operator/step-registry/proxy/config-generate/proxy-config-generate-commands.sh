@@ -4,13 +4,13 @@ set -o nounset
 set -o pipefail
 
 
-public_proxy_url_file="${SHARED_DIR}/public_proxy_url"
+proxy_public_url_file="${SHARED_DIR}/proxy_public_url"
 
-if [ ! -f "${public_proxy_url_file}" ]; then
-    echo "Did not found proxy setting from ${public_proxy_url_file}"
+if [ ! -f "${proxy_public_url_file}" ]; then
+    echo "Did not found proxy setting from ${proxy_public_url_file}"
     exit 1
 else
-    PUBLIC_PROXY_URL=$(< "${public_proxy_url_file}")
+    PUBLIC_PROXY_URL=$(< "${proxy_public_url_file}")
 fi
 
 if [ -z "${PUBLIC_PROXY_URL}" ]; then
