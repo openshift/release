@@ -56,6 +56,33 @@ function init_bootstrap() {
 	BASTION_SSH_PORTS=( 1033 1043 1053 1063 1073 1083 )
 }
 
+function init_worker() {
+
+  local DIR=$1
+  cat >> ${DIR}/manifests/99-sysctl-worker.yaml << EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: worker
+  name: 99-sysctl-worker
+spec:
+  config:
+    ignition:
+      version: 3.2.0
+    storage:
+      files:
+      - contents:
+          # kernel.sched_migration_cost_ns=25000
+          source: data:text/plain;charset=utf-8;base64,a2VybmVsLnNjaGVkX21pZ3JhdGlvbl9jb3N0X25zID0gMjUwMDA=
+        filesystem: root
+        mode: 0644
+        overwrite: true
+        path: /etc/sysctl.conf
+EOF
+
+}
+
 function collect_bootstrap() {
 	local ID=$1
 	local FROM
@@ -139,6 +166,10 @@ do
   manifest="$( basename "${item}" )"
   cp "${item}" "${dir}/manifests/${manifest##manifest_}"
 done <   <( find "${SHARED_DIR}" -name "manifest_*.yml" -print0)
+
+if [[ "${NODE_TUNING}" == "true" ]]; then
+  init_worker ${dir}
+fi
 
 echo "Installing cluster"
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
