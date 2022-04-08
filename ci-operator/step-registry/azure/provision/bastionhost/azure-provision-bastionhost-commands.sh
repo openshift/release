@@ -10,6 +10,24 @@ function run_command() {
     eval "${CMD}"
 }
 
+function wait_public_dns() {
+    echo "Wait public DNS - $1 take effect"
+    local try=0 retries=10
+
+    while [ X"$(dig +short $1)" == X"" ] && [ $try -lt $retries ]; do
+        echo "$1 does not take effect yet on internet, waiting..."
+        sleep 60
+        try=$(expr $try + 1)
+    done
+    if [ X"$try" == X"$retries" ]; then
+        echo "!!!!!!!!!!"
+        echo "Something wrong, pls check your dns provider"
+        return 4
+    fi
+    return 0
+
+}
+
 #####################################
 ##############Initialize#############
 #####################################
@@ -378,15 +396,40 @@ echo "Create bastion vm"
 bastion_ignition_file="${vhd_data}"
 run_command "az vm create --resource-group ${bastion_rg} --name ${bastion_name} --admin-username core --admin-password 'NotActuallyApplied!' --image '${bastion_image_id}' --os-disk-size-gb 99 --subnet ${bastion_subnet} --vnet-name ${bastion_vnet_name} --nsg '' --size 'Standard_DS1_v2' --debug --custom-data '${bastion_ignition_file}'" || exit 2
 
-#####################################
-#########Save Bastion Info###########
-#####################################
 bastion_private_ip=$(az vm list-ip-addresses --name ${bastion_name} --resource-group ${bastion_rg} | jq -r ".[].virtualMachine.network.privateIpAddresses[]") &&
 bastion_public_ip=$(az vm list-ip-addresses --name ${bastion_name} --resource-group ${bastion_rg} | jq -r ".[].virtualMachine.network.publicIpAddresses[].ipAddress") || exit 2
 if [ X"${bastion_public_ip}" == X"" ] || [ X"${bastion_private_ip}" == X"" ] ; then
     echo "Did not found public or internal IP!"
     exit 1
 fi
+
+#####################################
+####Register mirror registry DNS#####
+#####################################
+if [[ "${REGISTER_MIRROR_REGISTRY_DNS}" == "yes" ]]; then
+    mirror_registry_host="${bastion_name}.mirror-registry"
+    mirror_registry_dns="${mirror_registry_host}.${BASE_DOMAIN}"
+
+    echo "Adding private DNS record for mirror registry"
+    private_zone="mirror-registry.${BASE_DOMAIN}"
+    dns_vnet_link_name="${bastion_name}-pvz-vnet-link"
+    run_command "az network private-dns zone create -g ${bastion_rg} -n ${private_zone}" &&
+    run_command "az network private-dns record-set a add-record -g ${bastion_rg} -z ${private_zone} -n ${bastion_name} -a ${bastion_private_ip}" &&
+    run_command "az network private-dns link vnet create --name '${dns_vnet_link_name}' --registration-enabled false --resource-group ${bastion_rg} --virtual-network ${bastion_vnet_name} --zone-name ${private_zone}" || exit 2
+
+    echo "Adding public DNS record for mirror registry"
+    cmd="az network dns record-set a add-record -g ${BASE_RESOURCE_GROUP} -z ${BASE_DOMAIN} -n ${mirror_registry_host} -a ${bastion_public_ip}"
+    run_command "${cmd}" &&
+    echo "az network dns record-set a remove-record -g ${BASE_RESOURCE_GROUP} -z ${BASE_DOMAIN} -n ${mirror_registry_host} -a ${bastion_public_ip}" >>"${SHARED_DIR}/remove_resources_by_cli.sh"
+    wait_public_dns "${mirror_registry_dns}" || exit 2
+
+    # save mirror registry dns info
+    echo "${mirror_registry_dns}:5000" > "${SHARED_DIR}/mirror_registry_url"
+fi
+
+#####################################
+#########Save Bastion Info###########
+#####################################
 echo ${bastion_public_ip} > "${SHARED_DIR}/bastion_public_address"
 echo ${bastion_private_ip} > "${SHARED_DIR}/bastion_private_address"
 
@@ -397,7 +440,8 @@ echo "${proxy_public_url}" > "${SHARED_DIR}/proxy_public_url"
 echo "${proxy_private_url}" > "${SHARED_DIR}/proxy_private_url"
 
 # echo proxy IP to ${SHARED_DIR}/proxyip
-echo "${bastion_public_ip}" >> "${SHARED_DIR}/proxyip"
+echo "${bastion_public_ip}" > "${SHARED_DIR}/proxyip"
+
 #####################################
 ##############Clean Up###############
 #####################################
