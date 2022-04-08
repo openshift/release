@@ -6,14 +6,10 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-case "$CONFIG_TYPE" in
-  byon|proxy)
-    ;;
-  *)
-    echo "Skipping step due to CONFIG_TYPE not being byon or proxy."
+if [[ "$CONFIG_TYPE" != "proxy" ]]; then
+    echo "Skipping step due to CONFIG_TYPE not being proxy."
     exit 0
-    ;;
-esac
+fi
 
 export OS_CLIENT_CONFIG_FILE=${SHARED_DIR}/clouds.yaml
 
