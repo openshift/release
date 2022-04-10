@@ -23,7 +23,7 @@ SSH_PUB_KEY=$(<"${CLUSTER_PROFILE_DIR}"/ssh-publickey)
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
 case "$CONFIG_TYPE" in
-  minimal|byon|proxy)
+  minimal|proxy)
     ;;
   *)
     echo "No valid install config type specified. Please check CONFIG_TYPE"
@@ -63,7 +63,7 @@ metadata:
 networking:
   networkType: ${NETWORK_TYPE}
 EOF
-if [[ "${CONFIG_TYPE}" == "byon" || "${CONFIG_TYPE}" == "proxy" ]]; then
+if [[ "${CONFIG_TYPE}" == "proxy" ]]; then
 cat >> "${CONFIG}" << EOF
   machineNetwork:
   - cidr: $(<"${SHARED_DIR}"/MACHINES_SUBNET_RANGE)
@@ -83,7 +83,7 @@ cat >> "${CONFIG}" << EOF
     ingressFloatingIP: ${INGRESS_IP}
     externalNetwork:   ${OPENSTACK_EXTERNAL_NETWORK}
 EOF
-elif [[ "${CONFIG_TYPE}" == "byon" || "${CONFIG_TYPE}" == "proxy" ]]; then
+elif [[ "${CONFIG_TYPE}" == "proxy" ]]; then
 cat >> "${CONFIG}" << EOF
     machinesSubnet:    $(<"${SHARED_DIR}"/MACHINES_SUBNET_ID)
     apiVIP:            ${API_IP}

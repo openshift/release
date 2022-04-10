@@ -25,7 +25,7 @@ def _add_osd_rc_bootstrap(gendoc):
                 {
                     'from': {
                         'kind': 'DockerImage',
-                        'name': 'image-registry.openshift-image-registry.svc:5000/ocp/4.10:tests'
+                        'name': 'image-registry.openshift-image-registry.svc:5000/ocp/4.11:tests'
                     },
                     'importPolicy': {
                         'scheduled': True
@@ -189,8 +189,8 @@ def _get_osd_rc_deployment_sidecars(context):
                      f'-client-id=system:serviceaccount:{context.config.rc_deployment_namespace}:release-controller-{context.is_namespace}',
                      '-openshift-ca=/etc/pki/tls/cert.pem',
                      '-openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt',
-                     '-openshift-sar={"verb": "get", "resource": "imagestreams", "namespace": "ocp-private"}',
-                     '-openshift-delegate-urls={"/": {"verb": "get", "group": "image.openshift.io", "resource": "imagestreams", "namespace": "ocp-private"}}',
+                     '-openshift-sar={"verb": "get", "resource": "imagestreams", "namespace": "ocp-priv"}',
+                     '-openshift-delegate-urls={"/": {"verb": "get", "group": "image.openshift.io", "resource": "imagestreams", "namespace": "ocp-priv"}}',
                      '-client-secret-file=/var/run/secrets/kubernetes.io/serviceaccount/token',
                      '-cookie-secret-file=/etc/proxy/secrets/session_secret',
                      '-tls-cert=/etc/tls/private/tls.crt',

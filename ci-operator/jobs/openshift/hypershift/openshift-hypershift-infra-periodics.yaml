@@ -34,6 +34,8 @@ periodics:
         value: ci.hypershift.devcluster.openshift.com
       - name: HYPERSHIFT_PRUNER
         value: "true"
+      - name: KUBECONFIG
+        value: /kubeconfig/hypershift-ops-admin.kubeconfig
       image: registry.ci.openshift.org/ci/ipi-deprovision:latest
       imagePullPolicy: Always
       name: ipi-deprovision
@@ -44,6 +46,8 @@ periodics:
       volumeMounts:
       - mountPath: /aws
         name: cluster-secrets-aws
+      - mountPath: /kubeconfig
+        name: kubeconfig
     serviceAccountName: ipi-deprovisioner
     volumes:
     - name: cluster-secrets-aws
@@ -52,3 +56,6 @@ periodics:
         - key: credentials
           path: credentials
         secretName: hypershift-pool-aws-credentials
+    - name: kubeconfig
+      secret:
+        secretName: hypershift-ci-1

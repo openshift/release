@@ -43,7 +43,7 @@
           {
             alert: 'ghproxy-running-out-github-tokens-in-a-hour',
             expr: |||
-              github_token_usage * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login) + deriv(github_token_usage[20m]) * github_token_reset * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login) / 1e9 < 100
+              github_token_usage{ratelimit_resource="core"} * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login) + deriv(github_token_usage{ratelimit_resource="core"}[20m]) * github_token_reset{ratelimit_resource="core"} * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login) / 1e9 < 100
             |||,
             'for': '5m',
             labels: {
@@ -56,7 +56,7 @@
           {
             alert: 'ghproxy-running-out-github-tokens-in-a-hour',
             expr: |||
-              github_token_usage{token_hash=~"openshift-ci - .*"} + deriv(github_token_usage{token_hash=~"openshift-ci - .*"}[20m]) * github_token_reset  / 1e9 < 100
+              github_token_usage{ratelimit_resource="core",token_hash=~"openshift-ci - .*"} + deriv(github_token_usage{ratelimit_resource="core",token_hash=~"openshift-ci - .*"}[20m]) * github_token_reset{ratelimit_resource="core"}  / 1e9 < 100
             |||,
             'for': '5m',
             labels: {

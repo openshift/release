@@ -17,8 +17,12 @@ AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
 # log in with az
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
 
-rg_file="${SHARED_DIR}/resouregroup"
+remove_resources_by_cli="${SHARED_DIR}/remove_resources_by_cli.sh"
+if [ -f "${remove_resources_by_cli}" ]; then
+    sh -x "${remove_resources_by_cli}"
+fi
 
+rg_file="${SHARED_DIR}/resouregroup"
 if [ -f "${rg_file}" ]; then
     existing_rg=$(cat "${rg_file}")
     if [ "$(az group exists -n "${existing_rg}")" == "true" ]; then

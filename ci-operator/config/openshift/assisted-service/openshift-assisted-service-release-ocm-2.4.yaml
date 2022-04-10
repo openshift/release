@@ -53,6 +53,11 @@ images:
     COPY . .
   from: src
   to: assisted-service-scripts
+- dockerfile_literal: |
+    FROM coreos/centos
+    RUN yum install -y skopeo
+  from: src
+  to: assisted-service-publish-index
 operator:
   bundles:
   - dockerfile_path: deploy/olm-catalog/bundle.Dockerfile
@@ -273,24 +278,6 @@ tests:
       IP_STACK: v4
       NUM_EXTRA_WORKERS: "1"
     workflow: assisted-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-ipv4v6-sno-ocp-48
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
-    env:
-      DEVSCRIPTS_CONFIG: |
-        EXTRA_WORKER_VCPU=8
-        EXTRA_WORKER_MEMORY=32768
-        EXTRA_WORKER_DISK=120
-        PROVISIONING_NETWORK_PROFILE=Disabled
-        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
-      DISCONNECTED: "false"
-      IP_STACK: v4v6
-      NUM_EXTRA_WORKERS: "1"
-    workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-ipv4v6-sno-ocp-49
   optional: true
   steps:
@@ -467,21 +454,6 @@ tests:
       IP_STACK: v4
       NUM_EXTRA_WORKERS: "1"
     workflow: assisted-baremetal-operator-ztp-upgrade
-- as: e2e-ai-operator-ztp-ipv4v6-sno-periodic-ocp-48
-  cron: '@weekly'
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      DEVSCRIPTS_CONFIG: |
-        EXTRA_WORKER_VCPU=8
-        EXTRA_WORKER_MEMORY=32768
-        EXTRA_WORKER_DISK=120
-        PROVISIONING_NETWORK_PROFILE=Disabled
-        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
-      DISCONNECTED: "false"
-      IP_STACK: v4v6
-      NUM_EXTRA_WORKERS: "1"
-    workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-ipv4v6-sno-periodic-ocp-49
   cron: 0 0 */3 * *
   steps:
@@ -530,6 +502,7 @@ tests:
         NUM_MASTERS=1
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-static-ip
+  optional: true
   steps:
     cluster_profile: packet-assisted
     env:
@@ -562,24 +535,6 @@ tests:
     env:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=release-ocm-2.4
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-4-9
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.4
-        OPENSHIFT_VERSION=4.9
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-4-10
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.4
-        OPENSHIFT_VERSION=4.10
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-cnv
   optional: true
@@ -628,6 +583,15 @@ tests:
         make deploy_assisted_operator test_parallel
       TEST_SUITE: full
     workflow: assisted-baremetal
+- as: operator-catalog-publish-to-quay
+  postsubmit: true
+  steps:
+    env:
+      OPERATOR_MANIFESTS_TAG_TO_PIN: ocm-2.4
+      REGISTRY_BUNDLE_REPOSITORY_TAG: ocm-2.4
+      REGISTRY_CATALOG_REPOSITORY_TAG: ocm-2.4
+    test:
+    - ref: assisted-baremetal-operator-catalog-publish
 zz_generated_metadata:
   branch: release-ocm-2.4
   org: openshift

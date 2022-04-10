@@ -12,20 +12,24 @@ def add_imagestream_namespace_rbac(gendoc):
             'name': 'system:authenticated'
         })
     else:
+        # This group contains cluster admins on OpenShift CI build farm clusters
         puller_subjects.append({
             'apiGroup': 'rbac.authorization.k8s.io',
             'kind': 'Group',
-            'name': 'openshift-priv-admins'
+            'name': 'test-platform-ci-admins'
         })
+        # This group contains members of the OpenShift release team (ART) with some extra capabilities
         puller_subjects.append({
             'apiGroup': 'rbac.authorization.k8s.io',
             'kind': 'Group',
-            'name': 'qe'
+            'name': 'art-admins'
         })
+        # This group contains users with the ability to access the private release-controllers
+        # It's a mapping from the "openshift-private-release-admins" Rover Group
         puller_subjects.append({
             'apiGroup': 'rbac.authorization.k8s.io',
             'kind': 'Group',
-            'name': 'release-team'
+            'name': 'openshift-private-release-admins'
         })
 
     resources.append({
