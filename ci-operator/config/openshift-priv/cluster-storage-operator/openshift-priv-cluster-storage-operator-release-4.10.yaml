@@ -97,7 +97,23 @@ tests:
   optional: true
   steps:
     cluster_profile: azure4
-    workflow: openshift-e2e-azure-csi-file
+    env:
+      CLUSTERCSIDRIVER: file.csi.azure.com
+      TEST_CSI_DRIVER_MANIFEST: manifest-azure-file.yaml
+      TEST_SUITE: openshift/csi
+      TRUECONDITIONS: AzureFileDriverControllerServiceControllerAvailable AzureFileDriverNodeServiceControllerAvailable
+    post:
+    - ref: storage-obj-check
+    - chain: gather-core-dump
+    - chain: ipi-azure-post
+    pre:
+    - ref: ipi-conf-techpreview
+    - chain: ipi-azure-pre
+    - ref: storage-conf-csi-azure-file
+    - ref: storage-conf-wait-for-csi-driver
+    - ref: storage-obj-save
+    test:
+    - ref: openshift-e2e-test
 - as: e2e-aws-shared-resources
   optional: true
   steps:
