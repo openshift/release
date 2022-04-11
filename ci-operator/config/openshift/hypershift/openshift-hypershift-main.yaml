@@ -31,6 +31,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  ibmcloud-tests:
+    name: ibm-hypershift-testing
+    namespace: ci
+    tag: latest
   ocp_builder_rhel-8-golang-1.17-openshift-4.11:
     name: builder
     namespace: ocp
@@ -597,6 +601,47 @@ tests:
         requests:
           cpu: 100m
       timeout: 1h0m0s
+- as: e2e-ibmcloud-roks
+  skip_if_only_changed: (^(docs|examples|enhancements)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+  steps:
+    pre:
+    - ref: ipi-install-rbac
+    test:
+    - as: install-hypershift
+      cli: latest
+      commands: |-
+        export KUBECONFIG="/etc/ibmcloud/secrets/roks.kubeconfig"
+        bin/hypershift install --hypershift-image ${HYPERSHIFT_RELEASE_LATEST} --exclude-etcd true
+      credentials:
+      - mount_path: /etc/ibmcloud/secrets
+        name: hypershift-ibm-shared-ci-creds
+        namespace: test-credentials
+      dependencies:
+      - env: HYPERSHIFT_RELEASE_LATEST
+        name: hypershift-operator
+      from: bin
+      resources:
+        requests:
+          cpu: 100m
+    - as: create-guest-cluster
+      commands: |-
+        export CLUSTER_ID="openshift-release-1"
+        export MANAGED_CLUSTER_TYPE="openshift"
+        export MANAGEMENT_CLUSTER_KUBECONFIG="/etc/ibmcloud/secrets/roks.kubeconfig"
+        export CREATE_BOM="/home/armada-ansible/common/bom/openshift-target-bom-4.9.yml"
+        export UPDATE_BOM="/home/armada-ansible/common/bom/next/openshift-target-bom-4.9.yml"
+        export BOM_VERSION="4.9.8_1514_openshift"
+        ./ordercluster.sh
+      credentials:
+      - mount_path: /etc/ibmcloud/secrets
+        name: hypershift-ibm-shared-ci-creds
+        namespace: test-credentials
+      from: ibmcloud-tests
+      grace_period: 1m0s
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 5m0s
 zz_generated_metadata:
   branch: main
   org: openshift
