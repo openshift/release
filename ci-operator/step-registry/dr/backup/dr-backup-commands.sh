@@ -19,4 +19,10 @@ oc version
 go version
 oc get node
 
-
+echo  -e "Start dr test cases execution:\n"
+git clone https://github.com/openshift-qe/ocp-dr-testing.git
+echo -e "PWD:" 
+pwd
+cd ocp-dr-testing/test
+echo -e "ls ocp-dr-testing/test:\n"
+go test util.go testcase_test.go -v
