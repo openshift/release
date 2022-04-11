@@ -21,8 +21,9 @@ timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
     dnf install -y docker-ce docker-ce-cli containerd.io
 
     # attempt at addressing quay.io flakyness
+    # store container logs into journald
     mkdir -p /etc/docker
-    echo '{"debug": true, "max-concurrent-downloads": 1, "max-download-attempts": 50}' | tee /etc/docker/daemon.json
+    echo '{"debug": true, "max-concurrent-downloads": 1, "max-download-attempts": 50, "log-driver": "journald"}' | tee /etc/docker/daemon.json
     systemctl enable --now docker
 
     # install skipper
