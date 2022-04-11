@@ -1,0 +1,27 @@
+apiVersion: hive.openshift.io/v1
+kind: ClusterPool
+metadata:
+  name: rhecoedge-nvidia-ci-aws-cluster-pool # name is not relevant but of course must be unique
+  namespace: rhecoedge-nvidia-ci-cluster-pools
+  labels: # architecture, cloud, owner, product, version are used to filter out a pool when a job claims a cluster
+    architecture: amd64
+    cloud: aws
+    product: ocp
+    owner: rhecoedge-nvidia-ci
+    version: "4.10"
+spec:
+  baseDomain: ci.nvidia.rhecoeng.com # the base domain to install the cluster
+  imageSetRef:
+    name: ocp-4.10.0-amd64 # the name of the imageSet which determines the image to install the cluster; will be automatically updated if `version_*` labels are set
+  installConfigSecretTemplateRef:
+    name: rhecoedge-nvidia-ci-aws-install-config # the name of the secret with an installation config for the installer
+  skipMachinePools: true
+  platform:
+    aws:
+      credentialsSecretRef:
+        name: rhecoedge-nvidia-ci-aws-credentials # the name of the secret with the credentials of the cloud account
+      region: us-east-1
+  pullSecretRef:
+    name: pull-secret
+  size: 1 # the number of clusters that Hive should keep provisioned and waiting for use.
+  maxSize: 10 # the maximum number of clusters that can exist at the same time.
