@@ -6,22 +6,24 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build01
-    context: ci/prow/yes
+    context: ci/prow/e2e-4.10
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-rh-ecosystem-edge-nvidia-ci-main-yes
-    rerun_command: /test yes
+    name: pull-ci-rh-ecosystem-edge-nvidia-ci-main-e2e-4.10
+    rerun_command: /test e2e-4.10
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=yes
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-4.10
         command:
         - ci-operator
         image: ci-operator:latest
@@ -31,8 +33,14 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -42,10 +50,16 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )yes,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-4.10,?($|\s.*)
