@@ -4,13 +4,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-echo "${BASE_DOMAIN}" > "${SHARED_DIR}"/basedomain.txt
+echo "${BASE_DOMAIN:?BASE_DOMAIN env variable should be defined}" > "${SHARED_DIR}"/basedomain.txt
 
 cluster_name=${NAMESPACE}-${JOB_NAME_HASH}
 base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
 cluster_domain="${cluster_name}.${base_domain}"
 
-export AWS_DEFAULT_REGION=us-west-2  # TODO: Derive this?
 export AWS_SHARED_CREDENTIALS_FILE=/var/run/vault/nutanix/.awscred
 export AWS_MAX_ATTEMPTS=50
 export AWS_RETRY_MODE=adaptive
@@ -46,19 +45,10 @@ echo "${hosted_zone_id}" > "${SHARED_DIR}/hosted-zone.txt"
 echo "$(date -u --rfc-3339=seconds) - Creating DNS records ..."
 cat > "${SHARED_DIR}"/dns-create.json <<EOF
 {
-"Comment": "Create OpenShift DNS records for Nutanix IPI CI install",
 "Changes": [{
     "Action": "UPSERT",
     "ResourceRecordSet": {
       "Name": "api.${cluster_domain}.",
-      "Type": "A",
-      "TTL": 60,
-      "ResourceRecords": [{"Value": "${API_VIP}"}]
-      }
-    },{
-    "Action": "UPSERT",
-    "ResourceRecordSet": {
-      "Name": "api-int.${cluster_domain}.",
       "Type": "A",
       "TTL": 60,
       "ResourceRecords": [{"Value": "${API_VIP}"}]
@@ -74,25 +64,14 @@ cat > "${SHARED_DIR}"/dns-create.json <<EOF
 }]}
 EOF
 
-# api-int record is needed for Windows nodes
-# TODO: Remove the api-int entry in future
 echo "$(date -u --rfc-3339=seconds) - Creating batch file to destroy DNS records"
 
 cat > "${SHARED_DIR}"/dns-delete.json <<EOF
 {
-"Comment": "Delete public OpenShift DNS records for Nutanix IPI CI install",
 "Changes": [{
     "Action": "DELETE",
     "ResourceRecordSet": {
       "Name": "api.$cluster_domain.",
-      "Type": "A",
-      "TTL": 60,
-      "ResourceRecords": [{"Value": "${API_VIP}"}]
-      }
-    },{
-    "Action": "DELETE",
-    "ResourceRecordSet": {
-      "Name": "api-int.$cluster_domain.",
       "Type": "A",
       "TTL": 60,
       "ResourceRecords": [{"Value": "${API_VIP}"}]

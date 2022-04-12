@@ -16,6 +16,14 @@ declare prism_central_host
 declare prism_central_port
 declare prism_central_username
 declare prism_central_password
+declare prism_element_host
+declare prism_element_port
+declare prism_element_username
+declare prism_element_password
+declare prism_element_storage_container
+declare override_rhcos_image
+declare one_net_mode_network_name
+declare awk_ip_program
 # shellcheck source=/dev/random
 source "${NUTANIX_AUTH_PATH}"
 
@@ -44,7 +52,13 @@ api_ep="${pc_url}/api/nutanix/v3/subnets/list"
 data="{
   \"kind\": \"subnet\"
 }"
+
 subnet_name="${LEASED_RESOURCE}"
+slice_number=${LEASED_RESOURCE: -1}
+
+if [[ ! -z "${one_net_mode_network_name}" ]]; then
+  subnet_name="${one_net_mode_network_name}"
+fi
 
 subnets_json=$(curl -ks -u "${un}":"${pw}" -X POST ${api_ep} -H "Content-Type: application/json" -d @-<<<"${data}")
 subnet_uuid=$(echo "${subnets_json}" | jq ".entities[] | select (.spec.name == \"${subnet_name}\") | .metadata.uuid ")
@@ -62,6 +76,10 @@ if [[ -z "${API_VIP}" ]]; then
     exit 1
   fi
   API_VIP=$(echo "${subnet_ip}" | sed 's/"//g' | awk -F. '{printf "%d.%d.%d.2", $1, $2, $3}')
+
+  if [[ ! -z  "${awk_ip_program}" ]]; then
+    API_VIP=$(echo "${subnet_ip}" | sed 's/"//g' | awk -F. -v num=${slice_number} -v type="api" "${awk_ip_program}")
+  fi
 fi
 
 if [[ -z "${INGRESS_VIP}" ]]; then
@@ -70,16 +88,26 @@ if [[ -z "${INGRESS_VIP}" ]]; then
     exit 1
   fi
   INGRESS_VIP=$(echo "${subnet_ip}" | sed 's/"//g' | awk -F. '{printf "%d.%d.%d.3", $1, $2, $3}')
+
+  if [[ ! -z  "${awk_ip_program}" ]]; then
+    INGRESS_VIP=$(echo "${subnet_ip}" | sed 's/"//g' | awk -F. -v num=${slice_number} -v type="ingress" "${awk_ip_program}")
+  fi
 fi
 
 echo "$(date -u --rfc-3339=seconds) - Creating nutanix_context.sh file..."
 cat > "${SHARED_DIR}/nutanix_context.sh" << EOF
-export NUTANIX_HOST=${prism_central_host}
-export NUTANIX_PORT=${prism_central_port}
-export NUTANIX_USERNAME=${prism_central_username}
-export NUTANIX_PASSWORD=${prism_central_password}
-export PE_UUID=${pe_uuid}
-export SUBNET_UUID=${subnet_uuid}
-export API_VIP=${API_VIP}
-export INGRESS_VIP=${INGRESS_VIP}
+export NUTANIX_HOST='${prism_central_host}'
+export NUTANIX_PORT='${prism_central_port}'
+export NUTANIX_USERNAME='${prism_central_username}'
+export NUTANIX_PASSWORD='${prism_central_password}'
+export PE_HOST='${prism_element_host}'
+export PE_PORT='${prism_element_port}'
+export PE_USERNAME='${prism_element_username}'
+export PE_PASSWORD='${prism_element_password}'
+export PE_UUID='${pe_uuid}'
+export PE_STORAGE_CONTAINER='${prism_element_storage_container}'
+export SUBNET_UUID='${subnet_uuid}'
+export API_VIP='${API_VIP}'
+export INGRESS_VIP='${INGRESS_VIP}'
+export OVERRIDE_RHCOS_IMAGE='${override_rhcos_image}'
 EOF

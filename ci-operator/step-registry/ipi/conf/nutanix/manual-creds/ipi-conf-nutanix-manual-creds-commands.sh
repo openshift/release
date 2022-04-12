@@ -6,10 +6,8 @@ set -o pipefail
 
 source "${SHARED_DIR}/nutanix_context.sh"
 
-NTNX_ENDPOINT=$( echo -n "${NUTANIX_HOST}" | base64 )
-NTNX_PORT=$( echo -n "${NUTANIX_PORT}" | base64 )
-NTNX_USER=$( echo -n "${NUTANIX_USERNAME}" | base64 )
-NTNX_PASSWORD=$( echo -n "${NUTANIX_PASSWORD}" | base64 )
+credobj="[{\"type\":\"basic_auth\",\"data\":{\"prismCentral\":{\"username\":\"${NUTANIX_USERNAME}\",\"password\":\"${NUTANIX_PASSWORD}\"},\"prismElements\":null}}]"
+credentials=$( echo -n "${credobj}" | base64 -w 0 )
 
 # machine-api credentials manifest
 cat > "${SHARED_DIR}/manifest_openshift-machine-api-nutanix-credentials-credentials.yaml" << EOF
@@ -20,8 +18,5 @@ metadata:
    namespace: openshift-machine-api
 type: Opaque
 data:
-  NUTANIX_ENDPOINT: ${NTNX_ENDPOINT}
-  NUTANIX_PORT: ${NTNX_PORT}
-  NUTANIX_USER: ${NTNX_USER}
-  NUTANIX_PASSWORD: ${NTNX_PASSWORD}
+  credentials: ${credentials}
 EOF

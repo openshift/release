@@ -14,6 +14,11 @@ CONFIG="${SHARED_DIR}/install-config.yaml"
 
 source "${SHARED_DIR}/nutanix_context.sh"
 
+RHCOS_PATCH=""
+if [[ ! -z "${OVERRIDE_RHCOS_IMAGE}" ]]; then
+    RHCOS_PATCH=$(printf "\n    ClusterOSImage: %s" "${OVERRIDE_RHCOS_IMAGE}")
+fi
+
 echo "$(date -u --rfc-3339=seconds) - Adding platform data to install-config.yaml"
 
 # Populate install-config with Nutanix specifics
@@ -21,20 +26,42 @@ cat >> "${CONFIG}" << EOF
 baseDomain: ${BASE_DOMAIN}
 credentialsMode: Manual
 platform:
-  nutanix:
+  nutanix:${RHCOS_PATCH}
     apiVIP: ${API_VIP}
     ingressVIP: ${INGRESS_VIP}
-    password: ${NUTANIX_PASSWORD}
-    port: ${NUTANIX_PORT}
-    prismCentral: ${NUTANIX_HOST}
-    prismElementUUID: ${PE_UUID}
-    subnetUUID: ${SUBNET_UUID}
-    username: ${NUTANIX_USERNAME}
+    prismCentral:
+      endpoint:
+        address: ${NUTANIX_HOST}
+        port: ${NUTANIX_PORT}
+      password: ${NUTANIX_PASSWORD}
+      username: ${NUTANIX_USERNAME}
+    prismElements:
+    - endpoint:
+        address: ${PE_HOST}
+        port: ${PE_PORT}
+      uuid: ${PE_UUID}
+    subnetUUIDs: 
+    - ${SUBNET_UUID}
+networking:
+  clusterNetwork:
+  - cidr: 10.128.0.0/14
+    hostPrefix: 23
+  machineNetwork:
+  - cidr: 10.0.0.0/16
+  networkType: OpenShiftSDN
+  serviceNetwork:
+  - 172.30.0.0/16
 compute:
 - architecture: amd64
   hyperthreading: Enabled
   name: worker
-  platform: {}
+  platform:
+    nutanix:
+      cpus: 4
+      coresPerSocket: 1
+      memoryMiB: 16384
+      osDisk:
+        diskSizeMiB: 122880
   replicas: 3
 controlPlane:
   architecture: amd64
