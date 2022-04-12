@@ -65,7 +65,7 @@ export INSTALLER_IMAGE={{ ASSISTED_INSTALLER_IMAGE }}
 export CHECK_CLUSTER_VERSION=True
 export TEST_TEARDOWN=false
 export TEST_FUNC=test_install
-export MAKEFILE_TARGET='create_full_environment run test_parallel'
+export MAKEFILE_TARGET='setup run test_parallel'
 export ASSISTED_SERVICE_HOST={{ IP }}
 export PUBLIC_CONTAINER_REGISTRIES="{{ CI_REGISTRIES | join(',') }}"
 
@@ -75,7 +75,7 @@ export PULL_SECRET='\$(cat /root/prod/pull-secret)'
 export OFFLINE_TOKEN='\$(cat /root/prod/offline-token)'
 export REMOTE_SERVICE_URL=https://api.openshift.com
 export NO_MINIKUBE=true
-export MAKEFILE_TARGET='create_full_environment test_parallel'
+export MAKEFILE_TARGET='setup test_parallel'
 export WORKER_DISK="{{ disksize.stdout }}"
 {% endif %}
 
