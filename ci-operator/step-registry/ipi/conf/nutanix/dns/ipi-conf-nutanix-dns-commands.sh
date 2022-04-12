@@ -4,13 +4,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-echo "${BASE_DOMAIN}" > "${SHARED_DIR}"/basedomain.txt
+echo "${BASE_DOMAIN:?BASE_DOMAIN env variable should be defined}" > "${SHARED_DIR}"/basedomain.txt
 
-cluster_name=${NAMESPACE}-${JOB_NAME_HASH}
+cluster_name="${NAMESPACE}-${JOB_NAME_HASH}"
 base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
 cluster_domain="${cluster_name}.${base_domain}"
 
-export AWS_DEFAULT_REGION=us-west-2  # TODO: Derive this?
 export AWS_SHARED_CREDENTIALS_FILE=/var/run/vault/nutanix/.awscred
 export AWS_MAX_ATTEMPTS=50
 export AWS_RETRY_MODE=adaptive
@@ -58,15 +57,7 @@ cat > "${SHARED_DIR}"/dns-create.json <<EOF
     },{
     "Action": "UPSERT",
     "ResourceRecordSet": {
-      "Name": "api-int.${cluster_domain}.",
-      "Type": "A",
-      "TTL": 60,
-      "ResourceRecords": [{"Value": "${API_VIP}"}]
-      }
-    },{
-    "Action": "UPSERT",
-    "ResourceRecordSet": {
-      "Name": "*.apps.$cluster_domain.",
+      "Name": "*.apps.${cluster_domain}.",
       "Type": "A",
       "TTL": 60,
       "ResourceRecords": [{"Value": "${INGRESS_VIP}"}]
@@ -74,8 +65,6 @@ cat > "${SHARED_DIR}"/dns-create.json <<EOF
 }]}
 EOF
 
-# api-int record is needed for Windows nodes
-# TODO: Remove the api-int entry in future
 echo "$(date -u --rfc-3339=seconds) - Creating batch file to destroy DNS records"
 
 cat > "${SHARED_DIR}"/dns-delete.json <<EOF
@@ -84,7 +73,7 @@ cat > "${SHARED_DIR}"/dns-delete.json <<EOF
 "Changes": [{
     "Action": "DELETE",
     "ResourceRecordSet": {
-      "Name": "api.$cluster_domain.",
+      "Name": "api.${cluster_domain}.",
       "Type": "A",
       "TTL": 60,
       "ResourceRecords": [{"Value": "${API_VIP}"}]
@@ -92,15 +81,7 @@ cat > "${SHARED_DIR}"/dns-delete.json <<EOF
     },{
     "Action": "DELETE",
     "ResourceRecordSet": {
-      "Name": "api-int.$cluster_domain.",
-      "Type": "A",
-      "TTL": 60,
-      "ResourceRecords": [{"Value": "${API_VIP}"}]
-      }
-    },{
-    "Action": "DELETE",
-    "ResourceRecordSet": {
-      "Name": "*.apps.$cluster_domain.",
+      "Name": "*.apps.${cluster_domain}.",
       "Type": "A",
       "TTL": 60,
       "ResourceRecords": [{"Value": "${INGRESS_VIP}"}]
@@ -108,10 +89,10 @@ cat > "${SHARED_DIR}"/dns-delete.json <<EOF
 }]}
 EOF
 
-id=$(aws route53 change-resource-record-sets --hosted-zone-id "$hosted_zone_id" --change-batch file:///"${SHARED_DIR}"/dns-create.json --query '"ChangeInfo"."Id"' --output text)
+id=$(aws route53 change-resource-record-sets --hosted-zone-id "${hosted_zone_id}" --change-batch file:///"${SHARED_DIR}"/dns-create.json --query '"ChangeInfo"."Id"' --output text)
 
 echo "$(date -u --rfc-3339=seconds) - Waiting for DNS records to sync..."
 
-aws route53 wait resource-record-sets-changed --id "$id"
+aws route53 wait resource-record-sets-changed --id "${id}"
 
 echo "$(date -u --rfc-3339=seconds) - DNS records created."
