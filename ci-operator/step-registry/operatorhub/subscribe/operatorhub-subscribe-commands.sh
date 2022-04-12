@@ -1,40 +1,36 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
-set -ex
+set -o nounset
+set -o errexit
+set -o pipefail
 
-#set -o nounset
-#set -o errexit
-#set -o pipefail
-
-if [[ -z ${INSTALL_NAMESPACE} ]]; then
+if [[ -z "${SUB_INSTALL_NAMESPACE}" ]]; then
   echo "ERROR: INSTALL_NAMESPACE is not defined"
   exit 1
 fi
 
-if [[ -z ${PACKAGE} ]]; then
+if [[ -z "${SUB_PACKAGE}" ]]; then
   echo "ERROR: PACKAGE is not defined"
   exit 1
 fi
 
-if [[ -z ${CHANNEL} ]]; then
+if [[ -z "${SUB_CHANNEL}" ]]; then
   echo "ERROR: CHANNEL is not defined"
   exit 1
 fi
 
-if [[ ${TARGET_NAMESPACES} == "!install" ]]; then
-  TARGET_NAMESPACES=${INSTALL_NAMESPACE}
+if [[ "${SUB_TARGET_NAMESPACES}" == "!install" ]]; then
+  SUB_TARGET_NAMESPACES="${SUB_INSTALL_NAMESPACE}"
 fi
 
-echo "Installing ${PACKAGE} from ${CHANNEL} into ${INSTALL_NAMESPACE}, targeting ${TARGET_NAMESPACES}"
-
-SOURCE=${SOURCE:-redhat-operators}
+echo "Installing ${SUB_PACKAGE} from ${SUB_CHANNEL} into ${SUB_INSTALL_NAMESPACE}, targeting ${SUB_TARGET_NAMESPACES}"
 
 # create the install namespace
 oc apply -f - <<EOF
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: ${INSTALL_NAMESPACE}
+  name: "${SUB_INSTALL_NAMESPACE}"
 EOF
 
 # deploy new operator group
@@ -42,11 +38,11 @@ oc apply -f - <<EOF
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
-  name: ${INSTALL_NAMESPACE}-operator-group
-  namespace: ${INSTALL_NAMESPACE}
+  name: "${SUB_INSTALL_NAMESPACE}-operator-group"
+  namespace: "${SUB_INSTALL_NAMESPACE}"
 spec:
   targetNamespaces:
-  - $(echo \"${TARGET_NAMESPACES}\" | sed "s|,|\"\n  - \"|g")
+  - $(echo \"${SUB_TARGET_NAMESPACES}\" | sed "s|,|\"\n  - \"|g")
 EOF
 
 # subscribe to the operator
@@ -54,13 +50,13 @@ cat <<EOF | oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
-  name: ${PACKAGE}
-  namespace: ${INSTALL_NAMESPACE}
+  name: "${SUB_PACKAGE}"
+  namespace: "${SUB_INSTALL_NAMESPACE}"
 spec:
-  channel: ${CHANNEL}
+  channel: "${SUB_CHANNEL}"
   installPlanApproval: Automatic
-  name: ${PACKAGE}
-  source: ${SOURCE}
+  name: "${SUB_PACKAGE}"
+  source: "${SUB_SOURCE}"
   sourceNamespace: openshift-marketplace
 EOF
 
@@ -69,33 +65,33 @@ sleep 60
 
 RETRIES=30
 CSV=
-for i in $(seq ${RETRIES}); do
-  if [[ -z ${CSV} ]]; then
-    CSV=$(oc get subscription -n ${INSTALL_NAMESPACE} ${PACKAGE} -o jsonpath='{.status.installedCSV}')
+for i in $(seq "${RETRIES}"); do
+  if [[ -z "${CSV}" ]]; then
+    CSV=$(oc get subscription -n "${SUB_INSTALL_NAMESPACE}" "${SUB_PACKAGE}" -o jsonpath='{.status.installedCSV}')
   fi
 
-  if [[ -z ${CSV} ]]; then
-    echo "Try ${i}/${RETRIES}: can't get the ${PACKAGE} yet. Checking again in 30 seconds"
+  if [[ -z "${CSV}" ]]; then
+    echo "Try ${i}/${RETRIES}: can't get the ${SUB_PACKAGE} yet. Checking again in 30 seconds"
     sleep 30
   fi
 
-  if [[ $(oc get csv -n ${INSTALL_NAMESPACE} ${CSV} -o jsonpath={.status.phase}) == "Succeeded" ]]; then
-    echo "${PACKAGE} is deployed"
+  if [[ $(oc get csv -n ${SUB_INSTALL_NAMESPACE} ${CSV} -o jsonpath='{.status.phase}') == "Succeeded" ]]; then
+    echo "${SUB_PACKAGE} is deployed"
     break
   else
-    echo "Try ${i}/${RETRIES}: ${PACKAGE} is not deployed yet. Checking again in 30 seconds"
+    echo "Try ${i}/${RETRIES}: ${SUB_PACKAGE} is not deployed yet. Checking again in 30 seconds"
     sleep 30
   fi
 done
 
-if [[ $(oc get csv -n ${INSTALL_NAMESPACE} ${CSV} -o jsonpath={.status.phase}) != "Succeeded" ]]; then
-  echo "Error: Failed to deploy ${PACKAGE}"
+if [[ $(oc get csv -n "${SUB_INSTALL_NAMESPACE}" "${CSV}" -o jsonpath='{.status.phase}') != "Succeeded" ]]; then
+  echo "Error: Failed to deploy ${SUB_PACKAGE}"
   echo "CSV ${CSV} YAML"
-  oc get CSV ${CSV} -n ${INSTALL_NAMESPACE} -o yaml
+  oc get CSV "${CSV}" -n "${SUB_INSTALL_NAMESPACE}" -o yaml
   echo
   echo "CSV ${CSV} Describe"
-  oc describe CSV ${CSV} -n ${INSTALL_NAMESPACE}
+  oc describe CSV "${CSV}" -n "${SUB_INSTALL_NAMESPACE}"
   exit 1
 fi
 
-echo "successfully installed ${PACKAGE}"
+echo "successfully installed ${SUB_PACKAGE}"
