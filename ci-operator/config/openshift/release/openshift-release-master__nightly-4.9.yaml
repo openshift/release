@@ -452,7 +452,22 @@ tests:
     cluster_profile: azure-2
     env:
       BASE_DOMAIN: ci2.azure.devcluster.openshift.com
-    workflow: openshift-e2e-azure-csi-migration
+      CLUSTERCSIDRIVER: disk.csi.azure.com
+      TEST_CSI_DRIVER_MANIFEST: manifest-azure-disk.yaml
+      TEST_SUITE: openshift/csi
+      TRUECONDITIONS: AzureDiskDriverControllerServiceControllerAvailable AzureDiskDriverNodeServiceControllerAvailable
+    post:
+    - ref: storage-obj-check
+    - chain: gather-core-dump
+    - chain: ipi-azure-post
+    pre:
+    - ref: ipi-conf-techpreview
+    - chain: ipi-azure-pre
+    - ref: storage-conf-csi-azure-disk
+    - ref: storage-conf-wait-for-csi-driver
+    - ref: storage-obj-save
+    test:
+    - ref: openshift-e2e-test
 - as: e2e-azurestack-csi
   interval: 24h
   steps:
