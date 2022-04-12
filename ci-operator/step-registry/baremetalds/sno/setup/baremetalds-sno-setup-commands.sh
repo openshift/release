@@ -93,6 +93,6 @@ echo "${SINGLE_NODE_IP_ADDRESS} ${CLUSTER_API_DOMAIN}" | tee --append /etc/hosts
 echo Reloading NetworkManager systemd configuration
 systemctl reload NetworkManager
 
-timeout -s 9 105m make create_full_environment deploy_ibip
+timeout -s 9 105m make setup deploy_ibip
 
 EOF
