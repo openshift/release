@@ -1,0 +1,34 @@
+workflow:
+  as: optional-operators-cvp-common-aws-osd
+  steps:
+    cluster_profile: aws-osd-msp
+    env:
+      #BASE_DOMAIN: cpaas-ci.devcluster.openshift.com
+      OO_CHANNEL: "4.3"
+      OO_INSTALL_NAMESPACE: '!create'
+      OO_PACKAGE: e2e-test-operator
+      OO_TARGET_NAMESPACES: '!install'
+      PYXIS_URL: ""
+      CUSTOM_SCORECARD_TESTCASE: ""
+      TEST_MODE: "msp"
+    dependency_overrides:
+      BUNDLE_IMAGE: brew.registry.redhat.io/rh-osbs-stage/e2e-e2e-test-operator-bundle-container:8.0-11
+      OO_INDEX: brew.registry.redhat.io/rh-osbs-stage/iib:40523
+    pre:
+    - chain: osd-create # ipi-aws-pre 
+    - ref: optional-operators-configure-proxy-registry
+    - ref: optional-operators-cvp-common-apply-secrets
+    - ref: optional-operators-subscribe
+    test:
+    - ref: optional-operators-cvp-common-scorecard
+    - ref: optional-operators-cvp-common-test
+    post:
+    - chain: osd-delete  # check the shell script for osd-delete
+  documentation: |-
+    Provisions a clusters on AWS OSD cluster with a default configuration. Installs an optional
+    operator using the input index image, package and channel, and execute a
+    common suite of CVP tests to validate the optional operator.
+
+    Important: Parameter values in `env` are supposed to be used only in rehearsals
+    and serve as "testing defaults". Production jobs should always override them
+    via `cvp-trigger`.
