@@ -34,7 +34,7 @@ if [ "${ENVIRONMENT}" != "local" ]; then
 
   echo "export REMOTE_SERVICE_URL=${remote_service_url}" >> "${SHARED_DIR}/assisted-additional-config"
   echo "export NO_MINIKUBE=true" >> "${SHARED_DIR}/assisted-additional-config"
-  echo "export MAKEFILE_TARGET='create_full_environment test_parallel'" >> "${SHARED_DIR}/assisted-additional-config"
+  echo "export MAKEFILE_TARGET='setup test_parallel'" >> "${SHARED_DIR}/assisted-additional-config"
 
   WORKER_DISK_SIZE=$(echo 120G | numfmt --from=iec)
   echo "export WORKER_DISK=${WORKER_DISK_SIZE}" >> "${SHARED_DIR}/assisted-additional-config"
@@ -149,7 +149,7 @@ fi
 
 source /root/config
 
-make \${MAKEFILE_TARGET:-create_full_environment run test_parallel}
+make \${MAKEFILE_TARGET:-setup run test_parallel}
 
 EOF
 
