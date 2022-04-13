@@ -206,5 +206,5 @@ The repo is in a bad state where someone has pushed directly to the future relea
 #### Resolution
 
 1. Identify the owner(s) of the repo
-2. Reach out and tag them in `#forum-testplatfrom` asking them to clean up the affected branch.
+2. Reach out and tag them in `#forum-testplatform` asking them to clean up the affected branch.
 3. This job runs hourly, so silencing the alert until they can clean it up is a good idea. 
