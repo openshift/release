@@ -4,6 +4,18 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if [ -f "${SHARED_DIR}/kubeconfig" ] ; then
+    export KUBECONFIG=${SHARED_DIR}/kubeconfig
+fi
+cp -Lrvf "${KUBECONFIG}" /tmp/kubeconfig
+
+if [ -f "${SHARED_DIR}/runtime_env" ] ; then
+    source "${SHARED_DIR}/runtime_env"
+fi
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 # prepare users
 users=""
 htpass_file=/tmp/users.htpasswd
