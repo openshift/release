@@ -85,7 +85,6 @@ cat > packet-setup.yaml <<-EOF
   gather_facts: no
   vars:
     - cluster_type: "{{ lookup('env', 'CLUSTER_TYPE') }}"
-    - slackhook_path: "{{ lookup('env', 'CLUSTER_PROFILE_DIR') }}/slackhook"
     - packet_project_id: "{{ lookup('file', lookup('env', 'CLUSTER_PROFILE_DIR') + '/packet-project-id') }}"
     - packet_auth_token: "{{ lookup('file', lookup('env', 'CLUSTER_PROFILE_DIR') + '/packet-auth-token') }}"
 
@@ -115,9 +114,11 @@ cat > packet-setup.yaml <<-EOF
 EOF
 
 function send_slack(){
-    curl -X POST --data-urlencode\
-     "payload={\"text\":\"<https://prow.ci.openshift.org/view/gs/origin-ci-test/logs/$JOB_NAME/$BUILD_ID|Packet setup failed> $1\n\", \"blocks\": [ \
-]}" "https://hooks.slack.com/services/T027F3GAJ/B011TAG710V/${SLACK_AUTH_TOKEN}"
+    echo Packet setup failed: $1
+    SLACK_AUTH_TOKEN="T027F3GAJ/B011TAG710V/$(cat $CLUSTER_PROFILE_DIR/slackhook)"
+
+    curl -X POST --data "payload={\"text\":\"<https://prow.ci.openshift.org/view/gs/origin-ci-test/logs/$JOB_NAME/$BUILD_ID|Packet setup failed> $1\n\"}" \
+        "https://hooks.slack.com/services/${SLACK_AUTH_TOKEN}"
 }
 
 trap 'send_slack Failed to create equinix device: ipi-${NAMESPACE}-${JOB_NAME_HASH}-${BUILD_ID}' ERR
@@ -142,3 +143,6 @@ for _ in $(seq 30) ; do
         bash ${SHARED_DIR}/packet-conf.sh && exit 0 || exit 1
     fi
 done
+
+send_slack "Failed to create equinix device: ipi-${NAMESPACE}-${JOB_NAME_HASH}-${BUILD_ID}"
+exit 1
