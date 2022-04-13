@@ -194,8 +194,6 @@ in an attempt to fast-forward git content from the current development branch to
 
 #### Symptom
 
-
-
 ```
 level=error msg="Failed to execute command." branch=master commands="git push https://openshift-merge-robot:xxx@github.com/<some-org>/<some-repo> FETCH_HEAD:refs/heads/release-4.11" future-branch=release-4.11 org=<some-org> output="To https://github.com/<some-org>/<some-repo>\n ! [rejected]        FETCH_HEAD -> release-4.11 (fetch first)\nerror: failed to push some refs to 'https://github.com/<some-org>/<some-repo>'\nhint: Updates were rejected because the remote contains work that you do\nhint: not have locally. This is usually caused by another repository pushing\nhint: to the same ref. You may want to first integrate the remote changes\nhint: (e.g., 'git pull ...') before pushing again.\nhint: See the 'Note about fast-forwards' in 'git push --help' for details.\n" repo=<some-repo> source-file=<some-yaml-config>
 level=error msg="Could not push branch even with retries." branch=master future-branch=release-4.11 org=<some-org> repo=<some-repo> source-file=<some-yaml-config>
