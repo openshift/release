@@ -201,7 +201,7 @@ level=error msg="Could not push branch even with retries." branch=master future-
 
 #### Culprit
 
-The repo is in a bad state where someone has pushed directly to the `master` or `main` branch.
+The repo is in a bad state where someone has pushed directly to the future release branch.
 
 #### Resolution
 
