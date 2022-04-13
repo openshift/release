@@ -60,3 +60,18 @@ export vsphere_dev_network="${vsphere_dev_network}"
 export vsphere_datacenter="${vsphere_datacenter}"
 export vsphere_datastore="${vsphere_datastore}"
 EOF
+
+third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${LEASED_RESOURCE}"))
+
+echo "$(date -u --rfc-3339=seconds) - Creating vsphere_test_infra.sh file..."
+cat >> "${SHARED_DIR}/vsphere_test_infra.sh" << EOF
+export VSPHERE_CLUSTER="${vsphere_cluster}"
+export VSPHERE_USERNAME="${vsphere_user}"
+export VSPHERE_NETWORK="${LEASED_RESOURCE}"
+export VSPHERE_VCENTER="${vsphere_url}"
+export VSPHERE_DATACENTER="${vsphere_datacenter}"
+export VSPHERE_DATASTORE="${vsphere_datastore}"
+export VSPHERE_PASSWORD='${vsphere_password}'
+export API_VIP="192.168.${third_octet}.2"
+export INGRESS_VIP="192.168.${third_octet}.3"
+EOF
