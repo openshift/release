@@ -597,6 +597,18 @@ images:
       - destination_dir: usr/bin
         source_path: /usr/bin/oc
   to: sync-rover-groups
+- dockerfile_literal: |-
+    FROM quay.io/centos/centos:stream8
+    RUN dnf install -y git && dnf clean all && rm -rf /var/cache/dnf
+    ADD retester /usr/bin/retester
+    ENTRYPOINT ["/usr/bin/retester"]
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/retester
+  to: retester
 promotion:
   namespace: ci
   tag: latest
