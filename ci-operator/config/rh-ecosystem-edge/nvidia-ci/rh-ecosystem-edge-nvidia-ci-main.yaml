@@ -3,6 +3,9 @@ build_root:
     name: release
     namespace: openshift
     tag: golang-1.17
+images:
+- dockerfile_path: Dockerfile
+  to: nvidia-ci-tools
 resources:
   '*':
     limits:
@@ -15,6 +18,20 @@ tests:
   commands: make test-yes
   container:
     from: src
+- as: gpu-operator-arm-bm-sno
+  steps:
+    test:
+    - as: nightly
+      commands: make test-bm-arm-deployment
+      credentials:
+      - mount_path: /var/run/secrets
+        name: nvidia-ci-secrets
+        namespace: test-credentials
+      from: nvidia-ci-tools
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
 zz_generated_metadata:
   branch: main
   org: rh-ecosystem-edge
