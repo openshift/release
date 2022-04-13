@@ -4,6 +4,7 @@
 2. [`periodic-branch-protector`](#periodic-branch-protector)
 3. [`periodic-branch-protector-openshift-org`](#periodic-branch-protector-openshift-org)
 4. [`periodic-org-sync`](#periodic-org-sync)
+5. [`periodic-openshift-release-fast-forward`](#periodic-openshift-release-fast-forward)
 
 ## `branch-ci-openshift-release-master-release-controller-annotate`
 
@@ -177,3 +178,35 @@ a team, organization or something similar.
    the entities was not found (and so likely does not exist).
 3. Confirm the existence of `some-user` by visiting https://github.com/some-user
 4. Ping `@dpp-triage` to remove the user from their Peribolos configuration.
+
+
+## `periodic-openshift-release-fast-forward`
+
+This job runs [repo-brancher](https://github.com/openshift/ci-tools/tree/master/cmd/repo-brancher) in `fast-forward` mode
+in an attempt to fast-forward git content from the current development branch to the future branches if they already exist.
+
+#### Useful links
+
+- [Recent executions on Deck](https://prow.ci.openshift.org/?job=periodic-openshift-release-fast-forward)
+- [infra-periodics.yaml (ProwJob configuration)](https://github.com/openshift/release/blob/master/ci-operator/jobs/infra-periodics.yaml)
+
+### Attempt to push non fast-forward commit
+
+#### Symptom
+
+
+
+```
+level=error msg="Failed to execute command." branch=master commands="git push https://openshift-merge-robot:xxx@github.com/<some-org>/<some-repo> FETCH_HEAD:refs/heads/release-4.11" future-branch=release-4.11 org=<some-org> output="To https://github.com/<some-org>/<some-repo>\n ! [rejected]        FETCH_HEAD -> release-4.11 (fetch first)\nerror: failed to push some refs to 'https://github.com/<some-org>/<some-repo>'\nhint: Updates were rejected because the remote contains work that you do\nhint: not have locally. This is usually caused by another repository pushing\nhint: to the same ref. You may want to first integrate the remote changes\nhint: (e.g., 'git pull ...') before pushing again.\nhint: See the 'Note about fast-forwards' in 'git push --help' for details.\n" repo=<some-repo> source-file=<some-yaml-config>
+level=error msg="Could not push branch even with retries." branch=master future-branch=release-4.11 org=<some-org> repo=<some-repo> source-file=<some-yaml-config>
+```
+
+#### Culprit
+
+The repo is in a bad state where someone has pushed directly to the `master` or `main` branch.
+
+#### Resolution
+
+1. Identify the owner(s) of the repo
+2. Reach out and tag them in `#forum-testplatfrom` asking them to clean up the affected branch.
+3. This job runs hourly, so silencing the alert until they can clean it up is a good idea. 
