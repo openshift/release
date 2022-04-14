@@ -36,6 +36,12 @@ CONFIG = {
         'us-gov-west-1': 5,
         'us-gov-east-1': 5,
     },
+    'aws-c2s-qe-quota-slice': {
+        'us-iso-east-1': 8,
+    },
+    'aws-sc2s-qe-quota-slice': {
+        'us-isob-east-1': 5,
+    },
     'azure4-quota-slice': {
         'centralus': 33,
         'eastus': 8,
