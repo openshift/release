@@ -6,6 +6,30 @@ set -o pipefail
 
 echo "************ baremetalds packet setup command ************"
 
+function exit_with_success(){
+  cat >"${ARTIFACT_DIR}/junit_metal_setup.xml" <<EOF
+  <testsuite name="metal infra" tests="1" failures="0">
+    <testcase name="[sig-metal] should get working host from infra provider"/>
+  </testsuite>
+EOF
+  exit 0
+}
+
+function exit_with_failure(){
+  MESSAGE="Failed to create equinix device: ipi-${NAMESPACE}-${JOB_NAME_HASH}-${BUILD_ID}"
+  cat >"${ARTIFACT_DIR}/junit_metal_setup.xml" <<EOF
+  <testsuite name="metal infra" tests="1" failures="1">
+    <testcase name="[sig-metal] should get working host from infra provider">
+      <failure message="">$MESSAGE</failure>
+   </testcase>
+  </testsuite>
+EOF
+  send_slack $MESSAGE
+  exit 1
+}
+
+trap 'exit_with_failure' ERR
+
 cd
 cat > packet-config.yaml <<-EOF
 - name: Create Config for host
@@ -65,10 +89,9 @@ if [ -e "${CLUSTER_PROFILE_DIR}/ofcir_url" ] ; then
     CIRFILE=$SHARED_DIR/cir
     if curl -kfX POST -H "Host: ofcir.apps.ostest.test.metalkube.org" "$(cat ${CLUSTER_PROFILE_DIR}/ofcir_url)?name=$JOB_NAME/$BUILD_ID" -o $CIRFILE ; then
         jq -r .ip < $CIRFILE > $IPFILE
-        exit 0
+        exit_with_success
     fi
 fi
-
 
 # Avoid requesting a bunch of servers at the same time so they
 # don't race each other for available resources in a facility
@@ -121,7 +144,6 @@ function send_slack(){
         "https://hooks.slack.com/services/${SLACK_AUTH_TOKEN}"
 }
 
-trap 'send_slack Failed to create equinix device: ipi-${NAMESPACE}-${JOB_NAME_HASH}-${BUILD_ID}' ERR
 
 ansible-playbook packet-setup.yaml -e "packet_hostname=ipi-${NAMESPACE}-${JOB_NAME_HASH}-${BUILD_ID}"  |& gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0; fflush(); }'
 
@@ -140,9 +162,8 @@ for _ in $(seq 30) ; do
     if [ "$STATE" == "active" ] && [ -n "$IP" ] ; then
         echo "$IP" >  "${SHARED_DIR}/server-ip"
         # This also has 100 seconds worth of ssh retries
-        bash ${SHARED_DIR}/packet-conf.sh && exit 0 || exit 1
+        bash ${SHARED_DIR}/packet-conf.sh && exit_with_success || exit_with_failure
     fi
 done
 
-send_slack "Failed to create equinix device: ipi-${NAMESPACE}-${JOB_NAME_HASH}-${BUILD_ID}"
-exit 1
+exit_with_failure
