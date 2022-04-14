@@ -1,21 +1,22 @@
 presubmits:
-  openshift/ironic-rhcos-downloader:
+  openshift/okd-machine-os:
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build02
-    context: ci/prow/e2e-metal-ipi
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: build01
+    context: ci/prow/e2e-aws
     decorate: true
+    decoration_config:
+      skip_cloning: true
     labels:
-      ci-operator.openshift.io/cloud: equinix-ocp-metal
-      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ironic-rhcos-downloader-master-e2e-metal-ipi
-    rerun_command: /test e2e-metal-ipi
-    skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS)$
+    name: pull-ci-openshift-okd-machine-os-release-4.12-e2e-aws
+    rerun_command: /test e2e-aws
     spec:
       containers:
       - args:
@@ -24,8 +25,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-ipi-cluster-profile
-        - --target=e2e-metal-ipi
+        - --secret-dir=/usr/local/e2e-aws-cluster-profile
+        - --target=e2e-aws
         command:
         - ci-operator
         image: ci-operator:latest
@@ -41,7 +42,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-ipi-cluster-profile
+        - mountPath: /usr/local/e2e-aws-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -65,31 +66,32 @@ presubmits:
           secretName: ci-pull-credentials
       - name: cluster-profile
         secret:
-          secretName: cluster-secrets-equinix-ocp-metal
+          secretName: cluster-secrets-aws
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-ipi,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - ^master$
-    - ^master-
-    cluster: build02
-    context: ci/prow/e2e-metal-ipi-ovn-dualstack
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: build01
+    context: ci/prow/e2e-aws-crun
     decorate: true
+    decoration_config:
+      skip_cloning: true
     labels:
-      ci-operator.openshift.io/cloud: equinix-ocp-metal
-      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ironic-rhcos-downloader-master-e2e-metal-ipi-ovn-dualstack
+    name: pull-ci-openshift-okd-machine-os-release-4.12-e2e-aws-crun
     optional: true
-    rerun_command: /test e2e-metal-ipi-ovn-dualstack
-    skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS)$
+    rerun_command: /test e2e-aws-crun
     spec:
       containers:
       - args:
@@ -98,8 +100,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-ipi-ovn-dualstack-cluster-profile
-        - --target=e2e-metal-ipi-ovn-dualstack
+        - --secret-dir=/usr/local/e2e-aws-crun-cluster-profile
+        - --target=e2e-aws-crun
         command:
         - ci-operator
         image: ci-operator:latest
@@ -115,7 +117,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-ipi-ovn-dualstack-cluster-profile
+        - mountPath: /usr/local/e2e-aws-crun-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -139,30 +141,31 @@ presubmits:
           secretName: ci-pull-credentials
       - name: cluster-profile
         secret:
-          secretName: cluster-secrets-equinix-ocp-metal
+          secretName: cluster-secrets-aws
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-ipi-ovn-dualstack,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-crun,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build02
-    context: ci/prow/e2e-metal-ipi-ovn-ipv6
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: build01
+    context: ci/prow/e2e-aws-upgrade
     decorate: true
+    decoration_config:
+      skip_cloning: true
     labels:
-      ci-operator.openshift.io/cloud: equinix-ocp-metal
-      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ironic-rhcos-downloader-master-e2e-metal-ipi-ovn-ipv6
-    rerun_command: /test e2e-metal-ipi-ovn-ipv6
-    skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS)$
+    name: pull-ci-openshift-okd-machine-os-release-4.12-e2e-aws-upgrade
+    rerun_command: /test e2e-aws-upgrade
     spec:
       containers:
       - args:
@@ -171,8 +174,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-ipi-ovn-ipv6-cluster-profile
-        - --target=e2e-metal-ipi-ovn-ipv6
+        - --secret-dir=/usr/local/e2e-aws-upgrade-cluster-profile
+        - --target=e2e-aws-upgrade
         command:
         - ci-operator
         image: ci-operator:latest
@@ -188,7 +191,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-ipi-ovn-ipv6-cluster-profile
+        - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -212,30 +215,32 @@ presubmits:
           secretName: ci-pull-credentials
       - name: cluster-profile
         secret:
-          secretName: cluster-secrets-equinix-ocp-metal
+          secretName: cluster-secrets-aws
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-ipi-ovn-ipv6,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-upgrade,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - ^master$
-    - ^master-
-    cluster: build02
-    context: ci/prow/e2e-metal-ipi-serial-ipv4
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: build01
+    context: ci/prow/e2e-gcp
     decorate: true
+    decoration_config:
+      skip_cloning: true
     labels:
-      ci-operator.openshift.io/cloud: equinix-ocp-metal
-      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ironic-rhcos-downloader-master-e2e-metal-ipi-serial-ipv4
-    rerun_command: /test e2e-metal-ipi-serial-ipv4
-    skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS)$
+    name: pull-ci-openshift-okd-machine-os-release-4.12-e2e-gcp
+    optional: true
+    rerun_command: /test e2e-gcp
     spec:
       containers:
       - args:
@@ -244,8 +249,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-ipi-serial-ipv4-cluster-profile
-        - --target=e2e-metal-ipi-serial-ipv4
+        - --secret-dir=/usr/local/e2e-gcp-cluster-profile
+        - --target=e2e-gcp
         command:
         - ci-operator
         image: ci-operator:latest
@@ -261,7 +266,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-ipi-serial-ipv4-cluster-profile
+        - mountPath: /usr/local/e2e-gcp-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -284,31 +289,37 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-equinix-ocp-metal
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-ipi-serial-ipv4,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-gcp,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - ^master$
-    - ^master-
-    cluster: build02
-    context: ci/prow/e2e-metal-ipi-virtualmedia
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: build01
+    context: ci/prow/e2e-ovirt
     decorate: true
+    decoration_config:
+      skip_cloning: true
     labels:
-      ci-operator.openshift.io/cloud: equinix-ocp-metal
-      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
+      ci-operator.openshift.io/cloud: ovirt
+      ci-operator.openshift.io/cloud-cluster-profile: ovirt
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ironic-rhcos-downloader-master-e2e-metal-ipi-virtualmedia
-    rerun_command: /test e2e-metal-ipi-virtualmedia
-    skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS)$
+    name: pull-ci-openshift-okd-machine-os-release-4.12-e2e-ovirt
+    optional: true
+    rerun_command: /test e2e-ovirt
     spec:
       containers:
       - args:
@@ -317,8 +328,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-ipi-virtualmedia-cluster-profile
-        - --target=e2e-metal-ipi-virtualmedia
+        - --secret-dir=/usr/local/e2e-ovirt-cluster-profile
+        - --target=e2e-ovirt
         command:
         - ci-operator
         image: ci-operator:latest
@@ -334,7 +345,86 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-ipi-virtualmedia-cluster-profile
+        - mountPath: /usr/local/e2e-ovirt-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-ovirt
+          - configMap:
+              name: cluster-profile-ovirt
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-ovirt,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: vsphere
+    context: ci/prow/e2e-vsphere
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: vsphere
+      ci-operator.openshift.io/cloud-cluster-profile: vsphere
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-okd-machine-os-release-4.12-e2e-vsphere
+    optional: true
+    rerun_command: /test e2e-vsphere
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-vsphere-cluster-profile
+        - --target=e2e-vsphere
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-vsphere-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -358,28 +448,29 @@ presubmits:
           secretName: ci-pull-credentials
       - name: cluster-profile
         secret:
-          secretName: cluster-secrets-equinix-ocp-metal
+          secretName: cluster-secrets-vsphere
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-ipi-virtualmedia,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-vsphere,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build02
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: build01
     context: ci/prow/images
     decorate: true
+    decoration_config:
+      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ironic-rhcos-downloader-master-images
+    name: pull-ci-openshift-okd-machine-os-release-4.12-images
     rerun_command: /test images
-    skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS)$
     spec:
       containers:
       - args:
@@ -415,53 +506,3 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^master$
-    - ^master-
-    cluster: build02
-    context: ci/prow/okd-images
-    decorate: true
-    labels:
-      ci-operator.openshift.io/variant: okd
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ironic-rhcos-downloader-master-okd-images
-    rerun_command: /test okd-images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        - --target=[release:latest]
-        - --variant=okd
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )okd-images,?($|\s.*)
