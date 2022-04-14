@@ -21,5 +21,8 @@ else
 export http_proxy=${PUBLIC_PROXY_URL}
 export https_proxy=${PUBLIC_PROXY_URL}
 export no_proxy="localhost,127.0.0.1"
+export HTTP_PROXY=${PUBLIC_PROXY_URL}
+export HTTPS_PROXY=${PUBLIC_PROXY_URL}
+export NO_PROXY="localhost,127.0.0.1"
 EOF
 fi
