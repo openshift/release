@@ -1,6 +1,10 @@
 base_images:
-  builder:
+  pre-builder:
     name: stackrox-test
+    namespace: stackrox
+    tag: latest
+  image-builder:
+    name: stackrox-build
     namespace: stackrox
     tag: latest
 binary_build_commands: .openshift-ci-migration/migrate.sh binary_build_commands
@@ -11,19 +15,23 @@ build_root:
     tag: latest
 images:
 - dockerfile_path: stackrox/.openshift-ci/build/Dockerfile.pre-build-go-binaries
-  from: builder
+  from: pre-builder
   inputs:
     bin:
       paths:
       - destination_dir: .
         source_path: /go/src/github.com/stackrox/stackrox
   to: pre-build-go-binaries
-- dockerfile_path: .openshift-ci/build/Dockerfile.build-main
-  from: builder
+- dockerfile_path: stackrox/.openshift-ci/build/Dockerfile.build-main
+  from: image-builder
   inputs:
-    pre-build-go-binaries:
+    bin:
       paths:
       - destination_dir: .
+        source_path: /go/src/github.com/stackrox/stackrox
+    pre-build-go-binaries:
+      paths:
+      - destination_dir: pre-build-go-binaries-output
         source_path: /output
   to: main
 promotion:
