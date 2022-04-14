@@ -1,37 +1,73 @@
 base_images:
-  pre-builder:
-    name: stackrox-test
-    namespace: stackrox
-    tag: latest
-  image-builder:
+  stackrox-build:
     name: stackrox-build
     namespace: stackrox
     tag: latest
-binary_build_commands: .openshift-ci-migration/migrate.sh binary_build_commands
-build_root:
-  image_stream_tag:
+  stackrox-test:
     name: stackrox-test
     namespace: stackrox
     tag: latest
+  ubi-minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+binary_build_commands: .openshift-ci-migration/migrate.sh binary_build_commands
+build_root:
+  image_stream_tag:
+    name: stackrox-build
+    namespace: stackrox
+    tag: latest
 images:
+- dockerfile_path: stackrox/.openshift-ci/build/Dockerfile.pre-build-cli
+  from: stackrox-build
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/stackrox/stackrox
+  to: pre-build-cli
 - dockerfile_path: stackrox/.openshift-ci/build/Dockerfile.pre-build-go-binaries
-  from: pre-builder
+  from: stackrox-build
   inputs:
     bin:
       paths:
       - destination_dir: .
         source_path: /go/src/github.com/stackrox/stackrox
   to: pre-build-go-binaries
-- dockerfile_path: stackrox/.openshift-ci/build/Dockerfile.build-main
-  from: image-builder
+- dockerfile_path: stackrox/.openshift-ci/build/Dockerfile.pre-build-ui
+  from: stackrox-build
   inputs:
     bin:
       paths:
       - destination_dir: .
         source_path: /go/src/github.com/stackrox/stackrox
+  to: pre-build-ui
+- dockerfile_path: stackrox/.openshift-ci/build/Dockerfile.build-main
+  from: stackrox-build
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/stackrox/stackrox
+    pre-build-cli:
+      paths:
+      - destination_dir: pre-build-cli-output
+        source_path: /output
     pre-build-go-binaries:
       paths:
       - destination_dir: pre-build-go-binaries-output
+        source_path: /output
+    pre-build-ui:
+      paths:
+      - destination_dir: pre-build-ui-output
+        source_path: /output
+  to: build-main
+- dockerfile_path: stackrox/.openshift-ci/build/Dockerfile.main
+  from: ubi-minimal
+  inputs:
+    build-main:
+      paths:
+      - destination_dir: .
         source_path: /output
   to: main
 promotion:
