@@ -61,7 +61,8 @@ if test -f "${KUBECONFIG}"
 then
   TMPDIR=/tmp/azure-boot-logs
   mkdir -p $TMPDIR
-  oc --request-timeout=5s -n openshift-machine-api get machines -o jsonpath --template '{range .items[*]}{.metadata.name}{"\n"}{end}' >> "${TMPDIR}/azure-instance-names.txt"
+  # TODO make the get-boot-log down below non-fatal if it fails, but still provide error output.  For now, restrict to masters which seem to work.
+  oc --request-timeout=5s -n openshift-machine-api get machines -l machine.openshift.io/cluster-api-machine-role=master -o jsonpath --template '{range .items[*]}{.metadata.name}{"\n"}{end}' >> "${TMPDIR}/azure-instance-names.txt"
   RESOURCE_GROUP="$(oc get -o jsonpath='{.status.platformStatus.azure.resourceGroupName}' infrastructure cluster)"
 else
   echo "No kubeconfig; skipping boot log extraction."

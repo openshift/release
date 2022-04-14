@@ -8,14 +8,14 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-case "$CONFIG_TYPE" in
-  byon|proxy)
-    ;;
-  *)
-    echo "Skipping step due to CONFIG_TYPE not being byon or proxy."
+if [[ "$CONFIG_TYPE" != "proxy" ]]; then
+    if [[ "$ZONES_COUNT" != "0" ]]; then
+      echo "ZONES_COUNT was set to '${ZONES_COUNT}', although CONFIG_TYPE was not set to 'proxy'."
+      exit 1
+    fi
+    echo "Skipping step due to CONFIG_TYPE not being proxy."
     exit 0
-    ;;
-esac
+fi
 
 export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
 CLUSTER_NAME=$(<"${SHARED_DIR}"/CLUSTER_NAME)
@@ -24,21 +24,6 @@ ZONES=$(<"${SHARED_DIR}"/ZONES)
 
 mapfile -t ZONES < <(printf ${ZONES}) >/dev/null
 MAX_ZONES_COUNT=${#ZONES[@]}
-
-# For now, we only support the deployment of OCP into specific availability zones when pre-configuring
-# the network (BYON), for known limitations that will be addressed in the future.
-case "$CONFIG_TYPE" in
-  byon|proxy)
-    ;;
-  *)
-    if [[ "$ZONES_COUNT" != "0" ]]; then
-      echo "ZONES_COUNT was set to '${ZONES_COUNT}', although CONFIG_TYPE was not set to 'byon' or 'proxy'."
-      exit 1
-    fi
-    echo "Skipping step due to CONFIG_TYPE not being byon or proxy."
-    exit 0
-    ;;
-esac
 
 if [[ ${ZONES_COUNT} -gt ${MAX_ZONES_COUNT} ]]; then
   echo "Too many zones were requested: ${ZONES_COUNT}; only ${MAX_ZONES_COUNT} are available: ${ZONES[*]}"
@@ -93,9 +78,6 @@ else
 
   subnet_params=" --network ${MACHINES_NET_ID} --subnet-range ${SUBNET_RANGE} \
     --allocation-pool start=${ALLOCATION_POOL_START},end=${ALLOCATION_POOL_END}"
-  if [[ "${CONFIG_TYPE}" == "byon" ]]; then
-    subnet_params+=" --dns-nameserver ${DNS_IP}"
-  fi
 
   MACHINES_SUBNET_ID="$(openstack subnet create "${CLUSTER_NAME}-${CONFIG_TYPE}-machines-subnet" $subnet_params \
     --description "Machines subnet for ${CLUSTER_NAME}-${CONFIG_TYPE}" \
@@ -103,12 +85,6 @@ else
   echo "Created subnet for OpenShift machines: ${MACHINES_SUBNET_ID}"
   echo ${MACHINES_SUBNET_ID}>${SHARED_DIR}/MACHINES_SUBNET_ID
   echo ${SUBNET_RANGE}>${SHARED_DIR}/MACHINES_SUBNET_RANGE
-
-  if [[ "${CONFIG_TYPE}" == "byon" ]]; then
-    openstack router add subnet ${BASTION_ROUTER_ID} ${MACHINES_SUBNET_ID} >/dev/null
-    echo "Added machines subnet ${MACHINES_SUBNET_ID} to router: ${BASTION_ROUTER_ID}"
-  fi
-
 fi
 
 if [[ "${CONFIG_TYPE}" == "proxy" || ${OPENSTACK_PROVIDER_NETWORK} != "" ]]; then

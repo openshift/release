@@ -129,10 +129,10 @@ spec:
     rules:
     - alert: ghproxyDown
       annotations:
-        message: The service ghproxy has been down for 15 minutes.
+        message: The service ghproxy has been down for 10 minutes.
       expr: |
         absent(up{job="ghproxy"} == 1)
-      for: 15m
+      for: 10m
       labels:
         severity: critical
   - name: prow-monitoring-absent
@@ -263,7 +263,7 @@ spec:
       annotations:
         message: An excessive amount of CI Operator executions are failing with {{ $labels.reason }}, which is an infrastructure issue.
       expr: |
-        sum(rate(ci_operator_error_rate{state="failed",reason!~".*cloning_source",reason!~".*executing_template",reason!~".*executing_multi_stage_test",reason!~".*building_image_from_source",reason!~".*building_.*_image",reason!="executing_graph:interrupted"}[30m])) by (reason) > 0.02
+        sum(rate(ci_operator_error_rate{job_name!~"rehearse.*",state="failed",reason!~".*cloning_source",reason!~".*executing_template",reason!~".*executing_multi_stage_test",reason!~".*building_image_from_source",reason!~".*building_.*_image",reason!="executing_graph:interrupted"}[30m])) by (reason) > 0.02
       for: 1m
       labels:
         severity: critical

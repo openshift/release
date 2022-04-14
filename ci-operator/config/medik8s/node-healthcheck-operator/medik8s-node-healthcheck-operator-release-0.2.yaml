@@ -1,0 +1,71 @@
+base_images:
+  base:
+    name: ubi
+    namespace: ocp
+    tag: "8"
+  operator-index:
+    name: redhat-operator-index
+    namespace: ci
+    tag: v4.9
+binary_build_commands: make manager
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  to: node-healthcheck-operator
+operator:
+  bundles:
+  - as: my-bundle
+    base_index: operator-index
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/medik8s/node-healthcheck-operator:latest
+    with: pipeline:node-healthcheck-operator
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.10"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: test
+  commands: make test
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: openshift-e2e
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-my-bundle
+    env:
+      OO_CHANNEL: candidate
+      OO_INSTALL_NAMESPACE: default
+      OO_PACKAGE: node-healthcheck-operator
+      OO_TARGET_NAMESPACES: '!all'
+    test:
+    - as: e2e
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-aws
+zz_generated_metadata:
+  branch: release-0.2
+  org: medik8s
+  repo: node-healthcheck-operator

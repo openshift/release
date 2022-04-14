@@ -4,18 +4,14 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-case "$CONFIG_TYPE" in
-  byon|proxy)
-    ;;
-  *)
+if [[ "$CONFIG_TYPE" != "proxy" ]]; then
     if [[ "$ZONES_COUNT" != "0" ]]; then
-      echo "ZONES_COUNT was set to '${ZONES_COUNT}', although CONFIG_TYPE was not set to 'byon'."
+      echo "ZONES_COUNT was set to '${ZONES_COUNT}', although CONFIG_TYPE was not set to 'proxy'."
       exit 1
     fi
-    echo "Skipping step due to CONFIG_TYPE not being byon or proxy."
+    echo "Skipping step due to CONFIG_TYPE not being proxy."
     exit 0
-    ;;
-esac
+fi
 
 retry() {
     local retries=$1

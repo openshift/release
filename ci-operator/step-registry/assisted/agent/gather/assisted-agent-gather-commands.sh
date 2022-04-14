@@ -22,7 +22,7 @@ timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
 
     # sos report
     sos report --batch --tmp-dir /tmp/artifacts \
-        -o docker \
+        -o docker,logs \
         -k docker.all -k docker.logs
 EOF
 

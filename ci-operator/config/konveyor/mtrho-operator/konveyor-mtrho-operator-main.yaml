@@ -1,0 +1,49 @@
+base_images:
+  ubi8-minimal:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-base-openshift-4.11
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.16
+images:
+- dockerfile_path: Dockerfile
+  from: ubi8-minimal
+  to: mtrho-operator
+operator:
+  bundles:
+  - dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/konveyor/mtrho-operator-container:latest
+    with: mtrho-operator
+promotion:
+  name: "4.11"
+  namespace: konveyor
+releases:
+  initial:
+    integration:
+      name: "4.11"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.11"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+zz_generated_metadata:
+  branch: main
+  org: konveyor
+  repo: mtrho-operator

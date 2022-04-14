@@ -506,6 +506,64 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+- as: osde2e-stage-aws-addon-ocs-consumer
+  cron: 0 */12 * * *
+  steps:
+    pre:
+    - as: onboarding-ticket-generation
+      commands: |
+        curl -LsS https://raw.githubusercontent.com/red-hat-storage/ocs-operator/main/hack/ticketgen/ticketgen.sh -o ticketgen.sh
+        chmod +x ticketgen.sh
+        bash <(cat ticketgen.sh | sed "s/172800/999999999/") /usr/local/osde2e-ocs-consumer-addon-onboarding-secrets/private-key > ${SHARED_DIR}/onboarding-ticket.txt
+      credentials:
+      - mount_path: /usr/local/osde2e-ocs-consumer-addon-onboarding-secrets
+        name: osde2e-ocs-consumer-addon-onboarding-secrets
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    test:
+    - as: addon-ocs-consumer-tests
+      commands: |
+        export ADDON_PARAMETERS="{\"ocs-consumer\":{\"size\": \"1\", \"unit\": \"Ti\", \"storage-provider-endpoint\": \"$(cat /usr/local/osde2e-ocs-consumer-addon-onboarding-secrets/storage-provider-endpoint)\", \"onboarding-ticket\": \"$(cat ${SHARED_DIR}/onboarding-ticket.txt)\"}}"
+        export ADDON_IDS="ocs-consumer"
+        export ADDON_POLLING_TIMEOUT="14400"
+        export ADDON_TEST_HARNESSES="quay.io/rhceph-dev/ocsci-osd:consumer-addon"
+        export CHANNEL="stable"
+        export CONFIGS="aws,stage,addon-suite"
+        export CLOUD_PROVIDER_REGION="us-west-2"
+        export NUM_WORKER_NODES="3"
+        export OCM_CCS="true"
+        export OCM_COMPUTE_MACHINE_TYPE="m5.4xlarge"
+        export OCM_AWS_VPC_SUBNET_IDS="$(cat /usr/local/osde2e-ocs-consumer-addon-onboarding-secrets/aws-vpc-subnet-ids)"
+        export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-ocs-consumer-credentials,/usr/local/osde2e-ocs-consumer-addon-onboarding-secrets"
+        export REPORT_DIR="/tmp/artifacts"
+        #export CLUSTER_EXPIRY_IN_MINUTES="1440"
+        #export HIBERNATE_AFTER_USE="false"
+        #export DEBUG_OSD="true"
+
+        /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
+      credentials:
+      - mount_path: /usr/local/osde2e-common
+        name: osde2e-common
+        namespace: test-credentials
+      - mount_path: /usr/local/osde2e-ocs-consumer-credentials
+        name: osde2e-ocs-consumer-credentials
+        namespace: test-credentials
+      - mount_path: /usr/local/osde2e-ocs-consumer-addon-onboarding-secrets
+        name: osde2e-ocs-consumer-addon-onboarding-secrets
+        namespace: test-credentials
+      from_image:
+        name: osde2e
+        namespace: ci
+        tag: latest
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 6h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift

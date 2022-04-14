@@ -247,6 +247,24 @@ tests:
         OLM_OPERATORS=ocs
       TEST_SUITE: full
     workflow: assisted-baremetal
+- as: e2e-metal-assisted-odf
+  optional: true
+  run_if_changed: .*operator.*
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=odf
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-odf-periodic
+  cron: '@daily'
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=odf
+      TEST_SUITE: full
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-day2
   optional: true
   run_if_changed: ^(.*/day2/.*|.*/cluster/.*)$
@@ -451,6 +469,10 @@ tests:
   optional: true
   steps:
     cluster_profile: vsphere
+    env:
+      ASSISTED_CONFIG: |
+        export WORKER_COUNT=0
+      PLATFORM: vsphere
     workflow: assisted-vsphere
 zz_generated_metadata:
   branch: master

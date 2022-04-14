@@ -1,0 +1,45 @@
+ref:
+  as: assisted-common-setup-prepare
+  from: assisted-test-infra-dev-script
+  commands: assisted-common-setup-prepare-commands.sh
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 500Mi
+  credentials:
+  - namespace: test-credentials
+    name: vsphere-template-ssh-keys
+    mount_path: /var/run/vault/sshkeys
+  - namespace: test-credentials
+    name: edge-group-assisted-installer-bot
+    mount_path: /var/run/assisted-installer-bot
+  dependencies:
+  - name: "assisted-service"
+    env: ASSISTED_SERVICE_IMAGE
+  - name: "assisted-installer"
+    env: ASSISTED_INSTALLER_IMAGE
+  - name: "assisted-installer-agent"
+    env: ASSISTED_AGENT_IMAGE
+  - name: "assisted-installer-controller"
+    env: ASSISTED_CONTROLLER_IMAGE
+# this isn't a mistake, it allows the PROVIDER_IMAGE to be optional.
+# jobs that require it should add the actual provider image to their dependencies
+  - name: "assisted-installer-controller"
+    env: PROVIDER_IMAGE
+# this isn't a mistake, it allows the HYPERSHIFT_IMAGE to be optional.
+# jobs that require it should add the actual provider image to their dependencies
+  - name: "assisted-installer-controller"
+    env: HYPERSHIFT_IMAGE
+  env:
+  - name: ASSISTED_CONFIG
+    default: ""
+    documentation: Additional assisted configuration, appended to the one defined by the step command. See https://github.com/openshift/assisted-test-infra/blob/master/README.md for more details about supported values.
+  - name: PLATFORM
+    default: ""
+    documentation: Openshift platform. currently only vsphere platform is supported
+  - name: ENVIRONMENT
+    default: "local"
+    documentation: Choose environment to run the test over. Current options are "local" (the default) and "production".
+  timeout: 180m0s
+  documentation: |-
+    Prepare the remote machine (install packages, copy files), create config files, checkout test-infra.

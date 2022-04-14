@@ -90,31 +90,6 @@ function is_openshift_version_gte() {
     printf '%s\n%s' "$1" "${DS_OPENSHIFT_VERSION}" | sort -C -V
 }
 
-case "${CLUSTER_TYPE}" in
-packet|equinix*)
-    # shellcheck source=/dev/null
-    source "${SHARED_DIR}/packet-conf.sh"
-    # shellcheck source=/dev/null
-    source "${SHARED_DIR}/ds-vars.conf"
-        
-    setup_proxy
-    export KUBECONFIG=${SHARED_DIR}/kubeconfig
-
-    echo "### Checking release version"
-    if is_openshift_version_gte "4.8"; then
-        # Set test provider for only versions greater than or equal to 4.8
-        set_test_provider
-
-        # Mirroring test images is supported only for versions greater than or equal to 4.8
-        mirror_test_images
-    else
-        export TEST_PROVIDER='{"type":"skeleton"}'
-        use_minimal_test_list
-    fi
-    ;;
-*) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"; exit 1;;
-esac
-
 function upgrade() {
     mirror_release_image_for_disconnected_upgrade
     set -x
@@ -152,6 +127,31 @@ function check_clusteroperators_status() {
     oc wait clusteroperators --all --for=condition=Progressing=false --timeout=15m
     echo "$(date) - all clusteroperators are done progressing."
 }
+
+case "${CLUSTER_TYPE}" in
+packet|equinix*)
+    # shellcheck source=/dev/null
+    source "${SHARED_DIR}/packet-conf.sh"
+    # shellcheck source=/dev/null
+    source "${SHARED_DIR}/ds-vars.conf"
+
+    setup_proxy
+    export KUBECONFIG=${SHARED_DIR}/kubeconfig
+
+    echo "### Checking release version"
+    if is_openshift_version_gte "4.8"; then
+        # Set test provider for only versions greater than or equal to 4.8
+        set_test_provider
+
+        # Mirroring test images is supported only for versions greater than or equal to 4.8
+        mirror_test_images
+    else
+        export TEST_PROVIDER='{"type":"skeleton"}'
+        use_minimal_test_list
+    fi
+    ;;
+*) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"; exit 1;;
+esac
 
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_START"
 trap 'echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"' EXIT
