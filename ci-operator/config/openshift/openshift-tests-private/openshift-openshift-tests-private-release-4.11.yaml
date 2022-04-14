@@ -125,39 +125,130 @@ tests:
       timeout: 1h0m0s
     workflow: ipi-gcp
 - as: extended-aws-ipi
-  cron: 0 2 */3 * *
+  cron: 0 2 */5 * *
   steps:
-    cluster_profile: aws
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-aws-pre
-    test:
-    - ref: openshift-extended-test
-- as: extended-azure-ipi
-  cron: 0 18 */3 * *
-  steps:
-    cluster_profile: azure-2
+    cluster_profile: aws-qe
     env:
-      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
-    post:
-    - chain: ipi-azure-post
-    pre:
-    - chain: ipi-azure-pre
+      BASE_DOMAIN: qe.devcluster.openshift.com
     test:
     - ref: openshift-extended-test
-- as: extended-azure-upi
-  cron: 0 4 */3 * *
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: extended-aws-ipi-private
+  cron: 0 4 */5 * *
   steps:
-    cluster_profile: azure4
-    post:
-    - chain: upi-azure-post
-    pre:
-    - chain: upi-azure-pre
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
     test:
     - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-aws-ipi-private
+- as: extended-aws-ipi-proxy
+  cron: 0 6 */5 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy
+- as: extended-azure-ipi
+  cron: 0 8 */5 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-azure-ipi
+- as: extended-azure-ipi-ovn
+  cron: 0 10 */5 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-azure-ipi-ovn
+- as: extended-azure-ipi-proxy
+  cron: 0 12 */5 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-azure-ipi-proxy
+- as: extended-azure-upi
+  cron: 0 14 */5 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+    post:
+    - chain: cucushift-installer-rehearse-azure-upi-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-azure-upi-provision
+    test:
+    - ref: openshift-extended-test
+- as: extended-gcp-ipi
+  cron: 0 16 */5 * *
+  steps:
+    cluster_profile: gcp-qe
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-gcp-ipi
+- as: extended-gcp-ipi-private
+  cron: 0 18 */5 * *
+  steps:
+    cluster_profile: gcp-qe
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-gcp-ipi-private
+- as: extended-gcp-upi
+  cron: 0 20 */5 * *
+  steps:
+    cluster_profile: gcp-qe
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-gcp-upi
+- as: extended-vsphere-ipi
+  cron: 0 22 */5 * *
+  steps:
+    cluster_profile: vsphere
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-vsphere-ipi
+- as: extended-vsphere-ipi-proxy
+  cron: 0 23 */5 * *
+  steps:
+    cluster_profile: vsphere-discon
+    env:
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
+- as: extended-vsphere-upi
+  cron: 0 21 */5 * *
+  steps:
+    cluster_profile: vsphere
+    post:
+    - chain: cucushift-installer-rehearse-vsphere-upi-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-vsphere-upi-provision
+    test:
+    - ref: openshift-extended-test
+- as: extended-openstack-ipi
+  cron: 0 19 */5 * *
+  steps:
+    cluster_profile: openstack
+    env:
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_TYPE: minimal
+    test:
+    - ref: openshift-extended-test
+    workflow: ipi-openstack
 - as: extended-baremetal-ipi
-  cron: 0 6 */3 * *
+  cron: 0 19 */5 * *
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -169,59 +260,6 @@ tests:
     - chain: baremetalds-ipi-pre
     test:
     - ref: openshift-extended-test
-- as: extended-gcp-ipi
-  cron: 0 8 */3 * *
-  steps:
-    cluster_profile: gcp
-    post:
-    - chain: ipi-gcp-post
-    pre:
-    - chain: ipi-gcp-pre
-    test:
-    - ref: openshift-extended-test
-- as: extended-gcp-upi
-  cron: 0 10 */3 * *
-  steps:
-    cluster_profile: gcp
-    post:
-    - chain: upi-gcp-post
-    pre:
-    - chain: upi-gcp-pre
-    test:
-    - ref: openshift-extended-test
-- as: extended-openstack-ipi
-  cron: 0 12 */3 * *
-  steps:
-    cluster_profile: openstack
-    env:
-      BASE_DOMAIN: shiftstack.devcluster.openshift.com
-      CONFIG_TYPE: minimal
-    post:
-    - chain: ipi-openstack-post
-    pre:
-    - chain: ipi-openstack-pre
-    test:
-    - ref: openshift-extended-test
-- as: extended-vsphere-ipi
-  cron: 0 14 */3 * *
-  steps:
-    cluster_profile: vsphere
-    post:
-    - chain: ipi-vsphere-post
-    pre:
-    - chain: ipi-vsphere-pre
-    test:
-    - ref: openshift-extended-test
-- as: extended-vsphere-upi
-  cron: 0 16 */3 * *
-  steps:
-    cluster_profile: vsphere
-    post:
-    - chain: upi-vsphere-post
-    pre:
-    - chain: upi-vsphere-pre
-    test:
-    - ref: openshift-extended-test
 - as: extended-disasterrecovery-aws-ipi
   cron: 0 1 */3 * *
   steps:
@@ -230,12 +268,9 @@ tests:
       TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&
       TEST_SCENRAIOS: DR_Testing
       TEST_TIMEOUT: "50"
-    post:
-    - chain: cucushift-installer-rehearse-aws-ipi-private-deprovision
-    pre:
-    - chain: cucushift-installer-rehearse-aws-ipi-private-provision
     test:
     - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-aws-ipi-private
 - as: extended-disasterrecovery-gcp-ipi
   cron: 0 3 */3 * *
   steps:
@@ -244,24 +279,18 @@ tests:
       TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&
       TEST_SCENRAIOS: DR_Testing
       TEST_TIMEOUT: "50"
-    post:
-    - chain: cucushift-installer-rehearse-gcp-ipi-private-deprovision
-    pre:
-    - chain: cucushift-installer-rehearse-gcp-ipi-private-provision
     test:
     - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-gcp-ipi-private
 - as: extended-aws-ipi-disruptive
   interval: 168h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-qe
     env:
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;Serial&;~DisconnectedOnly&
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-aws-pre
     test:
     - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-aws-ipi
 zz_generated_metadata:
   branch: release-4.11
   org: openshift
