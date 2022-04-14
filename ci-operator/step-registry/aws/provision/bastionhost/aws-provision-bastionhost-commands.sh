@@ -8,21 +8,19 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
-CONFIG="${SHARED_DIR}/install-config.yaml"
 curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
 
-BASTION_NAME="$(/tmp/yq r "${CONFIG}" 'metadata.name')"
 REGION="${LEASED_RESOURCE}"
 
 # 1. get vpc id and public subnet
-VpcId=$(cat "${SHARED_DIR}/vpcid")
+VpcId=$(cat "${SHARED_DIR}/vpc_id")
 echo "VpcId: $VpcId"
 
-PublicSubnet="$(/tmp/yq r "${SHARED_DIR}/publicsubnetids" '[0]')"
+PublicSubnet="$(/tmp/yq r "${SHARED_DIR}/public_subnet_ids" '[0]')"
 echo "PublicSubnet: $PublicSubnet"
 
-stack_name=${BASTION_NAME}-bas
-s3_bucket_name=${BASTION_NAME}
+stack_name="${NAMESPACE}-${JOB_NAME_HASH}-bas"
+s3_bucket_name="${NAMESPACE}-${JOB_NAME_HASH}-s3"
 
 BastionHostInstanceType="t2.medium"
 # there is no t2.medium instance type in us-gov-east-1 region
@@ -393,13 +391,13 @@ EOF
 
 
 # upload ignition file to s3
-echo "s3://${s3_bucket_name}" > "$SHARED_DIR/bastionhosts3bucket"
 aws --region $REGION s3 mb "s3://${s3_bucket_name}"
+echo "s3://${s3_bucket_name}" > "$SHARED_DIR/to_be_removed_s3_bucket_list"
 aws --region $REGION s3api put-bucket-acl --bucket "${s3_bucket_name}" --acl public-read
 aws --region $REGION s3 cp ${workdir}/bastion.ign "s3://${s3_bucket_name}/bastion.ign"
 aws --region $REGION s3api put-object-acl --bucket "${s3_bucket_name}" --key "bastion.ign" --acl public-read
 
-
+echo ${stack_name} >> "${SHARED_DIR}/to_be_removed_cf_stack_list"
 aws --region $REGION cloudformation create-stack --stack-name ${stack_name} \
     --template-body file://${workdir}/bastion.yaml \
     --parameters \
@@ -417,7 +415,7 @@ aws --region "${REGION}" cloudformation wait stack-create-complete --stack-name 
 wait "$!"
 echo "Waited for stack"
 
-echo "$stack_name" > "${SHARED_DIR}/bastionhoststackname"
+echo "$stack_name" > "${SHARED_DIR}/bastion_host_stack_name"
 
 INSTANCE_ID="$(aws --region "${REGION}" cloudformation describe-stacks --stack-name "${stack_name}" \
 --query 'Stacks[].Outputs[?OutputKey == `BastionInstanceId`].OutputValue' --output text)"
@@ -440,6 +438,9 @@ PROXY_PRIVATE_URL="http://${PROXY_CREDENTIAL}@${BASTION_HOST_PRIVATE_DNS}:3128"
 
 echo "${PROXY_PUBLIC_URL}" > "${SHARED_DIR}/proxy_public_url"
 echo "${PROXY_PRIVATE_URL}" > "${SHARED_DIR}/proxy_private_url"
+
+MIRROR_REGISTRY_URL="${BASTION_HOST_PUBLIC_DNS}:5000"
+echo "${MIRROR_REGISTRY_URL}" > "${SHARED_DIR}/mirror_registry_url"
 
 echo "Sleeping 5 mins, make sure that the bastion host is fully started."
 sleep 300
