@@ -222,6 +222,32 @@ tests:
     - chain: upi-vsphere-pre
     test:
     - ref: openshift-extended-test
+- as: extended-disasterrecovery-aws-ipi
+  cron: 0 1 */3 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&
+      TEST_SCENRAIOS: DR_Testing
+    post:
+    - chain: cucushift-installer-rehearse-aws-ipi-private-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-aws-ipi-private-provision
+    test:
+    - ref: openshift-extended-test
+- as: extended-disasterrecovery-gcp-ipi
+  cron: 0 3 */3 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&
+      TEST_SCENRAIOS: DR_Testing
+    post:
+    - chain: cucushift-installer-rehearse-gcp-ipi-private-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-gcp-ipi-private-provision
+    test:
+    - ref: openshift-extended-test
 - as: extended-aws-ipi-disruptive
   interval: 168h
   steps:

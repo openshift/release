@@ -17,12 +17,6 @@ export ENABLE_PRINT_EVENT_STDOUT=true
 # and they will fail, like some cvo cases, because /var/run/secrets/ci.openshift.io/cluster-profile/gce.json does not exist.
 export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
 
-# setup proxy
-if test -f "${SHARED_DIR}/proxy-conf.sh"
-then
-    source "${SHARED_DIR}/proxy-conf.sh"
-fi
-
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 # create link for oc to kubectl
@@ -59,6 +53,24 @@ if ! [ -f "/usr/bin/extended-platform-tests" ]; then
 fi
 which extended-platform-tests
 
+# setup proxy
+if test -f "${SHARED_DIR}/proxy-conf.sh"
+then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
+#setup bastion
+if test -f "${SHARED_DIR}/bastion_public_address"
+then
+    QE_BASTION_PUBLIC_ADDRESS=$(cat "${SHARED_DIR}/bastion_public_address")
+    export QE_BASTION_PUBLIC_ADDRESS
+fi
+if test -f "${SHARED_DIR}/bastion_private_address"
+then
+    QE_BASTION_PRIVATE_ADDRESS=$(cat "${SHARED_DIR}/bastion_private_address")
+    export QE_BASTION_PRIVATE_ADDRESS
+fi
+
 # configure enviroment for different cluster
 echo "CLUSTER_TYPE is ${CLUSTER_TYPE}"
 case "${CLUSTER_TYPE}" in
@@ -84,7 +96,13 @@ aws)
     export KUBE_SSH_USER=core
     export SSH_CLOUD_PRIV_AWS_USER=core
     ;;
-azure4) export TEST_PROVIDER=azure;;
+azure4)
+    mkdir -p ~/.ssh
+    cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/kube_azure_rsa || true
+    eval export SSH_CLOUD_PRIV_KEY="~/.ssh/kube_azure_rsa"
+    export SSH_CLOUD_PRIV_AZURE_USER=core
+    export TEST_PROVIDER=azure
+    ;;
 azurestack)
     export TEST_PROVIDER="none"
     export AZURE_AUTH_LOCATION=${SHARED_DIR}/osServicePrincipal.json
