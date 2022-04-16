@@ -30,26 +30,16 @@ build_root:
     namespace: openshift
     tag: golang-1.17
 images:
-- dockerfile_path: images/Dockerfile
+- dockerfile_path: images/DockerfileNewGcc
   from: tools
   inputs:
     ocp_builder_rhel-8-golang-1.17-openshift-4.11:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
-  to: tests-private
-- dockerfile_literal: |
-    FROM src
-    RUN curl --silent --location https://rpm.nodesource.com/setup_lts.x | bash - && \
-        curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo | tee /etc/yum.repos.d/yarn.repo && \
-        PACKAGES="openssh-clients httpd-tools nodejs yarn xorg-x11-server-Xvfb gtk2-devel gtk3-devel libnotify-devel GConf2 nss libXScrnSaver alsa-lib" && \
-        yum install --setopt=tsflags=nodocs -y $PACKAGES && \
-        yum clean all && rm -rf /var/cache/yum/*
-  from: src
-  to: tests-private-ui
+  to: tests-private-newgcc
 promotion:
   excluded_images:
-  - tests-private
-  - tests-private-ui
+  - tests-private-newgcc
   name: "4.11"
   namespace: ocp
 releases:
@@ -79,186 +69,10 @@ tests:
   commands: make name-check
   container:
     from: src
-- as: e2e-aws
-  optional: true
-  skip_if_only_changed: frontend/
-  steps:
-    cluster_profile: aws
-    test:
-    - as: critical-test
-      cli: latest
-      commands: ./bin/extended-platform-tests run all --dry-run|grep -iv "VMonly"|grep
-        -E "OLM.*Critical"|./bin/extended-platform-tests run -f -
-      from: bin
-      resources:
-        limits:
-          memory: 4Gi
-        requests:
-          cpu: "2"
-          memory: 600Mi
-    - as: pr-test
-      cli: latest
-      commands: make pr-test
-      from: bin
-      resources:
-        limits:
-          memory: 4Gi
-        requests:
-          cpu: "2"
-          memory: 600Mi
-    workflow: ipi-aws
-- as: e2e-console
-  optional: true
-  run_if_changed: frontend/
-  steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
-    test:
-    - as: console-test
-      cli: latest
-      commands: cd frontend;./console-test-frontend.sh
-      from: tests-private-ui
-      resources:
-        requests:
-          cpu: "2"
-          memory: 600Mi
-      timeout: 1h0m0s
-    workflow: ipi-gcp
 - as: extended-aws-ipi
   cron: 0 2 */3 * *
   steps:
     cluster_profile: aws
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-aws-pre
-    test:
-    - ref: openshift-extended-test
-- as: extended-azure-ipi
-  cron: 0 18 */3 * *
-  steps:
-    cluster_profile: azure-2
-    env:
-      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
-    post:
-    - chain: ipi-azure-post
-    pre:
-    - chain: ipi-azure-pre
-    test:
-    - ref: openshift-extended-test
-- as: extended-azure-upi
-  cron: 0 4 */3 * *
-  steps:
-    cluster_profile: azure4
-    post:
-    - chain: upi-azure-post
-    pre:
-    - chain: upi-azure-pre
-    test:
-    - ref: openshift-extended-test
-- as: extended-baremetal-ipi
-  cron: 0 6 */3 * *
-  steps:
-    cluster_profile: equinix-ocp-metal
-    env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4
-    post:
-    - chain: baremetalds-ipi-post
-    pre:
-    - chain: baremetalds-ipi-pre
-    test:
-    - ref: openshift-extended-test
-- as: extended-gcp-ipi
-  cron: 0 8 */3 * *
-  steps:
-    cluster_profile: gcp
-    post:
-    - chain: ipi-gcp-post
-    pre:
-    - chain: ipi-gcp-pre
-    test:
-    - ref: openshift-extended-test
-- as: extended-gcp-upi
-  cron: 0 10 */3 * *
-  steps:
-    cluster_profile: gcp
-    post:
-    - chain: upi-gcp-post
-    pre:
-    - chain: upi-gcp-pre
-    test:
-    - ref: openshift-extended-test
-- as: extended-openstack-ipi
-  cron: 0 12 */3 * *
-  steps:
-    cluster_profile: openstack
-    env:
-      BASE_DOMAIN: shiftstack.devcluster.openshift.com
-      CONFIG_TYPE: minimal
-    post:
-    - chain: ipi-openstack-post
-    pre:
-    - chain: ipi-openstack-pre
-    test:
-    - ref: openshift-extended-test
-- as: extended-vsphere-ipi
-  cron: 0 14 */3 * *
-  steps:
-    cluster_profile: vsphere
-    post:
-    - chain: ipi-vsphere-post
-    pre:
-    - chain: ipi-vsphere-pre
-    test:
-    - ref: openshift-extended-test
-- as: extended-vsphere-upi
-  cron: 0 16 */3 * *
-  steps:
-    cluster_profile: vsphere
-    post:
-    - chain: upi-vsphere-post
-    pre:
-    - chain: upi-vsphere-pre
-    test:
-    - ref: openshift-extended-test
-- as: extended-disasterrecovery-aws-ipi
-  cron: 0 1 */3 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&
-      TEST_SCENRAIOS: DR_Testing
-      TEST_TIMEOUT: "50"
-    post:
-    - chain: cucushift-installer-rehearse-aws-ipi-private-deprovision
-    pre:
-    - chain: cucushift-installer-rehearse-aws-ipi-private-provision
-    test:
-    - ref: openshift-extended-test
-- as: extended-disasterrecovery-gcp-ipi
-  cron: 0 3 */3 * *
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&
-      TEST_SCENRAIOS: DR_Testing
-      TEST_TIMEOUT: "50"
-    post:
-    - chain: cucushift-installer-rehearse-gcp-ipi-private-deprovision
-    pre:
-    - chain: cucushift-installer-rehearse-gcp-ipi-private-provision
-    test:
-    - ref: openshift-extended-test
-- as: extended-aws-ipi-disruptive
-  interval: 168h
-  steps:
-    cluster_profile: aws
-    env:
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;Serial&;~DisconnectedOnly&
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-aws-pre
     test:
     - ref: openshift-extended-test
 zz_generated_metadata:
