@@ -16,6 +16,7 @@ images:
     RUN dnf install -y python38 python38-devel gcc gcc-c++ make mariadb-connector-c mariadb-connector-c-devel
     RUN pip3 install --no-cache-dir --upgrade pip wheel setuptools
     RUN pip3 install --no-cache-dir -r requirements.txt
+    RUN pip3 install --no-cache-dir pylint black
   from: ubi
   inputs:
     src:
@@ -33,6 +34,14 @@ resources:
 tests:
 - as: unit
   commands: python3 -m unittest
+  container:
+    from: python-test-runner
+- as: lint
+  commands: pylint --recursive=yes --fail-under=9.5 --ignore-paths=".*venv" .
+  container:
+    from: python-test-runner
+- as: style
+  commands: black --diff --check .
   container:
     from: python-test-runner
 zz_generated_metadata:
