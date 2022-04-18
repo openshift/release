@@ -114,6 +114,11 @@ if [[ -v IS_XPN ]]; then
   CLUSTER_NETWORK="${HOST_PROJECT_NETWORK}"
   COMPUTE_SUBNET="${HOST_PROJECT_COMPUTE_SUBNET}"
   CONTROL_SUBNET="${HOST_PROJECT_CONTROL_SUBNET}"
+elif [[ -f "${SHARED_DIR}/customer_vpc_subnets.yaml" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - Using pre-configured custom VPC..."
+  CLUSTER_NETWORK="$(gcloud compute networks describe "${CLUSTER_NAME}-network" --format json | jq -r .selfLink)"
+  CONTROL_SUBNET="$(gcloud compute networks subnets describe "${CLUSTER_NAME}-master-subnet" "--region=${REGION}" --format json | jq -r .selfLink)"
+  COMPUTE_SUBNET="$(gcloud compute networks subnets describe "${CLUSTER_NAME}-worker-subnet" "--region=${REGION}" --format json | jq -r .selfLink)"
 else
   cat <<EOF > 01_vpc.yaml
 imports:
@@ -127,7 +132,6 @@ resources:
     master_subnet_cidr: '${MASTER_SUBNET_CIDR}'
     worker_subnet_cidr: '${WORKER_SUBNET_CIDR}'
 EOF
-
   gcloud deployment-manager deployments create "${INFRA_ID}-vpc" --config 01_vpc.yaml
 
   ## Configure VPC variables
