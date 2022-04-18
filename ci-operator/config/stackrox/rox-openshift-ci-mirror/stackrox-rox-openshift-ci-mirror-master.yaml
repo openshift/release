@@ -3,6 +3,10 @@ base_images:
     name: stackrox-build
     namespace: stackrox
     tag: latest
+  stackrox-test:
+    name: stackrox-test
+    namespace: stackrox
+    tag: latest
   ubi-minimal:
     name: ubi-minimal
     namespace: ocp
@@ -15,7 +19,7 @@ build_root:
     tag: latest
 images:
 - dockerfile_path: stackrox/.openshift-ci/build/Dockerfile.pre-build-cli
-  from: stackrox-build
+  from: stackrox-test
   inputs:
     bin:
       paths:
@@ -23,7 +27,7 @@ images:
         source_path: /go/src/github.com/stackrox/stackrox
   to: pre-build-cli
 - dockerfile_path: stackrox/.openshift-ci/build/Dockerfile.pre-build-go-binaries
-  from: stackrox-build
+  from: stackrox-test
   inputs:
     bin:
       paths:
@@ -31,7 +35,7 @@ images:
         source_path: /go/src/github.com/stackrox/stackrox
   to: pre-build-go-binaries
 - dockerfile_path: stackrox/.openshift-ci/build/Dockerfile.pre-build-ui
-  from: stackrox-build
+  from: stackrox-test
   inputs:
     bin:
       paths:
@@ -39,7 +43,7 @@ images:
         source_path: /go/src/github.com/stackrox/stackrox
   to: pre-build-ui
 - dockerfile_path: stackrox/.openshift-ci/build/Dockerfile.build-main
-  from: stackrox-build
+  from: stackrox-test
   inputs:
     bin:
       paths:
@@ -87,8 +91,22 @@ tests:
 - as: style-checks
   steps:
     test:
-    - as: style-checks
+    - as: job
       commands: .openshift-ci-migration/migrate.sh style-checks
+      credentials:
+      - mount_path: /tmp/secret/stackrox-stackrox-initial
+        name: stackrox-stackrox-initial
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+- as: go-postgres-tests
+  steps:
+    test:
+    - as: job
+      commands: .openshift-ci-migration/migrate.sh go-postgres-tests
       credentials:
       - mount_path: /tmp/secret/stackrox-stackrox-initial
         name: stackrox-stackrox-initial
@@ -101,8 +119,50 @@ tests:
 - as: go-unit-tests
   steps:
     test:
-    - as: go-unit-tests
+    - as: job
       commands: .openshift-ci-migration/migrate.sh go-unit-tests
+      credentials:
+      - mount_path: /tmp/secret/stackrox-stackrox-initial
+        name: stackrox-stackrox-initial
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+- as: go-unit-tests-release
+  steps:
+    test:
+    - as: job
+      commands: .openshift-ci-migration/migrate.sh go-unit-tests-release
+      credentials:
+      - mount_path: /tmp/secret/stackrox-stackrox-initial
+        name: stackrox-stackrox-initial
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+- as: integration-unit-tests
+  steps:
+    test:
+    - as: job
+      commands: .openshift-ci-migration/migrate.sh integration-unit-tests
+      credentials:
+      - mount_path: /tmp/secret/stackrox-stackrox-initial
+        name: stackrox-stackrox-initial
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+- as: shell-unit-tests
+  steps:
+    test:
+    - as: job
+      commands: .openshift-ci-migration/migrate.sh shell-unit-tests
       credentials:
       - mount_path: /tmp/secret/stackrox-stackrox-initial
         name: stackrox-stackrox-initial
@@ -115,7 +175,7 @@ tests:
 - as: ui-unit-tests
   steps:
     test:
-    - as: ui-unit-tests
+    - as: job
       commands: .openshift-ci-migration/migrate.sh ui-unit-tests
       credentials:
       - mount_path: /tmp/secret/stackrox-stackrox-initial
@@ -129,7 +189,7 @@ tests:
 - as: gke-qa-e2e-tests
   steps:
     test:
-    - as: gke-qa-e2e-tests
+    - as: job
       commands: .openshift-ci-migration/migrate.sh gke-qa-e2e-tests
       credentials:
       - mount_path: /tmp/secret/stackrox-stackrox-e2e-tests
@@ -143,7 +203,7 @@ tests:
 - as: gke-upgrade-tests
   steps:
     test:
-    - as: gke-upgrade-tests
+    - as: job
       commands: .openshift-ci-migration/migrate.sh gke-upgrade-tests
       credentials:
       - mount_path: /tmp/secret/stackrox-stackrox-e2e-tests
@@ -157,7 +217,7 @@ tests:
 - as: gke-go-e2e-tests
   steps:
     test:
-    - as: gke-go-e2e-tests
+    - as: job
       commands: .openshift-ci-migration/migrate.sh gke-go-e2e-tests
       credentials:
       - mount_path: /tmp/secret/stackrox-stackrox-e2e-tests
@@ -171,7 +231,7 @@ tests:
 - as: gke-ui-e2e-tests
   steps:
     test:
-    - as: gke-ui-e2e-tests
+    - as: job
       commands: .openshift-ci-migration/migrate.sh gke-ui-e2e-tests
       credentials:
       - mount_path: /tmp/secret/stackrox-stackrox-e2e-tests
