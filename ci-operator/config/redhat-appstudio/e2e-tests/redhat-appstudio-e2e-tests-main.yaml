@@ -20,11 +20,17 @@ tests:
     test:
     - as: redhat-appstudio-e2e
       cli: latest
-      commands: |
-        # get branch ref of the fork the PR was created from
-        AUTHOR_LINK=$(jq -r '.refs[0].pulls[0].author_link' <<< ${CLONEREFS_OPTIONS} | tr -d '[:space:]')
-        PULL_PULL_SHA=${PULL_PULL_SHA:-$(jq -r '.refs[0].pulls[0].sha' <<< ${CLONEREFS_OPTIONS} | tr -d '[:space:]')}
-        echo "using author link ${AUTHOR_LINK}"
+      commands: "# get branch ref of the fork the PR was created from\nAUTHOR_LINK=$(jq
+        -r '.refs[0].pulls[0].author_link' <<< ${CLONEREFS_OPTIONS} | tr -d '[:space:]')\nPULL_PULL_SHA=${PULL_PULL_SHA:-$(jq
+        -r '.refs[0].pulls[0].sha' <<< ${CLONEREFS_OPTIONS} | tr -d '[:space:]')}\necho
+        \"using author link ${AUTHOR_LINK}\"\n\nREPO_URL=${AUTHOR_LINK}/e2e-tests\necho
+        \"branches of ${REPO_URL} - trying to detect the branch name we should use
+        for pairing.\"\ncurl ${REPO_URL}.git/info/refs?service=git-upload-pack --output
+        -\nGET_BRANCH_NAME=$(curl ${REPO_URL}.git/info/refs?service=git-upload-pack
+        --output - 2>/dev/null | grep -a ${PULL_PULL_SHA} || true)\n    \nBRANCH_REF=$(echo
+        ${GET_BRANCH_NAME} | awk '{print $2}')\necho \"detected branch ref ${BRANCH_REF}\"\n#
+        retrieve the branch name\nBRANCH_NAME=$(echo ${BRANCH_REF} | awk -F'/' '{print
+        $3}')\n"
       credentials:
       - mount_path: /usr/local/ci-secrets/redhat-appstudio-qe
         name: ci-secrets
