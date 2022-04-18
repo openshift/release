@@ -1,3 +1,8 @@
+base_images:
+  ubi:
+    name: ubi
+    namespace: ocp
+    tag: "8"
 build_root:
   image_stream_tag:
     name: release
@@ -5,10 +10,16 @@ build_root:
     tag: golang-1.15
 images:
 - dockerfile_literal: |-
-    FROM src
-    RUN pip3 install --upgrade pip wheel setuptools
-    RUN pip3 install -r requirements.txt
-  from: src
+    FROM ubi
+    RUN dnf install -y python38
+    RUN pip3 install --no-cache-dir --upgrade pip wheel setuptools
+    RUN pip3 install --no-cache-dir -r requirements.txt
+  from: ubi
+  inputs:
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/osd-alert-analysis
   to: python-test-runner
 resources:
   '*':
