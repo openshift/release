@@ -21,7 +21,10 @@ tests:
     - as: redhat-appstudio-e2e
       cli: latest
       commands: |
-        env
+        # get branch ref of the fork the PR was created from
+        AUTHOR_LINK=$(jq -r '.refs[0].pulls[0].author_link' <<< ${CLONEREFS_OPTIONS} | tr -d '[:space:]')
+        PULL_PULL_SHA=${PULL_PULL_SHA:-$(jq -r '.refs[0].pulls[0].sha' <<< ${CLONEREFS_OPTIONS} | tr -d '[:space:]')}
+        echo "using author link ${AUTHOR_LINK}"
       credentials:
       - mount_path: /usr/local/ci-secrets/redhat-appstudio-qe
         name: ci-secrets
