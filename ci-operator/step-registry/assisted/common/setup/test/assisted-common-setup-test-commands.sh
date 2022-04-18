@@ -31,5 +31,5 @@ timeout -s 9 175m ssh -F ${SHARED_DIR}/ssh_config ci_machine bash - << EOF |& se
 set -xeuo pipefail
 source /root/config.sh
 cd /home/assisted
-make \${MAKEFILE_TARGET:-create_full_environment run test_parallel}
+make \${MAKEFILE_TARGET:-setup run test_parallel}
 EOF
