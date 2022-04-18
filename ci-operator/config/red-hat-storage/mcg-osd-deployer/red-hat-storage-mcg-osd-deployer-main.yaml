@@ -1,0 +1,46 @@
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
+promotion:
+  name: "4.9"
+  namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.9"
+  namespace: ocp
+tests:
+- as: test-suite
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test-suite-aws
+      commands: make test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: lint
+  steps:
+    cluster_profile: aws
+    test:
+    - as: lint-aws
+      commands: make lint
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+zz_generated_metadata:
+  branch: main
+  org: red-hat-storage
+  repo: mcg-osd-deployer
