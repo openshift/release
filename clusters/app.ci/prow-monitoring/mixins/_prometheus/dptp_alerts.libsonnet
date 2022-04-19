@@ -160,6 +160,24 @@
           }
         ],
       },
+      {
+        name: 'openshift-priv-image-building-jobs-failing',
+        rules: [
+          {
+            alert: 'openshift-priv-image-building-jobs-failing',
+            expr: |||
+             sum(rate(prowjob_state_transitions{job="prow-controller-manager",job_name=~".*-images",org="openshift-priv",state="failure"}[6h])) by (job_name) > 0.05
+            |||,
+            'for': '1m',
+            labels: {
+              severity: 'critical',
+            },
+            annotations: {
+              message: 'openshift-priv image-building jobs are failing at a high rate. Check on <https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/?job=*-images|deck-internal>.',
+            },
+          }
+        ],
+      },
     ],
   },
 }
