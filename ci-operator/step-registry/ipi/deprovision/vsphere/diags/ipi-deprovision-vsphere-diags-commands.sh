@@ -60,21 +60,26 @@ function collect_diagnostic_data {
         echo "Checking if VMware tools is running on ${vmname}"
         output=$(govc vm.ip -wait=0h0m10s -vm.ipath="$vm")
         if [[ -z "$output" ]]; then
-            echo "VMware Tools is not running: ${vmname}"
+            echo "$(date -u --rfc-3339=seconds) VMware Tools is not running: ${vmname}"
             # VMware Tools is not running this RHCOS instance
             # didn't start up correctly in some way.
 
-            echo "Powering off: ${vmname}"
+            echo "$(date -u --rfc-3339=seconds) Powering off: ${vmname}"
             # power off machine
             govc vm.power -vm.ipath="$vm" -off -force=true
 
-            echo "Removing network adapter: ${vmname}"
+            echo "$(date -u --rfc-3339=seconds) Removing network adapter: ${vmname}"
             # remove network adapter
             govc device.remove -vm.ipath="$vm" ethernet-0
 
-            echo "Moving: ${vmname} to /${GOVC_DATACENTER}/vm/debug"
+            echo "$(date -u --rfc-3339=seconds) Moving: ${vmname} to /${GOVC_DATACENTER}/vm/debug"
             # move to the debug folder
             govc object.mv "$vm" "/${GOVC_DATACENTER}/vm/debug"
+
+            # removing the tag from the virtual machine
+            # the installer is deleting the vm
+            echo "$(date -u --rfc-3339=seconds) Removing tags attached: ${vmname}"
+            govc tags.detach "${cluster_name}" "${vm}"
         fi
     fi
 
