@@ -50,7 +50,7 @@ cat > "${SHARED_DIR}/vpc-destroy.sh" << EOF
 gcloud deployment-manager deployments delete -q "${CLUSTER_NAME}-vpc"
 EOF
 
-if [[ "${DISCONNECTED_NETWORK}" = "yes" ]]; then
+if [[ "${RESTRICTED_NETWORK}" = "yes" ]]; then
   echo "Updating the VPC into a disconnected network (removing NAT and enabling Private Google Access)..."
   gcloud compute routers nats delete -q "${CLUSTER_NAME}-nat-master" --router "${CLUSTER_NAME}-router" --region "${REGION}"
   gcloud compute routers nats delete -q "${CLUSTER_NAME}-nat-worker" --router "${CLUSTER_NAME}-router" --region "${REGION}"

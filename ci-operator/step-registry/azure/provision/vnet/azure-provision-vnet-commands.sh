@@ -85,7 +85,7 @@ computeSubnet=$(cat "${vnet_info_file}" | jq -r ".[].subnets[].name" | grep "wor
 clusterSubnetSNG="${VNET_BASE_NAME}-nsg"
 run_command "az network nsg rule create -g ${RESOURCE_GROUP} --nsg-name '${clusterSubnetSNG}' -n 'worker-allow' --priority 1000 --access Allow --source-port-ranges '*' --destination-port-ranges 80 443" || exit 3
 
-if [ X"${DISCONNECTED_NETWORK}" == X"yes" ]; then
+if [ X"${RESTRICTED_NETWORK}" == X"yes" ]; then
     echo "Remove outbound internet access from the Network Security groups used for master and worker subnets"
     create_disconnected_network "${RESOURCE_GROUP}" "${clusterSubnetSNG}"
 fi
