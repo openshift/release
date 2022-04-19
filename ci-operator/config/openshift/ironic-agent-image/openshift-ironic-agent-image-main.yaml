@@ -11,11 +11,23 @@ build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile.ocp
-  from: ocp_builder_rhel-8-base-openshift-4.11
+  from: base
   to: ironic-agent
 promotion:
   name: "4.11"
   namespace: ocp
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      #NOTE(elfosardo): use ironic repos, cause we're special
+      curl http://base-4-11-rhel-8-server-ironic.ocp.svc > /etc/yum.repos.d/base-4-11-rhel-8-server-ironic.repo
+      #NOTE(elfosardo): remove this once rhel8.6 content is available for all CI
+      #remove ci conflicting repos
+      rm -f /etc/yum.repos.d/ci-rpm-mirrors.repo
+      #use rhel8.6 beta repos
+      curl http://base-4-11-rhel86.ocp.svc > /etc/yum.repos.d/base-4-11-rhel86.repo
+    from: ocp_builder_rhel-8-base-openshift-4.11
+    to: base
 releases:
   initial:
     integration:
