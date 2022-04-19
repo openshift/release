@@ -1,6 +1,7 @@
 blunderbuss:
   max_request_count: 2
   request_count: 2
+  use_status_availability: true
 branch_cleaner: {}
 bugzilla:
   default:
@@ -30,6 +31,26 @@ bugzilla:
       - status: ON_DEV
       - status: POST
     agent-installer:
+      add_external_link: true
+      allowed_groups:
+      - redhat
+      - qe_staff
+      - nec
+      exclude_defaults: true
+      is_open: true
+      state_after_close:
+        status: NEW
+      state_after_merge:
+        status: MODIFIED
+      state_after_validation:
+        status: POST
+      target_release: 4.12.0
+      valid_states:
+      - status: NEW
+      - status: ASSIGNED
+      - status: ON_DEV
+      - status: POST
+    ci-v2:
       add_external_link: true
       allowed_groups:
       - redhat
@@ -335,6 +356,12 @@ config_updater:
   gzip: false
   maps:
     ci-operator/config/**/*-agent-installer.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
+    ci-operator/config/**/*-ci-v2*.yaml:
       clusters:
         app.ci:
         - ci
@@ -1043,6 +1070,12 @@ config_updater:
       gzip: true
       name: job-config-misc
     ci-operator/jobs/**/*-branch-openshift-*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
+    ci-operator/jobs/**/*-ci-v2*.yaml:
       clusters:
         app.ci:
         - ci
