@@ -4,8 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-INSTALL_STAGE="initial"
-
 function read_shared_dir() {
   local key="$1"
   yq r "${SHARED_DIR}/cluster-config.yaml" "$key"
@@ -24,8 +22,8 @@ function populate_artifact_dir() {
 }
 
 function prepare_next_steps() {
-  #Save install status for must-gather to generate junit
-  echo "$? $INSTALL_STAGE" > "${SHARED_DIR}/install-status.txt"
+  #Save exit code for must-gather to generate junit
+  echo "$?" > "${SHARED_DIR}/install-status.txt"
   set +e
   echo "Setup phase finished, prepare env for next steps"
   populate_artifact_dir
@@ -252,9 +250,6 @@ then
 	if [ ${ret} -gt 0 ] || [ -n "${OPENSHIFT_INSTALL_PRESERVE_BOOTSTRAP}" ]
 	then
 		collect_bootstrap 2
-	elif [ ${ret} -eq 0 ]
-	then
-	  INSTALL_STAGE="cluster_creation_successful"
 	fi
 fi
 
