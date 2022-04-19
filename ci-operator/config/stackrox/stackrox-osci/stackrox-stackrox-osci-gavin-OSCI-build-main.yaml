@@ -1,4 +1,8 @@
 base_images:
+  nginx-unprivileged:
+    name: nginx-unprivileged
+    namespace: ci
+    tag: 1.18-alpine
   stackrox-test:
     name: stackrox-test
     namespace: stackrox
@@ -7,6 +11,10 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
+  ubi8-nodejs16:
+    name: builder
+    namespace: ocp
+    tag: ubi8.nodejs.16
 binary_build_commands: .openshift-ci-migration/migrate.sh binary_build_commands
 build_root:
   image_stream_tag:
@@ -38,6 +46,17 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/stackrox/stackrox
   to: pre-build-ui
+- dockerfile_path: Dockerfile
+  from: nginx-unprivileged
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/stackrox/stackrox/docs/.
+    ubi8-nodejs16:
+      as:
+      - builder
+  to: docs
 - dockerfile_path: stackrox/.openshift-ci/build/Dockerfile.build-main
   from: stackrox-test
   inputs:
