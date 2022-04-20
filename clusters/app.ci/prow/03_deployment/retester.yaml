@@ -2,34 +2,31 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   namespace: ci
-  name: better-retester
+  name: retester
   annotations:
-    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"better-retester:shift-week"},"fieldPath":"spec.template.spec.containers[?(@.name==\"better-retester\")].image"}]'
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"retester:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"retester\")].image"}]'
   labels:
     app: prow
-    component: better-retester
-    shift-week: "true"
+    component: retester
 spec:
   replicas: 1
   selector:
     matchLabels:
       app: prow
-      component: better-retester
-      shift-week: "true"
+      component: retester
   strategy:
     type: Recreate
   template:
     metadata:
       labels:
         app: prow
-        component: better-retester
-        shift-week: "true"
+        component: retester
     spec:
       containers:
-      - image: better-retester:shift-week
-        name: better-retester
+      - image: retester:latest
+        name: retester
         command:
-        - better-retester
+        - retester
         args:
         - --config-path=/etc/config/config.yaml
         - --supplemental-prow-config-dir=/etc/config
@@ -103,15 +100,15 @@ spec:
               name: job-config-4.12
       - name: cache
         persistentVolumeClaim:
-          claimName: better-retester
+          claimName: retester
 ---
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
   labels:
     app: prow
-    component: better-retester
-  name: better-retester
+    component: retester
+  name: retester
   namespace: ci
 spec:
   accessModes:
