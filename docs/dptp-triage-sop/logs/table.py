@@ -20,8 +20,9 @@ data = json.load(open(sys.argv[1]))
 data = itertools.chain(*data)
 data = filter(lambda x: x["field"] == "@message", data)
 data = map(lambda x: json.loads(x["value"]), data)
-data = sorted(data, key=lambda x: x.get("component", ""))
-data = itertools.groupby(data, lambda x: x.get("component", ""))
+key = lambda x: x.get("component", "unknown")
+data = sorted(data, key=key)
+data = itertools.groupby(data, key)
 for component, fields in data:
     entries = []
     for raw_entry in fields:
