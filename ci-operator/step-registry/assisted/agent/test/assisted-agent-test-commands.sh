@@ -14,5 +14,6 @@ source "${SHARED_DIR}/packet-conf.sh"
 echo "### Running tests"
 timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
     cd /home/assisted
+    sed -i '/down/d' Makefile
     skipper make subsystem
 EOF
