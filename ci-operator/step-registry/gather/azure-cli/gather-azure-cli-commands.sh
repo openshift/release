@@ -1,5 +1,7 @@
 #!/bin/bash
 
+#noop
+
 set -o nounset
 
 export PATH=$PATH:/tmp/bin
