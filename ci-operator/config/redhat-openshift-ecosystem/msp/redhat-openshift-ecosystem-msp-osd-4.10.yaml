@@ -27,24 +27,25 @@ tests:
 - as: aws-msp-osd-4-10
   cron: '@yearly'
   steps:
-    cluster_profile: aws-msp-osd
+    cluster_profile: aws-osd-msp
+    dependency_overrides:
+      BUNDLE_IMAGE: brew.registry.redhat.io/rh-osbs-stage/e2e-e2e-test-operator-bundle-container:8.0-11
+      OO_INDEX: brew.registry.redhat.io/rh-osbs-stage/iib:40523
     env:
       CLUSTER_DURATION: "10800"
       CLUSTER_VERSION: "4.10"
       COMPUTE_NODES: "3"
-      BASE_DOMAIN: cpaas-ci.devcluster.openshift.com
+      CUSTOM_SCORECARD_TESTCASE: ""
       OO_CHANNEL: "4.3"
       OO_INSTALL_NAMESPACE: '!create'
       OO_PACKAGE: e2e-test-operator
       OO_TARGET_NAMESPACES: '!install'
       PYXIS_URL: ""
-      CUSTOM_SCORECARD_TESTCASE: ""
-      TEST_MODE: "msp"
-    dependency_overrides:
-      BUNDLE_IMAGE: brew.registry.redhat.io/rh-osbs-stage/e2e-e2e-test-operator-bundle-container:8.0-11
-      OO_INDEX: brew.registry.redhat.io/rh-osbs-stage/iib:40523  
+      TEST_MODE: msp
+    post:
+    - ref: osd-delete-delete
     pre:
-    - chain: ipi-install-rbac
+    - ref: ipi-install-rbac
     - ref: osd-create-create
     - ref: optional-operators-configure-proxy-registry
     - ref: optional-operators-cvp-common-apply-secrets
@@ -52,10 +53,7 @@ tests:
     test:
     - ref: optional-operators-cvp-common-scorecard
     - ref: optional-operators-cvp-common-test
-    post:
-    - chain: osd-delete-delete
 zz_generated_metadata:
-  branch: main
+  branch: osd-4.10
   org: redhat-openshift-ecosystem
   repo: msp
-  variant: 4.10-osd
