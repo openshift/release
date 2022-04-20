@@ -365,6 +365,7 @@ if [ X"${bastion_public_ip}" == X"" ] || [ X"${bastion_private_ip}" == X"" ] ; t
 fi
 echo ${bastion_public_ip} > "${SHARED_DIR}/bastion_public_address"
 echo ${bastion_private_ip} > "${SHARED_DIR}/bastion_private_address"
+echo "core" > "${SHARED_DIR}/bastion_ssh_user"
 
 proxy_credential=$(cat "${src_proxy_creds_file}")
 proxy_public_url="http://${proxy_credential}@${bastion_public_ip}:3128"
