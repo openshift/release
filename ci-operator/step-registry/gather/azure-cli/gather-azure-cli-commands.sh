@@ -1,8 +1,6 @@
 #!/bin/bash
 
 set -o nounset
-set -o errexit
-set -o pipefail
 
 export PATH=$PATH:/tmp/bin
 mkdir -p /tmp/bin
