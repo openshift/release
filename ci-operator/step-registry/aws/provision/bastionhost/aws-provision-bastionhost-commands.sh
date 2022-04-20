@@ -432,6 +432,7 @@ BASTION_HOST_PRIVATE_DNS="$(aws --region "${REGION}" cloudformation describe-sta
 
 echo "${BASTION_HOST_PUBLIC_DNS}" > "${SHARED_DIR}/bastion_public_address"
 echo "${BASTION_HOST_PRIVATE_DNS}" > "${SHARED_DIR}/bastion_private_address"
+echo "core" > "${SHARED_DIR}/bastion_ssh_user"
 
 PROXY_PUBLIC_URL="http://${PROXY_CREDENTIAL}@${BASTION_HOST_PUBLIC_DNS}:3128"
 PROXY_PRIVATE_URL="http://${PROXY_CREDENTIAL}@${BASTION_HOST_PRIVATE_DNS}:3128"
