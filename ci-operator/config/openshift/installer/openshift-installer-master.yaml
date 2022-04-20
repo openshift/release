@@ -51,7 +51,7 @@ build_root:
   from_repository: true
 images:
 - dockerfile_path: images/installer/Dockerfile.ci
-  from: base
+  from: base-osp
   inputs:
     ocp_builder_rhel-8-golang-1.17-openshift-4.10:
       as:
@@ -71,7 +71,7 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
   to: installer-artifacts
 - dockerfile_path: images/libvirt/Dockerfile.ci
-  from: base
+  from: base-osp
   inputs:
     ocp_builder_rhel-8-golang-1.17-openshift-4.10:
       as:
@@ -88,7 +88,7 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
   to: upi-installer
 - dockerfile_path: images/openstack/Dockerfile.ci
-  from: base
+  from: base-osp
   inputs:
     ocp_builder_rhel-8-golang-1.17-openshift-4.10:
       as:
@@ -98,7 +98,7 @@ images:
       - registry.ci.openshift.org/origin/4.10:cli
   to: openstack-installer
 - dockerfile_path: images/baremetal/Dockerfile.ci
-  from: base
+  from: base-osp
   inputs:
     ocp_builder_rhel-8-golang-1.17-openshift-4.10:
       as:
@@ -108,7 +108,7 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
   to: baremetal-installer
 - dockerfile_path: images/installer/Dockerfile.ci
-  from: base
+  from: base-osp
   inputs:
     ocp_builder_rhel-8-golang-1.17-openshift-4.10:
       as:
@@ -120,6 +120,12 @@ images:
 promotion:
   name: "4.11"
   namespace: ocp
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      curl http://base-openstack-4-11.ocp.svc > /etc/yum.repos.d/base-openstack-4-11.repo
+    from: base
+    to: base-osp
 releases:
   initial:
     integration:
