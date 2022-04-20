@@ -1,0 +1,61 @@
+base_images:
+  base:
+    name: "4.10"
+    namespace: ocp
+    tag: base
+  cli:
+    name: "4.10"
+    namespace: ocp
+    tag: cli
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.10"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: aws-msp-osd-4-10
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-msp-osd
+    env:
+      CLUSTER_DURATION: "10800"
+      CLUSTER_VERSION: "4.10"
+      COMPUTE_NODES: "3"
+      BASE_DOMAIN: cpaas-ci.devcluster.openshift.com
+      OO_CHANNEL: "4.3"
+      OO_INSTALL_NAMESPACE: '!create'
+      OO_PACKAGE: e2e-test-operator
+      OO_TARGET_NAMESPACES: '!install'
+      PYXIS_URL: ""
+      CUSTOM_SCORECARD_TESTCASE: ""
+      TEST_MODE: "msp"
+    dependency_overrides:
+      BUNDLE_IMAGE: brew.registry.redhat.io/rh-osbs-stage/e2e-e2e-test-operator-bundle-container:8.0-11
+      OO_INDEX: brew.registry.redhat.io/rh-osbs-stage/iib:40523  
+    pre:
+    - chain: ipi-install-rbac
+    - ref: osd-create-create
+    - ref: optional-operators-configure-proxy-registry
+    - ref: optional-operators-cvp-common-apply-secrets
+    - ref: optional-operators-subscribe
+    test:
+    - ref: optional-operators-cvp-common-scorecard
+    - ref: optional-operators-cvp-common-test
+    post:
+    - chain: osd-delete-delete
+zz_generated_metadata:
+  branch: main
+  org: redhat-openshift-ecosystem
+  repo: msp
+  variant: 4.10-osd
