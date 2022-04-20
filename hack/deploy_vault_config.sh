@@ -23,7 +23,7 @@ vault write auth/kubernetes/config \
     token_reviewer_jwt="${VAULT_KUBE_TOKEN}" \
     kubernetes_host=https://kubernetes.default.svc.cluster.local \
     kubernetes_ca_cert="${APP_CI_CA_CERT}" \
-    issuer="$(oc get authentication.config cluster -o template="{{ .spec.serviceAccountIssuer }}")"
+    issuer="$(oc --context=app.ci get authentication.config cluster -o template="{{ .spec.serviceAccountIssuer }}")"
 
 vault auth list |grep -q oidc || vault auth enable oidc
 echo "Configuring OIDC"
