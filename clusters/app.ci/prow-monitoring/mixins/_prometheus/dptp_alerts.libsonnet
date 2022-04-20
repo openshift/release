@@ -166,7 +166,14 @@
           {
             alert: 'openshift-priv-image-building-jobs-failing',
             expr: |||
-             sum(rate(prowjob_state_transitions{job="prow-controller-manager",job_name=~".*-images",org="openshift-priv",state="failure"}[6h])) > 0.05
+             sum(
+               rate(prowjob_state_transitions{job="prow-controller-manager",job_name=~".*-images",org="openshift-priv",state="failure"}[6h])
+             )
+             /
+             sum(
+               rate(prowjob_state_transitions{job="prow-controller-manager",job_name=~".*-images",org="openshift-priv"}[6h])
+             )
+             > 0.05
             |||,
             'for': '1m',
             labels: {
