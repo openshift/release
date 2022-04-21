@@ -18,65 +18,21 @@ build_root:
     namespace: stackrox
     tag: latest
 images:
-- dockerfile_path: .openshift-ci/build/Dockerfile.pre-build-cli
+- dockerfile_path: .openshift-ci/build/Dockerfile.main-bundle
   from: stackrox-test
   inputs:
     bin:
       paths:
       - destination_dir: .
         source_path: /go/src/github.com/stackrox/stackrox/.
-  to: pre-build-cli
-- dockerfile_path: stackrox/.openshift-ci/build/Dockerfile.pre-build-go-binaries
-  from: stackrox-test
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/stackrox/stackrox
-  to: pre-build-go-binaries
-- dockerfile_path: stackrox/.openshift-ci/build/Dockerfile.pre-build-ui
-  from: stackrox-test
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/stackrox/stackrox
-  to: pre-build-ui
-- dockerfile_path: Dockerfile.builder
-  from: ubi
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/stackrox/stackrox/docs/.
-  to: docs
-- dockerfile_path: stackrox/.openshift-ci/build/Dockerfile.build-main
-  from: stackrox-test
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/stackrox/stackrox
-    pre-build-cli:
-      paths:
-      - destination_dir: pre-build-cli-output
-        source_path: /output
-    pre-build-go-binaries:
-      paths:
-      - destination_dir: pre-build-go-binaries-output
-        source_path: /output
-    pre-build-ui:
-      paths:
-      - destination_dir: pre-build-ui-output
-        source_path: /output
-  to: build-main
-- dockerfile_path: Dockerfile.main
+  to: main-bundle
+- dockerfile_path: Dockerfile
   from: ubi-minimal
   inputs:
     bin:
       paths:
       - destination_dir: .
-        source_path: /go/src/github.com/stackrox/stackrox/.openshift-ci/build/.
+        source_path: /go/src/github.com/stackrox/stackrox/image/rhel/.
     build-main:
       paths:
       - destination_dir: .
