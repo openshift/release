@@ -32,7 +32,6 @@ export GOCACHE=/tmp/gocache
 export GOROOT=/usr/local/go
 
 # compile extended-platform-tests if it does not exist.
-export DEFAULT_EXTENDED_BIN=1
 # if [ -f "/usr/bin/extended-platform-tests" ]; then
 if ! [ -f "/usr/bin/extended-platform-tests" ]; then
     echo "extended-platform-tests does not exist, and try to compile it"
@@ -49,7 +48,6 @@ if ! [ -f "/usr/bin/extended-platform-tests" ]; then
     export REPORT_HANDLE_PATH="/tmp/extendedbin"
     cd ..
     rm -fr openshift-tests-private
-    export DEFAULT_EXTENDED_BIN=0
 fi
 which extended-platform-tests
 
@@ -203,7 +201,10 @@ function run {
         exit 0
     fi
     echo "fail"
-    exit ${DEFAULT_EXTENDED_BIN}
+    # hard-coded it as 0 although there is case failure.
+    # it ensure the the step after this step in test will be executed per https://docs.ci.openshift.org/docs/architecture/step-registry/#workflow
+    # please refer to the junit result for case result, not depends on step result.
+    exit 0
 }
 
 # select the cases per FILTERS
