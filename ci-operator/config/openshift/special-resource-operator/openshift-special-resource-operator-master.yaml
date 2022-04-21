@@ -68,16 +68,22 @@ resources:
       memory: 500Mi
 tests:
 - as: lint
-  commands: |
-    export XDG_CACHE_HOME=/tmp/.cache
-    make lint
+  commands: make lint
   container:
     clone: true
     from: test-bin
+  dependencies:
+    - env: GOFLAGS
+      name: ''
+    - env: XDG_CACHE_HOME
+      name: /tmp/.cache
 - as: kube-lint
   commands: make kube-lint
   container:
     from: src
+  dependencies:
+    - env: GOFLAGS
+      name: ''
 - as: unit
   commands: make unit-test
   container:
@@ -162,6 +168,8 @@ tests:
       dependencies:
       - env: IMG
         name: special-resource-rhel8-operator
+      - env: GOFLAGS
+        name: ''
       from: test-bin
       resources:
         requests:
