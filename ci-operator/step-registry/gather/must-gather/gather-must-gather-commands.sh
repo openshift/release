@@ -5,36 +5,92 @@ set -o errexit
 set -o pipefail
 
 function createInstallJunit() {
+  EXIT_CODE_CONFIG=3
+  EXIT_CODE_INFRA=4
+  EXIT_CODE_BOOTSTRAP=5
+  EXIT_CODE_CLUSTER=6
   if test -f "${SHARED_DIR}/install-status.txt"
   then
     EXIT_CODE=`cat ${SHARED_DIR}/install-status.txt | awk '{print $1}'`
-    INSTALL_STATUS=`cat ${SHARED_DIR}/install-status.txt | awk '{print $2}'`
     if [ "$EXIT_CODE" ==  0  ]
     then
       cat >"${ARTIFACT_DIR}/junit_install.xml" <<EOF
-      <testsuite name="cluster install" tests="2" failures="0">
-        <testcase name="cluster bootstrap should succeed"/>
-        <testcase name="cluster install should succeed"/>
+      <testsuite name="cluster install" tests="6" failures="0">
+        <testcase name="install should succeed: other"/>
+        <testcase name="install should succeed: configuration"/>
+        <testcase name="install should succeed: infrastructure"/>
+        <testcase name="install should succeed: cluster bootstrap"/>
+        <testcase name="install should succeed: cluster creation"/>
+        <testcase name="install should succeed: overall"/>
       </testsuite>
 EOF
-    elif [ $INSTALL_STATUS == "bootstrap_successful" ] || [ $INSTALL_STATUS == "cluster_creation_successful" ]
+    elif [ "$EXIT_CODE" == "$EXIT_CODE_CONFIG" ]
     then
       cat >"${ARTIFACT_DIR}/junit_install.xml" <<EOF
-      <testsuite name="cluster install" tests="2" failures="1">
-        <testcase name="cluster bootstrap should succeed"/>
-        <testcase name="cluster install should succeed">
-          <failure message="">openshift cluster install failed after stage $INSTALL_STATUS with exit code $EXIT_CODE</failure>
+      <testsuite name="cluster install" tests="3" failures="2">
+        <testcase name="install should succeed: other"/>
+        <testcase name="install should succeed: configuration">
+          <failure message="">openshift cluster install failed with config validation error</failure>
+        </testcase>
+        <testcase name="install should succeed: overall">
+          <failure message="">openshift cluster install failed overall</failure>
+        </testcase>
+      </testsuite>
+EOF
+EOF
+    elif [ "$EXIT_CODE" == "$EXIT_CODE_INFRA" ]
+    then
+      cat >"${ARTIFACT_DIR}/junit_install.xml" <<EOF
+      <testsuite name="cluster install" tests="4" failures="2">
+        <testcase name="install should succeed: other"/>
+        <testcase name="install should succeed: configuration"/>
+        <testcase name="install should succeed: infrastructure">
+          <failure message="">openshift cluster install failed with infrastructure setup</failure>
+        </testcase>
+        <testcase name="install should succeed: overall">
+          <failure message="">openshift cluster install failed overall</failure>
+        </testcase>
+      </testsuite>
+EOF
+    elif [ "$EXIT_CODE" == "$EXIT_CODE_BOOTSTRAP" ]
+    then
+      cat >"${ARTIFACT_DIR}/junit_install.xml" <<EOF
+      <testsuite name="cluster install" tests="5" failures="2">
+        <testcase name="install should succeed: other"/>
+        <testcase name="install should succeed: configuration"/>
+        <testcase name="install should succeed: infrastructure"/>
+        <testcase name="install should succeed: cluster bootstrap">
+          <failure message="">openshift cluster install failed with cluster bootstrap</failure>
+        </testcase>
+        <testcase name="install should succeed: overall">
+          <failure message="">openshift cluster install failed overall</failure>
+        </testcase>
+      </testsuite>
+EOF
+    elif [ "$EXIT_CODE" == "$EXIT_CODE_CLUSTER" ]
+    then
+      cat >"${ARTIFACT_DIR}/junit_install.xml" <<EOF
+      <testsuite name="cluster install" tests="6" failures="2">
+        <testcase name="install should succeed: other"/>
+        <testcase name="install should succeed: configuration"/>
+        <testcase name="install should succeed: infrastructure"/>
+        <testcase name="install should succeed: cluster bootstrap"/>
+        <testcase name="install should succeed: cluster creation">
+          <failure message="">openshift cluster install failed with cluster creation</failure>
+        </testcase>
+        <testcase name="install should succeed: overall">
+          <failure message="">openshift cluster install failed overall</failure>
         </testcase>
       </testsuite>
 EOF
     else
       cat >"${ARTIFACT_DIR}/junit_install.xml" <<EOF
       <testsuite name="cluster install" tests="2" failures="2">
-        <testcase name="cluster bootstrap should succeed">
-          <failure message="">cluster bootstrap failed</failure>
+        <testcase name="install should succeed: other">
+          <failure message="">openshift cluster install failed with other errors</failure>
         </testcase>
-        <testcase name="cluster install should succeed">
-          <failure message="">openshift cluster install failed after stage $INSTALL_STATUS with exit code $EXIT_CODE</failure>
+        <testcase name="install should succeed: overall">
+          <failure message="">openshift cluster install failed overall</failure>
         </testcase>
       </testsuite>
 EOF
