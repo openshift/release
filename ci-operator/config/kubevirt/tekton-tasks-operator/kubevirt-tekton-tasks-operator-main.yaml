@@ -51,6 +51,22 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-gcp
+- as: periodic-functests
+  cron: 0 0 * * SUN
+  steps:
+    test:
+    - as: periodic-functests
+      cli: latest
+      commands: |
+        ./scripts/e2e-functests.sh
+      dependencies:
+      - env: CI_OPERATOR_IMG
+        name: tekton-tasks-operator-container
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 zz_generated_metadata:
   branch: main
   org: kubevirt
