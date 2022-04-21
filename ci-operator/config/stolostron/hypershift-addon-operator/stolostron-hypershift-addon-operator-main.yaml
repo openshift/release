@@ -18,6 +18,16 @@ images:
 promotion:
   name: "2.0"
   namespace: stolostron
+releases:
+  initial:
+    integration:
+      name: "4.10"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.10"
+      namespace: ocp
 resources:
   '*':
     requests:
@@ -34,6 +44,24 @@ tests:
   commands: make test
   container:
     from: src
+- as: e2e
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        KUBECTL=oc
+        export KUBECTL
+        make test-e2e
+      dependencies:
+      - env: IMG
+        name: hypershift-addon-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: sonar
   commands: |
     export SONAR_GO_TEST_ARGS="./..."
