@@ -88,7 +88,7 @@
               severity: 'critical',
             },
             annotations: {
-              message: 'An excessive amount of CI Operator executions are failing with {{ $labels.reason }}, which is an infrastructure issue.',
+              message: 'An excessive amount of CI Operator executions are failing with `{{ $labels.reason }}`, which is an infrastructure issue. See <https://search.ci.openshift.org/?search=Reporting+job+state.*with+reason.*{{ $labels.reason }}&maxAge=6h&context=1&type=build-log&name=&excludeName=&maxMatches=5&maxBytes=20971520&groupBy=job|CI search>.',
             },
           }
         ],
@@ -106,7 +106,7 @@
               severity: 'critical',
             },
             annotations: {
-              message: 'An excessive amount of CI Operator executions are failing with {{ $labels.reason }}, which does not necessarily point to an infrastructure issue but is happening at an excessive rate and should be investigated.',
+              message: 'An excessive amount of CI Operator executions are failing with `{{ $labels.reason }}`, which does not necessarily point to an infrastructure issue but is happening at an excessive rate and should be investigated. See <https://search.ci.openshift.org/?search=Reporting+job+state.*with+reason.*{{ $labels.reason }}&maxAge=6h&context=1&type=build-log&name=&excludeName=&maxMatches=5&maxBytes=20971520&groupBy=job|CI search>.',
             },
           }
         ],
