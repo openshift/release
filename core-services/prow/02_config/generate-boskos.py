@@ -148,6 +148,9 @@ CONFIG = {
     'alibabacloud-quota-slice': {
         'us-east-1': 10,
     },
+    'alibabacloud-qe-quota-slice': {
+        'us-east-1': 10,
+    },
 }
 
 for i in range(3):

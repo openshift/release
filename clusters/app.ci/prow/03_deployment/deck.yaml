@@ -86,7 +86,7 @@ objects:
         serviceAccountName: deck
         containers:
         - name: deck
-          image: gcr.io/k8s-prow/deck:v20220420-14f1a66a0f
+          image: gcr.io/k8s-prow/deck:v20220421-92e6ee26d8
           args:
           - --config-path=/etc/config/config.yaml
           - --supplemental-prow-config-dir=/etc/config
@@ -300,10 +300,11 @@ objects:
           - mountPath: /etc/proxy/secrets
             name: session-secret
         - name: deck
-          image: gcr.io/k8s-prow/deck:v20220420-14f1a66a0f
+          image: gcr.io/k8s-prow/deck:v20220421-92e6ee26d8
           args:
-          - --github-oauth-config-file=/etc/github/config.json
-          - --github-token-path=/etc/oauth/oauth
+          - --github-oauth-config-file=/etc/oauth/config.json
+          - --github-app-id=$(GITHUB_APP_ID)
+          - --github-app-private-key-path=/etc/github/cert
           - --github-endpoint=http://ghproxy
           - --github-endpoint=https://api.github.com
           - --github-graphql-endpoint=http://ghproxy/graphql
@@ -321,10 +322,19 @@ objects:
           - --rerun-creates-job=true
           - --supplemental-plugin-config-dir=/etc/plugins
           - --kubeconfig-dir=/etc/build-farm-credentials
+          env:
+          - name: GITHUB_APP_ID
+            valueFrom:
+              secretKeyRef:
+                name: openshift-prow-github-app
+                key: appid
           ports:
             - name: http
               containerPort: 8080
           volumeMounts:
+          - name: github-app-credentials
+            mountPath: /etc/github
+            readOnly: true
           - name: service-account-token
             mountPath: /var/sa-token
           - name: gce-sa-credentials-gcs-private
@@ -339,9 +349,6 @@ objects:
             mountPath: /var/run/ko/static/extensions
             readOnly: true
           - name: oauth-config
-            mountPath: /etc/github
-            readOnly: true
-          - name: oauth
             mountPath: /etc/oauth
             readOnly: true
           - name: job-config
@@ -355,6 +362,9 @@ objects:
               memory: "3Gi"
               cpu: "600m"
         volumes:
+        - name: github-app-credentials
+          secret:
+            secretName: openshift-prow-github-app
         - name: service-account-token
           projected:
             sources:
@@ -366,9 +376,6 @@ objects:
         - name: extensions
           configMap:
             name: deck-internal-extensions
-        - name: oauth
-          secret:
-            secretName: github-credentials-openshift-ci-robot
         - name: oauth-config
           secret:
             secretName: github-app-credentials-private
