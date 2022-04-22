@@ -12,11 +12,6 @@ readonly CLUSTER
 
 echo "Checking Upgrade Channel on ${CLUSTER}"
 
-if ! oc config get-contexts ${CLUSTER} > /dev/null ; then
-  echo "found no context ${CLUSTER} in kubeconfig"
-  exit 1
-fi
-
 ID=$(ocm list cluster ${CLUSTER} --columns id --no-headers)
 readonly ID
 
