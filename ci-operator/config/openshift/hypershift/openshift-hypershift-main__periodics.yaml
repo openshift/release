@@ -119,6 +119,56 @@ tests:
           cpu: 100m
       timeout: 1h0m0s
     workflow: generic-claim
+- as: e2e-azure-periodic
+  cron: 0 */6 * * *
+  steps:
+    cluster_profile: azure4
+    env:
+      COMPUTE_NODE_TYPE: Standard_D16s_v3
+    post:
+    - chain: hypershift-dump
+    - chain: ipi-azure-post
+    pre:
+    - chain: ipi-azure-pre
+    - chain: hypershift-install
+    test:
+    - as: test-e2e
+      cli: latest
+      commands: |-
+        generate_junit() {
+          echo "Generating junit"
+          cat  /tmp/test_out | go tool test2json -t > /tmp/test_out.json
+          gotestsum --raw-command --junitfile="${ARTIFACT_DIR}/junit.xml" --format=standard-verbose -- cat /tmp/test_out.json
+        }
+        trap generate_junit EXIT
+
+        bin/test-e2e \
+          -test.v \
+          -test.timeout=0 \
+          -test.parallel=20 \
+          --e2e.node-pool-replicas=1 \
+          --e2e.availability-zones=1,2,3 \
+          --e2e.platform=Azure \
+          --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson \
+          --e2e.base-domain=ci.azure.devcluster.openshift.com \
+          --e2e.azure-credentials-file=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json \
+          --e2e.latest-release-image=${OCP_IMAGE_LATEST} \
+          --e2e.previous-release-image=${OCP_IMAGE_PREVIOUS} | tee /tmp/test_out
+      credentials:
+      - mount_path: /etc/ci-pull-credentials
+        name: ci-pull-credentials
+        namespace: test-credentials
+      dependencies:
+      - env: OCP_IMAGE_LATEST
+        name: release:latest
+      - env: OCP_IMAGE_PREVIOUS
+        name: release:hosted-ocp-previous
+      from: test-bin
+      grace_period: 15m0s
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 1h0m0s
 - as: e2e-aws-periodic-conformance-serial
   cron: 0 */6 * * *
   steps:
