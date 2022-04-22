@@ -29,6 +29,8 @@ CLUSTER_VERSION="$(/tmp/bin/oc adm release info -o json | jq -r .metadata.versio
 echo "Cluster version: $CLUSTER_VERSION"
 RESOURCE_GROUP="$(oc get -o jsonpath='{.status.platformStatus.azure.resourceGroupName}' infrastructure cluster)"
 echo "Resource group: $RESOURCE_GROUP"
+SUBSCRIPTION_ID="$(oc get configmap -n openshift-config cloud-provider-config -o jsonpath='{.data.config}' | jq -r '.subscriptionId')"
+echo "Subscription ID: $SUBSCRIPTION_ID"
 
 echo "$(date -u --rfc-3339=seconds) - Logging in to Azure..."
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}"
@@ -47,10 +49,10 @@ for i in $LB_RESOURCES; do
     for m in "${metrics[@]}";
     do
         echo "$(date -u --rfc-3339=seconds) - Gathering metric $m for load balancer $i"
-        az monitor metrics list --resource $i --offset 3h --metrics $m > $OUTPUT_DIR/lb-$LB_NAME-$m.json
+        az monitor metrics list --resource $i --offset 3h --metrics $m --subscription-id $SUBSCRIPTION_ID > $OUTPUT_DIR/lb-$LB_NAME-$m.json
     done
     # One-off additional filter for failed connections:
-    az monitor metrics list --resource $i --offset 3h --metrics SnatConnectionCount --filter "ConnectionState eq 'Failed'" > $OUTPUT_DIR/lb-$LB_NAME-SnatConnectionCount-ConnectionFailed.json
+    az monitor metrics list --resource $i --offset 3h --metrics SnatConnectionCount --filter "ConnectionState eq 'Failed'"  --subscription-id $SUBSCRIPTION_ID > $OUTPUT_DIR/lb-$LB_NAME-SnatConnectionCount-ConnectionFailed.json
 done
 
 # Gather Azure console logs. Note: this is only available for control plane hosts
@@ -72,5 +74,7 @@ az version
 cat "${TMPDIR}/azure-instance-names.txt" | sort | grep . | uniq | while read -r VM_NAME
 do
   echo "Gathering console logs for ${VM_NAME} in resource group ${RESOURCE_GROUP}"
-  LC_ALL=en_US.UTF-8 az vm boot-diagnostics get-boot-log --name "${VM_NAME}" --resource-group "${RESOURCE_GROUP}" > "${ARTIFACT_DIR}/${VM_NAME}-boot.log"
+  LC_ALL=en_US.UTF-8 az vm boot-diagnostics get-boot-log --name "${VM_NAME}" --resource-group "${RESOURCE_GROUP}" --subscription-id "${SUBSCRIPTION_ID}" > "${ARTIFACT_DIR}/${VM_NAME}-boot.log"
 done
+
+exit 0
