@@ -25,13 +25,12 @@ items:
         ref: "master"
       contextDir: "clusters/app.ci/supplemental-ci-images/azure/base-images/ci-base"
       dockerfile: |
-        FROM quay.io/centos/centos:7
+        FROM registry.access.redhat.com/ubi8/ubi:latest
         #create /home/prow
         ENV HOME=/home/prow
         RUN mkdir -p $HOME
         #install packages
         RUN yum -y update
-        RUN yum -y install epel-release
         RUN rpm --import https://packages.microsoft.com/keys/microsoft.asc
         RUN sh -c 'echo -e "[azure-cli]\nname=Azure CLI\nbaseurl=https://packages.microsoft.com/yumrepos/azure-cli\nenabled=1\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" >/etc/yum.repos.d/azure-cli.repo'
         RUN yum -y install --setopt=skip_missing_names_on_install=False \
@@ -42,16 +41,15 @@ items:
             lsof \
             make \
             net-tools \
-            PyYAML \
             tar \
             wget \
             which \
             sudo \
-            golang-bin-1.16.13-2.el7 \
+            golang \
             openssl
         # install oc client for tests
-        RUN curl -sL https://github.com/openshift/origin/releases/download/v3.11.0/openshift-origin-client-tools-v3.11.0-0cbc58b-linux-64bit.tar.gz | tar -C /tmp -xz
-        RUN mv /tmp/openshift-origin-client-tools-v3.11.0-0cbc58b-linux-64bit/{oc,kubectl} /usr/local/bin
+        RUN curl -sL https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/stable/openshift-client-linux.tar.gz | tar -C /tmp -xz
+        RUN mv /tmp/{oc,kubectl} /usr/local/bin
         RUN shopt -s dotglob && rm -rf $HOME/* /tmp/*
         RUN chmod -R g+w /etc/passwd /home
         # setup entrypoint
@@ -65,7 +63,7 @@ items:
       dockerStrategy:
         from:
           kind: DockerImage
-          name: quay.io/centos/centos:7
+          name: registry.access.redhat.com/ubi8/ubi:latest
         imageOptimizationPolicy: SkipLayers
       type: Docker
     triggers:
