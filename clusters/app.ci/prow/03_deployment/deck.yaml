@@ -91,8 +91,9 @@ objects:
           - --config-path=/etc/config/config.yaml
           - --supplemental-prow-config-dir=/etc/config
           - --cookie-secret=/etc/cookie/cookie
-          - --github-oauth-config-file=/etc/github/config.json
-          - --github-token-path=/etc/oauth/oauth
+          - --github-oauth-config-file=/etc/oauth/config.json
+          - --github-app-id=$(GITHUB_APP_ID)
+          - --github-app-private-key-path=/etc/github/cert
           - --github-endpoint=http://ghproxy
           - --github-endpoint=https://api.github.com
           - --github-graphql-endpoint=http://ghproxy/graphql
@@ -105,6 +106,12 @@ objects:
           - --rerun-creates-job=true
           - --supplemental-plugin-config-dir=/etc/plugins
           - --kubeconfig-dir=/etc/build-farm-credentials
+          env:
+          - name: GITHUB_APP_ID
+            valueFrom:
+              secretKeyRef:
+                name: openshift-prow-github-app
+                key: appid
           ports:
             - name: main
               containerPort: 8080
@@ -124,6 +131,9 @@ objects:
             periodSeconds: 10
             timeoutSeconds: 600
           volumeMounts:
+          - name: github-app-credentials
+            mountPath: /etc/github
+            readOnly: true
           - name: service-account-token
             mountPath: /var/sa-token
           - name: config
@@ -133,9 +143,6 @@ objects:
             mountPath: /var/run/ko/static/extensions
             readOnly: true
           - name: oauth-config
-            mountPath: /etc/github
-            readOnly: true
-          - name: oauth
             mountPath: /etc/oauth
             readOnly: true
           - name: cookie-secret
@@ -152,6 +159,9 @@ objects:
               memory: "5Gi"
               cpu: "500m"
         volumes:
+        - name: github-app-credentials
+          secret:
+            secretName: openshift-prow-github-app
         - name: service-account-token
           projected:
             sources:
@@ -166,9 +176,6 @@ objects:
         - name: oauth-config
           secret:
             secretName: github-app-credentials
-        - name: oauth
-          secret:
-            secretName: github-credentials-openshift-ci-robot
         - name: cookie-secret
           secret:
             secretName: cookie
