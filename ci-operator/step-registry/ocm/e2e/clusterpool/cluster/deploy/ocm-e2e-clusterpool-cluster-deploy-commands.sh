@@ -216,6 +216,22 @@ log "Using timestamp: $timestamp"
 version=$(sed -E 's/^[[:digit:]]{4}(-[[:digit:]]{2}){5}-//' <<< "$manifest")
 log "Using version: $version"
 
+# Based on version, stomp on PIPELINE_STAGE since we changed defaults midstream in 2.5
+if [[ $version = "2.0" ]]; then
+  PIPELINE_STAGE="edge"
+elif [[ $version = "2.1" ]]; then
+  PIPELINE_STAGE="edge"
+elif [[ $version = "2.2" ]]; then
+  PIPELINE_STAGE="edge"
+elif [[ $version = "2.3" ]]; then
+  PIPELINE_STAGE="edge"
+elif [[ $version = "2.4" ]]; then
+  PIPELINE_STAGE="edge"
+else
+  PIPELINE_STAGE="dev"
+fi
+log "Based on version, overriding your PIPELINE_STAGE override to: $PIPELINE_STAGE"
+
 # Get snapshot.
 snapshot="${version}-SNAPSHOT-${timestamp}"
 log "Using snapshot: $snapshot"

@@ -88,7 +88,7 @@
               severity: 'critical',
             },
             annotations: {
-              message: 'An excessive amount of CI Operator executions are failing with {{ $labels.reason }}, which is an infrastructure issue.',
+              message: 'An excessive amount of CI Operator executions are failing with `{{ $labels.reason }}`, which is an infrastructure issue. See <https://search.ci.openshift.org/?search=Reporting+job+state.*with+reason.*{{ $labels.reason }}&maxAge=6h&context=1&type=build-log&name=&excludeName=&maxMatches=5&maxBytes=20971520&groupBy=job|CI search>.',
             },
           }
         ],
@@ -106,7 +106,7 @@
               severity: 'critical',
             },
             annotations: {
-              message: 'An excessive amount of CI Operator executions are failing with {{ $labels.reason }}, which does not necessarily point to an infrastructure issue but is happening at an excessive rate and should be investigated.',
+              message: 'An excessive amount of CI Operator executions are failing with `{{ $labels.reason }}`, which does not necessarily point to an infrastructure issue but is happening at an excessive rate and should be investigated. See <https://search.ci.openshift.org/?search=Reporting+job+state.*with+reason.*{{ $labels.reason }}&maxAge=6h&context=1&type=build-log&name=&excludeName=&maxMatches=5&maxBytes=20971520&groupBy=job|CI search>.',
             },
           }
         ],
@@ -156,6 +156,33 @@
             },
             annotations: {
               message: 'Probing the instance {{ $labels.instance }} has been failing for the past minute.',
+            },
+          }
+        ],
+      },
+      {
+        name: 'openshift-priv-image-building-jobs-failing',
+        rules: [
+          {
+            alert: 'openshift-priv-image-building-jobs-failing',
+            expr: |||
+             (
+               sum(
+                 rate(prowjob_state_transitions{job="prow-controller-manager",job_name=~".*-images",org="openshift-priv",state="success"}[12h])
+               )
+               /
+               sum(
+                 rate(prowjob_state_transitions{job="prow-controller-manager",job_name=~".*-images",org="openshift-priv",state=~"success|failure|aborted"}[12h])
+               )
+             )
+             < 0.95
+            |||,
+            'for': '1m',
+            labels: {
+              severity: 'critical',
+            },
+            annotations: {
+              message: 'openshift-priv image-building jobs are failing at a high rate. Check on <https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/?job=*-images|deck-internal>.',
             },
           }
         ],
