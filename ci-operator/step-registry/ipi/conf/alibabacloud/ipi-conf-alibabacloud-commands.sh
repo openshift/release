@@ -5,14 +5,24 @@ set -o errexit
 set -o pipefail
 
 # copy the creds to the SHARED_DIR
-cp /var/run/vault/alibaba/alibabacreds.ini ${SHARED_DIR}
-cp /var/run/vault/alibaba/config ${SHARED_DIR}
-cp /var/run/vault/alibaba/envvars ${SHARED_DIR}
+if test -f "${CLUSTER_PROFILE_DIR}/alibabacreds.ini" 
+then
+  echo "Copying creds from CLUSTER_PROFILE_DIR to SHARED_DIR..."
+  cp ${CLUSTER_PROFILE_DIR}/alibabacreds.ini ${SHARED_DIR}
+  cp ${CLUSTER_PROFILE_DIR}/config ${SHARED_DIR}
+  cp ${CLUSTER_PROFILE_DIR}/envvars ${SHARED_DIR}
+else
+  echo "Copying creds from /var/run/vault/alibaba/ to SHARED_DIR..."
+  cp /var/run/vault/alibaba/alibabacreds.ini ${SHARED_DIR}
+  cp /var/run/vault/alibaba/config ${SHARED_DIR}
+  cp /var/run/vault/alibaba/envvars ${SHARED_DIR}
+fi
 
-source /var/run/vault/alibaba/envvars
+source ${SHARED_DIR}/envvars
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
+echo "Alibaba base domain: ${BASE_DOMAIN}"
 REGION="${LEASED_RESOURCE}"
 echo "Alibaba region: ${REGION}"
 
