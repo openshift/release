@@ -111,12 +111,43 @@ items:
                     values:
                     - ci-operator-configresolver
                 topologyKey: "kubernetes.io/hostname"
+        initContainers:
+        - name: git-sync-init
+          command:
+          - /git-sync
+          args:
+          - --repo=https://github.com/openshift/release.git
+          - --branch=master
+          - --root=/tmp/git-sync
+          - --one-time=true
+          env:
+          - name: GIT_SYNC_DEST
+            value: release
+          image: gcr.io/google_containers/git-sync:v3.1.6
+          volumeMounts:
+          - name: release
+            mountPath: /tmp/git-sync
         containers:
+        - name: git-sync
+          command:
+          - /git-sync
+          args:
+          - --repo=https://github.com/openshift/release.git
+          - --branch=master
+          - --wait=60
+          - --root=/tmp/git-sync
+          env:
+          - name: GIT_SYNC_DEST
+            value: release
+          image: gcr.io/google_containers/git-sync:v3.1.6
+          volumeMounts:
+          - name: release
+            mountPath: /tmp/git-sync
         - name: ci-operator-configresolver
           image: ci-operator-configresolver:latest
           args:
-          - -config=/etc/configs
-          - -registry=/etc/registry
+          - -config=/var/repo/release/ci-operator/config
+          - -registry=/var/repo/release/ci-operator/step-registry
           - -flat-registry
           - -log-level=debug
           - -cycle=2m
@@ -141,50 +172,13 @@ items:
             periodSeconds: 3
             timeoutSeconds: 600
           volumeMounts:
-          - name: registry
-            mountPath: /etc/registry
-            readOnly: true
-          - name: ci-operator-configs
-            mountPath: /etc/configs
+          - name: release
+            mountPath: /var/repo
             readOnly: true
           resources:
             requests:
               memory: "2Gi"
               cpu: "200m"
         volumes:
-        - name: registry
-          configMap:
-            name: step-registry
-        - name: ci-operator-configs
-          projected:
-            sources:
-            - configMap:
-                name: ci-operator-master-configs
-            - configMap:
-                name: ci-operator-misc-configs
-            - configMap:
-                name: ci-operator-3.x-configs
-            - configMap:
-                name: ci-operator-4.1-configs
-            - configMap:
-                name: ci-operator-4.2-configs
-            - configMap:
-                name: ci-operator-4.3-configs
-            - configMap:
-                name: ci-operator-4.4-configs
-            - configMap:
-                name: ci-operator-4.5-configs
-            - configMap:
-                name: ci-operator-4.6-configs
-            - configMap:
-                name: ci-operator-4.7-configs
-            - configMap:
-                name: ci-operator-4.8-configs
-            - configMap:
-                name: ci-operator-4.9-configs
-            - configMap:
-                name: ci-operator-4.10-configs
-            - configMap:
-                name: ci-operator-4.11-configs
-            - configMap:
-                name: ci-operator-4.12-configs
+        - name: release
+          emptyDir: {}
