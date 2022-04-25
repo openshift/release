@@ -151,6 +151,9 @@ CONFIG = {
     'alibabacloud-qe-quota-slice': {
         'us-east-1': 10,
     },
+    'alibabacloud-cn-qe-quota-slice': {
+        'cn-hangzhou': 10,
+    },
 }
 
 for i in range(3):
