@@ -19,7 +19,7 @@ CLUSTER_MULTI_AZ=${CLUSTER_MULTI_AZ:-false}
 SSO_CLIENT_ID=$(read_profile_file "sso-client-id")
 SSO_CLIENT_SECRET=$(read_profile_file "sso-client-secret")
 OCM_TOKEN=$(read_profile_file "ocm-token")
-CLUSTER_TIMEOUT=5400
+CLUSTER_TIMEOUT=${CLUSTER_TIMEOUT:-}
 
 AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
 OCM_CREATE_ARGS=""
