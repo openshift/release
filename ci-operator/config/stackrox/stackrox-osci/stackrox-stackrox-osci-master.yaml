@@ -37,9 +37,25 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/stackrox/stackrox/image/rhel/.
   to: main
+- dockerfile_literal: |
+    FROM scratch
+    COPY ./bin/roxctl-linux /roxctl
+    COPY ./tls-ca-bundle.pem /etc/ssl/certs/ca-certificates.crt
+    ENV ROX_ROXCTL_IN_MAIN_IMAGE="true"
+
+    USER 65534:65534
+    ENTRYPOINT [ "/roxctl" ]
+  inputs:
+    main-bundle:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/stackrox/stackrox/image/.
+      - destination_dir: .
+        source_path: /etc/pki/ca-trust/extracted/pem/.
+  to: roxctl
 promotion:
   namespace: stackrox
-  tag: main
+  tag: latest
 releases:
   latest:
     integration:
