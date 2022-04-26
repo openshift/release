@@ -57,6 +57,7 @@ function check_pod_status() {
 }
 
 CNF_NAMESPACE="example-cnf-sriov"
+PCI_DEVICE="06"
 
 # For disconnected or otherwise unreachable environments, we want to
 # have steps use an HTTP(S) proxy to reach the API server. This proxy
@@ -80,13 +81,16 @@ EOF
 echo "Created \"$CNF_NAMESPACE\" Namespace"
 
 # Mellanox use Bifurcation driver so we need the host-device CNI to move the NIC into the namespace
-if [[ "${OPENSTACK_SRIOV_NETWORK}" == "mellanox-sriov" ]]; then
+if [[ "${OPENSTACK_SRIOV_NETWORK}" == *"mellanox"* ]]; then
+    if [[ "${OPENSTACK_SRIOV_NETWORK}" == *"hwoffload"* ]]; then
+        PCI_DEVICE="05"
+    fi
     cat <<EOF > "${SHARED_DIR}/additionalnetwork-sriov.yaml"
 spec:
   additionalNetworks:
   - name: ${OPENSTACK_SRIOV_NETWORK}
     namespace: ${CNF_NAMESPACE}
-    rawCNIConfig: '{ "cniVersion": "0.3.1", "name": "${OPENSTACK_SRIOV_NETWORK}", "type": "host-device","pciBusId": "0000:00:06.0", "ipam": {}}'
+    rawCNIConfig: '{ "cniVersion": "0.3.1", "name": "${OPENSTACK_SRIOV_NETWORK}", "type": "host-device","pciBusId": "0000:00:${PCI_DEVICE}.0", "ipam": {}}'
     type: Raw
 EOF
     oc patch network.operator cluster --patch "$(cat "${SHARED_DIR}/additionalnetwork-sriov.yaml")" --type=merge
@@ -149,7 +153,7 @@ else
     exit 1
 fi
 
-TESTPMD_OUTPUT=$(oc -n "${CNF_NAMESPACE}" rsh "${CNF_POD}" bash -c "yes | testpmd -l 2-3 --in-memory -w 00:06.0 --socket-mem 1024 -n 4 --proc-type auto --file-prefix pg  -- --disable-rss  --nb-cores=1 --rxq=1 --txq=1 --auto-start --forward-mode=mac")
+TESTPMD_OUTPUT=$(oc -n "${CNF_NAMESPACE}" rsh "${CNF_POD}" bash -c "yes | testpmd -l 2-3 --in-memory -w 00:${PCI_DEVICE}.0 --socket-mem 1024 -n 4 --proc-type auto --file-prefix pg  -- --disable-rss  --nb-cores=1 --rxq=1 --txq=1 --auto-start --forward-mode=mac")
 echo "${TESTPMD_OUTPUT}"
 if [[ "${TESTPMD_OUTPUT}" == *"forwards packets on 1 streams"* ]]; then
     echo "Testpmd could run successfully"

@@ -16,16 +16,12 @@ images:
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
-      cat <<EOF> /etc/yum.repos.d/base-4-11-rhel-8-ironic-prevalidation.repo
-      [rhel-8-ironic-prevalidation-ocp411]
-      id = rhel-8-ironic-prevalidation-ocp411
-      name = rhel-8-ironic-prevalidation-ocp411
-      baseurl = http://base-4-11-rhel-8-ironic-prevalidation.ocp.svc/rhel-8-ironic-prevalidation
-      enabled = 1
-      gpgcheck = 0
-      priority = 1
-      skip_if_unavailable=FALSE
-      EOF
+      curl http://base-4-11-rhel-8-ironic-prevalidation.ocp.svc > /etc/yum.repos.d/base-4-11-rhel-8-ironic-prevalidation.repo
+      #NOTE(elfosardo): remove this once rhel8.6 content is available for all CI
+      #remove ci conflicting repos
+      rm -f /etc/yum.repos.d/ci-rpm-mirrors.repo
+      #use rhel8.6 beta repos
+      curl http://base-4-11-rhel86.ocp.svc > /etc/yum.repos.d/base-4-11-rhel86.repo
     from: ocp_builder_rhel-8-base-openshift-4.11
     to: base
 releases:

@@ -145,7 +145,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build03
     context: ci/prow/boskos-config
     decorate: true
     labels:
@@ -172,7 +172,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build03
     context: ci/prow/boskos-config-generation
     decorate: true
     labels:
@@ -196,7 +196,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build03
     context: ci/prow/build-clusters
     decorate: true
     labels:
@@ -437,7 +437,56 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: app.ci
+    context: ci/build-farm/build05-dry
+    decorate: true
+    labels:
+      ci.openshift.io/cluster: build05
+      ci.openshift.io/generator: cluster-init
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-build05-dry
+    rerun_command: /test build05-dry
+    run_if_changed: ^clusters/.*
+    spec:
+      containers:
+      - args:
+        - --config-dir=clusters/build-clusters/build05
+        - --as=
+        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+        command:
+        - applyconfig
+        env:
+        - name: HOME
+          value: /tmp
+        image: registry.ci.openshift.org/ci/applyconfig:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+        - mountPath: /tmp
+          name: tmp
+      serviceAccountName: config-updater
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.build05.config
+            path: kubeconfig
+          secretName: config-updater
+      - emptyDir: {}
+        name: tmp
+    trigger: (?m)^/test( | .* )build05-dry,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build03
     context: ci/prow/ci-operator-config
     decorate: true
     labels:
@@ -466,7 +515,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build03
     context: ci/prow/ci-operator-config-metadata
     decorate: true
     labels:
@@ -492,7 +541,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build03
     context: ci/prow/ci-operator-registry
     decorate: true
     labels:
@@ -522,7 +571,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build03
     context: ci/prow/ci-testgrid-allow-list
     decorate: true
     labels:
@@ -591,7 +640,7 @@ presubmits:
             secretKeyRef:
               key: appid
               name: openshift-prow-github-app
-        image: gcr.io/k8s-prow/checkconfig:v20220412-66078146cd
+        image: gcr.io/k8s-prow/checkconfig:v20220425-17d4663257
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -611,7 +660,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build03
     context: ci/prow/core-valid
     decorate: true
     decoration_config:
@@ -660,7 +709,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build03
     context: ci/prow/correctly-sharded-config
     decorate: true
     labels:
@@ -685,7 +734,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build03
     context: ci/prow/deprecate-templates
     decorate: true
     labels:
@@ -710,7 +759,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build03
     context: ci/prow/generated-config
     decorate: true
     labels:
@@ -736,7 +785,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build03
     context: ci/prow/generated-dashboards
     decorate: true
     labels:
@@ -811,7 +860,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build03
     context: ci/prow/ordered-prow-config
     decorate: true
     labels:
@@ -837,7 +886,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build03
     context: ci/prow/owners
     decorate: true
     labels:
@@ -863,7 +912,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build03
     context: ci/prow/pj-rehearse
     decorate: true
     name: pull-ci-openshift-release-master-pj-rehearse
@@ -901,7 +950,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build03
     context: ci/prow/pj-rehearse-blocking
     decorate: true
     name: pull-ci-openshift-release-master-pj-rehearse-blocking
@@ -938,7 +987,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build03
     context: ci/prow/pj-rehearse-max
     decorate: true
     name: pull-ci-openshift-release-master-pj-rehearse-max
@@ -976,7 +1025,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build03
     context: ci/prow/pj-rehearse-more
     decorate: true
     name: pull-ci-openshift-release-master-pj-rehearse-more
@@ -1014,7 +1063,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build03
     context: ci/prow/prow-config
     decorate: true
     labels:
@@ -1040,7 +1089,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build03
     context: ci/prow/prow-config-filenames
     decorate: true
     labels:
@@ -1067,7 +1116,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build03
     context: ci/prow/prow-config-semantics
     decorate: true
     labels:
@@ -1093,7 +1142,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build03
     context: ci/prow/release-config
     decorate: true
     labels:
@@ -1119,7 +1168,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build03
     context: ci/prow/release-controller-config
     decorate: true
     labels:
@@ -1145,7 +1194,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build03
     context: ci/prow/secret-generator-config-valid
     decorate: true
     labels:
@@ -1173,7 +1222,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build03
     context: ci/prow/services-valid
     decorate: true
     decoration_config:
@@ -1223,7 +1272,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build03
     context: ci/prow/step-registry-metadata
     decorate: true
     labels:
@@ -1249,7 +1298,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build03
     context: ci/prow/step-registry-shellcheck
     decorate: true
     labels:
@@ -1325,7 +1374,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build03
     context: ci/prow/openshift-image-mirror-mappings
     decorate: true
     labels:
@@ -1360,7 +1409,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build03
     context: ci/prow/pylint
     decorate: true
     labels:
@@ -1389,7 +1438,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build03
     context: ci/prow/sync-rover-groups
     decorate: true
     labels:
@@ -1421,7 +1470,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build03
     context: ci/prow/yamllint
     decorate: true
     labels:

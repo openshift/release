@@ -4,7 +4,7 @@ postsubmits:
     always_run: true
     branches:
     - ^backplane-2\.0$
-    cluster: build03
+    cluster: build04
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -58,7 +58,7 @@ postsubmits:
     always_run: true
     branches:
     - ^backplane-2\.0$
-    cluster: build03
+    cluster: build04
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -72,6 +72,7 @@ postsubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --target=pr-merge-image-mirror
         command:
         - ci-operator
@@ -82,6 +83,9 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -93,6 +97,9 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -103,7 +110,7 @@ postsubmits:
     always_run: true
     branches:
     - ^backplane-2\.0$
-    cluster: build03
+    cluster: build04
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -117,6 +124,7 @@ postsubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --target=publish
         command:
         - ci-operator
@@ -127,6 +135,9 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -138,6 +149,9 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials

@@ -125,7 +125,7 @@ tests:
       timeout: 1h0m0s
     workflow: ipi-gcp
 - as: extended-aws-ipi
-  cron: 0 2 * * *
+  cron: 0 2 */3 * *
   steps:
     cluster_profile: aws
     post:
@@ -135,7 +135,7 @@ tests:
     test:
     - ref: openshift-extended-test
 - as: extended-azure-ipi
-  cron: 0 18 * * *
+  cron: 0 18 */3 * *
   steps:
     cluster_profile: azure-2
     env:
@@ -147,7 +147,7 @@ tests:
     test:
     - ref: openshift-extended-test
 - as: extended-azure-upi
-  cron: 0 4 * * *
+  cron: 0 4 */3 * *
   steps:
     cluster_profile: azure4
     post:
@@ -157,7 +157,7 @@ tests:
     test:
     - ref: openshift-extended-test
 - as: extended-baremetal-ipi
-  cron: 0 6 * * *
+  cron: 0 6 */3 * *
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -170,7 +170,7 @@ tests:
     test:
     - ref: openshift-extended-test
 - as: extended-gcp-ipi
-  cron: 0 8 * * *
+  cron: 0 8 */3 * *
   steps:
     cluster_profile: gcp
     post:
@@ -180,7 +180,7 @@ tests:
     test:
     - ref: openshift-extended-test
 - as: extended-gcp-upi
-  cron: 0 10 * * *
+  cron: 0 10 */3 * *
   steps:
     cluster_profile: gcp
     post:
@@ -190,7 +190,7 @@ tests:
     test:
     - ref: openshift-extended-test
 - as: extended-openstack-ipi
-  cron: 0 12 * * *
+  cron: 0 12 */3 * *
   steps:
     cluster_profile: openstack
     env:
@@ -203,7 +203,7 @@ tests:
     test:
     - ref: openshift-extended-test
 - as: extended-vsphere-ipi
-  cron: 0 14 * * *
+  cron: 0 14 */3 * *
   steps:
     cluster_profile: vsphere
     post:
@@ -213,13 +213,41 @@ tests:
     test:
     - ref: openshift-extended-test
 - as: extended-vsphere-upi
-  cron: 0 16 * * *
+  cron: 0 16 */3 * *
   steps:
     cluster_profile: vsphere
     post:
     - chain: upi-vsphere-post
     pre:
     - chain: upi-vsphere-pre
+    test:
+    - ref: openshift-extended-test
+- as: extended-disasterrecovery-aws-ipi
+  cron: 0 1 */3 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&
+      TEST_SCENRAIOS: DR_Testing
+      TEST_TIMEOUT: "50"
+    post:
+    - chain: cucushift-installer-rehearse-aws-ipi-private-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-aws-ipi-private-provision
+    test:
+    - ref: openshift-extended-test
+- as: extended-disasterrecovery-gcp-ipi
+  cron: 0 3 */3 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&
+      TEST_SCENRAIOS: DR_Testing
+      TEST_TIMEOUT: "50"
+    post:
+    - chain: cucushift-installer-rehearse-gcp-ipi-private-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-gcp-ipi-private-provision
     test:
     - ref: openshift-extended-test
 - as: extended-aws-ipi-disruptive

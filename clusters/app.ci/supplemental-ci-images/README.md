@@ -27,3 +27,4 @@ These resources provide some supplemental images to be used in CI builds.
 - `ansible-runner-ovirt`: used by ovirt infra cleanup periodic [job](../../../ci-operator/config/openshift/cluster-api-provider-ovirt/)
 - `ovirt-prfinder`: used by ovirt prfinder periodic [job](../../../ci-operator/config/openshift/cluster-api-provider-ovirt/)
 - `telco-bastion`: used by cnf-features-deploy periodic [job](../../../ci-operator/config/openshift-kni/cnf-features-deploy/)
+- `ubi8-nginx`: Used by [crane-ui-plugin](../../../ci-operator/config/konveyor/crane-ui-plugin/)

@@ -18,6 +18,12 @@ then
   gcloud config set project "${GOOGLE_PROJECT_ID}"
 fi
 
+## Destroying DNS resources of mirror registry
+if [[ -f "${SHARED_DIR}/mirror-dns-destroy.sh" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - Destroying DNS resources of mirror registry..."
+  sh "${SHARED_DIR}/mirror-dns-destroy.sh"
+fi
+
 ## Destroy the SSH bastion
 echo "$(date -u --rfc-3339=seconds) - Destroying the bastion host..."
 sh "${SHARED_DIR}/bastion-destroy.sh"

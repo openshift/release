@@ -1,11 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
-INSTALL_STAGE="initial"
-
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-#Save install status for must-gather to generate junit
-trap 'echo "$? $INSTALL_STAGE" > "${SHARED_DIR}/install-status.txt"' EXIT TERM
+#Save exit code for must-gather to generate junit
+trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' EXIT TERM
 
 # The oc binary is placed in the shared-tmp by the test container and we want to use
 # that oc for all actions.
@@ -307,7 +305,6 @@ echo "Waiting for bootstrap to complete"
 openshift-install --dir=${ARTIFACT_DIR}/installer wait-for bootstrap-complete &
 wait "$!" || gather_bootstrap_and_fail
 
-INSTALL_STAGE="bootstrap_successful"
 echo "Bootstrap complete, destroying bootstrap resources"
 aws cloudformation delete-stack --stack-name "${CLUSTER_NAME}-bootstrap" &
 wait "$!"
@@ -345,8 +342,6 @@ set +x
 echo "Completing UPI setup"
 openshift-install --dir=${ARTIFACT_DIR}/installer wait-for install-complete 2>&1 | grep --line-buffered -v password &
 wait "$!"
-
-INSTALL_STAGE="cluster_creation_successful"
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 

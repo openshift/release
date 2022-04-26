@@ -4,11 +4,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-INSTALL_STAGE="initial"
-
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-#Save install status for must-gather to generate junit
-trap 'echo "$? $INSTALL_STAGE" > "${SHARED_DIR}/install-status.txt"' EXIT TERM
+#Save exit code for must-gather to generate junit
+trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' EXIT TERM
 export HOME=/tmp
 
 if [[ -z "$RELEASE_IMAGE_LATEST" ]]; then
@@ -252,8 +250,6 @@ if [ "$ret" -ne 0 ]; then
   exit "$ret"
 fi
 
-INSTALL_STAGE="bootstrap_successful"
-
 az network nsg rule delete -g "$RESOURCE_GROUP" --nsg-name "${INFRA_ID}"-nsg --name bootstrap_ssh_in
 az vm stop -g "$RESOURCE_GROUP" --name "${INFRA_ID}"-bootstrap
 az vm deallocate -g "$RESOURCE_GROUP" --name "${INFRA_ID}"-bootstrap
@@ -309,8 +305,6 @@ sed 's/password: .*/password: REDACTED/' "${dir}/.openshift_install.log" >>"${AR
 if [ $ret -ne 0 ]; then
   exit "$ret"
 fi
-
-INSTALL_STAGE="cluster_creation_successful"
 
 cp -t "${SHARED_DIR}" \
     "${dir}/auth/kubeconfig"

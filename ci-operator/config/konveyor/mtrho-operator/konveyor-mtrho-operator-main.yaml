@@ -1,4 +1,20 @@
 base_images:
+  crane-reverse-proxy:
+    name: "4.11"
+    namespace: konveyor
+    tag: crane-reverse-proxy
+  crane-runner:
+    name: "4.11"
+    namespace: konveyor
+    tag: crane-runner
+  crane-secret-service:
+    name: "4.11"
+    namespace: konveyor
+    tag: crane-secret-service
+  crane-ui-plugin:
+    name: "4.11"
+    namespace: konveyor
+    tag: crane-ui-plugin
   ubi8-minimal:
     name: builder
     namespace: ocp
@@ -7,7 +23,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.16
+    tag: golang-1.17
 images:
 - dockerfile_path: Dockerfile
   from: ubi8-minimal
@@ -18,6 +34,14 @@ operator:
   substitutions:
   - pullspec: quay.io/konveyor/mtrho-operator-container:latest
     with: mtrho-operator
+  - pullspec: quay.io/konveyor/crane-runner:latest
+    with: crane-runner
+  - pullspec: quay.io/konveyor/crane-reverse-proxy:latest
+    with: crane-reverse-proxy
+  - pullspec: quay.io/konveyor/crane-secret-service:latest
+    with: crane-secret-service
+  - pullspec: quay.io/konveyor/crane-ui-plugin:latest
+    with: crane-ui-plugin
 promotion:
   name: "4.11"
   namespace: konveyor
@@ -39,10 +63,35 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-aws
+- as: vet
+  commands: go vet -mod=mod ./...
+  container:
+    from: src
+- as: fmt
+  commands: go fmt -mod=mod ./...
+  container:
+    from: src
+- as: build
+  commands: go build -mod=mod
+  container:
+    from: src
+- as: operator-e2e
   steps:
     cluster_profile: aws
-    workflow: openshift-e2e-aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: openshift-migration
+      OO_PACKAGE: mtrho-operator
+      OO_TARGET_NAMESPACES: '!all'
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - ref: konveyor-install-openshift-pipelines-operator
+    - ref: optional-operators-subscribe
+    workflow: optional-operators-ci-aws
 zz_generated_metadata:
   branch: main
   org: konveyor

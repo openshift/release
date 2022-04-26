@@ -320,6 +320,7 @@ bastion_name="${CLUSTER_NAME}-bastion"
 gcloud compute instances create "${bastion_name}" \
   --image=${IMAGE_NAME} \
   --image-project=${IMAGE_PROJECT} \
+  --boot-disk-size=200GB \
   --metadata-from-file=user-data=${bastion_ignition_file} \
   --machine-type=${MACHINE_TYPE} \
   --network=${NETWORK} \
@@ -364,6 +365,7 @@ if [ X"${bastion_public_ip}" == X"" ] || [ X"${bastion_private_ip}" == X"" ] ; t
 fi
 echo ${bastion_public_ip} > "${SHARED_DIR}/bastion_public_address"
 echo ${bastion_private_ip} > "${SHARED_DIR}/bastion_private_address"
+echo "core" > "${SHARED_DIR}/bastion_ssh_user"
 
 proxy_credential=$(cat "${src_proxy_creds_file}")
 proxy_public_url="http://${proxy_credential}@${bastion_public_ip}:3128"
@@ -373,6 +375,36 @@ echo "${proxy_private_url}" > "${SHARED_DIR}/proxy_private_url"
 
 # echo proxy IP to ${SHARED_DIR}/proxyip
 echo "${bastion_public_ip}" >> "${SHARED_DIR}/proxyip"
+
+#####################################
+####Register mirror registry DNS#####
+#####################################
+if [[ "${REGISTER_MIRROR_REGISTRY_DNS}" == "yes" ]]; then
+  BASE_DOMAIN="$(< ${CLUSTER_PROFILE_DIR}/public_hosted_zone)"
+  BASE_DOMAIN_ZONE_NAME="$(gcloud dns managed-zones list --filter "DNS_NAME=${BASE_DOMAIN}." --format json | jq -r .[0].name)"
+
+  echo "Configuring public DNS for the mirror registry..."
+  gcloud dns record-sets create "${CLUSTER_NAME}.mirror-registry.${BASE_DOMAIN}." \
+  --rrdatas="${bastion_public_ip}" --type=A --ttl=60 --zone="${BASE_DOMAIN_ZONE_NAME}"
+
+  echo "Configuring private DNS for the mirror registry..."
+  gcloud dns managed-zones create "${CLUSTER_NAME}-mirror-registry-private-zone" \
+  --description "Private zone for the mirror registry." \
+  --dns-name "mirror-registry.${BASE_DOMAIN}." --visibility "private" --networks "${NETWORK}"
+  gcloud dns record-sets create "${CLUSTER_NAME}.mirror-registry.${BASE_DOMAIN}." \
+  --rrdatas="${bastion_private_ip}" --type=A --ttl=60 --zone="${CLUSTER_NAME}-mirror-registry-private-zone"
+
+  cat > "${SHARED_DIR}/mirror-dns-destroy.sh" << EOF
+  gcloud dns record-sets delete -q "${CLUSTER_NAME}.mirror-registry.${BASE_DOMAIN}." --type=A --zone="${BASE_DOMAIN_ZONE_NAME}"
+  gcloud dns record-sets delete -q "${CLUSTER_NAME}.mirror-registry.${BASE_DOMAIN}." --type=A --zone="${CLUSTER_NAME}-mirror-registry-private-zone"
+  gcloud dns managed-zones delete -q "${CLUSTER_NAME}-mirror-registry-private-zone"
+EOF
+
+  echo "Waiting for ${CLUSTER_NAME}.mirror-registry.${BASE_DOMAIN} taking effect..." && sleep 120s
+
+  MIRROR_REGISTRY_URL="${CLUSTER_NAME}.mirror-registry.${BASE_DOMAIN}:5000"
+  echo "${MIRROR_REGISTRY_URL}" > "${SHARED_DIR}/mirror_registry_url"
+fi
 
 #####################################
 ##############Clean Up###############

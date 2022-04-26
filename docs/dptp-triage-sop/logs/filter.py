@@ -57,6 +57,11 @@ if mode == "warnings":
         lambda message: matches(message, "tide", msg="GitHub status description needed to be truncated to fit GH API limit"),
         # our automation doesn't have access to the repo
         lambda message: matches(message, "hook", msg="Could not list labels on PR", error="the GitHub API request returns a 403"),
+        lambda message: any(
+            s in message.get("error", "") for s in ["context canceled", "context deadline exceeded", "net/http: request canceled"]
+        ) and any(
+            s in message.get("component", "") for s in ["crier", "dptp-controller-manager", 'prow-controller-manager', "deck", "tide", "pod-scaler reloader"]
+        ),
     ]
 elif mode == "errors":
     filters = [

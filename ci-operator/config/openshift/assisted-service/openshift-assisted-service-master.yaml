@@ -97,7 +97,7 @@ operator:
     with: assisted-installer-controller
   - pullspec: quay.io/edge-infrastructure/assisted-image-service:latest
     with: assisted-image-service
-  - pullspec: quay.io/edge-infrastructure/postgresql-12-centos7:latest
+  - pullspec: quay.io/centos7/postgresql-12-centos7:latest
     with: postgresql-12-centos7
 promotion:
   name: ocm-2.6
@@ -313,6 +313,7 @@ tests:
     workflow: generic-claim
 - as: e2e-metal-assisted-operator-disconnected
   optional: true
+  run_if_changed: ^(deploy/operator/.*)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -343,7 +344,7 @@ tests:
       NUM_EXTRA_WORKERS: "1"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-metal-assisted-operator-ztp
-  run_if_changed: ^(cmd/.*|data/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
+  run_if_changed: ^(cmd/.*|data/.*|deploy/operator/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -360,9 +361,29 @@ tests:
       IP_STACK: v4
       NUM_EXTRA_WORKERS: "1"
     workflow: assisted-baremetal-operator-ztp
+- as: e2e-metal-assisted-operator-capi
+  optional: true
+  run_if_changed: ^(deploy/operator/.*)$
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
+      HYPERSHIFT_IMAGE: hypershift-operator
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
+    env:
+      DEVSCRIPTS_CONFIG: |
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=32768
+        EXTRA_WORKER_DISK=120
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      DISCONNECTED: "false"
+      IP_STACK: v4
+      NUM_EXTRA_WORKERS: "1"
+    workflow: assisted-baremetal-operator-capi
 - as: e2e-ai-operator-ztp-ipv4v6-sno-ocp-49
   optional: true
-  run_if_changed: ^(deploy/.*)$
+  run_if_changed: ^(deploy/operator/.*)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -421,6 +442,7 @@ tests:
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-metal-assisted-operator-ztp-multinode-spoke
   optional: true
+  run_if_changed: ^(deploy/operator/.*)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -441,7 +463,7 @@ tests:
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-ipv4v6-3masters-ocp-49
   optional: true
-  run_if_changed: ^(deploy/.*)$
+  run_if_changed: ^(deploy/operator/.*)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -475,29 +497,6 @@ tests:
       IP_STACK: v4
       NUM_EXTRA_WORKERS: "1"
     workflow: assisted-baremetal-operator-ztp
-- as: e2e-metal-assisted-operator-ztp-periodic-upgrade
-  cron: '@daily'
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
-    env:
-      ASSISTED_STOP_AFTER_AGENT_DISCOVERY: "false"
-      ASSISTED_STOP_AFTER_AGENT_DISCOVERY_OVERRIDE: "true"
-      ASSISTED_UPGRADE_OPERATOR: "true"
-      ASSISTED_UPGRADE_OPERATOR_OVERRIDE: "false"
-      CATALOG_SOURCE_NAME: community-operators
-      CHANNEL_INSTALL_OVERRIDE: ocm-2.5
-      CHANNEL_UPGRADE_OVERRIDE: alpha
-      DEVSCRIPTS_CONFIG: |
-        EXTRA_WORKER_VCPU=8
-        EXTRA_WORKER_MEMORY=32768
-        EXTRA_WORKER_DISK=120
-        PROVISIONING_NETWORK_PROFILE=Disabled
-        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
-      IP_STACK: v4
-      NUM_EXTRA_WORKERS: "1"
-    workflow: assisted-baremetal-operator-ztp-upgrade
 - as: e2e-ai-operator-ztp-ipv4v6-sno-periodic-ocp-49
   cron: '@daily'
   steps:
@@ -572,7 +571,7 @@ tests:
         TEST_FUNC=test_networking
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-kube-api-net-suite
-  run_if_changed: ^(cmd/.*|data/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
+  optional: true
   steps:
     cluster_profile: packet-assisted
     env:

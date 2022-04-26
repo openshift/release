@@ -23,7 +23,7 @@ vault write auth/kubernetes/config \
     token_reviewer_jwt="${VAULT_KUBE_TOKEN}" \
     kubernetes_host=https://kubernetes.default.svc.cluster.local \
     kubernetes_ca_cert="${APP_CI_CA_CERT}" \
-    issuer="$(oc get authentication.config cluster -o template="{{ .spec.serviceAccountIssuer }}")"
+    issuer="$(oc --context=app.ci get authentication.config cluster -o template="{{ .spec.serviceAccountIssuer }}")"
 
 vault auth list |grep -q oidc || vault auth enable oidc
 echo "Configuring OIDC"
@@ -305,7 +305,10 @@ dptp_member_aliases='[
   "pmuller",
   "eberglin",
   "sgoeddel",
-  "jupierce"
+  "jupierce",
+  "bechen",
+  "jguzik",
+  "dgemoli"
  ]'
 dptp_ids="$(curl -Ss --fail -H "X-vault-token: ${VAULT_TOKEN}" "$VAULT_ADDR/v1/identity/entity/id?list=true" \
             |jq \

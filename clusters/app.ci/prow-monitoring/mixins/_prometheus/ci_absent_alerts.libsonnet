@@ -28,12 +28,12 @@
             expr: |||
               absent(up{job="%s"} == 1)
             ||| % name,
-            'for': '15m',
+            'for': '10m',
             labels: {
               severity: 'critical',
             },
             annotations: {
-              message: 'The service %s has been down for 15 minutes.' % name,
+              message: 'The service %s has been down for 10 minutes.' % name,
             },
           }
           for name in ['ghproxy']
