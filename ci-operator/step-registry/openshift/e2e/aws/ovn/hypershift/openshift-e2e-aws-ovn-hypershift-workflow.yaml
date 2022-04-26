@@ -1,0 +1,19 @@
+workflow:
+  as: openshift-e2e-aws-ovn-hypershift
+  steps:
+    pre:
+      - chain: ipi-conf-aws
+      - ref: ovn-conf
+      - chain: ipi-install
+      - chain: hypershift-install
+      - chain: hypershift-aws-create
+    post:
+      - chain: hypershift-dump
+      - chain: hypershift-aws-destroy
+      - chain: ipi-deprovision
+    test:
+      - chain: hypershift-conformance
+    env:
+      CONTROLPLANE_OPERATOR_IMAGE: "LATEST"
+  documentation: |-
+    The HyperShift conformance workflow executes the conformonce test suite with the OVNKubernetes network plugin in the HyperShift hosted cluster.
