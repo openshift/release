@@ -3,6 +3,10 @@ base_images:
     name: stackrox-test
     namespace: stackrox
     tag: latest
+  ubi:
+    name: ubi
+    namespace: ocp
+    tag: "8"
   ubi-minimal:
     name: ubi-minimal
     namespace: ocp
@@ -14,61 +18,24 @@ build_root:
     namespace: stackrox
     tag: latest
 images:
-- dockerfile_path: stackrox/.openshift-ci/build/Dockerfile.pre-build-cli
+- dockerfile_path: stackrox/.openshift-ci/build/Dockerfile.build-main-and-bundle
   from: stackrox-test
   inputs:
     bin:
       paths:
       - destination_dir: .
         source_path: /go/src/github.com/stackrox/stackrox
-  to: pre-build-cli
-- dockerfile_path: stackrox/.openshift-ci/build/Dockerfile.pre-build-go-binaries
-  from: stackrox-test
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/stackrox/stackrox
-  to: pre-build-go-binaries
-- dockerfile_path: stackrox/.openshift-ci/build/Dockerfile.pre-build-ui
-  from: stackrox-test
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/stackrox/stackrox
-  to: pre-build-ui
-- dockerfile_path: stackrox/.openshift-ci/build/Dockerfile.build-main
-  from: stackrox-test
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/stackrox/stackrox
-    pre-build-cli:
-      paths:
-      - destination_dir: pre-build-cli-output
-        source_path: /output
-    pre-build-go-binaries:
-      paths:
-      - destination_dir: pre-build-go-binaries-output
-        source_path: /output
-    pre-build-ui:
-      paths:
-      - destination_dir: pre-build-ui-output
-        source_path: /output
-  to: build-main
-- dockerfile_path: Dockerfile.main
+  to: main-bundle
+- build_args:
+  - name: ROX_IMAGE_FLAVOR
+  - value: development_build
+  dockerfile_path: Dockerfile
   from: ubi-minimal
   inputs:
-    bin:
+    main-bundle:
       paths:
       - destination_dir: .
-        source_path: /go/src/github.com/stackrox/stackrox/.openshift-ci/build/.
-    build-main:
-      paths:
-      - destination_dir: .
-        source_path: /output
+        source_path: /go/src/github.com/stackrox/stackrox/image/rhel/.
   to: main
 promotion:
   namespace: stackrox
