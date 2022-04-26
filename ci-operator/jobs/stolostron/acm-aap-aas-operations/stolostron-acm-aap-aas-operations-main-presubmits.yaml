@@ -5,22 +5,23 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    context: ci/prow/lint
+    cluster: build01
+    context: ci/prow/check-kubectl
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stolostron-acm-aap-aas-operations-main-lint
-    rerun_command: /test lint
+    name: pull-ci-stolostron-acm-aap-aas-operations-main-check-kubectl
+    rerun_command: /test check-kubectl
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=lint
+        - --target=check-kubectl
         command:
         - ci-operator
         image: ci-operator:latest
@@ -47,4 +48,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )lint,?($|\s.*)
+    trigger: (?m)^/test( | .* )check-kubectl,?($|\s.*)
