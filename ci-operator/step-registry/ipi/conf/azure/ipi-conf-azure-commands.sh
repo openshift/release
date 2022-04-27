@@ -23,6 +23,8 @@ elif [[ "${SIZE_VARIANT}" == "large" ]]; then
   master_type=Standard_D16s_v3
 elif [[ "${SIZE_VARIANT}" == "compact" ]]; then
   master_type=Standard_D8s_v3
+elif [[ "${SIZE_VARIANT}" == "ovn_control" ]]; then
+  master_type=Standard_L32s_v2
 fi
 
 cat >> "${CONFIG}" << EOF
