@@ -18,7 +18,7 @@ build_root:
     namespace: stackrox
     tag: latest
 images:
-- dockerfile_path: stackrox/.openshift-ci/build/Dockerfile.build-main-and-bundle
+- dockerfile_path: stackrox/.openshift-ci/build/Dockerfile.build-main-and-bundles
   from: stackrox-test
   inputs:
     bin:
@@ -55,6 +55,19 @@ images:
       - destination_dir: .
         source_path: /etc/pki/ca-trust/extracted/pem/.
   to: roxctl
+- build_args:
+  - name: ROX_IMAGE_FLAVOR
+  - value: development_build
+  dockerfile_path: Dockerfile
+  from: ubi
+  inputs:
+    main-bundle:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/stackrox/stackrox/image/.
+      - destination_dir: .
+        source_path: /go/src/github.com/stackrox/stackrox/image/postgres/.
+  to: central-db
 promotion:
   namespace: stackrox
   tag: latest
