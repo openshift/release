@@ -17,8 +17,8 @@ finished()
   retval=$?
 
   echo "Fetching kubeconfig, other credentials..."
-  scp "${SSHOPTS[@]}" "root@${IP}:/root/dev-scripts/ocp/ostest/auth/kubeconfig" "${SHARED_DIR}/"
-  scp "${SSHOPTS[@]}" "root@${IP}:/root/dev-scripts/ocp/ostest/auth/kubeadmin-password" "${SHARED_DIR}/"
+  scp "${SSHOPTS[@]}" "root@${IP}:/root/dev-scripts/ocp/*/auth/kubeconfig" "${SHARED_DIR}/"
+  scp "${SSHOPTS[@]}" "root@${IP}:/root/dev-scripts/ocp/*/auth/kubeadmin-password" "${SHARED_DIR}/"
 
   echo "Adding proxy-url in kubeconfig"
   sed -i "/- cluster/ a\    proxy-url: http://$IP:8213/" "${SHARED_DIR}"/kubeconfig
@@ -74,6 +74,9 @@ then
   scp "${SSHOPTS[@]}" "${SHARED_DIR}/dev-scripts-additional-config" "root@${IP}:dev-scripts-additional-config"
 fi
 
+[ -e "${SHARED_DIR}/bm.json" ] && scp "${SSHOPTS[@]}" "${SHARED_DIR}/bm.json" "root@${IP}:bm.json"
+
+
 timeout -s 9 175m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
 
 set -xeuo pipefail
@@ -124,9 +127,27 @@ then
   cat /root/dev-scripts-additional-config >> /root/dev-scripts/config_root.sh
 fi
 
-echo 'export KUBECONFIG=/root/dev-scripts/ocp/ostest/auth/kubeconfig' >> /root/.bashrc
+if [ -e /root/bm.json ] ; then
+    . /root/dev-scripts-additional-config
+
+    cp /root/bm.json /root/dev-scripts/bm.json
+
+    nmcli --fields UUID c show | grep -v UUID | xargs -t -n 1 nmcli con delete
+    nmcli con add ifname \${CLUSTER_NAME}bm type bridge con-name \${CLUSTER_NAME}bm bridge.stp off
+    nmcli con add type ethernet ifname eth2 master \${CLUSTER_NAME}bm con-name \${CLUSTER_NAME}bm-eth2
+    nmcli con reload
+    sleep 10
+
+    echo 'export KUBECONFIG=/root/dev-scripts/ocp/\$CLUSTER_NAME/auth/kubeconfig' >> /root/.bashrc
+else
+    echo 'export KUBECONFIG=/root/dev-scripts/ocp/ostest/auth/kubeconfig' >> /root/.bashrc
+fi
 
 timeout -s 9 105m make ${DEVSCRIPTS_TARGET}
+
+if [ -e /root/bm.json ] ; then
+    sudo firewall-cmd --add-port=8213/tcp --zone=libvirt
+fi
 EOF
 
 # Copy dev-scripts variables to be shared with the test step
