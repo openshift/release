@@ -49,6 +49,9 @@ if [[ -z "$IMAGE_TAG" ]]; then
         periodic)
             echo "INFO Building default image tag for a $JOB_TYPE job"
             IMAGE_TAG="${RELEASE_TAG_PREFIX}-${current_date}"
+
+            # Make the daily image also accessible through just the prefix
+            EXTRA_TAG="${RELEASE_TAG_PREFIX}"
             ;;
         *)
             echo "ERROR Cannot publish an image from a $JOB_TYPE job"
@@ -98,5 +101,13 @@ oc image mirror "$SOURCE_IMAGE_REF" "$DESTINATION_IMAGE_REF" --dry-run=$dry || {
     echo "ERROR Unable to mirror image"
     exit 1
 }
+
+if [[ $EXTRA_TAG != "" ]]; then
+    EXTRA_TAG_DESTINATION_IMAGE_REF="$REGISTRY_HOST/$REGISTRY_ORG/$IMAGE_REPO:$EXTRA_TAG"
+    oc image mirror "$DESTINATION_IMAGE_REF" "$EXTRA_TAG_DESTINATION_IMAGE_REF" --dry-run=$dry || {
+        echo "ERROR Unable to mirror image"
+        exit 1
+    }
+fi
 
 echo "INFO Mirroring complete."
