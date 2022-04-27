@@ -334,6 +334,34 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
+- as: e2e-kitchensink-ocp-410-continuous
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.10"
+  cron: 0 8,20 * * *
+  steps:
+    test:
+    - as: serverless-kitchensink-e2e
+      commands: make test-kitchensink-e2e
+      dependencies:
+      - env: KNATIVE_OPENSHIFT_INGRESS
+        name: knative-openshift-ingress
+      - env: KNATIVE_OPERATOR
+        name: knative-operator
+      - env: OPENSHIFT_KNATIVE_OPERATOR
+        name: openshift-knative-operator
+      from: serverless-operator-src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: openshift-knative
