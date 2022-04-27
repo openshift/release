@@ -24,6 +24,7 @@ sudo dnf install -y podman firewalld
 # Setup squid proxy for accessing cluster
 cat <<SQUID>\$HOME/squid.conf
 acl cluster dstdomain .metalkube.org
+acl cluster dstdomain .ocpci.eng.rdu2.redhat.com
 http_access allow cluster
 http_access deny all
 http_port 8213
@@ -36,9 +37,11 @@ sudo systemctl start firewalld
 sudo firewall-cmd --add-port=8213/tcp --permanent
 sudo firewall-cmd --reload
 
+sudo setenforce 0
 sudo podman run -d --rm \
      --net host \
      --volume \$HOME/squid.conf:/etc/squid/squid.conf \
+     --volume /etc/resolv.conf:/etc/resolv.conf \
      --name external-squid \
      --dns 127.0.0.1 \
      quay.io/sameersbn/squid:latest
@@ -47,9 +50,9 @@ EOF
 cat <<EOF> "${SHARED_DIR}/proxy-conf.sh"
 export HTTP_PROXY=http://${IP}:8213/
 export HTTPS_PROXY=http://${IP}:8213/
-export NO_PROXY="redhat.io,quay.io,redhat.com,openshift.org,openshift.com,svc,amazonaws.com,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,localhost,127.0.0.1"
+export NO_PROXY="redhat.io,quay.io,openshift.org,openshift.com,svc,amazonaws.com,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,localhost,127.0.0.1"
 
 export http_proxy=http://${IP}:8213/
 export https_proxy=http://${IP}:8213/
-export no_proxy="redhat.io,quay.io,redhat.com,openshift.org,openshift.com,svc,amazonaws.com,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,localhost,127.0.0.1"
+export no_proxy="redhat.io,quay.io,openshift.org,openshift.com,svc,amazonaws.com,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,localhost,127.0.0.1"
 EOF
