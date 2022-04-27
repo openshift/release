@@ -50,7 +50,7 @@ function wait_for_sriov_pods() {
     fi
 }
 
-oc_version=$(oc version | cut -d ' ' -f 3 | cut -d '.' -f1,2 | sed -n '2p')
+oc_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
 case "${oc_version}" in
     # Remove 4.11 once it's GA
     4.11)
@@ -108,7 +108,6 @@ spec:
 EOF
     )
     echo "Created \"$SNO_OPERATORGROUP\" OperatorGroup"
-    channel=$(oc version -o yaml | grep openshiftVersion | grep -o '[0-9]*[.][0-9]*' | head -1)
     SNO_SUBSCRIPTION=$(
         oc create -f - -o jsonpath='{.metadata.name}' <<EOF
 apiVersion: operators.coreos.com/v1alpha1
@@ -117,7 +116,7 @@ metadata:
   name: sriov-network-operator-subscription
   namespace: openshift-sriov-network-operator
 spec:
-  channel: "${channel}"
+  channel: "${oc_version}"
   name: sriov-network-operator
   source: redhat-operators
   sourceNamespace: openshift-marketplace
