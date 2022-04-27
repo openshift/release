@@ -102,7 +102,7 @@ oc image mirror "$SOURCE_IMAGE_REF" "$DESTINATION_IMAGE_REF" --dry-run=$dry || {
     exit 1
 }
 
-if [[ $EXTRA_TAG != "" ]]; then
+if [[ ${EXTRA_TAG:-} != "" ]]; then
     EXTRA_TAG_DESTINATION_IMAGE_REF="$REGISTRY_HOST/$REGISTRY_ORG/$IMAGE_REPO:$EXTRA_TAG"
     oc image mirror "$DESTINATION_IMAGE_REF" "$EXTRA_TAG_DESTINATION_IMAGE_REF" --dry-run=$dry || {
         echo "ERROR Unable to mirror image"
