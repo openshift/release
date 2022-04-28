@@ -37,23 +37,15 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/stackrox/stackrox/image/rhel/.
   to: main
-- dockerfile_literal: |
-    # A copy of stackrox/stackrox/image/roxctl.Dockerfile dockerfile_path
-    # do not support `FROM scratch`.
-    FROM scratch
-    COPY ./bin/roxctl-linux /roxctl
-    COPY ./tls-ca-bundle.pem /etc/ssl/certs/ca-certificates.crt
-    ENV ROX_ROXCTL_IN_MAIN_IMAGE="true"
-
-    USER 65534:65534
-    ENTRYPOINT [ "/roxctl" ]
+- dockerfile_path: roxctl.Dockerfile
   inputs:
     main-bundle:
       paths:
       - destination_dir: .
         source_path: /go/src/github.com/stackrox/stackrox/image/.
-      - destination_dir: .
-        source_path: /etc/pki/ca-trust/extracted/pem/.
+    ubi-minimal:
+      as:
+      - registry.access.redhat.com/ubi8-minimal:latest
   to: roxctl
 - build_args:
   - name: ROX_IMAGE_FLAVOR
