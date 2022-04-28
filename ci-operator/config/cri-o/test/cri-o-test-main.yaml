@@ -1,41 +1,53 @@
-binary_build_commands: ./cmd/setup.sh
-build_root:
-  image_stream_tag:
+base_images:
+  coreos-centos-stream8:
+    name: stream8
+    namespace: coreos
+    tag: "8"
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  openshift_release_golang-1.17:
     name: release
     namespace: openshift
     tag: golang-1.17
-promotion:
-  name: "4.9"
-  namespace: ocp
+build_root:
+  project_image:
+    dockerfile_path: Dockerfile.crio-test-agent
+images:
+- dockerfile_path: Dockerfile.crio-test-agent
+  from: coreos-centos-stream8
+  inputs:
+    openshift_release_golang-1.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
+  to: crio-test-agent
+- dockerfile_literal: |
+    FROM base
+    COPY . .
+  from: src
+  to: crio-test-agent-src
 releases:
   initial:
     integration:
-      name: "4.9"
+      name: "4.10"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.9"
+      name: "4.10"
       namespace: ocp
 resources:
   '*':
-    limits:
-      memory: 4Gi
     requests:
       cpu: 100m
       memory: 200Mi
+test_binary_build_commands: "echo \"asdf\" \n"
 tests:
-- as: integration
+- as: example
   steps:
-    cluster_profile: aws
-    test:
-    - as: integration
-      commands: make integration
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
+    cluster_profile: equinix-ocp-metal
+    workflow: crio-test-agent
 zz_generated_metadata:
   branch: main
   org: cri-o
