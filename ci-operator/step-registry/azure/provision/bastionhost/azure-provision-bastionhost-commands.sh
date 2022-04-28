@@ -34,16 +34,10 @@ function wait_public_dns() {
 
 workdir=`mktemp -d`
 
-bastion_ignition_file="${workdir}/bastion.ign"
 ssh_pub_keys_file="${CLUSTER_PROFILE_DIR}/ssh-publickey"
-reg_cert_file="/var/run/vault/mirror-registry/server_domain.crt"
-reg_key_file="/var/run/vault/mirror-registry/server_domain.pem"
-src_proxy_creds_file="/var/run/vault/proxy/proxy_creds"
-src_proxy_creds_encrypted_file="/var/run/vault/proxy/proxy_creds_encrypted_apr1"
-src_registry_creds_encrypted_file="/var/run/vault/mirror-registry/registry_creds_encrypted_htpasswd"
 
 # dump out from 'openshift-install coreos print-stream-json' on 4.10.0-rc.1
-vhd_uri=https://rhcos.blob.core.windows.net/imagebucket/rhcos-410.84.202201251210-0-azure.x86_64.vhd
+bastion_source_vhd_uri="${BASTION_VHD_URI}"
 bastion_name="${NAMESPACE}-${JOB_NAME_HASH}-bastion"
 
 if [ -z "${RESOURCE_GROUP}" ]; then
@@ -76,19 +70,79 @@ fi
 #####################################
 echo "Generate ignition config for bastion host."
 
+
 ## ----------------------------------------------------------------
-# PROXY
-# /srv/squid/etc/passwords
-# /srv/squid/etc/mime.conf
-# /srv/squid/etc/squid.conf
-# /srv/squid/log/
-# /srv/squid/cache
+## Generate ignition file for dynamic host
 ## ----------------------------------------------------------------
 
-proxy_password_file="${workdir}/proxy_password_file"
+bastion_ignition_file="${workdir}/bastion.ign"
+
+function patch_ignition_file()
+{
+  local base_ignition=$1
+  local patch_ignition=$2
+  t=$(mktemp)
+  # jq deepmerge 
+  # https://stackoverflow.com/questions/53661930/jq-recursively-merge-objects-and-concatenate-arrays
+  jq -s 'def deepmerge(a;b):
+  reduce b[] as $item (a;
+    reduce ($item | keys_unsorted[]) as $key (.;
+      $item[$key] as $val | ($val | type) as $type | .[$key] = if ($type == "object") then
+        deepmerge({}; [if .[$key] == null then {} else .[$key] end, $val])
+      elif ($type == "array") then
+        (.[$key] + $val | unique)
+      else
+        $val
+      end)
+    );
+  deepmerge({}; .)' "${base_ignition}" "${patch_ignition}" > "${t}"
+  mv "${t}" "${base_ignition}"
+  rm -f "${t}"
+}
+
+# base ignition content
+cat > "${bastion_ignition_file}" << EOF
+{
+  "ignition": {
+    "config": {},
+    "security": {
+      "tls": {}
+    },
+    "timeouts": {},
+    "version": "3.0.0"
+  },
+  "passwd": {
+    "users": [
+      {
+        "name": "core",
+        "sshAuthorizedKeys": []
+      }
+    ]
+  },
+  "storage": {
+    "files": [
+    ],
+    "directories": [
+    ]
+  },
+  "systemd": {
+    "units": [
+      {
+        "enabled": false,
+        "mask": true,
+        "name": "zincati.service"
+      }
+    ]
+  }
+}
+EOF
+
+
+## ----------------------------------------------------------------
+# PROXY
+## ----------------------------------------------------------------
 proxy_config_file="${workdir}/proxy_config_file"
 proxy_service_file="${workdir}/proxy_service_file"
-cat "${src_proxy_creds_encrypted_file}" > "${proxy_password_file}"
 
 ## PROXY CONFIG
 cat > "${proxy_config_file}" << EOF
@@ -131,107 +185,21 @@ RestartSec=30
 WantedBy=multi-user.target
 EOF
 
-## ----------------------------------------------------------------
-# MIRROR REGISTORY
-# /opt/registry/auth/htpasswd
-# /opt/registry/certs/domain.crt
-# /opt/registry/certs/domain.key
-# /opt/registry/data
-# 
-## ----------------------------------------------------------------
+PROXY_CREDENTIAL_ARP1=$(< /var/run/vault/proxy/proxy_creds_encrypted_apr1)
+PROXY_CREDENTIAL_CONTENT="$(echo -e ${PROXY_CREDENTIAL_ARP1} | base64 -w0)"
+PROXY_CONFIG_CONTENT=$(cat ${proxy_config_file} | base64 -w0)
+PROXY_SERVICE_CONTENT=$(sed ':a;N;$!ba;s/\n/\\n/g' ${proxy_service_file} | sed 's/\"/\\"/g')
 
-## REGISTRY PASSWORD
-registry_password_file="${workdir}/registry_password_file"
-registry_service_file="${workdir}/registry_service_file"
-cat "${src_registry_creds_encrypted_file}" > "${registry_password_file}"
-
-cat > "${registry_service_file}" << EOF
-[Unit]
-Description=OpenShift POC HTTP for PXE Config
-After=network.target syslog.target
-
-[Service]
-Type=simple
-TimeoutStartSec=5m
-ExecStartPre=-/usr/bin/podman rm "poc-registry"
-ExecStartPre=/usr/bin/chcon -Rt container_file_t /opt/registry
-
-ExecStart=/usr/bin/podman run   --name poc-registry -p 5000:5000 \
-                                --net host \
-                                -v /opt/registry/data:/var/lib/registry:z \
-                                -v /opt/registry/auth:/auth \
-                                -e "REGISTRY_AUTH=htpasswd" \
-                                -e "REGISTRY_AUTH_HTPASSWD_REALM=Registry Realm" \
-                                -e REGISTRY_AUTH_HTPASSWD_PATH=/auth/htpasswd \
-                                -v /opt/registry/certs:/certs:z \
-                                -e REGISTRY_HTTP_TLS_CERTIFICATE=/certs/domain.crt \
-                                -e REGISTRY_HTTP_TLS_KEY=/certs/domain.key \
-                                registry:2
-
-ExecReload=-/usr/bin/podman stop "poc-registry"
-ExecReload=-/usr/bin/podman rm "poc-registry"
-ExecStop=-/usr/bin/podman stop "poc-registry"
-Restart=always
-RestartSec=30
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-
-
-# ## ----------------------------------------------------------------
-# # DISABLE AUTO UPDATE
-# # /etc/zincati/config.d/90-disable-auto-updates.toml
-# ## ----------------------------------------------------------------
-# zincati_config="${workdir}/zincati_config"
-# cat > "${zincati_config}" << EOF
-# [updates]
-# enabled = false
-# EOF
-
-
-## ----------------------------------------------------------------
-# IGNITION
-## ----------------------------------------------------------------
-
-PROXY_PASSWORD_CONTENT=$(cat "${proxy_password_file}" | base64 -w0)
-PROXY_CONFIG_CONTENT=$(cat "${proxy_config_file}" | base64 -w0)
-
-REGISTRY_PASSWORD_CONTENT=$(cat "${registry_password_file}" | base64 -w0)
-REGISTRY_KEY_CONTENT=$(cat "${reg_key_file}" | base64 -w0)
-REGISTRY_CRT_CONTENT=$(cat "${reg_cert_file}" | base64 -w0)
-
-# adjust system unit content to ignition format
-#   replace [newline] with '\n', and replace '"' with '\"'
-#   https://stackoverflow.com/questions/1251999/how-can-i-replace-a-newline-n-using-sed
-PROXY_SERVICE_CONTENT=$(sed ':a;N;$!ba;s/\n/\\n/g' "${proxy_service_file}" | sed 's/\"/\\"/g')
-REGISTRY_SERVICE_CONTENT=$(sed ':a;N;$!ba;s/\n/\\n/g' "${registry_service_file}" | sed 's/\"/\\"/g')
-
-cat > "${bastion_ignition_file}" << EOF
+# proxy ignition
+proxy_ignition_patch=$(mktemp)
+cat > "${proxy_ignition_patch}" << EOF
 {
-  "ignition": {
-    "config": {},
-    "security": {
-      "tls": {}
-    },
-    "timeouts": {},
-    "version": "3.0.0"
-  },
-  "passwd": {
-    "users": [
-      {
-        "name": "core",
-        "sshAuthorizedKeys": []
-      }
-    ]
-  },
   "storage": {
     "files": [
       {
         "path": "/srv/squid/etc/passwords",
         "contents": {
-          "source": "data:text/plain;base64,${PROXY_PASSWORD_CONTENT}"
+          "source": "data:text/plain;base64,${PROXY_CREDENTIAL_CONTENT}"
         },
         "mode": 420
       },
@@ -248,27 +216,6 @@ cat > "${bastion_ignition_file}" << EOF
           "source": "data:text/plain;base64,"
         },
         "mode": 420
-      },
-      {
-        "path": "/opt/registry/auth/htpasswd",
-        "contents": {
-          "source": "data:text/plain;base64,${REGISTRY_PASSWORD_CONTENT}"
-        },
-        "mode": 420
-      },
-      {
-        "path": "/opt/registry/certs/domain.crt",
-        "contents": {
-          "source": "data:text/plain;base64,${REGISTRY_CRT_CONTENT}"
-        },
-        "mode": 420
-      },
-      {
-        "path": "/opt/registry/certs/domain.key",
-        "contents": {
-          "source": "data:text/plain;base64,${REGISTRY_KEY_CONTENT}"
-        },
-        "mode": 420
       }
     ],
     "directories": [
@@ -279,10 +226,6 @@ cat > "${bastion_ignition_file}" << EOF
       {
         "path": "/srv/squid/cache",
         "mode": 493
-      },
-      {
-        "path": "/opt/registry/data",
-        "mode": 493
       }
     ]
   },
@@ -292,21 +235,199 @@ cat > "${bastion_ignition_file}" << EOF
         "contents": "${PROXY_SERVICE_CONTENT}",
         "enabled": true,
         "name": "squid-proxy.service"
-      },
-      {
-        "contents": "${REGISTRY_SERVICE_CONTENT}",
-        "enabled": true,
-        "name": "poc-registry.service"
-      },
-      {
-        "enabled": false,
-        "mask": true,
-        "name": "zincati.service"
       }
     ]
   }
 }
 EOF
+
+# patch proxy setting to ignition
+patch_ignition_file "${bastion_ignition_file}" "${proxy_ignition_patch}"
+rm -f "${proxy_ignition_patch}"
+
+
+
+## ----------------------------------------------------------------
+# MIRROR REGISTORY
+## ----------------------------------------------------------------
+
+function gen_registry_service_file() {
+  local port="$1"
+  local output="$2"
+  cat > "${output}" << EOF
+[Unit]
+Description=OpenShift POC HTTP for PXE Config
+After=network.target syslog.target
+
+[Service]
+Type=simple
+TimeoutStartSec=5m
+ExecStartPre=-/usr/bin/podman rm "poc-registry-${port}"
+ExecStartPre=/usr/bin/chcon -Rt container_file_t /opt/registry-${port}
+
+
+ExecStart=/usr/bin/podman run   --name poc-registry-${port} \
+                                -p ${port}:${port} \
+                                --net host \
+                                -v /opt/registry-${port}/data:/var/lib/registry:z \
+                                -v /opt/registry-${port}/auth:/auth \
+                                -v /opt/registry-${port}/certs:/certs:z \
+                                -v /opt/registry-${port}/config.yaml:/etc/docker/registry/config.yml \
+                                registry:2
+
+ExecReload=-/usr/bin/podman stop "poc-registry-${port}"
+ExecReload=-/usr/bin/podman rm "poc-registry-${port}"
+ExecStop=-/usr/bin/podman stop "poc-registry-${port}"
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target
+EOF
+}
+
+function gen_registry_config_file() {
+  local port="$1"
+  local output="$2"
+  cat > "${output}" << EOF
+version: 0.1
+log:
+  fields:
+    service: registry
+http:
+  addr: :${port}
+  headers:
+    X-Content-Type-Options: [nosniff]
+  tls:
+    certificate: /certs/domain.crt
+    key: /certs/domain.key
+storage:
+  cache:
+    blobdescriptor: inmemory
+  filesystem:
+    rootdirectory: /opt/registry-${port}
+auth:
+  htpasswd:
+    realm: Registry Realm
+    path: /auth/htpasswd
+health:
+  storagedriver:
+    enabled: true
+    interval: 10s
+    threshold: 3
+EOF
+}
+
+REGISTRY_PASSWORD_CONTENT=$(cat "/var/run/vault/mirror-registry/registry_creds_encrypted_htpasswd" | base64 -w0)
+REGISTRY_CRT_CONTENT=$(cat "/var/run/vault/mirror-registry/server_domain.crt" | base64 -w0)
+REGISTRY_KEY_CONTENT=$(cat "/var/run/vault/mirror-registry/server_domain.pem" | base64 -w0)
+
+declare -a registry_ports=("5000" "6001" "6002")
+
+for port in "${registry_ports[@]}"; do
+  registry_service_file="${workdir}/registry_service_file_$port"
+  registry_config_file="${workdir}/registry_config_file_$port"
+
+  gen_registry_service_file $port "${registry_service_file}"
+  gen_registry_config_file $port "${registry_config_file}"
+done
+
+# special custom configurations for individual registry register
+patch_file=$(mktemp)
+
+# patch proxy for 6001 quay.io
+reg_quay_url=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.url')
+reg_quay_user=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.user')
+reg_quay_password=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.password')
+cat > "${patch_file}" << EOF
+proxy:
+  remoteurl: "${reg_quay_url}"
+  username: "${reg_quay_user}"
+  password: "${reg_quay_password}"
+EOF
+/tmp/yq m -x -i "${workdir}/registry_config_file_6001" "${patch_file}"
+
+# patch proxy for 6002 brew.registry.redhat.io
+reg_brew_url=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.url')
+reg_brew_user=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.user')
+reg_brew_password=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.password')
+cat > "${patch_file}" << EOF
+proxy:
+  remoteurl: "${reg_brew_url}"
+  username: "${reg_brew_user}"
+  password: "${reg_brew_password}"
+EOF
+/tmp/yq m -x -i "${workdir}/registry_config_file_6002" "${patch_file}"
+
+rm -f "${patch_file}"
+
+for port in "${registry_ports[@]}"; do
+  registry_service_file="${workdir}/registry_service_file_$port"
+  registry_config_file="${workdir}/registry_config_file_$port"
+
+  # adjust system unit content to ignition format
+  #   replace [newline] with '\n', and replace '"' with '\"'
+  #   https://stackoverflow.com/questions/1251999/how-can-i-replace-a-newline-n-using-sed
+  REGISTRY_SERVICE_CONTENT=$(sed ':a;N;$!ba;s/\n/\\n/g' "${registry_service_file}" | sed 's/\"/\\"/g')
+  REGISTRY_CONFIG_CONTENT=$(cat "${registry_config_file}" | base64 -w0)
+
+  registry_ignition_patch=$(mktemp)
+  cat > "${registry_ignition_patch}" << EOF
+{
+  "storage": {
+    "files": [
+      {
+        "path": "/opt/registry-${port}/auth/htpasswd",
+        "contents": {
+          "source": "data:text/plain;base64,${REGISTRY_PASSWORD_CONTENT}"
+        },
+        "mode": 420
+      },
+      {
+        "path": "/opt/registry-${port}/certs/domain.crt",
+        "contents": {
+          "source": "data:text/plain;base64,${REGISTRY_CRT_CONTENT}"
+        },
+        "mode": 420
+      },
+      {
+        "path": "/opt/registry-${port}/certs/domain.key",
+        "contents": {
+          "source": "data:text/plain;base64,${REGISTRY_KEY_CONTENT}"
+        },
+        "mode": 420
+      },
+      {
+        "path": "/opt/registry-${port}/config.yaml",
+        "contents": {
+          "source": "data:text/plain;base64,${REGISTRY_CONFIG_CONTENT}"
+        },
+        "mode": 420
+      }
+    ],
+    "directories": [
+      {
+        "path": "/opt/registry-${port}/data",
+        "mode": 493
+      }
+    ]
+  },
+  "systemd": {
+    "units": [
+      {
+        "contents": "${REGISTRY_SERVICE_CONTENT}",
+        "enabled": true,
+        "name": "poc-registry-${port}.service"
+      }
+    ]
+  }
+}
+EOF
+
+  # patch proxy setting to ignition
+  patch_ignition_file "${bastion_ignition_file}" "${registry_ignition_patch}"
+  rm -f "${registry_ignition_patch}"
+done
 
 # update ssh keys
 tmp_keys_json=`mktemp`
@@ -339,13 +460,18 @@ AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
 AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
 
 # log in with az
+if [[ "${CLUSTER_TYPE}" == "azuremag" ]]; then
+    az cloud set --name AzureUSGovernment
+else
+    az cloud set --name AzureCloud
+fi
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
 
 #####################################
 ##########Create Bastion#############
 #####################################
 
-echo "azure vhd uri: ${vhd_uri}"
+echo "azure vhd uri: ${bastion_source_vhd_uri}"
 
 vhd_data=${bastion_ignition_file}
 
@@ -358,7 +484,6 @@ account_key=$(az storage account keys list -g ${bastion_rg} --account-name ${sa_
 
 echo "Copy bastion vhd from public blob URI to the bastion Storage Account"
 storage_contnainer="${bastion_name}vhd"
-bastion_source_vhd_uri="${vhd_uri}"
 vhd_name=$(basename "${bastion_source_vhd_uri}")
 status="unknown"
 run_command "az storage container create --name ${storage_contnainer} --account-name ${sa_name}" &&
@@ -434,7 +559,7 @@ echo ${bastion_public_ip} > "${SHARED_DIR}/bastion_public_address"
 echo ${bastion_private_ip} > "${SHARED_DIR}/bastion_private_address"
 echo "core" > "${SHARED_DIR}/bastion_ssh_user"
 
-proxy_credential=$(cat "${src_proxy_creds_file}")
+proxy_credential=$(cat /var/run/vault/proxy/proxy_creds)
 proxy_public_url="http://${proxy_credential}@${bastion_public_ip}:3128"
 proxy_private_url="http://${proxy_credential}@${bastion_private_ip}:3128"
 echo "${proxy_public_url}" > "${SHARED_DIR}/proxy_public_url"
