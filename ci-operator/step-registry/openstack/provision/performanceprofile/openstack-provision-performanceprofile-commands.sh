@@ -87,7 +87,7 @@ spec:
     enabled: false
 EOL
 
-oc_version=$(oc version | cut -d ' ' -f 3 | cut -d '.' -f1,2 | sed -n '2p')
+oc_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
 case "${oc_version}" in
     # Remove 4.11 once it's GA
     4.11) dev_version=master ;;
