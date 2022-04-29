@@ -1,12 +1,16 @@
 base_images:
   base:
-    name: "4.9"
+    name: "4.10"
     namespace: ocp
     tag: base
   cli:
-    name: "4.9"
+    name: "4.10"
     namespace: ocp
     tag: cli
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
   openshift_knative-v1.1.0_knative-eventing-kafka-src:
     name: knative-v1.1.0
     namespace: openshift
@@ -94,7 +98,7 @@ releases:
   latest:
     release:
       channel: stable
-      version: "4.9"
+      version: "4.10"
 resources:
   '*':
     limits:
@@ -103,13 +107,23 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-azure-ocp-49-continuous
+- as: e2e-osd-410-continuous
   cron: 0 0 * * 0
   steps:
-    cluster_profile: azure4
+    cluster_profile: osd-ephemeral
+    env:
+      CLUSTER_DURATION: "10800"
+      CLUSTER_VERSION: "4.10"
+      COMPUTE_NODES: "4"
+    post:
+    - chain: gather
+    - ref: osd-delete-delete
+    pre:
+    - ref: ipi-install-rbac
+    - ref: osd-create-create
     test:
     - as: serverless-e2e
-      commands: make install-mesh test-e2e-with-kafka
+      commands: make test-e2e-with-kafka test-upstream-e2e-no-upgrade
       dependencies:
       - env: KNATIVE_OPENSHIFT_INGRESS
         name: knative-openshift-ingress
@@ -124,9 +138,8 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: openshift-e2e-azure
 zz_generated_metadata:
   branch: main
   org: openshift-knative
   repo: serverless-operator
-  variant: 4.9-azure
+  variant: 4.10-osd
