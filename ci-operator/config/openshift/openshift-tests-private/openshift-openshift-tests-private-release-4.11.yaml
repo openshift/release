@@ -7,10 +7,6 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  hypershift-operator:
-    name: "4.11"
-    namespace: ocp
-    tag: hypershift-operator
   ocp_builder_rhel-8-golang-1.17-openshift-4.11:
     name: builder
     namespace: ocp
@@ -128,22 +124,6 @@ tests:
           memory: 600Mi
       timeout: 1h0m0s
     workflow: ipi-gcp
-- as: extended-aws-ipi-hypershift
-  cron: 0 2 */3 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      TEST_SCENRAIOS: Hypershift
-    post:
-    - chain: hypershift-aws-destroy
-    - chain: cucushift-installer-rehearse-aws-ipi-deprovision
-    pre:
-    - chain: cucushift-installer-rehearse-aws-ipi-provision
-    - chain: hypershift-install
-    - chain: hypershift-aws-create
-    test:
-    - ref: openshift-extended-test
 zz_generated_metadata:
   branch: release-4.11
   org: openshift
