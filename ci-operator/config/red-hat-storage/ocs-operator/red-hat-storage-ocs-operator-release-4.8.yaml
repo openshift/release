@@ -58,8 +58,6 @@ images:
   to: ocs-must-gather
 operator:
   bundles:
-  - as: dev-master-dependencies
-    dockerfile_path: openshift-ci/Dockerfile.bundle.master
   - as: fixed-dependencies
     dockerfile_path: openshift-ci/Dockerfile.bundle
   substitutions:
@@ -70,7 +68,6 @@ promotion:
   - ocs-operator
   - operator-registry-base
   - ocs-registry
-  - ocs-registry-master
   name: ocs-4.8
   namespace: ocp
 releases:
@@ -103,8 +100,12 @@ tests:
   steps:
     cluster_profile: aws
     dependencies:
+      CATALOG_FULL_IMAGE_NAME: ocs-registry
+      MUST_GATHER_FULL_IMAGE_NAME: ocs-must-gather
       OO_INDEX: ci-index-fixed-dependencies
     env:
+      OCP_MUST_GATHER_DIR: ${ARTIFACT_DIR}/ocp-must-gather
+      OCS_MUST_GATHER_DIR: ${ARTIFACT_DIR}/ocs-must-gather
       OO_CHANNEL: alpha
       OO_INSTALL_NAMESPACE: openshift-storage
       OO_PACKAGE: ocs-operator
@@ -113,6 +114,12 @@ tests:
     - as: ocs-must-gather
       cli: latest
       commands: hack/dump-debug-info.sh
+      dependencies:
+      - env: MUST_GATHER_FULL_IMAGE_NAME
+        name: ocs-must-gather
+      env:
+      - name: OCP_MUST_GATHER_DIR
+      - name: OCS_MUST_GATHER_DIR
       from: src
       resources:
         requests:
@@ -123,38 +130,10 @@ tests:
       commands: |
         export GOFLAGS=''; make functest
       dependencies:
-      - env: OO_INDEX
-        name: ci-index
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: optional-operators-ci-aws
-- as: ocs-operator-bundle-master-e2e-aws
-  cron: 0 0 * * *
-  steps:
-    cluster_profile: aws
-    dependencies:
-      OO_INDEX: ci-index-dev-master-dependencies
-    env:
-      OO_CHANNEL: alpha
-      OO_INSTALL_NAMESPACE: openshift-storage
-      OO_PACKAGE: ocs-operator
-      OO_TARGET_NAMESPACES: '!install'
-    post:
-    - as: ocs-must-gather
-      cli: latest
-      commands: hack/dump-debug-info.sh
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    test:
-    - as: tests
-      commands: |
-        export GOFLAGS=''; make functest
-      dependencies:
+      - env: CATALOG_FULL_IMAGE_NAME
+        name: ocs-registry
+      - env: MUST_GATHER_FULL_IMAGE_NAME
+        name: ocs-must-gather
       - env: OO_INDEX
         name: ci-index
       from: src
