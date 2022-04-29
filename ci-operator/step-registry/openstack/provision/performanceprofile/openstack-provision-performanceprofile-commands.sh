@@ -88,7 +88,7 @@ spec:
 EOL
 
 oc_version=$(oc version -o json | jq -r '.openshiftVersion')
-if [[ "${oc_version}" == *"4.9"* && "${oc_version}" == *"4.10"* ]]; then
+if [[ "${oc_version}" == *"4.9"* || "${oc_version}" == *"4.10"* ]]; then
     PAO_NAMESPACE=$(
         oc create -f - -o jsonpath='{.metadata.name}' <<EOF
 apiVersion: v1
