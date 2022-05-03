@@ -64,8 +64,8 @@ else
 fi
 
 echo "Downloading current MachineSet for workers"
-WORKER_MACHINESET=$(oc get machineset -n openshift-machine-api | grep worker | awk '{print $1}')
-oc get machineset -n openshift-machine-api "${WORKER_MACHINESET}" -o json > "${SHARED_DIR}/original-worker-machineset.json"
+WORKER_MACHINESET=$(oc get machinesets.machine.openshift.io -n openshift-machine-api | grep worker | awk '{print $1}')
+oc get machinesets.machine.openshift.io -n openshift-machine-api "${WORKER_MACHINESET}" -o json > "${SHARED_DIR}/original-worker-machineset.json"
 
 if [[ "${OPENSTACK_SRIOV_NETWORK}" == *"hwoffload"* ]]; then
     PROFILE="\"profile\": {\"capabilities\": \"[switchdev]\"},"
@@ -91,12 +91,10 @@ cat <<EOF > "${SHARED_DIR}/sriov_patch.json"
                 "tags": [
                   "sriov"
                 ],
-                "vnicType": "direct",
                 ${PROFILE:-}
-                "portSecurity": false
+                "vnicType": "direct",
               }
-            ],
-            "trunk": false
+            ]
           }
         }
       }
@@ -104,15 +102,19 @@ cat <<EOF > "${SHARED_DIR}/sriov_patch.json"
   }
 }
 EOF
+
+cat ${SHARED_DIR}/original-worker-machineset.json
+cat ${SHARED_DIR}/sriov_patch.json
 echo "Merging the original worker MachineSet with the patched configuration for SR-IOV"
 jq -Ss '.[0] * .[1]' "${SHARED_DIR}/original-worker-machineset.json" "${SHARED_DIR}/sriov_patch.json" > "${SHARED_DIR}/sriov-worker-machineset.json"
 python -c 'import sys, yaml, json; yaml.dump(json.load(sys.stdin), sys.stdout, indent=2)' < "${SHARED_DIR}/sriov-worker-machineset.json" > "${SHARED_DIR}/sriov-worker-machineset.yaml"
+
 
 echo "Apply the new MachineSet for SR-IOV workers"
 oc apply -f "${SHARED_DIR}/sriov-worker-machineset.yaml"
 
 echo "Scaling up worker to 1"
-oc scale --replicas=1 machineset "${WORKER_MACHINESET}" -n openshift-machine-api
+oc scale --replicas=1 machinesets.machine.openshift.io "${WORKER_MACHINESET}" -n openshift-machine-api
 wait_for_worker_machines
 
 echo "Disable mastersSchedulable since we now have a dedicated worker node"
