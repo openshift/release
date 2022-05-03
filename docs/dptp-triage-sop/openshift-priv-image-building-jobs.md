@@ -5,7 +5,7 @@ As this alert is the result of an aggregate of job statuses from all of the repo
 
 ## Useful Links
 - [Recent executions on Deck Internal](https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/?job=*-images)
-- [Prometheus Success Rate Graph](https://prometheus-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/graph?g0.range_input=12h&g0.expr=(sum(rate(prowjob_state_transitions%7Bjob%3D%22prow-controller-manager%22%2Cjob_name%3D~%22.*-images%22%2Corg%3D%22openshift-priv%22%2Cstate%3D%22success%22%7D%5B12h%5D%29)%2Fsum(rate(prowjob_state_transitions%7Bjob%3D%22prow-controller-manager%22%2Cjob_name%3D~%22.*-images%22%2Corg%3D%22openshift-priv%22%2Cstate%3D~%22success%7Cfailure%7Caborted%22%7D%5B12h%5D)%29%29%0A%20%20%20%20%20%20%20%20&g0.tab=0)
+- [Prometheus Success Rate Graph](https://prometheus-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/graph?g0.range_input=12h&g0.expr=%28sum%28rate%28prowjob_state_transitions%7Bjob%3D%22prow-controller-manager%22%2Cjob_name%3D~%22.*-images%22%2Corg%3D%22openshift-priv%22%2Cstate%3D%22success%22%7D%5B12h%5D%29%29%2Fsum%28rate%28prowjob_state_transitions%7Bjob%3D%22prow-controller-manager%22%2Cjob_name%3D~%22.*-images%22%2Corg%3D%22openshift-priv%22%2Cstate%3D~%22success%7Cfailure%7Caborted%22%7D%5B12h%5D%29%29%29%0A%20%20%20%20%20%20%20%20&g0.tab=0)
 
 ## Corresponding public (`openshift` org) image-building job is also failing
 
@@ -13,4 +13,4 @@ As this alert is the result of an aggregate of job statuses from all of the repo
 It is important to check the corresponding public image building job on [deck](https://prow.ci.openshift.org/?job=*-images) for failures.
 
 ### Resolution
-If it is also failing: reach out to the owner(s) of the repo, explain the failure, and ask them to fix it.
+If it is also failing: reach out to the owner(s) of the repo, explain the failure, and ask them to fix it or disable the promotion.
