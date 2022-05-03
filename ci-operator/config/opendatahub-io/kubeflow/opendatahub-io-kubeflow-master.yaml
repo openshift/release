@@ -7,10 +7,10 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.15
+    tag: golang-1.17
 images:
 - context_dir: components
-  dockerfile_path: notebook-controller/Dockerfile.ci
+  dockerfile_path: notebook-controller/Dockerfile
   from: ubi_minimal
   inputs:
     root:
@@ -36,10 +36,48 @@ tests:
   commands: |
     unset GOFLAGS
     pushd components/notebook-controller
-    KUBEBUILDER_ASSETS="${PWD}/testbin/bin" make test
+    make test
   container:
     from: src
   run_if_changed: ^(components/common/.*|components/notebook-controller/.*)
+- as: promote-images
+  postsubmit: true
+  steps:
+    env:
+      KUBEFLOW_VERSION: "1.6"
+    test:
+    - as: promote-images
+      commands: |
+        # Use the commit SHA of the base branch to set the image tag
+        # https://github.com/kubernetes/test-infra/blob/master/prow/jobs.md#job-environment-variables
+        tag=${KUBEFLOW_VERSION}-${PULL_BASE_SHA}
+
+        # Create a mapping file with the kubeflow images
+        cat << EOF > images.txt
+        ${KF_NOTEBOOK_CONTROLLER_IMAGE} quay.io/opendatahub/kubeflow-notebook-controller:${tag}
+        EOF
+
+        # Mirror the kubeflow images
+        oc image mirror --keep-manifest-list --skip-multiple-scopes \
+          -a /etc/quay/config.json -f images.txt
+      credentials:
+      - mount_path: /etc/quay/config.json
+        name: quay-io-opendatahub-io
+        namespace: test-credentials
+      dependencies:
+      - env: KF_NOTEBOOK_CONTROLLER_IMAGE
+        name: kubeflow-notebook-controller
+      env:
+      - name: KUBEFLOW_VERSION
+      from_image:
+        name: "4.10"
+        namespace: ocp
+        tag: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 1h0m0s
 zz_generated_metadata:
   branch: master
   org: opendatahub-io
