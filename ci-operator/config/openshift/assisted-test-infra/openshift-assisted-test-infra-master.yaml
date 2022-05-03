@@ -33,7 +33,7 @@ images:
   to: assisted-test-infra
 - dockerfile_literal: |
     FROM dev-scripts
-    RUN ansible-galaxy collection install community.general && ansible-galaxy collection install community.vmware
+    RUN ansible-galaxy collection install community.general
     COPY . assisted-test-infra/
     RUN chgrp -R 0 assisted-test-infra && \
         chmod -R g=u assisted-test-infra
@@ -402,7 +402,33 @@ tests:
         KUBE_API=true
         ENABLE_KUBE_API=true
         ISO_IMAGE_TYPE=minimal-iso
-        STATIC_IPS=true
+        TEST_FUNC=test_kubeapi
+        MAKEFILE_TARGET="create_full_environment run test_kube_api_parallel"
+      PACKET_PLAN: m2.xlarge.x86
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-ha-kube-api-ipv4
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        KUBE_API=true
+        ENABLE_KUBE_API=true
+        IPv4=true
+        ISO_IMAGE_TYPE=minimal-iso
+        TEST_FUNC=test_kubeapi
+        MAKEFILE_TARGET="create_full_environment run test_kube_api_parallel"
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-ha-kube-api-ipv6
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        KUBE_API=true
+        ENABLE_KUBE_API=true
+        IPv6=true
+        ISO_IMAGE_TYPE=minimal-iso
         TEST_FUNC=test_kubeapi
         MAKEFILE_TARGET="create_full_environment run test_kube_api_parallel"
     workflow: assisted-baremetal

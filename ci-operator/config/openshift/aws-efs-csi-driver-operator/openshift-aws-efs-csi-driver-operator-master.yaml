@@ -11,10 +11,6 @@ base_images:
     name: "4.11"
     namespace: ocp
     tag: csi-livenessprobe
-  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.17-openshift-4.10
   ocp_builder_rhel-8-golang-1.17-openshift-4.11:
     name: builder
     namespace: ocp
@@ -22,7 +18,7 @@ base_images:
   operator-index:
     name: redhat-operator-index
     namespace: ci
-    tag: v4.8
+    tag: v4.10
   provisioner-operand:
     name: "4.11"
     namespace: ocp
@@ -42,9 +38,6 @@ images:
 - dockerfile_path: Dockerfile
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
     ocp_builder_rhel-8-golang-1.17-openshift-4.11:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
@@ -52,9 +45,9 @@ images:
 - dockerfile_path: Dockerfile.create_efs
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
+    ocp_builder_rhel-8-golang-1.17-openshift-4.11:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
   to: aws-efs-csi-operator-create-efs
 operator:
   bundles:
@@ -113,7 +106,7 @@ tests:
       OO_INDEX: ci-index-aws-efs-csi-driver-operator-bundle
     env:
       CLUSTERCSIDRIVER: efs.csi.aws.com
-      OO_CHANNEL: "4.9"
+      OO_CHANNEL: stable
       OO_INSTALL_NAMESPACE: openshift-cluster-csi-drivers
       OO_PACKAGE: aws-efs-csi-driver-operator
       OO_TARGET_NAMESPACES: '!all'
@@ -129,7 +122,7 @@ tests:
       OO_INDEX: ci-index-aws-efs-csi-driver-operator-bundle
     env:
       CLUSTERCSIDRIVER: efs.csi.aws.com
-      OO_CHANNEL: "4.9"
+      OO_CHANNEL: stable
       OO_INSTALL_NAMESPACE: openshift-cluster-csi-drivers
       OO_PACKAGE: aws-efs-csi-driver-operator
       OO_TARGET_NAMESPACES: '!all'
