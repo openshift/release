@@ -19,6 +19,7 @@ CLUSTER_MULTI_AZ=${CLUSTER_MULTI_AZ:-false}
 SSO_CLIENT_ID=$(read_profile_file "sso-client-id")
 SSO_CLIENT_SECRET=$(read_profile_file "sso-client-secret")
 OCM_TOKEN=$(read_profile_file "ocm-token")
+CLUSTER_TIMEOUT=${CLUSTER_TIMEOUT}
 
 AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
 OCM_CREATE_ARGS=""
@@ -115,6 +116,7 @@ echo '{ "expiration_timestamp": "'"${INIT_EXPIRATION_DATE}"'" }' | ocm patch "/a
 echo -n "${CLUSTER_ID}" > "${HOME}/cluster-id"
 
 echo "Waiting for cluster ready..."
+start_time=$(date +"%s")
 while true; do
   sleep 60
   CLUSTER_STATE=$(ocm get cluster "${CLUSTER_ID}" | jq -r '.status.state')
@@ -122,6 +124,10 @@ while true; do
   if [[ "${CLUSTER_STATE}" == "ready" ]]; then
     echo "Cluster is reported as ready"
     break
+  fi
+  if (( $(date +"%s") - $start_time >= $CLUSTER_TIMEOUT )); then
+    echo "error: Timed out while waiting for cluster to be ready"
+    exit 1
   fi
   if [[ "${CLUSTER_STATE}" != "installing" && "${CLUSTER_STATE}" != "pending" ]]; then
     ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/logs/install" > "${ARTIFACT_DIR}/.osd_install.log" || echo "error: Unable to pull installation log."
