@@ -46,44 +46,24 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-- as: promote-images
+- as: notebook-controller-image-mirror
   postsubmit: true
   steps:
+    dependencies:
+      SOURCE_IMAGE_REF: kubeflow-notebook-controller
     env:
-      KUBEFLOW_VERSION: "1.6"
-    test:
-    - as: promote-images
-      commands: |
-        # Use the commit SHA of the base branch to set the image tag
-        # https://github.com/kubernetes/test-infra/blob/master/prow/jobs.md#job-environment-variables
-        tag=${KUBEFLOW_VERSION}-${PULL_BASE_SHA}
-
-        # Create a mapping file with the kubeflow images
-        cat << EOF > images.txt
-        ${KF_NOTEBOOK_CONTROLLER_IMAGE} quay.io/opendatahub/kubeflow-notebook-controller:${tag}
-        EOF
-
-        # Mirror the kubeflow images
-        oc image mirror --keep-manifest-list --skip-multiple-scopes \
-          -a /etc/quay/config.json -f images.txt
-      credentials:
-      - mount_path: /etc/quay/config.json
-        name: quay-io-opendatahub-io
-        namespace: test-credentials
-      dependencies:
-      - env: KF_NOTEBOOK_CONTROLLER_IMAGE
-        name: kubeflow-notebook-controller
-      env:
-      - name: KUBEFLOW_VERSION
-      from_image:
-        name: "4.10"
-        namespace: ocp
-        tag: cli
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-      timeout: 1h0m0s
+      IMAGE_REPO: kubeflow-notebook-controller
+      RELEASE_VERSION: "1.6"
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-controller-image-mirror-latest
+  cron: 0 2 * * *
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: kubeflow-notebook-controller
+    env:
+      IMAGE_REPO: kubeflow-notebook-controller
+      IMAGE_TAG: latest
+    workflow: opendatahub-io-ci-image-mirror
 zz_generated_metadata:
   branch: master
   org: opendatahub-io
