@@ -1,0 +1,50 @@
+base_images:
+  base:
+    name: "4.10"
+    namespace: ocp
+    tag: base
+build_root:
+  project_image:
+    dockerfile_path: openshift/ci-operator/build-image/Dockerfile
+releases:
+  initial:
+    integration:
+      name: "4.10"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.10"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 1Gi
+    requests:
+      cpu: "500m"
+      memory: 500Mi
+tests:
+- as: br-p10-r3-ord-upstream-nightly-aws-ocp-410
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.10"
+  steps:
+    test:
+    - as: test
+      cli: latest
+      commands: TEST_CASE=tests/broker/kafka/p10-r3-ordered/ ./bin/run_upstream_nightly.sh
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+      timeout: 2h0m0s
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: main
+  org: openshift-knative
+  repo: eventing-hyperfoil-benchmark
+  variant: "410"
