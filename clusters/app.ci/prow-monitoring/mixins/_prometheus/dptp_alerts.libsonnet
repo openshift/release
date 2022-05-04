@@ -182,7 +182,7 @@
               severity: 'critical',
             },
             annotations: {
-              message: 'openshift-priv image-building jobs are failing at a high rate. Check on <https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/?job=*-images|deck-internal>. See <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/openshift-priv-image-building-jobs.md|SOP>).',
+              message: 'openshift-priv image-building jobs are failing at a high rate. Check on <https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/?job=*-images|deck-internal>. See <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/openshift-priv-image-building-jobs.md|SOP>.',
             },
           }
         ],
