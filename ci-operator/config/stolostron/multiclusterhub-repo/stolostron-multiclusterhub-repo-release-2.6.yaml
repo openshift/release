@@ -3,7 +3,7 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  builder-go1.17:
+  stolostron_builder_go1.17-linux:
     name: builder
     namespace: stolostron
     tag: go1.17-linux
@@ -14,17 +14,15 @@ build_root:
     namespace: stolostron
     tag: go1.17-linux
 images:
-- dockerfile_path: build/Dockerfile.prow
+- dockerfile_path: Dockerfile.prow
   from: base
   inputs:
-    builder-go1.17:
+    stolostron_builder_go1.17-linux:
       as:
       - registry.ci.openshift.org/stolostron/builder:go1.17-linux
-  to: multiclusterhub-operator
-- dockerfile_path: build/Dockerfile.test.prow
-  from: builder-go1.17
-  to: multiclusterhub-operator-tests
+  to: multiclusterhub-repo
 promotion:
+  disabled: true
   name: "2.6"
   namespace: stolostron
 resources:
@@ -35,10 +33,8 @@ resources:
 tests:
 - as: test-unit
   commands: |
-    export ocm_dir=$(mktemp -d -t ocm-XXXXX)
-    export HOME="$ocm_dir"
-    export SELF="make -f Makefile"
-    make -f Makefile test
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow unit-tests
   container:
     from: src
 - as: sonar-pre-submit
@@ -60,13 +56,32 @@ tests:
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
-- as: fast-forward
+- as: publish
   postsubmit: true
   steps:
+    dependencies:
+      SOURCE_IMAGE_REF: multiclusterhub-repo
     env:
-      DESTINATION_BRANCH: release-2.6
-    workflow: ocm-ci-fastforward
+      IMAGE_REPO: multiclusterhub-repo
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
+        export OSCI_PUBLISH_DELAY="0"
+        export SELF="make -f Makefile.prow"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: main
+  branch: release-2.6
   org: stolostron
-  repo: multiclusterhub-operator
+  repo: multiclusterhub-repo
