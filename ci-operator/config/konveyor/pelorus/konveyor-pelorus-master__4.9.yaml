@@ -68,9 +68,11 @@ tests:
         timeout 1m bash -c 'until curl -o mongo-persistent.yaml https://raw.githubusercontent.com/konveyor/mig-demo-apps/master/apps/todolist-mongo-go/mongo-persistent.yaml; do sleep 20; done'
         sed -i 's/your_org/mig-demo-apps/g' mongo-persistent.yaml
         timeout 10m bash -c 'until oc create -f mongo-persistent.yaml; do sleep 10; done'
+        timeout 10m bash -c 'until oc get svc todolist --namespace mongo-persistent; do sleep 10; done'
+        # TEST to ensure the todolist app commit and image sha are read by the exporters
         committime_route=`oc get route -n pelorus committime-generic -o=template='http://{{.spec.host | printf "%s\n"}}'`
-        timeout 5m bash -c 'until curl $committime_route 2>&1 | grep mongo; do sleep 10; done'
         deploytime_route=`oc get route -n pelorus deploytime-exporter -o=template='http://{{.spec.host | printf "%s\n"}}'`
+        timeout 5m bash -c 'until curl $committime_route 2>&1 | grep mongo; do sleep 10; done'
         timeout 2m bash -c 'until curl $deploytime_route 2>&1 | grep todolist; do sleep 10; done'
       from: src
       resources:
