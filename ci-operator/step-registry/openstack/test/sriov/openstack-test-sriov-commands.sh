@@ -85,15 +85,18 @@ if [[ "${OPENSTACK_SRIOV_NETWORK}" == *"mellanox"* ]]; then
     if [[ "${OPENSTACK_SRIOV_NETWORK}" == *"hwoffload"* ]]; then
         PCI_DEVICE="05"
     fi
-    cat <<EOF > "${SHARED_DIR}/additionalnetwork-sriov.yaml"
+    cat <<EOF > "${SHARED_DIR}/host-device.yaml"
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  annotations:
+    k8s.v1.cni.cncf.io/resourceName: openshift.io/${OPENSTACK_SRIOV_NETWORK}
+  name: ${OPENSTACK_SRIOV_NETWORK}
+  namespace: ${CNF_NAMESPACE}
 spec:
-  additionalNetworks:
-  - name: ${OPENSTACK_SRIOV_NETWORK}
-    namespace: ${CNF_NAMESPACE}
-    rawCNIConfig: '{ "cniVersion": "0.3.1", "name": "${OPENSTACK_SRIOV_NETWORK}", "type": "host-device","pciBusId": "0000:00:${PCI_DEVICE}.0", "ipam": {}}'
-    type: Raw
+  config: '{ "cniVersion": "0.3.1", "name": "${OPENSTACK_SRIOV_NETWORK}", "type": "host-device","pciBusId": "0000:00:${PCI_DEVICE}.0", "ipam": {}}'
 EOF
-    oc patch network.operator cluster --patch "$(cat "${SHARED_DIR}/additionalnetwork-sriov.yaml")" --type=merge
+    oc apply -f "${SHARED_DIR}/host-device.yaml"
     wait_for_network
     ANNOTATIONS="k8s.v1.cni.cncf.io/networks: ${OPENSTACK_SRIOV_NETWORK}"
 else

@@ -89,15 +89,18 @@ else
         exit 1
     fi
     
-    cat <<EOF > "${SHARED_DIR}/additionalnetwork-dpdk.yaml"
+    cat <<EOF > "${SHARED_DIR}/host-device.yaml"
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  annotations:
+    k8s.v1.cni.cncf.io/resourceName: openshift.io/${OPENSTACK_DPDK_NETWORK}
+  name: ${OPENSTACK_DPDK_NETWORK}
+  namespace: ${CNF_NAMESPACE}
 spec:
-  additionalNetworks:
-  - name: ${OPENSTACK_DPDK_NETWORK}
-    namespace: ${CNF_NAMESPACE}
-    rawCNIConfig: '{ "cniVersion": "0.3.1", "name": "${OPENSTACK_DPDK_NETWORK}", "type": "host-device","pciBusId": "0000:00:04.0", "ipam": {}}'
-    type: Raw
+  config: '{ "cniVersion": "0.3.1", "name": "${OPENSTACK_DPDK_NETWORK}", "type": "host-device","pciBusId": "0000:00:04.0", "ipam": {}}'
 EOF
-    oc patch network.operator cluster --patch "$(cat "${SHARED_DIR}/additionalnetwork-dpdk.yaml")" --type=merge
+    oc apply -f "${SHARED_DIR}/host-device.yaml"
     wait_for_network
     ANNOTATIONS="k8s.v1.cni.cncf.io/networks: ${OPENSTACK_DPDK_NETWORK}"
 fi
