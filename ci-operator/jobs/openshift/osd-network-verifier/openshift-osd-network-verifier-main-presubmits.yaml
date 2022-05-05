@@ -6,22 +6,20 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build04
-    context: ci/prow/build
+    context: ci/prow/images
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-osd-network-verifier-main-build
-    rerun_command: /test build
+    name: pull-ci-openshift-osd-network-verifier-main-images
+    rerun_command: /test images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=build
+        - --target=[images]
         command:
         - ci-operator
         image: ci-operator:latest
@@ -48,7 +46,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )build,?($|\s.*)
+    trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -57,8 +55,6 @@ presubmits:
     cluster: build04
     context: ci/prow/test
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
