@@ -37,11 +37,11 @@ images:
     src:
       paths:
       - destination_dir: validate-microshift
-        source_path: /go/src/github.com/redhat-et/microshift/validate-microshift/
+        source_path: /go/src/github.com/openshift/microshift/validate-microshift/
       - destination_dir: .
-        source_path: /go/src/github.com/redhat-et/microshift/packaging/systemd/microshift-containerized.service
+        source_path: /go/src/github.com/openshift/microshift/packaging/systemd/microshift-containerized.service
       - destination_dir: .
-        source_path: /go/src/github.com/redhat-et/microshift/packaging/crio.conf.d/microshift.conf
+        source_path: /go/src/github.com/openshift/microshift/packaging/crio.conf.d/microshift.conf
     test-bin:
       paths:
       - destination_dir: .
@@ -54,14 +54,14 @@ images:
         rpm-build glibc-static gcc selinux-policy-devel util-linux && \
         dnf clean all && \
         rm -rf /var/cache/dnf/*
-    WORKDIR /go/src/github.com/redhat-et/microshift
+    WORKDIR /go/src/github.com/openshift/microshift
     RUN make rpm
     FROM libvirt-installer
     WORKDIR /opt/microshift-rpms
     USER root
     RUN mkdir bin selinux
-    COPY --from=builder /go/src/github.com/redhat-et/microshift/packaging/rpm/_rpmbuild/RPMS/x86_64/microshift-* bin/
-    COPY --from=builder /go/src/github.com/redhat-et/microshift/packaging/rpm/_rpmbuild/RPMS/noarch/microshift-selinux-* selinux/
+    COPY --from=builder /go/src/github.com/openshift/microshift/packaging/rpm/_rpmbuild/RPMS/x86_64/microshift-* bin/
+    COPY --from=builder /go/src/github.com/openshift/microshift/packaging/rpm/_rpmbuild/RPMS/noarch/microshift-selinux-* selinux/
     COPY microshift.conf /tmp/microshift.conf
     COPY openshift-tests /usr/bin/openshift-tests
     COPY oc /usr/bin/oc
@@ -79,7 +79,7 @@ images:
       - src
       paths:
       - destination_dir: .
-        source_path: /go/src/github.com/redhat-et/microshift/packaging/crio.conf.d/microshift.conf
+        source_path: /go/src/github.com/openshift/microshift/packaging/crio.conf.d/microshift.conf
     test-bin:
       paths:
       - destination_dir: .
@@ -117,74 +117,74 @@ tests:
   run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
   steps:
     cluster_profile: gcp
-    workflow: redhat-et-microshift-e2e-rpm-install
+    workflow: openshift-microshift-e2e-rpm-install
 - as: e2e-openshift-conformance-sig-api-machinery
   optional: true
   run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
   steps:
     cluster_profile: gcp
-    workflow: redhat-et-microshift-e2e-openshift-conformance-sig-api-machinery
+    workflow: openshift-microshift-e2e-openshift-conformance-sig-api-machinery
 - as: e2e-openshift-conformance-sig-apps
   optional: true
   run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
   steps:
     cluster_profile: gcp
-    workflow: redhat-et-microshift-e2e-openshift-conformance-sig-apps
+    workflow: openshift-microshift-e2e-openshift-conformance-sig-apps
 - as: e2e-openshift-conformance-sig-arch
   optional: true
   run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
   steps:
     cluster_profile: gcp
-    workflow: redhat-et-microshift-e2e-openshift-conformance-sig-arch
+    workflow: openshift-microshift-e2e-openshift-conformance-sig-arch
 - as: e2e-openshift-conformance-sig-auth
   optional: true
   run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod)|Makefile
   steps:
     cluster_profile: gcp
-    workflow: redhat-et-microshift-e2e-openshift-conformance-sig-auth
+    workflow: openshift-microshift-e2e-openshift-conformance-sig-auth
 - as: e2e-openshift-conformance-sig-cli
   optional: true
   run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
   steps:
     cluster_profile: gcp
-    workflow: redhat-et-microshift-e2e-openshift-conformance-sig-cli
+    workflow: openshift-microshift-e2e-openshift-conformance-sig-cli
 - as: e2e-openshift-conformance-sig-instrumentation
   optional: true
   run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
   steps:
     cluster_profile: gcp
-    workflow: redhat-et-microshift-e2e-openshift-conformance-sig-instrumentation
+    workflow: openshift-microshift-e2e-openshift-conformance-sig-instrumentation
 - as: e2e-openshift-conformance-sig-network
   optional: true
   run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
   steps:
     cluster_profile: gcp
-    workflow: redhat-et-microshift-e2e-openshift-conformance-sig-network
+    workflow: openshift-microshift-e2e-openshift-conformance-sig-network
 - as: e2e-openshift-conformance-sig-node
   optional: true
   run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
   steps:
     cluster_profile: gcp
-    workflow: redhat-et-microshift-e2e-openshift-conformance-sig-node
+    workflow: openshift-microshift-e2e-openshift-conformance-sig-node
 - as: e2e-openshift-conformance-sig-scheduling
   optional: true
   run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
   steps:
     cluster_profile: gcp
-    workflow: redhat-et-microshift-e2e-openshift-conformance-sig-scheduling
+    workflow: openshift-microshift-e2e-openshift-conformance-sig-scheduling
 - as: e2e-openshift-conformance-sig-storage
   optional: true
   run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
   steps:
     cluster_profile: gcp
-    workflow: redhat-et-microshift-e2e-openshift-conformance-sig-storage
+    workflow: openshift-microshift-e2e-openshift-conformance-sig-storage
 - as: e2e-reboot
   optional: true
   run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
   steps:
     cluster_profile: gcp
-    workflow: redhat-et-microshift-e2e-reboot-tests
+    workflow: openshift-microshift-e2e-reboot-tests
 zz_generated_metadata:
   branch: main
-  org: redhat-et
+  org: openshift
   repo: microshift
