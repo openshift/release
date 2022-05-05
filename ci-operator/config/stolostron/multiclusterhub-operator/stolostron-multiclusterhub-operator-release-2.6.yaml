@@ -3,6 +3,10 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
+  builder-go1.17:
+    name: builder
+    namespace: stolostron
+    tag: go1.17-linux
   stolostron_builder_go1.17-linux:
     name: builder
     namespace: stolostron
@@ -14,30 +18,19 @@ build_root:
     namespace: stolostron
     tag: go1.17-linux
 images:
-- dockerfile_path: Dockerfile.prow
+- dockerfile_path: build/Dockerfile.prow
   from: base
   inputs:
     stolostron_builder_go1.17-linux:
       as:
       - registry.ci.openshift.org/stolostron/builder:go1.17-linux
-  to: discovery-operator
-- dockerfile_path: Dockerfile.test.prow
-  from: base
-  inputs:
-    stolostron_builder_go1.17-linux:
-      as:
-      - registry.ci.openshift.org/stolostron/builder:go1.17-linux
-  to: discovery-operator-tests
-- dockerfile_path: Dockerfile.testserver.prow
-  from: base
-  inputs:
-    stolostron_builder_go1.17-linux:
-      as:
-      - registry.ci.openshift.org/stolostron/builder:go1.17-linux
-  to: discovery-testserver
+  to: multiclusterhub-operator
+- dockerfile_path: build/Dockerfile.test.prow
+  from: builder-go1.17
+  to: multiclusterhub-operator-tests
 promotion:
   disabled: true
-  name: "2.0"
+  name: "2.6"
   namespace: stolostron
 resources:
   '*':
@@ -47,8 +40,10 @@ resources:
 tests:
 - as: test-unit
   commands: |
-    export SELF="make -f Makefile.prow"
-    make -f Makefile.prow unit-tests
+    export ocm_dir=$(mktemp -d -t ocm-XXXXX)
+    export HOME="$ocm_dir"
+    export SELF="make -f Makefile"
+    make -f Makefile test
   container:
     from: src
 - as: sonar-pre-submit
@@ -74,17 +69,15 @@ tests:
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: discovery-operator
+      SOURCE_IMAGE_REF: multiclusterhub-operator
     env:
-      IMAGE_REPO: discovery-operator
+      IMAGE_REPO: multiclusterhub-operator
       REGISTRY_ORG: stolostron
     test:
     - as: publish
       commands: |-
         export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
         export OSCI_PUBLISH_DELAY="0"
-        export OSCI_PIPELINE_PRODUCT_PREFIX=backplane
-        export OSCI_PIPELINE_REPO=backplane-pipeline
         export SELF="make -f Makefile.prow"
         make -f Makefile.prow osci/publish
       credentials:
@@ -101,45 +94,15 @@ tests:
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: discovery-operator-tests
+      SOURCE_IMAGE_REF: multiclusterhub-operator-tests
     env:
-      IMAGE_REPO: discovery-operator-tests
+      IMAGE_REPO: multiclusterhub-operator-tests
       REGISTRY_ORG: stolostron
     test:
     - as: publish
       commands: |-
-        export OSCI_COMPONENT_NAME="discovery-operator-tests"
+        export OSCI_COMPONENT_NAME="multiclusterhub-operator-tests"
         export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
-        export OSCI_PIPELINE_PRODUCT_PREFIX=backplane
-        export OSCI_PIPELINE_REPO=backplane-pipeline
-        export OSCI_PUBLISH_DELAY="0"
-        export SELF="make -f Makefile.prow"
-        make -f Makefile.prow osci/publish
-      credentials:
-      - mount_path: /etc/github
-        name: acm-cicd-github
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: ocm-ci-image-mirror
-- as: publish-testserver
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: discovery-testserver
-    env:
-      IMAGE_REPO: discovery-testserver
-      REGISTRY_ORG: stolostron
-    test:
-    - as: publish
-      commands: |-
-        export OSCI_COMPONENT_NAME="discovery-testserver"
-        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
-        export OSCI_PIPELINE_PRODUCT_PREFIX=backplane
-        export OSCI_PIPELINE_REPO=backplane-pipeline
         export OSCI_PUBLISH_DELAY="0"
         export SELF="make -f Makefile.prow"
         make -f Makefile.prow osci/publish
@@ -154,6 +117,6 @@ tests:
           memory: 200Mi
     workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: backplane-2.0
+  branch: release-2.6
   org: stolostron
-  repo: discovery
+  repo: multiclusterhub-operator

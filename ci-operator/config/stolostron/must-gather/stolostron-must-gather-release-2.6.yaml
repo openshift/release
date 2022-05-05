@@ -21,6 +21,7 @@ images:
       - registry.ci.openshift.org/ocp/4.9:cli
   to: must-gather
 promotion:
+  disabled: true
   name: "2.6"
   namespace: stolostron
 resources:
@@ -37,17 +38,36 @@ tests:
       IMAGE_REPO: must-gather
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
-- as: backplane-fast-forward
-  postsubmit: true
-  steps:
-    env:
-      DESTINATION_BRANCH: release-2.6
-    workflow: ocm-ci-fastforward
 - as: test-unit
   commands: make -f Makefile.prow unit-test
   container:
     from: src
+- as: publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: must-gather
+    env:
+      IMAGE_REPO: must-gather
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
+        export SELF="make -f Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: main
+  branch: release-2.6
   org: stolostron
   repo: must-gather
