@@ -1156,56 +1156,6 @@ periodics:
   cron: '@hourly'
   decorate: true
   labels:
-    ci.openshift.io/area: opendatahub-io
-    ci.openshift.io/role: image-mirroring
-  name: periodic-image-mirroring-opendatahub-io-kubeflow
-  spec:
-    automountServiceAccountToken: true
-    containers:
-    - args:
-      - -c
-      - |
-        set -o errexit
-        cp ~/.docker/config.json /tmp/config.json
-        failures=0
-        for mapping in /etc/imagemirror/mapping_kubeflow*; do
-          echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
-          if ! oc image mirror --keep-manifest-list -a /tmp/config.json -f="$mapping" --skip-multiple-scopes; then
-            echo "ERROR: Failed to mirror images from $mapping"
-            failures=$((failures+1))
-          fi
-        done
-        exit $failures
-      command:
-      - /bin/bash
-      env:
-      - name: HOME
-        value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.9:cli
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /home/mirror/.docker/config.json
-        name: push
-        readOnly: true
-        subPath: config.json
-      - mountPath: /etc/imagemirror
-        name: config
-    volumes:
-    - name: push
-      secret:
-        secretName: registry-push-credentials-quay-io-opendatahub-io
-    - configMap:
-        name: image-mirror-mappings
-      name: config
-- agent: kubernetes
-  cluster: app.ci
-  cron: '@hourly'
-  decorate: true
-  labels:
     ci.openshift.io/area: konveyor
     ci.openshift.io/role: image-mirroring
   name: periodic-image-mirroring-konveyor
