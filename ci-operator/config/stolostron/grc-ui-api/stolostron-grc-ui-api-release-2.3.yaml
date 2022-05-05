@@ -46,6 +46,18 @@ tests:
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
+- as: sonar-post-submit
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow sonar/js/jest-init
+    make -f Makefile.prow unit-tests
+    make -f Makefile.prow sonar/js/prow
+  container:
+    from: src
+  postsubmit: true
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
 - as: latest-image-mirror
   postsubmit: true
   steps:
