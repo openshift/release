@@ -15,6 +15,11 @@ AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
 AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
 
 # log in with az
+if [[ "${CLUSTER_TYPE}" == "azuremag" ]]; then
+    az cloud set --name AzureUSGovernment
+else
+    az cloud set --name AzureCloud
+fi
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
 
 remove_resources_by_cli="${SHARED_DIR}/remove_resources_by_cli.sh"
