@@ -346,4 +346,4 @@ esac
 
 # Looks like because of the upgrade SNO cluster unavailable after the upgrade immediately
 # that's why we are waiting 10m
-sleep 5
+sleep 10m
