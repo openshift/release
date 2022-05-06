@@ -17,3 +17,10 @@ for server in $(openstack server list -c Name -f value | grep "$CLUSTER_NAME" | 
 
 	openstack console log show $server          &> "${ARTIFACT_DIR}/nodes/console_${server}.log"
 done
+
+openstack port list | grep "$CLUSTER_NAME" > "${ARTIFACT_DIR}/openstack_ports.log"
+
+for port in $(openstack port list -c Name -f value | grep "$CLUSTER_NAME" | sort); do
+	echo -e "\n$ openstack port show $port" >> "${ARTIFACT_DIR}/openstack_ports.log"
+	openstack port show $port               >> "${ARTIFACT_DIR}/openstack_ports.log"
+done
