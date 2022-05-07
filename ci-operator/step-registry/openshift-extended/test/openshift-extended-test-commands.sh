@@ -175,7 +175,17 @@ function run {
 
     handle_filters "~Flaky&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;${TEST_FILTERS}"
     echo "------------------the case selected------------------"
-    cat ./case_selected|wc -l
+    selected_case_num=$(cat ./case_selected|wc -l)
+    if [ "W${selected_case_num}W" == "W0W" ]; then
+        echo "No Case Selected"
+        if [ "W${FORCE_SUCCESS_EXIT}W" == "WnoW" ]; then
+            echo "do not force success exit"
+            exit 1
+        fi
+        echo "force success exit"
+        exit 0
+    fi
+    echo ${selected_case_num}
     cat ./case_selected
     echo "-----------------------------------------------------"
 
@@ -269,10 +279,13 @@ function handle_and_filter {
     action="$(echo $1 | grep -Eo '^[~]?')"
     value="$(echo $1 | grep -Eo '[a-zA-Z0-9]{1,}')"
 
+    ret=0
     if [ "W${action}W" == "WW" ]; then
-        cat ./case_selected | grep -E "${value}" > ./case_selected_and
+        cat ./case_selected | grep -E "${value}" > ./case_selected_and || ret=$?
+        check_case_selected "${ret}"
     else
-        cat ./case_selected | grep -v -E "${value}" > ./case_selected_and
+        cat ./case_selected | grep -v -E "${value}" > ./case_selected_and || ret=$?
+        check_case_selected "${ret}"
     fi
     if [[ -e ./case_selected_and ]]; then
         cp -fr ./case_selected_and ./case_selected && rm -fr ./case_selected_and
@@ -283,10 +296,13 @@ function handle_or_filter {
     action="$(echo $1 | grep -Eo '^[~]?')"
     value="$(echo $1 | grep -Eo '[a-zA-Z0-9]{1,}')"
 
+    ret=0
     if [ "W${action}W" == "WW" ]; then
-        cat ./case_selected | grep -E "${value}" >> ./case_selected_or
+        cat ./case_selected | grep -E "${value}" >> ./case_selected_or || ret=$?
+        check_case_selected "${ret}"
     else
-        cat ./case_selected | grep -v -E "${value}" >> ./case_selected_or
+        cat ./case_selected | grep -v -E "${value}" >> ./case_selected_or || ret=$?
+        check_case_selected "${ret}"
     fi
 }
 function handle_result {
@@ -317,5 +333,13 @@ function handle_result {
     fi
     cp -fr import-*.xml "${ARTIFACT_DIR}/junit/"
     rm -fr ${newresultfile}
+}
+function check_case_selected {
+    found_ok=$1
+    if [ "W${found_ok}W" == "W0W" ]; then
+        echo "find case"
+    else
+        echo "do not find case"
+    fi
 }
 run
