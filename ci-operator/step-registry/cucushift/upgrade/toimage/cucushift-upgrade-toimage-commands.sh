@@ -53,16 +53,53 @@ function admin_ack() {
     fi
 }
 
+# Set cv.spec.channel
+function set_channel() {
+    # with oc 4.9 and above, oc adm upgrade channel <channel> works for channel change
+    # with oc 4.8 and below, oc patch clusterversion version --type json -p '[{"op": "add", "path": "/spec/channel", "value": "<channel>"}]' works for channel change
+    if [[ $# -ne 1 ]]; then
+        echo -e "Error on the number of the positional parameters, expected 1, but got $#\n" && return 0
+    fi
+    local oc_version oc_x_version oc_y_version cmd
+    oc_version="$(oc version | grep -i client | sed 's/.*: //')"
+    oc_x_version="$(echo "${oc_version}" | cut -f1 -d.)"
+    oc_y_version="$(echo "${oc_version}" | cut -f2 -d.)"
+    cmd="oc adm upgrade channel ${1}"
+    if (( oc_x_version == 4 && oc_y_version < 9 )); then
+        cmd="oc patch clusterversion version --type json -p '[{\"op\": \"add\", \"path\": \"/spec/channel\", \"value\": \"${1}\"}]'"
+    fi
+    if ! eval "${cmd}"; then
+        echo >&2 "Changing upgrade channel failed"  && return 0
+    else
+        echo "Upgrade channel is changed" && return 0
+    fi
+}
+
 # Upgrade the cluster to target release
 function upgrade() {
-    if [[ "${FORCE_UPDATE}" == "false" ]]; then
-        oc adm upgrade --to-image="${target}" --allow-explicit-upgrade
-        echo "Upgrading cluster to ${target} gets started..."
-    else       
-        oc adm upgrade --to-image="${target}" --allow-explicit-upgrade --force
-        echo "Force upgrading cluster to ${target} gets started..."       
+    # At current stage, keep using production cincinnati and change the channel to candidate 
+    echo "Switching upgrade channel"
+    local channel="candidate-${target_major_minor_version}"
+    set_channel "${channel}"
+    
+    echo "Get available updates"
+    if avail_updates=$(oc get clusterversion/version -ojson | jq -r .status.availableUpdates[].version) && [[ -n "${avail_updates}" ]]; then
+        if [[ ${avail_updates} == *"${target_version}"* ]]; then
+            echo "${target_version} is one of recommended updates, upgrade cluster using oc adm upgrade --to"
+            oc adm upgrade --to "${target_version}" "${force}"
+        fi
     fi
-    return 0
+
+    echo "Get conditional updates"
+    if cond_updates=$(oc get clusterversion/version -ojson | jq -r .status.conditionalUpdates[].version) && [[ -n "${cond_updates}" ]]; then
+        if [[ ${cond_updates} == *"${target_version}"* ]]; then
+            echo "${target_version} is one of conditional updates, upgrade cluster using oc adm upgrade --to --allow-not-recommended"
+            oc adm upgrade --to "${target_version}" --allow-not-recommended "${force}"
+        fi
+    fi 
+    
+    echo "Upgrade cluster using oc adm upgrade --to-image"
+    oc adm upgrade --to-image="${target}" --allow-explicit-upgrade "${force}"
 }
 
 # Monitor the upgrade status
@@ -130,12 +167,13 @@ echo -e "Source release minor version is: ${source_minor_version}"
 
 target_version="$(oc adm release info "${target}" --output=json | jq -r '.metadata.version')"
 target_minor_version="$(echo "${target_version}" | cut -f2 -d.)"
+target_major_minor_version="$(echo "${target_version}" | cut -f1,2 -d.)"
 echo -e "Target release version is: ${target_version}\nTarget minor version is: ${target_minor_version}"
 
-FORCE_UPDATE=false
+force=""
 if ! check_signed; then
     echo "You're updating to an unsigned images, you must override the verification using --force flag"
-    FORCE_UPDATE=true
+    force="--force"
 else
     admin_ack
 fi
