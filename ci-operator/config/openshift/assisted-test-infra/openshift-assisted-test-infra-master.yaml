@@ -59,6 +59,10 @@ releases:
       include_built_images: true
       name: "4.9"
       namespace: ocp
+  ocp-4-11:
+    integration:
+      name: "4.11"
+      namespace: ocp
 resources:
   '*':
     requests:
@@ -507,6 +511,15 @@ tests:
 - as: e2e-metal-single-node-live-iso
   steps:
     cluster_profile: packet-sno
+    workflow: baremetalds-sno
+- as: e2e-metal-single-node-with-worker-live-iso
+  run_if_changed: .*bootstrap_in_place.*
+  steps:
+    cluster_profile: packet-sno
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:ocp-4-11
+    env:
+      TEST_FUNC: test_bip_add_worker
     workflow: baremetalds-sno
 - as: e2e-vsphere-assisted
   optional: true
