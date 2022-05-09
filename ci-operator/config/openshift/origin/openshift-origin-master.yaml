@@ -7,6 +7,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.46.0
   ocp_builder_rhel-8-golang-1.15-openshift-4.8:
     name: builder
     namespace: ocp
@@ -322,6 +326,15 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-cgroupsv2
+- as: lint
+  commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    golangci-lint run -v
+  container:
+    clone: true
+    from: golangci-lint
 zz_generated_metadata:
   branch: master
   org: openshift
