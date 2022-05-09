@@ -14,4 +14,5 @@ pushd /tmp
 git clone https://github.com/cloud-bulldozer/e2e-benchmarking
 pushd e2e-benchmarking/workloads/kube-burner
 export WORKLOAD=cluster-density
+pip install jq
 ./run.sh

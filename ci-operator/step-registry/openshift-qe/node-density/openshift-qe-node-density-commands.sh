@@ -16,4 +16,5 @@ pushd e2e-benchmarking/workloads/kube-burner
 export WORKLOAD=node-density
 export NODE_COUNT=2
 export PODS_PER_NODE=100
+pip install jq
 ./run.sh
