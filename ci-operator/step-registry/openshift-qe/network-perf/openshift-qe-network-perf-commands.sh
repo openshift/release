@@ -13,4 +13,5 @@ source ./venv_qe/bin/activate
 
 git clone https://github.com/cloud-bulldozer/e2e-benchmarking
 pushd e2e-benchmarking/workloads/network-perf
+pip install jq
 ./run.sh
