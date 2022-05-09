@@ -61,6 +61,8 @@ images:
         source_path: /go/src/github.com/stackrox/stackrox/image/postgres/.
   to: central-db
 promotion:
+  excluded_images:
+  - main-bundle
   namespace: stackrox
   tag: latest
 releases:
@@ -78,11 +80,18 @@ tests:
   steps:
     test:
     - as: job
-      commands: .openshift-ci-migration/migrate.sh push-images
+      commands: .openshift-ci-migration/migrate.sh push-images STACKROX_BRANDING
       credentials:
       - mount_path: /tmp/secret/stackrox-stackrox-push
         name: stackrox-stackrox-push
         namespace: test-credentials
+      dependencies:
+      - env: MAIN_IMAGE
+        name: main
+      - env: ROXCTL_IMAGE
+        name: roxctl
+      - env: CENTRAL_DB_IMAGE
+        name: central-db
       from: src
       resources:
         requests:
@@ -187,6 +196,7 @@ tests:
           cpu: 2000m
           memory: 4000Mi
 - as: gke-qa-e2e-tests
+  optional: true
   steps:
     test:
     - as: job
@@ -229,6 +239,193 @@ tests:
           cpu: 2000m
           memory: 4000Mi
 - as: gke-ui-e2e-tests
+  steps:
+    test:
+    - as: job
+      commands: .openshift-ci-migration/migrate.sh gke-ui-e2e-tests
+      credentials:
+      - mount_path: /tmp/secret/stackrox-stackrox-e2e-tests
+        name: stackrox-stackrox-e2e-tests
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+- as: merge-push-images
+  postsubmit: true
+  steps:
+    test:
+    - as: job
+      commands: .openshift-ci-migration/migrate.sh push-images STACKROX_BRANDING
+      credentials:
+      - mount_path: /tmp/secret/stackrox-stackrox-push
+        name: stackrox-stackrox-push
+        namespace: test-credentials
+      dependencies:
+      - env: MAIN_IMAGE
+        name: main
+      - env: ROXCTL_IMAGE
+        name: roxctl
+      - env: CENTRAL_DB_IMAGE
+        name: central-db
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+- as: merge-style-checks
+  postsubmit: true
+  steps:
+    test:
+    - as: job
+      commands: .openshift-ci-migration/migrate.sh style-checks
+      credentials:
+      - mount_path: /tmp/secret/stackrox-stackrox-initial
+        name: stackrox-stackrox-initial
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+- as: merge-go-postgres-tests
+  postsubmit: true
+  steps:
+    test:
+    - as: job
+      commands: .openshift-ci-migration/migrate.sh go-postgres-tests
+      credentials:
+      - mount_path: /tmp/secret/stackrox-stackrox-initial
+        name: stackrox-stackrox-initial
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+- as: merge-go-unit-tests
+  postsubmit: true
+  steps:
+    test:
+    - as: job
+      commands: .openshift-ci-migration/migrate.sh go-unit-tests
+      credentials:
+      - mount_path: /tmp/secret/stackrox-stackrox-initial
+        name: stackrox-stackrox-initial
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+- as: merge-go-unit-tests-release
+  postsubmit: true
+  steps:
+    test:
+    - as: job
+      commands: .openshift-ci-migration/migrate.sh go-unit-tests-release
+      credentials:
+      - mount_path: /tmp/secret/stackrox-stackrox-initial
+        name: stackrox-stackrox-initial
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+- as: merge-integration-unit-tests
+  postsubmit: true
+  steps:
+    test:
+    - as: job
+      commands: .openshift-ci-migration/migrate.sh integration-unit-tests
+      credentials:
+      - mount_path: /tmp/secret/stackrox-stackrox-initial
+        name: stackrox-stackrox-initial
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+- as: merge-shell-unit-tests
+  postsubmit: true
+  steps:
+    test:
+    - as: job
+      commands: .openshift-ci-migration/migrate.sh shell-unit-tests
+      credentials:
+      - mount_path: /tmp/secret/stackrox-stackrox-initial
+        name: stackrox-stackrox-initial
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+- as: merge-ui-unit-tests
+  postsubmit: true
+  steps:
+    test:
+    - as: job
+      commands: .openshift-ci-migration/migrate.sh ui-unit-tests
+      credentials:
+      - mount_path: /tmp/secret/stackrox-stackrox-initial
+        name: stackrox-stackrox-initial
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+- as: merge-gke-qa-e2e-tests
+  postsubmit: true
+  steps:
+    test:
+    - as: job
+      commands: .openshift-ci-migration/migrate.sh gke-qa-e2e-tests
+      credentials:
+      - mount_path: /tmp/secret/stackrox-stackrox-e2e-tests
+        name: stackrox-stackrox-e2e-tests
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+- as: merge-gke-upgrade-tests
+  postsubmit: true
+  steps:
+    test:
+    - as: job
+      commands: .openshift-ci-migration/migrate.sh gke-upgrade-tests
+      credentials:
+      - mount_path: /tmp/secret/stackrox-stackrox-e2e-tests
+        name: stackrox-stackrox-e2e-tests
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+- as: merge-gke-go-e2e-tests
+  postsubmit: true
+  steps:
+    test:
+    - as: job
+      commands: .openshift-ci-migration/migrate.sh gke-go-e2e-tests
+      credentials:
+      - mount_path: /tmp/secret/stackrox-stackrox-e2e-tests
+        name: stackrox-stackrox-e2e-tests
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+- as: merge-gke-ui-e2e-tests
+  postsubmit: true
   steps:
     test:
     - as: job

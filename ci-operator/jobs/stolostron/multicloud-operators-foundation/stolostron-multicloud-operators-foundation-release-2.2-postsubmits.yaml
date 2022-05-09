@@ -4,7 +4,7 @@ postsubmits:
     always_run: true
     branches:
     - ^release-2\.2$
-    cluster: build04
+    cluster: build02
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -55,53 +55,42 @@ postsubmits:
         secret:
           secretName: result-aggregator
   - agent: kubernetes
-    always_run: true
     branches:
     - ^release-2\.2$
-    cluster: build04
+    cluster: build02
     decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
     name: branch-ci-stolostron-multicloud-operators-foundation-release-2.2-publish
     spec:
       containers:
       - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=publish
+        - -f
+        - /opt/build-harness/Makefile.prow
+        - osci/publish
         command:
-        - ci-operator
-        image: ci-operator:latest
+        - make
+        env:
+        - name: JQ
+          value: /usr/local/bin/jq
+        - name: OSCI_COMPONENT_NAME
+          value: multicloud-manager
+        - name: OSCI_COMPONENT_VERSION
+          value: 2.2.0
+        - name: OSCI_IMAGE_REMOTE_REPO_SRC
+          value: registry.ci.openshift.org/stolostron
+        - name: SELF
+          value: make -f /opt/build-harness/Makefile.prow
+        image: registry.ci.openshift.org/stolostron/builder:go1.17-linux
         imagePullPolicy: Always
         name: ""
         resources:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
+        - mountPath: /etc/github
+          name: acm-cicd-github
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: ci-pull-credentials
+      - name: acm-cicd-github
         secret:
-          secretName: ci-pull-credentials
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
+          secretName: acm-cicd-github

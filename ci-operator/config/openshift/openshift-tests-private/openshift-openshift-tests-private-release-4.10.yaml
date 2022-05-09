@@ -7,6 +7,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  hypershift-operator:
+    name: "4.10"
+    namespace: ocp
+    tag: hypershift-operator
   ocp_builder_rhel-8-golang-1.17-openshift-4.10:
     name: builder
     namespace: ocp
@@ -132,6 +136,21 @@ tests:
     - chain: ipi-aws-post
     pre:
     - chain: ipi-aws-pre
+    test:
+    - ref: openshift-extended-test
+- as: extended-aws-ipi-hypershift
+  cron: 0 18 */3 * *
+  steps:
+    cluster_profile: aws
+    env:
+      TEST_SCENRAIOS: Hypershift
+    post:
+    - chain: hypershift-aws-destroy
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: hypershift-install
+    - chain: hypershift-aws-create
     test:
     - ref: openshift-extended-test
 - as: extended-azure-ipi

@@ -82,9 +82,39 @@ tests:
     - as: tests
       commands: |
         make test-e2e
-      dependencies:
-      - env: OO_INDEX
-        name: ci-index
+      from: src-oc
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-aws
+- as: nightly-e2e
+  interval: 24h
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-quay
+    env:
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: '!create'
+      OO_PACKAGE: quay-bridge-operator
+      OO_TARGET_NAMESPACES: '!all'
+    post:
+    - ref: quay-gather
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - ref: quay-install-ocs-operator
+    - ref: quay-install-quay-operator
+    - ref: quay-install-quay
+    - ref: quay-create-admin
+    - ref: optional-operators-subscribe
+    - ref: quay-enable-quay-bridge-operator
+    test:
+    - as: tests
+      commands: |
+        make test-e2e
       from: src-oc
       resources:
         requests:

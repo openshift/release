@@ -1,7 +1,7 @@
 periodics:
 - agent: kubernetes
-  cluster: build02
-  cron: 40 2 * * *
+  cluster: build04
+  cron: 54 22 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -12,9 +12,10 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: packet-edge
     ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+    ci-operator.openshift.io/variant: edge
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-service-master-e2e-ai-operator-ztp-ipv4v6-3masters-periodic-ocp-49
+  name: periodic-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-ipv4v6-3masters-periodic-ocp-49
   reporter_config:
     slack:
       channel: '#assisted-deployment-ci'
@@ -34,6 +35,7 @@ periodics:
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-ai-operator-ztp-ipv4v6-3masters-periodic-ocp-49-cluster-profile
       - --target=e2e-ai-operator-ztp-ipv4v6-3masters-periodic-ocp-49
+      - --variant=edge
       command:
       - ci-operator
       image: ci-operator:latest
@@ -81,8 +83,8 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
-  cron: 28 2 * * *
+  cluster: build04
+  cron: 30 22 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -93,9 +95,10 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: packet-edge
     ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+    ci-operator.openshift.io/variant: edge
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-service-master-e2e-ai-operator-ztp-ipv4v6-sno-periodic-ocp-49
+  name: periodic-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-ipv4v6-sno-periodic-ocp-49
   reporter_config:
     slack:
       channel: '#assisted-deployment-ci'
@@ -115,6 +118,7 @@ periodics:
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-ai-operator-ztp-ipv4v6-sno-periodic-ocp-49-cluster-profile
       - --target=e2e-ai-operator-ztp-ipv4v6-sno-periodic-ocp-49
+      - --variant=edge
       command:
       - ci-operator
       image: ci-operator:latest
@@ -162,8 +166,8 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
-  cron: 20 0 * * *
+  cluster: build04
+  cron: 22 2 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -174,9 +178,10 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: packet-edge
     ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+    ci-operator.openshift.io/variant: edge
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-service-master-e2e-metal-assisted-kube-api-late-binding-single-node-periodic
+  name: periodic-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-kube-api-late-binding-single-node-periodic
   reporter_config:
     slack:
       channel: '#assisted-deployment-ci'
@@ -196,6 +201,7 @@ periodics:
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-assisted-kube-api-late-binding-single-node-periodic-cluster-profile
       - --target=e2e-metal-assisted-kube-api-late-binding-single-node-periodic
+      - --variant=edge
       command:
       - ci-operator
       image: ci-operator:latest
@@ -243,8 +249,8 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
-  cron: 21 1 * * *
+  cluster: build04
+  cron: 3 1 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -255,9 +261,93 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: packet-edge
     ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+    ci-operator.openshift.io/variant: edge
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-service-master-e2e-metal-assisted-operator-disconnected-periodic
+  name: periodic-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-operator-capi-periodic
+  reporter_config:
+    slack:
+      channel: '#assisted-deployment-ci'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
+        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs>'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-metal-assisted-operator-capi-periodic-cluster-profile
+      - --target=e2e-metal-assisted-operator-capi-periodic
+      - --variant=edge
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-metal-assisted-operator-capi-periodic-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-packet-assisted
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build04
+  cron: 39 1 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: assisted-service
+  labels:
+    ci-operator.openshift.io/cloud: packet-edge
+    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+    ci-operator.openshift.io/variant: edge
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-operator-disconnected-periodic
   reporter_config:
     slack:
       channel: '#assisted-deployment-ci'
@@ -277,6 +367,7 @@ periodics:
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-assisted-operator-disconnected-periodic-cluster-profile
       - --target=e2e-metal-assisted-operator-disconnected-periodic
+      - --variant=edge
       command:
       - ci-operator
       image: ci-operator:latest
@@ -324,8 +415,8 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
-  cron: 49 23 * * *
+  cluster: build04
+  cron: 11 3 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -336,9 +427,10 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: packet-edge
     ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+    ci-operator.openshift.io/variant: edge
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-service-master-e2e-metal-assisted-operator-ztp-multinode-spoke-periodic
+  name: periodic-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-operator-ztp-multinode-spoke-periodic
   reporter_config:
     slack:
       channel: '#assisted-deployment-ci'
@@ -358,6 +450,7 @@ periodics:
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-assisted-operator-ztp-multinode-spoke-periodic-cluster-profile
       - --target=e2e-metal-assisted-operator-ztp-multinode-spoke-periodic
+      - --variant=edge
       command:
       - ci-operator
       image: ci-operator:latest
@@ -405,8 +498,8 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
-  cron: 0 22 * * *
+  cluster: build04
+  cron: 34 2 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -417,9 +510,10 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: packet-edge
     ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+    ci-operator.openshift.io/variant: edge
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-service-master-e2e-metal-assisted-operator-ztp-periodic
+  name: periodic-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-operator-ztp-periodic
   reporter_config:
     slack:
       channel: '#assisted-deployment-ci'
@@ -439,6 +533,7 @@ periodics:
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-metal-assisted-operator-ztp-periodic-cluster-profile
       - --target=e2e-metal-assisted-operator-ztp-periodic
+      - --variant=edge
       command:
       - ci-operator
       image: ci-operator:latest
@@ -486,8 +581,8 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
-  cron: 12 22 * * *
+  cluster: build04
+  cron: 42 22 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -496,9 +591,10 @@ periodics:
     org: openshift
     repo: assisted-service
   labels:
+    ci-operator.openshift.io/variant: edge
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-service-master-mirror-nightly-image
+  name: periodic-ci-openshift-assisted-service-master-edge-mirror-nightly-image
   reporter_config:
     slack:
       channel: '#assisted-deployment-ci'
@@ -516,6 +612,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=mirror-nightly-image
+      - --variant=edge
       command:
       - ci-operator
       image: ci-operator:latest
@@ -549,7 +646,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
+  cluster: build04
   cron: 0 */6 * * *
   decorate: true
   decoration_config:
@@ -559,9 +656,10 @@ periodics:
     org: openshift
     repo: assisted-service
   labels:
+    ci-operator.openshift.io/variant: edge
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-service-master-subsystem-aws-periodic
+  name: periodic-ci-openshift-assisted-service-master-edge-subsystem-aws-periodic
   reporter_config:
     slack:
       channel: '#assisted-deployment-ci'
@@ -580,6 +678,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=subsystem-aws-periodic
+      - --variant=edge
       command:
       - ci-operator
       image: ci-operator:latest
@@ -619,7 +718,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
+  cluster: build04
   cron: 0 */6 * * *
   decorate: true
   decoration_config:
@@ -629,9 +728,10 @@ periodics:
     org: openshift
     repo: assisted-service
   labels:
+    ci-operator.openshift.io/variant: edge
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-service-master-subsystem-kubeapi-aws-periodic
+  name: periodic-ci-openshift-assisted-service-master-edge-subsystem-kubeapi-aws-periodic
   reporter_config:
     slack:
       channel: '#assisted-deployment-ci'
@@ -650,6 +750,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=subsystem-kubeapi-aws-periodic
+      - --variant=edge
       command:
       - ci-operator
       image: ci-operator:latest

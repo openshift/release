@@ -23,7 +23,7 @@ build_root:
 images:
 - dockerfile_path: automation/generatetasks/build/Dockerfile
   from: base_fedora
-  to: generatetasks
+  to: base-tests
 - context_dir: modules/create-vm/
   dockerfile_path: build/create-vm/Dockerfile
   from: ubi_minimal
@@ -94,7 +94,7 @@ tests:
 
     make test-yaml-consistency
   container:
-    from: generatetasks
+    from: base-tests
 - as: e2e-tests-namespace-scope
   steps:
     cluster_profile: azure4
@@ -110,7 +110,8 @@ tests:
           ln -s oc kubectl
           popd
         fi
-
+        automation/build-test.sh
+        export PATH=$PATH:$(pwd)/go/bin
         SCOPE=namespace \
         NUM_NODES=4 \
           make e2e-tests
@@ -131,7 +132,7 @@ tests:
         name: tekton-task-wait-for-vmi-status
       - env: MODIFY_VM_TEMPLATE_IMAGE
         name: tekton-task-modify-vm-template
-      from: test-bin
+      from: base-tests
       resources:
         requests:
           cpu: "4"
@@ -152,7 +153,8 @@ tests:
           ln -s oc kubectl
           popd
         fi
-
+        automation/build-test.sh
+        export PATH=$PATH:$(pwd)/go/bin
         SCOPE=cluster \
         NUM_NODES=4 \
           make e2e-tests
@@ -173,7 +175,7 @@ tests:
         name: tekton-task-wait-for-vmi-status
       - env: MODIFY_VM_TEMPLATE_IMAGE
         name: tekton-task-modify-vm-template
-      from: test-bin
+      from: base-tests
       resources:
         requests:
           cpu: "4"

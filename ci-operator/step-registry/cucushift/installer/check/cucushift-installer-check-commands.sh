@@ -25,4 +25,5 @@ run_command "oc get nodes -owide"
 run_command "oc get clusteroperators"
 run_command "oc get networks.config.openshift.io cluster -oyaml"
 run_command "oc get networks.operator.openshift.io cluster -oyaml"
+run_command "oc -n openshift-ingress-operator get ingresscontroller -oyaml"
 set -e
