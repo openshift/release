@@ -100,6 +100,8 @@ operator:
   - pullspec: quay.io/centos7/postgresql-12-centos7:latest
     with: postgresql-12-centos7
 promotion:
+  additional_images:
+    assisted-service-operator-index: ci-index
   name: ocm-2.6
   namespace: edge-infrastructure
 releases:
@@ -656,20 +658,29 @@ tests:
         OPENSHIFT_VERSION=4.10
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-cnv
-  run_if_changed: ^(data/.*|internal/operators/.*)$
+  optional: true
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=cnv
     workflow: assisted-baremetal
+- as: e2e-metal-assisted-odf
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=odf
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-ocs
-  run_if_changed: ^(data/.*|internal/operators/.*)$
+  optional: true
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=ocs
+        OPENSHIFT_VERSION=4.8
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-day2
   optional: true

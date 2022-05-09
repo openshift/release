@@ -1,65 +1,25 @@
 base_images:
-  assisted-image-service:
-    name: ocm-2.6
-    namespace: edge-infrastructure
-    tag: assisted-image-service
-  assisted-installer:
-    name: ocm-2.6
-    namespace: edge-infrastructure
-    tag: assisted-installer
-  assisted-installer-agent:
-    name: ocm-2.6
-    namespace: edge-infrastructure
-    tag: assisted-installer-agent
-  assisted-installer-controller:
-    name: ocm-2.6
-    namespace: edge-infrastructure
-    tag: assisted-installer-controller
-  assisted-test-infra:
-    name: ocm-2.6
-    namespace: edge-infrastructure
-    tag: assisted-test-infra
-  coreos_centos_stream8:
-    name: stream8
-    namespace: coreos
-    tag: "8"
-  dev-scripts:
-    name: test
-    namespace: ocp-kni
-    tag: dev-scripts
-  edge_infrastructure_swagger_codegen_cli:
-    name: edge-infrastructure-swagger-codegen-cli
-    namespace: ci
-    tag: 2.4.18
-  goswagger_swagger:
-    name: goswagger-swagger
-    namespace: ci
-    tag: v0.28.0
-  hypershift-operator:
+  base:
     name: "4.11"
     namespace: ocp
-    tag: hypershift-operator
+    tag: base
   openshift_release_golang-1.17:
     name: release
     namespace: openshift
     tag: golang-1.17
-  postgresql-12-centos7:
-    name: postgresql-12-centos7
-    namespace: edge-infrastructure
-    tag: latest
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.17
+  from_repository: true
 images:
-- dockerfile_path: Dockerfile.assisted-service
-  from: coreos_centos_stream8
+- dockerfile_path: Dockerfile.assisted-service.ocp
+  from: base
   inputs:
     openshift_release_golang-1.17:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.17
-  to: assisted-service
+  to: agent-installer-api-server
+promotion:
+  name: "4.11"
+  namespace: ocp
 releases:
   latest:
     integration:

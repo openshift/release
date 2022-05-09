@@ -1,8 +1,12 @@
 base_images:
   cli:
-    name: "4.10"
+    name: "4.11"
     namespace: ocp
     tag: cli
+  ocp_builder_rhel-8-golang-1.18-openshift-4.11:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.18-openshift-4.11
   ubi_minimal:
     name: ubi-minimal
     namespace: ocp
@@ -13,8 +17,14 @@ build_root:
     dockerfile_literal: |
       FROM registry.access.redhat.com/ubi8
       USER root
-      RUN yum install -y make go diffutils openssl git && \
+      ENV GOVERSION=1.18.1
+      RUN yum install -y gcc make diffutils openssl git && \
           yum clean all && rm -rf /var/cache/dnf/*
+      # Install Go. This version will only be used for unit tests. The
+      # official builds are done via their own container image Dockerfiles
+      RUN rm -rf /usr/local/go && \
+          curl -fsSL https://go.dev/dl/go${GOVERSION}.linux-amd64.tar.gz | tar -C /usr/local -xzf -
+      ENV PATH=$PATH:/usr/local/go/bin
       RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 && \
           chmod 700 get_helm.sh && \
           ./get_helm.sh
@@ -39,22 +49,46 @@ images:
   to: src-oc
 - context_dir: .
   from: ubi_minimal
+  inputs:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
+      as:
+      - golang:1.18
   to: volsync
 - context_dir: mover-rclone
   from: ubi_minimal
+  inputs:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
+      as:
+      - golang:1.18
   to: volsync-mover-rclone
 - context_dir: mover-restic
   from: ubi_minimal
+  inputs:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
+      as:
+      - golang:1.18
   to: volsync-mover-restic
 - context_dir: mover-rsync
   from: ubi_minimal
+  inputs:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
+      as:
+      - golang:1.18
   to: volsync-mover-rsync
+- context_dir: mover-syncthing
+  from: ubi_minimal
+  inputs:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
+      as:
+      - golang:1.18
+  to: volsync-mover-syncthing
 promotion:
   additional_images:
     volsync: volsync
     volsync-mover-rclone: volsync-mover-rclone
     volsync-mover-restic: volsync-mover-restic
     volsync-mover-rsync: volsync-mover-rsync
+    volsync-mover-syncthing: volsync-mover-syncthing
   namespace: volsync
   tag: latest
 releases:
@@ -62,7 +96,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.10"
+      version: "4.11"
 resources:
   '*':
     limits:
@@ -73,7 +107,7 @@ resources:
 tests:
 - as: unit
   commands: |
-    export TEST_ARGS='-progress -randomizeAllSpecs -nodes 1 -randomizeSuites -slowSpecThreshold 30 -cover -coverprofile cover.out -outputdir .'
+    go version
     make test
   container:
     from: src

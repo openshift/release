@@ -17,13 +17,15 @@ function join_by { local IFS="$1"; shift; echo "$*"; }
 
 REGION="${LEASED_RESOURCE}"
 # BootstrapInstanceType gets its value from pkg/types/aws/defaults/platform.go
-architecture="amd64"
+architecture=${OCP_ARCH:-"amd64"}
 arch_instance_type=m5
 if [[ "${CLUSTER_TYPE}" == "aws-arm64" ]]; then
   architecture="arm64"
-  arch_instance_type=m6g
 fi
 
+if [[ x"${architecture}" == x"arm64" ]]; then
+  arch_instance_type=m6g
+fi
 BOOTSTRAP_NODE_TYPE=${arch_instance_type}.large
 
 workers=3
@@ -43,7 +45,7 @@ fi
 mapfile -t AVAILABILITY_ZONES < <(aws --region "${REGION}" ec2 describe-availability-zones | jq -r '.AvailabilityZones[] | select(.State == "available") | .ZoneName' | sort -u)
 # Generate availability zones with OpenShift Installer required instance types
 
-if [[ "${COMPUTE_NODE_TYPE}" == "${BOOTSTRAP_NODE_TYPE}" && "${COMPUTE_NODE_TYPE}" == "${master_type}" ]]; then ## all regions are the same 
+if [[ "${COMPUTE_NODE_TYPE}" == "${BOOTSTRAP_NODE_TYPE}" && "${COMPUTE_NODE_TYPE}" == "${master_type}" ]]; then ## all regions are the same
   mapfile -t INSTANCE_ZONES < <(aws --region "${REGION}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${master_type}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 1 ' | awk '{print $2}')
 elif [[ "${master_type}" == null && "${COMPUTE_NODE_TYPE}" == null  ]]; then ## two null regions
   mapfile -t INSTANCE_ZONES < <(aws --region "${REGION}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${master_type}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 1 ' | awk '{print $2}')
@@ -52,7 +54,7 @@ elif [[ "${master_type}" == null || "${COMPUTE_NODE_TYPE}" == null ]]; then ## o
     mapfile -t INSTANCE_ZONES < <(aws --region "${REGION}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${master_type}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 1 ' | awk '{print $2}')
   else ## "one null region and no duplicates"
     mapfile -t INSTANCE_ZONES < <(aws --region "${REGION}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${master_type}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 2 ' | awk '{print $2}')
-  fi 
+  fi
 elif [[ "${BOOTSTRAP_NODE_TYPE}" == "${COMPUTE_NODE_TYPE}" || "${BOOTSTRAP_NODE_TYPE}" == "${master_type}" || "${master_type}" == "${COMPUTE_NODE_TYPE}" ]]; then ## duplicates regions with no null region
   mapfile -t INSTANCE_ZONES < <(aws --region "${REGION}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${master_type}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 2 ' | awk '{print $2}')
 elif [[ "${BOOTSTRAP_NODE_TYPE}" != "${COMPUTE_NODE_TYPE}" && "${COMPUTE_NODE_TYPE}" != "${master_type}" ]]; then   # three different regions
@@ -133,6 +135,6 @@ platform:
   aws:
     amiID: ${RHCOS_AMI}
 EOF
-  /tmp/yq m -x -i "${CONFIG}" "${CONFIG_PATCH_AMI}"  
+  /tmp/yq m -x -i "${CONFIG}" "${CONFIG_PATCH_AMI}"
   cp "${SHARED_DIR}/install-config-ami.yaml.patch" "${ARTIFACT_DIR}/"
 fi

@@ -146,6 +146,47 @@ periodics:
         secretName: sprint-automation
 - agent: kubernetes
   cluster: app.ci
+  cron: 0 8 * * 1-5
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-pr-reminder
+  spec:
+    containers:
+    - args:
+      - --config-path=/etc/config/config.yaml
+      - --github-mapping-config-path=/etc/github-mapping/mapping.yaml
+      - --slack-token-path=/etc/slack/oauth_token
+      command:
+      - /usr/bin/pr-reminder
+      image: registry.ci.openshift.org/ci/pr-reminder:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/slack
+        name: slack
+        readOnly: true
+      - mountPath: /etc/config
+        name: config
+        readOnly: true
+      - mountPath: /etc/github-mapping
+        name: github-mapping
+        readOnly: true
+    volumes:
+    - name: slack
+      secret:
+        secretName: slack-credentials-dptp-bot
+    - configMap:
+        name: pr-reminder-config
+      name: config
+    - configMap:
+        name: sync-rover-groups
+      name: github-mapping
+- agent: kubernetes
+  cluster: app.ci
   cron: '@yearly'
   decorate: true
   labels:
@@ -170,7 +211,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20220506-6d355b2d97
+      image: gcr.io/k8s-prow/commenter:v20220518-4571841471
       imagePullPolicy: Always
       name: ""
       resources:
@@ -244,7 +285,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20220506-6d355b2d97
+      image: gcr.io/k8s-prow/commenter:v20220518-4571841471
       imagePullPolicy: Always
       name: ""
       resources:
@@ -285,7 +326,7 @@ periodics:
       - --random
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20220506-6d355b2d97
+      image: gcr.io/k8s-prow/commenter:v20220518-4571841471
       imagePullPolicy: Always
       name: ""
       resources:
@@ -331,7 +372,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20220506-6d355b2d97
+      image: gcr.io/k8s-prow/commenter:v20220518-4571841471
       imagePullPolicy: Always
       name: ""
       resources:
@@ -377,7 +418,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20220506-6d355b2d97
+      image: gcr.io/k8s-prow/commenter:v20220518-4571841471
       imagePullPolicy: Always
       name: ""
       resources:
@@ -427,7 +468,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20220506-6d355b2d97
+      image: gcr.io/k8s-prow/commenter:v20220518-4571841471
       imagePullPolicy: Always
       name: ""
       resources:
@@ -477,7 +518,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20220506-6d355b2d97
+      image: gcr.io/k8s-prow/commenter:v20220518-4571841471
       imagePullPolicy: Always
       name: ""
       resources:
@@ -526,7 +567,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20220506-6d355b2d97
+      image: gcr.io/k8s-prow/commenter:v20220518-4571841471
       imagePullPolicy: Always
       name: ""
       resources:
@@ -575,7 +616,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20220506-6d355b2d97
+      image: gcr.io/k8s-prow/commenter:v20220518-4571841471
       imagePullPolicy: Always
       name: ""
       resources:
@@ -609,7 +650,7 @@ periodics:
       - --debug
       command:
       - /ko-app/label_sync
-      image: gcr.io/k8s-prow/label_sync:v20220506-6d355b2d97
+      image: gcr.io/k8s-prow/label_sync:v20220518-4571841471
       imagePullPolicy: Always
       name: ""
       resources:
@@ -745,6 +786,58 @@ periodics:
     workdir: true
   interval: 5m
   labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  max_concurrency: 1
+  name: periodic-ipi-deprovision-aws-3
+  reporter_config:
+    slack:
+      channel: '#ops-ci'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: '@aws-ci-admin Job *{{.Spec.Job}}* failed. <{{.Status.URL}}|View
+        logs>'
+  spec:
+    containers:
+    - command:
+      - ./core-services/ipi-deprovision/aws.sh
+      env:
+      - name: HOME
+        value: /tmp
+      - name: AWS_SHARED_CREDENTIALS_FILE
+        value: /aws/.awscred
+      - name: CLUSTER_TTL
+        value: 30 minutes ago
+      image: registry.ci.openshift.org/ci/ipi-deprovision:latest
+      imagePullPolicy: Always
+      name: ipi-deprovision
+      resources:
+        requests:
+          cpu: "1"
+          memory: 300Mi
+      volumeMounts:
+      - mountPath: /aws
+        name: cluster-secrets-aws
+    serviceAccountName: ipi-deprovisioner
+    volumes:
+    - name: cluster-secrets-aws
+      secret:
+        items:
+        - key: .awscred
+          path: .awscred
+        secretName: cluster-secrets-aws-3
+- agent: kubernetes
+  cluster: build01
+  decorate: true
+  decoration_config:
+    timeout: 8h0m0s
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+    workdir: true
+  interval: 5m
+  labels:
     ci.openshift.io/role: cloud-gcp
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   max_concurrency: 1
@@ -860,7 +953,7 @@ periodics:
       - --config=core-services/prow/02_config/_bumper.yaml
       command:
       - /ko-app/generic-autobumper
-      image: gcr.io/k8s-prow/generic-autobumper:v20220506-6d355b2d97
+      image: gcr.io/k8s-prow/generic-autobumper:v20220518-4571841471
       imagePullPolicy: IfNotPresent
       name: autobump
       resources:
@@ -1081,7 +1174,7 @@ periodics:
       - --github-enabled-org=openshift
       command:
       - /ko-app/branchprotector
-      image: gcr.io/k8s-prow/branchprotector:v20220506-6d355b2d97
+      image: gcr.io/k8s-prow/branchprotector:v20220518-4571841471
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1135,7 +1228,7 @@ periodics:
           secretKeyRef:
             key: appid
             name: openshift-prow-github-app
-      image: gcr.io/k8s-prow/branchprotector:v20220506-6d355b2d97
+      image: gcr.io/k8s-prow/branchprotector:v20220518-4571841471
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1192,7 +1285,7 @@ periodics:
       - --github-allowed-burst=600
       command:
       - /ko-app/peribolos
-      image: gcr.io/k8s-prow/peribolos:v20220506-6d355b2d97
+      image: gcr.io/k8s-prow/peribolos:v20220518-4571841471
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1270,7 +1363,7 @@ periodics:
       - --kubeconfig-dir=/etc/build-farm-credentials
       command:
       - hack/config-bootstrapper.sh
-      image: gcr.io/k8s-prow/config-bootstrapper:v20220506-6d355b2d97
+      image: gcr.io/k8s-prow/config-bootstrapper:v20220518-4571841471
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1846,7 +1939,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: gcr.io/k8s-prow/invitations-accepter:v20220506-6d355b2d97
+      image: gcr.io/k8s-prow/invitations-accepter:v20220518-4571841471
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1878,7 +1971,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: gcr.io/k8s-prow/invitations-accepter:v20220506-6d355b2d97
+      image: gcr.io/k8s-prow/invitations-accepter:v20220518-4571841471
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1910,7 +2003,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: gcr.io/k8s-prow/invitations-accepter:v20220506-6d355b2d97
+      image: gcr.io/k8s-prow/invitations-accepter:v20220518-4571841471
       imagePullPolicy: Always
       name: ""
       resources:
