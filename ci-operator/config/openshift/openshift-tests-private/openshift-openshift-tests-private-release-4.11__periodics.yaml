@@ -118,6 +118,39 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi
+- as: e2e-azure-ipi-ovn
+  cron: 0 8 */3 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      E2E_RUN_TAGS: '@azure-ipi and @network-ovnkubernetes and not @fips'
+      TAG_VERSION: '@4.11'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-azure-ipi-ovn
+- as: e2e-azure-ipi-proxy
+  cron: 0 13 */3 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      E2E_RUN_TAGS: '@azure-ipi and @proxy and @network-openshiftsdn and not @fips'
+      TAG_VERSION: '@4.11'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-azure-ipi-proxy
+- as: e2e-azure-upi
+  cron: 0 18 */3 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      E2E_RUN_TAGS: '@azure-upi and @network-openshiftsdn and not @fips'
+      TAG_VERSION: '@4.11'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-azure-upi
 - as: extended-aws-ipi-hypershift
   cron: 0 2 */3 * *
   steps:
@@ -132,36 +165,6 @@ tests:
     - chain: cucushift-installer-rehearse-aws-ipi-provision
     - chain: hypershift-install
     - chain: hypershift-aws-create
-    test:
-    - ref: openshift-extended-test
-- as: extended-azure-ipi-ovn
-  cron: 0 10 */3 * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-    test:
-    - ref: openshift-extended-test
-    workflow: cucushift-installer-rehearse-azure-ipi-ovn
-- as: extended-azure-ipi-proxy
-  cron: 0 12 */3 * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-    test:
-    - ref: openshift-extended-test
-    workflow: cucushift-installer-rehearse-azure-ipi-proxy
-- as: extended-azure-upi
-  cron: 0 14 */3 * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-    post:
-    - chain: cucushift-installer-rehearse-azure-upi-deprovision
-    pre:
-    - chain: cucushift-installer-rehearse-azure-upi-provision
     test:
     - ref: openshift-extended-test
 - as: extended-gcp-ipi
