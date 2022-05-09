@@ -13,7 +13,7 @@ build_root:
     dockerfile_literal: |
       FROM registry.access.redhat.com/ubi8
       USER root
-      RUN yum install -y python39 make diffutils openssl git && \
+      RUN yum install -y python39 make diffutils openssl git curl && \
           yum clean all && rm -rf /var/cache/dnf/*
       ENV XDG_DATA_HOME=/.local
       WORKDIR pelorus
@@ -59,6 +59,22 @@ tests:
         timeout 10m bash -c 'until oc get svc grafana-service --namespace pelorus; do sleep 10; done'
         timeout 10m bash -c 'until oc get svc prometheus-operated --namespace pelorus; do sleep 10; done'
         timeout 10m bash -c 'until oc get svc prometheus-pelorus --namespace pelorus; do sleep 10; done'
+        # update exporter values and helm upgrade
+        timeout 1m bash -c 'until curl -o ci_values.yaml https://raw.githubusercontent.com/konveyor/mig-demo-apps/master/apps/todolist-mongo-go/pelorus/values.yaml; do sleep 20; done'
+        timeout 10m bash -c 'until helm upgrade pelorus charts/pelorus --namespace pelorus --values ci_values.yaml; do sleep 10; done'
+        timeout 10m bash -c 'until oc get svc committime-generic --namespace pelorus; do sleep 10; done'
+        timeout 10m bash -c 'until oc get svc deploytime-exporter --namespace pelorus; do sleep 10; done'
+        # install the sample-app - https://github.com/konveyor/mig-demo-apps/tree/master/apps/todolist-mongo-go
+        timeout 1m bash -c 'until curl -o mongo-persistent.yaml https://raw.githubusercontent.com/konveyor/mig-demo-apps/master/apps/todolist-mongo-go/mongo-persistent.yaml; do sleep 20; done'
+        sed -i 's/your_org/mig-demo-apps/g' mongo-persistent.yaml
+        timeout 10m bash -c 'until oc create -f mongo-persistent.yaml; do sleep 10; done'
+        timeout 10m bash -c 'until oc get svc todolist --namespace mongo-persistent; do sleep 10; done'
+        # TEST to ensure the todolist app commit and image sha are read by the exporters
+        committime_route=`oc get route -n pelorus committime-generic -o=template='http://{{.spec.host | printf "%s\n"}}'`
+        deploytime_route=`oc get route -n pelorus deploytime-exporter -o=template='http://{{.spec.host | printf "%s\n"}}'`
+        # There is a bug or issue atm, do not enable yet.
+        # timeout 5m bash -c 'until curl $committime_route 2>&1 | grep mongo; do sleep 10; done'
+        # timeout 2m bash -c 'until curl $deploytime_route 2>&1 | grep todolist; do sleep 10; done'
       from: src
       resources:
         requests:

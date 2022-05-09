@@ -51,7 +51,7 @@ images:
     openshift_release_golang-1.17:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.17
-  to: assisted-service-unit-test
+  to: assisted-service-build
 - dockerfile_path: Dockerfile.assisted-service
   from: coreos_centos_stream8
   inputs:
@@ -111,6 +111,16 @@ test_binary_build_commands: |
   go mod vendor
   mkdir /.cache && chmod 775 -R /.cache && chmod 775 -R $GOPATH
 tests:
+- as: verify-generated-code
+  skip_if_only_changed: ^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNER_ALIASES)$
+  steps:
+    test:
+    - ref: assisted-verify-generated-code
+- as: verify-generated-code-postsubmit
+  postsubmit: true
+  steps:
+    test:
+    - ref: assisted-verify-generated-code
 - as: mirror-nightly-image
   cron: '@daily'
   steps:
@@ -148,7 +158,7 @@ tests:
     export GINKGO_REPORTFILE=${ARTIFACT_DIR}/junit_unit_test.xml
     make ci-unit-test
   container:
-    from: assisted-service-unit-test
+    from: assisted-service-build
   secret:
     mount_path: /tmp/secret
     name: assisted-service-codecov-token
@@ -161,7 +171,7 @@ tests:
     export GINKGO_REPORTFILE=${ARTIFACT_DIR}/junit_unit_test.xml
     make ci-unit-test
   container:
-    from: assisted-service-unit-test
+    from: assisted-service-build
   postsubmit: true
   secret:
     mount_path: /tmp/secret
@@ -526,8 +536,10 @@ tests:
   steps:
     cluster_profile: packet-assisted
     env:
-      POST_INSTALL_COMMANDS: |
+      ASSISTED_CONFIG: |
         SERVICE_BASE_REF=release-ocm-2.5
+      POST_INSTALL_COMMANDS: |
+        export INDEX_IMAGE=quay.io/edge-infrastructure/assisted-service-index:ocm-2.5
         export TEST_FUNC=test_late_binding_kube_api_sno
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
         make deploy_assisted_operator test_kube_api_parallel
@@ -538,8 +550,10 @@ tests:
   steps:
     cluster_profile: packet-assisted
     env:
-      POST_INSTALL_COMMANDS: |
+      ASSISTED_CONFIG: |
         SERVICE_BASE_REF=release-ocm-2.5
+      POST_INSTALL_COMMANDS: |
+        export INDEX_IMAGE=quay.io/edge-infrastructure/assisted-service-index:ocm-2.5
         export TEST_FUNC=test_late_binding_kube_api_sno
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
         make deploy_assisted_operator test_kube_api_parallel
@@ -552,6 +566,7 @@ tests:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=release-ocm-2.5
       POST_INSTALL_COMMANDS: |
+        export INDEX_IMAGE=quay.io/edge-infrastructure/assisted-service-index:ocm-2.5
         export TEST_FUNC=test_late_binding_kube_api_sno
         export HOLD_INSTALLATION=true
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
