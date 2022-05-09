@@ -79,6 +79,20 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ocm-e2e-clusterpool
+- as: sonar-post-submit
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make install
+    make lint
+    make -f Makefile.prow sonar/js/jest-init
+    make unit-test
+    make -f Makefile.prow sonar/js/prow
+  container:
+    from: src
+  postsubmit: true
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
 - as: latest-image-mirror
   postsubmit: true
   steps:
@@ -98,6 +112,57 @@ tests:
       IMAGE_REPO: grc-ui-tests
       IMAGE_TAG: latest-2.3
       REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: grc-ui
+    env:
+      IMAGE_REPO: grc-ui
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
+        export OSCI_PUBLISH_DELAY="0"
+        export SELF="make -f Makefile.prow"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+- as: publish-tests
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: grc-ui-tests
+    env:
+      IMAGE_REPO: grc-ui-tests
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_COMPONENT_NAME="grc-ui-tests"
+        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
+        export OSCI_PUBLISH_DELAY="0"
+        export SELF="make -f Makefile.prow"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     workflow: ocm-ci-image-mirror
 zz_generated_metadata:
   branch: release-2.3
