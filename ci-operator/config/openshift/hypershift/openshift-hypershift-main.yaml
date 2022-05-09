@@ -1,4 +1,8 @@
 base_images:
+  assisted-image-service:
+    name: ocm-2.6
+    namespace: edge-infrastructure
+    tag: assisted-image-service
   assisted-installer:
     name: ocm-2.6
     namespace: edge-infrastructure
@@ -15,6 +19,14 @@ base_images:
     name: ocm-2.6
     namespace: edge-infrastructure
     tag: assisted-service
+  assisted-service-operator-index:
+    name: ocm-2.6
+    namespace: edge-infrastructure
+    tag: assisted-service-operator-index
+  assisted-service-scripts:
+    name: ocm-2.6
+    namespace: edge-infrastructure
+    tag: assisted-service-scripts
   assisted-test-infra:
     name: ocm-2.6
     namespace: edge-infrastructure
@@ -331,6 +343,25 @@ tests:
       GATHER_CAPI_LOGS: "true"
       TEST_SUITE: minimal
     workflow: assisted-baremetal
+- as: capi-provider-agent-sanity-operator
+  optional: true
+  run_if_changed: ^(api/.*|hypershift-operator/controllers/hostedcluster/internal/platform/agent/.*)$
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      HYPERSHIFT_IMAGE: pipeline:hypershift-operator
+      INDEX_IMAGE: assisted-service-operator-index
+    env:
+      DEVSCRIPTS_CONFIG: |
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=32768
+        EXTRA_WORKER_DISK=120
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      DISCONNECTED: "false"
+      IP_STACK: v4
+      NUM_EXTRA_WORKERS: "1"
+    workflow: assisted-baremetal-operator-capi
 - as: e2e-kubevirt-azure
   optional: true
   steps:
