@@ -1,22 +1,22 @@
 base_images:
-  cluster-logging-operator-5-5:
-    name: "5.5"
+  cluster-logging-operator-5-4:
+    name: "5.4"
     namespace: logging
     tag: cluster-logging-operator
-  cluster-logging-operator-e2e-5-5:
-    name: "5.5"
+  cluster-logging-operator-e2e-5-4:
+    name: "5.4"
     namespace: logging
     tag: cluster-logging-operator-e2e
-  cluster-logging-operator-registry-5-5:
-    name: "5.5"
+  cluster-logging-operator-registry-5-4:
+    name: "5.4"
     namespace: logging
     tag: cluster-logging-operator-registry
-  elasticsearch-operator-5-5:
-    name: "5.5"
+  elasticsearch-operator-5-4:
+    name: "5.4"
     namespace: logging
     tag: elasticsearch-operator
-  elasticsearch-operator-registry-5-5:
-    name: "5.5"
+  elasticsearch-operator-registry-5-4:
+    name: "5.4"
     namespace: logging
     tag: elasticsearch-operator-registry
   elasticsearch-proxy:
@@ -43,8 +43,8 @@ base_images:
     name: "4.9"
     namespace: ocp
     tag: oauth-proxy
-  ubi8-ruby27:
-    name: ubi-ruby-27
+  ubi8-ruby25:
+    name: ubi-ruby-25
     namespace: ocp
     tag: "8"
 build_root:
@@ -58,10 +58,10 @@ images:
   to: test-unit-fluentd
 - context_dir: fluentd
   dockerfile_path: Dockerfile
-  from: ubi8-ruby27
+  from: ubi8-ruby25
   to: logging-fluentd
 promotion:
-  name: v1.14.x
+  name: v1.14.5
   namespace: logging
 releases:
   latest:
@@ -82,24 +82,23 @@ tests:
   commands: make lint
   container:
     from: src
-- as: cluster-logging-operator-e2e-5-5
+- as: cluster-logging-operator-e2e-5-4
   steps:
     cluster_profile: gcp
     test:
     - as: test
       cli: latest
-      commands: export GINKGO_OPTS="-ginkgo.skip vector"; FAKE_HOME_DIR=/tmp/home
-        LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts
+      commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts
         make test-e2e-olm
       dependencies:
       - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
-        name: pipeline:cluster-logging-operator-registry-5-5
+        name: pipeline:cluster-logging-operator-registry-5-4
       - env: IMAGE_CLUSTER_LOGGING_OPERATOR
-        name: pipeline:cluster-logging-operator-5-5
+        name: pipeline:cluster-logging-operator-5-4
       - env: IMAGE_ELASTICSEARCH_OPERATOR_REGISTRY
-        name: pipeline:elasticsearch-operator-registry-5-5
+        name: pipeline:elasticsearch-operator-registry-5-4
       - env: IMAGE_ELASTICSEARCH_OPERATOR
-        name: pipeline:elasticsearch-operator-5-5
+        name: pipeline:elasticsearch-operator-5-4
       - env: IMAGE_OAUTH_PROXY
         name: pipeline:oauth-proxy
       - env: IMAGE_LOGGING_FLUENTD
@@ -114,13 +113,13 @@ tests:
         name: pipeline:logging-eventrouter
       - env: IMAGE_LOG_FILE_METRIC_EXPORTER
         name: pipeline:log-file-metric-exporter
-      from: pipeline:cluster-logging-operator-e2e-5-5
+      from: pipeline:cluster-logging-operator-e2e-5-4
       resources:
         requests:
           cpu: 100m
       timeout: 3h0m0s
     workflow: ipi-gcp
-- as: clo-functional-5-5
+- as: clo-functional-5-4
   steps:
     cluster_profile: gcp
     test:
@@ -130,15 +129,15 @@ tests:
         make test-functional
       dependencies:
       - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
-        name: pipeline:cluster-logging-operator-registry-5-5
+        name: pipeline:cluster-logging-operator-registry-5-4
       - env: IMAGE_CLUSTER_LOGGING_OPERATOR
-        name: pipeline:cluster-logging-operator-5-5
+        name: pipeline:cluster-logging-operator-5-4
       - env: IMAGE_OAUTH_PROXY
         name: pipeline:oauth-proxy
       - env: IMAGE_LOGGING_FLUENTD
         name: pipeline:logging-fluentd
       - env: IMAGE_ELASTICSEARCH_OPERATOR
-        name: pipeline:elasticsearch-operator-5-5
+        name: pipeline:elasticsearch-operator-5-4
       - env: IMAGE_ELASTICSEARCH_PROXY
         name: pipeline:elasticsearch-proxy
       - env: IMAGE_ELASTICSEARCH6
@@ -149,12 +148,12 @@ tests:
         name: pipeline:logging-eventrouter
       - env: IMAGE_LOG_FILE_METRIC_EXPORTER
         name: pipeline:log-file-metric-exporter
-      from: pipeline:cluster-logging-operator-e2e-5-5
+      from: pipeline:cluster-logging-operator-e2e-5-4
       resources:
         requests:
           cpu: 100m
     workflow: ipi-gcp
 zz_generated_metadata:
-  branch: main
+  branch: v1.14.5
   org: ViaQ
   repo: logging-fluentd
