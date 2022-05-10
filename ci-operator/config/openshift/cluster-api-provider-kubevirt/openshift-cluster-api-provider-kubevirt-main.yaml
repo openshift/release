@@ -7,10 +7,18 @@ base_images:
     name: "4.10"
     namespace: ocp
     tag: cli
+  hypershift-operator-4.11:
+    name: "4.11"
+    namespace: ocp
+    tag: hypershift-operator
   openshift_release_golang-1.17:
     name: release
     namespace: openshift
     tag: golang-1.17
+  openshift_release_golang-1.18:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
 binary_build_commands: make manager
 build_root:
   image_stream_tag:
@@ -79,9 +87,38 @@ images:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.17
   to: capk-oc-bin-image
+- build_args:
+  - name: ARCH
+    value: amd64
+  - name: ldflags
+  dockerfile_literal: |-
+    FROM src
+    COPY oc hypershift /usr/bin/
+    RUN mkdir -p /go/src/github.com/openshift && \
+        cd /go/src/github.com/openshift && \
+        git clone https://github.com/openshift/hypershift.git && \
+        cd hypershift/ && \
+        go mod tidy && go mod vendor && \
+        make e2e
+    WORKDIR /go/src/github.com/openshift/hypershift
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+    hypershift-operator-4.11:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/hypershift
+    openshift_release_golang-1.18:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.18
+  to: hypershift-cli-e2e
 promotion:
   excluded_images:
   - capk-oc-bin-image
+  - hypershift-cli-e2e
   namespace: hypershift
   tag: dev-latest
 releases:
@@ -187,6 +224,74 @@ tests:
           --ginkgo.label-filter="!persistentVMs" \
           --ginkgo.skip="unrecoverable VMI"
       from: capk-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: ipi-gcp
+- as: cluster-api-provider-kubevirt-with-hypershift
+  steps:
+    cluster_profile: gcp
+    env:
+      SUB_CHANNEL: stable
+      SUB_INSTALL_NAMESPACE: openshift-cnv
+      SUB_PACKAGE: kubevirt-hyperconverged
+      SUB_TARGET_NAMESPACES: openshift-cnv
+    test:
+    - ref: operatorhub-subscribe
+    - as: deploy-cnv-hyperconverged-cr
+      commands: |-
+        oc create -f - <<EOF
+        apiVersion: hco.kubevirt.io/v1beta1
+        kind: HyperConverged
+        metadata:
+          name: kubevirt-hyperconverged
+          namespace: openshift-cnv
+        EOF
+
+        oc wait hyperconverged -n openshift-cnv kubevirt-hyperconverged --for=condition=Available --timeout=15m
+      from: capk-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    - as: deploy-hypershift
+      commands: |-
+        set -x
+        hypershift install
+        oc patch deployment -n hypershift operator --type=json -p '[{"op": "add", "path": "/spec/template/spec/containers/0/env/-", "value": {"name": "IMAGE_KUBEVIRT_CAPI_PROVIDER", "value": "'"${CAPK_IMAGE}"'"}}]'
+        # make sure the patch worked
+        oc get deployment -n hypershift operator -o yaml
+        oc wait deployment -n hypershift operator --for=condition=Available --timeout=5m
+      dependencies:
+      - env: CAPK_IMAGE
+        name: cluster-api-kubevirt-controller
+      from: hypershift-cli-e2e
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    - as: hypershift-e2e
+      commands: |-
+        set -x
+        export KUBEVIRT_PLATFORM_ENABLED=true
+        export RHCOS_CD_IMAGE="quay.io/containerdisks/rhcos:4.10"
+
+        # run the test
+        bin/test-e2e \
+                  --test.v \
+                  --test.timeout=0 \
+                  --test.run=TestKubeVirtCreateCluster \
+                  --e2e.node-pool-replicas=5 \
+                  --e2e.base-domain="fake" \
+                  --e2e.kubevirt-container-disk-image="${RHCOS_CD_IMAGE}" \
+                  --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson \
+                  --e2e.platform=KubeVirt
+      credentials:
+      - mount_path: /etc/ci-pull-credentials
+        name: ci-pull-credentials
+        namespace: test-credentials
+      from: hypershift-cli-e2e
       resources:
         requests:
           cpu: 500m
