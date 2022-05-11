@@ -50,7 +50,7 @@ az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIEN
 if [ X"${OUTBOUND_UDR_TYPE}" == X"NAT" ]; then
   echo "Use NAT for UserDefinedRouting..."
   VNET_FILE="${SHARED_DIR}/customer_vnet_subnets.yaml"
-  RESOURCE_GROUP=$(cat ${SHARED_DIR}/resouregroup)
+  RESOURCE_GROUP=$(cat ${SHARED_DIR}/resourcegroup)
   vnet_name=$(/tmp/yq r ${VNET_FILE} 'platform.azure.virtualNetwork')
   controlPlaneSubnet=$(/tmp/yq r ${VNET_FILE} 'platform.azure.controlPlaneSubnet')
   computeSubnet=$(/tmp/yq r ${VNET_FILE} 'platform.azure.computeSubnet')

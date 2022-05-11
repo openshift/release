@@ -27,7 +27,7 @@ export SSH_PUB_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-publickey
 infra_id=$(oc get -o jsonpath='{.status.infrastructureName}{"\n"}' infrastructure cluster)
 
 # Get bastion RG info
-vnet_RG=$(cat ${SHARED_DIR}/resouregroup)
+vnet_RG=$(cat ${SHARED_DIR}/resourcegroup)
 echo "${vnet_RG}"
 
 # Get existing vnet info
