@@ -60,12 +60,12 @@ if [[ -z "${OPENSTACK_EXTERNAL_NETWORK:-}" ]]; then
 		exit 1
 	fi
 
-	if ! [[ -v external_network[$CLUSTER_TYPE] ]]; then
+	if ! [[ -v external_network["$CLUSTER_TYPE"] ]]; then
 		echo "OPENSTACK_EXTERNAL_NETWORK value for CLUSTER_TYPE '$CLUSTER_TYPE' not known."
 		exit 1
 	fi
 
-	OPENSTACK_EXTERNAL_NETWORK="${external_network[$CLUSTER_TYPE]}"
+	OPENSTACK_EXTERNAL_NETWORK="${external_network["$CLUSTER_TYPE"]}"
 fi
 
 if [[ -z "${OPENSTACK_CONTROLPLANE_FLAVOR:-}" ]]; then
@@ -74,12 +74,12 @@ if [[ -z "${OPENSTACK_CONTROLPLANE_FLAVOR:-}" ]]; then
 		exit 1
 	fi
 
-	if ! [[ -v controlplane_flavor[$CLUSTER_TYPE] ]]; then
+	if ! [[ -v controlplane_flavor["$CLUSTER_TYPE"] ]]; then
 		echo "OPENSTACK_CONTROLPLANE_FLAVOR value for CLUSTER_TYPE '$CLUSTER_TYPE' not known."
 		exit 1
 	fi
 
-	OPENSTACK_CONTROLPLANE_FLAVOR="${controlplane_flavor[$CLUSTER_TYPE]}"
+	OPENSTACK_CONTROLPLANE_FLAVOR="${controlplane_flavor["$CLUSTER_TYPE"]}"
 fi
 
 if [[ -z "${OPENSTACK_COMPUTE_FLAVOR:-}" ]]; then
@@ -88,12 +88,12 @@ if [[ -z "${OPENSTACK_COMPUTE_FLAVOR:-}" ]]; then
 		exit 1
 	fi
 
-	if ! [[ -v compute_flavor[$CLUSTER_TYPE] ]]; then
+	if ! [[ -v compute_flavor["$CLUSTER_TYPE"] ]]; then
 		echo "OPENSTACK_COMPUTE_FLAVOR value for CLUSTER_TYPE '$CLUSTER_TYPE' not known."
 		exit 1
 	fi
 
-	OPENSTACK_COMPUTE_FLAVOR="${compute_flavor[$CLUSTER_TYPE]}"
+	OPENSTACK_COMPUTE_FLAVOR="${compute_flavor["$CLUSTER_TYPE"]}"
 fi
 
 if [[ -z "${ZONES:-}" ]]; then
@@ -102,12 +102,12 @@ if [[ -z "${ZONES:-}" ]]; then
 		exit 1
 	fi
 
-	if ! [[ -v compute_azs[$CLUSTER_TYPE] ]]; then
+	if ! [[ -v compute_azs["$CLUSTER_TYPE"] ]]; then
 		echo "ZONES value for CLUSTER_TYPE '$CLUSTER_TYPE' not known."
 		exit 1
 	fi
 
-	ZONES="${compute_azs[$CLUSTER_TYPE]}"
+	ZONES="${compute_azs["$CLUSTER_TYPE"]}"
 fi
 
 if [[ -z "${BASTION_FLAVOR:-}" ]]; then
@@ -116,12 +116,12 @@ if [[ -z "${BASTION_FLAVOR:-}" ]]; then
 		exit 1
 	fi
 
-	if ! [[ -v bastion_flavor[$CLUSTER_TYPE] ]]; then
+	if ! [[ -v bastion_flavor["$CLUSTER_TYPE"] ]]; then
 		echo "BASTION_FLAVOR value for CLUSTER_TYPE '$CLUSTER_TYPE' not known."
 		exit 1
 	fi
 
-	BASTION_FLAVOR="${bastion_flavor[$CLUSTER_TYPE]}"
+	BASTION_FLAVOR="${bastion_flavor["$CLUSTER_TYPE"]}"
 fi
 
 cat <<< "$OPENSTACK_EXTERNAL_NETWORK"    > "${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK"
@@ -142,7 +142,7 @@ CLUSTER_TYPE: $CLUSTER_TYPE
 OPENSTACK_EXTERNAL_NETWORK: $OPENSTACK_EXTERNAL_NETWORK
 OPENSTACK_CONTROLPLANE_FLAVOR: $OPENSTACK_CONTROLPLANE_FLAVOR
 OPENSTACK_COMPUTE_FLAVOR: $OPENSTACK_COMPUTE_FLAVOR
-CLUSTER_NAME: $(cat ${SHARED_DIR}/CLUSTER_NAME)
+CLUSTER_NAME: $(cat "${SHARED_DIR}/CLUSTER_NAME")
 ZONES: $ZONES
 BASTION_FLAVOR: $BASTION_FLAVOR
 EOF
