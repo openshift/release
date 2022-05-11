@@ -4,6 +4,15 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+function show_time_used() {
+    local time_start test_type time_used
+    time_start="$1"
+    test_type="$2"
+
+    time_used="$(( ($(date +%s) - time_start)/60 ))"
+    echo "${test_type} tests took ${time_used} minutes"
+}
+
 if [ -f "${SHARED_DIR}/kubeconfig" ] ; then
     export KUBECONFIG=${SHARED_DIR}/kubeconfig
 fi
@@ -32,22 +41,37 @@ cd verification-tests
 export BUSHSLICER_LOG_LEVEL=plain
 # run normal tests
 export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/parallel/normal"
+timestamp_start="$(date +%s)"
 parallel_cucumber -n "${PARALLEL}" --first-is-1 --type cucumber --serialize-stdout --combine-stderr --prefix-output-with-test-env-number --exec \
     'export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS=$(echo ${USERS} | cut -d "," -f ${TEST_ENV_NUMBER},$((${TEST_ENV_NUMBER}+${PARALLEL})),$((${TEST_ENV_NUMBER}+${PARALLEL}*2)),$((${TEST_ENV_NUMBER}+${PARALLEL}*3)));
      export WORKSPACE=/tmp/dir${TEST_ENV_NUMBER};
-     parallel_cucumber --group-by found --only-group ${TEST_ENV_NUMBER} -o "--tags \"${E2E_RUN_TAGS} and not @admin and not @serial and ${E2E_SKIP_TAGS}\" -p junit"' || true
+     parallel_cucumber --group-by found --only-group ${TEST_ENV_NUMBER} -o "--tags \"${E2E_RUN_TAGS} and ${E2E_SKIP_TAGS} and not @serial and not @console and not @admin\" -p junit"' || true
+show_time_used "$timestamp_start" 'normal'
 
 # run admin tests
 export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/parallel/admin"
+timestamp_start="$(date +%s)"
 parallel_cucumber -n "${PARALLEL}" --first-is-1 --type cucumber --serialize-stdout --combine-stderr --prefix-output-with-test-env-number --exec \
     'export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS=$(echo ${USERS} | cut -d "," -f ${TEST_ENV_NUMBER},$((${TEST_ENV_NUMBER}+${PARALLEL})),$((${TEST_ENV_NUMBER}+${PARALLEL}*2)),$((${TEST_ENV_NUMBER}+${PARALLEL}*3)));
      export WORKSPACE=/tmp/dir${TEST_ENV_NUMBER};
-     parallel_cucumber --group-by found --only-group ${TEST_ENV_NUMBER} -o "--tags \"${E2E_RUN_TAGS} and @admin and not @serial and ${E2E_SKIP_TAGS}\" -p junit"' || true
+     parallel_cucumber --group-by found --only-group ${TEST_ENV_NUMBER} -o "--tags \"${E2E_RUN_TAGS} and ${E2E_SKIP_TAGS} and not @serial and not @console and @admin\" -p junit"' || true
+show_time_used "$timestamp_start" 'admin'
+
+# run console tests
+export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/parallel/console"
+timestamp_start="$(date +%s)"
+parallel_cucumber -n 2 --first-is-1 --type cucumber --serialize-stdout --combine-stderr --prefix-output-with-test-env-number --exec \
+    'export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS=$(echo ${USERS} | cut -d "," -f ${TEST_ENV_NUMBER},$((${TEST_ENV_NUMBER}+${PARALLEL})),$((${TEST_ENV_NUMBER}+${PARALLEL}*2)),$((${TEST_ENV_NUMBER}+${PARALLEL}*3)));
+     export WORKSPACE=/tmp/dir${TEST_ENV_NUMBER};
+     parallel_cucumber --group-by found --only-group ${TEST_ENV_NUMBER} -o "--tags \"${E2E_RUN_TAGS} and ${E2E_SKIP_TAGS} and not @serial and @console\" -p junit"' || true
+show_time_used "$timestamp_start" 'console'
 
 # run the rest tests in serial
 export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/serial"
 export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS="${USERS}"
-cucumber --tags "${E2E_RUN_TAGS} and @serial and ${E2E_SKIP_TAGS}" -p junit || true
+timestamp_start="$(date +%s)"
+cucumber --tags "${E2E_RUN_TAGS} and ${E2E_SKIP_TAGS} and @serial" -p junit || true
+show_time_used "$timestamp_start" 'serial'
 
 # summarize test results
 echo "Summarizing test result..."

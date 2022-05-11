@@ -67,6 +67,12 @@ then
 	source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+oc_version=$(oc version -o json | jq -r '.openshiftVersion')
+if [[ "${oc_version}" != *"4.9"* && "${oc_version}" != *"4.10"* ]]; then
+    echo "This script is only needed for OpenShift 4.9 and 4.10"
+    exit 0
+fi
+
 SCRIPT_BASE64=$(curl --retry 10 https://raw.githubusercontent.com/rh-nfv-int/shift-on-stack-vhostuser/master/roles/sos-vhostuser/files/vhostuser | base64 -w 0)
 SCRIPT_ARG_BASE64=$(echo "ARG=\"${NETWORK_ID}\"" | base64 -w 0)
 VHOSTUSER_MC=$(

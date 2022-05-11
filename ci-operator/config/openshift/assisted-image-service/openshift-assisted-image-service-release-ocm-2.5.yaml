@@ -1,8 +1,32 @@
 base_images:
+  assisted-installer:
+    name: ocm-2.5
+    namespace: edge-infrastructure
+    tag: assisted-installer
+  assisted-installer-agent:
+    name: ocm-2.5
+    namespace: edge-infrastructure
+    tag: assisted-installer-agent
+  assisted-installer-controller:
+    name: ocm-2.5
+    namespace: edge-infrastructure
+    tag: assisted-installer-controller
+  assisted-service:
+    name: ocm-2.5
+    namespace: edge-infrastructure
+    tag: assisted-service
+  assisted-test-infra:
+    name: ocm-2.5
+    namespace: edge-infrastructure
+    tag: assisted-test-infra
   coreos-centos-stream8:
     name: stream8
     namespace: coreos
     tag: "8"
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
   golangci-lint:
     name: golangci-lint
     namespace: ci
@@ -96,6 +120,23 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: assisted-image-service-codecov-token
+- as: e2e-metal-assisted-deploy-nodes
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=release-ocm-2.5
+        MAKEFILE_TARGET="setup run deploy_nodes"
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=release-ocm-2.5
+    workflow: assisted-baremetal
 zz_generated_metadata:
   branch: release-ocm-2.5
   org: openshift
