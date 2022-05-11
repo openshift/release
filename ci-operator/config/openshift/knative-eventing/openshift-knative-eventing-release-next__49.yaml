@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: "4.7"
+    name: "4.9"
     namespace: ocp
     tag: base
 binary_build_commands: make install
@@ -260,36 +260,43 @@ images:
 promotion:
   additional_images:
     knative-eventing-src: src
+  disabled: true
   name: knative-nightly
   namespace: openshift
 releases:
   initial:
     integration:
-      name: "4.7"
+      name: "4.9"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.7"
+      name: "4.9"
       namespace: ocp
 resources:
   '*':
     limits:
-      memory: 3Gi
+      memory: 2Gi
     requests:
       cpu: 500m
       memory: 2Gi
   bin:
     limits:
-      memory: 3Gi
+      memory: 2Gi
     requests:
       cpu: 500m
       memory: 2Gi
 test_binary_build_commands: make test-install
 tests:
-- as: e2e-aws-ocp-47
+- as: e2e-aws-ocp-49
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.9"
   steps:
-    cluster_profile: aws
     test:
     - as: test
       cli: latest
@@ -362,10 +369,16 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: ipi-aws
-- as: conformance-aws-ocp-47
+    workflow: generic-claim
+- as: conformance-aws-ocp-49
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.9"
   steps:
-    cluster_profile: aws
     test:
     - as: test
       cli: latest
@@ -438,10 +451,16 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: ipi-aws
-- as: reconciler-aws-ocp-47
+    workflow: generic-claim
+- as: reconciler-aws-ocp-49
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.9"
   steps:
-    cluster_profile: aws
     test:
     - as: test
       cli: latest
@@ -514,9 +533,9 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: ipi-aws
+    workflow: generic-claim
 zz_generated_metadata:
   branch: release-next
   org: openshift
   repo: knative-eventing
-  variant: "47"
+  variant: "49"

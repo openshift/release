@@ -67,11 +67,14 @@ oc registry login || {
     exit 1
 }
 
+# Check if running in openshift/release only in presubmit jobs because
+# REPO_OWNER and REPO_NAME are not available for other types
 dry=false
-# Check if running in openshift/release
-if [[ "$REPO_OWNER" == "openshift" && "$REPO_NAME" == "release" ]]; then
-    log "INFO Running in openshift/release, setting dry-run to true"
-    dry=true
+if [[ "$JOB_TYPE" == "presubmit" ]]; then
+    if [[ "$REPO_OWNER" == "openshift" && "$REPO_NAME" == "release" ]]; then
+        log "INFO Running in openshift/release, setting dry-run to true"
+        dry=true
+    fi
 fi
 
 # Build destination image reference

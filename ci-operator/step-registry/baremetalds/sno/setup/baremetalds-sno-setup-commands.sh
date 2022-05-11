@@ -75,7 +75,7 @@ set +x
 echo "export PULL_SECRET='\$(cat /root/pull-secret)'" >> /root/config
 echo "export NO_MINIKUBE=true" >> /root/config
 
-echo "export OPENSHIFT_INSTALL_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST}" >> /root/config
+echo "export OPENSHIFT_INSTALL_RELEASE_IMAGE=${OPENSHIFT_INSTALL_RELEASE_IMAGE:-${RELEASE_IMAGE_LATEST}}" >> /root/config
 
 set -x
 
@@ -93,6 +93,6 @@ echo "${SINGLE_NODE_IP_ADDRESS} ${CLUSTER_API_DOMAIN}" | tee --append /etc/hosts
 echo Reloading NetworkManager systemd configuration
 systemctl reload NetworkManager
 
-timeout -s 9 105m make setup deploy_ibip
+timeout -s 9 105m make setup deploy_ibip TEST_FUNC=${TEST_FUNC}
 
 EOF

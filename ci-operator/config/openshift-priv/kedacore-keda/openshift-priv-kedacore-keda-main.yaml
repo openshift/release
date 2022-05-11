@@ -8,7 +8,10 @@ base_images:
     namespace: ocp
     tag: rhel-8-golang-1.17-openshift-4.11
 build_root:
-  from_repository: true
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.17-openshift-4.11
 images:
 - from: base
   inputs:
@@ -19,26 +22,33 @@ images:
 promotion:
   name: 4.11-priv
   namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: "4.11"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.11"
+      namespace: ocp
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: tooldeps-check
-  commands: make tooldeps-check
-  container:
-    from: src
 - as: gofmt
-  commands: make fmt
+  commands: env && GOFLAGS="" make fmt
   container:
     from: src
 - as: govet
-  commands: make vet
+  commands: env && GOFLAGS="" make vet
   container:
     from: src
 - as: clientset-verify
-  commands: make clientset-verify
+  commands: mkdir /tmp/codecopy && cp -a * /tmp/codecopy && cd /tmp/codecopy && make
+    clientset-generate
   container:
     from: src
 zz_generated_metadata:

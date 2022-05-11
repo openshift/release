@@ -127,7 +127,7 @@ run_command "az image create --resource-group ${bastion_rg} --name '${bastion_na
 bastion_image_id=$(az image show --resource-group ${bastion_rg} --name "${bastion_name}-image" | jq -r '.id')
 
 echo "Create bastion subnet"
-open_port="22 3128 3129 5000" bastion_nsg="${bastion_name}-nsg" bastion_subnet="${bastion_name}Subnet"
+open_port="22 3128 3129 5000 6001 6002" bastion_nsg="${bastion_name}-nsg" bastion_subnet="${bastion_name}Subnet"
 run_command "az network nsg create -g ${bastion_rg} -n ${bastion_nsg}" &&
 run_command "az network nsg rule create -g ${bastion_rg} --nsg-name '${bastion_nsg}' -n '${bastion_name}-allow' --priority 1000 --access Allow --source-port-ranges '*' --destination-port-ranges ${open_port}" &&
 #subnet cidr for int service is hard code, it should be a sub rang of the whole VNet cidr, and not conflicts with master subnet and worker subnet
