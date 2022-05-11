@@ -35,6 +35,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  ibmcloud-tests:
+    name: ibm-hypershift-testing
+    namespace: ci
+    tag: latest
   ocp_builder_rhel-8-golang-1.18-openshift-4.11:
     name: builder
     namespace: ocp
@@ -574,6 +578,45 @@ tests:
         requests:
           cpu: 100m
       timeout: 1h0m0s
+- as: e2e-ibmcloud-roks
+  skip_if_only_changed: (^(docs|examples|enhancements)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+  steps:
+    pre:
+    - ref: ipi-install-rbac
+    test:
+    - as: install-hypershift
+      cli: latest
+      commands: |-
+        export KUBECONFIG="/etc/ibmcloud/secrets/roks.kubeconfig"
+        bin/hypershift install --hypershift-image ${HYPERSHIFT_RELEASE_LATEST} --exclude-etcd true
+      credentials:
+      - mount_path: /etc/ibmcloud/secrets
+        name: hypershift-ibm-shared-ci-creds
+        namespace: test-credentials
+      dependencies:
+      - env: HYPERSHIFT_RELEASE_LATEST
+        name: hypershift-operator
+      from: bin
+      resources:
+        requests:
+          cpu: 100m
+    - as: create-guest-cluster
+      commands: |-
+        export CLUSTER_ID="hypershift-ci-${BUILD_ID}"
+        export MANAGED_CLUSTER_TYPE="openshift"
+        export MANAGEMENT_CLUSTER_KUBECONFIG="/etc/ibmcloud/secrets/roks.kubeconfig"
+        export BOM_VERSION="4.9.28_1536_openshift"
+        ./cluster-create.sh
+      credentials:
+      - mount_path: /etc/ibmcloud/secrets
+        name: hypershift-ibm-shared-ci-creds
+        namespace: test-credentials
+      from: ibmcloud-tests
+      grace_period: 1m0s
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 5m0s
 zz_generated_metadata:
   branch: main
   org: openshift
