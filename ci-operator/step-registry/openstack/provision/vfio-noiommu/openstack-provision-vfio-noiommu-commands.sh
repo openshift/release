@@ -54,6 +54,12 @@ then
 	source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+oc_version=$(oc version -o json | jq -r '.openshiftVersion')
+if [[ "${oc_version}" != *"4.9"* && "${oc_version}" != *"4.10"* ]]; then
+    echo "This script is only needed for OpenShift 4.9 and 4.10"
+    exit 0
+fi
+
 VFIO_NOIOMMU=$(
     oc create -f - -o jsonpath='{.metadata.name}' <<EOF
 kind: MachineConfig

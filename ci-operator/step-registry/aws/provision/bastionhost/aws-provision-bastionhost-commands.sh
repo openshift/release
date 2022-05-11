@@ -12,6 +12,11 @@ curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -
 
 REGION="${LEASED_RESOURCE}"
 
+# Using source region for C2S and SC2S
+if [[ "${CLUSTER_TYPE}" == "aws-c2s" ]] || [[ "${CLUSTER_TYPE}" == "aws-sc2s" ]]; then
+  REGION=$(jq -r ".\"${LEASED_RESOURCE}\".source_region" "${CLUSTER_PROFILE_DIR}/shift_project_setting.json")
+fi
+
 # 1. get vpc id and public subnet
 VpcId=$(cat "${SHARED_DIR}/vpc_id")
 echo "VpcId: $VpcId"
@@ -19,31 +24,43 @@ echo "VpcId: $VpcId"
 PublicSubnet="$(/tmp/yq r "${SHARED_DIR}/public_subnet_ids" '[0]')"
 echo "PublicSubnet: $PublicSubnet"
 
-stack_name="${NAMESPACE}-${JOB_NAME_HASH}-bas"
-s3_bucket_name="${NAMESPACE}-${JOB_NAME_HASH}-s3"
+CLUSTER_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
+stack_name="${CLUSTER_NAME}-bas"
+s3_bucket_name="${CLUSTER_NAME}-s3"
+bastion_ignition_file="${SHARED_DIR}/${CLUSTER_NAME}-bastion.ign"
+bastion_cf_tpl_file="${SHARED_DIR}/${CLUSTER_NAME}-bastion-cf-tpl.yaml"
+
+
+if [[ "${BASTION_HOST_AMI}" == "" ]]; then
+  # create bastion host dynamicly
+  if [[ ! -f "${bastion_ignition_file}" ]]; then
+    echo "'${bastion_ignition_file}' not found , abort." && exit 1
+  fi
+  curl -sL https://raw.githubusercontent.com/yunjiang29/ocp-test-data/main/coreos-for-bastion-host/fedora-coreos-stable.json -o /tmp/fedora-coreos-stable.json
+  ami_id=$(jq -r .architectures.x86_64.images.aws.regions[\"${REGION}\"].image < /tmp/fedora-coreos-stable.json)
+
+  ign_location="s3://${s3_bucket_name}/bastion.ign"
+  aws --region $REGION s3 mb "s3://${s3_bucket_name}"
+  echo "s3://${s3_bucket_name}" > "$SHARED_DIR/to_be_removed_s3_bucket_list"
+  aws --region $REGION s3 cp ${bastion_ignition_file} "${ign_location}"
+else
+  # use BYO bastion host
+  ami_id=${BASTION_HOST_AMI}
+  ign_location="NA"
+fi
+
+echo -e "AMI ID: $ami_id"
 
 BastionHostInstanceType="t2.medium"
 # there is no t2.medium instance type in us-gov-east-1 region
-if [ "${REGION}" == "us-gov-east-1" ]; then
+if [[ "${REGION}" == "us-gov-east-1" ]]; then
     BastionHostInstanceType="t3a.medium"
 fi
-
-ssh_pub_key=$(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")
-
-workdir=`mktemp -d`
-
-echo -e "==== Start to create bastion host ===="
-echo -e "working dir: $workdir"
-
-# TODO: move repo to a more appropriate location
-curl -sL https://raw.githubusercontent.com/yunjiang29/ocp-test-data/main/coreos-for-bastion-host/fedora-coreos-stable.json -o $workdir/fedora-coreos-stable.json
-AmiId=$(jq -r .architectures.x86_64.images.aws.regions[\"${REGION}\"].image < $workdir/fedora-coreos-stable.json)
-echo -e "AMI ID: $AmiId"
 
 ## ----------------------------------------------------------------
 # bastion host CF template
 ## ----------------------------------------------------------------
-cat > ${workdir}/bastion.yaml << EOF
+cat > ${bastion_cf_tpl_file} << EOF
 AWSTemplateFormatVersion: 2010-09-09
 Description: Template for RHEL machine Launch
 
@@ -76,6 +93,7 @@ Parameters:
     Type: String
   BastionIgnitionLocation:
     Description: Ignition config file location.
+    Default: NA
     Type: String
 
 Metadata:
@@ -95,7 +113,40 @@ Metadata:
       BastionHostInstanceType:
         default: "Worker Instance Type"
 
+Conditions:
+  UseIgnition: !Not [ !Equals ["NA", !Ref BastionIgnitionLocation] ]
+
 Resources:
+  BastionIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        - Effect: "Allow"
+          Principal:
+            Service:
+            - "ec2.amazonaws.com"
+          Action:
+          - "sts:AssumeRole"
+      Path: "/"
+      Policies:
+      - PolicyName: !Join ["-", [!Ref Machinename, "policy"]]
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+          - Effect: "Allow"
+            Action: "s3:Get*"
+            Resource: "*"
+          - Effect: "Allow"
+            Action: "s3:List*"
+            Resource: "*"
+  BastionInstanceProfile:
+    Type: "AWS::IAM::InstanceProfile"
+    Properties:
+      Path: "/"
+      Roles:
+      - Ref: "BastionIamRole"
   BastionSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -122,6 +173,10 @@ Resources:
         ToPort: 5000
         CidrIp: 0.0.0.0/0
       - IpProtocol: tcp
+        FromPort: 6001
+        ToPort: 6002
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
         FromPort: 80
         ToPort: 80
         CidrIp: 0.0.0.0/0
@@ -134,6 +189,7 @@ Resources:
     Type: AWS::EC2::Instance
     Properties:
       ImageId: !Ref AmiId
+      IamInstanceProfile: !Ref BastionInstanceProfile
       InstanceType: !Ref BastionHostInstanceType
       NetworkInterfaces:
       - AssociatePublicIpAddress: "True"
@@ -147,14 +203,16 @@ Resources:
       BlockDeviceMappings:
         - DeviceName: /dev/xvda
           Ebs:
-            VolumeSize: "60"
+            VolumeSize: "120"
             VolumeType: gp2
       UserData:
-        Fn::Base64: !Sub
-        - '{"ignition":{"config":{"replace":{"source":"\${IgnitionLocation}"}},"version":"3.0.0"}}'
-        - {
-          IgnitionLocation: !Ref BastionIgnitionLocation
-        }
+        !If
+          - "UseIgnition"
+          - Fn::Base64:
+              !Sub
+                - '{"ignition":{"config":{"replace":{"source":"\${IgnitionLocation}"}},"version":"3.0.0"}}'
+                - IgnitionLocation: !Ref BastionIgnitionLocation
+          - !Ref "AWS::NoValue"
 
 Outputs:
   BastionInstanceId:
@@ -175,238 +233,19 @@ Outputs:
 EOF
 
 
-## ----------------------------------------------------------------
-# PROXY
-# /srv/squid/etc/passwords
-# /srv/squid/etc/mime.conf
-# /srv/squid/etc/squid.conf
-# /srv/squid/log/
-# /srv/squid/cache
-## ----------------------------------------------------------------
-
-## PROXY CONFIG
-cat > ${workdir}/squid.conf << EOF
-auth_param basic program /usr/lib64/squid/basic_ncsa_auth /etc/squid/passwords
-auth_param basic realm proxy
-
-acl authenticated proxy_auth REQUIRED
-acl CONNECT method CONNECT
-http_access allow authenticated
-http_port 3128
-EOF
-
-## PROXY Service
-cat > ${workdir}/squid-proxy.service << EOF
-[Unit]
-Description=OpenShift QE Squid Proxy Server
-After=network.target syslog.target
-
-[Service]
-Type=simple
-TimeoutStartSec=5m
-ExecStartPre=-/usr/bin/podman rm "squid-proxy"
-
-ExecStart=/usr/bin/podman run   --name "squid-proxy" \
-                                --net host \
-                                -p 3128:3128 \
-                                -p 3129:3129 \
-                                -v /srv/squid/etc:/etc/squid:Z \
-                                -v /srv/squid/cache:/var/spool/squid:Z \
-                                -v /srv/squid/log:/var/log/squid:Z \
-                                quay.io/crcont/squid
-
-ExecReload=-/usr/bin/podman stop "squid-proxy"
-ExecReload=-/usr/bin/podman rm "squid-proxy"
-ExecStop=-/usr/bin/podman stop "squid-proxy"
-Restart=always
-RestartSec=30
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-## ----------------------------------------------------------------
-# MIRROR REGISTORY
-# /opt/registry/auth/htpasswd
-# /opt/registry/certs/domain.crt
-# /opt/registry/certs/domain.key
-# /opt/registry/data
-# 
-## ----------------------------------------------------------------
-
-cat > ${workdir}/poc-registry.service << EOF
-[Unit]
-Description=OpenShift POC HTTP for PXE Config
-After=network.target syslog.target
-
-[Service]
-Type=simple
-TimeoutStartSec=5m
-ExecStartPre=-/usr/bin/podman rm "poc-registry"
-ExecStartPre=/usr/bin/chcon -Rt container_file_t /opt/registry
-
-ExecStart=/usr/bin/podman run   --name poc-registry -p 5000:5000 \
-                                --net host \
-                                -v /opt/registry/data:/var/lib/registry:z \
-                                -v /opt/registry/auth:/auth \
-                                -e "REGISTRY_AUTH=htpasswd" \
-                                -e "REGISTRY_AUTH_HTPASSWD_REALM=Registry Realm" \
-                                -e REGISTRY_AUTH_HTPASSWD_PATH=/auth/htpasswd \
-                                -v /opt/registry/certs:/certs:z \
-                                -e REGISTRY_HTTP_TLS_CERTIFICATE=/certs/domain.crt \
-                                -e REGISTRY_HTTP_TLS_KEY=/certs/domain.key \
-                                registry:2
-
-ExecReload=-/usr/bin/podman stop "poc-registry"
-ExecReload=-/usr/bin/podman rm "poc-registry"
-ExecStop=-/usr/bin/podman stop "poc-registry"
-Restart=always
-RestartSec=30
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-
-## ----------------------------------------------------------------
-# IGNITION
-## ----------------------------------------------------------------
-
-PROXY_CREDENTIAL=$(< /var/run/vault/proxy/proxy_creds)
-PROXY_CREDENTIAL_ARP1=$(< /var/run/vault/proxy/proxy_creds_encrypted_apr1)
-PROXY_CREDENTIAL_CONTENT="$(echo -e ${PROXY_CREDENTIAL_ARP1} | base64 -w0)"
-
-PROXY_CONFIG_CONTENT=$(cat ${workdir}/squid.conf | base64 -w0)
-
-REGISTRY_PASSWORD_CONTENT=$(cat "/var/run/vault/mirror-registry/registry_creds_encrypted_htpasswd" | base64 -w0)
-REGISTRY_CRT_CONTENT=$(cat "/var/run/vault/mirror-registry/server_domain.crt" | base64 -w0)
-REGISTRY_KEY_CONTENT=$(cat "/var/run/vault/mirror-registry/server_domain.pem" | base64 -w0)
-
-
-PROXY_SERVICE_CONTENT=$(sed ':a;N;$!ba;s/\n/\\n/g' ${workdir}/squid-proxy.service | sed 's/\"/\\"/g')
-REGISTRY_SERVICE_CONTENT=$(sed ':a;N;$!ba;s/\n/\\n/g' ${workdir}/poc-registry.service | sed 's/\"/\\"/g')
-
-echo -e "Creating ${workdir}/bastion.ign"
-cat > ${workdir}/bastion.ign << EOF
-{
-  "ignition": {
-    "config": {},
-    "security": {
-      "tls": {}
-    },
-    "timeouts": {},
-    "version": "3.0.0"
-  },
-  "passwd": {
-    "users": [
-      {
-        "name": "core",
-        "sshAuthorizedKeys": [
-          "${ssh_pub_key}"
-        ]
-      }
-    ]
-  },
-  "storage": {
-    "files": [
-      {
-        "path": "/srv/squid/etc/passwords",
-        "contents": {
-          "source": "data:text/plain;base64,${PROXY_CREDENTIAL_CONTENT}"
-        },
-        "mode": 420
-      },
-      {
-        "path": "/srv/squid/etc/squid.conf",
-        "contents": {
-          "source": "data:text/plain;base64,${PROXY_CONFIG_CONTENT}"
-        },
-        "mode": 420
-      },
-      {
-        "path": "/srv/squid/etc/mime.conf",
-        "contents": {
-          "source": "data:text/plain;base64,"
-        },
-        "mode": 420
-      },
-      {
-        "path": "/opt/registry/auth/htpasswd",
-        "contents": {
-          "source": "data:text/plain;base64,${REGISTRY_PASSWORD_CONTENT}"
-        },
-        "mode": 420
-      },
-      {
-        "path": "/opt/registry/certs/domain.crt",
-        "contents": {
-          "source": "data:text/plain;base64,${REGISTRY_CRT_CONTENT}"
-        },
-        "mode": 420
-      },
-      {
-        "path": "/opt/registry/certs/domain.key",
-        "contents": {
-          "source": "data:text/plain;base64,${REGISTRY_KEY_CONTENT}"
-        },
-        "mode": 420
-      }
-    ],
-    "directories": [
-      {
-        "path": "/srv/squid/log",
-        "mode": 493
-      },
-      {
-        "path": "/srv/squid/cache",
-        "mode": 493
-      },
-      {
-        "path": "/opt/registry/data",
-        "mode": 493
-      }
-    ]
-  },
-  "systemd": {
-    "units": [
-      {
-        "contents": "${PROXY_SERVICE_CONTENT}",
-        "enabled": true,
-        "name": "squid-proxy.service"
-      },
-      {
-        "contents": "${REGISTRY_SERVICE_CONTENT}",
-        "enabled": true,
-        "name": "poc-registry.service"
-      },
-      {
-        "enabled": false,
-        "mask": true,
-        "name": "zincati.service"
-      }
-    ]
-  }
-}
-EOF
-
-
-# upload ignition file to s3
-aws --region $REGION s3 mb "s3://${s3_bucket_name}"
-echo "s3://${s3_bucket_name}" > "$SHARED_DIR/to_be_removed_s3_bucket_list"
-aws --region $REGION s3api put-bucket-acl --bucket "${s3_bucket_name}" --acl public-read
-aws --region $REGION s3 cp ${workdir}/bastion.ign "s3://${s3_bucket_name}/bastion.ign"
-aws --region $REGION s3api put-object-acl --bucket "${s3_bucket_name}" --key "bastion.ign" --acl public-read
-
+# create bastion instance bucket
+echo -e "==== Start to create bastion host ===="
 echo ${stack_name} >> "${SHARED_DIR}/to_be_removed_cf_stack_list"
 aws --region $REGION cloudformation create-stack --stack-name ${stack_name} \
-    --template-body file://${workdir}/bastion.yaml \
+    --template-body file://${bastion_cf_tpl_file} \
+    --capabilities CAPABILITY_NAMED_IAM \
     --parameters \
         ParameterKey=VpcId,ParameterValue="${VpcId}"  \
         ParameterKey=BastionHostInstanceType,ParameterValue="${BastionHostInstanceType}"  \
         ParameterKey=Machinename,ParameterValue="${stack_name}"  \
         ParameterKey=PublicSubnet,ParameterValue="${PublicSubnet}" \
-        ParameterKey=AmiId,ParameterValue="${AmiId}" \
-        ParameterKey=BastionIgnitionLocation,ParameterValue="s3://${s3_bucket_name}/bastion.ign"  &
+        ParameterKey=AmiId,ParameterValue="${ami_id}" \
+        ParameterKey=BastionIgnitionLocation,ParameterValue="${ign_location}"  &
 
 wait "$!"
 echo "Created stack"
@@ -434,6 +273,7 @@ echo "${BASTION_HOST_PUBLIC_DNS}" > "${SHARED_DIR}/bastion_public_address"
 echo "${BASTION_HOST_PRIVATE_DNS}" > "${SHARED_DIR}/bastion_private_address"
 echo "core" > "${SHARED_DIR}/bastion_ssh_user"
 
+PROXY_CREDENTIAL=$(< /var/run/vault/proxy/proxy_creds)
 PROXY_PUBLIC_URL="http://${PROXY_CREDENTIAL}@${BASTION_HOST_PUBLIC_DNS}:3128"
 PROXY_PRIVATE_URL="http://${PROXY_CREDENTIAL}@${BASTION_HOST_PRIVATE_DNS}:3128"
 

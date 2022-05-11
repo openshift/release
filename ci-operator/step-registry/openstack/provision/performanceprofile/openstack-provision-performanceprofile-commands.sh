@@ -87,25 +87,8 @@ spec:
     enabled: false
 EOL
 
-oc_version=$(oc version | cut -d ' ' -f 3 | cut -d '.' -f1,2 | sed -n '2p')
-case "${oc_version}" in
-    # Remove 4.11 once it's GA
-    4.11) dev_version=master ;;
-    *) ;;
-esac
-
-if [ -n "${dev_version:-}" ]; then
-    git clone --branch ${dev_version} https://github.com/openshift-kni/performance-addon-operators /tmp/performance-addon-operators
-    pushd /tmp/performance-addon-operators
-    if [[ ! -f cluster-setup/manual-cluster/performance/performance_profile.yaml ]]; then
-        echo "performance_profile.yaml was not found in the PAO repository"
-        exit 1
-    fi
-    cp /tmp/performance_profile.yaml cluster-setup/manual-cluster/performance/
-    export CLUSTER=manual
-    make cluster-deploy
-    popd
-else
+oc_version=$(oc version -o json | jq -r '.openshiftVersion')
+if [[ "${oc_version}" == *"4.9"* || "${oc_version}" == *"4.10"* ]]; then
     PAO_NAMESPACE=$(
         oc create -f - -o jsonpath='{.metadata.name}' <<EOF
 apiVersion: v1
@@ -168,9 +151,9 @@ EOF
         exit 1
     fi
 
-    PAO_PROFILE=$(oc create -f /tmp/performance_profile.yaml -o jsonpath='{.metadata.name}')
-    echo "Created \"$PAO_PROFILE\" PerformanceProfile"
 fi
+PAO_PROFILE=$(oc create -f /tmp/performance_profile.yaml -o jsonpath='{.metadata.name}')
+echo "Created \"$PAO_PROFILE\" PerformanceProfile"
 
 check_workers_updated
 
