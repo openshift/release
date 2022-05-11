@@ -745,6 +745,58 @@ periodics:
     workdir: true
   interval: 5m
   labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  max_concurrency: 1
+  name: periodic-ipi-deprovision-aws-3
+  reporter_config:
+    slack:
+      channel: '#ops-ci'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: '@aws-ci-admin Job *{{.Spec.Job}}* failed. <{{.Status.URL}}|View
+        logs>'
+  spec:
+    containers:
+    - command:
+      - ./core-services/ipi-deprovision/aws.sh
+      env:
+      - name: HOME
+        value: /tmp
+      - name: AWS_SHARED_CREDENTIALS_FILE
+        value: /aws/.awscred
+      - name: CLUSTER_TTL
+        value: 30 minutes ago
+      image: registry.ci.openshift.org/ci/ipi-deprovision:latest
+      imagePullPolicy: Always
+      name: ipi-deprovision
+      resources:
+        requests:
+          cpu: "1"
+          memory: 300Mi
+      volumeMounts:
+      - mountPath: /aws
+        name: cluster-secrets-aws
+    serviceAccountName: ipi-deprovisioner
+    volumes:
+    - name: cluster-secrets-aws
+      secret:
+        items:
+        - key: .awscred
+          path: .awscred
+        secretName: cluster-secrets-aws-3
+- agent: kubernetes
+  cluster: build01
+  decorate: true
+  decoration_config:
+    timeout: 8h0m0s
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+    workdir: true
+  interval: 5m
+  labels:
     ci.openshift.io/role: cloud-gcp
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   max_concurrency: 1
