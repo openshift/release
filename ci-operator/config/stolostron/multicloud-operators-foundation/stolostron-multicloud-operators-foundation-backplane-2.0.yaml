@@ -22,18 +22,17 @@ images:
       - registry.ci.openshift.org/stolostron/builder:go1.17-linux
   to: multicloud-manager
 promotion:
-  disabled: true
   name: "2.0"
   namespace: stolostron
 releases:
   initial:
     integration:
-      name: "4.8"
+      name: "4.9"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.8"
+      name: "4.9"
       namespace: ocp
 resources:
   '*':
@@ -65,8 +64,15 @@ tests:
   container:
     from: test-bin
 - as: e2e
+  cluster_claim:
+    architecture: amd64
+    as: custom
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h30m0s
+    version: "4.9"
   steps:
-    cluster_profile: aws
     test:
     - as: test
       cli: latest
@@ -85,7 +91,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    workflow: generic-claim
 - as: sonarcloud
   steps:
     test:

@@ -1,4 +1,8 @@
 base_images:
+  assisted-image-service:
+    name: ocm-2.6
+    namespace: edge-infrastructure
+    tag: assisted-image-service
   assisted-installer:
     name: ocm-2.6
     namespace: edge-infrastructure
@@ -192,20 +196,7 @@ tests:
       timeout: 5m0s
     - as: test-e2e
       cli: latest
-      commands: |-
-        bin/test-e2e \
-          -test.v \
-          -test.timeout=0 \
-          --e2e.aws-credentials-file=/etc/hypershift-pool-aws-credentials/credentials \
-          --e2e.aws-zones=us-east-1a,us-east-1b \
-          --e2e.node-pool-replicas=1 \
-          --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson \
-          --e2e.base-domain=ci.hypershift.devcluster.openshift.com \
-          --e2e.latest-release-image=${OCP_IMAGE_LATEST} \
-          --e2e.previous-release-image=${OCP_IMAGE_PREVIOUS} \
-          --e2e.additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
-          --e2e.control-plane-operator-image=${HYPERSHIFT_RELEASE_LATEST} \
-          --e2e.aws-endpoint-access=PublicAndPrivate
+      commands: make ci-test-e2e
       credentials:
       - mount_path: /etc/hypershift-pool-aws-credentials
         name: hypershift-pool-aws-credentials
@@ -218,8 +209,6 @@ tests:
         name: release:hosted-ocp-latest
       - env: OCP_IMAGE_PREVIOUS
         name: release:hosted-ocp-previous
-      - env: HYPERSHIFT_RELEASE_LATEST
-        name: hypershift-operator
       from: test-bin
       grace_period: 15m0s
       resources:
@@ -273,20 +262,7 @@ tests:
       timeout: 5m0s
     - as: test-e2e
       cli: latest
-      commands: |-
-        bin/test-e2e \
-          -test.v \
-          -test.timeout=0 \
-          --e2e.aws-credentials-file=/etc/hypershift-pool-aws-credentials/credentials \
-          --e2e.aws-zones=us-east-1a,us-east-1b \
-          --e2e.node-pool-replicas=1 \
-          --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson \
-          --e2e.base-domain=ci.hypershift.devcluster.openshift.com \
-          --e2e.latest-release-image=${OCP_IMAGE_LATEST} \
-          --e2e.previous-release-image=${OCP_IMAGE_PREVIOUS} \
-          --e2e.additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
-          --e2e.control-plane-operator-image=${HYPERSHIFT_RELEASE_LATEST} \
-          --e2e.aws-endpoint-access=PublicAndPrivate
+      commands: make ci-test-e2e
       credentials:
       - mount_path: /etc/hypershift-pool-aws-credentials
         name: hypershift-pool-aws-credentials
@@ -299,8 +275,6 @@ tests:
         name: release:hosted-ocp-latest
       - env: OCP_IMAGE_PREVIOUS
         name: release:hosted-ocp-previous
-      - env: HYPERSHIFT_RELEASE_LATEST
-        name: hypershift-operator
       from: test-bin
       grace_period: 15m0s
       resources:
@@ -366,7 +340,6 @@ tests:
                   --e2e.latest-release-image=${OCP_IMAGE_LATEST} \
                   --e2e.previous-release-image=${OCP_IMAGE_PREVIOUS} \
                   --e2e.kubevirt-container-disk-image="${RHCOS_CD_IMAGE}" \
-                  --e2e.control-plane-operator-image=${HYPERSHIFT_RELEASE_LATEST} \
                   --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson
       credentials:
       - mount_path: /etc/ci-pull-credentials
@@ -420,7 +393,6 @@ tests:
                   --e2e.latest-release-image=${OCP_IMAGE_LATEST} \
                   --e2e.previous-release-image=${OCP_IMAGE_PREVIOUS} \
                   --e2e.kubevirt-container-disk-image="${RHCOS_CD_IMAGE}" \
-                  --e2e.control-plane-operator-image=${HYPERSHIFT_RELEASE_LATEST} \
                   --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson
       credentials:
       - mount_path: /etc/ci-pull-credentials
@@ -576,7 +548,7 @@ tests:
           -test.timeout=0 \
           -test.run=TestUpgradeControlPlane \
           --e2e.aws-credentials-file=/etc/hypershift-ci-jobs-awscreds/credentials \
-          --e2e.aws-zones=us-east-1a,us-east-1b \
+          --e2e.aws-zones=us-east-1a,us-east-1b,us-east-1c \
           --e2e.node-pool-replicas=1 \
           --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson \
           --e2e.base-domain=ci.hypershift.devcluster.openshift.com \
