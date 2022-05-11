@@ -249,7 +249,7 @@ storage:
   cache:
     blobdescriptor: inmemory
   filesystem:
-    rootdirectory: /opt/registry-${port}
+    rootdirectory: /var/lib/registry
 auth:
   htpasswd:
     realm: Registry Realm

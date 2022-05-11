@@ -1,4 +1,8 @@
 base_images:
+  assisted-image-service:
+    name: ocm-2.6
+    namespace: edge-infrastructure
+    tag: assisted-image-service
   assisted-installer-agent:
     name: ocm-2.6
     namespace: edge-infrastructure
@@ -106,10 +110,12 @@ tests:
     make lint
   container:
     from: test-bin
+  skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
 - as: format-check
   commands: make format-check
   container:
     from: test-bin
+  skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
 - as: unit-test
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
@@ -119,6 +125,7 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: assisted-installer-codecov-token
+  skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
 - as: unit-test-postsubmit
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
@@ -130,7 +137,7 @@ tests:
     mount_path: /tmp/secret
     name: assisted-installer-codecov-token
 - as: e2e-metal-assisted
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: packet-assisted
     workflow: assisted-baremetal
@@ -153,21 +160,28 @@ tests:
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-cnv
   optional: true
-  run_if_changed: ^(src/assisted_installer_controller/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=cnv
     workflow: assisted-baremetal
+- as: e2e-metal-assisted-odf
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=odf
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-ocs
   optional: true
-  run_if_changed: ^(src/assisted_installer_controller/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=ocs
+        OPENSHIFT_VERSION=4.8
     workflow: assisted-baremetal
 zz_generated_metadata:
   branch: master
