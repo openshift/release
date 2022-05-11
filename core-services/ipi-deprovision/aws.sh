@@ -20,15 +20,21 @@ function deprovision() {
   REGION="$(cat ${WORKDIR}/metadata.json|jq .aws.region -r)"
   INFRA_ID="$(cat ${WORKDIR}/metadata.json|jq '.aws.identifier[0]|keys[0]' -r|cut -d '/' -f3|tr -d '\n')"
   if [[ -n ${HYPERSHIFT_PRUNER:-} ]]; then
-    for hostedcluster in  $(oc get hostedcluster -n clusters -o json | jq -r --argjson timestamp 21600 '.items[] | select (.metadata.creationTimestamp | sub("\\..*";"Z") | sub("\\s";"T") | fromdate < now - $timestamp).metadata.name'); do
-      hypershift destroy cluster aws --aws-creds "${AWS_SHARED_CREDENTIALS_FILE}" --namespace clusters --name "${hostedcluster}";
-    done
     HYPERSHIFT_BASE_DOMAIN="${HYPERSHIFT_BASE_DOMAIN:-origin-ci-int-aws.dev.rhcloud.com}"
     timeout --signal=SIGQUIT 30m hypershift destroy infra aws --aws-creds "${AWS_SHARED_CREDENTIALS_FILE}" --infra-id "${INFRA_ID}" --base-domain "${HYPERSHIFT_BASE_DOMAIN}" --region "${REGION}" || touch "${WORKDIR}/failure"
     timeout --signal=SIGQUIT 30m hypershift destroy iam aws --aws-creds "${AWS_SHARED_CREDENTIALS_FILE}" --infra-id "${INFRA_ID}" --region "${REGION}" || touch "${WORKDIR}/failure"
   fi
   timeout --signal=SIGQUIT 60m openshift-install --dir "${WORKDIR}" --log-level error destroy cluster && touch "${WORKDIR}/success" || touch "${WORKDIR}/failure"
 }
+
+if [[ -n ${HYPERSHIFT_PRUNER:-} ]]; then
+  had_failure=0
+  for hostedcluster in  $(oc get hostedcluster -n clusters -o json | jq -r --argjson timestamp 21600 '.items[] | select (.metadata.creationTimestamp | sub("\\..*";"Z") | sub("\\s";"T") | fromdate < now - $timestamp).metadata.name'); do
+    hypershift destroy cluster aws --aws-creds "${AWS_SHARED_CREDENTIALS_FILE}" --namespace clusters --name "${hostedcluster}" || had_failure=$((had_failure+1))
+  done
+  # Exit here if we had errors, otherwise we destroy the OIDC providers for the hostedclusters and deadlock deletion as cluster api creds stop working so it will never be able to remove machine finalizers
+  if [[ $had_failure -ne 0 ]]; then exit $had_failure; fi
+fi
 
 logdir="${ARTIFACTS}/deprovision"
 mkdir -p "${logdir}"
