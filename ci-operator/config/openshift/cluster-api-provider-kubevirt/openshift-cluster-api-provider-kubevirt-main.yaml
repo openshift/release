@@ -11,10 +11,6 @@ base_images:
     name: "4.11"
     namespace: ocp
     tag: hypershift-operator
-  openshift_release_golang-1.17:
-    name: release
-    namespace: openshift
-    tag: golang-1.17
   openshift_release_golang-1.18:
     name: release
     namespace: openshift
@@ -24,14 +20,14 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.17
+    tag: golang-1.18
 images:
 - build_args:
   - name: ARCH
     value: amd64
   - name: ldflags
   dockerfile_literal: |-
-    FROM registry.ci.openshift.org/openshift/release:golang-1.17 as toolchain
+    FROM registry.ci.openshift.org/openshift/release:golang-1.18 as toolchain
 
     # Run this with docker build --build_arg $(go env GOPROXY) to override the goproxy
     ARG goproxy=https://proxy.golang.org
@@ -61,9 +57,9 @@ images:
     ENTRYPOINT ["/manager"]
   from: base
   inputs:
-    openshift_release_golang-1.17:
+    openshift_release_golang-1.18:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.17
+      - registry.ci.openshift.org/openshift/release:golang-1.18
   to: cluster-api-kubevirt-controller
 - build_args:
   - name: ARCH
@@ -83,9 +79,9 @@ images:
       paths:
       - destination_dir: .
         source_path: /usr/bin/oc
-    openshift_release_golang-1.17:
+    openshift_release_golang-1.18:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.17
+      - registry.ci.openshift.org/openshift/release:golang-1.18
   to: capk-oc-bin-image
 - build_args:
   - name: ARCH
@@ -122,6 +118,12 @@ promotion:
   namespace: hypershift
   tag: dev-latest
 releases:
+  hosted-ocp-previous:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: ci
+      version: "4.11"
   initial:
     integration:
       name: "4.11"
@@ -232,25 +234,10 @@ tests:
 - as: cluster-api-provider-kubevirt-with-hypershift
   steps:
     cluster_profile: gcp
-    env:
-      SUB_CHANNEL: stable
-      SUB_INSTALL_NAMESPACE: openshift-cnv
-      SUB_PACKAGE: kubevirt-hyperconverged
-      SUB_TARGET_NAMESPACES: openshift-cnv
     test:
-    - ref: operatorhub-subscribe
-    - as: deploy-cnv-hyperconverged-cr
-      commands: |-
-        oc create -f - <<EOF
-        apiVersion: hco.kubevirt.io/v1beta1
-        kind: HyperConverged
-        metadata:
-          name: kubevirt-hyperconverged
-          namespace: openshift-cnv
-        EOF
-
-        oc wait hyperconverged -n openshift-cnv kubevirt-hyperconverged --for=condition=Available --timeout=15m
-      from: capk-oc-bin-image
+    - as: deploy-cnv
+      commands: ./hack/ci/install-cnv.sh
+      from: hypershift-cli-e2e
       resources:
         requests:
           cpu: 500m
@@ -275,28 +262,34 @@ tests:
       commands: |-
         set -x
         export KUBEVIRT_PLATFORM_ENABLED=true
-        export RHCOS_CD_IMAGE="quay.io/containerdisks/rhcos:4.10"
 
         # run the test
         bin/test-e2e \
                   --test.v \
                   --test.timeout=0 \
                   --test.run=TestKubeVirtCreateCluster \
-                  --e2e.node-pool-replicas=5 \
+                  --e2e.latest-release-image=${OCP_IMAGE_LATEST} \
+                  --e2e.previous-release-image=${OCP_IMAGE_PREVIOUS} \
+                  --e2e.node-pool-replicas=2 \
+                  --e2e.kubevirt-node-memory="6Gi" \
                   --e2e.base-domain="fake" \
-                  --e2e.kubevirt-container-disk-image="${RHCOS_CD_IMAGE}" \
                   --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson \
                   --e2e.platform=KubeVirt
       credentials:
       - mount_path: /etc/ci-pull-credentials
         name: ci-pull-credentials
         namespace: test-credentials
+      dependencies:
+      - env: OCP_IMAGE_LATEST
+        name: release:latest
+      - env: OCP_IMAGE_PREVIOUS
+        name: release:hosted-ocp-previous
       from: hypershift-cli-e2e
       resources:
         requests:
           cpu: 500m
           memory: 1Gi
-    workflow: ipi-gcp
+    workflow: ipi-gcp-ovn
 zz_generated_metadata:
   branch: main
   org: openshift
