@@ -15,7 +15,7 @@ echo "Checking readyz endpoint"
 function checkreadyz() {
     for (( n=1; n<=10; n++ ))
     do
-        api=$(oc get --raw='/readyz')
+        api=$(oc get --raw='/readyz' 2> /dev/null)
         if test "${api}" != "ok"
         then
             echo "Health check endpoint readyz not ok; checking again in one minute"
