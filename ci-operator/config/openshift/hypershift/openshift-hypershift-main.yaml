@@ -116,70 +116,6 @@ tests:
     test:
     - as: install-hypershift
       cli: latest
-      commands: make ci-install-hypershift-private
-      credentials:
-      - mount_path: /etc/hypershift-pool-aws-credentials
-        name: hypershift-pool-aws-credentials
-        namespace: test-credentials
-      dependencies:
-      - env: HYPERSHIFT_RELEASE_LATEST
-        name: hypershift-operator
-      from: bin
-      grace_period: 1m0s
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 5m0s
-    - as: test-e2e
-      cli: latest
-      commands: |-
-        bin/test-e2e \
-        -test.v \
-        -test.timeout=0 \
-        -test.run="TestUpgradeControlPlane|TestCreateCluster" \
-        --e2e.aws-credentials-file=/etc/hypershift-pool-aws-credentials/credentials \
-        --e2e.aws-zones=us-east-1a,us-east-1b,us-east-1c \
-        --e2e.node-pool-replicas=1 \
-        --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson \
-        --e2e.base-domain=ci.hypershift.devcluster.openshift.com \
-        --e2e.latest-release-image=${OCP_IMAGE_LATEST} \
-        --e2e.previous-release-image=${OCP_IMAGE_PREVIOUS} \
-        --e2e.additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
-        --e2e.aws-endpoint-access=PublicAndPrivate \
-        --e2e.external-dns-domain=service.ci.hypershift.devcluster.openshift.com
-      credentials:
-      - mount_path: /etc/hypershift-pool-aws-credentials
-        name: hypershift-pool-aws-credentials
-        namespace: test-credentials
-      - mount_path: /etc/ci-pull-credentials
-        name: ci-pull-credentials
-        namespace: test-credentials
-      dependencies:
-      - env: OCP_IMAGE_LATEST
-        name: release:latest
-      - env: OCP_IMAGE_PREVIOUS
-        name: release:hosted-ocp-previous
-      from: test-bin
-      grace_period: 30m0s
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 1h0m0s
-    workflow: generic-claim
-- as: e2e-aws-all
-  cluster_claim:
-    architecture: amd64
-    as: not_latest
-    cloud: aws
-    owner: hypershift
-    product: ocp
-    timeout: 1h30m0s
-    version: "4.9"
-  optional: true
-  steps:
-    test:
-    - as: install-hypershift
-      cli: latest
       commands: make ci-install-hypershift
       credentials:
       - mount_path: /etc/hypershift-pool-aws-credentials
@@ -206,15 +142,15 @@ tests:
         namespace: test-credentials
       dependencies:
       - env: OCP_IMAGE_LATEST
-        name: release:hosted-ocp-latest
+        name: release:latest
       - env: OCP_IMAGE_PREVIOUS
         name: release:hosted-ocp-previous
       from: test-bin
-      grace_period: 15m0s
+      grace_period: 30m0s
       resources:
         requests:
           cpu: 100m
-      timeout: 2h0m0s
+      timeout: 1h0m0s
     workflow: generic-claim
 - as: e2e-aws-metrics
   cluster_claim:
@@ -272,7 +208,7 @@ tests:
         namespace: test-credentials
       dependencies:
       - env: OCP_IMAGE_LATEST
-        name: release:hosted-ocp-latest
+        name: release:latest
       - env: OCP_IMAGE_PREVIOUS
         name: release:hosted-ocp-previous
       from: test-bin
@@ -527,7 +463,7 @@ tests:
       cli: latest
       commands: |-
         export KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
-        make ci-install-hypershift-private
+        make ci-install-hypershift
       credentials:
       - mount_path: /etc/hypershift-pool-aws-credentials
         name: hypershift-ci-jobs-awscreds
@@ -543,20 +479,7 @@ tests:
       cli: latest
       commands: |-
         export KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
-        bin/test-e2e \
-          -test.v \
-          -test.timeout=0 \
-          -test.run=TestUpgradeControlPlane \
-          --e2e.aws-credentials-file=/etc/hypershift-ci-jobs-awscreds/credentials \
-          --e2e.aws-zones=us-east-1a,us-east-1b,us-east-1c \
-          --e2e.node-pool-replicas=1 \
-          --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson \
-          --e2e.base-domain=ci.hypershift.devcluster.openshift.com \
-          --e2e.latest-release-image=${OCP_IMAGE_LATEST} \
-          --e2e.previous-release-image=${OCP_IMAGE_PREVIOUS} \
-          --e2e.additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
-          --e2e.control-plane-operator-image=${HYPERSHIFT_RELEASE_LATEST} \
-          --e2e.aws-endpoint-access=PublicAndPrivate
+        make ci-test-e2e
       credentials:
       - mount_path: /etc/hypershift-ci-jobs-awscreds
         name: hypershift-ci-jobs-awscreds
@@ -566,11 +489,9 @@ tests:
         namespace: test-credentials
       dependencies:
       - env: OCP_IMAGE_LATEST
-        name: release:hosted-ocp-latest
+        name: release:latest
       - env: OCP_IMAGE_PREVIOUS
         name: release:hosted-ocp-previous
-      - env: HYPERSHIFT_RELEASE_LATEST
-        name: hypershift-operator
       from: test-bin
       grace_period: 30m0s
       resources:
