@@ -95,8 +95,7 @@ cat <<EOF > "${SHARED_DIR}/sriov_patch.json"
                 ${PROFILE:-}
                 "portSecurity": false
               }
-            ],
-            "trunk": false
+            ]
           }
         }
       }
