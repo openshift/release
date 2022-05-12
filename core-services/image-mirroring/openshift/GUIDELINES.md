@@ -60,3 +60,11 @@ cluster-capi-operator - Should be something like cluster-openshift-cluster-api-o
 cluster-capi-controllers - should be cluster-api-controllers ($technology-$optionalModifier).  Unfortunately this collides with using `cluster-` to indicate a CVO operator but it's difficult to avoid in this case.  As the name does not end in -operator, hopefully the distinction is clear.
 
 cluster-api-actuator-pkg - Should be machine-api-actuators-tests.  It's not a cluster operator, and the component is machine-api, and the image contains tests, not product functionality.
+
+# Renaming images
+
+If for some reason your image needs to be renamed in the future, you must follow the steps described in our [CI docs](https://docs.ci.openshift.org/docs/how-tos/onboarding-a-new-component/#removing-or-renaming-an-image-from-an-openshift-release-image).
+
+In particular pay special attention to coordinating the landing of all the PRs involved in close time proximity, so that we are
+not in a situation where payloads cannot be built due to invalid image name references.  You can work with a staff engineer
+to help accelerate the merging of the PRs so they can land close to simultaneously (via CI test overrides and use of manual merges).
