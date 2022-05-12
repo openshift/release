@@ -50,7 +50,7 @@ update:
 template-allowlist:
 	./hack/generate-template-allowlist.sh
 
-release-controllers:
+release-controllers: update_crt_crd
 	./hack/generators/release-controllers/generate-release-controllers.py .
 
 checkconfig:
@@ -315,16 +315,21 @@ download_dp_crd:
 	curl -o clusters/app.ci/prow/01_crd/pullrequestpayloadqualificationruns.yaml https://raw.githubusercontent.com/openshift/ci-tools/master/pkg/api/pullrequestpayloadqualification/v1/ci.openshift.io_pullrequestpayloadqualificationruns.yaml
 .PHONY: download_dp_crd
 
+download_crt_crd:
+	curl -o clusters/app.ci/release-controller/admin_01_releasepayload_crd.yaml https://raw.githubusercontent.com/openshift/release-controller/master/artifacts/release.openshift.io_releasepayloads.yaml
+.PHONY: download_crt_crd
+
 sed_cmd := sed
 uname_out := $(shell uname -s)
 ifeq ($(uname_out),Darwin)
 sed_cmd := gsed
 endif
 
-crds = 'clusters/build-clusters/common/testimagestreamtagimport.yaml' 'clusters/app.ci/prow/01_crd/pullrequestpayloadqualificationruns.yaml'
+crds = 'clusters/build-clusters/common/testimagestreamtagimport.yaml' 'clusters/app.ci/prow/01_crd/pullrequestpayloadqualificationruns.yaml' 'clusters/app.ci/release-controller/admin_01_releasepayload_crd.yaml'
 
 $(crds):
 	@#remove the empty lines at the beginning of the file. We do this to pass the yaml lint
 	$(sed_cmd) -i '/./,$$!d' $@
 
 update_dp_crd: download_dp_crd $(crds)
+update_crt_crd: download_crt_crd $(crds)
