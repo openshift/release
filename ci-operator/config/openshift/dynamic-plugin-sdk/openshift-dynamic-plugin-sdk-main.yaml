@@ -13,14 +13,38 @@ resources:
       memory: 250Mi
 tests:
 - as: all-packages
-  commands: "export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN) \n./test.sh"
-  container:
-    from: src
+  steps:
+    test:
+    - as: all-packages
+      commands: "export CODECOV_TOKEN=$(cat /tmp/secret/SDK_CODECOV_TOKEN) \n./test.sh\n"
+      credentials:
+      - mount_path: /tmp/secret
+        name: hac-core-deploy-tokens
+        namespace: test-credentials
+      from: src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 100m
+          memory: 250Mi
 - as: all-packages-coverage-upload
-  commands: "export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN) \n./test.sh"
-  container:
-    from: src
   postsubmit: true
+  steps:
+    test:
+    - as: all-packages-coverage-upload
+      commands: "export CODECOV_TOKEN=$(cat /tmp/secret/SDK_CODECOV_TOKEN) \n./test.sh\n"
+      credentials:
+      - mount_path: /tmp/secret
+        name: hac-core-deploy-tokens
+        namespace: test-credentials
+      from: src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 100m
+          memory: 250Mi
 zz_generated_metadata:
   branch: main
   org: openshift
