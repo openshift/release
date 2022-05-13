@@ -12,12 +12,21 @@ build_root:
 canonical_go_repository: github.com/openshift/ironic-agent-image
 images:
 - dockerfile_path: Dockerfile.ocp
-  from: ocp_builder_rhel-8-base-openshift-4.11
+  from: base
   to: ironic-agent
 promotion:
   disabled: true
   name: 4.11-priv
   namespace: ocp-private
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      #NOTE(elfosardo): use ironic repos, cause we're special
+      curl http://base-4-11-rhel-8-server-ironic.ocp.svc > /etc/yum.repos.d/base-4-11-rhel-8-server-ironic.repo
+      #NOTE(elfosardo): this should be disabled globally
+      dnf config-manager --set-disabled openstack-16-for-rhel-8-rpms
+    from: ocp_builder_rhel-8-base-openshift-4.11
+    to: base
 releases:
   initial:
     integration:
