@@ -7,15 +7,20 @@ build_root:
 resources:
   '*':
     limits:
-      memory: 4Gi
+      memory: 6Gi
     requests:
       cpu: 100m
-      memory: 200Mi
+      memory: 250Mi
 tests:
 - as: all-packages
-  commands: ./test.sh
+  commands: "export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN) \n./test.sh"
   container:
     from: src
+- as: all-packages-coverage-upload
+  commands: "export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN) \n./test.sh"
+  container:
+    from: src
+  postsubmit: true
 zz_generated_metadata:
   branch: main
   org: openshift
