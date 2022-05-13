@@ -4,8 +4,14 @@ base_images:
     namespace: ocp
     tag: "8.5"
 build_root:
-  from_repository: true
+  project_image:
+    dockerfile_literal: |
+      FROM registry.ci.openshift.org/origin/centos:stream8
+      RUN dnf install git -y
 images:
+- dockerfile_path: Dockerfile.build
+  from: src
+  to: assisted-events-scrape-build
 - dockerfile_path: Dockerfile
   from: ubi_minimal
   to: assisted-events-scrape
@@ -23,11 +29,11 @@ tests:
 - as: lint
   commands: make lint
   container:
-    from: src
+    from: assisted-events-scrape-build
 - as: unit-test
   commands: make unit-test
   container:
-    from: src
+    from: assisted-events-scrape-build
 - as: integration-test
   cluster_claim:
     architecture: amd64
@@ -45,7 +51,7 @@ tests:
       dependencies:
       - env: ASSISTED_EVENTS_SCRAPE_IMAGE
         name: assisted-events-scrape
-      from: src
+      from: assisted-events-scrape-build
       resources:
         requests:
           cpu: 100m
