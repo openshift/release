@@ -1,3 +1,12 @@
+base_images:
+  coreos_coreos-assembler_latest:
+    name: coreos-assembler
+    namespace: coreos
+    tag: latest
+  coreos_fcos-buildroot_testing-devel:
+    name: fcos-buildroot
+    namespace: coreos
+    tag: testing-devel
 binary_build_commands: ./ci/build.sh && make install
 build_root:
   image_stream_tag:
@@ -6,6 +15,13 @@ build_root:
     tag: testing-devel
 images:
 - dockerfile_path: ci/prow/Dockerfile
+  inputs:
+    coreos_coreos-assembler_latest:
+      as:
+      - registry.ci.openshift.org/coreos/coreos-assembler:latest
+    coreos_fcos-buildroot_testing-devel:
+      as:
+      - registry.ci.openshift.org/coreos/fcos-buildroot:testing-devel
   to: rpmostree-fcos-e2e
 resources:
   '*':
