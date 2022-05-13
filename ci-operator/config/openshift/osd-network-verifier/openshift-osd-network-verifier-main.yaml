@@ -24,6 +24,29 @@ tests:
   commands: make build
   container:
     from: src
+- as: coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  secret:
+    mount_path: /tmp/secret
+    name: osd-network-verifier-codecov-token
+- as: publish-coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  postsubmit: true
+  secret:
+    mount_path: /tmp/secret
+    name: osd-network-verifier-codecov-token
+- as: lint
+  commands: make lint
+  container:
+    from: src
 zz_generated_metadata:
   branch: main
   org: openshift
