@@ -69,7 +69,6 @@ export PLATFORM=vsphere
 export VIP_DHCP_ALLOCATION=false
 export VSPHERE_PARENT_FOLDER=assisted-test-infra-ci
 export VSPHERE_FOLDER="build-${BUILD_ID}"
-export TEST_TEARDOWN=true
 export VSPHERE_CLUSTER="${vsphere_cluster}"
 export VSPHERE_USERNAME="${vsphere_user}"
 export VSPHERE_NETWORK="${LEASED_RESOURCE}"
