@@ -146,6 +146,47 @@ periodics:
         secretName: sprint-automation
 - agent: kubernetes
   cluster: app.ci
+  cron: 0 8 * * 1-5
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-pr-reminder
+  spec:
+    containers:
+      - args:
+          - --config-path=/etc/config/config.yaml
+          - --github-mapping-config-path=/etc/github-mapping/mapping.yaml
+          - --slack-token-path=/etc/slack/oauth_token
+        command:
+          - /usr/bin/pr-reminder
+        image: registry.ci.openshift.org/ci/pr-reminder:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 500m
+        volumeMounts:
+          - mountPath: /etc/slack
+            name: slack
+            readOnly: true
+          - mountPath: /etc/config
+            name: config
+            readOnly: true
+          - mountPath: /etc/github-mapping
+            name: github-mapping
+            readOnly: true
+    volumes:
+      - name: slack
+        secret:
+          secretName: slack-credentials-dptp-bot
+      - configMap:
+          name: pr-reminder-config
+        name: config
+      - configMap:
+          name: sync-rover-groups
+        name: github-mapping
+- agent: kubernetes
+  cluster: app.ci
   cron: '@yearly'
   decorate: true
   labels:
