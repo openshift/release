@@ -7,15 +7,20 @@ base_images:
     name: opm-builder
     namespace: ci
     tag: v1.14.3
-binary_build_commands: export GOFLAGS=''
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: rhel-8-release-golang-1.17-openshift-4.11
+  project_image:
+    dockerfile_literal: |
+      FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
+      ENV GOFLAGS=''
+  use_build_cache: true
 images:
 - dockerfile_path: Dockerfile
   from: base
+  inputs:
+    root:
+      as:
+      - docker.io/library/golang:1.17
+      - golang:1.17
   to: odf-operator
 - dockerfile_path: bundle.Dockerfile
   from: base
