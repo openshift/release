@@ -150,7 +150,7 @@ ansible-playbook packet-setup.yaml -e "packet_hostname=ipi-${NAMESPACE}-${JOB_NA
 DEVICEID=$(jq -r .devices[0].id < ${SHARED_DIR}/hosts.json)
 
 function refresh_device_info(){
-    curl -H "X-Auth-Token: $(cat ${CLUSTER_PROFILE_DIR}/packet-auth-token)"  "https://api.equinix.com/metal/v1/devices/$DEVICEID" > /tmp/device.json
+    curl -s -H "X-Auth-Token: $(cat ${CLUSTER_PROFILE_DIR}/packet-auth-token)"  "https://api.equinix.com/metal/v1/devices/$DEVICEID" > /tmp/device.json
     STATE=$(jq -r .state < /tmp/device.json)
     IP=$(jq -r .ip_addresses[0].address < /tmp/device.json)
 }
