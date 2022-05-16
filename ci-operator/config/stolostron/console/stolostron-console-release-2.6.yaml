@@ -23,15 +23,9 @@ images:
       as:
       - registry.ci.openshift.org/stolostron/common-nodejs-parent:nodejs-14
   to: console
-- dockerfile_path: Dockerfile.mce.prow
-  inputs:
-    stolostron_builder_nodejs14-linux:
-      as:
-      - registry.ci.openshift.org/stolostron/builder:nodejs14-linux
-    stolostron_common-nodejs-parent_nodejs-14:
-      as:
-      - registry.ci.openshift.org/stolostron/common-nodejs-parent:nodejs-14
-  to: console-mce
+promotion:
+  name: "2.6"
+  namespace: stolostron
 resources:
   '*':
     requests:
@@ -44,10 +38,24 @@ tests:
     make -f Makefile.prow install
     make -f Makefile.prow lint
     make -f Makefile.prow check
+    make -f Makefile.prow sonar/js/jest-init
     make -f Makefile.prow unit-tests
     make -f Makefile.prow sonar/js/prow
   container:
     from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+- as: sonar-post-submit
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow install
+    make -f Makefile.prow sonar/js/jest-init
+    make -f Makefile.prow unit-tests
+    make -f Makefile.prow sonar/js/prow
+  container:
+    from: src
+  postsubmit: true
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
@@ -56,43 +64,40 @@ tests:
     dependencies:
       SOURCE_IMAGE_REF: console
     workflow: ocm-ci-image-mirror
-- as: pr-image-mirror-mce
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: console-mce
-    env:
-      IMAGE_REPO: console-mce
-    workflow: ocm-ci-image-mirror
 - as: latest-image-mirror
   postsubmit: true
   steps:
     dependencies:
       SOURCE_IMAGE_REF: console
     env:
-      IMAGE_TAG: latest
+      IMAGE_TAG: latest-2.6
     workflow: ocm-ci-image-mirror
-- as: latest-image-mirror-mce
+- as: publish
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: console-mce
+      SOURCE_IMAGE_REF: console
     env:
-      IMAGE_REPO: console-mce
-      IMAGE_TAG: latest
+      IMAGE_REPO: console
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
+        export OSCI_PUBLISH_DELAY="0"
+        export SELF="make -f Makefile.prow"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     workflow: ocm-ci-image-mirror
-- as: fast-forward
-  postsubmit: true
-  steps:
-    env:
-      DESTINATION_BRANCH: release-2.6
-    workflow: ocm-ci-fastforward
-- as: fast-forward-mce
-  postsubmit: true
-  steps:
-    env:
-      DESTINATION_BRANCH: backplane-2.1
-    workflow: ocm-ci-fastforward
 zz_generated_metadata:
-  branch: main
+  branch: release-2.6
   org: stolostron
   repo: console
