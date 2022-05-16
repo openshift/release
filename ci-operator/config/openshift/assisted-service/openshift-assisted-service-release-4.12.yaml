@@ -1,0 +1,37 @@
+base_images:
+  base:
+    name: "4.12"
+    namespace: ocp
+    tag: base
+  openshift_release_golang-1.17:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile.assisted-service.ocp
+  from: base
+  inputs:
+    openshift_release_golang-1.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
+  to: agent-installer-api-server
+promotion:
+  name: "4.12"
+  namespace: ocp
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.12"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+zz_generated_metadata:
+  branch: release-4.12
+  org: openshift
+  repo: assisted-service

@@ -7,6 +7,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.46.0
   ocp_builder_rhel-8-golang-1.15-openshift-4.8:
     name: builder
     namespace: ocp
@@ -250,7 +254,6 @@ tests:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ipv4
 - as: e2e-metal-ipi-ovn-ipv6
-  optional: true
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
@@ -269,6 +272,11 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-serial-ipv4
+- as: e2e-metal-ipi-serial-ovn-ipv6
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-serial-ovn-ipv6
 - as: e2e-aws-single-node
   optional: true
   steps:
@@ -320,6 +328,15 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-cgroupsv2
+- as: lint
+  commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    golangci-lint run -v
+  container:
+    clone: true
+    from: golangci-lint
 zz_generated_metadata:
   branch: master
   org: openshift-priv
