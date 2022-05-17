@@ -86,7 +86,7 @@ def _library_go_rbac(gendoc):
                 {
                     'apiGroups': [''],
                     'resources': ['configmaps'],
-                    'verbs': ['get', 'list', 'watch', 'update']
+                    'verbs': ['create', 'get', 'list', 'watch', 'update']
                 },
                 {
                     'apiGroups': [''],
