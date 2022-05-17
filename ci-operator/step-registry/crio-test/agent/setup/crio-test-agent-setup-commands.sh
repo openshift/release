@@ -31,5 +31,5 @@ timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
     chown -R root:root "\${REPO_DIR}"
     cd "\${REPO_DIR}/contrib/test/integration"
     echo "localhost" >> hosts
-    ansible-playbook -i hosts "host=localhost" --connection=local
+    ansible-playbook main.yml -i hosts "host=localhost" --connection=local
 EOF
