@@ -105,6 +105,9 @@ def generate_app_ci_content(config, git_clone_dir):
     # TRT RBAC
     content.generate_trt_rbac(config)
 
+    # Release Payload Controller
+    content.add_release_payload_controller_resources(config, context)
+
 
 def run(git_clone_dir, bump=False):
 
