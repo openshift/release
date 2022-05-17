@@ -83,7 +83,7 @@ cat > packet-config.yaml <<-EOF
 EOF
 ansible-playbook packet-config.yaml |& gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0; fflush(); }'
 
-if [ -e "${CLUSTER_PROFILE_DIR}/ofcir_url" ] ; then
+if [ -e "${CLUSTER_PROFILE_DIR}/ofcir_url-disabled" ] ; then
     echo "Attempting to acquire a Host from OFCIR"
     IPFILE=$SHARED_DIR/server-ip
     CIRFILE=$SHARED_DIR/cir
