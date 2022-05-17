@@ -12,6 +12,13 @@ source "${SHARED_DIR}/packet-conf.sh"
 
 # Setup a squid proxy for accessing the cluster
 ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
+
+# TODO: remove me
+# https://bugzilla.redhat.com/show_bug.cgi?id=2087096
+sed -i -e 's/repo=.*/repo=rocky-AppStream-8.5/g' /etc/yum.repos.d/Rocky-AppStream.repo
+sed -i -e 's/repo=.*/repo=rocky-BaseOS-8.5/g' /etc/yum.repos.d/Rocky-BaseOS.repo
+sed -i -e 's/repo=.*/repo=rocky-extras-8.5/g' /etc/yum.repos.d/Rocky-Extras.repo
+
 sudo dnf install -y podman firewalld
 
 # Setup squid proxy for accessing cluster
