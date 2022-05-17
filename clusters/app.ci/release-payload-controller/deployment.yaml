@@ -1,0 +1,39 @@
+##################################################################################
+#                                DO NOT EDIT
+# File generated during execution of: generate-release-controllers.py
+##################################################################################
+
+
+#---------------------------------------------------------------------------------
+# release_payload_controller_resources.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"release-payload-controller:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"controller\")].image"}]'
+  name: release-payload-controller
+  namespace: ci
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: release-payload-controller
+  template:
+    metadata:
+      labels:
+        app: release-payload-controller
+    spec:
+      containers:
+      - command:
+        - /usr/bin/release-payload-controller
+        - start
+        - --namespace=ci
+        - -v=6
+        image: release-payload-controller:latest
+        name: controller
+        resources:
+          requests:
+            memory: 2Gi
+      serviceAccountName: release-payload-controller
