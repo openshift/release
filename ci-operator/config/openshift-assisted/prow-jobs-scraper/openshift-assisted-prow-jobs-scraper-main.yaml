@@ -3,11 +3,8 @@ build_root:
   project_image:
     dockerfile_literal: |-
       FROM registry.ci.openshift.org/ocp/ubi-python-39:8
-      # Prow expects to be able to check out a repo under /go
+      # Ensure user is root for Prow to checkout the sources
       USER 0:0
-      WORKDIR /go
-      RUN chown 1001:1001 .
-      USER 1001:1001
 resources:
   '*':
     limits:
@@ -17,8 +14,6 @@ resources:
       memory: 200Mi
 test_binary_build_commands: |
   make full-install
-  find . -type d -exec chmod 777 {} \;
-  find . -type f -exec chmod 666 {} \;
 tests:
 - as: unit-tests
   commands: make unit-tests
