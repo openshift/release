@@ -119,11 +119,12 @@ images:
       - registry.ci.openshift.org/coreos/fedora:35
   to: layering-test-img
 promotion:
-  disabled: true
+  additional_images:
+    rhel-coreos: machine-os-oci-content
   excluded_images:
   - '*'
-  name: "4.11"
-  namespace: ocp
+  namespace: rhcos-devel
+  tag: latest
 releases:
   initial:
     integration:
@@ -144,15 +145,15 @@ tests:
   commands: ./ci/validate.sh
   container:
     from: src
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  cron: '@daily'
 - as: validate-built-image
   commands: cat /etc/os-release
   container:
     from: machine-os-oci-content
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  cron: '@daily'
 - as: test-qemu-nvme
   cluster: build02
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  cron: '@daily'
   steps:
     test:
     - as: test
@@ -172,7 +173,7 @@ tests:
           memory: 3Gi
 - as: test-qemu-firmware-uefi
   cluster: build02
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  cron: '@daily'
   steps:
     test:
     - as: test
@@ -192,7 +193,7 @@ tests:
           memory: 3Gi
 - as: test-qemu-kola-upgrade
   cluster: build02
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  cron: '@daily'
   steps:
     test:
     - as: test
@@ -212,7 +213,7 @@ tests:
           memory: 3Gi
 - as: test-qemu-kola
   cluster: build02
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  cron: '@daily'
   steps:
     test:
     - as: test
@@ -232,7 +233,7 @@ tests:
           memory: 3Gi
 - as: test-qemu-metal
   cluster: build02
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  cron: '@daily'
   steps:
     test:
     - as: test
@@ -253,7 +254,7 @@ tests:
           devices.kubevirt.io/kvm: "1"
           memory: 3Gi
 - as: test-in-cluster
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  cron: '@daily'
   steps:
     cluster_profile: gcp
     test:
@@ -274,3 +275,4 @@ zz_generated_metadata:
   branch: master
   org: openshift
   repo: os
+  variant: periodic
