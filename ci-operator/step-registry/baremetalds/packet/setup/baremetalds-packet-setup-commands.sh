@@ -144,7 +144,7 @@ function send_slack(){
         "https://hooks.slack.com/services/${SLACK_AUTH_TOKEN}"
 }
 
-
+sleep 1800
 ansible-playbook packet-setup.yaml -e "packet_hostname=ipi-${NAMESPACE}-${JOB_NAME_HASH}-${BUILD_ID}"  |& gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0; fflush(); }'
 
 DEVICEID=$(jq -r .devices[0].id < ${SHARED_DIR}/hosts.json)
