@@ -298,7 +298,7 @@ tests:
       GATHER_CAPI_LOGS: "true"
       TEST_SUITE: minimal
     workflow: assisted-baremetal
-- as: e2e-kubevirt-azure
+- as: e2e-kubevirt-azure-ovn
   optional: true
   steps:
     cluster_profile: azure4
@@ -318,7 +318,6 @@ tests:
         bin/hypershift install --hypershift-image ${HYPERSHIFT_RELEASE_LATEST}
 
         export KUBEVIRT_PLATFORM_ENABLED=true
-        export RHCOS_CD_IMAGE="quay.io/containerdisks/rhcos:4.10"
 
         # complie the e2e tests
         make e2e
@@ -328,11 +327,12 @@ tests:
                   --test.v \
                   --test.timeout=0 \
                   --test.run=TestKubeVirtCreateCluster \
-                  --e2e.node-pool-replicas=5 \
+                  --e2e.node-pool-replicas=2 \
+                  --e2e.kubevirt-node-memory="6Gi" \
+                  --e2e.platform="KubeVirt" \
                   --e2e.base-domain="fake" \
                   --e2e.latest-release-image=${OCP_IMAGE_LATEST} \
                   --e2e.previous-release-image=${OCP_IMAGE_PREVIOUS} \
-                  --e2e.kubevirt-container-disk-image="${RHCOS_CD_IMAGE}" \
                   --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson
       credentials:
       - mount_path: /etc/ci-pull-credentials
@@ -349,8 +349,8 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-azure
-- as: e2e-kubevirt-gcp
+    workflow: ipi-azure-ovn
+- as: e2e-kubevirt-gcp-ovn
   optional: true
   skip_if_only_changed: (^(docs|examples|enhancements)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
@@ -371,7 +371,6 @@ tests:
         bin/hypershift install --hypershift-image ${HYPERSHIFT_RELEASE_LATEST}
 
         export KUBEVIRT_PLATFORM_ENABLED=true
-        export RHCOS_CD_IMAGE="quay.io/containerdisks/rhcos:4.10"
 
         # complie the e2e tests
         make e2e
@@ -381,11 +380,12 @@ tests:
                   --test.v \
                   --test.timeout=0 \
                   --test.run=TestKubeVirtCreateCluster \
-                  --e2e.node-pool-replicas=5 \
+                  --e2e.node-pool-replicas=2 \
+                  --e2e.kubevirt-node-memory="6Gi" \
+                  --e2e.platform="KubeVirt" \
                   --e2e.base-domain="fake" \
                   --e2e.latest-release-image=${OCP_IMAGE_LATEST} \
                   --e2e.previous-release-image=${OCP_IMAGE_PREVIOUS} \
-                  --e2e.kubevirt-container-disk-image="${RHCOS_CD_IMAGE}" \
                   --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson
       credentials:
       - mount_path: /etc/ci-pull-credentials
@@ -402,7 +402,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-gcp
+    workflow: ipi-gcp-ovn
 - as: e2e-aws-nested
   optional: true
   skip_if_only_changed: (^(docs|examples|enhancements)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
