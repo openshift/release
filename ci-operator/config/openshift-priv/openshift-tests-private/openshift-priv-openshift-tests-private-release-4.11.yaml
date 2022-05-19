@@ -3,18 +3,10 @@ base_images:
     name: 4.11-priv
     namespace: ocp-private
     tag: cli
-  dev-scripts:
-    name: test
-    namespace: ocp-kni
-    tag: dev-scripts
   ocp_builder_rhel-8-golang-1.17-openshift-4.11:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.17-openshift-4.11
-  openstack-installer:
-    name: 4.11-priv
-    namespace: ocp-private
-    tag: openstack-installer
   tools:
     name: 4.11-priv
     namespace: ocp-private
@@ -81,9 +73,14 @@ tests:
   commands: make name-check
   container:
     from: src
+- as: code-check
+  commands: make check-code
+  container:
+    from: src
+  optional: true
 - as: e2e-aws
   optional: true
-  skip_if_only_changed: frontend/
+  skip_if_only_changed: frontend/|test/extended/disaster_recovery/
   steps:
     cluster_profile: aws
     test:
@@ -125,6 +122,20 @@ tests:
           memory: 600Mi
       timeout: 1h0m0s
     workflow: ipi-gcp
+- as: debug-disasterrecovery-aws-ipi
+  optional: true
+  run_if_changed: test/extended/disaster_recovery/
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FORCE_SUCCESS_EXIT: "no"
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;DEBUGPHASE&
+      TEST_SCENRAIOS: DR_Testing
+      TEST_TIMEOUT: "50"
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-aws-ipi-private
 zz_generated_metadata:
   branch: release-4.11
   org: openshift-priv

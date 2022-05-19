@@ -1,0 +1,31 @@
+chain:
+  as: cucushift-installer-rehearse-azure-ipi-rhel8-provision
+  steps:
+  - ref: azure-provision-resourcegroup
+  - ref: azure-provision-vnet
+  - chain: azure-provision-bastionhost
+  - ref: ipi-conf
+  - ref: ipi-conf-azure
+  - ref: ipi-conf-azure-provisionednetwork
+  - ref: ipi-install-monitoringpvc
+  - ref: ipi-install-rbac
+  - ref: openshift-cluster-bot-rbac
+  - ref: ipi-install-install
+  - ref: ipi-install-times-collection
+  - ref: workers-rhel-azure-provision
+  - chain: workers-rhel
+  env:
+  - name: RHEL_WORKER_COUNT
+    default: 2
+    documentation: The number of rhel worker to be provisioned.
+  - name: RHEL_VM_SIZE
+    default: "Standard_D4s_v3"
+    documentation: The Size of the RHEL VM provisioned.
+  - name: RHEL_IMAGE
+    default: "RedHat:RHEL:8-lvm-gen2:8.5.2021121504"
+    documentation: "The Image used to provision the RHEL instance"
+  - name: PLATFORM_VERSION
+    default:  "8.3"
+    documentation: "RHEL node version"
+  documentation: |-
+    Create a IPI cluster with RHEL worker nodes on Azure for QE e2e tests.
