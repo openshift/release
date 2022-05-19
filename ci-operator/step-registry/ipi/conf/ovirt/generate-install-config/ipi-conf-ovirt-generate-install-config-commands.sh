@@ -18,6 +18,8 @@ baseDomain: ${BASE_DOMAIN}
 metadata:
   name: ${OCP_CLUSTER}
 networking:
+  machineNetwork:
+  - cidr: ${MACHINE_NETWORK_CIDR}
   networkType: ${NETWORK_TYPE}
 compute:
 - hyperthreading: Enabled
