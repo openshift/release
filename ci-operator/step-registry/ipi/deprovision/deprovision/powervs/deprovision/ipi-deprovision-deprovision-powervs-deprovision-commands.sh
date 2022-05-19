@@ -19,8 +19,8 @@ if [[ "${CLUSTER_TYPE}" == "ibmcloud" ]]; then
 fi
 
 if [[ "${CLUSTER_TYPE}" == "powervs" ]]; then
-  IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/powervs-api-key")"
-  export IC_API_KEY
+  IBMCLOUD_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/powervs-creds")"
+  export IBMCLOUD_API_KEY
 fi
 
 echo "Deprovisioning cluster ..."
