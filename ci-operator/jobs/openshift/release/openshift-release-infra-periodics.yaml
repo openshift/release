@@ -1301,6 +1301,23 @@ periodics:
                   commands: sleep $(CLUSTER_DURATION) & wait
                   from: cli
                   resources: { requests: { cpu: 100m, memory: 100Mi } }
+          - as: launch-ovn-ipv4
+            steps:
+              cluster_profile: equinix-ocp-metal
+              env:
+                DEVSCRIPTS_CONFIG: |
+                  IP_STACK=v4
+                  NETWORK_TYPE=OVNKubernetes
+              post:
+                - chain: baremetalds-ipi-post
+              pre:
+                - ref: openshift-cluster-bot-rbac
+                - chain: baremetalds-ipi-pre
+              test:
+                - as: wait
+                  commands: sleep $(CLUSTER_DURATION) & wait
+                  from: cli
+                  resources: { requests: { cpu: 100m, memory: 100Mi } }
           - as: launch-ipv6
             steps:
               cluster_profile: equinix-ocp-metal
@@ -1318,7 +1335,41 @@ periodics:
                   commands: sleep $(CLUSTER_DURATION) & wait
                   from: cli
                   resources: { requests: { cpu: 100m, memory: 100Mi } }
+          - as: launch-ovn-ipv6
+            steps:
+              cluster_profile: equinix-ocp-metal
+              env:
+                DEVSCRIPTS_CONFIG: |
+                  IP_STACK=v6
+                  NETWORK_TYPE=OVNKubernetes
+              post:
+                - chain: baremetalds-ipi-post
+              pre:
+                - ref: openshift-cluster-bot-rbac
+                - chain: baremetalds-ipi-pre
+              test:
+                - as: wait
+                  commands: sleep $(CLUSTER_DURATION) & wait
+                  from: cli
+                  resources: { requests: { cpu: 100m, memory: 100Mi } }
           - as: launch-dualstack
+            steps:
+              cluster_profile: equinix-ocp-metal
+              env:
+                DEVSCRIPTS_CONFIG: |
+                  IP_STACK=v4v6
+                  NETWORK_TYPE=OVNKubernetes
+              post:
+                - chain: baremetalds-ipi-post
+              pre:
+                - ref: openshift-cluster-bot-rbac
+                - chain: baremetalds-ipi-pre
+              test:
+                - as: wait
+                  commands: sleep $(CLUSTER_DURATION) & wait
+                  from: cli
+                  resources: { requests: { cpu: 100m, memory: 100Mi } }
+          - as: launch-ovn-dualstack
             steps:
               cluster_profile: equinix-ocp-metal
               env:
