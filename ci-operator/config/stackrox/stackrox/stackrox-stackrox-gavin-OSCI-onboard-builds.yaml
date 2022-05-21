@@ -23,7 +23,8 @@ images:
   dockerfile_path: .openshift-ci/build/Dockerfile.build-main-and-bundles
   from: stackrox-test
   to: main-bundle
-- build_args:
+- context_dir: safe_context
+  build_args:
   - name: ROX_PRODUCT_BRANDING
     value: RHACS_BRANDING
   dockerfile_path: Dockerfile.gen
@@ -31,20 +32,22 @@ images:
   inputs:
     main-bundle:
       paths:
-      - destination_dir: .
+      - destination_dir: safe_context
         source_path: /go/src/github.com/stackrox/stackrox/image/rhel/.
   to: main
-- dockerfile_path: Dockerfile
+- context_dir: safe_context
+  dockerfile_path: Dockerfile
   inputs:
     main-bundle:
       paths:
-      - destination_dir: .
+      - destination_dir: safe_context
         source_path: /go/src/github.com/stackrox/stackrox/image/roxctl/.
     ubi-minimal:
       as:
       - registry.access.redhat.com/ubi8-minimal:latest
   to: roxctl
-- build_args:
+- context_dir: safe_context
+  build_args:
   - name: ROX_PRODUCT_BRANDING
     value: RHACS_BRANDING
   dockerfile_path: Dockerfile.gen
@@ -52,9 +55,9 @@ images:
   inputs:
     main-bundle:
       paths:
-      - destination_dir: .
+      - destination_dir: safe_context
         source_path: /go/src/github.com/stackrox/stackrox/image/.
-      - destination_dir: .
+      - destination_dir: safe_context
         source_path: /go/src/github.com/stackrox/stackrox/image/postgres/.
   to: central-db
 promotion:
