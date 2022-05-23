@@ -1,19 +1,28 @@
 base_images:
-  base:
-    name: ubi-minimal
+  cli:
+    name: "4.8"
     namespace: ocp
-    tag: "8"
+    tag: cli
+  ocp_4.7_cli:
+    name: "4.7"
+    namespace: ocp
+    tag: cli
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.17-linux
+    tag: go1.16-linux
 images:
-- dockerfile_path: Dockerfile
-  from: base
-  to: must-gather
+- dockerfile_path: Dockerfile.prow
+  from: cli
+  inputs:
+    ocp_4.7_cli:
+      as:
+      - registry.ci.openshift.org/ocp/4.7:cli
+  to: backplane-must-gather
 promotion:
-  name: "2.5"
+  disabled: true
+  name: "2.1"
   namespace: stolostron
 resources:
   '*':
@@ -21,14 +30,6 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: pr-image-mirror
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: must-gather
-    env:
-      IMAGE_REPO: must-gather
-      REGISTRY_ORG: stolostron
-    workflow: ocm-ci-image-mirror
 - as: test-unit
   commands: make -f Makefile.prow unit-test
   container:
@@ -37,14 +38,16 @@ tests:
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: must-gather
+      SOURCE_IMAGE_REF: backplane-must-gather
     env:
-      IMAGE_REPO: must-gather
+      IMAGE_REPO: backplane-must-gather
       REGISTRY_ORG: stolostron
     test:
     - as: publish
       commands: |-
         export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
+        export OSCI_PIPELINE_PRODUCT_PREFIX=backplane
+        export OSCI_PIPELINE_REPO=backplane-pipeline
         export SELF="make -f Makefile.prow"
         export OSCI_PUBLISH_DELAY="0"
         make -f Makefile.prow osci/publish
@@ -59,6 +62,6 @@ tests:
           memory: 200Mi
     workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: release-2.5
+  branch: backplane-2.1
   org: stolostron
-  repo: must-gather
+  repo: backplane-must-gather
