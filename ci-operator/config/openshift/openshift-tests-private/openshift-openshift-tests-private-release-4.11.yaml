@@ -79,25 +79,21 @@ tests:
   optional: true
 - as: e2e-aws
   optional: true
-  skip_if_only_changed: frontend/|test/extended/disaster_recovery/
+  skip_if_only_changed: frontend/|test/extended/disaster_recovery/|test/extended/hypershift/
   steps:
     cluster_profile: aws
     test:
-    - as: critical-test
-      cli: latest
-      commands: ./bin/extended-platform-tests run all --dry-run|grep -iv "VMonly"|grep
-        -E "OLM.*Critical"|./bin/extended-platform-tests run -f -
-      from: bin
-      resources:
-        limits:
-          memory: 4Gi
-        requests:
-          cpu: "2"
-          memory: 600Mi
     - as: pr-test
       cli: latest
-      commands: make pr-test
-      from: bin
+      commands: |
+        echo "HOME is ${HOME}"
+        if ! which kubectl; then
+          mkdir -p "${HOME}"
+          export PATH=$PATH:$HOME
+          ln -s "$(which oc)" ${HOME}/kubectl
+        fi
+        make pr-test
+      from: tests-private
       resources:
         limits:
           memory: 4Gi
