@@ -1,4 +1,8 @@
 base_images:
+  jenkins-agent-base:
+    name: 4.11-priv
+    namespace: ocp-private
+    tag: jenkins-agent-base
   jenkins-agent-maven:
     name: 4.11-priv
     namespace: ocp-private
@@ -50,6 +54,7 @@ resources:
       memory: 200Mi
 tests:
 - as: e2e-aws-jenkins-sync-plugin
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
     test:
@@ -59,6 +64,8 @@ tests:
       dependencies:
       - env: JENKINS_IMAGE
         name: pipeline:jenkins
+      - env: JENKINS_AGENT_BASE_IMAGE
+        name: pipeline:jenkins-agent-base
       from: src
       resources:
         requests:

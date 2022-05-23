@@ -30,28 +30,32 @@ s3_bucket_name="${CLUSTER_NAME}-s3"
 bastion_ignition_file="${SHARED_DIR}/${CLUSTER_NAME}-bastion.ign"
 bastion_cf_tpl_file="${SHARED_DIR}/${CLUSTER_NAME}-bastion-cf-tpl.yaml"
 
-if [[ ! -f "${bastion_ignition_file}" ]]; then
-  echo "'${bastion_ignition_file}' not found, abort." && exit 1
-fi
 
-
-BastionHostInstanceType="t2.medium"
-# there is no t2.medium instance type in us-gov-east-1 region
-if [ "${REGION}" == "us-gov-east-1" ]; then
-    BastionHostInstanceType="t3a.medium"
-fi
-
-echo -e "==== Start to create bastion host ===="
-
-# TODO: move repo to a more appropriate location
-if [ "${BASTION_HOST_AMI}" == "" ]; then
+if [[ "${BASTION_HOST_AMI}" == "" ]]; then
+  # create bastion host dynamicly
+  if [[ ! -f "${bastion_ignition_file}" ]]; then
+    echo "'${bastion_ignition_file}' not found , abort." && exit 1
+  fi
   curl -sL https://raw.githubusercontent.com/yunjiang29/ocp-test-data/main/coreos-for-bastion-host/fedora-coreos-stable.json -o /tmp/fedora-coreos-stable.json
   ami_id=$(jq -r .architectures.x86_64.images.aws.regions[\"${REGION}\"].image < /tmp/fedora-coreos-stable.json)
+
+  ign_location="s3://${s3_bucket_name}/bastion.ign"
+  aws --region $REGION s3 mb "s3://${s3_bucket_name}"
+  echo "s3://${s3_bucket_name}" > "$SHARED_DIR/to_be_removed_s3_bucket_list"
+  aws --region $REGION s3 cp ${bastion_ignition_file} "${ign_location}"
 else
+  # use BYO bastion host
   ami_id=${BASTION_HOST_AMI}
+  ign_location="NA"
 fi
 
 echo -e "AMI ID: $ami_id"
+
+BastionHostInstanceType="t2.medium"
+# there is no t2.medium instance type in us-gov-east-1 region
+if [[ "${REGION}" == "us-gov-east-1" ]]; then
+    BastionHostInstanceType="t3a.medium"
+fi
 
 ## ----------------------------------------------------------------
 # bastion host CF template
@@ -228,22 +232,9 @@ Outputs:
     Value: !GetAtt BastionInstance.PublicIp
 EOF
 
-# upload ignition file to s3
-if [ "${BASTION_HOST_AMI}" == "" ]; then
-  ign_location="s3://${s3_bucket_name}/bastion.ign"
-  aws --region $REGION s3 mb "s3://${s3_bucket_name}"
-  echo "s3://${s3_bucket_name}" > "$SHARED_DIR/to_be_removed_s3_bucket_list"
-  aws --region $REGION s3 cp ${bastion_ignition_file} "${ign_location}"
-else
-  ign_location="NA"
-fi
-
-
-## ----------------------------------------------------------------
-## End of generate ignition file for dynamic host
-## ----------------------------------------------------------------
 
 # create bastion instance bucket
+echo -e "==== Start to create bastion host ===="
 echo ${stack_name} >> "${SHARED_DIR}/to_be_removed_cf_stack_list"
 aws --region $REGION cloudformation create-stack --stack-name ${stack_name} \
     --template-body file://${bastion_cf_tpl_file} \

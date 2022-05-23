@@ -39,6 +39,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.17-openshift-4.11
+  ocp_builder_rhel-8-golang-1.18-openshift-4.11:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.18-openshift-4.11
   origin_4.10_cli:
     name: "4.10"
     namespace: origin
@@ -60,6 +64,9 @@ images:
     ocp_builder_rhel-8-golang-1.17-openshift-4.11:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
+    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
   to: installer
 - dockerfile_path: images/installer-artifacts/Dockerfile.rhel
   from: installer
@@ -117,6 +124,9 @@ images:
     ocp_builder_rhel-8-golang-1.17-openshift-4.11:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
+    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
   to: ovirt-installer
 promotion:
   name: 4.12-priv
@@ -315,7 +325,7 @@ tests:
     workflow: openshift-upgrade-gcp-latestinstaller
 - as: e2e-metal-ipi
   optional: true
-  run_if_changed: (baremetal|metal3-io)
+  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|terraform/providers)/(alibabacloud|aws|azure|azurestack|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -398,7 +408,7 @@ tests:
     workflow: openshift-e2e-vsphere
 - as: e2e-vsphere-upi
   optional: true
-  run_if_changed: ^(upi/vsphere/.*)
+  run_if_changed: (^(upi/vsphere/.*)|^(images/installer/Dockerfile\.upi.*))
   steps:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere-upi

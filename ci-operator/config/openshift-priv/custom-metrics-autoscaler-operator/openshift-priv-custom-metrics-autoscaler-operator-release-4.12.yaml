@@ -3,28 +3,42 @@ base_images:
     name: 4.12-priv
     namespace: ocp-private
     tag: base
-  ocp_builder_rhel-8-golang-1.17-openshift-4.12:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.17-openshift-4.12
 build_root:
-  from_repository: true
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.17-openshift-4.11
+canonical_go_repository: github.com/openshift/custom-metrics-autoscaler-operator
 images:
 - from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.12:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.12
   to: custom-metrics-autoscaler-operator
 promotion:
-  disabled: true
   name: 4.12-priv
   namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.12-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.12-priv
+      namespace: ocp-private
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- as: gofmt
+  commands: env && GOFLAGS="" make fmt
+  container:
+    from: src
+- as: govet
+  commands: env && GOFLAGS="" make vet
+  container:
+    from: src
 zz_generated_metadata:
   branch: release-4.12
   org: openshift-priv

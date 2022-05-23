@@ -29,6 +29,9 @@ class RCPaths:
         # TRT Resources
         self.path_trt_resources = self.path_base.joinpath('clusters/app.ci/trt')
 
+        # Release Payload Controller Resources
+        self.path_rpc_resources = self.path_base.joinpath('clusters/app.ci/release-payload-controller')
+
 
 class Config:
 
@@ -39,6 +42,7 @@ class Config:
         self.arches = ('x86_64', 's390x', 'ppc64le', 'arm64', 'multi')
         self.paths = RCPaths(git_clone_dir)
         self.releases = self._get_releases()
+        self.rpc_release_namespace = "ocp"
 
     def _get_releases(self):
         releases = []
