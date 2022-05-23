@@ -78,10 +78,9 @@ tests:
         # TEST to ensure the todolist app commit and image sha are read by the exporters
         committime_route=`oc get route -n pelorus committime-generic -o=template='http://{{.spec.host | printf "%s\n"}}'`
         deploytime_route=`oc get route -n pelorus deploytime-exporter -o=template='http://{{.spec.host | printf "%s\n"}}'`
-        # There is a bug or issue atm, do not enable yet.
-        #timeout 5m bash -c 'until curl $committime_route 2>&1 | grep mongo; do sleep 10; done'
-        #timeout 2m bash -c 'until curl $deploytime_route 2>&1 | grep todolist; do sleep 10; done'
+        # check the logs for todolist-mongo-go in the mongo-persistent namespace
         timeout 5m bash -c 'until oc -n pelorus logs --since=10s service/committime-generic | grep "namespace=mongo-persistent, app=todolist"; do sleep 10; done'
+        timeout 5m bash -c 'until oc -n pelorus logs --since=5m service/deploytime-exporter | grep "namespace=mongo-persistent, app=todolist"; do sleep 10; done'
       from: src
       resources:
         requests:
