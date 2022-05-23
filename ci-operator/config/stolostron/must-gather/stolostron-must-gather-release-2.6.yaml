@@ -3,6 +3,10 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
+  cli:
+    name: "4.9"
+    namespace: ocp
+    tag: cli
 build_root:
   image_stream_tag:
     name: builder
@@ -11,9 +15,14 @@ build_root:
 images:
 - dockerfile_path: Dockerfile
   from: base
+  inputs:
+    cli:
+      as:
+      - registry.ci.openshift.org/ocp/4.9:cli
   to: must-gather
 promotion:
-  name: "2.5"
+  disabled: true
+  name: "2.6"
   namespace: stolostron
 resources:
   '*':
@@ -59,6 +68,6 @@ tests:
           memory: 200Mi
     workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: release-2.5
+  branch: release-2.6
   org: stolostron
   repo: must-gather
