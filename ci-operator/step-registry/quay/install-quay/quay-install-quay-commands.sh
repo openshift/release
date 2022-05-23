@@ -11,7 +11,6 @@ metadata:
   name: noobaa
   namespace: openshift-storage
 spec:
-  dbType: postgres
   dbResources:
     requests:
       cpu: '0.1'
@@ -22,7 +21,7 @@ spec:
       memory: 1Gi
 EOF
 
-echo "Waiting for NooBar storage..." >&2
+echo "Waiting for NooBaa storage..." >&2
 oc -n openshift-storage wait noobaa.noobaa.io/noobaa --for=condition=Available --timeout=120s
 
 echo "Creating Quay registry..." >&2

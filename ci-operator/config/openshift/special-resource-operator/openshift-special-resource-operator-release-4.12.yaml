@@ -3,10 +3,10 @@ base_images:
     name: "4.12"
     namespace: ocp
     tag: base
-  ocp_builder_rhel-8-golang-1.17-openshift-4.11:
+  ocp_builder_rhel-8-golang-1.18-openshift-4.11:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.17-openshift-4.11
+    tag: rhel-8-golang-1.18-openshift-4.11
 build_root:
   image_stream_tag:
     name: builder
@@ -16,9 +16,9 @@ images:
 - dockerfile_path: Dockerfile
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.11:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
   to: special-resource-rhel8-operator
 - dockerfile_literal: |
     FROM src
@@ -68,14 +68,12 @@ resources:
       memory: 500Mi
 tests:
 - as: lint
-  commands: |
-    export XDG_CACHE_HOME=/tmp/.cache
-    make lint
+  commands: GOFLAGS= XDG_CACHE_HOME=/tmp/.cache make lint
   container:
     clone: true
     from: test-bin
 - as: kube-lint
-  commands: make kube-lint
+  commands: GOFLAGS= make kube-lint
   container:
     from: src
 - as: unit
@@ -126,7 +124,7 @@ tests:
       commands: |
         oc -n default exec pod/podman -- podman pull \
             --authfile /run/user/0/containers/auth.json \
-            registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11 \
+            registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11 \
             registry.ci.openshift.org/ocp/4.11:base
         oc -n default exec pod/podman -- unshare -n podman build -t sro:disconnected --no-cache -f /tmp/sro/Dockerfile
       from: src
@@ -158,7 +156,7 @@ tests:
           memory: 500Mi
     - as: deploy-sro
       cli: latest
-      commands: make deploy
+      commands: GOFLAGS= make deploy
       dependencies:
       - env: IMG
         name: special-resource-rhel8-operator

@@ -27,7 +27,98 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
   to: build-test-qemu-img
+- dockerfile_literal: |
+    # This stage actually builds the RHCOS OCI image. However, due to
+    # limitations within OpenShift CI, we need to do the following:
+    # 1. Disable KVM by using the COSA_NO_KVM env var. This is due to OpenShift
+    # CI using the default OpenShift Docker Build strategy, which precludes us
+    # from mounting /dev/kvm into the build context.
+    # 2. Due to a limitation in the version of Buildah that OpenShift Builds
+    # uses (at the time of this writing, it uses a v1.23.z version of Buildah),
+    # we cannot mount the build context into the container build (e.g., `RUN
+    # --mount=type=bind,rw=true,src=.,dst=/buildcontext,bind-propagation=shared
+    # <cmd>`), which would allow it to mutate the build context. This is due to
+    # https://github.com/containers/buildah/pull/3548 not being present.
+    # For now, this necessitates passing this image into the cosa-build image
+    # build below to extract the OCI archive and inject it into the
+    # ImageStream. However, once the OpenShift CI system is upgraded to use
+    # OpenShift 4.11, we can create the RHCOS image in a single shot via this
+    # stage.
+    FROM build-test-qemu-img:latest
+    ENV COSA_DIR=/tmp/cosa
+    ENV COSA_SKIP_OVERLAY=1
+    RUN mkdir -p "${COSA_DIR}" && \
+      COSA_NO_KVM=1 /src/ci/prow-build.sh && \
+      rm -rf "${COSA_DIR}/cache"
+    # We need to make sure that root can read / write to the COSA_DIR so that
+    # when this container is actually run, we have permissions to read and
+    # write to the COSA_DIR to allow the Kola tests to run.
+    # Note: In Docker BuildKit, this would double the image size because this
+    # would create an additional layer. However, since OpenShift Image Builds
+    # use Buildah, this is eliminated because it squashes these layers
+    # together.
+    USER root
+    RUN chgrp -Rf root "${COSA_DIR}" && \
+      chmod -Rf g+w "${COSA_DIR}"
+    USER builder
+    WORKDIR /tmp/cosa
+  inputs:
+    build-test-qemu-img:
+      as:
+      - build-test-qemu-img:latest
+  to: cosa-build
+- dockerfile_literal: |
+    # We need the OCI archive to be somewhere with a predictable place with a constant
+    # path. However, the Kola tests expect the OCI archive to have the build
+    # number included in the filename. With that in mind, this image build will
+    # extract the RHCOS OCI archive from the cosa-build archive and place it in
+    # a constant path for extraction by the machine-os-oci-content image build.
+    FROM cosa-build:latest AS base
+    RUN /src/ci/simplify-ociarchive-path.sh
+
+    FROM scratch
+    COPY --from=base /tmp/cosa/builds/latest/x86_64/rhcos.x86_64.ociarchive /tmp/cosa/builds/latest/x86_64/rhcos.x86_64.ociarchive
+  inputs:
+    cosa-build:
+      as:
+      - cosa-build:latest
+  to: cosa-oci-archive
+- dockerfile_literal: |
+    # This extracts the OCI archive from the cosa-build image build, injects it
+    # into the build context, and then uses that OCI archive as this image.
+    # This makes use of the following:
+    # - OpenShift Image Builds allows one to pass in a path from another container
+    # image. It places this under /tmp/build/inputs/<path>. See:
+    # https://github.com/openshift/builder/blob/37525a77fa07e26c420962dee47193d672ef0b35/pkg/build/builder/common.go#L72
+    # - Buildah allows one to use oci-archive as a transport. See:
+    # https://www.redhat.com/sysadmin/7-transports-features
+    # - Utilizing the above features in concert with one another and using an
+    # absolute path to refer to the OCI archive in the build context allows us
+    # to "import" the OCI archive into the CI ImageStream.
+    FROM oci-archive:/tmp/build/inputs/magic/cosa/builds/latest/x86_64/rhcos.x86_64.ociarchive
+  inputs:
+    cosa-oci-archive:
+      paths:
+      - destination_dir: magic
+        source_path: /tmp/cosa
+  to: machine-os-oci-content
+- dockerfile_literal: |
+    # Create a slimmer Fedora-based image for the layering test binary. This is
+    # intended to make the startup of the OS layering test faster since we
+    # won't have to pull the larger build-test-qemu-img.
+    FROM build-test-qemu-img:latest AS base
+    FROM registry.ci.openshift.org/coreos/fedora:35 AS final
+    COPY --from=base /usr/local/bin/layering_test /usr/local/bin/layering_test
+  inputs:
+    build-test-qemu-img:
+      as:
+      - build-test-qemu-img:latest
+    fedora:
+      as:
+      - registry.ci.openshift.org/coreos/fedora:35
+  to: layering-test-img
 promotion:
+  disabled: true
   excluded_images:
   - '*'
   name: 4.11-priv
@@ -45,21 +136,7 @@ releases:
 resources:
   '*':
     requests:
-      cpu: 1000m
-      memory: 1Gi
-  build-test-qemu:
-    limits:
-      devices.kubevirt.io/kvm: "1"
-    requests:
-      cpu: 1000m
-      devices.kubevirt.io/kvm: "1"
-      memory: 3Gi
-  periodic-os-build:
-    limits:
-      devices.kubevirt.io/kvm: "1"
-    requests:
-      cpu: 1000m
-      devices.kubevirt.io/kvm: "1"
+      cpu: 2000m
       memory: 3Gi
 tests:
 - as: validate
@@ -67,11 +144,131 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: build-test-qemu
-  commands: /src/ci/build-test-qemu.sh
+- as: validate-built-image
+  commands: cat /etc/os-release
   container:
-    from: build-test-qemu-img
+    from: machine-os-oci-content
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: test-qemu-nvme
+  cluster: build02
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        #!/bin/bash
+        set -xeuo
+        /src/ci/set-openshift-user.sh
+        cosa kola run --qemu-nvme=true basic
+      from: cosa-build
+      resources:
+        limits:
+          devices.kubevirt.io/kvm: "1"
+        requests:
+          cpu: 2000m
+          devices.kubevirt.io/kvm: "1"
+          memory: 3Gi
+- as: test-qemu-firmware-uefi
+  cluster: build02
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        #!/bin/bash
+        set -xeuo
+        /src/ci/set-openshift-user.sh
+        cosa kola run --qemu-firmware=uefi basic
+      from: cosa-build
+      resources:
+        limits:
+          devices.kubevirt.io/kvm: "1"
+        requests:
+          cpu: 2000m
+          devices.kubevirt.io/kvm: "1"
+          memory: 3Gi
+- as: test-qemu-kola-upgrade
+  cluster: build02
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        #!/bin/bash
+        set -xeuo
+        /src/ci/set-openshift-user.sh
+        kola run-upgrade -b rhcos -v --find-parent-image --qemu-image-dir tmp/ --output-dir tmp/kola-upgrade
+      from: cosa-build
+      resources:
+        limits:
+          devices.kubevirt.io/kvm: "1"
+        requests:
+          cpu: 2000m
+          devices.kubevirt.io/kvm: "1"
+          memory: 3Gi
+- as: test-qemu-kola
+  cluster: build02
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        #!/bin/bash
+        set -xeuo
+        /src/ci/set-openshift-user.sh
+        cosa kola run --parallel 2
+      from: cosa-build
+      resources:
+        limits:
+          devices.kubevirt.io/kvm: "1"
+        requests:
+          cpu: 2000m
+          devices.kubevirt.io/kvm: "1"
+          memory: 3Gi
+- as: test-qemu-metal
+  cluster: build02
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        #!/bin/bash
+        set -xeuo
+        /src/ci/set-openshift-user.sh
+        cosa buildextend-metal && cosa buildextend-metal4k && cosa buildextend-live
+        cosa compress --artifact=metal --artifact=metal4k
+        kola testiso -S --scenarios pxe-install,pxe-offline-install --output-dir tmp/kola-metal
+      from: cosa-build
+      resources:
+        limits:
+          devices.kubevirt.io/kvm: "1"
+        requests:
+          cpu: 2000m
+          devices.kubevirt.io/kvm: "1"
+          memory: 3Gi
+- as: test-in-cluster
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: boot-from-derived-image
+      cli: latest
+      commands: /usr/local/bin/layering_test -test.v -test.failfast -test.timeout
+        45m -build-log="${ARTIFACT_DIR}/derived-image-build.log"
+      dependencies:
+      - env: BASE_IMAGE_PULLSPEC
+        name: pipeline:machine-os-oci-content
+      from: layering-test-img
+      resources:
+        requests:
+          cpu: 1000m
+    workflow: ipi-gcp
+  timeout: 4h30m0s
 zz_generated_metadata:
   branch: master
   org: openshift-priv
