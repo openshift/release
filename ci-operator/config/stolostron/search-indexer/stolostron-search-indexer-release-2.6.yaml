@@ -19,8 +19,9 @@ images:
     stolostron_builder_go1.17-linux:
       as:
       - registry.ci.openshift.org/stolostron/builder:go1.17-linux
-  to: search-v2-api
+  to: search-indexer
 promotion:
+  disabled: true
   name: "2.6"
   namespace: stolostron
 resources:
@@ -32,37 +33,43 @@ tests:
 - as: pr-image-mirror
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: search-v2-api
+      SOURCE_IMAGE_REF: search-indexer
     env:
-      IMAGE_REPO: search-v2-api
+      IMAGE_REPO: search-indexer
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
-- as: release-fast-forward
-  postsubmit: true
-  steps:
-    env:
-      DESTINATION_BRANCH: release-2.6
-    workflow: ocm-ci-fastforward
-- as: lint
-  commands: |
-    GOLANGCI_LINT_CACHE=/tmp/golangci-cache make -f Makefile.prow lint
-  container:
-    from: src
 - as: test-unit
   commands: |
     export SELF="make -f Makefile.prow"
     make -f Makefile.prow unit-test
   container:
     from: src
-- as: sonar-pre-submit
-  commands: |
-    export SELF="make -f Makefile.prow"
-    make -f Makefile.prow sonar/go/prow
-  container:
-    from: src
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
+- as: publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: search-indexer
+    env:
+      IMAGE_REPO: search-indexer
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
+        export OSCI_COMPONENT_VERSION="2.6"
+        export SELF="make -f Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 - as: sonar-post-submit
   commands: |
     export SELF="make -f Makefile.prow"
@@ -74,6 +81,6 @@ tests:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
 zz_generated_metadata:
-  branch: main
+  branch: release-2.6
   org: stolostron
-  repo: search-v2-api
+  repo: search-indexer
