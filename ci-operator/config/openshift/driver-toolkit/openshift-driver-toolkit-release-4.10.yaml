@@ -44,10 +44,29 @@ tests:
   commands: make verify
   container:
     from: src
+- as: verify-imagestream
+  commands: |
+    ls /manifests/01-openshift-imagestream.yaml
+    ls /manifests/image-references
+  container:
+    from: driver-toolkit
 - as: image-contents
   commands: cat /etc/driver-toolkit-release.json
   container:
     from: driver-toolkit
+- as: driver-toolkit-e2e-aws
+  optional: true
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: e2e-aws-driver-toolkit-presubmit
   steps:
     cluster_profile: aws
@@ -62,11 +81,11 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-aws
+- as: openshift-e2e-aws
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
-- as: e2e-upgrade
+- as: openshift-e2e-upgrade-aws
   steps:
     cluster_profile: aws
     workflow: openshift-upgrade-aws
