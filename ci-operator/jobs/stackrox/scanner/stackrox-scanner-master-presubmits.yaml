@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build01
     context: ci/prow/style-checks
     decorate: true
     decoration_config:
@@ -17,29 +17,29 @@ presubmits:
     rerun_command: /test style-checks
     spec:
       containers:
-        - args:
-          - --gcs-upload-secret=/secrets/gcs/service-account.json
-          - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-          - --report-credentials-file=/etc/report/credentials
-          - --target=style-checks
-          command:
-          - ci-operator
-          image: ci-operator:latest
-          imagePullPolicy: Always
-          name: ""
-          resources:
-            requests:
-              cpu: 10m
-          volumeMounts:
-          - mountPath: /secrets/gcs
-            name: gcs-credentials
-            readOnly: true
-          - mountPath: /etc/pull-secret
-            name: pull-secret
-            readOnly: true
-          - mountPath: /etc/report
-            name: result-aggregator
-            readOnly: true
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=style-checks
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
       serviceAccountName: ci-operator
       volumes:
       - name: pull-secret
