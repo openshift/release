@@ -17,16 +17,32 @@ tests:
 - as: style-checks
   steps:
     test:
-    - ref: stackrox-stackrox
-- as: more-style-checks
-  steps:
-    test:
-    - ref: stackrox-stackrox
+    - as: job
+      commands: .openshift-ci/dispatch.sh ${JOB_NAME##merge-}
+      credentials:
+      - mount_path: /tmp/secret/stackrox-stackrox-initial
+        name: stackrox-stackrox-initial
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
 - as: merge-style-checks
   postsubmit: true
   steps:
     test:
-    - ref: stackrox-stackrox
+    - as: job
+      commands: .openshift-ci/dispatch.sh ${JOB_NAME##merge-}
+      credentials:
+      - mount_path: /tmp/secret/stackrox-stackrox-initial
+        name: stackrox-stackrox-initial
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
 zz_generated_metadata:
   branch: master
   org: stackrox
