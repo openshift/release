@@ -16,7 +16,7 @@ metadata:
   name: release-payload-controller
   namespace: ci
 spec:
-  replicas: 1
+  replicas: 3
   selector:
     matchLabels:
       app: release-payload-controller
@@ -34,6 +34,25 @@ spec:
         image: release-payload-controller:latest
         name: controller
         resources:
-          requests:
+          limits:
+            cpu: 500m
             memory: 2Gi
+          requests:
+            cpu: 250m
+            memory: 1Gi
       serviceAccountName: release-payload-controller
+---
+#---------------------------------------------------------------------------------
+# release_payload_controller_resources.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: release-payload-controller
+  namespace: ci
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: release-payload-controller
