@@ -50,6 +50,7 @@ EOF
   else
     echo "No core dump files found."
     # successful junit, otherwise we can break aggregation when it does fail and we don't have passes to compare to
+    mkdir -p ${ARTIFACT_DIR}/junit/
     cat >> ${ARTIFACT_DIR}/junit/junit_core_dump_status.xml << EOF
 <testsuite name="gather core dump" tests="1" failures="0">
 <testcase name="core files found">
