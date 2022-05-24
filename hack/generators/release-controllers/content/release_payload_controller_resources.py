@@ -174,52 +174,75 @@ def _namespaced_rbac_resources(gendoc):
 def _deployment_resources(gendoc):
     context = gendoc.context
 
-    gendoc.append({
-        'apiVersion': 'apps/v1',
-        'kind': 'Deployment',
-        'metadata': {
-            'annotations': {
-                'image.openshift.io/triggers': '[{"from":{"kind":"ImageStreamTag","name":"release-payload-controller:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\\"controller\\")].image"}]'
+    gendoc.append_all([
+        {
+            'apiVersion': 'apps/v1',
+            'kind': 'Deployment',
+            'metadata': {
+                'annotations': {
+                    'image.openshift.io/triggers': '[{"from":{"kind":"ImageStreamTag","name":"release-payload-controller:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\\"controller\\")].image"}]'
+                },
+                'name': 'release-payload-controller',
+                'namespace': context.config.rc_deployment_namespace,
             },
-            'name': 'release-payload-controller',
-            'namespace': context.config.rc_deployment_namespace,
-        },
-        'spec': {
-            'replicas': 1,
-            'selector': {
-                'matchLabels': {
-                    'app': 'release-payload-controller'
-                }
-            },
-            'template': {
-                'metadata': {
-                    'labels': {
+            'spec': {
+                'replicas': 3,
+                'selector': {
+                    'matchLabels': {
                         'app': 'release-payload-controller'
                     }
                 },
-                'spec': {
-                    'containers': [
-                        {
-                            "resources": {
-                                "requests": {
-                                    "memory": "2Gi"
-                                },
-                            },
-                            'command': [
-                                '/usr/bin/release-payload-controller',
-                                'start',
-                                '--namespace=ci',
-                                '-v=6',
-                            ],
-                            'image': 'release-payload-controller:latest',
-                            'name': 'controller',
+                'template': {
+                    'metadata': {
+                        'labels': {
+                            'app': 'release-payload-controller'
                         }
-                    ],
-                    'serviceAccountName': 'release-payload-controller',
+                    },
+                    'spec': {
+                        'containers': [
+                            {
+                                "resources": {
+                                    "limits": {
+                                        "cpu": "500m",
+                                        "memory": "2Gi"
+                                    },
+                                    "requests": {
+                                        "cpu": "250m",
+                                        "memory": "1Gi"
+                                    },
+                                },
+                                'command': [
+                                    '/usr/bin/release-payload-controller',
+                                    'start',
+                                    '--namespace=ci',
+                                    '-v=6',
+                                ],
+                                'image': 'release-payload-controller:latest',
+                                'name': 'controller',
+                            }
+                        ],
+                        'serviceAccountName': 'release-payload-controller',
+                    }
+                }
+            }
+        },
+        {
+            'apiVersion': 'policy/v1',
+            'kind': 'PodDisruptionBudget',
+            'metadata': {
+                'name': 'release-payload-controller',
+                'namespace': context.config.rc_deployment_namespace,
+            },
+            'spec': {
+                'minAvailable': 1,
+                'selector': {
+                    'matchLabels': {
+                        'app': 'release-payload-controller',
+                    }
                 }
             }
         }
-    })
+    ])
 
 
 def add_release_payload_controller_resources(config, context):
