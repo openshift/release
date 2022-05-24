@@ -20,7 +20,33 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
   to: special-resource-rhel8-operator
+- dockerfile_literal: |
+    FROM src
+    RUN export VERSION="stable" && \
+        URL="https://github.com/koalaman/shellcheck/releases/download" && \
+        export URL="${URL}/${VERSION}/shellcheck-${VERSION}.linux.x86_64.tar.xz" && \
+        wget -q -O - "${URL}" | tar -xJv && \
+        cp "shellcheck-${VERSION}/shellcheck" /usr/local/bin/ && \
+        rm -rf "shellcheck-${VERSION}"
+    RUN mkdir /tmp/helm && \
+        cd /tmp/helm && \
+        curl https://get.helm.sh/helm-v3.6.0-linux-amd64.tar.gz -o helm.tar.gz && \
+        tar xvfpz helm.tar.gz && \
+        mv linux-amd64/helm /usr/local/bin && \
+        chmod +x /usr/local/bin/helm && \
+        rm -rf /tmp/helm
+    RUN mkdir /tmp/oc && \
+        cd /tmp/oc && \
+        curl -L https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz -o oc.tar.gz && \
+        tar xzvf oc.tar.gz && \
+        mv kubectl /usr/local/bin/ && \
+        cd - && \
+        rm -rf /tmp/oc
+  from: src
+  to: test-bin
 promotion:
+  excluded_images:
+  - test-bin
   name: "4.10"
   namespace: ocp
 releases:
@@ -41,14 +67,56 @@ resources:
       cpu: 300m
       memory: 500Mi
 tests:
-- as: unit
-  commands: make test
+- as: kube-lint
+  commands: GOFLAGS= make kube-lint
   container:
     from: src
 - as: verify
   commands: make verify
   container:
     from: src
+- as: e2e-aws-ocp
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.10"
+  steps:
+    test:
+    - as: deploy-nfd
+      cli: latest
+      commands: |
+        git clone --branch release-4.10 https://github.com/openshift/cluster-nfd-operator
+        cd cluster-nfd-operator
+        make deploy IMAGE_TAG=quay.io/openshift/origin-cluster-nfd-operator:4.10
+        oc apply -f config/samples/nfd.openshift.io_v1_nodefeaturediscovery.yaml
+      from: test-bin
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+    - as: deploy-sro
+      cli: latest
+      commands: GOFLAGS= make deploy
+      dependencies:
+      - env: IMG
+        name: special-resource-rhel8-operator
+      from: test-bin
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: test-bin
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+    workflow: generic-claim
 zz_generated_metadata:
   branch: release-4.10
   org: openshift
