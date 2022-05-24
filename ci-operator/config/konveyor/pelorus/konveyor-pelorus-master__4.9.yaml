@@ -68,7 +68,7 @@ tests:
         # update exporter values and helm upgrade
         timeout 1m bash -c 'until curl -o ci_values.yaml https://raw.githubusercontent.com/konveyor/mig-demo-apps/master/apps/todolist-mongo-go/pelorus/values.yaml; do sleep 20; done'
         timeout 10m bash -c 'until helm upgrade pelorus charts/pelorus --namespace pelorus --values ci_values.yaml; do sleep 10; done'
-        timeout 10m bash -c 'until oc get svc committime-generic --namespace pelorus; do sleep 10; done'
+        timeout 10m bash -c 'until oc get svc committime-exporter --namespace pelorus; do sleep 10; done'
         timeout 10m bash -c 'until oc get svc deploytime-exporter --namespace pelorus; do sleep 10; done'
         # install the sample-app - https://github.com/konveyor/mig-demo-apps/tree/master/apps/todolist-mongo-go
         timeout 1m bash -c 'until curl -o mongo-persistent.yaml https://raw.githubusercontent.com/konveyor/mig-demo-apps/master/apps/todolist-mongo-go/mongo-persistent.yaml; do sleep 20; done'
@@ -76,11 +76,11 @@ tests:
         timeout 10m bash -c 'until oc create -f mongo-persistent.yaml; do sleep 10; done'
         timeout 10m bash -c 'until oc get svc todolist --namespace mongo-persistent; do sleep 10; done'
         # TEST to ensure the todolist app commit and image sha are read by the exporters
-        committime_route=`oc get route -n pelorus committime-generic -o=template='http://{{.spec.host | printf "%s\n"}}'`
+        committime_route=`oc get route -n pelorus committime-exporter -o=template='http://{{.spec.host | printf "%s\n"}}'`
         deploytime_route=`oc get route -n pelorus deploytime-exporter -o=template='http://{{.spec.host | printf "%s\n"}}'`
-        # There is a bug or issue atm, do not enable yet.
-        timeout 5m bash -c 'until curl $committime_route 2>&1 | grep mongo; do sleep 10; done'
-        timeout 2m bash -c 'until curl $deploytime_route 2>&1 | grep todolist; do sleep 10; done'
+        # check the logs for todolist-mongo-go in the mongo-persistent namespace
+        timeout 5m bash -c 'until oc -n pelorus logs --since=10s service/committime-exporter | grep "namespace=mongo-persistent, app=todolist"; do sleep 10; done'
+        timeout 5m bash -c 'until oc -n pelorus logs --since=5m service/deploytime-exporter | grep "namespace=mongo-persistent, app=todolist"; do sleep 10; done'
       from: src
       resources:
         requests:
