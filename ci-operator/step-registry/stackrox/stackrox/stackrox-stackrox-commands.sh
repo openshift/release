@@ -1,2 +1,2 @@
 #!/bin/bash
-exec .openshift-ci/dispatch.sh $TEST_SUITE
+exec .openshift-ci/dispatch.sh "$JOB_NAME"
