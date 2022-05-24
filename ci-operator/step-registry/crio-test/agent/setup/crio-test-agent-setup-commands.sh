@@ -12,6 +12,7 @@ tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/crio-test.tar.gz"
 timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF 
     export HOME=/root
     export GOROOT=/usr/local/go
+    echo GOROOT="/usr/local/go" >> /etc/environment
 
     dnf install python39 -y
     curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
