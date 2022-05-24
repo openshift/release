@@ -20,9 +20,15 @@ images:
 - build_args:
   - name: ROX_PRODUCT_BRANDING
     value: RHACS_BRANDING
-  dockerfile_path: .openshift-ci/build/Dockerfile.build-main-and-bundles
+  dockerfile_path: .openshift-ci/build/Dockerfile.build-main-and-bundle
   from: stackrox-test
   to: main-bundle
+- build_args:
+  - name: ROX_PRODUCT_BRANDING
+    value: RHACS_BRANDING
+  dockerfile_path: .openshift-ci/build/Dockerfile.build-central-db-bundle
+  from: stackrox-test
+  to: central-db-bundle
 - build_args:
   - name: ROX_PRODUCT_BRANDING
     value: RHACS_BRANDING
@@ -50,7 +56,7 @@ images:
   dockerfile_path: Dockerfile.gen
   from: ubi
   inputs:
-    main-bundle:
+    central-db-bundle:
       paths:
       - destination_dir: .
         source_path: /go/src/github.com/stackrox/stackrox/image/postgres/.
@@ -58,6 +64,7 @@ images:
 promotion:
   excluded_images:
   - main-bundle
+  - central-db-bundle
   namespace: stackrox
   tag: pr-test
 resources:
