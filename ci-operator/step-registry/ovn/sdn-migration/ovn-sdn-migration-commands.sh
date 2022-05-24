@@ -52,6 +52,10 @@ oc wait co network --for='condition=PROGRESSING=True' --timeout=30s
 # Wait until the multus pods are restarted
 timeout 300s oc rollout status ds/multus -n openshift-multus
 
+#sleep 60 to make sure api rollback after multus pods are rebuild
+
+sleep 60
+
 # Reboot all the nodes
 
 oc get pod -n openshift-machine-config-operator | grep daemon|awk '{print $1}'|xargs -i oc rsh -n openshift-machine-config-operator {} chroot /rootfs shutdown -r +1
