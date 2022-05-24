@@ -1,27 +1,24 @@
-presubmits:
+postsubmits:
   stackrox/scanner:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
+    - ^ross-unit-test-osci$
     cluster: build01
-    context: ci/prow/style-checks
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-scanner-master-style-checks
-    rerun_command: /test style-checks
+    max_concurrency: 1
+    name: branch-ci-stackrox-scanner-ross-unit-test-osci-merge-style-checks
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=style-checks
+        - --target=merge-style-checks
         command:
         - ci-operator
         image: ci-operator:latest
@@ -48,29 +45,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )style-checks,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
+    - ^ross-unit-test-osci$
     cluster: build01
-    context: ci/prow/unit-tests
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-scanner-master-unit-tests
-    rerun_command: /test unit-tests
+    max_concurrency: 1
+    name: branch-ci-stackrox-scanner-ross-unit-test-osci-merge-unit-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=unit-tests
+        - --target=merge-unit-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -97,4 +90,3 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )unit-tests,?($|\s.*)
