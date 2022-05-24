@@ -20,8 +20,23 @@ tests:
     - as: job
       commands: .openshift-ci/dispatch.sh style-checks
       credentials:
-      - mount_path: /tmp/secret/stackrox-scanner-initial
-        name: stackrox-scanner-initial
+      - mount_path: /tmp/secret/stackrox-stackrox-initial
+        name: stackrox-stackrox-initial
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+- as: merge-style-checks
+  postsubmit: true
+  steps:
+    test:
+    - as: job
+      commands: .openshift-ci/dispatch.sh style-checks
+      credentials:
+      - mount_path: /tmp/secret/stackrox-stackrox-initial
+        name: stackrox-stackrox-initial
         namespace: test-credentials
       from: src
       resources:
