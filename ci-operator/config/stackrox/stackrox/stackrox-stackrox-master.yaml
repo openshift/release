@@ -15,7 +15,7 @@ resources:
       memory: 4000Mi
 tests:
 - as: style-checks
-  steps:
+  steps: &default
     test:
     - as: job
       commands: .openshift-ci/dispatch.sh ${JOB_NAME##merge-}
@@ -30,19 +30,7 @@ tests:
           memory: 4000Mi
 - as: merge-style-checks
   postsubmit: true
-  steps:
-    test:
-    - as: job
-      commands: .openshift-ci/dispatch.sh ${JOB_NAME##merge-}
-      credentials:
-      - mount_path: /tmp/secret/stackrox-stackrox-initial
-        name: stackrox-stackrox-initial
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 4000Mi
+  steps: *default
 zz_generated_metadata:
   branch: master
   org: stackrox
