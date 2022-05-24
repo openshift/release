@@ -7,6 +7,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.46.0
   ocp_builder_rhel-8-golang-1.18-openshift-4.11:
     name: builder
     namespace: ocp
@@ -48,11 +52,7 @@ tests:
   container:
     from: src
 - as: verify
-  commands: "export GOLANGCI_LINT_VERSION=$(cat .golangciversion 2&> /dev/null ||
-    echo \"1.23.8\")  \nexport GOLANGCI_LINT_CACHE=/tmp/.cache\ncurl -sfL \"https://github.com/golangci/golangci-lint/releases/download/v${GOLANGCI_LINT_VERSION:?'golangci-lint
-    version is unset'}/golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64.tar.gz\"
-    | tar -C /go/bin -zx --strip-components=1 \"golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64/golangci-lint\"\n
-    ./hack/verify-style.sh\n"
+  commands: hack/verify-style.sh
   container:
     from: src
 - as: e2e-gcp
@@ -203,6 +203,15 @@ tests:
   optional: true
   steps:
     workflow: hypershift-aws-conformance
+- as: lint
+  commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    golangci-lint run --verbose --print-resources-usage --modules-download-mode=vendor --timeout=5m0s
+  container:
+    clone: true
+    from: golangci-lint
 zz_generated_metadata:
   branch: release-4.11
   org: openshift-priv
