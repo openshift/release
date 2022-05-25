@@ -73,6 +73,7 @@ tests:
         oc apply -f charts/pelorus/configmaps
         # update exporter values and helm upgrade
         timeout 1m bash -c 'until curl -o ci_values.yaml https://raw.githubusercontent.com/konveyor/mig-demo-apps/jira_failure/apps/todolist-mongo-go/pelorus/values.yaml; do sleep 20; done'
+        cat ci_values.yaml
         timeout 10m bash -c 'until helm upgrade pelorus charts/pelorus --namespace pelorus --values ci_values.yaml; do sleep 10; done'
         timeout 10m bash -c 'until oc get svc committime-exporter --namespace pelorus; do sleep 10; done'
         timeout 10m bash -c 'until oc get svc deploytime-exporter --namespace pelorus; do sleep 10; done'
