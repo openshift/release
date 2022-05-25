@@ -20,21 +20,81 @@ resources:
       cpu: 2000m
       memory: 2Gi
 tests:
-- as: e2e-master
+- as: jh-at-scale
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 2h0m0s
-    version: "4.9"
+    version: "4.10"
   steps:
-    test:
-    - as: presubmit
-      commands: run ods ci-1
+    post:
+    - as: ods-osd-cluster-destroy
+      commands: run ods osd_cluster destroy
       credentials:
       - mount_path: /var/run/psap-ods-secret-1
         name: psap-ods-secret-1
+        namespace: test-credentials
+      - mount_path: /var/run/psap-entitlement-secret
+        name: psap-entitlement-secret
+        namespace: test-credentials
+      from: ci-artifacts
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+    - chain: gather
+    pre:
+    - as: ods-osd-cluster-create
+      commands: run ods osd_cluster create
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      - mount_path: /var/run/psap-entitlement-secret
+        name: psap-entitlement-secret
+        namespace: test-credentials
+      from: ci-artifacts
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+    - ref: ipi-install-rbac
+    test:
+    - as: test
+      commands: run ods jh-at-scale
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      - mount_path: /var/run/psap-entitlement-secret
+        name: psap-entitlement-secret
+        namespace: test-credentials
+      from: ci-artifacts
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+    workflow: generic-claim
+- as: jh-at-small-scale
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.10"
+  steps:
+    test:
+    - as: test
+      commands: run ods jh-at-scale single-cluster
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      - mount_path: /var/run/psap-entitlement-secret
+        name: psap-entitlement-secret
         namespace: test-credentials
       from: ci-artifacts
       resources:
