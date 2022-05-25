@@ -1,5 +1,5 @@
 base_images:
-  stolostron_builder_go1.18-linux:
+  stolostron_builder_go1.17-linux:
     name: builder
     namespace: stolostron
     tag: go1.18-linux
@@ -11,11 +11,12 @@ build_root:
 images:
 - dockerfile_path: Dockerfile
   inputs:
-    stolostron_builder_go1.18-linux:
+    stolostron_builder_go1.17-linux:
       as:
-      - registry.ci.openshift.org/stolostron/builder:go1.18-linux
+      - registry.ci.openshift.org/stolostron/builder:go1.17-linux
   to: hypershift-addon-operator
 promotion:
+  disabled: true
   name: "2.1"
   namespace: stolostron
 releases:
@@ -34,12 +35,6 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: backplane-fast-forward
-  postsubmit: true
-  steps:
-    env:
-      DESTINATION_BRANCH: backplane-2.1
-    workflow: ocm-ci-fastforward
 - as: unit-tests
   commands: make test
   container:
@@ -79,17 +74,6 @@ tests:
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
-- as: sonar-post-submit
-  commands: |
-    export SONAR_GO_TEST_ARGS="./..."
-    export SELF="make -f /opt/build-harness/Makefile.prow"
-    make -f /opt/build-harness/Makefile.prow sonar/go/prow
-  container:
-    from: src
-  postsubmit: true
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
 - as: pr-image-mirror
   steps:
     dependencies:
@@ -108,7 +92,36 @@ tests:
       IMAGE_TAG: latest
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
+- as: publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: hypershift-addon-operator
+    env:
+      IMAGE_REPO: hypershift-addon-operator
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_COMPONENT_NAME=hypershift-addon-operator
+        export OSCI_COMPONENT_VERSION=2.1.0
+        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
+        export OSCI_PIPELINE_PRODUCT_PREFIX=backplane
+        export OSCI_PIPELINE_REPO=backplane-pipeline
+        export SELF="make -f /opt/build-harness/Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        make -f /opt/build-harness/Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: main
+  branch: backplane-2.1
   org: stolostron
   repo: hypershift-addon-operator
