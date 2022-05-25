@@ -51,6 +51,10 @@ tests:
     - as: e2e
       commands: |
         # TODO: optimize this
+        #  get files and env vars ( to set exporter git url and branch )
+        ls -la
+        set
+        # end get files and env vars
         set -x
         make dev-env
         source .venv/bin/activate
@@ -65,8 +69,11 @@ tests:
         timeout 10m bash -c 'until oc get svc grafana-service --namespace pelorus; do sleep 10; done'
         timeout 10m bash -c 'until oc get svc prometheus-operated --namespace pelorus; do sleep 10; done'
         timeout 10m bash -c 'until oc get svc prometheus-pelorus --namespace pelorus; do sleep 10; done'
+        # load the config maps
+        oc apply -f charts/pelorus/configmaps
         # update exporter values and helm upgrade
-        timeout 1m bash -c 'until curl -o ci_values.yaml https://raw.githubusercontent.com/konveyor/mig-demo-apps/master/apps/todolist-mongo-go/pelorus/values.yaml; do sleep 20; done'
+        timeout 1m bash -c 'until curl -o ci_values.yaml https://raw.githubusercontent.com/konveyor/mig-demo-apps/jira_failure/apps/todolist-mongo-go/pelorus/values.yaml; do sleep 20; done'
+        cat ci_values.yaml
         timeout 10m bash -c 'until helm upgrade pelorus charts/pelorus --namespace pelorus --values ci_values.yaml; do sleep 10; done'
         timeout 10m bash -c 'until oc get svc committime-exporter --namespace pelorus; do sleep 10; done'
         timeout 10m bash -c 'until oc get svc deploytime-exporter --namespace pelorus; do sleep 10; done'
@@ -81,6 +88,11 @@ tests:
         # check the logs for todolist-mongo-go in the mongo-persistent namespace
         timeout 5m bash -c 'until oc -n pelorus logs --since=10s service/committime-exporter | grep "namespace=mongo-persistent, app=todolist"; do sleep 10; done'
         timeout 5m bash -c 'until oc -n pelorus logs --since=5m service/deploytime-exporter | grep "namespace=mongo-persistent, app=todolist"; do sleep 10; done'
+      # https://vault.ci.openshift.org/ui/vault/secrets/kv/show/selfservice/konveyor/pelorus/jira
+      secrets:
+      - mount_path: /var/run/konveyor/pelorus/jira
+        name: jira-credentials
+        namespace: pelorus
       from: src
       resources:
         requests:
