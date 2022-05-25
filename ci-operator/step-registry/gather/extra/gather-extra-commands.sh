@@ -340,9 +340,9 @@ ${t_all}     cluster:usage:cpu:kube_apiserver:total:avg   avg(sum(rate(container
 ${t_install} cluster:usage:cpu:kube_apiserver:install:avg avg(sum(rate(container_cpu_usage_seconds_total{pod=~"kube-apiserver-ip-.*", namespace="openshift-kube-apiserver"}[${d_install}])) by (pod))
 ${t_test}    cluster:usage:cpu:kube_apiserver:test:avg    avg(sum(rate(container_cpu_usage_seconds_total{pod=~"kube-apiserver-ip-.*", namespace="openshift-kube-apiserver"}[${d_test}])) by (pod))
 
-${t_all}     cluster:usage:cpu:apiserver:total:seconds:quantile label_replace(quantile_over_time(.95,sum(irate(container_cpu_usage_seconds_total{{pod=~"kube-apiserver-ip-.*", namespace="openshift-kube-apiserver"}[90s:30s]))[${d_all}:]),"quantile","0.95","","")
-${t_install} cluster:usage:cpu:apiserver:install:seconds:quantile label_replace(quantile_over_time(.95,sum(irate(container_cpu_usage_seconds_total{{pod=~"kube-apiserver-ip-.*", namespace="openshift-kube-apiserver"}[90s:30s]))[${d_all}:${d_test}]),"quantile","0.95","","")
-${t_test}    cluster:usage:cpu:apiserver:test:seconds:quantile label_replace(quantile_over_time(.95,sum(irate(container_cpu_usage_seconds_total{{pod=~"kube-apiserver-ip-.*", namespace="openshift-kube-apiserver"}[90s:30s]))[${d_test}:]),"quantile","0.95","","")
+${t_all}     cluster:usage:cpu:apiserver:total:seconds:quantile label_replace(quantile_over_time(.95,sum(irate(container_cpu_usage_seconds_total{pod=~"kube-apiserver-ip-.*", namespace="openshift-kube-apiserver"}[90s:30s]))[${d_all}:]),"quantile","0.95","","")
+${t_install} cluster:usage:cpu:apiserver:install:seconds:quantile label_replace(quantile_over_time(.95,sum(irate(container_cpu_usage_seconds_total{pod=~"kube-apiserver-ip-.*", namespace="openshift-kube-apiserver"}[90s:30s]))[${d_all}:${d_test}]),"quantile","0.95","","")
+${t_test}    cluster:usage:cpu:apiserver:test:seconds:quantile label_replace(quantile_over_time(.95,sum(irate(container_cpu_usage_seconds_total{pod=~"kube-apiserver-ip-.*", namespace="openshift-kube-apiserver"}[90s:30s]))[${d_test}:]),"quantile","0.95","","")
 
 ${t_all}     cluster:usage:cpu:etcd:total:avg   avg(sum(rate(container_cpu_usage_seconds_total{pod=~"etcd-ip-.*", namespace="openshift-etcd"}[${d_all}])) by (pod))
 ${t_install} cluster:usage:cpu:etcd:install:avg avg(sum(rate(container_cpu_usage_seconds_total{pod=~"etcd-ip-.*", namespace="openshift-etcd"}[${d_install}])) by (pod))
