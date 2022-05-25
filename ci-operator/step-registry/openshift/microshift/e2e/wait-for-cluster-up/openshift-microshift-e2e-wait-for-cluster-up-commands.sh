@@ -33,6 +33,11 @@ gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
 gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
 gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
+cat > "${HOME}"/crio-auth.conf <<'EOF'
+[crio.image]
+global_auth_file="/home/rhel8user/pull-secret"
+EOF
+
 cat > "${HOME}"/start_microshift.sh <<'EOF'
 #!/bin/bash
 set -xeuo pipefail
@@ -48,6 +53,10 @@ if [[ $(command -v podman) ]]; then
   sudo podman cp microshift:/var/lib/microshift/resources/kubeadmin/kubeconfig /var/lib/microshift/resources/kubeadmin/kubeconfig  
 else
   echo "This is rpm run";
+
+  sudo cp ~/crio-auth.conf /etc/crio/crio.conf.d/crio-auth.conf
+  sudo systemctl daemon-reload
+  sudo systemctl restart crio
 
   # test if microshift is running
   sudo systemctl status microshift;
@@ -71,6 +80,12 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   --recurse /tmp/validate-microshift rhel8user@"${INSTANCE_PREFIX}":~/validate-microshift
+
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+  --quiet \
+  --project "${GOOGLE_PROJECT_ID}" \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  --recurse "${HOME}"/crio-auth.conf rhel8user@"${INSTANCE_PREFIX}":~/crio-auth.conf
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \
