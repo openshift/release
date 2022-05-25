@@ -1,4 +1,8 @@
 base_images:
+  cli:
+    name: "4.10"
+    namespace: ocp
+    tag: cli
   os:
     name: alpine
     namespace: ci
@@ -39,6 +43,31 @@ tests:
   commands: make format
   container:
     from: src
+- as: e2e
+  cluster_claim:
+    # architecture, cloud, owner, product, and version are used to determine a cluster pool by matching the labels
+    as: custom    # optional; release name to use when importing cluster claim release; defaults to `latest`
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.10"
+  steps:
+    test:
+    - as: claim
+      commands: |
+        printenv KUBECONFIG
+        printenv KUBEADMIN_PASSWORD_FILE
+        oc get node
+        oc config view
+        oc whoami
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim # expose images, gather logs (https://steps.ci.openshift.org/workflow/generic-claim)
 zz_generated_metadata:
   branch: master
   org: openshift
