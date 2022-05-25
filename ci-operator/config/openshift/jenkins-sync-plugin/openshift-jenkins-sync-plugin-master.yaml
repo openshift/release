@@ -1,16 +1,3 @@
-base_images:
-  jenkins-agent-base:
-    name: "4.11"
-    namespace: ocp
-    tag: jenkins-agent-base
-  jenkins-agent-maven:
-    name: "4.11"
-    namespace: ocp
-    tag: jenkins-agent-maven
-  original_jenkins:
-    name: "4.11"
-    namespace: ocp
-    tag: jenkins
 build_root:
   image_stream_tag:
     name: release
@@ -18,15 +5,6 @@ build_root:
     tag: golang-1.16
 images:
 - dockerfile_path: Dockerfile
-  from: original_jenkins
-  inputs:
-    jenkins-agent-maven:
-      as:
-      - quay.io/openshift/origin-jenkins-agent-maven:4.9.0
-    src:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/jenkins-sync-plugin/.
   to: jenkins
 promotion:
   additional_images:
@@ -62,8 +40,6 @@ tests:
       dependencies:
       - env: JENKINS_IMAGE
         name: pipeline:jenkins
-      - env: JENKINS_AGENT_BASE_IMAGE
-        name: pipeline:jenkins-agent-base
       from: src
       resources:
         requests:

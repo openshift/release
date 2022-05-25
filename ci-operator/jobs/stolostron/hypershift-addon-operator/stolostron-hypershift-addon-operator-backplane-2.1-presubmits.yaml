@@ -1,80 +1,28 @@
 presubmits:
-  stolostron/multicloud-operators-foundation:
+  stolostron/hypershift-addon-operator:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-2\.1$
-    - ^release-2\.1-
-    cluster: build01
-    context: ci/prow/build
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stolostron-multicloud-operators-foundation-release-2.1-build
-    rerun_command: /test build
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=build
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )build,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-2\.1$
-    - ^release-2\.1-
+    - ^backplane-2\.1$
+    - ^backplane-2\.1-
     cluster: build01
     context: ci/prow/e2e
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stolostron-multicloud-operators-foundation-release-2.1-e2e
+    name: pull-ci-stolostron-hypershift-addon-operator-backplane-2.1-e2e
     rerun_command: /test e2e
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-cluster-profile
         - --target=e2e
         command:
         - ci-operator
@@ -85,16 +33,14 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -104,18 +50,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
+      - name: hive-hive-credentials
         secret:
-          secretName: cluster-secrets-aws
+          secretName: hive-hive-credentials
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -126,8 +66,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-2\.1$
-    - ^release-2\.1-
+    - ^backplane-2\.1$
+    - ^backplane-2\.1-
     cluster: build01
     context: ci/prow/images
     decorate: true
@@ -136,7 +76,7 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stolostron-multicloud-operators-foundation-release-2.1-images
+    name: pull-ci-stolostron-hypershift-addon-operator-backplane-2.1-images
     rerun_command: /test images
     spec:
       containers:
@@ -175,25 +115,26 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-2\.1$
-    - ^release-2\.1-
+    - ^backplane-2\.1$
+    - ^backplane-2\.1-
     cluster: build01
-    context: ci/prow/unit
+    context: ci/prow/pr-image-mirror
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stolostron-multicloud-operators-foundation-release-2.1-unit
-    rerun_command: /test unit
+    name: pull-ci-stolostron-hypershift-addon-operator-backplane-2.1-pr-image-mirror
+    rerun_command: /test pr-image-mirror
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=unit
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=pr-image-mirror
         command:
         - ci-operator
         image: ci-operator:latest
@@ -203,6 +144,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -214,35 +158,39 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )unit,?($|\s.*)
+    trigger: (?m)^/test( | .* )pr-image-mirror,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-2\.1$
-    - ^release-2\.1-
+    - ^backplane-2\.1$
+    - ^backplane-2\.1-
     cluster: build01
-    context: ci/prow/verify
+    context: ci/prow/sonar
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stolostron-multicloud-operators-foundation-release-2.1-verify
-    rerun_command: /test verify
+    name: pull-ci-stolostron-hypershift-addon-operator-backplane-2.1-sonar
+    rerun_command: /test sonar
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=verify
+        - --secret-dir=/secrets/acm-sonarcloud-token
+        - --target=sonar
         command:
         - ci-operator
         image: ci-operator:latest
@@ -252,6 +200,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/acm-sonarcloud-token
+          name: acm-sonarcloud-token
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -263,35 +214,38 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: acm-sonarcloud-token
+        secret:
+          secretName: acm-sonarcloud-token
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )verify,?($|\s.*)
+    trigger: (?m)^/test( | .* )sonar,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-2\.1$
-    - ^release-2\.1-
+    - ^backplane-2\.1$
+    - ^backplane-2\.1-
     cluster: build01
-    context: ci/prow/verify-deps
+    context: ci/prow/unit-tests
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stolostron-multicloud-operators-foundation-release-2.1-verify-deps
-    rerun_command: /test verify-deps
+    name: pull-ci-stolostron-hypershift-addon-operator-backplane-2.1-unit-tests
+    rerun_command: /test unit-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=verify-deps
+        - --target=unit-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -318,4 +272,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )verify-deps,?($|\s.*)
+    trigger: (?m)^/test( | .* )unit-tests,?($|\s.*)
