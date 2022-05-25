@@ -2055,6 +2055,108 @@ periodics:
   cron: '@yearly'
   decorate: true
   labels:
+    job-env: gcp
+    job-test: e2e
+    job-type: upgrade
+  name: release-openshift-okd-installer-e2e-gcp-upgrade
+  spec:
+    containers:
+    - args:
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-$(CLUSTER_TYPE)-upgrade
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_INITIAL
+      - name: RELEASE_IMAGE_LATEST
+      - name: CLUSTER_VARIANT
+      - name: BRANCH
+        value: "4.1"
+      - name: CLUSTER_TYPE
+        value: gcp
+      - name: CONFIG_SPEC
+        value: |
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tag_specification:
+            name: "$(BRANCH)"
+            namespace: origin
+          tests:
+          - as: e2e-$(CLUSTER_TYPE)
+            commands: TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-serial
+            commands: TEST_SUITE=openshift/conformance/serial run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-upgrade
+            commands: TEST_SUITE=all run-upgrade-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
+          - as: launch-$(CLUSTER_TYPE)
+            commands: sleep 9000 & wait
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/e2e-gcp-upgrade-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-gcp
+        - configMap:
+            name: cluster-profile-gcp
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+- agent: kubernetes
+  cluster: build01
+  cron: '@yearly'
+  decorate: true
+  labels:
     job-env: azure
     job-test: e2e
     job-type: upgrade
