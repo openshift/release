@@ -1,10 +1,10 @@
 base_images:
   base:
-    name: "4.10"
+    name: "4.11"
     namespace: ocp
     tag: base
   cli:
-    name: "4.10"
+    name: "4.11"
     namespace: ocp
     tag: cli
   hypershift-operator-4.11:
@@ -247,9 +247,31 @@ tests:
         set -x
         hypershift install
         oc patch deployment -n hypershift operator --type=json -p '[{"op": "add", "path": "/spec/template/spec/containers/0/env/-", "value": {"name": "IMAGE_KUBEVIRT_CAPI_PROVIDER", "value": "'"${CAPK_IMAGE}"'"}}]'
+
         # make sure the patch worked
-        oc get deployment -n hypershift operator -o yaml
-        oc wait deployment -n hypershift operator --for=condition=Available --timeout=5m
+        oc get deployment -n hypershift operator -o yaml | grep "${CAPK_IMAGE}"
+
+        VALID_IMAGE="false"
+        # verify the image in the manager pod
+        for i in $(seq 20); do
+          sleep 60
+          # wait until the old pod is deleted
+          if [[ $(oc get pods -n hypershift -l "app=operator,hypershift.openshift.io/operator-component=operator,name=operator" --no-headers | wc -l) != 1 ]]; then
+            continue
+          fi
+          # check if the pod contains the required env var
+          if [[ $(oc get pods -n hypershift -l "app=operator,hypershift.openshift.io/operator-component=operator,name=operator" -o yaml | grep "name: IMAGE_KUBEVIRT_CAPI_PROVIDER" -A1 | grep "value: ${CAPK_IMAGE}") ]]; then
+            VALID_IMAGE=true
+            break
+          fi
+        done
+
+        if [[ "${VALID_IMAGE}" == "true" ]]; then
+          oc wait deployment -n hypershift operator --for=condition=Available --timeout=5m
+        else
+          echo "error: couldn't validate the manager pod image."
+          exit 1
+        fi
       dependencies:
       - env: CAPK_IMAGE
         name: cluster-api-kubevirt-controller
