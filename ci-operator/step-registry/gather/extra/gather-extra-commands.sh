@@ -135,6 +135,7 @@ for path in "${paths[@]}" ; do
   done < ${output_dir}.audit_logs_listing
 done
 
+oc get node -oname | xargs oc adm must-gather -- /usr/bin/gather_multus_logs
 
 echo "INFO: gathering quay tcpdump packet headers if present"
 output_dir="${ARTIFACT_DIR}/tcpdump/"
