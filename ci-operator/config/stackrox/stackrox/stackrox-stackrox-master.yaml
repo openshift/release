@@ -3,11 +3,70 @@ base_images:
     name: stackrox-test
     namespace: stackrox
     tag: latest
+  ubi:
+    name: ubi
+    namespace: ocp
+    tag: "8"
+  ubi-minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
 build_root:
   image_stream_tag:
     name: stackrox-test
     namespace: stackrox
     tag: latest
+images:
+- build_args:
+  - name: ROX_PRODUCT_BRANDING
+    value: RHACS_BRANDING
+  dockerfile_path: .openshift-ci/build/Dockerfile.build-main-and-bundle
+  from: stackrox-test
+  to: main-bundle
+- build_args:
+  - name: ROX_PRODUCT_BRANDING
+    value: RHACS_BRANDING
+  dockerfile_path: .openshift-ci/build/Dockerfile.build-central-db-bundle
+  from: stackrox-test
+  to: central-db-bundle
+- build_args:
+  - name: ROX_PRODUCT_BRANDING
+    value: RHACS_BRANDING
+  dockerfile_path: Dockerfile.gen
+  from: ubi-minimal
+  inputs:
+    main-bundle:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/stackrox/stackrox/image/rhel/.
+  to: main
+- dockerfile_path: Dockerfile
+  inputs:
+    main-bundle:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/stackrox/stackrox/image/roxctl/.
+    ubi-minimal:
+      as:
+      - registry.access.redhat.com/ubi8-minimal:latest
+  to: roxctl
+- build_args:
+  - name: ROX_PRODUCT_BRANDING
+    value: RHACS_BRANDING
+  dockerfile_path: Dockerfile.gen
+  from: ubi
+  inputs:
+    central-db-bundle:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/stackrox/stackrox/image/postgres/.
+  to: central-db
+promotion:
+  excluded_images:
+  - main-bundle
+  - central-db-bundle
+  namespace: stackrox
+  tag: latest
 resources:
   '*':
     requests:
