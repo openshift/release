@@ -87,6 +87,10 @@ cat > "${SHARED_DIR}"/dns-delete.json <<EOF
 }]}
 EOF
 
+echo $hosted_zone_id
+echo $base_domain
+echo $cluster_domain
+
 id=$(aws route53 change-resource-record-sets --hosted-zone-id "$hosted_zone_id" --change-batch file:///"${SHARED_DIR}"/dns-create.json --query '"ChangeInfo"."Id"' --output text)
 
 echo "$(date -u --rfc-3339=seconds) - Waiting for DNS records to sync..."
