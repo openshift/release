@@ -666,3 +666,72 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )validate-vendor,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build02
+    context: ci/prow/snyk-code
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-snyk-code
+    optional: true
+    rerun_command: /test snyk-code
+    spec:
+      containers:
+      - args:
+        - code
+        - test
+        - --project-name=ci-tools
+        - --org=red-hat-org
+        command:
+        - /usr/local/bin/snyk
+        env:
+        - name: SNYK_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: api-token
+              name: snyk-credentials
+        image: snyk-cli:go1.18
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: "1"
+    trigger: (?m)^/test( | .* )snyk-code,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build02
+    context: ci/prow/snyk-deps
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-snyk-deps
+    optional: true
+    rerun_command: /test snyk-deps
+    spec:
+      containers:
+      - args:
+        - test
+        - --project-name=ci-tools
+        - --org=red-hat-org
+        command:
+        - /usr/local/bin/snyk
+        env:
+        - name: SNYK_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: api-token
+              name: snyk-credentials
+        image: snyk-cli:go1.18
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: "1"
+    trigger: (?m)^/test( | .* )snyk-deps,?($|\s.*)
