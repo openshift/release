@@ -13,6 +13,7 @@ timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
     export HOME=/root
     export GOROOT=/usr/local/go
     echo GOROOT="/usr/local/go" >> /etc/environment
+    cat /etc/environment 
 
     dnf install python39 -y
     curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
@@ -34,5 +35,5 @@ timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
     chown -R root:root "\${REPO_DIR}"
     cd "\${REPO_DIR}/contrib/test/integration"
     echo "localhost" >> hosts
-    ansible-playbook main.yml -i hosts -e "host=localhost" -e "GOPATH=~/go" --connection=local
+    ansible-playbook main.yml -i hosts -e "host=localhost" -e "GOPATH=/usr/local/go" --connection=local
 EOF
