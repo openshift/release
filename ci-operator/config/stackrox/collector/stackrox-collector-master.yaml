@@ -3,6 +3,20 @@ build_root:
     name: release
     namespace: openshift
     tag: golang-1.17
+images:
+- dockerfile_literal: |-
+    FROM centos:8
+    RUN yum install -y git
+    RUN git clone --recurse-submodules https://github.com/stackrox/collector.git
+    RUN yum makecache
+    RUN yum install gcc gcc-c++ -y
+    RUN yum install yum-utils -y
+    RUN yum-config-manager --enable extras
+    RUN yum makecache
+    RUN yum install clang -y
+  from: os
+  to: test-image
+
 resources:
   '*':
     limits:
@@ -13,12 +27,9 @@ resources:
 tests:
 - as: lint
   commands: |-
-    uname -a
-    ls /usr/bin
-    yum install -y llvm
     make -C collector check
   container:
-    from: src
+    from: test-image
 zz_generated_metadata:
   branch: master
   org: stackrox
