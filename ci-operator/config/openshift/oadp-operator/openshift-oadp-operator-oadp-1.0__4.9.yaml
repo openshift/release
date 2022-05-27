@@ -15,16 +15,22 @@ build_root:
 images:
 - dockerfile_path: Dockerfile
   from: base
-  to: oadp-operator
+  to: oadp-operator-1.0
 - dockerfile_path: build/ci-Dockerfile
   from: ocp_builder_rhel-8-golang-1.16-openshift-4.9
-  to: test-oadp-operator
+  to: test-oadp-operator-1.0
 operator:
   bundles:
   - dockerfile_path: build/Dockerfile.bundle
   substitutions:
   - pullspec: quay.io/konveyor/oadp-operator:latest
-    with: oadp-operator
+    with: oadp-operator-1.0
+promotion:
+  additional_images:
+    oadp-operator-oadp1.0-index: ci-index
+    oadp-operator-oadp1.0-src: src
+  name: oadp-operator
+  namespace: openshift
 releases:
   latest:
     release:
@@ -88,7 +94,7 @@ tests:
       - mount_path: /var/run/oadp-credentials
         name: oadp-credentials
         namespace: test-credentials
-      from: test-oadp-operator
+      from: test-oadp-operator-1.0
       resources:
         requests:
           cpu: 1000m
@@ -113,7 +119,7 @@ tests:
       - mount_path: /var/run/oadp-credentials
         name: oadp-credentials
         namespace: test-credentials
-      from: test-oadp-operator
+      from: test-oadp-operator-1.0
       resources:
         requests:
           cpu: 1000m
@@ -138,7 +144,7 @@ tests:
       - mount_path: /var/run/oadp-credentials
         name: oadp-credentials
         namespace: test-credentials
-      from: test-oadp-operator
+      from: test-oadp-operator-1.0
       resources:
         requests:
           cpu: 1000m
@@ -163,7 +169,7 @@ tests:
       - mount_path: /var/run/oadp-credentials
         name: oadp-credentials
         namespace: test-credentials
-      from: test-oadp-operator
+      from: test-oadp-operator-1.0
       resources:
         requests:
           cpu: 1000m
