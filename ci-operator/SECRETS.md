@@ -192,16 +192,6 @@ cluster:
 For each master, the `jenkins-credentials-${master_url}` secret holds the
 password for the Jenkins user in the `password` key.
 
-
-### Slack Bot Credentials
-
-The following Slack bots have their Slack API tokens for the CoreOS Slack organization
-stored on the cluster
-
- - cluster-bot as `ci-chat-bot-slack-token`
-
-This token is granted access to talk to the Slack API for automation purposes.
-
 ## Secret Regeneration
 
 `make job JOB=periodic-ci-secret-bootstrap` or wait for the [periodic-ci-secret-bootstrap](https://github.com/openshift/release/blob/f266979b7e0cfe8d7bf25a013a96a9086e7e8731/ci-operator/jobs/infra-periodics.yaml#L1187) job to be triggered the next time.
