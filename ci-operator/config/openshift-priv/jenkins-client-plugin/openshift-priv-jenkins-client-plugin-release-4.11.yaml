@@ -1,26 +1,11 @@
-base_images:
-  jenkins-agent-base:
-    name: 4.11-priv
-    namespace: ocp-private
-    tag: jenkins-agent-base
-  original_jenkins:
-    name: 4.11-priv
-    namespace: ocp-private
-    tag: jenkins
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: golang-1.16
 canonical_go_repository: github.com/openshift/jenkins-client-plugin
 images:
 - dockerfile_path: Dockerfile
-  from: original_jenkins
-  inputs:
-    src:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/jenkins-client-plugin/.
   to: jenkins
 promotion:
   additional_images:
@@ -57,8 +42,6 @@ tests:
       dependencies:
       - env: JENKINS_IMAGE
         name: pipeline:jenkins
-      - env: JENKINS_AGENT_BASE_IMAGE
-        name: pipeline:jenkins-agent-base
       from: src
       resources:
         requests:
