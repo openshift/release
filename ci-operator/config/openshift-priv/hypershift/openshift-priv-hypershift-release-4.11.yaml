@@ -127,6 +127,14 @@ tests:
     - as: test-e2e
       cli: latest
       commands: |-
+        set -euo pipefail
+
+        generate_junit() {
+          cat  /tmp/test_out | go tool test2json -t > /tmp/test_out.json
+          gotestsum --raw-command --junitfile="${ARTIFACT_DIR}/junit.xml" --format=standard-verbose -- cat /tmp/test_out.json
+        }
+        trap generate_junit EXIT
+
         bin/test-e2e \
         -test.v \
         -test.timeout=0 \
@@ -140,7 +148,7 @@ tests:
         --e2e.previous-release-image=${OCP_IMAGE_PREVIOUS} \
         --e2e.additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
         --e2e.aws-endpoint-access=PublicAndPrivate \
-        --e2e.external-dns-domain=service.ci.hypershift.devcluster.openshift.com
+        --e2e.external-dns-domain=service.ci.hypershift.devcluster.openshift.com | tee /tmp/test_out
       credentials:
       - mount_path: /etc/hypershift-pool-aws-credentials
         name: hypershift-pool-aws-credentials
