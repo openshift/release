@@ -1,10 +1,18 @@
+base_images:
+  centos:
+    name: centos
+    namespace: origin
+    tag: stream8
 build_root:
   project_image:
     dockerfile_path: Dockerfile.build_root
 images:
 - dockerfile_path: Dockerfile
   from: src
-  to: stackrox-osci-build
+  to: stackrox-osci-build-from-src
+- dockerfile_path: Dockerfile
+  from: centos
+  to: stackrox-osci-build-from-centos
 promotion:
   namespace: stackrox
   tag: latest
@@ -14,13 +22,20 @@ resources:
       cpu: 2000m
       memory: 4000Mi
 tests:
-- as: check-image
+- as: check-image-from-src
   commands: |
     set -x
     echo "hello world"
     cat /hello_world.txt || true
   container:
-    from: stackrox-osci-build
+    from: stackrox-osci-build-from-src
+- as: check-image-from-centos
+  commands: |
+    set -x
+    echo "hello world"
+    cat /hello_world.txt || true
+  container:
+    from: stackrox-osci-build-from-centos
 - as: check-src
   commands: |
     set -x
