@@ -9,9 +9,9 @@ base_images:
     tag: latest
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.17
+    name: collector-test
+    namespace: stackrox
+    tag: latest
 images:
 - dockerfile_literal: |-
     FROM centos:8
@@ -51,12 +51,10 @@ resources:
 tests:
 - as: lint-via-clang-format
   commands: make -C collector/collector check
-  container:
-    from: collector-test
+  from: src
 - as: lint-via-shfmt
   commands: go install mvdan.cc/sh/v3/cmd/shfmt@v3.4.1; make -C collector shfmt-check
-  container:
-    from: collector-test
+  from: src
 zz_generated_metadata:
   branch: master
   org: stackrox
