@@ -12,35 +12,6 @@ build_root:
     name: collector-test
     namespace: stackrox
     tag: latest
-images:
-- dockerfile_literal: |-
-    FROM centos:8
-    RUN yum install -y git
-    RUN git clone --recurse-submodules https://github.com/stackrox/collector.git
-    RUN yum makecache
-    RUN yum install gcc gcc-c++ -y
-    RUN yum install yum-utils -y
-    RUN yum-config-manager --enable extras
-    RUN yum makecache
-    RUN yum install clang -y
-    RUN yum install git-clang-format -y
-    RUN clang_version="$(yum --showduplicates list git-clang-format | grep 13.0.1-1 | tail -1)"; \
-        yum --showducplicates list git-clang-format; \
-        echo "clang_version= $clang_version"
-                                                                                               #yum install git-clang-format
-  from: centos
-  to: test-image
-- dockerfile_literal: |-
-    FROM centos:8
-    RUN yum install -y git go make
-    RUN git clone --recurse-submodules https://github.com/stackrox/collector.git
-    RUN yum install -y epel-release
-    RUN yum install snapd -y
-    RUN ln -s /var/lib/snapd/snap /snap
-    RUN snap install shfmt
-    RUN go install mvdan.cc/sh/v3/cmd/shfmt@v3.4.1
-  from: centos
-  to: shfmt-image
 resources:
   '*':
     limits:
