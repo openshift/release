@@ -15,6 +15,17 @@ REGION="${LEASED_RESOURCE}"
 
 curl -L https://raw.githubusercontent.com/openshift/installer/master/upi/aws/cloudformation/01_vpc.yaml -o /tmp/01_vpc.yaml
 
+# add Name tag for VPC
+cat > "/tmp/01_vpc_name.yaml.patch" << EOF
+Resources:
+  VPC:
+    Properties:
+      Tags:
+      - Key: Name
+        Value: !Join [ "-", [ !Ref "AWS::StackName", "cf" ] ]
+EOF
+/tmp/yq m -x -i "/tmp/01_vpc.yaml" "/tmp/01_vpc_name.yaml.patch"
+
 # The above cloudformation template's max zones account is 3
 if [[ "${ZONES_COUNT}" -gt 3 ]]
 then

@@ -81,6 +81,9 @@ Resources:
       EnableDnsSupport: "true"
       EnableDnsHostnames: "true"
       CidrBlock: !Ref VpcCidr
+      Tags:
+      - Key: Name
+        Value: !Join [ "-", [ !Ref "AWS::StackName", "cf" ] ]
   PublicSubnet:
     Type: "AWS::EC2::Subnet"
     Properties:
