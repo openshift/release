@@ -11,7 +11,7 @@ CONFIG="${SHARED_DIR}/install-config.yaml"
 
 if [ -f "${SHARED_DIR}/customer_vnet_subnets.yaml" ]; then
   VNET_FILE="${SHARED_DIR}/customer_vnet_subnets.yaml"
-  RESOURCE_GROUP=$(cat ${SHARED_DIR}/resouregroup)
+  RESOURCE_GROUP=$(cat ${SHARED_DIR}/resourcegroup)
   vnet_name=$(/tmp/yq r ${VNET_FILE} 'platform.azure.virtualNetwork')
   controlPlaneSubnet=$(/tmp/yq r ${VNET_FILE} 'platform.azure.controlPlaneSubnet')
   computeSubnet=$(/tmp/yq r ${VNET_FILE} 'platform.azure.computeSubnet')

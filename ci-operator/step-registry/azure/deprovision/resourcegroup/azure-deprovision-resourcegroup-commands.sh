@@ -27,7 +27,7 @@ if [ -f "${remove_resources_by_cli}" ]; then
     sh -x "${remove_resources_by_cli}"
 fi
 
-rg_file="${SHARED_DIR}/resouregroup"
+rg_file="${SHARED_DIR}/resourcegroup"
 if [ -f "${rg_file}" ]; then
     existing_rg=$(cat "${rg_file}")
     if [ "$(az group exists -n "${existing_rg}")" == "true" ]; then
