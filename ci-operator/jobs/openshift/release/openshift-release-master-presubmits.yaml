@@ -1496,3 +1496,44 @@ presubmits:
           requests:
             cpu: "1"
     trigger: (?m)^/test( | .* )yamllint,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build03
+    context: ci/prow/check-gh-automation
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-check-gh-automation
+    rerun_command: /test check-gh-automation
+    run_if_changed: ^ci-operator/jobs/.*
+    spec:
+      containers:
+      - args:
+        - --bot=openshift-merge-robot
+        - --bot=openshift-ci-robot
+        - --candidate-path=.
+        - --github-app-id=$(GITHUB_APP_ID)
+        - --github-app-private-key-path=/etc/github/cert
+        command:
+        - check-gh-automation
+        env:
+        - name: GITHUB_APP_ID
+          valueFrom:
+            secretKeyRef:
+              key: appid
+              name: openshift-prow-github-app
+        image: registry.ci.openshift.org/ci/check-gh-automation:latest
+        imagePullPolicy: Always
+        name: ""
+        volumeMounts:
+        - mountPath: /etc/github
+          name: github-app-credentials
+          readOnly: true
+      volumes:
+      - name: github-app-credentials
+        secret:
+          secretName: openshift-prow-github-app
+    trigger: (?m)^/test( | .* )check-gh-automation,?($|\s.*)
