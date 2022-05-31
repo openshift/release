@@ -175,7 +175,7 @@
                  rate(prowjob_state_transitions{job="prow-controller-manager",job_name=~".*-images",org="openshift-priv",state=~"success|failure|aborted"}[12h])
                )
              )
-             < 0.95
+             < 0.90
             |||,
             'for': '1m',
             labels: {
