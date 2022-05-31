@@ -1,0 +1,29 @@
+ref:
+  as: upi-install-aws-cluster-custom
+  from: upi-installer
+  grace_period: 10m
+  commands: upi-install-aws-cluster-custom-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: BOOTSTRAP_INSTANCE_TYPE
+    default: "i3.large"
+  - name: MASTER_INSTANCE_TYPE
+    default: "m5.xlarge"
+  - name: WORKER_INSTANCE_TYPE
+    default: "m5.xlarge"
+  - name: ADD_INGRESS_RECORDS_MANUALLY
+    default: "no"
+  dependencies:
+  - name: "release:latest"
+    env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+  documentation: >-
+    This step deploys a UPI cluster to the CI AWS project.
+    
+    * Note: Use this step if you need more flexibility than upi-install-aws-cluster provides
+    
+    It allows you to create app dns records manually via setting ADD_INGRESS_RECORDS_MANUALLY
+    And supoprts private cluster and disconnected & private cluster.
+    The VPC and basion host are created by aws-provision-vpc* and aws-provision-bastionhost
