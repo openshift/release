@@ -43,7 +43,7 @@ if [[ ! -f "${bastion_ignition_file}" ]]; then
 fi
 
 if [ -z "${RESOURCE_GROUP}" ]; then
-  rg_file="${SHARED_DIR}/resouregroup"
+  rg_file="${SHARED_DIR}/resourcegroup"
   if [ -f "${rg_file}" ]; then
     bastion_rg=$(cat "${rg_file}")
   else
