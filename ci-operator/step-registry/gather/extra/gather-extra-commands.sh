@@ -135,6 +135,11 @@ for path in "${paths[@]}" ; do
   done < ${output_dir}.audit_logs_listing
 done
 
+# change to the network artifact dir
+mkdir -p ${ARTIFACT_DIR}/network/multus_logs/
+pushd ${ARTIFACT_DIR}/network/multus_logs/ || return
+oc get node -oname | xargs oc adm must-gather -- /usr/bin/gather_multus_logs
+popd || return
 
 # If the tcpdump-service step was used, grab the pcap files.
 echo "INFO: gathering quay tcpdump packet headers if present"
