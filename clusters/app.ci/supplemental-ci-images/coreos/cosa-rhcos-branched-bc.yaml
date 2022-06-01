@@ -35,6 +35,34 @@ items:
   apiVersion: v1
   metadata:
     namespace: coreos
+    name: coreos-assembler-4.11
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: coreos-assembler:4.11
+    source:
+      git:
+        ref: rhcos-4.11
+        uri: https://github.com/coreos/coreos-assembler.git
+      type: Git
+    strategy:
+      dockerStrategy:
+        imageOptimizationPolicy: SkipLayers
+      type: Docker
+    triggers:
+    - type: ImageChange
+    - type: ConfigChange
+    - type: "GitHub"
+      github:
+        secretReference:
+          name: "github-coreos-assembler-webhook-secret"
+- kind: BuildConfig
+  apiVersion: v1
+  metadata:
+    namespace: coreos
     name: coreos-assembler-4.10
   spec:
     successfulBuildsHistoryLimit: 1
