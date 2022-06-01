@@ -127,6 +127,24 @@ tests:
     - ref: konveyor-install-openshift-pipelines-operator
     - ref: optional-operators-subscribe
     workflow: optional-operators-ci-aws
+- as: operator-e2e-periodic
+  interval: 24h
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: openshift-migration
+      OO_PACKAGE: crane-operator
+      OO_TARGET_NAMESPACES: '!all'
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - ref: konveyor-install-openshift-pipelines-operator
+    - ref: optional-operators-subscribe
+    workflow: optional-operators-ci-aws
 zz_generated_metadata:
   branch: main
   org: konveyor
