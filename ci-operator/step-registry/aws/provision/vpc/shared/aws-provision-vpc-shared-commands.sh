@@ -13,7 +13,7 @@ TAGS="Key=expirationDate,Value=${EXPIRATION_DATE}"
 
 REGION="${LEASED_RESOURCE}"
 
-curl -L https://raw.githubusercontent.com/openshift/installer/master/upi/aws/cloudformation/01_vpc.yaml -o /tmp/01_vpc.yaml
+curl -L https://raw.githubusercontent.com/yunjiang29/ocp-test-data/main/upi_on_aws-cloudformation-templates/01_vpc.yaml -o /tmp/01_vpc.yaml
 
 # The above cloudformation template's max zones account is 3
 if [[ "${ZONES_COUNT}" -gt 3 ]]

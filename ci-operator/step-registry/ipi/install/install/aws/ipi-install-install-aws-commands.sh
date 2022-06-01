@@ -130,92 +130,7 @@ fi
 
 if [ "${ADD_INGRESS_RECORDS_MANUALLY}" == "yes" ]; then
 
-  if [ "${CLUSTER_TYPE}" == "aws" ] || [ "${CLUSTER_TYPE}" == "aws-arm64" ]; then
-    # creating app record
-    cat >> "/tmp/ingress_app.yml" << EOF
-AWSTemplateFormatVersion: 2010-09-09
-Description: Template for OpenShift Cluster Network Elements (Route53 & LBs)
-
-Parameters:
-  PrivateHostedZoneId:
-    Description: The Route53 private zone ID to register the targets with, such as Z21IXYZABCZ2A4.
-    Type: String
-  PrivateHostedZoneName:
-    Description: The Route53 zone to register the targets with, such as cluster.example.com. Omit the trailing period.
-    Type: String
-  RouterLbDns:
-    Description: The loadbalancer DNS
-    Type: String
-  RouterLbHostedZoneId:
-    Description: The Route53 zone ID where loadbalancer reside
-    Type: String
-
-Metadata:
-  AWS::CloudFormation::Interface:
-    ParameterLabels:
-      PrivateHostedZoneId:
-        default: "Private Hosted Zone ID"
-      PrivateHostedZoneName:
-        default: "Private Hosted Zone Name"
-      RouterLbDns:
-        default: "router loadbalancer dns"
-      RouterLbHostedZoneId:
-        default: "Private Hosted Zone ID of router lb"
-
-Resources:
-  InternalAppsRecord:
-    Type: AWS::Route53::RecordSet
-    Properties:
-      AliasTarget:
-        DNSName: !Ref RouterLbDns
-        HostedZoneId: !Ref RouterLbHostedZoneId
-        EvaluateTargetHealth: false
-      HostedZoneId: !Ref PrivateHostedZoneId
-      Name: !Join [".", ["*.apps", !Ref PrivateHostedZoneName]]
-      Type: A
-EOF
-  fi
-
-  if [ "${CLUSTER_TYPE}" == "aws-usgov" ]; then
-    # creating app record
-    cat >> "/tmp/ingress_app.yml" << EOF
-AWSTemplateFormatVersion: 2010-09-09
-Description: Template for OpenShift Cluster Network Elements (Route53 & LBs)
-
-Parameters:
-  PrivateHostedZoneId:
-    Description: The Route53 private zone ID to register the targets with, such as Z21IXYZABCZ2A4.
-    Type: String
-  PrivateHostedZoneName:
-    Description: The Route53 zone to register the targets with, such as cluster.example.com. Omit the trailing period.
-    Type: String
-  RouterLbDns:
-    Description: The loadbalancer DNS
-    Type: String
-
-
-Metadata:
-  AWS::CloudFormation::Interface:
-    ParameterLabels:
-      PrivateHostedZoneId:
-        default: "Private Hosted Zone ID"
-      PrivateHostedZoneName:
-        default: "Private Hosted Zone Name"
-      RouterLbDns:
-        default: "router loadbalancer dns"
-
-Resources:
-  InternalAppsRecord:
-    Type: AWS::Route53::RecordSet
-    Properties:
-      HostedZoneId: !Ref PrivateHostedZoneId
-      Name: !Join [".", ["*.apps", !Ref PrivateHostedZoneName]]
-      Type: CNAME
-      TTL: 10
-      ResourceRecords:
-      - !Ref RouterLbDns
-EOF
-  fi
+  curl -L https://raw.githubusercontent.com/yunjiang29/ocp-test-data/main/upi_on_aws-cloudformation-templates/97_apps_ingress-elb_dns.yaml -o /tmp/ingress_app.yml
 
   APPS_DNS_STACK_NAME="${CLUSTER_NAME}-apps-dns"
   echo ${APPS_DNS_STACK_NAME} > "${SHARED_DIR}/apps_dns_stack_name"
@@ -236,6 +151,7 @@ EOF
       ParameterKey=PrivateHostedZoneName,ParameterValue=${private_route53_hostzone_name} \
       ParameterKey=RouterLbDns,ParameterValue=${router_lb} \
       ParameterKey=RouterLbHostedZoneId,ParameterValue=${router_lb_hostzone_id} \
+      ParameterKey=RegisterPublicAppsDNS,ParameterValue="no" \
       --capabilities CAPABILITY_NAMED_IAM &
     wait "$!"
     ret=$?
@@ -248,6 +164,7 @@ EOF
       ParameterKey=PrivateHostedZoneId,ParameterValue=${private_route53_hostzone_id} \
       ParameterKey=PrivateHostedZoneName,ParameterValue=${private_route53_hostzone_name} \
       ParameterKey=RouterLbDns,ParameterValue=${router_lb} \
+      ParameterKey=RegisterPublicAppsDNS,ParameterValue="no" \
       --capabilities CAPABILITY_NAMED_IAM &
     wait "$!"
     ret=$?
