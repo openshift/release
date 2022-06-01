@@ -1,14 +1,18 @@
 periodics:
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   cron: 0 0,2,4,6,8,10,12,14,16,18,20,22 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
+  extra_refs:
+  - base_ref: ddolgov-feature-crawling
+    org: stackrox
+    repo: kernel-packer
   labels:
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-stackrox-kernel-packer-ddolgov-feature-crawling-crawl-kernels-periodics
+  name: periodic-ci-stackrox-kernel-packer-ddolgov-feature-crawling-crawl-kernels
   spec:
     containers:
     - args:
@@ -24,16 +28,16 @@ periodics:
       resources:
         requests:
           cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
+      volumeMounts:
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: pull-secret
