@@ -25,7 +25,9 @@ for count in $(seq 1 ${RHEL_WORKER_COUNT}); do
   echo "$(date -u --rfc-3339=seconds) - Provision ${infra_id}-rhel-${count} ..."
   govc vm.clone -vm /${vcenter_datacenter}/vm/Templates/${RHEL_IMAGE} -on=false -net=${LEASED_RESOURCE} ${infra_id}-rhel-${count}
   govc vm.customize -vm ${vcenter_folder}/${infra_id}-rhel-${count} -name=${infra_id}-rhel-${count} -ip=dhcp
-  govc vm.change -vm ${vcenter_folder}/${infra_id}-rhel-${count} -c ${RHEL_CPUS_NUM} -m ${RHEL_MEMORY_SIZE}
+  govc vm.change -vm ${vcenter_folder}/${infra_id}-rhel-${count} -c ${RHEL_VM_CPUS_NUM} -m ${RHEL_VM_MEMORY_SIZE}
+  disk_name=$(govc device.info -json -vm ${vcenter_folder}/${infra_id}-rhel-${count} | jq -r '.Devices[]|select(.Type == "VirtualDisk")|.Name')
+  govc vm.disk.change -vm ${vcenter_folder}/${infra_id}-rhel-${count} -disk.name ${disk_name} -size ${RHEL_VM_DISK_SIZE}G
   govc vm.power -on ${vcenter_folder}/${infra_id}-rhel-${count}
   govc tags.attach ${infra_id} ${vcenter_folder}/${infra_id}-rhel-${count}
 
