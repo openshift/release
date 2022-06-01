@@ -152,6 +152,7 @@ oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
 function run {
     test_scenarios=""
     echo "TEST_SCENRAIOS: \"${TEST_SCENRAIOS:-}\""
+    echo "TEST_ADDITIONAL: \"${TEST_ADDITIONAL:-}\""
     echo "TEST_IMPORTANCE: \"${TEST_IMPORTANCE}\""
     echo "TEST_FILTERS: \"~NonUnifyCI&;~Flaky&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;${TEST_FILTERS}\""
     echo "TEST_TIMEOUT: \"${TEST_TIMEOUT}\""
@@ -169,9 +170,27 @@ function run {
         echo "fail to parse ${TEST_SCENRAIOS}"
         exit 1
     fi
-    echo "scenarios: ${test_scenarios:1:-1}"
+    echo "test scenarios: ${test_scenarios:1:-1}"
+    test_scenarios="${test_scenarios:1:-1}"
+
+    test_additional=""
+    if [[ -n "${TEST_ADDITIONAL:-}" ]]; then
+        readarray -t additionals <<< "${TEST_ADDITIONAL}"
+        for additional in "${additionals[@]}"; do
+            test_additional="${test_additional}|${additional}"
+        done
+    else
+        echo "there is no additional"
+    fi
+
+    if [ "W${test_additional}W" != "WW" ]; then
+        echo "test additional: ${test_additional:1:-1}"
+        test_scenarios="${test_scenarios}|${test_additional:1:-1}"
+    fi
+
+    echo "final scenarios: ${test_scenarios}"
     extended-platform-tests run all --dry-run | \
-        grep -E "${test_scenarios:1:-1}" | grep -E "${TEST_IMPORTANCE}" > ./case_selected
+        grep -E "${test_scenarios}" | grep -E "${TEST_IMPORTANCE}" > ./case_selected
 
     handle_filters "~Flaky&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;${TEST_FILTERS}"
     echo "------------------the case selected------------------"
