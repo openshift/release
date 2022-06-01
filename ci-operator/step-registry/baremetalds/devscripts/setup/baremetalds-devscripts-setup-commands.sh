@@ -14,7 +14,10 @@ source "${SHARED_DIR}/packet-conf.sh"
 finished()
 {
   #Save exit code for must-gather to generate junit
-  echo "$?" > "${SHARED_DIR}/install-status.txt"
+  retval=$?
+  echo "Installer exited with $retval"
+  echo "$retval" > "${SHARED_DIR}/install-status.txt"
+
   set +e
 
   echo "Fetching kubeconfig, other credentials..."
