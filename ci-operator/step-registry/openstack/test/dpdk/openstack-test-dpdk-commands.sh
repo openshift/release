@@ -117,10 +117,9 @@ spec:
     command: ["sleep", "99999"]
     image: registry.redhat.io/openshift4/dpdk-base-rhel8:v4.9
     securityContext:
-      capabilities:
-        add: ["IPC_LOCK","SYS_ADMIN"]
-      privileged: true
       runAsUser: 0
+      capabilities:
+        add: ["IPC_LOCK","SYS_RESOURCE","NET_RAW"]
     resources:
       requests:
         memory: 1000Mi
