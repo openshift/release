@@ -1,8 +1,4 @@
 base_images:
-  base:
-    name: ubi-minimal
-    namespace: ocp
-    tag: "8"
   stolostron_builder_go1.17-linux:
     name: builder
     namespace: stolostron
@@ -13,50 +9,40 @@ build_root:
     namespace: stolostron
     tag: go1.17-linux
 images:
-- dockerfile_path: build/Dockerfile.prow
-  from: base
-  inputs:
-    stolostron_builder_go1.17-linux:
-      as:
-      - registry.ci.openshift.org/stolostron/builder:go1.17-linux
-  to: multicluster-operators-channel
+- dockerfile_path: Dockerfile.prow
+  from: stolostron_builder_go1.17-linux
+  to: applifecycle-backend-e2e
 promotion:
-  name: "2.5"
+  disabled: true
+  name: "2.6"
   namespace: stolostron
 resources:
   '*':
     requests:
-      cpu: 100m
+      cpu: 80m
       memory: 200Mi
 tests:
-- as: test-unit
+- as: unit
   commands: |
     export SELF="make -f Makefile.prow"
-    make -f Makefile.prow lint
-    make -f Makefile.prow test
+    make -f Makefile.prow setup-tests
+    set -o pipefail
+    make -f Makefile.prow test 2>&1 | tee ${ARTIFACT_DIR}/test_out.log
+    set +o pipefail
   container:
     from: src
-- as: sonarcloud
-  commands: |
-    export SELF="make -f /opt/build-harness/Makefile.prow"
-    make -f /opt/build-harness/Makefile.prow sonar/go/prow
-  container:
-    from: src
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
 - as: pr-image-mirror
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: multicluster-operators-channel
+      SOURCE_IMAGE_REF: applifecycle-backend-e2e
     workflow: ocm-ci-image-mirror
 - as: publish
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: multicluster-operators-channel
+      SOURCE_IMAGE_REF: applifecycle-backend-e2e
     env:
-      IMAGE_REPO: multicluster-operators-channel
+      IMAGE_REPO: applifecycle-backend-e2e
       REGISTRY_ORG: stolostron
     test:
     - as: publish
@@ -75,17 +61,17 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ocm-ci-image-mirror
-- as: latest-image-mirror
+- as: pr-merge-image-mirror
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: multicluster-operators-channel
+      SOURCE_IMAGE_REF: applifecycle-backend-e2e
     env:
-      IMAGE_REPO: multicluster-operators-channel
-      IMAGE_TAG: 2.5.0
+      IMAGE_REPO: applifecycle-backend-e2e
+      IMAGE_TAG: 2.6.0
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: release-2.5
+  branch: release-2.6
   org: stolostron
-  repo: multicloud-operators-channel
+  repo: applifecycle-backend-e2e
