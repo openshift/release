@@ -128,6 +128,7 @@ CONFIG = {
     'vsphere-quota-slice':{},
     'vsphere-discon-quota-slice':{},
     'vsphere-clusterbot-quota-slice':{},
+    'vsphere-multizone-quota-slice':{},
     'vsphere-platform-none-quota-slice':{},
     'osd-ephemeral-quota-slice': {
         'default': 15,
@@ -198,6 +199,9 @@ for i in range(60,62):
 
 for i in range(50,54):
     CONFIG['vsphere-clusterbot-quota-slice']['ci-segment-{}'.format(i)] = 1
+    
+for i in range(151,155):
+    CONFIG['vsphere-multizone-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 config = {
     'resources': [],
