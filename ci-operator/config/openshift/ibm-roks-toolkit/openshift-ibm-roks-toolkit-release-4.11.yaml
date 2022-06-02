@@ -3,6 +3,10 @@ base_images:
     name: roks-toolkit-base
     namespace: hypershift-toolkit
     tag: latest
+  openshift_release_golang-1.18:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
 binary_build_commands: make build
 build_root:
   image_stream_tag:
@@ -11,12 +15,24 @@ build_root:
     tag: golang-1.18
 images:
 - from: base
+  inputs:
+    openshift_release_golang-1.18:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.18
   to: ibm-roks-toolkit
 - dockerfile_path: Dockerfile.cpoperator
   from: base
+  inputs:
+    openshift_release_golang-1.18:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.18
   to: control-plane-operator
 - dockerfile_path: Dockerfile.metrics
   from: base
+  inputs:
+    openshift_release_golang-1.18:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.18
   to: metrics
 - dockerfile_path: hack/releaser/Dockerfile
   from: src
