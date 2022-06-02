@@ -2338,3 +2338,62 @@ periodics:
     - name: build-farm-credentials
       secret:
         secretName: github-ldap-user-group-creator
+- agent: kubernetes
+  annotations:
+    ci.openshift.io/description: This runs the check-gh-automation tool to verify
+      that all repos with CI configured are accessible by test-platform's bots
+    ci.openshift.io/sop: https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/infrastructure-jobs.md#periodic-check-gh-automation
+  cluster: app.ci
+  cron: 0 3 * * 1
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+    workdir: true
+  labels:
+    ci.openshift.io/role: infra
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-check-gh-automation
+  spec:
+    containers:
+    - args:
+      - --config-path=./core-services/prow/02_config/_config.yaml
+      - --supplemental-prow-config-dir=./core-services/prow/02_config
+      - --job-config-path=./ci-operator/jobs
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
+      - --github-endpoint=http://ghproxy
+      - --github-endpoint=https://api.github.com
+      - --github-hourly-tokens=600
+      - --github-allowed-burst=600
+      - --bot=openshift-merge-robot
+      - --bot=openshift-ci-robot
+      - --ignore=openshift
+      - --ignore=openshift-priv
+      - --ignore=kata-containers/kata-containers
+      - --ignore=containers/gvisor-tap-vsock
+      - --ignore=containers/podman-py
+      - --ignore=red-hat-storage/mcg-osd-deployer
+      command:
+      - ./hack/check-gh-automation.sh
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-prow-github-app
+      image: registry.ci.openshift.org/ci/check-gh-automation:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: github-app-credentials
+        readOnly: true
+    volumes:
+    - name: github-app-credentials
+      secret:
+        secretName: openshift-prow-github-app
