@@ -43,7 +43,8 @@ function urlencode() {
 
 function prometheus_var_init() {
 	HOSTNAME=$(oc get routes/prometheus-k8s -n openshift-monitoring -o json | jq -r '.spec.host')
-	TOKEN=$(oc -n openshift-monitoring sa get-token prometheus-k8s)
+	# Do not exit with err if a token was not obtained. Collecting metrics is optional and should not fail the whole run
+	TOKEN=$(oc -n openshift-monitoring sa get-token prometheus-k8s || true)
 	export HOSTNAME
 	export TOKEN
 }
@@ -337,15 +338,18 @@ declare -a WATCHERS
 trap 'echo "Killing WATCHERS"; for PID in ${WATCHERS[@]}; do kill -9 ${PID} >/dev/null 2>&1 || true; done' TERM
 
 prometheus_var_init
+if [ -n "$TOKEN" ]; then
+    prometheus_cmrss_loop &
+	WATCHERS+=( "$!" )
 
-prometheus_cmrss_loop &
-WATCHERS+=( "$!" )
+	prometheus_kaebb_loop &
+	WATCHERS+=( "$!" )
 
-prometheus_kaebb_loop &
-WATCHERS+=( "$!" )
-
-prometheus_GRPCRequestsSlow_loop &
-WATCHERS+=( "$!" )
+	prometheus_GRPCRequestsSlow_loop &
+	WATCHERS+=( "$!" )
+else
+    echo "Failed to get a token from prometheus service account. Skipping metrics collection"
+fi
 
 oc_adm_top_nodes_loop &
 WATCHERS+=( "$!" )
