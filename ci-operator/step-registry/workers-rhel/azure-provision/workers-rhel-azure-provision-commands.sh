@@ -51,6 +51,7 @@ for count in $(seq 1 ${RHEL_WORKER_COUNT}); do
     --admin-user "${RHEL_USER}" \
     --public-ip-address "" \
     --size "${RHEL_VM_SIZE}" \
+    --os-disk-size-gb "${RHEL_VM_DISK_SIZE}" \
     --nsg "" \
     --subnet "${computeSubnetID}" > /tmp/tmp.json
   
