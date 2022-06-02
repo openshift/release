@@ -1,0 +1,65 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+canonical_go_repository: sigs.k8s.io/security-profiles-operator
+images:
+- dockerfile_path: Dockerfile.ubi
+  to: security-profiles-operator
+releases:
+  initial:
+    integration:
+      name: "4.12"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.12"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: APPARMOR_ENABLED=0 BPF_ENABLED=0 make test-unit
+  container:
+    from: src
+- as: e2e-operator
+  steps:
+    cluster_profile: aws
+    test:
+    - as: e2e-operator
+      cli: latest
+      commands: |
+        export E2E_CLUSTER_TYPE=openshift
+        export E2E_SPO_IMAGE=$IMAGE_FROM_CI
+        export E2E_SKIP_BUILD_IMAGES=true
+        export E2E_SKIP_NAMESPACED_TESTS=true
+        export E2E_TEST_SECCOMP=true
+        export E2E_TEST_PROFILE_RECORDING=false
+        export E2E_TEST_BPF_RECORDER=false
+        export E2E_TEST_LOG_ENRICHER=true
+        # The SELinux tests are disabled on purpose now; one of the SELinux
+        # tests is flaky. Re-adding them is tracked with
+        # https://issues.redhat.com/browse/CMP-1468
+        #export E2E_TEST_SELINUX=true
+        export E2E_TEST_LABEL_POD_DENIALS=true
+        make test-e2e
+      dependencies:
+      - env: IMAGE_FROM_CI
+        name: security-profiles-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: security-profiles-operator
