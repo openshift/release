@@ -35,7 +35,8 @@ function wait_public_dns() {
 bastion_source_vhd_uri="${BASTION_VHD_URI}"
 
 CLUSTER_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
-bastion_name="${CLUSTER_NAME}-bastion"
+#bastion_name="${CLUSTER_NAME}-bastion"
+bastion_name="bastion-${CLUSTER_NAME}"
 bastion_ignition_file="${SHARED_DIR}/${CLUSTER_NAME}-bastion.ign"
 
 if [[ ! -f "${bastion_ignition_file}" ]]; then
