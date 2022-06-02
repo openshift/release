@@ -10,9 +10,18 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+ref:
+- as: initjob
+  commands: .circleci/initjob/20-set-up-shared-environment.sh .
+  from: src
+  resources:
+    requests:
+      cpu: 2000m
+      memory: 4000Mi
 tests:
 - as: lint
   steps:
+    ref: initjob
     test:
     - as: clang-format
       commands: make -C collector check
