@@ -59,8 +59,15 @@ tests:
     test:
     - as: test
       commands: |
-        oc get templates -n openshift | grep 'No resources found'
-        oc get is -n openshift | grep 'No resources found'
+        function assert_empty() {
+          KIND="$1"
+          NAMES="$(oc -n openshift get -o jsonpath='{.items[*].metadata.name}' "${KIND}")"
+          if test -n "${NAMES}"
+          then
+            echo "Should not have ${KIND} in the openshift namespace, but we have: ${NAMES}"
+          fi
+        }
+        assert_empty templates && assert_empty imagestreams
       from: src
       resources:
         requests:
