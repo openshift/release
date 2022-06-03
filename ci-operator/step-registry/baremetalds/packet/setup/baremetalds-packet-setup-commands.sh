@@ -6,6 +6,11 @@ set -o pipefail
 
 echo "************ baremetalds packet setup command ************"
 
+# testing
+if [ "$JOB_NAME_SAFE" != "e2e-metal-ipi" ] ; then
+    exit 1
+fi
+
 function exit_with_success(){
   cat >"${ARTIFACT_DIR}/junit_metal_setup.xml" <<EOF
   <testsuite name="metal infra" tests="1" failures="0">
@@ -29,6 +34,12 @@ EOF
 }
 
 trap 'exit_with_failure' ERR
+
+# Initial check
+if [[ ! "${CLUSTER_TYPE}" =~ ^packet.*$|^equinix.*$ ]]; then
+    echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"
+    exit 1
+fi
 
 cd
 cat > packet-config.yaml <<-EOF
@@ -64,11 +75,6 @@ cat > packet-config.yaml <<-EOF
       content: |
         source "\${SHARED_DIR}/fix-uid.sh"
 
-        # Initial check
-        if [[ ! "\${CLUSTER_TYPE}" =~ ^packet.*$|^equinix.*$ ]]; then
-            echo >&2 "Unsupported cluster type '\${CLUSTER_TYPE}'"
-            exit 1
-        fi
 
         IP=\$(cat "\${SHARED_DIR}/server-ip")
         SSHOPTS=(-o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o LogLevel=ERROR -i "\${CLUSTER_PROFILE_DIR}/packet-ssh-key")
@@ -83,7 +89,7 @@ cat > packet-config.yaml <<-EOF
 EOF
 ansible-playbook packet-config.yaml |& gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0; fflush(); }'
 
-if [ -e "${CLUSTER_PROFILE_DIR}/ofcir_url" ] ; then
+if [ -e "${CLUSTER_PROFILE_DIR}/ofcir_url_disabled" ] ; then
     echo "Attempting to acquire a Host from OFCIR"
     IPFILE=$SHARED_DIR/server-ip
     CIRFILE=$SHARED_DIR/cir
@@ -99,42 +105,11 @@ SLEEPTIME=$(( RANDOM % 120 ))
 echo "Sleeping for $SLEEPTIME seconds"
 sleep $SLEEPTIME
 
-# Run Ansible playbook
-cat > packet-setup.yaml <<-EOF
-- name: setup Packet host
-  hosts: localhost
-  collections:
-   - community.general
-  gather_facts: no
-  vars:
-    - cluster_type: "{{ lookup('env', 'CLUSTER_TYPE') }}"
-    - packet_project_id: "{{ lookup('file', lookup('env', 'CLUSTER_PROFILE_DIR') + '/packet-project-id') }}"
-    - packet_auth_token: "{{ lookup('file', lookup('env', 'CLUSTER_PROFILE_DIR') + '/packet-auth-token') }}"
+# Select a facility, we can't use any with current generations PLANs as we risk landing in a higher cost Facility
+curl -H "X-Auth-Token: $(cat $CLUSTER_PROFILE_DIR/packet-project-id)" https://api.equinix.com/metal/v1/capacity > /tmp/equinix_capacity.json
+FACILITY=$(cat /tmp/equinix_capacity.json | jq -rc ".capacity | . as $obj | keys[] | select([$obj[.][\"$PACKET_PLAN\"].level]|inside([\"normal\",\"limited\"]))" | shuf | head -n 1)
 
-  tasks:
-  - name: check cluster type
-    fail:
-      msg: "Unsupported CLUSTER_TYPE '{{ cluster_type }}'"
-    when: "cluster_type is not regex('^packet.*$|^equinix.*$')"
-
-  - name: create Packet host with error handling
-    block:
-    - name: create Packet host {{ packet_hostname }}
-      packet_device:
-        auth_token: "{{ packet_auth_token }}"
-        project_id: "{{ packet_project_id }}"
-        hostnames: "{{ packet_hostname }}"
-        operating_system: ${PACKET_OS}
-        plan: ${PACKET_PLAN}
-        facility: any
-        tags: "{{ 'PR:', lookup('env', 'PULL_NUMBER'), 'Job name:', lookup('env', 'JOB_NAME'), 'Job id:', lookup('env', 'PROW_JOB_ID') }}"
-      register: hosts
-      no_log: true
-    - name: write device info to file
-      copy:
-        content="{{ hosts }}"
-        dest="${SHARED_DIR}/hosts.json"
-EOF
+curl -H "X-Auth-Token: $(cat $CLUSTER_PROFILE_DIR/packet-auth-token)" -H "Content-Type: application/json" -d "{\"plan\":\"$PACKET_PLAN\", \"operating_system\":\"$PACKET_OS\", \"facility\":\"$FACILITY\", \"hostname\":\"ipi-${NAMESPACE}-${JOB_NAME_HASH}-${BUILD_ID}\"}" https://api.equinix.com/metal/v1/projects/$(cat $CLUSTER_PROFILE_DIR/packet-project-id)/devices > ${SHARED_DIR}/hosts.json
 
 function send_slack(){
     echo Packet setup failed: $1
@@ -145,9 +120,7 @@ function send_slack(){
 }
 
 
-ansible-playbook packet-setup.yaml -e "packet_hostname=ipi-${NAMESPACE}-${JOB_NAME_HASH}-${BUILD_ID}"  |& gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0; fflush(); }'
-
-DEVICEID=$(jq -r .devices[0].id < ${SHARED_DIR}/hosts.json)
+DEVICEID=$(jq -r .id < ${SHARED_DIR}/hosts.json)
 
 function refresh_device_info(){
     curl -H "X-Auth-Token: $(cat ${CLUSTER_PROFILE_DIR}/packet-auth-token)"  "https://api.equinix.com/metal/v1/devices/$DEVICEID" > /tmp/device.json
