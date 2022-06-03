@@ -19,8 +19,9 @@ images:
     stolostron_builder_go1.17-linux:
       as:
       - registry.ci.openshift.org/stolostron/builder:go1.17-linux
-  to: search-operator
+  to: insights-client
 promotion:
+  disabled: true
   name: "2.6"
   namespace: stolostron
 resources:
@@ -29,6 +30,14 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: insights-client
+    env:
+      IMAGE_REPO: insights-client
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
 - as: e2e
   steps:
     env:
@@ -42,41 +51,45 @@ tests:
     test:
     - as: e2e
       commands: |
-        echo $(ls -ltr /etc/secret)
-        echo $(pwd)
-        export QUAY_TOKEN=$(cat /etc/secret/credentials)
         echo "COMPONENT_IMAGE_REF=$COMPONENT_IMAGE_REF"
         export SELF="make -f Makefile.prow"
         set -o pipefail
         make -f Makefile.prow test-e2e
         set +o pipefail
-      credentials:
-      - mount_path: /etc/secret
-        name: ocm-obs-usa-quaytoken
-        namespace: test-credentials
       dependencies:
       - env: COMPONENT_IMAGE_REF
-        name: search-operator
+        name: insights-client
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
     workflow: ocm-e2e-kind
-- as: pr-image-mirror
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: search-operator
-    env:
-      IMAGE_REPO: search-operator
-      REGISTRY_ORG: stolostron
-    workflow: ocm-ci-image-mirror
-- as: backplane-fast-forward
+- as: publish
   postsubmit: true
   steps:
+    dependencies:
+      SOURCE_IMAGE_REF: insights-client
     env:
-      DESTINATION_BRANCH: release-2.6
-    workflow: ocm-ci-fastforward
+      IMAGE_REPO: insights-client
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
+        export SELF="make -f Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 - as: test-unit
   commands: |
     export SELF="make -f Makefile.prow"
@@ -103,6 +116,6 @@ tests:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
 zz_generated_metadata:
-  branch: main
+  branch: release-2.6
   org: stolostron
-  repo: search-operator
+  repo: insights-client

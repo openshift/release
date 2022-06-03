@@ -17,6 +17,7 @@ images:
       - registry.ci.openshift.org/stolostron/builder:nodejs14-linux
   to: search-api
 promotion:
+  disabled: true
   name: "2.6"
   namespace: stolostron
 resources:
@@ -33,21 +34,10 @@ tests:
       IMAGE_REPO: search-api
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
-- as: backplane-fast-forward
-  postsubmit: true
-  steps:
-    env:
-      DESTINATION_BRANCH: release-2.6
-    workflow: ocm-ci-fastforward
-- as: lint
-  commands: |
-    make -f Makefile.prow install
-    make -f Makefile.prow lint
-  container:
-    from: src
 - as: unit-test-sonar-pre-submit
   commands: |
     export SELF="make -f Makefile.prow"
+    make -f Makefile.prow install
     make -f Makefile.prow sonar/js/jest-init
     make -f Makefile.prow unit-test
     make -f Makefile.prow sonar/js/prow
@@ -59,6 +49,7 @@ tests:
 - as: unit-test-sonar-post-submit
   commands: |
     export SELF="make -f Makefile.prow"
+    make -f Makefile.prow install
     make -f Makefile.prow sonar/js/jest-init
     make -f Makefile.prow unit-test
     make -f Makefile.prow sonar/js/prow
@@ -68,7 +59,32 @@ tests:
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
+- as: publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: search-api
+    env:
+      IMAGE_REPO: search-api
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
+        export SELF="make -f Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: main
+  branch: release-2.6
   org: stolostron
   repo: search-api
