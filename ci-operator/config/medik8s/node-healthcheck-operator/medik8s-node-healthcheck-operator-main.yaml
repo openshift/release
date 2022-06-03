@@ -3,13 +3,13 @@ base_images:
     name: ubi
     namespace: ocp
     tag: "8"
-  snr-index:
-    name: "4.11"
-    namespace: ocp
-    tag: self-node-remediation-index
+  opm-builder:
+    name: opm-builder
+    namespace: ci
+    tag: latest
   snr-operator:
     name: "4.11"
-    namespace: ocp
+    namespace: medik8s
     tag: self-node-remediation-operator
 binary_build_commands: make manager
 build_root:
@@ -21,6 +21,64 @@ images:
 - dockerfile_path: Dockerfile
   from: base
   to: node-healthcheck-operator
+- dockerfile_literal: |
+    # gobuilder doesn't have envsubst...
+    FROM base
+    RUN yum install make git golang gettext -y
+    # Ensure correct Go version
+    ENV GO_VERSION=1.18
+    RUN go install golang.org/dl/go${GO_VERSION}@latest && \
+      ~/go/bin/go${GO_VERSION} download && \
+      /bin/cp -f ~/go/bin/go${GO_VERSION} /usr/bin/go && \
+      go version
+  from: base
+  to: bundle-base
+- dockerfile_literal: |
+    FROM bundle-base
+    ENV SNR_DIR=/snr
+    ENV REG=image-registry.openshift-image-registry.svc:5000
+    RUN mkdir -p ${SNR_DIR} && \
+        curl -L https://github.com/medik8s/self-node-remediation/tarball/main | tar -C ${SNR_DIR} -xz --strip=1 && \
+        VERSION=0.0.1 IMG=${REG}/${OPENSHIFT_BUILD_NAMESPACE}/pipeline:self-node-remediation-operator make -C ${SNR_DIR} manifests bundle
+    LABEL operators.operatorframework.io.bundle.mediatype.v1=registry+v1
+    LABEL operators.operatorframework.io.bundle.manifests.v1=${SNR_DIR}/bundle/manifests
+    LABEL operators.operatorframework.io.bundle.metadata.v1=${SNR_DIR}/bundle/metadata
+    LABEL operators.operatorframework.io.bundle.package.v1=self-node-remediation
+    LABEL operators.operatorframework.io.bundle.channels.v1=stable
+  from: bundle-base
+  to: snr-bundle
+- dockerfile_literal: |
+    FROM opm-builder
+  from: opm-builder
+  to: opm-builder-with-env
+- dockerfile_literal: |
+    FROM quay.io/operator-framework/upstream-opm-builder:latest
+    #ENV REG=image-registry.openshift-image-registry.svc:5000
+    ENV REG=registry.build03.ci.openshift.org
+    RUN opm index add \
+    --bundles ${REG}/${OPENSHIFT_BUILD_NAMESPACE}/pipeline:snr-bundle \
+    --out-dockerfile index.Dockerfile \
+    --generate
+  from: opm-builder-with-env
+  inputs:
+    snr-bundle:
+      as:
+      - just-wait-for-it
+  to: snr-index-gen
+- dockerfile_literal: |
+    FROM quay.io/operator-framework/upstream-opm-builder:latest
+    LABEL operators.operatorframework.io.index.database.v1=/database/index.db
+    COPY database/index.db /database/index.db
+    EXPOSE 50051
+    ENTRYPOINT ["/bin/opm"]
+    CMD ["registry", "serve", "--database", "/database/index.db"]
+  from: opm-builder
+  inputs:
+    snr-index-gen:
+      paths:
+      - destination_dir: .
+        source_path: /database
+  to: snr-index
 operator:
   bundles:
   - as: my-bundle
@@ -29,8 +87,6 @@ operator:
   substitutions:
   - pullspec: quay.io/medik8s/node-healthcheck-operator:.*
     with: pipeline:node-healthcheck-operator
-  - pullspec: quay.io/medik8s/self-node-remediation-operator:.*
-    with: pipeline:snr-operator
 releases:
   latest:
     candidate:
