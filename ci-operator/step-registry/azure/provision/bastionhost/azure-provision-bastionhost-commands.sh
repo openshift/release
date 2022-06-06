@@ -35,8 +35,7 @@ function wait_public_dns() {
 bastion_source_vhd_uri="${BASTION_VHD_URI}"
 
 CLUSTER_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
-#bastion_name="${CLUSTER_NAME}-bastion"
-bastion_name="bastion-${CLUSTER_NAME}"
+bastion_name="${CLUSTER_NAME}-bastion"
 bastion_ignition_file="${SHARED_DIR}/${CLUSTER_NAME}-bastion.ign"
 
 if [[ ! -f "${bastion_ignition_file}" ]]; then
@@ -163,7 +162,8 @@ if [[ "${REGISTER_MIRROR_REGISTRY_DNS}" == "yes" ]]; then
     echo "Adding public DNS record for mirror registry"
     cmd="az network dns record-set a add-record -g ${BASE_RESOURCE_GROUP} -z ${BASE_DOMAIN} -n ${mirror_registry_host} -a ${bastion_public_ip}"
     run_command "${cmd}" &&
-    echo "az network dns record-set a remove-record -g ${BASE_RESOURCE_GROUP} -z ${BASE_DOMAIN} -n ${mirror_registry_host} -a ${bastion_public_ip}" >>"${SHARED_DIR}/remove_resources_by_cli.sh"
+    echo "az network dns record-set a remove-record -g ${BASE_RESOURCE_GROUP} -z ${BASE_DOMAIN} -n ${mirror_registry_host} -a ${bastion_public_ip} || :" >>"${SHARED_DIR}/remove_resources_by_cli.sh"
+    
     wait_public_dns "${mirror_registry_dns}" || exit 2
 
     # save mirror registry dns info
