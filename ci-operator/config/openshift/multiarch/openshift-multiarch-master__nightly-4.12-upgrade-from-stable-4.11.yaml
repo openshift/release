@@ -1,0 +1,90 @@
+base_images:
+  ansible:
+    name: "4.11"
+    namespace: ocp
+    tag: ansible
+  assisted-installer:
+    name: assisted
+    namespace: ocp-kni
+    tag: assisted-installer
+  assisted-installer-agent:
+    name: assisted
+    namespace: ocp-kni
+    tag: assisted-installer-agent
+  assisted-installer-controller:
+    name: assisted
+    namespace: ocp-kni
+    tag: assisted-installer-controller
+  assisted-service:
+    name: assisted
+    namespace: ocp-kni
+    tag: assisted-service
+  assisted-test-infra:
+    name: assisted-test
+    namespace: ocp-kni
+    tag: assisted-test-infra
+  base:
+    name: "4.11"
+    namespace: ocp
+    tag: base
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  libvirt-installer:
+    name: "4.11"
+    namespace: ocp
+    tag: libvirt-installer
+  upi-installer:
+    name: "4.11"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  arm64-initial:
+    prerelease:
+      architecture: arm64
+      product: ocp
+      version_bounds:
+        lower: 4.10.0-0
+        upper: 4.11.0-0
+  arm64-latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.11"
+  initial:
+    prerelease:
+      product: ocp
+      version_bounds:
+        lower: 4.10.0-0
+        upper: 4.11.0-0
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.11"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: ocp-e2e-aws-arm64
+  interval: 24h
+  steps:
+    cluster_profile: aws-arm64
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: arm-ci.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      TEST_ARGS: --from-repository quay.io/multi-arch/community-e2e-images
+      TEST_TYPE: upgrade-conformance
+    workflow: openshift-upgrade-aws
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: multiarch
+  variant: nightly-4.11-upgrade-from-stable-4.10
