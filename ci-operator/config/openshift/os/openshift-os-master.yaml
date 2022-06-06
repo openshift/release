@@ -162,8 +162,9 @@ tests:
         #!/bin/bash
         set -xeuo
         /src/ci/set-openshift-user.sh
+        /src/ci/prow-build.sh
         cosa kola run --qemu-nvme=true basic
-      from: cosa-build
+      from: build-test-qemu-img
       resources:
         limits:
           devices.kubevirt.io/kvm: "1"
@@ -182,8 +183,9 @@ tests:
         #!/bin/bash
         set -xeuo
         /src/ci/set-openshift-user.sh
+        /src/ci/prow-build.sh
         cosa kola run --qemu-firmware=uefi basic
-      from: cosa-build
+      from: build-test-qemu-img
       resources:
         limits:
           devices.kubevirt.io/kvm: "1"
@@ -202,8 +204,9 @@ tests:
         #!/bin/bash
         set -xeuo
         /src/ci/set-openshift-user.sh
+        /src/ci/prow-build.sh
         kola run-upgrade -b rhcos -v --find-parent-image --qemu-image-dir tmp/ --output-dir tmp/kola-upgrade
-      from: cosa-build
+      from: build-test-qemu-img
       resources:
         limits:
           devices.kubevirt.io/kvm: "1"
@@ -222,8 +225,9 @@ tests:
         #!/bin/bash
         set -xeuo
         /src/ci/set-openshift-user.sh
+        /src/ci/prow-build.sh
         cosa kola run --parallel 2
-      from: cosa-build
+      from: build-test-qemu-img
       resources:
         limits:
           devices.kubevirt.io/kvm: "1"
@@ -242,10 +246,11 @@ tests:
         #!/bin/bash
         set -xeuo
         /src/ci/set-openshift-user.sh
+        /src/ci/prow-build.sh
         cosa buildextend-metal && cosa buildextend-metal4k && cosa buildextend-live
         cosa compress --artifact=metal --artifact=metal4k
         kola testiso -S --scenarios pxe-install,pxe-offline-install --output-dir tmp/kola-metal
-      from: cosa-build
+      from: build-test-qemu-img
       resources:
         limits:
           devices.kubevirt.io/kvm: "1"
