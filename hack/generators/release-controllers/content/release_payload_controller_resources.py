@@ -89,6 +89,11 @@ def _library_go_rbac(gendoc):
                     'verbs': ['create', 'get', 'list', 'watch', 'update']
                 },
                 {
+                    'apiGroups': ['coordination.k8s.io'],
+                    'resources': ['leases'],
+                    'verbs': ['create', 'get', 'list', 'watch', 'update']
+                },
+                {
                     'apiGroups': [''],
                     'resources': ['events'],
                     'verbs': ['create']
