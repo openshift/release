@@ -61,7 +61,8 @@ tests:
     - as: test
       cli: latest
       commands: |
-        SHOULD_BE_PRESENT="cli cli-artifacts driver-toolkit installer installer-artifacts must-gather oauth-proxy tests tools"
+        IMAGESTREAM_ALLOWED_LIST="cli cli-artifacts driver-toolkit installer installer-artifacts must-gather oauth-proxy tests tools"
+        TEMPLATE_ALLOWED_LIST=""
         function exists_in_list() {
           LIST=$1
           DELIMITER=$2
@@ -77,15 +78,30 @@ tests:
 
         function check_present_list_is_correct() {
           CURRENT_LIST=("$@")
+          ((last_idx=${#CURRENT_LIST[@]} - 1))
+          KIND=${CURRENT_LIST[last_idx]}
+          unset CURRENT_LIST[last_idx]
           for i in "${CURRENT_LIST[@]}";
-          do
-            if exists_in_list "$SHOULD_BE_PRESENT" " " $i; then
-              echo "$i is present, which is expected"
-            else
-              echo "Should not be present, but we have: $i"
-              return 1
-            fi
-          done
+            do
+              if [ "$KIND" == "imagestreams" ] ; then
+                if exists_in_list "$IMAGESTREAM_ALLOWED_LIST" " " $i; then
+                  echo "imagestream $i is present, which is expected"
+                else
+                  echo "$i imagestream should not be present"
+                  return 1
+                fi
+              elif [ "$KIND" == "templates" ] ; then
+                if exists_in_list "$TEMPLATE_ALLOWED_LIST" " " $i; then
+                  echo "template $i is present, which is expected"
+                else
+                  echo "$i template should not be present"
+                  return 1
+                fi
+              else
+                echo "Unknown kind passed as an argument"
+                return 1
+              fi
+            done
         }
 
         function assert_empty() {
@@ -94,7 +110,7 @@ tests:
           if test -n "${NAMES}"
           then
             echo "${KIND} : ${NAMES} present in the cluster"
-            check_present_list_is_correct ${NAMES[@]}
+            check_present_list_is_correct ${NAMES[@]} ${KIND}
           fi
         }
         assert_empty templates && assert_empty imagestreams
