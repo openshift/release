@@ -61,12 +61,40 @@ tests:
     - as: test
       cli: latest
       commands: |
+        SHOULD_BE_PRESENT="cli cli-artifacts driver-toolkit installer installer-artifacts must-gather oauth-proxy tests tools"
+        function exists_in_list() {
+          LIST=$1
+          DELIMITER=$2
+          VALUE=$3
+          LIST_WHITESPACES=`echo $LIST | tr "$DELIMITER" " "`
+          for x in $LIST_WHITESPACES; do
+            if [ "$x" = "$VALUE" ]; then
+              return 0
+            fi
+          done
+          return 1
+        }
+
+        function check_present_list_is_correct() {
+          CURRENT_LIST=("$@")
+          for i in "${CURRENT_LIST[@]}";
+          do
+            if exists_in_list "$SHOULD_BE_PRESENT" " " $i; then
+              echo "$i is present, which is expected"
+            else
+              echo "Should not be present, but we have: $i"
+              return 1
+            fi
+          done
+        }
+
         function assert_empty() {
           KIND="$1"
           NAMES="$(oc -n openshift get -o jsonpath='{.items[*].metadata.name}' "${KIND}")"
           if test -n "${NAMES}"
           then
-            echo "Should not have ${KIND} in the openshift namespace, but we have: ${NAMES}"
+            echo "${KIND} : ${NAMES} present in the cluster"
+            check_present_list_is_correct ${NAMES[@]}
           fi
         }
         assert_empty templates && assert_empty imagestreams
