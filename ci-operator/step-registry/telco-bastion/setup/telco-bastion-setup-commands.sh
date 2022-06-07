@@ -98,6 +98,7 @@ cat << EOF > ~/ssh-connection-workaround.yml
     when: ready.stat.exists == False
 EOF
 
+echo test
 ansible-playbook -i ~/inventory ~/ocp-install.yml -vvvv || sleep 10800 # sleep 3 hours
 
 MINUTES_WAITED=0
