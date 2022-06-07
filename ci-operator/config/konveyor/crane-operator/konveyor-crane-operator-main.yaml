@@ -1,8 +1,4 @@
 base_images:
-  base:
-    name: "4.11"
-    namespace: ocp
-    tag: base
   crane-reverse-proxy:
     name: "4.11"
     namespace: konveyor
@@ -19,10 +15,6 @@ base_images:
     name: "4.11"
     namespace: konveyor
     tag: crane-ui-plugin
-  opm-builder:
-    name: opm-builder
-    namespace: ci
-    tag: latest
   ubi8-minimal:
     name: builder
     namespace: ocp
@@ -36,31 +28,6 @@ images:
 - dockerfile_path: Dockerfile
   from: ubi8-minimal
   to: crane-operator
-- dockerfile_path: bundle.Dockerfile
-  from: base
-  to: crane-operator-bundle
-- dockerfile_literal: |
-    FROM quay.io/operator-framework/upstream-opm-builder:latest
-    RUN opm index add \
-    --bundles "quay.io/konveyor/crane-operator-bundle:latest" \
-    --out-dockerfile index.Dockerfile \
-    --generate
-  from: opm-builder
-  to: crane-operator-index-gen
-- dockerfile_literal: |
-    FROM quay.io/operator-framework/opm:latest
-    LABEL operators.operatorframework.io.index.database.v1=/database/index.db
-    COPY database/index.db /database/index.db
-    EXPOSE 50051
-    ENTRYPOINT ["/bin/opm"]
-    CMD ["registry", "serve", "--database", "/database/index.db"]
-  from: opm-builder
-  inputs:
-    crane-operator-index-gen:
-      paths:
-      - destination_dir: .
-        source_path: /database
-  to: crane-operator-index
 operator:
   bundles:
   - dockerfile_path: bundle.Dockerfile
@@ -76,8 +43,6 @@ operator:
   - pullspec: quay.io/konveyor/crane-ui-plugin:latest
     with: crane-ui-plugin
 promotion:
-  excluded_images:
-  - crane-operator-index-gen
   name: "4.11"
   namespace: konveyor
 releases:
