@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.8"
+    name: "4.10"
     namespace: ocp
     tag: cli
   ubi_minimal:
@@ -13,7 +13,7 @@ build_root:
     dockerfile_literal: |
       FROM registry.access.redhat.com/ubi8
       USER root
-      RUN yum install -y python39 make diffutils openssl git && \
+      RUN yum install -y python39 make diffutils openssl git curl && \
           yum clean all && rm -rf /var/cache/dnf/*
       ENV XDG_DATA_HOME=/.local
       WORKDIR pelorus
@@ -21,7 +21,7 @@ releases:
   latest:
     release:
       channel: stable
-      version: "4.8"
+      version: "4.10"
 resources:
   '*':
     limits:
@@ -51,6 +51,7 @@ tests:
     - as: e2e
       commands: |
         set -x
+        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
         make dev-env
         make e2e-tests
       from: src
@@ -63,4 +64,4 @@ zz_generated_metadata:
   branch: master
   org: konveyor
   repo: pelorus
-  variant: "4.8"
+  variant: "4.10"
