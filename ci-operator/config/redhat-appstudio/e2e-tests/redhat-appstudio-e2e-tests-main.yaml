@@ -33,10 +33,18 @@ tests:
         resources:
           requests:
             cpu: 100m
+      post:
+      - ref: ocm-e2e-kind-destroy
+        resources:
+          requests:
+            cpu: 100m
       cli: latest
       commands: |
         export AWS_CREDENTIALS_SECRET=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/ec2creds)
         export AWS_INSTANCE_TYPE==t3.small
+        VMIP=$(cat ${SHARED_DIR}/public_ip)
+        chmod 400 "${SHARED_DIR}/private.pem"
+        ssh -i ${SHARED_DIR}/private.pem $VMIP '( kubectl get nodes )'
       credentials:
       - mount_path: /usr/local/ci-secrets/redhat-appstudio-qe
         name: ci-secrets
