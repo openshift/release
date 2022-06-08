@@ -25,23 +25,15 @@ tests:
     version: "4.9"
   skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
+    post:
+    - ref: ocm-e2e-kind-destroy
+    pre:
+    - ref: ocm-ci-rbac
+    - ref: ocm-e2e-kind-create
     test:
     - as: redhat-appstudio-e2e
-      pre:
-      - ref: ocm-ci-rbac
-      - ref: ocm-e2e-kind-create
-        resources:
-          requests:
-            cpu: 100m
-      post:
-      - ref: ocm-e2e-kind-destroy
-        resources:
-          requests:
-            cpu: 100m
       cli: latest
       commands: |
-        export AWS_CREDENTIALS_SECRET=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/ec2creds)
-        export AWS_INSTANCE_TYPE==t3.small
         VMIP=$(cat ${SHARED_DIR}/public_ip)
         chmod 400 "${SHARED_DIR}/private.pem"
         ssh -i ${SHARED_DIR}/private.pem $VMIP '( kubectl get nodes )'
