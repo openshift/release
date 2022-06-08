@@ -89,6 +89,10 @@ tests:
   steps:
     test:
     - ref: stackrox-initial
+- as: policy-checks
+  steps:
+    test:
+    - ref: stackrox-initial
 - as: go-unit-tests
   steps:
     test:
@@ -115,6 +119,11 @@ tests:
     test:
     - ref: stackrox-e2e
   timeout: 3h0m0s
+- as: gke-ui-e2e-tests
+  optional: true
+  steps:
+    test:
+    - ref: stackrox-e2e
 - as: gke-upgrade-tests
   optional: true
   steps:
@@ -153,14 +162,29 @@ tests:
 - as: merge-gke-qa-e2e-tests
   postsubmit: true
   steps:
+    env:
+      QA_TEST_TARGET: test
     test:
     - ref: stackrox-e2e
   timeout: 3h0m0s
+- as: merge-gke-ui-e2e-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-e2e
 - as: merge-gke-upgrade-tests
   postsubmit: true
   steps:
     test:
     - ref: stackrox-e2e
+- as: nightly-gke-qa-e2e-tests
+  cron: 0 5 * * *
+  steps:
+    env:
+      QA_TEST_TARGET: test
+    test:
+    - ref: stackrox-e2e
+  timeout: 3h0m0s
 zz_generated_metadata:
   branch: master
   org: stackrox
