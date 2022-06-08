@@ -26,29 +26,6 @@ if ! which kubectl; then
     ln -s "$(which oc)" ${HOME}/kubectl
 fi
 
-# configure go env
-export GOPATH=/tmp/goproject
-export GOCACHE=/tmp/gocache
-export GOROOT=/usr/local/go
-
-# compile extended-platform-tests if it does not exist.
-# if [ -f "/usr/bin/extended-platform-tests" ]; then
-if ! [ -f "/usr/bin/extended-platform-tests" ]; then
-    echo "extended-platform-tests does not exist, and try to compile it"
-    mkdir -p /tmp/extendedbin
-    export PATH=/tmp/extendedbin:$PATH
-    cd /tmp/goproject
-    user_name=$(cat /var/run/tests-private-account/name)
-    user_token=$(cat /var/run/tests-private-account/token)
-    git clone https://${user_name}:${user_token}@github.com/openshift/openshift-tests-private.git
-    cd openshift-tests-private
-    make build
-    cp bin/extended-platform-tests /tmp/extendedbin
-    cp pipeline/handleresult.py /tmp/extendedbin
-    export REPORT_HANDLE_PATH="/tmp/extendedbin"
-    cd ..
-    rm -fr openshift-tests-private
-fi
 which extended-platform-tests
 
 # setup proxy
