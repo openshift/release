@@ -76,10 +76,9 @@ tests:
         }
 
         function check_present_list_is_correct() {
-          CURRENT_LIST=("$@")
-          ((last_idx=${#CURRENT_LIST[@]} - 1))
-          KIND=${CURRENT_LIST[last_idx]}
-          unset CURRENT_LIST[last_idx]
+          KIND="${1}"
+          shift
+          CURRENT_LIST="${@}"
           for i in "${CURRENT_LIST[@]}";
             do
               if [ "$KIND" == "imagestreams" ] ; then
@@ -105,11 +104,11 @@ tests:
 
         function assert_empty() {
           KIND="$1"
-          NAMES="$(oc -n openshift get -o jsonpath='{.items[*].metadata.name}' "${KIND}")"
+          NAMES=($(oc -n openshift get -o jsonpath='{.items[*].metadata.name}' "${KIND}"))
           if test -n "${NAMES}"
           then
             echo "${KIND} : ${NAMES} present in the cluster"
-            check_present_list_is_correct ${NAMES[@]} ${KIND}
+            check_present_list_is_correct "${KIND}" "${NAMES[@]}"
           fi
         }
         assert_empty templates && assert_empty imagestreams
