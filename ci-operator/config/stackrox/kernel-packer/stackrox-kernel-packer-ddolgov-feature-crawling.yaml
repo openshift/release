@@ -1,7 +1,7 @@
 build_root:
   project_image:
-    dockerfile_path: Dockerfile.ubi
     context_dir: kernel-crawler
+    dockerfile_path: Dockerfile.ubi
 resources:
   '*':
     limits:
@@ -15,14 +15,19 @@ tests:
   container:
     from: src
 - as: crawl-kernels
-  commands: .openshift-ci/crawl/main.sh
-  credentials:
-  - mount_path: /tmp/secret/stackrox-kernel-packer-crawl
-    name: stackrox-kernel-packer-crawl-test
-    namespace: test-credentials
-  container:
-    from: src
-  cron: 0 0,2,4,6,8,10,12,14,16,18,20,22 * * *
+  steps:
+    test:
+    - as: crawl
+      commands: .openshift-ci/crawl/main.sh
+      credentials:
+      - mount_path: /tmp/secret/stackrox-kernel-packer-crawl
+        name: stackrox-kernel-packer-crawl-test
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
 zz_generated_metadata:
   branch: ddolgov-feature-crawling
   org: stackrox
