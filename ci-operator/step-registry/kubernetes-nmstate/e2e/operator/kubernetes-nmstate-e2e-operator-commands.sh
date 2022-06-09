@@ -1,6 +1,7 @@
 #!/bin/bash
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
+export IMAGE_BUILDER="echo" # Workarround to skip image builds in versions which don't support the SKIP_IMAGE_BUILD var (<4.10)
 
 # wait for all clusteroperators to reach progressing=false to ensure that we achieved the configuration specified at installation
 # time before we run our e2e tests.

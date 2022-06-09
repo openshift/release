@@ -1,6 +1,57 @@
+base_images:
+  base:
+    name: "4.9"
+    namespace: ocp
+    tag: base
+  cli:
+    name: "4.9"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.16-openshift-4.9
 build_root:
   from_repository: true
+images:
+- dockerfile_path: build/Dockerfile.openshift
+  inputs:
+    base:
+      as:
+      - registry.ci.openshift.org/ocp/4.9:base
+    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
+  to: kubernetes-nmstate-handler
+- dockerfile_path: build/Dockerfile.operator.openshift
+  inputs:
+    base:
+      as:
+      - registry.ci.openshift.org/ocp/4.9:base
+    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
+  to: kubernetes-nmstate-operator
+- dockerfile_literal: |
+    FROM src
+    COPY oc /usr/bin/oc
+    RUN ln -s /usr/bin/oc /usr/bin/kubectl
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: src-with-oc-and-kubectl
 promotion:
+  excluded_images:
+  - kubernetes-nmstate-handler
+  - kubernetes-nmstate-operator
+  - src-with-oc-and-kubectl
   name: "4.9"
   namespace: ocp
 releases:
@@ -25,6 +76,24 @@ tests:
   commands: make test/unit
   container:
     from: src
+- as: e2e-handler-sdn-ipv4
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE="OpenShiftSDN"
+        MIRROR_IMAGES=false
+    workflow: kubernetes-nmstate-e2e-handler
+- as: e2e-operator-sdn-ipv4
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE="OpenShiftSDN"
+        MIRROR_IMAGES=false
+    workflow: kubernetes-nmstate-e2e-operator
 zz_generated_metadata:
   branch: release-4.9
   org: openshift
