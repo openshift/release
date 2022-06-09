@@ -84,6 +84,19 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJE
   rhel8user@"${INSTANCE_PREFIX}" \
   --command 'export RPM=$(ls $HOME/microshift) && sudo dnf install $HOME/microshift/$RPM -y'
 
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+  --quiet \
+  --project "${GOOGLE_PROJECT_ID}" \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  --recurse "${HOME}"/pull-secret rhel8user@"${INSTANCE_PREFIX}":~/pull-secret
+
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  rhel8user@"${INSTANCE_PREFIX}" \
+  --command 'sudo mkdir -p /etc/crio/ && \
+  sudo mv $HOME/pull-secret /etc/crio/openshift-pull-secret && \
+  sudo chmod 600 /etc/crio/openshift-pull-secret'
+
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
@@ -129,16 +142,3 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJE
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
   --command 'sudo mv openshift-tests /usr/bin/openshift-tests'
-
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
-  --quiet \
-  --project "${GOOGLE_PROJECT_ID}" \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  --recurse "${HOME}"/pull-secret rhel8user@"${INSTANCE_PREFIX}":~/pull-secret
-
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  rhel8user@"${INSTANCE_PREFIX}" \
-  --command 'sudo mkdir -p /etc/crio/ && \
-  sudo mv $HOME/pull-secret /etc/crio/openshift-pull-secret && \
-  sudo chmod 600 /etc/crio/openshift-pull-secret'
