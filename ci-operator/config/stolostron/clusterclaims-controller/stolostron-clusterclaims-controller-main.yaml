@@ -29,6 +29,15 @@ tests:
   commands: make unit-tests
   container:
     from: src
+- as: sonar
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow sonar/go/prow
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
 - as: sonar-post-submit
   commands: |
     export SELF="make -f Makefile.prow"
