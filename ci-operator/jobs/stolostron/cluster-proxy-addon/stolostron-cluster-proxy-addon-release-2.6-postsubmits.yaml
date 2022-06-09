@@ -1,55 +1,10 @@
 postsubmits:
-  stolostron/cluster-proxy:
+  stolostron/cluster-proxy-addon:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^main$
-    cluster: build04
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stolostron-cluster-proxy-main-fast-forward
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=fast-forward
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^main$
-    cluster: build04
+    - ^release-2\.6$
+    cluster: build01
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -57,7 +12,7 @@ postsubmits:
       ci-operator.openshift.io/is-promotion: "true"
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-stolostron-cluster-proxy-main-images
+    name: branch-ci-stolostron-cluster-proxy-addon-release-2.6-images
     spec:
       containers:
       - args:
@@ -102,22 +57,23 @@ postsubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^main$
-    cluster: build04
+    - ^release-2\.6$
+    cluster: build01
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-stolostron-cluster-proxy-main-pr-merge-image-mirror
+    name: branch-ci-stolostron-cluster-proxy-addon-release-2.6-publish
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=pr-merge-image-mirror
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=publish
         command:
         - ci-operator
         image: ci-operator:latest
@@ -127,6 +83,9 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -138,6 +97,9 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
