@@ -43,7 +43,7 @@ base_images:
     name: release
     namespace: openshift
     tag: golang-1.18
-binary_build_commands: make build
+binary_build_commands: make build e2e
 build_root:
   from_repository: true
 images:
@@ -53,6 +53,22 @@ images:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.18
   to: hypershift-operator
+- from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: ./bin/test-e2e
+        source_path: /go/src/github.com/openshift/hypershift/bin/test-e2e
+      - destination_dir: ./bin/test-setup
+        source_path: /go/src/github.com/openshift/hypershift/bin/test-setup
+      - destination_dir: ./Makefile
+        source_path: /go/src/github.com/openshift/hypershift/Makefile
+      - destination_dir: ./hack/ci-test-e2e.sh
+        source_path: /go/src/github.com/openshift/hypershift/hack/ci-test-e2e.sh
+    openshift_release_golang-1.18:
+      as:
+      - quay.io/openshift/origin-base:4.10
+  to: hypershift-test
 - dockerfile_path: Dockerfile.control-plane
   from: base
   inputs:
