@@ -74,7 +74,46 @@ releases:
 resources:
   '*':
     requests:
+      cpu: 100m
+      memory: 200Mi
+  cosa-build:
+    requests:
       cpu: 2000m
+      memory: 3Gi
+  test-qemu-firmware-uefi:
+    limits:
+      devices.kubevirt.io/kvm: "1"
+    requests:
+      cpu: 2000m
+      devices.kubevirt.io/kvm: "1"
+      memory: 3Gi
+  test-qemu-kola:
+    limits:
+      devices.kubevirt.io/kvm: "1"
+    requests:
+      cpu: 2000m
+      devices.kubevirt.io/kvm: "1"
+      memory: 3Gi
+  test-qemu-kola-metal:
+    limits:
+      devices.kubevirt.io/kvm: "1"
+    requests:
+      cpu: 2000m
+      devices.kubevirt.io/kvm: "1"
+      memory: 3Gi
+  test-qemu-kola-upgrade:
+    limits:
+      devices.kubevirt.io/kvm: "1"
+    requests:
+      cpu: 2000m
+      devices.kubevirt.io/kvm: "1"
+      memory: 3Gi
+  test-qemu-nvme:
+    limits:
+      devices.kubevirt.io/kvm: "1"
+    requests:
+      cpu: 2000m
+      devices.kubevirt.io/kvm: "1"
       memory: 3Gi
 tests:
 - as: validate
@@ -89,79 +128,34 @@ tests:
   cron: '@daily'
 - as: test-qemu-nvme
   cluster: build02
+  commands: /src/ci/test-qemu-nvme.sh
+  container:
+    from: build-test-qemu-img
   cron: '@daily'
-  steps:
-    test:
-    - as: test
-      commands: /src/ci/test-qemu-nvme.sh
-      from: build-test-qemu-img
-      resources:
-        limits:
-          devices.kubevirt.io/kvm: "1"
-        requests:
-          cpu: 2000m
-          devices.kubevirt.io/kvm: "1"
-          memory: 3Gi
 - as: test-qemu-firmware-uefi
   cluster: build02
+  commands: /src/ci/test-qemu-firmware-uefi.sh
+  container:
+    from: build-test-qemu-img
   cron: '@daily'
-  steps:
-    test:
-    - as: test
-      commands: /src/ci/test-qemu-firmware-uefi.sh
-      from: build-test-qemu-img
-      resources:
-        limits:
-          devices.kubevirt.io/kvm: "1"
-        requests:
-          cpu: 2000m
-          devices.kubevirt.io/kvm: "1"
-          memory: 3Gi
 - as: test-qemu-kola-upgrade
   cluster: build02
+  commands: /src/ci/test-qemu-kola-upgrade.sh
+  container:
+    from: build-test-qemu-img
   cron: '@daily'
-  steps:
-    test:
-    - as: test
-      commands: /src/ci/test-qemu-kola-upgrade.sh
-      from: build-test-qemu-img
-      resources:
-        limits:
-          devices.kubevirt.io/kvm: "1"
-        requests:
-          cpu: 2000m
-          devices.kubevirt.io/kvm: "1"
-          memory: 3Gi
 - as: test-qemu-kola
   cluster: build02
+  commands: /src/ci/test-qemu-kola.sh
+  container:
+    from: build-test-qemu-img
   cron: '@daily'
-  steps:
-    test:
-    - as: test
-      commands: /src/ci/test-qemu-kola.sh
-      from: build-test-qemu-img
-      resources:
-        limits:
-          devices.kubevirt.io/kvm: "1"
-        requests:
-          cpu: 2000m
-          devices.kubevirt.io/kvm: "1"
-          memory: 3Gi
 - as: test-qemu-metal
   cluster: build02
+  commands: /src/ci/test-qemu-metal.sh
+  container:
+    from: build-test-qemu-img
   cron: '@daily'
-  steps:
-    test:
-    - as: test
-      commands: /src/ci/test-qemu-metal.sh
-      from: build-test-qemu-img
-      resources:
-        limits:
-          devices.kubevirt.io/kvm: "1"
-        requests:
-          cpu: 2000m
-          devices.kubevirt.io/kvm: "1"
-          memory: 3Gi
 - as: test-in-cluster
   cron: '@daily'
   steps:
@@ -177,7 +171,7 @@ tests:
       from: layering-test-img
       resources:
         requests:
-          cpu: 1000m
+          cpu: 100m
     workflow: ipi-gcp
   timeout: 4h30m0s
 zz_generated_metadata:
