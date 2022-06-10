@@ -1,0 +1,42 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: create-prowjobs
+  labels:
+    rbac.authorization.k8s.io/aggregate-to-admin: "true"
+rules:
+- apiGroups:
+  - prow.k8s.io
+  resources:
+  - prowjobs
+  verbs:
+  - create
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: test-platform-ci-admins-create-prowjobs
+  namespace: ci
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: create-prowjobs
+subjects:
+- kind: Group
+  apiGroup: rbac.authorization.k8s.io
+  name: test-platform-ci-admins
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: aos-qe-create-prowjobs
+  namespace: ci
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: create-prowjobs
+subjects:
+- kind: Group
+  apiGroup: rbac.authorization.k8s.io
+  name: aos-qe
