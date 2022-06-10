@@ -110,6 +110,12 @@ while IFS= read -r i; do
   FILTER=gzip queue ${ARTIFACT_DIR}/nodes/$i/journal.gz oc --insecure-skip-tls-verify adm node-logs $i --unify=false
   FILTER=gzip queue ${ARTIFACT_DIR}/nodes/$i/journal-previous.gz oc --insecure-skip-tls-verify adm node-logs $i --unify=false --boot=-1
   FILTER=gzip queue ${ARTIFACT_DIR}/nodes/$i/audit.gz oc --insecure-skip-tls-verify adm node-logs $i --unify=false --path=audit/audit.log
+
+  # TODO: some temporary debug gathering for azure storage issues
+  queue ${ARTIFACT_DIR}/nodes/$i/udevadm oc --insecure-skip-tls-verify debug node/$i -- chroot /host sh -c "/usr/sbin/udevadm info --export-db"
+  queue ${ARTIFACT_DIR}/nodes/$i/lsblk oc --insecure-skip-tls-verify debug node/$i -- chroot /host sh -c "/usr/bin/lsblk"
+  queue ${ARTIFACT_DIR}/nodes/$i/lsblk-Ol oc --insecure-skip-tls-verify debug node/$i -- chroot /host sh -c "/usr/bin/lsblk -Ol"
+  queue ${ARTIFACT_DIR}/nodes/$i/dmesg oc --insecure-skip-tls-verify debug node/$i -- chroot /host sh -c "/usr/bin/dmesg"
 done < /tmp/nodes
 
 echo "INFO: gathering the audit logs for each master"
