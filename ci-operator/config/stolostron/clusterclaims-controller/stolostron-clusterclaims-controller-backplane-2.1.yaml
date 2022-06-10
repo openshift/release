@@ -1,98 +1,77 @@
 base_images:
-  base:
-    name: ubi-minimal
-    namespace: ocp
-    tag: "8"
   stolostron_builder_go1.18-linux:
     name: builder
     namespace: stolostron
     tag: go1.18-linux
-binary_build_commands: go build ./cmd/manager
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
     tag: go1.18-linux
 images:
-- dockerfile_path: build/Dockerfile
-  from: base
+- dockerfile_path: Dockerfile.prow
   inputs:
     stolostron_builder_go1.18-linux:
       as:
       - registry.ci.openshift.org/stolostron/builder:go1.18-linux
-  to: klusterlet-addon-controller
+  to: clusterclaims-controller
 promotion:
-  name: "2.6"
+  name: "2.1"
   namespace: stolostron
-releases:
-  initial:
-    integration:
-      name: "4.10"
-      namespace: ocp
-  latest:
-    integration:
-      include_built_images: true
-      name: "4.10"
-      namespace: ocp
 resources:
   '*':
-    limits:
-      memory: 6Gi
     requests:
-      cpu: 80m
+      cpu: 100m
       memory: 200Mi
 tests:
-- as: check
-  commands: make check
+- as: unit-tests
+  commands: make unit-tests
   container:
     from: src
-- as: unit
-  commands: make test
-  container:
-    from: src
-- as: sonarcloud
+- as: sonar-post-submit
   commands: |
-    export SELF="make -f /opt/build-harness/Makefile.prow"
-    make -f /opt/build-harness/Makefile.prow sonar/go/prow
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow sonar/go/prow
   container:
     from: src
+  postsubmit: true
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
 - as: pr-image-mirror
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: klusterlet-addon-controller
+      SOURCE_IMAGE_REF: clusterclaims-controller
     env:
-      IMAGE_REPO: klusterlet-addon-controller
+      IMAGE_REPO: clusterclaims-controller
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
 - as: pr-merge-image-mirror
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: klusterlet-addon-controller
+      SOURCE_IMAGE_REF: clusterclaims-controller
     env:
-      IMAGE_REPO: klusterlet-addon-controller
+      IMAGE_REPO: clusterclaims-controller
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
 - as: publish
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: klusterlet-addon-controller
+      SOURCE_IMAGE_REF: clusterclaims-controller
     env:
-      IMAGE_REPO: klusterlet-addon-controller
+      IMAGE_REPO: clusterclaims-controller
       REGISTRY_ORG: stolostron
     test:
     - as: publish
       commands: |-
-        export OSCI_COMPONENT_NAME=klusterlet-addon-controller
-        export OSCI_COMPONENT_VERSION=release-2.6
         export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
-        export SELF="make -f /opt/build-harness/Makefile.prow"
+        export OSCI_PIPELINE_PRODUCT_PREFIX=backplane
+        export OSCI_PIPELINE_REPO=backplane-pipeline
+        export SELF="make -f Makefile.prow"
         export OSCI_PUBLISH_DELAY="0"
-        make -f /opt/build-harness/Makefile.prow osci/publish
+        make -f Makefile.prow osci/publish
       credentials:
       - mount_path: /etc/github
         name: acm-cicd-github
@@ -104,6 +83,6 @@ tests:
           memory: 200Mi
     workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: release-2.6
+  branch: backplane-2.1
   org: stolostron
-  repo: klusterlet-addon-controller
+  repo: clusterclaims-controller
