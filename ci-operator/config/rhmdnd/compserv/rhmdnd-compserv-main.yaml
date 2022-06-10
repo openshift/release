@@ -4,6 +4,12 @@ build_root:
     name: release
     namespace: openshift
     tag: golang-1.18
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.11"
+      namespace: ocp
 resources:
   '*':
     limits:
@@ -17,6 +23,18 @@ tests:
   commands: make test
   container:
     from: test-bin
+- as: e2e-aws
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: rhmdnd
