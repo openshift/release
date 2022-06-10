@@ -45,34 +45,6 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
   to: build-image
-- dockerfile_path: ci/Dockerfile.cosa-build
-  inputs:
-    build-test-qemu-img:
-      as:
-      - build-test-qemu-img:latest
-  to: cosa-build
-- dockerfile_path: ci/Dockerfile.cosa-oci-archive
-  inputs:
-    cosa-build:
-      as:
-      - cosa-build:latest
-  to: cosa-oci-archive
-- dockerfile_path: ci/Dockerfile.machine-os-oci-content
-  inputs:
-    cosa-oci-archive:
-      paths:
-      - destination_dir: magic
-        source_path: /tmp/cosa
-  to: machine-os-oci-content
-- dockerfile_path: ci/Dockerfile.layering-test
-  inputs:
-    build-test-qemu-img:
-      as:
-      - build-test-qemu-img:latest
-    fedora:
-      as:
-      - registry.ci.openshift.org/coreos/fedora:35
-  to: layering-test-img
 promotion:
   disabled: true
   excluded_images:
@@ -99,11 +71,6 @@ tests:
   commands: ci/prow-entrypoint.sh validate
   container:
     from: src
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: validate-built-image
-  commands: cat /etc/os-release
-  container:
-    from: machine-os-oci-content
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: build-test-qemu-kola-basic
   cluster: build02
@@ -165,24 +132,6 @@ tests:
           cpu: 2000m
           devices.kubevirt.io/kvm: "1"
           memory: 3Gi
-- as: test-in-cluster
-  optional: true
-  steps:
-    cluster_profile: gcp
-    test:
-    - as: boot-from-derived-image
-      cli: latest
-      commands: /usr/local/bin/layering_test -test.v -test.failfast -test.timeout
-        45m -build-log="${ARTIFACT_DIR}/derived-image-build.log"
-      dependencies:
-      - env: BASE_IMAGE_PULLSPEC
-        name: pipeline:machine-os-oci-content
-      from: layering-test-img
-      resources:
-        requests:
-          cpu: 1000m
-    workflow: ipi-gcp
-  timeout: 4h30m0s
 zz_generated_metadata:
   branch: master
   org: openshift
