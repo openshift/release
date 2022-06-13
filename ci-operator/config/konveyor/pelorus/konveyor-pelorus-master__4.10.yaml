@@ -60,6 +60,44 @@ tests:
           cpu: 500m
           memory: 1Gi
     workflow: openshift-e2e-aws
+- as: e2e-openshift-test-scenario-1-periodic
+  cron: 0 3 * * *
+  steps:
+    cluster_profile: aws
+    env:
+      FIPS_ENABLED: "false"
+    test:
+    - as: e2e-openshift-scenario-1-periodic
+      commands: |
+        set -x
+        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        make dev-env
+        make e2e-tests-scenario-1
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: openshift-e2e-aws
+- as: e2e-openshift-test-scenario-2-periodic
+  cron: 0 4 * * *
+  steps:
+    cluster_profile: aws
+    env:
+      FIPS_ENABLED: "false"
+    test:
+    - as: e2e-openshift-scenario-2-periodic
+      commands: |
+        set -x
+        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        make dev-env
+        make e2e-tests-scenario-2
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: master
   org: konveyor
