@@ -155,14 +155,11 @@ spec:
 EOF
 
 for _ in {1..60}; do
-    if [[ "$(oc -n quay-enterprise get quayregistry quay -o jsonpath='{.status.conditions[?(@.type=="Available")].status}')" == "True" ]]; then
-        echo "Quay is ready" >&2
-        break
-    else
-        echo "Timeout...Quay is not ready within 15 mins...exiting..." >&2
+    if [[ "$(oc -n quay get quayregistry quay -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' || true)" == "True" ]]; then
+        echo "Quay is in ready status" >&2
         exit 0
     fi
     sleep 15
 done
-echo "Quay is deployed successfully..." >&2
+echo "Timed out waiting for Quay to become ready afer 15 mins" >&2
 oc -n quay-enterprise get quayregistries -o yaml > "$ARTIFACT_DIR/quayregistries.yaml"
