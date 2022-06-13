@@ -168,3 +168,6 @@ fi
 ##############Clean Up###############
 #####################################
 rm -rf "${workdir}"
+
+echo "Sleeping 5 mins, make sure that the bastion host is fully started."
+sleep 300
