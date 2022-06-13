@@ -1,3 +1,8 @@
+base_images:
+  cli:
+    name: "4.11"
+    namespace: ocp
+    tag: cli
 build_root:
   image_stream_tag:
     name: release
@@ -20,6 +25,16 @@ resources:
 tests:
 - as: quay-e2e-tests
   steps:
+    cluster_profile: aws
+    env:
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      ODF_OPERATOR_CHANNEL: stable-4.10
+      QUAY_OPERATOR_CHANNEL: stable-3.7
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - ref: quay-deploy-quay-odf
     test:
     - as: quay-e2e-tests
       commands: ls;echo "onboarding quay-tests repo"
@@ -27,6 +42,7 @@ tests:
       resources:
         requests:
           cpu: 200m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: quay
