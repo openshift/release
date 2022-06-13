@@ -33,11 +33,11 @@ echo "INFO Clusterpool list json file"
 cat list.json
 echo "     --- end ---"
 
-echo "Info Getting the names of all clusterpools in a ready state"
-jq -r '.items[] | select(.status.ready > 0) | .metadata.name' list.json > "$LIST_FILE"
-echo "INFO Saving clusterpool ready list to artifact directory"
+echo "Info Getting the names of all clusterpools in a ready or standby state"
+jq -r '.items[] | select(.status.standby + .status.ready > 0) | .metadata.name' list.json > "$LIST_FILE"
+echo "INFO Saving clusterpool ready or standby list to artifact directory"
 cp "$LIST_FILE" "${ARTIFACT_DIR}/$CLUSTERPOOL_LIST_FILE"
-echo "INFO All ready clusterpools:"
+echo "INFO All ready or standby clusterpools:"
 cat "$LIST_FILE"
 echo "     --- end ---"
 
@@ -106,7 +106,7 @@ case "$CLUSTERPOOL_LIST_ORDER" in
     sort)
         echo "INFO Sorting clusterpool list"
         sort "$LIST_FILE" > "$LIST_FILE.tmp"
-        
+
         echo "INFO Sorted clusterpool list:"
         cat "$LIST_FILE.tmp"
         echo "     --- end ---"
@@ -117,7 +117,7 @@ case "$CLUSTERPOOL_LIST_ORDER" in
     shuffle)
         echo "INFO Shuffling clusterpool list"
         shuf "$LIST_FILE" > "$LIST_FILE.tmp"
-        
+
         echo "INFO Shuffled clusterpool list:"
         cat "$LIST_FILE.tmp"
         echo "     --- end ---"
