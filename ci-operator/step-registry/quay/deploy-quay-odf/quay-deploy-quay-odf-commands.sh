@@ -155,7 +155,7 @@ spec:
 EOF
 
 for _ in {1..60}; do
-    if [[ "$(oc -n quay get quayregistry quay -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' || true)" == "True" ]]; then
+    if [[ "$(oc -n quay-enterprise get quayregistry quay -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' || true)" == "True" ]]; then
         echo "Quay is in ready status" >&2
         exit 0
     fi
