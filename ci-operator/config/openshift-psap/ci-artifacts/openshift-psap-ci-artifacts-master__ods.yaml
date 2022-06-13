@@ -20,6 +20,44 @@ resources:
       cpu: 2000m
       memory: 2Gi
 tests:
+- as: jh-full-scale
+  steps:
+    post:
+    - as: cluster-destroy
+      commands: run ods clusters destroy
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from: ci-artifacts
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+    pre:
+    - as: cluster-create
+      commands: run ods clusters create
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from: ci-artifacts
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+    test:
+    - as: test
+      commands: run ods jh-at-scale
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from: ci-artifacts
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
 - as: jh-at-scale
   cluster_claim:
     architecture: amd64
