@@ -10,6 +10,9 @@ kind: ContainerRuntimeConfig
 metadata:
  name: custom-loglevel
 spec:
+ machineConfigSelector:
+   matchExpressions:
+     - {key: machineconfiguration.openshift.io/role, operator: In, values: [worker,master]}
  containerRuntimeConfig:
    logLevel: debug
 EOF
