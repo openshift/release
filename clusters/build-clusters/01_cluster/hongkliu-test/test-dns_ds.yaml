@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: test-dns
+  namespace: hongkliu-test
+  labels:
+    k8s-app: test-dns
+spec:
+  selector:
+    matchLabels:
+      name: test-dns
+  template:
+    metadata:
+      labels:
+        name: test-dns
+    spec:
+      tolerations:
+      - key: node-role.kubernetes.io/ci-builds-worker
+        operator: Exists
+        effect: NoSchedule
+      - key: node-role.kubernetes.io/ci-tests-worker
+        operator: Exists
+        effect: NoSchedule
+      containers:
+      - name: test-dns
+        command: ["/bin/sh","-c"]
+        args:
+        - |
+          SUCCESS_COUNTER=0
+          FAILURE_COUNTER=0
+          while true; do
+            if curl -s https://github.com > /dev/null ; then
+              let SUCCESS_COUNTER=SUCCESS_COUNTER+1
+              echo "$(date -u): success: $SUCCESS_COUNTER"
+            else
+              let FAILURE_COUNTER=FAILURE_COUNTER+1
+              echo "$(date -u): failure: $FAILURE_COUNTER"
+            fi
+            sleep 1
+          done
+
+        image: registry.ci.openshift.org/ci/centos:8
+        resources:
+          limits:
+            memory: 200Mi
+          requests:
+            cpu: 100m
+            memory: 200Mi
+      terminationGracePeriodSeconds: 30
