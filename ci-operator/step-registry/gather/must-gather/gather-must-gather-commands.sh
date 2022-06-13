@@ -12,6 +12,7 @@ function createInstallJunit() {
   if test -f "${SHARED_DIR}/install-status.txt"
   then
     EXIT_CODE=`cat ${SHARED_DIR}/install-status.txt | awk '{print $1}'`
+    cp "${SHARED_DIR}/install-status.txt" ${ARTIFACT_DIR}/
     if [ "$EXIT_CODE" ==  0  ]
     then
       cat >"${ARTIFACT_DIR}/junit_install.xml" <<EOF
