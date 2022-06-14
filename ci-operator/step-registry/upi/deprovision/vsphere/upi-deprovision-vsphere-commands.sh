@@ -35,6 +35,11 @@ vm_path="/${GOVC_DATACENTER}/vm/${cluster_name}"
 vcenter_state=${ARTIFACT_DIR}/vcenter_state
 mkdir ${vcenter_state}
 
+curl https://${GOVC_URL} -o /dev/null
+if [ $? -ne 0 ]; then     
+    echo "Unable to reach vCenter. There may be an issue with the vCenter at ${GOVC_URL} or the backing VPN to the vCenter."
+fi
+
 govc object.collect "/${GOVC_DATACENTER}/host" triggeredAlarmState &> ${vcenter_state}/host_alarms.log
 govc metric.ls $vm_path/* | xargs govc metric.sample -json -n 60 $vm_path/* &> ${vcenter_state}/vm_metrics.json
 

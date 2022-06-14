@@ -87,6 +87,11 @@ function collect_diagnostic_data {
   first_vm=$(echo "${clustervms}" | cut -d" " -f1)
   target_hw_version=$(govc vm.info -json=true "${first_vm}" | jq -r .VirtualMachines[0].Config.Version)
   echo "{\"hw_version\":  \"${target_hw_version}\", \"cloud\": \"${cloud_where_run}\"}" > "${ARTIFACT_DIR}/runtime-config.json"
+  
+  curl https://${GOVC_URL} -o /dev/null
+  if [ $? -ne 0 ]; then     
+    echo "Unable to reach vCenter. There may be an issue with the vCenter at ${GOVC_URL} or the backing VPN to the vCenter."
+  fi
 
   set -e
 }

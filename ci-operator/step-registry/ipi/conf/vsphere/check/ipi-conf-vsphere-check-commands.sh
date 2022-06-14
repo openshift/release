@@ -33,6 +33,14 @@ if [ $((${LEASED_RESOURCE//[!0-9]/})) -ge 88 ]; then
   vsphere_datastore="vsanDatastore"
 fi
 
+set +o errexit
+curl https://${vsphere_url} -o /dev/null
+ if [ $? -ne 0 ]; then     
+    echo "Unable to reach vCenter. There may be an issue with the vCenter at ${vsphere_url} or the backing VPN to the vCenter."
+    exit 1
+fi
+set -o errexit
+
 declare vcenter_usernames
 declare vcenter_passwords
 # shellcheck source=/dev/null
