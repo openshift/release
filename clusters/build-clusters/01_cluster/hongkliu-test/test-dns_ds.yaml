@@ -47,3 +47,101 @@ spec:
             cpu: 100m
             memory: 200Mi
       terminationGracePeriodSeconds: 30
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app: curler
+  name: curler
+  namespace: openshift-dns
+spec:
+  selector:
+    matchLabels:
+      app: curler
+  template:
+    metadata:
+      labels:
+        app: curler
+    spec:
+      containers:
+      - command:
+        - "/bin/bash"
+        - "-c"
+        - |
+          set -uo pipefail
+          while :
+            do curl -skw "dnslookup: %{time_namelookup} | connect: %{time_connect} | appconnect: %{time_appconnect} | pretransfer: %{time_pretransfer} | starttransfer: %{time_starttransfer} | total: %{time_total} | size: %{size_download}\n" "https://canary-openshift-ingress-canary.${CLUSTER_INGRESS_DOMAIN}/"
+            sleep 1
+            done
+        # oc adm release info --image-for=cli
+        image: quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:ba44dead03ea74107f90d58525106fb52d27a120b73c6cc8e2be31d37043ca1c
+        name: curl
+        env:
+        - name: "CLUSTER_INGRESS_DOMAIN"
+          # oc get ingresses.config/cluster -o 'jsonpath={.spec.domain}'
+          value: "apps.build01.ci.devcluster.openshift.com"
+      hostNetwork: false
+      nodeSelector:
+        "kubernetes.io/os": "linux"
+      tolerations:
+      - key: "node-role.kubernetes.io/master"
+        operator: Exists
+      - key: node-role.kubernetes.io/ci-builds-worker
+        operator: Exists
+        effect: NoSchedule
+      - key: node-role.kubernetes.io/ci-tests-worker
+        operator: Exists
+        effect: NoSchedule
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app: dumper
+  name: dumper
+  namespace: openshift-dns
+spec:
+  selector:
+    matchLabels:
+      app: dumper
+  template:
+    metadata:
+      labels:
+        app: dumper
+    spec:
+      containers:
+      - command:
+        - "/bin/bash"
+        - "-c"
+        - |
+          set -euo pipefail
+          curler_container_id=$(chroot /host crictl ps --label=io.kubernetes.container.name=curl,io.kubernetes.pod.namespace=openshift-dns | awk 'NR==2{print $1}')
+          curler_pod_ip_addr=$(chroot /host crictl inspect -o go-template --template='{{index .info.runtimeSpec.annotations "io.kubernetes.cri-o.IP.0"}}' "$curler_container_id")
+          /sbin/tcpdump -i any "host $curler_pod_ip_addr and (udp port 53 or tcp port 53 or udp port 5353 or tcp port 5353)"
+        # oc adm release info --image-for=tools
+        image: quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:3e630fcf3b3a8c3b78e6766eb1e71db69a9ccdae9014e32464390806e74eaca9
+        name: tcpdump
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - mountPath: /host
+          name: host-slash
+          readOnly: true
+      hostNetwork: true
+      nodeSelector:
+        "kubernetes.io/os": "linux"
+      privileged: true
+      tolerations:
+      - key: "node-role.kubernetes.io/master"
+        operator: Exists
+      - key: node-role.kubernetes.io/ci-builds-worker
+        operator: Exists
+        effect: NoSchedule
+      - key: node-role.kubernetes.io/ci-tests-worker
+        operator: Exists
+        effect: NoSchedule
+      volumes:
+      - name: host-slash
+        hostPath:
+          path: /
