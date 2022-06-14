@@ -1,16 +1,27 @@
 chain:
-  as: cucushift-installer-rehearse-vsphere-ipi-proxy-workers-rhcos-rhel8-provision
+  as: cucushift-installer-rehearse-vsphere-upi-disconnected-workers-rhcos-rhel8-provision
   steps:
-  - chain: ipi-conf-vsphere
-  - ref: ipi-conf-vsphere-proxy
-  - chain: ipi-install-vsphere
+  - ref: ipi-install-rbac
+  - ref: openshift-cluster-bot-rbac
+  - ref: ipi-conf
+  - ref: ipi-conf-vsphere-check
+  - ref: ipi-conf-vsphere-mirror-registry
+  - ref: mirror-images-by-oc-adm
+  - ref: ipi-conf-mirror
+  - ref: upi-conf-vsphere
+  - ref: upi-conf-vsphere-ova
+  - ref: upi-install-vsphere
+  - ref: ipi-install-times-collection
+  - ref: mirror-images-enable-qe-catalogsource
   - ref: ipi-conf-vsphere-bastionhost
   - ref: workers-rhel-vsphere-provision
+  - ref: workers-rhel-vsphere-provision-dns
+  - ref: workers-rhel-pre-hook-haproxy
   - ref: workers-rhel-pre-hook-sshtunnel
   - chain: workers-rhel
   env:
   - name: RHEL_WORKER_COUNT
-    default: 3
+    default: 2
     documentation: The number of rhel worker to be provisioned.
   - name: RHEL_IMAGE
     default: "qe-rhel-86-release"
@@ -36,4 +47,4 @@ chain:
     documentation: |-
       Keep or remove rhcos worker after scaling up rhel worker.
   documentation: |-
-    Create an IPI cluster behind proxy in a disconnected network on vSphere and scaleup rhel8 worker nodes for QE e2e tests.
+    Create an UPI cluster in disconnected network on vSphere and scaleup rhel workers for QE e2e tests.
