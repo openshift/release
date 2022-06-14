@@ -58,14 +58,19 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: verify
-  commands: make verify
+- as: verify-code
+  commands: make verify-bindata && make verify-gofmt
   container:
     from: src
 - as: unit
   commands: make test
   container:
     from: src
+- as: gosec
+  commands: make verify-gosec
+  container:
+    from: src
+  optional: true
 - as: makerelease
   postsubmit: true
   steps:
