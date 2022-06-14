@@ -11,7 +11,7 @@ set -o pipefail
 YQ_URI=https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64
 YQ_HASH=e70e482e7ddb9cf83b52f5e83b694a19e3aaf36acf6b82512cbe66e41d569201
 echo "${YQ_HASH} -" > /tmp/sum.txt
-if ! curl -Ls "${YQ_URI}" | tee /tmp/yq | sha256sum -c /tmp/sum.txt >/dev/null 2>/dev/null; then
+if ! curl -L --fail "${YQ_URI}" | tee /tmp/yq | sha256sum -c /tmp/sum.txt >/dev/null; then
   echo "Expected file at ${YQ_URI} to have checksum ${YQ_HASH} but instead got $(sha256sum </tmp/yq | cut -d' ' -f1)"
   strings /tmp/yq
   exit 1
