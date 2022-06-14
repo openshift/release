@@ -1,0 +1,278 @@
+#!/bin/bash
+
+set -o nounset
+set -o errexit
+set -o pipefail
+
+export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+
+# TODO: move to image
+curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
+
+function join_by { local IFS="$1"; shift; echo "$*"; }
+
+EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
+TAGS="Key=expirationDate,Value=${EXPIRATION_DATE}"
+
+CONFIG="${SHARED_DIR}/install-config.yaml"
+PATCH=/tmp/install-config-blackholenetwork.yaml.patch
+
+REGION="${LEASED_RESOURCE}"
+
+CLUSTER_NAME="$(/tmp/yq r "${CONFIG}" 'metadata.name')"
+
+cat << EOF > /tmp/blackhole_vpc.yaml
+# This is the template file used to generate blackhole VPC and subnet entries.
+AWSTemplateFormatVersion: 2010-09-09
+Description: Template for Best Practice VPC with 1-3 AZs
+
+Parameters:
+  VpcCidr:
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(1[6-9]|2[0-4]))$
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-24.
+    Default: 10.0.0.0/16
+    Description: CIDR block for VPC.
+    Type: String
+  AvailabilityZoneCount:
+    ConstraintDescription: "The number of availability zones. (Min: 1, Max: 3)"
+    MinValue: 1
+    MaxValue: 3
+    Default: 1
+    Description: "How many AZs to create VPC subnets for. (Min: 1, Max: 3)"
+    Type: Number
+  SubnetBits:
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/19-27.
+    MinValue: 5
+    MaxValue: 13
+    Default: 12
+    Description: "Size of each subnet to create within the availability zones. (Min: 5 = /27, Max: 13 = /19)"
+    Type: Number
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    - Label:
+        default: "Network Configuration"
+      Parameters:
+      - VpcCidr
+      - SubnetBits
+    - Label:
+        default: "Availability Zones"
+      Parameters:
+      - AvailabilityZoneCount
+    ParameterLabels:
+      AvailabilityZoneCount:
+        default: "Availability Zone Count"
+      VpcCidr:
+        default: "VPC CIDR"
+      SubnetBits:
+        default: "Bits Per Subnet"
+
+Conditions:
+  DoAz3: !Equals [3, !Ref AvailabilityZoneCount]
+  DoAz2: !Or [!Equals [2, !Ref AvailabilityZoneCount], Condition: DoAz3]
+
+Resources:
+  VPC:
+    Type: "AWS::EC2::VPC"
+    Properties:
+      EnableDnsSupport: "true"
+      EnableDnsHostnames: "true"
+      CidrBlock: !Ref VpcCidr
+  PublicSubnet:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Select [0, !Cidr [!Ref VpcCidr, 6, !Ref SubnetBits]]
+      AvailabilityZone: !Select
+      - 0
+      - Fn::GetAZs: !Ref "AWS::Region"
+  PublicSubnet2:
+    Type: "AWS::EC2::Subnet"
+    Condition: DoAz2
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Select [1, !Cidr [!Ref VpcCidr, 6, !Ref SubnetBits]]
+      AvailabilityZone: !Select
+      - 1
+      - Fn::GetAZs: !Ref "AWS::Region"
+  PublicSubnet3:
+    Type: "AWS::EC2::Subnet"
+    Condition: DoAz3
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Select [2, !Cidr [!Ref VpcCidr, 6, !Ref SubnetBits]]
+      AvailabilityZone: !Select
+      - 2
+      - Fn::GetAZs: !Ref "AWS::Region"
+  InternetGateway:
+    Type: "AWS::EC2::InternetGateway"
+  GatewayToInternet:
+    Type: "AWS::EC2::VPCGatewayAttachment"
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+  PublicRouteTable:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref VPC
+  PublicRoute:
+    Type: "AWS::EC2::Route"
+    DependsOn: GatewayToInternet
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+  PublicSubnetRouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref PublicRouteTable
+  PublicSubnetRouteTableAssociation2:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Condition: DoAz2
+    Properties:
+      SubnetId: !Ref PublicSubnet2
+      RouteTableId: !Ref PublicRouteTable
+  PublicSubnetRouteTableAssociation3:
+    Condition: DoAz3
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref PublicSubnet3
+      RouteTableId: !Ref PublicRouteTable
+  PrivateSubnet:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Select [3, !Cidr [!Ref VpcCidr, 6, !Ref SubnetBits]]
+      AvailabilityZone: !Select
+      - 0
+      - Fn::GetAZs: !Ref "AWS::Region"
+  PrivateRouteTable:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref VPC
+  PrivateSubnetRouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref PrivateSubnet
+      RouteTableId: !Ref PrivateRouteTable
+  PrivateSubnet2:
+    Type: "AWS::EC2::Subnet"
+    Condition: DoAz2
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Select [4, !Cidr [!Ref VpcCidr, 6, !Ref SubnetBits]]
+      AvailabilityZone: !Select
+      - 1
+      - Fn::GetAZs: !Ref "AWS::Region"
+  PrivateRouteTable2:
+    Type: "AWS::EC2::RouteTable"
+    Condition: DoAz2
+    Properties:
+      VpcId: !Ref VPC
+  PrivateSubnetRouteTableAssociation2:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Condition: DoAz2
+    Properties:
+      SubnetId: !Ref PrivateSubnet2
+      RouteTableId: !Ref PrivateRouteTable2
+  PrivateSubnet3:
+    Type: "AWS::EC2::Subnet"
+    Condition: DoAz3
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Select [5, !Cidr [!Ref VpcCidr, 6, !Ref SubnetBits]]
+      AvailabilityZone: !Select
+      - 2
+      - Fn::GetAZs: !Ref "AWS::Region"
+  PrivateRouteTable3:
+    Type: "AWS::EC2::RouteTable"
+    Condition: DoAz3
+    Properties:
+      VpcId: !Ref VPC
+  PrivateSubnetRouteTableAssociation3:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Condition: DoAz3
+    Properties:
+      SubnetId: !Ref PrivateSubnet3
+      RouteTableId: !Ref PrivateRouteTable3
+  HTTPSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: HTTPS Security Group
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 443
+        ToPort: 443
+        CidrIp: !Ref VpcCidr
+      VpcId: !Ref VPC
+  
+
+Outputs:
+  VpcId:
+    Description: ID of the new VPC.
+    Value: !Ref VPC
+  PublicSubnetIds:
+    Description: Subnet IDs of the public subnets.
+    Value:
+      !Join [
+        ",",
+        [!Ref PublicSubnet, !If [DoAz2, !Ref PublicSubnet2, !Ref "AWS::NoValue"], !If [DoAz3, !Ref PublicSubnet3, !Ref "AWS::NoValue"]]
+      ]
+  PrivateSubnetIds:
+    Description: Subnet IDs of the private subnets.
+    Value:
+      !Join [
+        ",",
+        [!Ref PrivateSubnet, !If [DoAz2, !Ref PrivateSubnet2, !Ref "AWS::NoValue"], !If [DoAz3, !Ref PrivateSubnet3, !Ref "AWS::NoValue"]]
+      ]
+EOF
+
+# The above cloudformation template's max zones account is 3
+if [[ "${ZONES_COUNT}" -gt 3 ]]
+then
+  ZONES_COUNT=3
+fi
+
+STACK_NAME="${CLUSTER_NAME}-shared-vpc-blackhole"
+aws --region "${REGION}" cloudformation create-stack \
+  --stack-name "${STACK_NAME}" \
+  --template-body "$(cat /tmp/blackhole_vpc.yaml)" \
+  --tags "${TAGS}" \
+  --parameters "ParameterKey=AvailabilityZoneCount,ParameterValue=${ZONES_COUNT}" &
+
+wait "$!"
+echo "Created stack"
+
+aws --region "${REGION}" cloudformation wait stack-create-complete --stack-name "${STACK_NAME}" &
+wait "$!"
+echo "Waited for stack"
+
+subnets="$(aws --region "${REGION}" cloudformation describe-stacks --stack-name "${STACK_NAME}" | jq -c '[.Stacks[].Outputs[] | select(.OutputKey | endswith("SubnetIds")).OutputValue | split(",")[]]' | sed "s/\"/'/g")"
+echo "Subnets : ${subnets}"
+
+# save stack information to ${SHARED_DIR} for deprovision step
+echo "${STACK_NAME}" >> "${SHARED_DIR}/blackholenetworkstackname"
+
+# Generate working availability zones from the region
+mapfile -t AVAILABILITY_ZONES < <(aws --region "${REGION}" ec2 describe-availability-zones | jq -r '.AvailabilityZones[] | select(.State == "available") | .ZoneName' | sort -u)
+ZONES=("${AVAILABILITY_ZONES[@]:0:${ZONES_COUNT}}")
+ZONES_STR="[ $(join_by , "${ZONES[@]}") ]"
+echo "AWS region: ${REGION} (zones: ${ZONES_STR})"
+
+cat > "${PATCH}" << EOF
+controlPlane:
+  platform:
+    aws:
+      zones: ${ZONES_STR}
+compute:
+- platform:
+    aws:
+      zones: ${ZONES_STR}
+platform:
+  aws:
+    subnets: ${subnets}
+EOF
+
+/tmp/yq m -x -i "${CONFIG}" "${PATCH}"
