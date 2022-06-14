@@ -128,7 +128,6 @@ function run {
     echo "TEST_SCENRAIOS_PREUPG: \"${TEST_SCENRAIOS_PREUPG:-}\""
     echo "TEST_ADDITIONAL_PREUPG: \"${TEST_ADDITIONAL_PREUPG:-}\""
     echo "TEST_IMPORTANCE: \"${TEST_IMPORTANCE}\""
-    echo "TEST_FILTERS_PREUPG: \"~NonUnifyCI&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;NonPreRelease&;PreChkUpgrade&;${TEST_FILTERS_PREUPG}\""
     echo "TEST_TIMEOUT: \"${TEST_TIMEOUT}\""
     if [[ -n "${TEST_SCENRAIOS_PREUPG:-}" ]]; then
         readarray -t scenarios <<< "${TEST_SCENRAIOS_PREUPG}"
@@ -166,7 +165,17 @@ function run {
     extended-platform-tests run all --dry-run | \
         grep -E "${test_scenarios}" | grep -E "${TEST_IMPORTANCE}" > ./case_selected
 
-    handle_filters "~NonUnifyCI&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;NonPreRelease&;PreChkUpgrade&;${TEST_FILTERS_PREUPG}"
+    test_filters=""
+    if [[ -n "${TEST_FILTERS_PREUPG:-}" ]]; then
+        # shellcheck disable=SC2153
+        test_filters="~NonUnifyCI&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;NonPreRelease&;PreChkUpgrade&;${TEST_FILTERS};${TEST_FILTERS_PREUPG}"
+    else
+        # shellcheck disable=SC2153
+        test_filters="~NonUnifyCI&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;NonPreRelease&;PreChkUpgrade&;${TEST_FILTERS}"
+    fi
+    echo "final test_filters: \"${test_filters}\""
+
+    handle_filters "${test_filters}"
     echo "------------------the case selected------------------"
     selected_case_num=$(cat ./case_selected|wc -l)
     if [ "W${selected_case_num}W" == "W0W" ]; then
