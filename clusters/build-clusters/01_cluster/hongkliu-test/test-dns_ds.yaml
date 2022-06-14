@@ -116,7 +116,7 @@ spec:
         - "-c"
         - |
           set -euo pipefail
-          curler_container_id=$(chroot /host crictl ps --label=io.kubernetes.container.name=curl,io.kubernetes.pod.namespace=openshift-dns | awk 'NR==2{print $1}')
+          curler_container_id=$(chroot /host crictl ps --label=io.kubernetes.container.name=curl --label=io.kubernetes.pod.namespace=openshift-dns | awk 'NR==2{print $1}')
           curler_pod_ip_addr=$(chroot /host crictl inspect -o go-template --template='{{index .info.runtimeSpec.annotations "io.kubernetes.cri-o.IP.0"}}' "$curler_container_id")
           /sbin/tcpdump -i any "host $curler_pod_ip_addr and (udp port 53 or tcp port 53 or udp port 5353 or tcp port 5353)"
         # oc adm release info --image-for=tools
