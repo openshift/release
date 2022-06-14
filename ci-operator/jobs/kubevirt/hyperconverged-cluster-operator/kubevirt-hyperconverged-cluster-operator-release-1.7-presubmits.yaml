@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-1\.7$
     - ^release-1\.7-
-    cluster: build02
+    cluster: build04
     context: ci/prow/ci-index
     decorate: true
     decoration_config:
@@ -54,7 +54,7 @@ presubmits:
     branches:
     - ^release-1\.7$
     - ^release-1\.7-
-    cluster: build02
+    cluster: build04
     context: ci/prow/ci-index-hco-upgrade-bundle
     decorate: true
     decoration_config:
@@ -103,7 +103,7 @@ presubmits:
     branches:
     - ^release-1\.7$
     - ^release-1\.7-
-    cluster: build02
+    cluster: build04
     context: ci/prow/ci-index-hco-upgrade-prev-bundle
     decorate: true
     decoration_config:
@@ -152,7 +152,7 @@ presubmits:
     branches:
     - ^release-1\.7$
     - ^release-1\.7-
-    cluster: build02
+    cluster: build04
     context: ci/prow/hco-e2e-image-index-aws
     decorate: true
     decoration_config:
@@ -227,7 +227,7 @@ presubmits:
     branches:
     - ^release-1\.7$
     - ^release-1\.7-
-    cluster: build02
+    cluster: build04
     context: ci/prow/hco-e2e-image-index-azure
     decorate: true
     decoration_config:
@@ -302,7 +302,7 @@ presubmits:
     branches:
     - ^release-1\.7$
     - ^release-1\.7-
-    cluster: build02
+    cluster: build04
     context: ci/prow/hco-e2e-image-index-sno-aws
     decorate: true
     decoration_config:
@@ -378,7 +378,7 @@ presubmits:
     branches:
     - ^release-1\.7$
     - ^release-1\.7-
-    cluster: build02
+    cluster: build04
     context: ci/prow/hco-e2e-image-index-sno-azure
     decorate: true
     decoration_config:
@@ -454,7 +454,7 @@ presubmits:
     branches:
     - ^release-1\.7$
     - ^release-1\.7-
-    cluster: build02
+    cluster: build04
     context: ci/prow/hco-e2e-kv-smoke-azure
     decorate: true
     decoration_config:
@@ -529,7 +529,86 @@ presubmits:
     branches:
     - ^release-1\.7$
     - ^release-1\.7-
-    cluster: build02
+    cluster: build04
+    context: ci/prow/hco-e2e-kv-smoke-gcp
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-kubevirt-hyperconverged-cluster-operator-release-1.7-hco-e2e-kv-smoke-gcp
+    rerun_command: /test hco-e2e-kv-smoke-gcp
+    run_if_changed: ^(api/.*|assets/.*|build/.*|ci-test-files/.*|config/.*|controllers/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/hco-e2e-kv-smoke-gcp-cluster-profile
+        - --target=hco-e2e-kv-smoke-gcp
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/hco-e2e-kv-smoke-gcp-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )hco-e2e-kv-smoke-gcp,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-1\.7$
+    - ^release-1\.7-
+    cluster: build04
     context: ci/prow/hco-e2e-upgrade-index-aws
     decorate: true
     decoration_config:
@@ -604,7 +683,7 @@ presubmits:
     branches:
     - ^release-1\.7$
     - ^release-1\.7-
-    cluster: build02
+    cluster: build04
     context: ci/prow/hco-e2e-upgrade-index-azure
     decorate: true
     decoration_config:
@@ -679,7 +758,7 @@ presubmits:
     branches:
     - ^release-1\.7$
     - ^release-1\.7-
-    cluster: build02
+    cluster: build04
     context: ci/prow/hco-e2e-upgrade-prev-index-aws
     decorate: true
     decoration_config:
@@ -754,7 +833,7 @@ presubmits:
     branches:
     - ^release-1\.7$
     - ^release-1\.7-
-    cluster: build02
+    cluster: build04
     context: ci/prow/hco-e2e-upgrade-prev-index-azure
     decorate: true
     decoration_config:
@@ -829,7 +908,7 @@ presubmits:
     branches:
     - ^release-1\.7$
     - ^release-1\.7-
-    cluster: build02
+    cluster: build04
     context: ci/prow/hco-e2e-upgrade-prev-index-sno-aws
     decorate: true
     decoration_config:
@@ -905,7 +984,7 @@ presubmits:
     branches:
     - ^release-1\.7$
     - ^release-1\.7-
-    cluster: build02
+    cluster: build04
     context: ci/prow/hco-e2e-upgrade-prev-index-sno-azure
     decorate: true
     decoration_config:
@@ -981,7 +1060,7 @@ presubmits:
     branches:
     - ^release-1\.7$
     - ^release-1\.7-
-    cluster: build02
+    cluster: build04
     context: ci/prow/images
     decorate: true
     decoration_config:

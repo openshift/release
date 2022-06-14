@@ -3,14 +3,6 @@ base_images:
     name: coreos-assembler
     namespace: coreos
     tag: latest
-  fedora:
-    name: fedora
-    namespace: coreos
-    tag: "35"
-  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.17-openshift-4.10
 build_root:
   image_stream_tag:
     name: fcos-buildroot
@@ -18,43 +10,31 @@ build_root:
     tag: testing-devel
 canonical_go_repository: github.com/openshift/os
 images:
-- dockerfile_path: ci/Dockerfile
+- dockerfile_literal: |
+    # COSA + source code
+    FROM registry.svc.ci.openshift.org/coreos/coreos-assembler:latest
+    WORKDIR /src
+    # Tell the build scripts that we have setup a directory for unprivileged build
+    ENV COSA_DIR=/tmp/cosa
+    RUN mkdir -p "${COSA_DIR}"
+    # Prow doesn't support emptydir for jobs today
+    ENV COSA_SKIP_OVERLAY=1
+    # Copy the source code
+    COPY . .
+    # We need to make sure that root can read / write to the COSA_DIR so that
+    # when this container is actually run, we have permissions to read and
+    # write to the COSA_DIR to allow the Kola tests to run.
+    USER root
+    RUN chgrp -Rf root "${COSA_DIR}" && \
+      chmod -Rf g+w "${COSA_DIR}"
+    # Go back to unprivileged user for COSA
+    USER builder
+    WORKDIR /tmp/cosa
   inputs:
     coreos_coreos-assembler_latest:
       as:
       - registry.svc.ci.openshift.org/coreos/coreos-assembler:latest
-    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
-  to: build-test-qemu-img
-- dockerfile_path: ci/Dockerfile.cosa-build
-  inputs:
-    build-test-qemu-img:
-      as:
-      - build-test-qemu-img:latest
-  to: cosa-build
-- dockerfile_path: ci/Dockerfile.cosa-oci-archive
-  inputs:
-    cosa-build:
-      as:
-      - cosa-build:latest
-  to: cosa-oci-archive
-- dockerfile_path: ci/Dockerfile.machine-os-oci-content
-  inputs:
-    cosa-oci-archive:
-      paths:
-      - destination_dir: magic
-        source_path: /tmp/cosa
-  to: machine-os-oci-content
-- dockerfile_path: ci/Dockerfile.layering-test
-  inputs:
-    build-test-qemu-img:
-      as:
-      - build-test-qemu-img:latest
-    fedora:
-      as:
-      - registry.ci.openshift.org/coreos/fedora:35
-  to: layering-test-img
+  to: build-image
 promotion:
   disabled: true
   excluded_images:
@@ -74,112 +54,98 @@ releases:
 resources:
   '*':
     requests:
+      cpu: 100m
+      memory: 200Mi
+  rhcos-86-build-test-metal:
+    limits:
+      devices.kubevirt.io/kvm: "1"
+    requests:
       cpu: 2000m
+      devices.kubevirt.io/kvm: "1"
+      memory: 3Gi
+  rhcos-86-build-test-qemu:
+    limits:
+      devices.kubevirt.io/kvm: "1"
+    requests:
+      cpu: 2000m
+      devices.kubevirt.io/kvm: "1"
+      memory: 3Gi
+  rhcos-90-build-test-metal:
+    limits:
+      devices.kubevirt.io/kvm: "1"
+    requests:
+      cpu: 2000m
+      devices.kubevirt.io/kvm: "1"
+      memory: 3Gi
+  rhcos-90-build-test-qemu:
+    limits:
+      devices.kubevirt.io/kvm: "1"
+    requests:
+      cpu: 2000m
+      devices.kubevirt.io/kvm: "1"
+      memory: 3Gi
+  scos-9-build-test-metal:
+    limits:
+      devices.kubevirt.io/kvm: "1"
+    requests:
+      cpu: 2000m
+      devices.kubevirt.io/kvm: "1"
+      memory: 3Gi
+  scos-9-build-test-qemu:
+    limits:
+      devices.kubevirt.io/kvm: "1"
+    requests:
+      cpu: 2000m
+      devices.kubevirt.io/kvm: "1"
       memory: 3Gi
 tests:
 - as: validate
-  commands: ci/validate.sh
+  commands: ci/prow-entrypoint.sh validate
   container:
-    from: coreos_coreos-assembler_latest
+    from: src
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: validate-built-image
-  commands: cat /etc/os-release
+- as: rhcos-86-build-test-qemu
+  cluster: build02
+  commands: /src/ci/prow-entrypoint.sh rhcos-86-build-test-qemu
   container:
-    from: machine-os-oci-content
+    from: build-image
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: test-qemu-nvme
+  timeout: 3h0m0s
+- as: rhcos-86-build-test-metal
   cluster: build02
+  commands: /src/ci/prow-entrypoint.sh rhcos-86-build-test-metal
+  container:
+    from: build-image
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-  steps:
-    test:
-    - as: test
-      commands: /src/ci/test-qemu-nvme.sh
-      from: build-test-qemu-img
-      resources:
-        limits:
-          devices.kubevirt.io/kvm: "1"
-        requests:
-          cpu: 2000m
-          devices.kubevirt.io/kvm: "1"
-          memory: 3Gi
-- as: test-qemu-firmware-uefi
+  timeout: 3h0m0s
+- as: rhcos-90-build-test-qemu
   cluster: build02
+  commands: /src/ci/prow-entrypoint.sh rhcos-90-build-test-qemu
+  container:
+    from: build-image
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-  steps:
-    test:
-    - as: test
-      commands: /src/ci/test-qemu-firmware-uefi.sh
-      from: build-test-qemu-img
-      resources:
-        limits:
-          devices.kubevirt.io/kvm: "1"
-        requests:
-          cpu: 2000m
-          devices.kubevirt.io/kvm: "1"
-          memory: 3Gi
-- as: test-qemu-kola-upgrade
+  timeout: 3h0m0s
+- as: rhcos-90-build-test-metal
   cluster: build02
+  commands: /src/ci/prow-entrypoint.sh rhcos-90-build-test-metal
+  container:
+    from: build-image
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-  steps:
-    test:
-    - as: test
-      commands: /src/ci/test-qemu-kola-upgrade.sh
-      from: build-test-qemu-img
-      resources:
-        limits:
-          devices.kubevirt.io/kvm: "1"
-        requests:
-          cpu: 2000m
-          devices.kubevirt.io/kvm: "1"
-          memory: 3Gi
-- as: test-qemu-kola
+  timeout: 3h0m0s
+- as: scos-9-build-test-qemu
   cluster: build02
+  commands: /src/ci/prow-entrypoint.sh scos-9-build-test-qemu
+  container:
+    from: build-image
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-  steps:
-    test:
-    - as: test
-      commands: /src/ci/test-qemu-kola.sh
-      from: build-test-qemu-img
-      resources:
-        limits:
-          devices.kubevirt.io/kvm: "1"
-        requests:
-          cpu: 2000m
-          devices.kubevirt.io/kvm: "1"
-          memory: 3Gi
-- as: test-qemu-metal
+  timeout: 3h0m0s
+- as: scos-9-build-test-metal
   cluster: build02
+  commands: /src/ci/prow-entrypoint.sh scos-9-build-test-metal
+  container:
+    from: build-image
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-  steps:
-    test:
-    - as: test
-      commands: /src/ci/test-qemu-metal.sh
-      from: build-test-qemu-img
-      resources:
-        limits:
-          devices.kubevirt.io/kvm: "1"
-        requests:
-          cpu: 2000m
-          devices.kubevirt.io/kvm: "1"
-          memory: 3Gi
-- as: test-in-cluster
-  optional: true
-  steps:
-    cluster_profile: gcp
-    test:
-    - as: boot-from-derived-image
-      cli: latest
-      commands: /usr/local/bin/layering_test -test.v -test.failfast -test.timeout
-        45m -build-log="${ARTIFACT_DIR}/derived-image-build.log"
-      dependencies:
-      - env: BASE_IMAGE_PULLSPEC
-        name: pipeline:machine-os-oci-content
-      from: layering-test-img
-      resources:
-        requests:
-          cpu: 1000m
-    workflow: ipi-gcp
-  timeout: 4h30m0s
+  timeout: 3h0m0s
 zz_generated_metadata:
   branch: master
   org: openshift-priv
