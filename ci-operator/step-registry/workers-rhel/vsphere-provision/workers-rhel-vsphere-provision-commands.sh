@@ -47,26 +47,37 @@ for count in $(seq 1 ${RHEL_WORKER_COUNT}); do
     exit 1
   fi
 
-  echo ${rhel_node_ip} >> /tmp/rhel_nodes_ip
+  echo "${infra_id}-rhel-${count} ${rhel_node_ip}" >> "${SHARED_DIR}"/rhel_nodes_info
 done
+cp "${SHARED_DIR}"/rhel_nodes_info "${ARTIFACT_DIR}"/rhel_nodes_info
 
-cp /tmp/rhel_nodes_ip "${ARTIFACT_DIR}"
+lb_group=""
+lb_vars=""
+if test -n "$(govc ls ${vcenter_folder} | grep "lb-0")"; then
+  lb_ip="$(govc vm.info -json ${vcenter_folder}/lb-0 | jq -r .VirtualMachines[].Summary.Guest.IpAddress)"
+  lb_group="[lb]\n${lb_ip}"
+  lb_vars="[lb:vars]\nansible_user=core\nansible_become=True"
+fi
 
 #Generate ansible-hosts file
 cat > "${SHARED_DIR}/ansible-hosts" << EOF
 [all:vars]
 openshift_kubeconfig_path=${KUBECONFIG}
 openshift_pull_secret_path=${PULL_SECRET_PATH}
+ansible_ssh_common_args="-o IdentityFile=${SSH_PRIV_KEY_PATH} -o StrictHostKeyChecking=no"
 
 [new_workers:vars]
-ansible_ssh_common_args="-o IdentityFile=${SSH_PRIV_KEY_PATH} -o StrictHostKeyChecking=no"
 ansible_user=${SSH_USER}
 ansible_become=True
+
+$(echo -e ${lb_vars})
 
 [new_workers]
 # hostnames must be listed by what `hostname -f` returns on the host
 # this is the name the cluster will use
-$(</tmp/rhel_nodes_ip)
+$(awk '{print $2}' "${SHARED_DIR}"/rhel_nodes_info)
+
+$(echo -e ${lb_group})
 
 [workers:children]
 new_workers
