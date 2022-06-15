@@ -3,6 +3,10 @@ base_images:
     name: ubi
     namespace: ocp
     tag: "8"
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.46.0
 build_root:
   project_image:
     dockerfile_path: Dockerfile.buildroot
@@ -27,9 +31,14 @@ tests:
     from: src
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: lint
-  commands: HOME=/tmp make lint
+  commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    HOME=/tmp make lint
   container:
-    from: src
+    clone: true
+    from: golangci-lint
 zz_generated_metadata:
   branch: master
   org: openshift
