@@ -100,6 +100,11 @@ equinix-ocp-metal)
     export TEST_PROVIDER='{"type":"skeleton"}';;
 *)
     echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"
+    if [ "W${FORCE_SUCCESS_EXIT}W" == "WnoW" ]; then
+        echo "do not force success exit"
+        exit 1
+    fi
+    echo "force success exit"
     exit 0
     ;;
 esac
