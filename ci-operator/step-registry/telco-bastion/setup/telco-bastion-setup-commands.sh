@@ -4,19 +4,19 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-echo "************ telco-bastion setup command ************"
-
+echo "************ telco cluster setup command ************"
 # TODO: Remove once OpenShift CI will be upgraded to 4.2 (see https://access.redhat.com/articles/4859371)
 ~/fix_uid.sh
 
 # Workaround 777 perms on secret ssh password file
-SSH_PASS=$(cat /var/run/ssh-pass/password)
+KNI_SSH_PASS=$(cat /var/run/kni-pass/knipass)
+HYPERV_IP=10.19.16.50
+TEST_CLUSTER_API_IP=10.19.16.74
 
 cat << EOF > ~/inventory
 [all]
-sshd.bastion-telco ansible_ssh_user=tester ansible_ssh_common_args="-o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=90" ansible_password=$SSH_PASS
+${HYPERV_IP} ansible_ssh_user=kni ansible_ssh_common_args="-o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=90" ansible_password=$KNI_SSH_PASS
 EOF
-
 set -x
 
 KCLI_PARAM=""
@@ -30,9 +30,9 @@ cat << EOF > ~/ocp-install.yml
   hosts: all
   gather_facts: false
   tasks:
-  - name: Wait 300 seconds, but only start checking after 60 seconds
+  - name: Wait 300 seconds, but only start checking after 10 seconds
     wait_for_connection:
-      delay: 60
+      delay: 10
       timeout: 300
   - name: Clone repo
     git:
@@ -46,21 +46,27 @@ cat << EOF > ~/ocp-install.yml
     ignore_errors: yes
   - name: Remove lock file
     file:
-      path: /home/tester/vm_ready.txt
+      path: /home/kni/us_cnfdc5_ready.txt
       state: absent
   - name: Run deployment
-    shell: kcli create plan --skippre --paramfile /home/tester/kcli_parameters.yml upstream_ci $KCLI_PARAM
+    shell: kcli create plan --skippre --paramfile /home/kni/kcli_parameters.yml upstream_ci $KCLI_PARAM
     args:
       chdir: ~/kcli-openshift4-baremetal
 EOF
+
 cat << EOF > ~/copy-kubeconfig-to-bastion.yml
----
-- name: Copy kubeconfig from installer to bastion
+- name: Copy kubeconfig from installer to vm
   hosts: all
   tasks:
-  - name: Run playbook to copy kubeconfig from installer vm to bastion vm
-    shell: ansible-playbook -i /home/tester/inventory /home/tester/kubeconfig.yml
+    - name: Copy kubeconfig from installer vm
+      shell: kcli scp root@cnfdc5-installer:/root/ocp/auth/kubeconfig /home/kni/.kube/config
+    - name: Add skip-tls-verify to kubeconfig
+      lineinfile:
+        path: /home/kni/.kube/config
+        regexp: '    certificate-authority-data:'
+        line: '    insecure-skip-tls-verify: true'
 EOF
+
 cat << EOF > ~/fetch-kubeconfig.yml
 ---
 - name: Fetch kubeconfig for cluster
@@ -68,14 +74,14 @@ cat << EOF > ~/fetch-kubeconfig.yml
   tasks:
   - name: Grab the kubeconfig
     fetch:
-      src: /home/tester/.kube/config
+      src: /home/kni/.kube/config
       dest: $SHARED_DIR/kubeconfig
       flat: yes
   - name: Modify local copy of kubeconfig
     lineinfile:
       path: $SHARED_DIR/kubeconfig
-      regexp: '    server: https://127.0.0.1:6443'
-      line: "    server: https://sshd.bastion-telco:6443"
+      regexp: '    server: https://api.cnfdc5.t5g.lab.eng.bos.redhat.com:6443'
+      line: "    server: https://${TEST_CLUSTER_API_IP}:6443"
     delegate_to: localhost
 EOF
 
@@ -86,9 +92,15 @@ cat << EOF > ~/ssh-connection-workaround.yml
   hosts: all
   tasks:
   - name: Try to grab file to see install finished
-    shell: kcli scp root@cnfdc5-installer:/root/cluster_ready.txt /home/tester/vm_ready.txt
+    shell: >-
+      kcli scp root@cnfdc5-installer:/root/cluster_ready.txt /home/kni/us_cnfdc5_ready.txt &&
+      ls /home/kni/us_cnfdc5_ready.txt
+    register: result
+    until: result is success
+    retries: 180
+    delay: 60
   - name: Check if successful
-    stat: path=/home/tester/vm_ready.txt
+    stat: path=/home/kni/us_cnfdc5_ready.txt
     register: ready
   - name: Fail if file was not there
     fail:
@@ -96,15 +108,8 @@ cat << EOF > ~/ssh-connection-workaround.yml
     when: ready.stat.exists == False
 EOF
 
+
 ansible-playbook -i ~/inventory ~/ocp-install.yml -vvvv
-
-MINUTES_WAITED=0
-until [ $MINUTES_WAITED -ge 180 ] || ansible-playbook -i ~/inventory ~/ssh-connection-workaround.yml
-do
-    sleep 60
-    echo "Installation not finished yet."
-    ((MINUTES_WAITED+=1))
-done
-
+ansible-playbook -i ~/inventory ~/ssh-connection-workaround.yml
 ansible-playbook -i ~/inventory ~/copy-kubeconfig-to-bastion.yml
 ansible-playbook -i ~/inventory ~/fetch-kubeconfig.yml -vvvv
