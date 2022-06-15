@@ -98,7 +98,10 @@ openstack*)
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
 equinix-ocp-metal)
     export TEST_PROVIDER='{"type":"skeleton"}';;
-*) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"; exit 1;;
+*)
+    echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"
+    exit 0
+    ;;
 esac
 
 # create execution directory
