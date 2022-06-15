@@ -15,6 +15,7 @@ These resources provide some supplemental images to be used in CI builds.
 - `cdi_builder_is.yaml`: Used by [openshift-kni/performance-addon-operators](../../../ci-operator/config/openshift-kni/performance-addon-operators)
 - `cli-jq.yaml`: Used by [openshift/kubernetes](../../ci-operator/config/openshift/kubernetes)
 - `cli-ocm.yaml`: Used by step registry (e.g. osd-create-create) when ocm is needed to create OpenShift Dedicated Clusters
+- `cli-yq.yaml`: Used by step registry when yq is needed to process YAML, instead of using curl
 - `html-proofer_is.yaml`, `hugo_is.yaml` and `nginx-unprivileged_is.yaml`: Used by [openshift/ci-docs](../../ci-operator/config/openshift/ci-docs)
 - `insights-operator-tests.yaml`: Used by [openshift/insights-operator](../../ci-operator/config/openshift/insights-operator)
 - `manage-clonerefs.yaml`: Used by [ProwJob/periodic-manage-clonerefs](https://github.com/openshift/release/blob/968b1dca270336a548f87ccca6d96c9fd7940fbe/ci-operator/jobs/infra-periodics.yaml#L8)

@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: List
+items:
+- kind: ImageStream
+  apiVersion: v1
+  metadata:
+    namespace: ocp
+    name: cli-yq
+- kind: BuildConfig
+  apiVersion: v1
+  metadata:
+    namespace: ocp
+    name: cli-yq
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        name: cli-yq:latest
+    source:
+      dockerfile: |
+        FROM registry.access.redhat.com/ubi8/ubi-minimal:latest
+        ARG YQ_URI=https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64
+        ARG YQ_HASH=e70e482e7ddb9cf83b52f5e83b694a19e3aaf36acf6b82512cbe66e41d569201
+        RUN echo "${YQ_HASH} -" > /tmp/sum.txt && \
+          curl -L --fail "${YQ_URI}" | tee /bin/yq | sha256sum -c /tmp/sum.txt >/dev/null && \
+          chmod +x /bin/yq && \
+          rm /tmp/sum.txt
+        ENTRYPOINT /bin/yq
+      type: Dockerfile
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: registry.access.redhat.com/ubi8/ubi-minimal:latest
+        imageOptimizationPolicy: SkipLayers
+    triggers:
+    - type: ConfigChange
