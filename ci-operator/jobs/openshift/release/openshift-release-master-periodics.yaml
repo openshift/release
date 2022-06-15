@@ -58442,3 +58442,110 @@ periodics:
         - key: sa.config-updater.build05.config
           path: kubeconfig
         secretName: config-updater
+- agent: kubernetes
+  cluster: vsphere
+  cron: '@yearly'
+  decorate: true
+  decoration_config:
+    timeout: 6h0m0s
+  name: release-openshift-release-analysis-install-analysis-ci-vsphere-sdn-ipi
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/usr/local/pull-secret
+      - --target=release-analysis-install-analysis
+      command:
+      - ci-operator
+      env:
+      - name: GOOGLE_SA_CREDENTIAL_FILE
+        value: /var/run/secrets/google-serviceaccount-credentials.json
+      - name: INFRASTRUCTURE
+        value: ipi
+      - name: JOB_START_TIME
+      - name: MINIMUM_SUCCESSFUL_COUNT
+        value: "2"
+      - name: NETWORK
+        value: sdn
+      - name: PAYLOAD_TAG
+      - name: PLATFORM
+        value: vsphere
+      - name: TEST_GROUP
+        value: install
+      - name: UNRESOLVED_CONFIG
+        value: |
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: release-analysis-install-analysis
+            steps:
+              env:
+                GOOGLE_SA_CREDENTIAL_FILE: "$(GOOGLE_SA_CREDENTIAL_FILE)"
+                JOB_START_TIME: "$(JOB_START_TIME)"
+                PAYLOAD_TAG: "$(PAYLOAD_TAG)"
+                WORKING_DIR: "$(WORKING_DIR)"
+                PLATFORM: "$(PLATFORM)"
+                NETWORK: "$(NETWORK)"
+                INFRASTRUCTURE: "$(INFRASTRUCTURE)"
+                MINIMUM_SUCCESSFUL_COUNT: "$(MINIMUM_SUCCESSFUL_COUNT)"
+                TEST_GROUP: "$(TEST_GROUP)"
+              test:
+              - ref: openshift-release-analysis-test-case-analysis
+      - name: WORKING_DIR
+        value: $(ARTIFACT_DIR)/release-analysis-install-analysis
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: aggregator-check-install
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
