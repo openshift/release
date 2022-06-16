@@ -127,6 +127,19 @@ tests:
     test:
     - ref: stackrox-e2e
   timeout: 3h0m0s
+- as: gke-openshift-4-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 3h0m0s
+    version: "4.8"
+  optional: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+  timeout: 3h0m0s
 - as: gke-ui-e2e-tests
   optional: true
   steps:
@@ -142,6 +155,28 @@ tests:
   steps:
     test:
     - ref: stackrox-e2e
+- as: merge-push-images
+  postsubmit: true
+  steps:
+    test:
+    - as: push
+      commands: .openshift-ci/dispatch.sh push-images "RHACS_BRANDING"
+      credentials:
+      - mount_path: /tmp/secret/stackrox-stackrox-push
+        name: stackrox-stackrox-push
+        namespace: test-credentials
+      dependencies:
+      - env: MAIN_IMAGE
+        name: main
+      - env: ROXCTL_IMAGE
+        name: roxctl
+      - env: CENTRAL_DB_IMAGE
+        name: central-db
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
 - as: merge-style-checks
   postsubmit: true
   steps:
@@ -190,6 +225,21 @@ tests:
     test:
     - ref: stackrox-e2e
   timeout: 3h0m0s
+- as: merge-openshift-4-qa-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 3h0m0s
+    version: "4.8"
+  postsubmit: true
+  steps:
+    env:
+      QA_TEST_TARGET: test
+    test:
+    - ref: stackrox-e2e
+  timeout: 3h0m0s
 - as: merge-gke-ui-e2e-tests
   postsubmit: true
   steps:
@@ -201,6 +251,21 @@ tests:
     test:
     - ref: stackrox-e2e
 - as: nightly-gke-qa-e2e-tests
+  cron: 0 5 * * *
+  steps:
+    env:
+      QA_TEST_TARGET: test
+    test:
+    - ref: stackrox-e2e
+  timeout: 3h0m0s
+- as: nightly-openshift-4-qa-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 3h0m0s
+    version: "4.8"
   cron: 0 5 * * *
   steps:
     env:
