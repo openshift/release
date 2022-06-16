@@ -3,36 +3,36 @@ base_images:
     name: roks-toolkit-base
     namespace: hypershift-toolkit
     tag: latest
-  openshift_release_golang-1.17:
+  openshift_release_golang-1.18:
     name: release
     namespace: openshift
-    tag: golang-1.17
+    tag: golang-1.18
 binary_build_commands: make build
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.17
+    tag: golang-1.18
 images:
 - from: base
   inputs:
-    openshift_release_golang-1.17:
+    openshift_release_golang-1.18:
       as:
-      - openshift/origin-release:golang-1.17
+      - registry.ci.openshift.org/openshift/release:golang-1.18
   to: ibm-roks-toolkit
 - dockerfile_path: Dockerfile.cpoperator
   from: base
   inputs:
-    openshift_release_golang-1.17:
+    openshift_release_golang-1.18:
       as:
-      - openshift/origin-release:golang-1.17
+      - registry.ci.openshift.org/openshift/release:golang-1.18
   to: control-plane-operator
 - dockerfile_path: Dockerfile.metrics
   from: base
   inputs:
-    openshift_release_golang-1.17:
+    openshift_release_golang-1.18:
       as:
-      - openshift/origin-release:golang-1.17
+      - registry.ci.openshift.org/openshift/release:golang-1.18
   to: metrics
 - dockerfile_path: hack/releaser/Dockerfile
   from: src
@@ -40,17 +40,17 @@ images:
 promotion:
   excluded_images:
   - release-base
-  name: ibm-roks-4.11
+  name: ibm-roks-4.12
   namespace: hypershift-toolkit
 releases:
   initial:
     integration:
-      name: "4.11"
+      name: "4.12"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.11"
+      name: "4.12"
       namespace: ocp
 resources:
   '*':
@@ -58,14 +58,19 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: verify
-  commands: make verify
+- as: verify-code
+  commands: make verify-bindata && make verify-gofmt
   container:
     from: src
 - as: unit
   commands: make test
   container:
     from: src
+- as: gosec
+  commands: make verify-gosec
+  container:
+    from: src
+  optional: true
 - as: makerelease
   postsubmit: true
   steps:

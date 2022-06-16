@@ -63,8 +63,13 @@ EOF
 
 third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${LEASED_RESOURCE}"))
 
-echo "$(date -u --rfc-3339=seconds) - Creating vsphere_test_infra.sh file..."
-cat >> "${SHARED_DIR}/vsphere_test_infra.sh" << EOF
+echo "$(date -u --rfc-3339=seconds) - Creating platform-conf.sh file..."
+cat >> "${SHARED_DIR}/platform-conf.sh" << EOF
+export PLATFORM=vsphere
+export VIP_DHCP_ALLOCATION=false
+export VSPHERE_PARENT_FOLDER=assisted-test-infra-ci
+export VSPHERE_FOLDER="build-${BUILD_ID}"
+export TEST_TEARDOWN=true
 export VSPHERE_CLUSTER="${vsphere_cluster}"
 export VSPHERE_USERNAME="${vsphere_user}"
 export VSPHERE_NETWORK="${LEASED_RESOURCE}"
@@ -74,4 +79,5 @@ export VSPHERE_DATASTORE="${vsphere_datastore}"
 export VSPHERE_PASSWORD='${vsphere_password}'
 export API_VIP="192.168.${third_octet}.2"
 export INGRESS_VIP="192.168.${third_octet}.3"
+export BASE_DOMAIN="vmc-ci.devcluster.openshift.com"
 EOF

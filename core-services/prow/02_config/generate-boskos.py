@@ -27,9 +27,6 @@ CONFIG = {
     },
     'aws-3-quota-slice': {
         'us-east-1': 40,
-        'us-east-2': 40,
-        'us-west-1': 35,
-        'us-west-2': 40,
     },
     'aws-qe-quota-slice': {
         'us-east-2': 25,
@@ -128,6 +125,7 @@ CONFIG = {
     'vsphere-quota-slice':{},
     'vsphere-discon-quota-slice':{},
     'vsphere-clusterbot-quota-slice':{},
+    'vsphere-multizone-quota-slice':{},
     'vsphere-platform-none-quota-slice':{},
     'osd-ephemeral-quota-slice': {
         'default': 15,
@@ -187,7 +185,7 @@ for i in range(10, 24):
 for i in range(1, 7):
     CONFIG['ovirt-upgrade-quota-slice']['ovirt-upgrade-{}'.format(i)] = 1
 
-for i in range(76,103):
+for i in range(79,106):
     CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 for i in range(56,60):
@@ -198,6 +196,9 @@ for i in range(60,62):
 
 for i in range(50,54):
     CONFIG['vsphere-clusterbot-quota-slice']['ci-segment-{}'.format(i)] = 1
+    
+for i in range(151,155):
+    CONFIG['vsphere-multizone-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 config = {
     'resources': [],

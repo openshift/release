@@ -1,0 +1,53 @@
+base_images:
+  base:
+    name: 4.11-priv
+    namespace: ocp-private
+    tag: base
+  ocp_4.11_cli:
+    name: 4.11-priv
+    namespace: ocp-private
+    tag: cli
+  openshift_release_golang-1.17:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/assisted-service
+images:
+- dockerfile_path: Dockerfile.assisted-service.ocp
+  from: base
+  inputs:
+    ocp_4.11_cli:
+      as:
+      - registry.ci.openshift.org/ocp/4.11:cli
+    openshift_release_golang-1.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
+  to: agent-installer-api-server
+promotion:
+  name: 4.11-priv
+  namespace: ocp-private
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.11-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: push-pr-image
+  optional: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: agent-installer-api-server
+    test:
+    - ref: assisted-baremetal-images-publish
+zz_generated_metadata:
+  branch: master
+  org: openshift-priv
+  repo: assisted-service

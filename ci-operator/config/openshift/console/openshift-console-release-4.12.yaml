@@ -3,12 +3,19 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-base-openshift-4.6
+  nodejs-10:
+    name: nodejs-10-rhel7
+    namespace: openshift
+    tag: latest
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile
   from: base
   to: console
+- dockerfile_path: Dockerfile.plugins.demo
+  from: nodejs-10
+  to: console-plugin-demo
 promotion:
   additional_images:
     console-tests: src
@@ -66,6 +73,9 @@ tests:
     - as: test
       cli: latest
       commands: ./test-prow-e2e.sh
+      dependencies:
+      - env: CYPRESS_PLUGIN_PULL_SPEC
+        name: console-plugin-demo
       from: src
       resources:
         requests:

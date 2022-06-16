@@ -29,16 +29,25 @@ images:
   to: src-oc
 operator:
   bundles:
-  - dockerfile_path: bundle.Dockerfile
+  - as: self-node-remediation-bundle
+    dockerfile_path: bundle.Dockerfile
   substitutions:
   - pullspec: quay.io/medik8s/self-node-remediation-operator:.*
     with: pipeline:self-node-remediation-operator
+promotion:
+  additional_images:
+    self-node-remediation-bundle: self-node-remediation-bundle
+    self-node-remediation-index: ci-index-self-node-remediation-bundle
+  excluded_images:
+  - src-oc
+  name: "4.11"
+  namespace: medik8s
 releases:
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.10"
+      version: "4.11"
 resources:
   '*':
     requests:
@@ -53,6 +62,8 @@ tests:
 - as: e2e-test
   steps:
     cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-self-node-remediation-bundle
     env:
       OO_CHANNEL: stable
       OO_INSTALL_NAMESPACE: self-node-remediation

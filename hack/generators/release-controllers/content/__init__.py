@@ -14,3 +14,4 @@ from content.origin_resources import generate_origin_admin_resources, generate_o
 from content.signer_resources import generate_signer_resources
 from content.development_rbac import generate_development_rbac
 from content.trt_rbac import generate_trt_rbac
+from content.release_payload_controller_resources import add_release_payload_controller_resources

@@ -204,6 +204,10 @@ export SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 export PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
 export OPENSHIFT_INSTALL_INVOKER=openshift-internal-ci/${JOB_NAME}/${BUILD_ID}
 export HOME=/tmp
+export IBMCLOUD_API_KEY=${IBMCLOUD_API_KEY}
+export IBMCLOUD_APIKEY_CCM_CREDS=${IBMCLOUD_APIKEY_CCM_CREDS}
+export IBMCLOUD_APIKEY_INGRESS_CREDS=${IBMCLOUD_APIKEY_INGRESS_CREDS}
+export IBMCLOUD_APIKEY_MACHINEAPI_CREDS=${IBMCLOUD_APIKEY_MACHINEAPI_CREDS}
 
 # For disconnected or otherwise unreachable environments, we want to
 # have steps use an HTTP(S) proxy to reach the API server. This proxy
@@ -250,8 +254,57 @@ cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/
 
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
+# Add ignition configs
+openshift-install --dir="${dir}" create ignition-configs &
+wait "$!"
+
 openshift-install --dir="${dir}" create manifests &
 wait "$!"
+# copy ccoctl files
+cat > "${dir}/manifests/openshift-cloud-controller-manager-ibm-cloud-credentials-credentials.yaml" << EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  creationTimestamp: null
+  name: ibm-cloud-credentials
+  namespace: openshift-cloud-controller-manager
+stringData:
+  ibm-credentials.env: |-
+    IBMCLOUD_AUTHTYPE=iam
+    IBMCLOUD_APIKEY=${IBMCLOUD_APIKEY_CCM_CREDS}
+  ibmcloud_api_key: ${IBMCLOUD_APIKEY_CCM_CREDS}
+type: Opaque
+EOF
+
+cat > "${dir}/manifests/openshift-ingress-operator-cloud-credentials-credentials.yaml" << EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  creationTimestamp: null
+  name: cloud-credentials
+  namespace: openshift-ingress-operator
+stringData:
+  ibm-credentials.env: |-
+    IBMCLOUD_AUTHTYPE=iam
+    IBMCLOUD_APIKEY=${IBMCLOUD_APIKEY_INGRESS_CREDS}
+  ibmcloud_api_key: ${IBMCLOUD_APIKEY_INGRESS_CREDS}
+type: Opaque
+EOF
+
+cat > "${dir}/manifests/openshift-machine-api-powervs-credentials-credentials.yaml" << EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  creationTimestamp: null
+  name: powervs-credentials
+  namespace: openshift-machine-api
+stringData:
+  ibm-credentials.env: |-
+    IBMCLOUD_AUTHTYPE=iam
+    IBMCLOUD_APIKEY=${IBMCLOUD_APIKEY_MACHINEAPI_CREDS}
+  ibmcloud_api_key: ${IBMCLOUD_APIKEY_MACHINEAPI_CREDS}
+type: Opaque
+EOF
 
 sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
 

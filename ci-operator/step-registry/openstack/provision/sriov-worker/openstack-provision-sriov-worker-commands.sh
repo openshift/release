@@ -93,10 +93,10 @@ cat <<EOF > "${SHARED_DIR}/sriov_patch.json"
                 ],
                 "vnicType": "direct",
                 ${PROFILE:-}
-                "portSecurity": false
+                "portSecurity": false,
+                "trunk": false
               }
-            ],
-            "trunk": false
+            ]
           }
         }
       }

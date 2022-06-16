@@ -28,7 +28,7 @@ cfg["controlPlane"]["replicas"] = 1
 if not "networking" in cfg:
     cfg["networking"] = {}
 
-cfg["networking"]["networkType"] = "OVNKubernetes"
+cfg["networking"]["networkType"] = "'${NETWORK_TYPE}'"
 
 # Single Node Openshift requires extra memory and compute resources
 platform = cfg["controlPlane"]["platform"]

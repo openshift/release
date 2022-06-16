@@ -12,13 +12,13 @@ spec:
     rules:
     - alert: mirroring-failures
       annotations:
-        message: '@build-cop image mirroring jobs have failed. View failed jobs at the <https://prow.ci.openshift.org/?job=periodic-image-mirroring-openshift|overview>.  If there is a consistent issue, open a bugzilla bug against Test Infrastructure and assign it to Clayton Coleman.'
+        message: '@patch-manager image mirroring jobs have failed. View failed jobs at the <https://prow.ci.openshift.org/?job=periodic-image-mirroring-openshift|overview>.  If there is a consistent issue, open a bugzilla bug against Test Infrastructure and help drive it to resolution.'
       expr: |
         increase(prowjob_state_transitions{job_name="periodic-image-mirroring-openshift",state="failure"}[5m]) > 0
       for: 1m
       labels:
         severity: critical
-        team: build-cop
+        team: patch-manager
   - name: ci-absent
     rules:
     - alert: deckDown
@@ -320,7 +320,7 @@ spec:
             rate(prowjob_state_transitions{job="prow-controller-manager",job_name=~".*-images",org="openshift-priv",state=~"success|failure|aborted"}[12h])
           )
         )
-        < 0.95
+        < 0.90
       for: 1m
       labels:
         severity: critical
@@ -503,3 +503,13 @@ spec:
       labels:
         severity: critical
         team: release-controller
+  - name: tide-missing
+    rules:
+    - alert: TideNotMergingPRs
+      annotations:
+        message: Tide has not merged any pull requests in the last hour, likely indicating an outage in the service.
+      expr: |
+        (sum(rate(merges_count[60m])) and on () (day_of_week() <= 5 and day_of_week() >= 1) and on() (hour() > 7 and hour() < 22 )) == 0
+      for: 60m
+      labels:
+        severity: critical

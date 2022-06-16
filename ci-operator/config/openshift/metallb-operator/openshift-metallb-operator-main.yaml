@@ -15,10 +15,14 @@ base_images:
     name: "4.11"
     namespace: ocp
     tag: metallb-frr
-  ocp_builder_rhel-8-golang-1.17-openshift-4.11:
+  ocp_builder_rhel-8-golang-1.18-openshift-4.11:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.17-openshift-4.11
+    tag: rhel-8-golang-1.18-openshift-4.11
+  redhat-operator-index:
+    name: redhat-operator-index
+    namespace: ci
+    tag: v4.10
 build_root:
   image_stream_tag:
     name: release
@@ -28,13 +32,17 @@ images:
 - dockerfile_path: Dockerfile.openshift
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.11:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
   to: metallb-operator
 operator:
   bundles:
   - dockerfile_path: bundleci.Dockerfile
+  - as: upgrade-bundle
+    base_index: redhat-operator-index
+    dockerfile_path: bundleci.Dockerfile
+    update_graph: semver
   substitutions:
   - pullspec: quay.io/openshift/origin-metallb:4.11
     with: pipeline:metallb
@@ -81,6 +89,28 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: optional-operators-ci-aws
+- as: operator-e2e-upgrade
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-upgrade-bundle
+    env:
+      INITIAL_CHANNEL: "4.10"
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: openshift-metallb-operator
+      OO_LATEST_CSV: metallb-operator.v4.11.0
+      OO_PACKAGE: metallb-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: e2e
+      commands: |
+        OO_INSTALL_NAMESPACE=openshift-metallb-operator IS_OPENSHIFT=1 TESTS_REPORTS_PATH=/logs/artifacts/ make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-aws-upgrade
 - as: metallb-e2e-metal-ipi
   steps:
     cluster_profile: equinix-ocp-metal

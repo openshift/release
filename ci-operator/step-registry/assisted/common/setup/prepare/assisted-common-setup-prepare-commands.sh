@@ -6,28 +6,6 @@ set -o pipefail
 
 echo "************ assisted common setup prepare command ************"
 
-mkdir -p build/ansible
-cd build/ansible
-
-cat > packing-test-infra.yaml <<-EOF
-- name: Packing assisted-test-infra
-  hosts: localhost
-  collections:
-    - community.general
-  gather_facts: no
-  vars:
-    ansible_remote_tmp: ../tmp
-  tasks:
-    - name: Compress
-      community.general.archive:
-        path: ../../
-        exclude_path:
-          - ../../build
-        dest: assisted-test-infra.tgz
-EOF
-
-ansible-playbook packing-test-infra.yaml
-
 # Get packet | vsphere configuration
 # shellcheck source=/dev/null
 set +e
@@ -35,17 +13,60 @@ source "${SHARED_DIR}/packet-conf.sh"
 source "${SHARED_DIR}/ci-machine-config.sh"
 set -e
 
+mkdir -p build/ansible
+cd build/ansible
+
+cat > packing-test-infra.yaml <<-EOF
+- name: Prepare locally
+  hosts: localhost
+  collections:
+    - community.general
+  gather_facts: no
+  vars:
+    ansible_remote_tmp: ../tmp
+    SHARED_DIR: "{{ lookup('env', 'SHARED_DIR') }}"
+  tasks:
+    - name: Compress assisted-test-infra
+      community.general.archive:
+        path: ../../
+        exclude_path:
+          - ../../build
+        dest: assisted-test-infra.tgz
+    - name: Ensuring assisted-additional-config existence
+      ansible.builtin.file:
+        path: "{{ SHARED_DIR }}/assisted-additional-config"
+        state: touch
+    - name: Ensuring platform-conf.sh existence
+      ansible.builtin.file:
+        path: "{{ SHARED_DIR }}/platform-conf.sh"
+        state: touch
+    - name: Create ansible inventory
+      ansible.builtin.copy:
+        dest: inventory
+        content: |
+          [all]
+          {{ lookup('env', 'IP') }} ansible_user=root ansible_ssh_user=root ansible_ssh_private_key_file={{ lookup('env', 'SSH_KEY_FILE') }} ansible_ssh_common_args="-o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=90 -o LogLevel=ERROR"
+    - name: Create ssh config file
+      ansible.builtin.copy:
+        dest: "{{ SHARED_DIR }}/ssh_config"
+        content: |
+          Host ci_machine
+            User root
+            HostName {{ lookup('env', 'IP') }}
+            ConnectTimeout 5
+            StrictHostKeyChecking no
+            ServerAliveInterval 90
+            LogLevel ERROR
+            IdentityFile {{ lookup('env', 'SSH_KEY_FILE') }}
+EOF
+
+ansible-playbook packing-test-infra.yaml
+
 # shellcheck disable=SC2034
 export CI_CREDENTIALS_DIR=/var/run/assisted-installer-bot
-touch ${SHARED_DIR}/assisted-additional-config
 
 # TODO: Remove once OpenShift CI will be upgraded to 4.2 (see https://access.redhat.com/articles/4859371)
 ~/fix_uid.sh
-
-cat << EOF > inventory
-[all]
-${IP} ansible_user=root ansible_ssh_user=root ansible_ssh_private_key_file=${SSH_KEY_FILE} ansible_ssh_common_args="-o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=90 -o LogLevel=ERROR"
-EOF
 
 cat << EOF > config.sh.j2
 export REPO_DIR={{ REPO_DIR }}
@@ -65,7 +86,6 @@ export INSTALLER_IMAGE={{ ASSISTED_INSTALLER_IMAGE }}
 export CHECK_CLUSTER_VERSION=True
 export TEST_TEARDOWN=false
 export TEST_FUNC=test_install
-export MAKEFILE_TARGET='setup run test_parallel'
 export ASSISTED_SERVICE_HOST={{ IP }}
 export PUBLIC_CONTAINER_REGISTRIES="{{ CI_REGISTRIES | join(',') }}"
 
@@ -94,14 +114,7 @@ export SERVICE_BRANCH={{ PULL_PULL_SHA }}
 export OPENSHIFT_INSTALL_RELEASE_IMAGE={{ RELEASE_IMAGE_LATEST }}
 {% endif %}
 
-{% if PLATFORM == "vsphere" %}
-export PLATFORM=vsphere
-export VIP_DHCP_ALLOCATION=false
-export VSPHERE_PARENT_FOLDER=assisted-test-infra-ci
-export VSPHERE_FOLDER="build-{{ lookup('env', 'BUILD_ID') }}"
-export TEST_TEARDOWN=true
-source /root/vsphere_test_infra.sh
-{% endif %}
+source /root/platform-conf.sh
 
 {# Additional mechanism to inject assisted additional variables directly #}
 {% if ASSISTED_CONFIG is defined %}
@@ -136,6 +149,7 @@ cat > run_test_playbook.yaml <<-EOF
     PROVIDER_IMAGE: "{{ lookup('env', 'PROVIDER_IMAGE') }}"
     HYPERSHIFT_IMAGE: "{{ lookup('env', 'HYPERSHIFT_IMAGE') }}"
     ENVIRONMENT: "{{ lookup('env', 'ENVIRONMENT') }}"
+    POST_INSTALL_COMMANDS: "{{ lookup('env', 'POST_INSTALL_COMMANDS') }}"
   tasks:
     - name: Fail on unsupported environment
       fail:
@@ -175,8 +189,8 @@ cat > run_test_playbook.yaml <<-EOF
     - name: Copy vsphere credentials file
       become: true
       ansible.builtin.copy:
-        src: "{{ SHARED_DIR }}/vsphere_test_infra.sh"
-        dest: /root/vsphere_test_infra.sh
+        src: "{{ SHARED_DIR }}/platform-conf.sh"
+        dest: /root/platform-conf.sh
     - name: Install packages
       dnf:
         name:
@@ -237,6 +251,12 @@ cat > run_test_playbook.yaml <<-EOF
         owner: root
         group: root
         mode: 0755
+    - name: Create post install script
+      ansible.builtin.copy:
+        dest: /root/assisted-post-install.sh
+        content: |
+          {{ POST_INSTALL_COMMANDS }}
+          echo "Finish running post installation script"
 EOF
 
 ansible-playbook run_test_playbook.yaml -i inventory

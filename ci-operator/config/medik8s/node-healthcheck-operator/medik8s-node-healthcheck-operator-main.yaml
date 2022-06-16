@@ -3,10 +3,10 @@ base_images:
     name: ubi
     namespace: ocp
     tag: "8"
-  operator-index:
-    name: redhat-operator-index
+  opm-builder:
+    name: opm-builder
     namespace: ci
-    tag: v4.9
+    tag: latest
 binary_build_commands: make manager
 build_root:
   image_stream_tag:
@@ -17,13 +17,25 @@ images:
 - dockerfile_path: Dockerfile
   from: base
   to: node-healthcheck-operator
+- dockerfile_literal: |
+    FROM opm-builder
+    RUN opm index add \
+      --bundles quay.io/medik8s/self-node-remediation-operator-bundle:0.0.1 \
+      --out-dockerfile index.Dockerfile \
+      --generate
+    LABEL operators.operatorframework.io.index.database.v1=/database/index.db
+    EXPOSE 50051
+    ENTRYPOINT ["/bin/opm"]
+    CMD ["registry", "serve", "--database", "/database/index.db"]
+  from: opm-builder
+  to: snr-index
 operator:
   bundles:
   - as: my-bundle
-    base_index: operator-index
+    base_index: snr-index
     dockerfile_path: bundle.Dockerfile
   substitutions:
-  - pullspec: quay.io/medik8s/node-healthcheck-operator:latest
+  - pullspec: quay.io/medik8s/node-healthcheck-operator:.*
     with: pipeline:node-healthcheck-operator
 releases:
   latest:
