@@ -44,8 +44,13 @@ gcloud deployment-manager deployments delete -q "${INFRA_ID}"-{worker,control-pl
 
 # Only delete these deployments when they are expected to exist.
 if [[ ! -v IS_XPN ]]; then
-  echo "$(date -u --rfc-3339=seconds) - Deleting security and vpc deployments..."
-  gcloud deployment-manager deployments delete -q "${INFRA_ID}"-{security,vpc}
+  echo "$(date -u --rfc-3339=seconds) - Deleting security deployment..."
+  gcloud deployment-manager deployments delete -q "${INFRA_ID}-security"
+
+  if [[ ! -f "${SHARED_DIR}/customer_vpc_subnets.yaml" ]]; then
+    echo "$(date -u --rfc-3339=seconds) - Deleting vpc deployment..."
+    gcloud deployment-manager deployments delete -q "${INFRA_ID}-vpc"
+  fi
 fi
 
 # Delete XPN DNS entries

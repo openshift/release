@@ -3,37 +3,23 @@ base_images:
     name: "4.11"
     namespace: ocp
     tag: cli
-  ocp_builder_rhel-8-golang-1.17-openshift-4.11:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.17-openshift-4.11
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.11"
+  tests-private-ui:
+    name: tests-private-ui
+    namespace: ci
+    tag: "4.11"
   tools:
     name: "4.11"
     namespace: ocp
     tag: tools
-binary_build_commands: make all
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.17
-images:
-- dockerfile_path: images/Dockerfile
-  from: tools
-  inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.11:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
-  to: tests-private
-- dockerfile_literal: |
-    FROM src
-    RUN curl --silent --location https://rpm.nodesource.com/setup_lts.x | bash - && \
-        curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo | tee /etc/yum.repos.d/yarn.repo && \
-        PACKAGES="openssh-clients httpd-tools nodejs yarn xorg-x11-server-Xvfb gtk2-devel gtk3-devel libnotify-devel GConf2 nss libXScrnSaver alsa-lib" && \
-        yum install --setopt=tsflags=nodocs -y $PACKAGES && \
-        yum clean all && rm -rf /var/cache/yum/*
-  from: src
-  to: tests-private-ui
+    tag: golang-1.18
 releases:
   arm64-latest:
     candidate:
@@ -53,11 +39,6 @@ resources:
     requests:
       cpu: "1"
       memory: 4Gi
-  bin:
-    requests:
-      cpu: "2"
-      memory: 8Gi
-test_binary_build_commands: make test
 tests:
 - as: e2e-aws-ipi
   cron: 0 6 */3 * *

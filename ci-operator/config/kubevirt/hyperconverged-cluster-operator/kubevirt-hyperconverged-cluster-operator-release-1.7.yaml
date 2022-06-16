@@ -280,6 +280,26 @@ tests:
           cpu: 500m
           memory: 1Gi
     workflow: optional-operators-ci-aws
+- as: hco-e2e-kv-smoke-gcp
+  run_if_changed: ^(api/.*|assets/.*|build/.*|ci-test-files/.*|config/.*|controllers/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
+  steps:
+    cluster_profile: gcp
+    env:
+      OO_CHANNEL: 1.7.0
+      OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
+      OO_PACKAGE: community-kubevirt-hyperconverged
+      OO_TARGET_NAMESPACES: '!all'
+    test:
+    - as: e2e-test
+      commands: |
+        make deploy_cr
+        make test-kv-smoke-prow
+      from: hco-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-gcp
 - as: hco-e2e-upgrade-index-aws
   run_if_changed: ^(api/.*|assets/.*|build/.*|ci-test-files/.*|config/.*|controllers/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
   steps:

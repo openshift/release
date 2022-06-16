@@ -78,6 +78,8 @@ tests:
   cron: 0 */2 * * *
   steps:
     cluster_profile: packet-assisted
+    env:
+      LEAK_THRESHOLD_SECONDS: "18000"
     test:
     - ref: baremetalds-packet-check
 - as: sno-packet-check
@@ -159,6 +161,16 @@ tests:
       ASSISTED_CONFIG: |
         DISK_ENCRYPTION_ROLES=all
         DISK_ENCRYPTION_MODE=tang
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-tang-periodic
+  cron: '@daily'
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        DISK_ENCRYPTION_ROLES=all
+        DISK_ENCRYPTION_MODE=tang
+      TEST_SUITE: full
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-4-6
   optional: true
@@ -290,6 +302,18 @@ tests:
       ASSISTED_CONFIG: |
         TEST_FUNC=test_deploy_day2_nodes_cloud
     workflow: assisted-baremetal
+- as: e2e-metal-assisted-day2-single-node
+  optional: true
+  run_if_changed: ^(.*/day2/.*|.*/cluster/.*)$
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.11
+        NUM_MASTERS=1
+        NUM_WORKERS=0
+        TEST_FUNC=test_deploy_day2_nodes_cloud
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-day2-periodic
   cron: '@daily'
   steps:
@@ -407,7 +431,7 @@ tests:
         ISO_IMAGE_TYPE=minimal-iso
         STATIC_IPS=true
         TEST_FUNC=test_kubeapi
-        MAKEFILE_TARGET="create_full_environment run test_kube_api_parallel"
+        MAKEFILE_TARGET="setup run test_kube_api_parallel"
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-ha-kube-api
   optional: true
@@ -419,7 +443,7 @@ tests:
         ENABLE_KUBE_API=true
         ISO_IMAGE_TYPE=minimal-iso
         TEST_FUNC=test_kubeapi
-        MAKEFILE_TARGET="create_full_environment run test_kube_api_parallel"
+        MAKEFILE_TARGET="setup run test_kube_api_parallel"
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-ha-kube-api-ipv4
@@ -433,7 +457,7 @@ tests:
         IPv4=true
         ISO_IMAGE_TYPE=minimal-iso
         TEST_FUNC=test_kubeapi
-        MAKEFILE_TARGET="create_full_environment run test_kube_api_parallel"
+        MAKEFILE_TARGET="setup run test_kube_api_parallel"
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-ha-kube-api-ipv6
   optional: true
@@ -446,7 +470,7 @@ tests:
         IPv6=true
         ISO_IMAGE_TYPE=minimal-iso
         TEST_FUNC=test_kubeapi
-        MAKEFILE_TARGET="create_full_environment run test_kube_api_parallel"
+        MAKEFILE_TARGET="setup run test_kube_api_parallel"
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-capi
   optional: true
@@ -461,25 +485,8 @@ tests:
         MINIKUBE_DISK_SIZE=70g
         MINIKUBE_RAM_MB=10240
         TEST_FUNC=test_capi_provider
-        MAKEFILE_TARGET="create_full_environment run deploy_capi_env test_kube_api_parallel"
+        MAKEFILE_TARGET="setup run deploy_capi_env test_kube_api_parallel"
       GATHER_CAPI_LOGS: "true"
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-capi-periodic
-  cron: '@daily'
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      HYPERSHIFT_IMAGE: hypershift-operator
-    env:
-      ASSISTED_CONFIG: |
-        KUBE_API=yes
-        ENABLE_KUBE_API=true
-        MINIKUBE_DISK_SIZE=70g
-        MINIKUBE_RAM_MB=10240
-        TEST_FUNC=test_capi_provider
-        MAKEFILE_TARGET="create_full_environment run deploy_capi_env test_kube_api_parallel"
-      GATHER_CAPI_LOGS: "true"
-      TEST_SUITE: full
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-kube-api-net-suite-periodic
   cron: '@daily'
@@ -493,7 +500,7 @@ tests:
         ISO_IMAGE_TYPE=minimal-iso
         STATIC_IPS=true
         TEST_FUNC=test_kubeapi
-        MAKEFILE_TARGET="create_full_environment run test_kube_api_parallel"
+        MAKEFILE_TARGET="setup run test_kube_api_parallel"
       TEST_SUITE: full
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-static-ip-suite
