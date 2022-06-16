@@ -239,6 +239,9 @@ dir=/tmp/installer
 mkdir "${dir}/"
 cp "${SHARED_DIR}/install-config.yaml" "${dir}/"
 
+curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
+/tmp/yq w -i "${SHARED_DIR}/install-config.yaml" 'networking.networkType' OVNKubernetes
+
 # move private key to ~/.ssh/ so that installer can use it to gather logs on
 # bootstrap failure
 mkdir -p ~/.ssh
