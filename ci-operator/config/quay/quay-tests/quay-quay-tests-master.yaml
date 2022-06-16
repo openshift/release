@@ -8,6 +8,21 @@ build_root:
     name: release
     namespace: openshift
     tag: golang-1.13
+images:
+- dockerfile_literal: |
+    FROM src
+    RUN curl --silent --location https://rpm.nodesource.com/setup_lts.x | bash - && \
+        curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo | tee /etc/yum.repos.d/yarn.repo && \
+        PACKAGES="openssh-clients httpd-tools nodejs yarn xorg-x11-server-Xvfb gtk2-devel gtk3-devel libnotify-devel GConf2 nss libXScrnSaver alsa-lib skopeo" && \
+        yum install --setopt=tsflags=nodocs -y $PACKAGES && \
+        yum clean all && rm -rf /var/cache/yum/*
+  from: src
+  to: quay-test-console
+promotion:
+ excluded_images:
+ - quay-test-console
+ namespace: ci
+ tag: "latest"
 releases:
   latest:
     candidate:
@@ -35,13 +50,7 @@ tests:
     pre:
     - chain: ipi-aws-pre
     - ref: quay-tests-deploy-quay-odf
-    test:
-    - as: quay-e2e-tests
-      commands: ls;echo "onboarding quay-tests repo"
-      from: src
-      resources:
-        requests:
-          cpu: 200m
+    - ref: quay-tests-test-quay-e2e
     workflow: ipi-aws
 zz_generated_metadata:
   branch: master
