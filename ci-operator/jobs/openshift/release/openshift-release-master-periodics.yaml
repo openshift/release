@@ -1150,7 +1150,7 @@ periodics:
   - base_ref: master
     org: openshift
     repo: release
-  interval: 48h
+  interval: 24h
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-2
@@ -1159,7 +1159,18 @@ periodics:
     ci.openshift.io/no-builds: "true"
     job-release: "4.10"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-master-ci-4.10-e2e-aws-upgrade-rollback
+  name: periodic-ci-openshift-release-master-ci-4.10-e2e-aws-upgrade-ovn-single-node
+  reporter_config:
+    slack:
+      channel: '#single-node-ci'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
+        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs> | <https://amd64.ocp.releases.ci.openshift.org/releasestream/4.10.0-0.nightly/release/{{index
+        .Annotations "release.openshift.io/tag"}}|Release status>'
   spec:
     containers:
     - args:
@@ -1168,8 +1179,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-aws-upgrade-rollback-cluster-profile
-      - --target=e2e-aws-upgrade-rollback
+      - --secret-dir=/usr/local/e2e-aws-upgrade-ovn-single-node-cluster-profile
+      - --target=e2e-aws-upgrade-ovn-single-node
       - --variant=ci-4.10
       command:
       - ci-operator
@@ -1186,7 +1197,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-aws-upgrade-rollback-cluster-profile
+      - mountPath: /usr/local/e2e-aws-upgrade-ovn-single-node-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -1226,7 +1237,7 @@ periodics:
   - base_ref: master
     org: openshift
     repo: release
-  interval: 24h
+  interval: 48h
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-2
@@ -1235,18 +1246,7 @@ periodics:
     ci.openshift.io/no-builds: "true"
     job-release: "4.10"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-master-ci-4.10-e2e-aws-upgrade-single-node
-  reporter_config:
-    slack:
-      channel: '#single-node-ci'
-      job_states_to_report:
-      - success
-      - failure
-      - error
-      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
-        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs> | <https://amd64.ocp.releases.ci.openshift.org/releasestream/4.10.0-0.nightly/release/{{index
-        .Annotations "release.openshift.io/tag"}}|Release status>'
+  name: periodic-ci-openshift-release-master-ci-4.10-e2e-aws-upgrade-rollback
   spec:
     containers:
     - args:
@@ -1255,8 +1255,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-aws-upgrade-single-node-cluster-profile
-      - --target=e2e-aws-upgrade-single-node
+      - --secret-dir=/usr/local/e2e-aws-upgrade-rollback-cluster-profile
+      - --target=e2e-aws-upgrade-rollback
       - --variant=ci-4.10
       command:
       - ci-operator
@@ -1273,7 +1273,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-aws-upgrade-single-node-cluster-profile
+      - mountPath: /usr/local/e2e-aws-upgrade-rollback-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -1930,7 +1930,7 @@ periodics:
     ci.openshift.io/no-builds: "true"
     job-release: "4.10"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-master-ci-4.10-e2e-azure-upgrade-single-node
+  name: periodic-ci-openshift-release-master-ci-4.10-e2e-azure-upgrade-ovn-single-node
   reporter_config:
     slack:
       channel: '#single-node-ci'
@@ -1950,8 +1950,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-azure-upgrade-single-node-cluster-profile
-      - --target=e2e-azure-upgrade-single-node
+      - --secret-dir=/usr/local/e2e-azure-upgrade-ovn-single-node-cluster-profile
+      - --target=e2e-azure-upgrade-ovn-single-node
       - --variant=ci-4.10
       command:
       - ci-operator
@@ -1968,7 +1968,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-azure-upgrade-single-node-cluster-profile
+      - mountPath: /usr/local/e2e-azure-upgrade-ovn-single-node-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -4870,7 +4870,7 @@ periodics:
   - base_ref: master
     org: openshift
     repo: release
-  interval: 48h
+  interval: 24h
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-2
@@ -4879,7 +4879,18 @@ periodics:
     ci.openshift.io/no-builds: "true"
     job-release: "4.11"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-master-ci-4.11-e2e-aws-upgrade-rollback
+  name: periodic-ci-openshift-release-master-ci-4.11-e2e-aws-upgrade-ovn-single-node
+  reporter_config:
+    slack:
+      channel: '#single-node-ci'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
+        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs> | <https://amd64.ocp.releases.ci.openshift.org/releasestream/4.11.0-0.nightly/release/{{index
+        .Annotations "release.openshift.io/tag"}}|Release status>'
   spec:
     containers:
     - args:
@@ -4888,8 +4899,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-aws-upgrade-rollback-cluster-profile
-      - --target=e2e-aws-upgrade-rollback
+      - --secret-dir=/usr/local/e2e-aws-upgrade-ovn-single-node-cluster-profile
+      - --target=e2e-aws-upgrade-ovn-single-node
       - --variant=ci-4.11
       command:
       - ci-operator
@@ -4906,7 +4917,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-aws-upgrade-rollback-cluster-profile
+      - mountPath: /usr/local/e2e-aws-upgrade-ovn-single-node-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -4946,7 +4957,7 @@ periodics:
   - base_ref: master
     org: openshift
     repo: release
-  interval: 24h
+  interval: 48h
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-2
@@ -4955,18 +4966,7 @@ periodics:
     ci.openshift.io/no-builds: "true"
     job-release: "4.11"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-master-ci-4.11-e2e-aws-upgrade-single-node
-  reporter_config:
-    slack:
-      channel: '#single-node-ci'
-      job_states_to_report:
-      - success
-      - failure
-      - error
-      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
-        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs> | <https://amd64.ocp.releases.ci.openshift.org/releasestream/4.11.0-0.nightly/release/{{index
-        .Annotations "release.openshift.io/tag"}}|Release status>'
+  name: periodic-ci-openshift-release-master-ci-4.11-e2e-aws-upgrade-rollback
   spec:
     containers:
     - args:
@@ -4975,8 +4975,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-aws-upgrade-single-node-cluster-profile
-      - --target=e2e-aws-upgrade-single-node
+      - --secret-dir=/usr/local/e2e-aws-upgrade-rollback-cluster-profile
+      - --target=e2e-aws-upgrade-rollback
       - --variant=ci-4.11
       command:
       - ci-operator
@@ -4993,7 +4993,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-aws-upgrade-single-node-cluster-profile
+      - mountPath: /usr/local/e2e-aws-upgrade-rollback-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -5650,7 +5650,7 @@ periodics:
     ci.openshift.io/no-builds: "true"
     job-release: "4.11"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-master-ci-4.11-e2e-azure-upgrade-single-node
+  name: periodic-ci-openshift-release-master-ci-4.11-e2e-azure-upgrade-ovn-single-node
   reporter_config:
     slack:
       channel: '#single-node-ci'
@@ -5670,8 +5670,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-azure-upgrade-single-node-cluster-profile
-      - --target=e2e-azure-upgrade-single-node
+      - --secret-dir=/usr/local/e2e-azure-upgrade-ovn-single-node-cluster-profile
+      - --target=e2e-azure-upgrade-ovn-single-node
       - --variant=ci-4.11
       command:
       - ci-operator
@@ -5688,7 +5688,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-azure-upgrade-single-node-cluster-profile
+      - mountPath: /usr/local/e2e-azure-upgrade-ovn-single-node-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -8753,7 +8753,7 @@ periodics:
     ci.openshift.io/no-builds: "true"
     job-release: "4.12"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-master-ci-4.12-e2e-aws-upgrade-rollback
+  name: periodic-ci-openshift-release-master-ci-4.12-e2e-aws-upgrade-ovn-single-node
   spec:
     containers:
     - args:
@@ -8762,8 +8762,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-aws-upgrade-rollback-cluster-profile
-      - --target=e2e-aws-upgrade-rollback
+      - --secret-dir=/usr/local/e2e-aws-upgrade-ovn-single-node-cluster-profile
+      - --target=e2e-aws-upgrade-ovn-single-node
       - --variant=ci-4.12
       command:
       - ci-operator
@@ -8780,7 +8780,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-aws-upgrade-rollback-cluster-profile
+      - mountPath: /usr/local/e2e-aws-upgrade-ovn-single-node-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -8829,7 +8829,7 @@ periodics:
     ci.openshift.io/no-builds: "true"
     job-release: "4.12"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-master-ci-4.12-e2e-aws-upgrade-single-node
+  name: periodic-ci-openshift-release-master-ci-4.12-e2e-aws-upgrade-rollback
   spec:
     containers:
     - args:
@@ -8838,8 +8838,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-aws-upgrade-single-node-cluster-profile
-      - --target=e2e-aws-upgrade-single-node
+      - --secret-dir=/usr/local/e2e-aws-upgrade-rollback-cluster-profile
+      - --target=e2e-aws-upgrade-rollback
       - --variant=ci-4.12
       command:
       - ci-operator
@@ -8856,7 +8856,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-aws-upgrade-single-node-cluster-profile
+      - mountPath: /usr/local/e2e-aws-upgrade-rollback-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -9513,7 +9513,7 @@ periodics:
     ci.openshift.io/no-builds: "true"
     job-release: "4.12"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-master-ci-4.12-e2e-azure-upgrade-single-node
+  name: periodic-ci-openshift-release-master-ci-4.12-e2e-azure-upgrade-ovn-single-node
   spec:
     containers:
     - args:
@@ -9522,8 +9522,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-azure-upgrade-single-node-cluster-profile
-      - --target=e2e-azure-upgrade-single-node
+      - --secret-dir=/usr/local/e2e-azure-upgrade-ovn-single-node-cluster-profile
+      - --target=e2e-azure-upgrade-ovn-single-node
       - --variant=ci-4.12
       command:
       - ci-operator
@@ -9540,7 +9540,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-azure-upgrade-single-node-cluster-profile
+      - mountPath: /usr/local/e2e-azure-upgrade-ovn-single-node-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -17234,7 +17234,7 @@ periodics:
   - base_ref: master
     org: openshift
     repo: release
-  interval: 48h
+  interval: 24h
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-2
@@ -17243,7 +17243,7 @@ periodics:
     ci.openshift.io/no-builds: "true"
     job-release: "4.8"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-master-ci-4.8-e2e-aws-upgrade-rollback
+  name: periodic-ci-openshift-release-master-ci-4.8-e2e-aws-upgrade-ovn-single-node
   spec:
     containers:
     - args:
@@ -17252,8 +17252,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-aws-upgrade-rollback-cluster-profile
-      - --target=e2e-aws-upgrade-rollback
+      - --secret-dir=/usr/local/e2e-aws-upgrade-ovn-single-node-cluster-profile
+      - --target=e2e-aws-upgrade-ovn-single-node
       - --variant=ci-4.8
       command:
       - ci-operator
@@ -17270,7 +17270,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-aws-upgrade-rollback-cluster-profile
+      - mountPath: /usr/local/e2e-aws-upgrade-ovn-single-node-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -17310,7 +17310,7 @@ periodics:
   - base_ref: master
     org: openshift
     repo: release
-  interval: 24h
+  interval: 48h
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-2
@@ -17319,7 +17319,7 @@ periodics:
     ci.openshift.io/no-builds: "true"
     job-release: "4.8"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-master-ci-4.8-e2e-aws-upgrade-single-node
+  name: periodic-ci-openshift-release-master-ci-4.8-e2e-aws-upgrade-rollback
   spec:
     containers:
     - args:
@@ -17328,8 +17328,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-aws-upgrade-single-node-cluster-profile
-      - --target=e2e-aws-upgrade-single-node
+      - --secret-dir=/usr/local/e2e-aws-upgrade-rollback-cluster-profile
+      - --target=e2e-aws-upgrade-rollback
       - --variant=ci-4.8
       command:
       - ci-operator
@@ -17346,7 +17346,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-aws-upgrade-single-node-cluster-profile
+      - mountPath: /usr/local/e2e-aws-upgrade-rollback-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -17775,7 +17775,7 @@ periodics:
     ci.openshift.io/no-builds: "true"
     job-release: "4.8"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-master-ci-4.8-e2e-azure-upgrade-single-node
+  name: periodic-ci-openshift-release-master-ci-4.8-e2e-azure-upgrade-ovn-single-node
   spec:
     containers:
     - args:
@@ -17784,8 +17784,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-azure-upgrade-single-node-cluster-profile
-      - --target=e2e-azure-upgrade-single-node
+      - --secret-dir=/usr/local/e2e-azure-upgrade-ovn-single-node-cluster-profile
+      - --target=e2e-azure-upgrade-ovn-single-node
       - --variant=ci-4.8
       command:
       - ci-operator
@@ -17802,7 +17802,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-azure-upgrade-single-node-cluster-profile
+      - mountPath: /usr/local/e2e-azure-upgrade-ovn-single-node-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -19927,7 +19927,7 @@ periodics:
   - base_ref: master
     org: openshift
     repo: release
-  interval: 48h
+  interval: 24h
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-2
@@ -19936,7 +19936,17 @@ periodics:
     ci.openshift.io/no-builds: "true"
     job-release: "4.9"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-master-ci-4.9-e2e-aws-upgrade-rollback
+  name: periodic-ci-openshift-release-master-ci-4.9-e2e-aws-upgrade-ovn-single-node
+  reporter_config:
+    slack:
+      channel: '#single-node-ci'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
+        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs>'
   spec:
     containers:
     - args:
@@ -19945,8 +19955,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-aws-upgrade-rollback-cluster-profile
-      - --target=e2e-aws-upgrade-rollback
+      - --secret-dir=/usr/local/e2e-aws-upgrade-ovn-single-node-cluster-profile
+      - --target=e2e-aws-upgrade-ovn-single-node
       - --variant=ci-4.9
       command:
       - ci-operator
@@ -19963,7 +19973,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-aws-upgrade-rollback-cluster-profile
+      - mountPath: /usr/local/e2e-aws-upgrade-ovn-single-node-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -20003,7 +20013,7 @@ periodics:
   - base_ref: master
     org: openshift
     repo: release
-  interval: 24h
+  interval: 48h
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-2
@@ -20012,17 +20022,7 @@ periodics:
     ci.openshift.io/no-builds: "true"
     job-release: "4.9"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-master-ci-4.9-e2e-aws-upgrade-single-node
-  reporter_config:
-    slack:
-      channel: '#single-node-ci'
-      job_states_to_report:
-      - success
-      - failure
-      - error
-      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
-        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs>'
+  name: periodic-ci-openshift-release-master-ci-4.9-e2e-aws-upgrade-rollback
   spec:
     containers:
     - args:
@@ -20031,8 +20031,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-aws-upgrade-single-node-cluster-profile
-      - --target=e2e-aws-upgrade-single-node
+      - --secret-dir=/usr/local/e2e-aws-upgrade-rollback-cluster-profile
+      - --target=e2e-aws-upgrade-rollback
       - --variant=ci-4.9
       command:
       - ci-operator
@@ -20049,7 +20049,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-aws-upgrade-single-node-cluster-profile
+      - mountPath: /usr/local/e2e-aws-upgrade-rollback-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -20630,7 +20630,7 @@ periodics:
     ci.openshift.io/no-builds: "true"
     job-release: "4.9"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-master-ci-4.9-e2e-azure-upgrade-single-node
+  name: periodic-ci-openshift-release-master-ci-4.9-e2e-azure-upgrade-ovn-single-node
   reporter_config:
     slack:
       channel: '#single-node-ci'
@@ -20649,8 +20649,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-azure-upgrade-single-node-cluster-profile
-      - --target=e2e-azure-upgrade-single-node
+      - --secret-dir=/usr/local/e2e-azure-upgrade-ovn-single-node-cluster-profile
+      - --target=e2e-azure-upgrade-ovn-single-node
       - --variant=ci-4.9
       command:
       - ci-operator
@@ -20667,7 +20667,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-azure-upgrade-single-node-cluster-profile
+      - mountPath: /usr/local/e2e-azure-upgrade-ovn-single-node-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -27641,7 +27641,7 @@ periodics:
     ci.openshift.io/no-builds: "true"
     job-release: "4.10"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-master-nightly-4.10-upgrade-from-stable-4.9-e2e-aws-upgrade-single-node
+  name: periodic-ci-openshift-release-master-nightly-4.10-upgrade-from-stable-4.9-e2e-aws-upgrade-ovn-single-node
   spec:
     containers:
     - args:
@@ -27650,8 +27650,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-aws-upgrade-single-node-cluster-profile
-      - --target=e2e-aws-upgrade-single-node
+      - --secret-dir=/usr/local/e2e-aws-upgrade-ovn-single-node-cluster-profile
+      - --target=e2e-aws-upgrade-ovn-single-node
       - --variant=nightly-4.10-upgrade-from-stable-4.9
       command:
       - ci-operator
@@ -27668,7 +27668,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-aws-upgrade-single-node-cluster-profile
+      - mountPath: /usr/local/e2e-aws-upgrade-ovn-single-node-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -27717,7 +27717,7 @@ periodics:
     ci.openshift.io/no-builds: "true"
     job-release: "4.10"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-master-nightly-4.10-upgrade-from-stable-4.9-e2e-azure-upgrade-single-node
+  name: periodic-ci-openshift-release-master-nightly-4.10-upgrade-from-stable-4.9-e2e-azure-upgrade-ovn-single-node
   spec:
     containers:
     - args:
@@ -27726,8 +27726,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-azure-upgrade-single-node-cluster-profile
-      - --target=e2e-azure-upgrade-single-node
+      - --secret-dir=/usr/local/e2e-azure-upgrade-ovn-single-node-cluster-profile
+      - --target=e2e-azure-upgrade-ovn-single-node
       - --variant=nightly-4.10-upgrade-from-stable-4.9
       command:
       - ci-operator
@@ -27744,7 +27744,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-azure-upgrade-single-node-cluster-profile
+      - mountPath: /usr/local/e2e-azure-upgrade-ovn-single-node-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -33292,7 +33292,7 @@ periodics:
     ci.openshift.io/no-builds: "true"
     job-release: "4.11"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-master-nightly-4.11-upgrade-from-stable-4.10-e2e-aws-upgrade-single-node
+  name: periodic-ci-openshift-release-master-nightly-4.11-upgrade-from-stable-4.10-e2e-aws-upgrade-ovn-single-node
   spec:
     containers:
     - args:
@@ -33301,8 +33301,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-aws-upgrade-single-node-cluster-profile
-      - --target=e2e-aws-upgrade-single-node
+      - --secret-dir=/usr/local/e2e-aws-upgrade-ovn-single-node-cluster-profile
+      - --target=e2e-aws-upgrade-ovn-single-node
       - --variant=nightly-4.11-upgrade-from-stable-4.10
       command:
       - ci-operator
@@ -33319,7 +33319,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-aws-upgrade-single-node-cluster-profile
+      - mountPath: /usr/local/e2e-aws-upgrade-ovn-single-node-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -33368,7 +33368,7 @@ periodics:
     ci.openshift.io/no-builds: "true"
     job-release: "4.11"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-master-nightly-4.11-upgrade-from-stable-4.10-e2e-azure-upgrade-single-node
+  name: periodic-ci-openshift-release-master-nightly-4.11-upgrade-from-stable-4.10-e2e-azure-upgrade-ovn-single-node
   spec:
     containers:
     - args:
@@ -33377,8 +33377,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-azure-upgrade-single-node-cluster-profile
-      - --target=e2e-azure-upgrade-single-node
+      - --secret-dir=/usr/local/e2e-azure-upgrade-ovn-single-node-cluster-profile
+      - --target=e2e-azure-upgrade-ovn-single-node
       - --variant=nightly-4.11-upgrade-from-stable-4.10
       command:
       - ci-operator
@@ -33395,7 +33395,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-azure-upgrade-single-node-cluster-profile
+      - mountPath: /usr/local/e2e-azure-upgrade-ovn-single-node-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -38716,7 +38716,7 @@ periodics:
     ci.openshift.io/no-builds: "true"
     job-release: "4.12"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-master-nightly-4.12-upgrade-from-stable-4.11-e2e-aws-upgrade-single-node
+  name: periodic-ci-openshift-release-master-nightly-4.12-upgrade-from-stable-4.11-e2e-aws-upgrade-ovn-single-node
   spec:
     containers:
     - args:
@@ -38725,8 +38725,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-aws-upgrade-single-node-cluster-profile
-      - --target=e2e-aws-upgrade-single-node
+      - --secret-dir=/usr/local/e2e-aws-upgrade-ovn-single-node-cluster-profile
+      - --target=e2e-aws-upgrade-ovn-single-node
       - --variant=nightly-4.12-upgrade-from-stable-4.11
       command:
       - ci-operator
@@ -38743,7 +38743,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-aws-upgrade-single-node-cluster-profile
+      - mountPath: /usr/local/e2e-aws-upgrade-ovn-single-node-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -38792,7 +38792,7 @@ periodics:
     ci.openshift.io/no-builds: "true"
     job-release: "4.12"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-master-nightly-4.12-upgrade-from-stable-4.11-e2e-azure-upgrade-single-node
+  name: periodic-ci-openshift-release-master-nightly-4.12-upgrade-from-stable-4.11-e2e-azure-upgrade-ovn-single-node
   spec:
     containers:
     - args:
@@ -38801,8 +38801,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-azure-upgrade-single-node-cluster-profile
-      - --target=e2e-azure-upgrade-single-node
+      - --secret-dir=/usr/local/e2e-azure-upgrade-ovn-single-node-cluster-profile
+      - --target=e2e-azure-upgrade-ovn-single-node
       - --variant=nightly-4.12-upgrade-from-stable-4.11
       command:
       - ci-operator
@@ -38819,7 +38819,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-azure-upgrade-single-node-cluster-profile
+      - mountPath: /usr/local/e2e-azure-upgrade-ovn-single-node-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -55774,7 +55774,7 @@ periodics:
     ci.openshift.io/no-builds: "true"
     job-release: "4.9"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-master-nightly-4.9-upgrade-from-stable-4.8-e2e-aws-upgrade-single-node
+  name: periodic-ci-openshift-release-master-nightly-4.9-upgrade-from-stable-4.8-e2e-aws-upgrade-ovn-single-node
   spec:
     containers:
     - args:
@@ -55783,8 +55783,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-aws-upgrade-single-node-cluster-profile
-      - --target=e2e-aws-upgrade-single-node
+      - --secret-dir=/usr/local/e2e-aws-upgrade-ovn-single-node-cluster-profile
+      - --target=e2e-aws-upgrade-ovn-single-node
       - --variant=nightly-4.9-upgrade-from-stable-4.8
       command:
       - ci-operator
@@ -55801,7 +55801,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-aws-upgrade-single-node-cluster-profile
+      - mountPath: /usr/local/e2e-aws-upgrade-ovn-single-node-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -55850,7 +55850,7 @@ periodics:
     ci.openshift.io/no-builds: "true"
     job-release: "4.9"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-master-nightly-4.9-upgrade-from-stable-4.8-e2e-azure-upgrade-single-node
+  name: periodic-ci-openshift-release-master-nightly-4.9-upgrade-from-stable-4.8-e2e-azure-upgrade-ovn-single-node
   spec:
     containers:
     - args:
@@ -55859,8 +55859,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-azure-upgrade-single-node-cluster-profile
-      - --target=e2e-azure-upgrade-single-node
+      - --secret-dir=/usr/local/e2e-azure-upgrade-ovn-single-node-cluster-profile
+      - --target=e2e-azure-upgrade-ovn-single-node
       - --variant=nightly-4.9-upgrade-from-stable-4.8
       command:
       - ci-operator
@@ -55877,7 +55877,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-azure-upgrade-single-node-cluster-profile
+      - mountPath: /usr/local/e2e-azure-upgrade-ovn-single-node-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
