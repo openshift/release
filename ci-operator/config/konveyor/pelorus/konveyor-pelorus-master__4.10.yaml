@@ -1,0 +1,109 @@
+base_images:
+  cli:
+    name: "4.10"
+    namespace: ocp
+    tag: cli
+  ubi_minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+binary_build_commands: make dev-env
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi8
+      USER root
+      RUN yum install -y python39 make diffutils openssl git curl && \
+          yum clean all && rm -rf /var/cache/dnf/*
+      ENV XDG_DATA_HOME=/.local
+      WORKDIR pelorus
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.10"
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+tests:
+- as: unit
+  steps:
+    test:
+    - as: unit
+      commands: |
+        make lint
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: e2e-openshift
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      FIPS_ENABLED: "false"
+    test:
+    - as: e2e
+      commands: |
+        set -x
+        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        make dev-env
+        make e2e-tests
+      credentials:
+      - mount_path: /var/run/konveyor/pelorus/github
+        name: github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: openshift-e2e-aws
+- as: e2e-openshift-test-scenario-1-periodic
+  cron: 0 3 * * *
+  steps:
+    cluster_profile: aws
+    env:
+      FIPS_ENABLED: "false"
+    test:
+    - as: e2e-openshift-scenario-1-periodic
+      commands: |
+        set -x
+        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        make dev-env
+        make e2e-tests-scenario-1
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: openshift-e2e-aws
+- as: e2e-openshift-test-scenario-2-periodic
+  cron: 0 4 * * *
+  steps:
+    cluster_profile: aws
+    env:
+      FIPS_ENABLED: "false"
+    test:
+    - as: e2e-openshift-scenario-2-periodic
+      commands: |
+        set -x
+        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        make dev-env
+        make e2e-tests-scenario-2
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: openshift-e2e-aws
+zz_generated_metadata:
+  branch: master
+  org: konveyor
+  repo: pelorus
+  variant: "4.10"

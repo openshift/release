@@ -43,7 +43,7 @@ if [[ ! -f "${bastion_ignition_file}" ]]; then
 fi
 
 if [ -z "${RESOURCE_GROUP}" ]; then
-  rg_file="${SHARED_DIR}/resouregroup"
+  rg_file="${SHARED_DIR}/resourcegroup"
   if [ -f "${rg_file}" ]; then
     bastion_rg=$(cat "${rg_file}")
   else
@@ -162,7 +162,8 @@ if [[ "${REGISTER_MIRROR_REGISTRY_DNS}" == "yes" ]]; then
     echo "Adding public DNS record for mirror registry"
     cmd="az network dns record-set a add-record -g ${BASE_RESOURCE_GROUP} -z ${BASE_DOMAIN} -n ${mirror_registry_host} -a ${bastion_public_ip}"
     run_command "${cmd}" &&
-    echo "az network dns record-set a remove-record -g ${BASE_RESOURCE_GROUP} -z ${BASE_DOMAIN} -n ${mirror_registry_host} -a ${bastion_public_ip}" >>"${SHARED_DIR}/remove_resources_by_cli.sh"
+    echo "az network dns record-set a remove-record -g ${BASE_RESOURCE_GROUP} -z ${BASE_DOMAIN} -n ${mirror_registry_host} -a ${bastion_public_ip} || :" >>"${SHARED_DIR}/remove_resources_by_cli.sh"
+    
     wait_public_dns "${mirror_registry_dns}" || exit 2
 
     # save mirror registry dns info
@@ -184,3 +185,6 @@ echo "${proxy_private_url}" > "${SHARED_DIR}/proxy_private_url"
 
 # echo proxy IP to ${SHARED_DIR}/proxyip
 echo "${bastion_public_ip}" > "${SHARED_DIR}/proxyip"
+
+echo "Sleeping 5 mins, make sure that the bastion host is fully started."
+sleep 300

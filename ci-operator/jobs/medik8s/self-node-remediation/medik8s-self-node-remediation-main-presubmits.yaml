@@ -6,23 +6,23 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/ci-index
+    context: ci/prow/ci-index-self-node-remediation-bundle
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.10"
+      job-release: "4.11"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-medik8s-self-node-remediation-main-ci-index
-    rerun_command: /test ci-index
+    name: pull-ci-medik8s-self-node-remediation-main-ci-index-self-node-remediation-bundle
+    rerun_command: /test ci-index-self-node-remediation-bundle
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=ci-index
+        - --target=ci-index-self-node-remediation-bundle
         command:
         - ci-operator
         image: ci-operator:latest
@@ -49,7 +49,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ci-index,?($|\s.*)
+    trigger: (?m)^/test( | .* )ci-index-self-node-remediation-bundle,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -64,7 +64,7 @@ presubmits:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
-      job-release: "4.10"
+      job-release: "4.11"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-medik8s-self-node-remediation-main-e2e-test
     rerun_command: /test e2e-test
@@ -137,7 +137,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.10"
+      job-release: "4.11"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-medik8s-self-node-remediation-main-images
     rerun_command: /test images
@@ -148,6 +148,8 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
+        - --target=ci-index-self-node-remediation-bundle
+        - --target=self-node-remediation-bundle
         command:
         - ci-operator
         image: ci-operator:latest
@@ -187,7 +189,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.10"
+      job-release: "4.11"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-medik8s-self-node-remediation-main-test
     rerun_command: /test test

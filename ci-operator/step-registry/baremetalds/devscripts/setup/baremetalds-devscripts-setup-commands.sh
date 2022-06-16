@@ -14,7 +14,10 @@ source "${SHARED_DIR}/packet-conf.sh"
 finished()
 {
   #Save exit code for must-gather to generate junit
-  echo "$?" > "${SHARED_DIR}/install-status.txt"
+  retval=$?
+  echo "Installer exited with $retval"
+  echo "$retval" > "${SHARED_DIR}/install-status.txt"
+
   set +e
 
   echo "Fetching kubeconfig, other credentials..."
@@ -117,7 +120,7 @@ fi
 
 echo 'export KUBECONFIG=/root/dev-scripts/ocp/ostest/auth/kubeconfig' >> /root/.bashrc
 
-timeout -s 9 105m make
+timeout -s 9 105m make ${DEVSCRIPTS_TARGET}
 EOF
 
 # Copy dev-scripts variables to be shared with the test step

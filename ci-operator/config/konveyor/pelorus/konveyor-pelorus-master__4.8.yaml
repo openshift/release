@@ -31,10 +31,16 @@ resources:
       memory: 1Gi
 tests:
 - as: unit
-  commands: |
-    make lint
-  container:
-    from: src
+  steps:
+    test:
+    - as: unit
+      commands: |
+        make lint
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: e2e-openshift
   optional: true
   steps:
@@ -44,21 +50,9 @@ tests:
     test:
     - as: e2e
       commands: |
-        # TODO: optimize this
         set -x
         make dev-env
-        source .venv/bin/activate
-        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
-        oc create namespace pelorus
-        timeout 30s bash -c 'until oc get project | grep pelorus; do sleep 10; done'
-        helm install operators charts/operators --namespace pelorus --debug
-        # check operators
-        timeout 5m bash -c 'until oc get svc grafana-operator-controller-manager-metrics-service --namespace pelorus; do sleep 10; done'
-        helm install pelorus charts/pelorus --namespace pelorus --debug
-        # check final deployment
-        timeout 10m bash -c 'until oc get svc grafana-service --namespace pelorus; do sleep 10; done'
-        timeout 10m bash -c 'until oc get svc prometheus-operated --namespace pelorus; do sleep 10; done'
-        timeout 10m bash -c 'until oc get svc prometheus-pelorus --namespace pelorus; do sleep 10; done'
+        make e2e-tests
       from: src
       resources:
         requests:

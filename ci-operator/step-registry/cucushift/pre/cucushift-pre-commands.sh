@@ -20,7 +20,7 @@ fi
 users=""
 htpass_file=/tmp/users.htpasswd
 
-for i in $(seq 1 30);
+for i in $(seq 1 50);
 do
     username="testuser-${i}"
     password=$(< /dev/urandom tr -dc 'a-z0-9' | fold -w 12 | head -n 1 || true)

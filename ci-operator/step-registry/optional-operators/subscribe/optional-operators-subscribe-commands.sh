@@ -246,7 +246,7 @@ oc get -n "$OO_INSTALL_NAMESPACE" operatorgroup "$OPERATORGROUP" -o yaml >"$OG_A
 
 CS_ART="$ARTIFACT_DIR/cs-$CATSRC.yaml"
 echo "Dumping CatalogSource $CATSRC as $CS_ART"
-oc get -n "$OO_INSTALL_NAMESPACE" catalogsource "$CATSRC" -o yaml >"$CS_ART"
+oc get -n "$CS_NAMESPACE" catalogsource "$CATSRC" -o yaml >"$CS_ART"
 for field in message reason; do
     VALUE="$(oc get -n "$OO_INSTALL_NAMESPACE" catalogsource "$CATSRC" -o jsonpath="{.status.$field}" || true)"
     if [[ -n "$VALUE" ]]; then

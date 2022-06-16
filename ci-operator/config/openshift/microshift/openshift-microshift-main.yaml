@@ -1,0 +1,190 @@
+base_images:
+  cli:
+    name: "4.8"
+    namespace: ocp
+    tag: cli
+  libvirt-installer:
+    name: "4.10"
+    namespace: ocp
+    tag: libvirt-installer
+  test-bin:
+    name: "4.8"
+    namespace: ocp
+    tag: tests
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.17-openshift-4.10
+images:
+- dockerfile_path: packaging/images/microshift/Dockerfile
+  to: linux-amd64-4.8.0-0.microshift
+- dockerfile_literal: |
+    FROM libvirt-installer
+    USER root
+    ADD validate-microshift /tmp/
+    COPY microshift-containerized.service /tmp/microshift-containerized.service
+    RUN bash -c 'sed -i "s/autoupdate=registry/autoupdate=local/g" /tmp/microshift-containerized.service'
+    COPY microshift.conf /tmp/microshift.conf
+    COPY oc /usr/bin/oc
+    COPY openshift-tests /usr/bin/openshift-tests
+  from: libvirt-installer
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+    src:
+      paths:
+      - destination_dir: validate-microshift
+        source_path: /go/src/github.com/openshift/microshift/validate-microshift/
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/microshift/packaging/systemd/microshift-containerized.service
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/microshift/packaging/crio.conf.d/microshift.conf
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/openshift-tests
+  to: microshift-test-binaries
+- dockerfile_literal: |
+    FROM src as builder
+    RUN dnf update -y && \
+        dnf install --setopt=tsflags=nodocs -y \
+        rpm-build glibc-static gcc selinux-policy-devel util-linux && \
+        dnf clean all && \
+        rm -rf /var/cache/dnf/*
+    WORKDIR /go/src/github.com/openshift/microshift
+    RUN make rpm
+    FROM libvirt-installer
+    WORKDIR /opt/microshift-rpms
+    USER root
+    RUN mkdir bin selinux
+    COPY --from=builder /go/src/github.com/openshift/microshift/packaging/rpm/_rpmbuild/RPMS/x86_64/microshift-* bin/
+    COPY --from=builder /go/src/github.com/openshift/microshift/packaging/rpm/_rpmbuild/RPMS/noarch/microshift-selinux-* selinux/
+    COPY microshift.conf /tmp/microshift.conf
+    COPY openshift-tests /usr/bin/openshift-tests
+    COPY oc /usr/bin/oc
+  from: libvirt-installer
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+    libvirt-installer:
+      as:
+      - libvirt-installer
+    src:
+      as:
+      - src
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/microshift/packaging/crio.conf.d/microshift.conf
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/openshift-tests
+  to: microshift-test-rpm
+promotion:
+  name: microshift
+  namespace: microshift
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.8"
+  namespace: ocp
+tests:
+- as: verify
+  commands: make verify
+  container:
+    from: src
+- as: test-unit
+  commands: make test-unit
+  container:
+    from: src
+- as: test-srpm
+  commands: make srpm
+  container:
+    from: src
+  run_if_changed: ^(rpm/*|packaging/.*|Makefile)
+- as: e2e-rpm-install
+  optional: true
+  run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-microshift-e2e-rpm-install
+- as: e2e-openshift-conformance-sig-api-machinery
+  optional: true
+  run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-microshift-e2e-openshift-conformance-sig-api-machinery
+- as: e2e-openshift-conformance-sig-apps
+  optional: true
+  run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-microshift-e2e-openshift-conformance-sig-apps
+- as: e2e-openshift-conformance-sig-arch
+  optional: true
+  run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-microshift-e2e-openshift-conformance-sig-arch
+- as: e2e-openshift-conformance-sig-auth
+  optional: true
+  run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod)|Makefile
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-microshift-e2e-openshift-conformance-sig-auth
+- as: e2e-openshift-conformance-sig-cli
+  optional: true
+  run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-microshift-e2e-openshift-conformance-sig-cli
+- as: e2e-openshift-conformance-sig-instrumentation
+  optional: true
+  run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-microshift-e2e-openshift-conformance-sig-instrumentation
+- as: e2e-openshift-conformance-sig-network
+  optional: true
+  run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-microshift-e2e-openshift-conformance-sig-network
+- as: e2e-openshift-conformance-sig-node
+  optional: true
+  run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-microshift-e2e-openshift-conformance-sig-node
+- as: e2e-openshift-conformance-sig-scheduling
+  optional: true
+  run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-microshift-e2e-openshift-conformance-sig-scheduling
+- as: e2e-openshift-conformance-sig-storage
+  optional: true
+  run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-microshift-e2e-openshift-conformance-sig-storage
+- as: e2e-reboot
+  optional: true
+  run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-microshift-e2e-reboot-tests
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: microshift

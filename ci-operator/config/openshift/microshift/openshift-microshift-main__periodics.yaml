@@ -1,0 +1,116 @@
+base_images:
+  cli:
+    name: "4.8"
+    namespace: ocp
+    tag: cli
+  libvirt-installer:
+    name: "4.10"
+    namespace: ocp
+    tag: libvirt-installer
+  linux-amd64-4.8.0-0.microshift:
+    name: microshift
+    namespace: microshift
+    tag: linux-amd64-4.8.0-0.microshift
+  microshift-test-binaries:
+    name: microshift
+    namespace: microshift
+    tag: microshift-test-binaries
+  microshift-test-rpm:
+    name: microshift
+    namespace: microshift
+    tag: microshift-test-rpm
+  test-bin:
+    name: "4.8"
+    namespace: ocp
+    tag: tests
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.16-openshift-4.10
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 800Mi
+tag_specification:
+  name: "4.8"
+  namespace: ocp
+tests:
+- as: copr-rpm-health-check
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-microshift-e2e-copr-install
+- as: test-unit
+  commands: make test-unit
+  container:
+    from: src
+  cron: 0 0 * * *
+- as: test-srpm
+  commands: make srpm
+  container:
+    from: src
+  cron: 0 0 * * *
+- as: e2e-openshift-conformance-sig-api-machinery
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-microshift-e2e-openshift-conformance-sig-api-machinery
+- as: e2e-openshift-conformance-sig-apps
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-microshift-e2e-openshift-conformance-sig-apps
+- as: e2e-openshift-conformance-sig-arch
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-microshift-e2e-openshift-conformance-sig-arch
+- as: e2e-openshift-conformance-sig-auth
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-microshift-e2e-openshift-conformance-sig-auth
+- as: e2e-openshift-conformance-sig-cli
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-microshift-e2e-openshift-conformance-sig-cli
+- as: e2e-openshift-conformance-sig-instrumentation
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-microshift-e2e-openshift-conformance-sig-instrumentation
+- as: e2e-openshift-conformance-sig-network
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-microshift-e2e-openshift-conformance-sig-network
+- as: e2e-openshift-conformance-sig-node
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-microshift-e2e-openshift-conformance-sig-node
+- as: e2e-openshift-conformance-sig-scheduling
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-microshift-e2e-openshift-conformance-sig-scheduling
+- as: e2e-openshift-conformance-sig-storage
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-microshift-e2e-openshift-conformance-sig-storage
+- as: e2e-reboot
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-microshift-e2e-reboot-tests
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: microshift
+  variant: periodics
