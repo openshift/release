@@ -52,6 +52,13 @@ if [[ -f "${SHARED_DIR}/kubeconfig" ]] ; then
     export KUBECONFIG=${SHARED_DIR}/kubeconfig
 fi
 
+# Setup proxy if it's present in the shared dir
+if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]] 
+then
+    # shellcheck disable=SC1091
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 # private mirror registry host
 # <public_dns>:<port>
 if [[ ! -f "${SHARED_DIR}/mirror_registry_url" ]]; then

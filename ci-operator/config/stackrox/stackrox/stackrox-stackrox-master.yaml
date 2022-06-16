@@ -93,11 +93,19 @@ tests:
   steps:
     test:
     - ref: stackrox-initial
+- as: mitre-bundles-checks
+  steps:
+    test:
+    - ref: stackrox-initial
 - as: go-unit-tests
   steps:
     test:
     - ref: stackrox-initial
 - as: go-unit-tests-release
+  steps:
+    test:
+    - ref: stackrox-initial
+- as: go-postgres-tests
   steps:
     test:
     - ref: stackrox-initial
@@ -119,7 +127,25 @@ tests:
     test:
     - ref: stackrox-e2e
   timeout: 3h0m0s
+- as: gke-openshift-4-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 3h0m0s
+    version: "4.8"
+  optional: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+  timeout: 3h0m0s
 - as: gke-ui-e2e-tests
+  optional: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+- as: gke-nongroovy-e2e-tests
   optional: true
   steps:
     test:
@@ -144,6 +170,11 @@ tests:
   steps:
     test:
     - ref: stackrox-initial
+- as: merge-go-postgres-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-initial
 - as: merge-integration-unit-tests
   postsubmit: true
   steps:
@@ -159,7 +190,27 @@ tests:
   steps:
     test:
     - ref: stackrox-initial
+- as: merge-gke-nongroovy-e2e-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-e2e
 - as: merge-gke-qa-e2e-tests
+  postsubmit: true
+  steps:
+    env:
+      QA_TEST_TARGET: test
+    test:
+    - ref: stackrox-e2e
+  timeout: 3h0m0s
+- as: merge-openshift-4-qa-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 3h0m0s
+    version: "4.8"
   postsubmit: true
   steps:
     env:
@@ -178,6 +229,21 @@ tests:
     test:
     - ref: stackrox-e2e
 - as: nightly-gke-qa-e2e-tests
+  cron: 0 5 * * *
+  steps:
+    env:
+      QA_TEST_TARGET: test
+    test:
+    - ref: stackrox-e2e
+  timeout: 3h0m0s
+- as: nightly-openshift-4-qa-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 3h0m0s
+    version: "4.8"
   cron: 0 5 * * *
   steps:
     env:
