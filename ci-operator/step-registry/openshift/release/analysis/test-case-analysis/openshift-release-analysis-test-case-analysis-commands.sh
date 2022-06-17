@@ -13,5 +13,5 @@ job-run-aggregator analyze-test-case \
   --minimum-successful-count=${MINIMUM_SUCCESSFUL_COUNT} \
   --job-start-time=${JOB_START_TIME} \
   --working-dir=${WORKING_DIR} \
-  --timeout=4h40m \
+  --timeout=4h30m \
   --test-group=${TEST_GROUP}
