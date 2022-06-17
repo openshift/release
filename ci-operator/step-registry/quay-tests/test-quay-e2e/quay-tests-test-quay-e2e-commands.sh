@@ -25,6 +25,7 @@ trap copyArtifacts EXIT
 #Trigget Quay E2E Testing
 set +x
 quay_route=$(oc get quayregistry quay -n quay-enterprise -o jsonpath='{.status.registryEndpoint}')
+echo "The Quay hostname is $quay_route"
 quay_hostname=${quay_route#*//}
 echo "The Quay hostname is $quay_hostname"
 export CYPRESS_QUAY_ENDPOINT=$quay_hostname
