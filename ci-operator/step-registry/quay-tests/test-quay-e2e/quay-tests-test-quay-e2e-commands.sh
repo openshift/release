@@ -28,6 +28,5 @@ quay_route=$(oc get quayregistry quay -n quay-enterprise -o jsonpath='{.status.r
 quay_hostname=${quay_route#*//}
 echo "The Quay hostname is $quay_hostname"
 export CYPRESS_QUAY_ENDPOINT=$quay_hostname
-yarn run smoke
+yarn run smoke || exit 0
 
-exit 0
