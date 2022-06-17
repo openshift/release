@@ -13,7 +13,7 @@ mkdir -p $ARTIFACT_DIR
 
 
 function copyArtifacts {
-    cp -r ./cypress/results/* $ARTIFACT_DIR && cp -r ./cypress/screenshots/* $ARTIFACT_DIR
+    cp -r ./cypress/results/* $ARTIFACT_DIR && cp -r ./cypress/videos/smoke/* $ARTIFACT_DIR
 }
 
 # Install Dependcies defined in packages.json
