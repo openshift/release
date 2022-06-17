@@ -44,7 +44,20 @@ if test -f "${SHARED_DIR}/bastion_private_address"
 then
     QE_BASTION_PRIVATE_ADDRESS=$(cat "${SHARED_DIR}/bastion_private_address")
     export QE_BASTION_PRIVATE_ADDRESS
+    if ! whoami &> /dev/null; then
+        if [[ -w /etc/passwd ]]; then
+            echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+        fi
+    fi
 fi
+if test -f "${SHARED_DIR}/bastion_ssh_user"
+then
+    QE_BASTION_SSH_USER=$(cat "${SHARED_DIR}/bastion_ssh_user")
+fi
+mkdir -p ~/.ssh
+cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/ssh-privatekey || true
+chmod 0600 ~/.ssh/ssh-privatekey || true
+eval export SSH_CLOUD_PRIV_KEY="~/.ssh/ssh-privatekey"
 
 # configure enviroment for different cluster
 echo "CLUSTER_TYPE is ${CLUSTER_TYPE}"
@@ -52,10 +65,9 @@ case "${CLUSTER_TYPE}" in
 gcp)
     export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
     export KUBE_SSH_USER=core
-    export SSH_CLOUD_PRIV_GCP_USER=core
+    export SSH_CLOUD_PRIV_GCP_USER="${QE_BASTION_SSH_USER:-core}"
     mkdir -p ~/.ssh
     cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/google_compute_engine || true
-    eval export SSH_CLOUD_PRIV_KEY="~/.ssh/google_compute_engine"
     PROJECT="$(oc get -o jsonpath='{.status.platformStatus.gcp.projectID}' infrastructure cluster)"
     REGION="$(oc get -o jsonpath='{.status.platformStatus.gcp.region}' infrastructure cluster)"
     export TEST_PROVIDER="{\"type\":\"gce\",\"region\":\"${REGION}\",\"multizone\": true,\"multimaster\":true,\"projectid\":\"${PROJECT}\"}"
@@ -63,19 +75,23 @@ gcp)
 aws)
     mkdir -p ~/.ssh
     cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/kube_aws_rsa || true
-    eval export SSH_CLOUD_PRIV_KEY="~/.ssh/kube_aws_rsa"
     export PROVIDER_ARGS="-provider=aws -gce-zone=us-east-1"
     REGION="$(oc get -o jsonpath='{.status.platformStatus.aws.region}' infrastructure cluster)"
     ZONE="$(oc get -o jsonpath='{.items[0].metadata.labels.failure-domain\.beta\.kubernetes\.io/zone}' nodes)"
     export TEST_PROVIDER="{\"type\":\"aws\",\"region\":\"${REGION}\",\"zone\":\"${ZONE}\",\"multizone\":true,\"multimaster\":true}"
     export KUBE_SSH_USER=core
-    export SSH_CLOUD_PRIV_AWS_USER=core
+    export SSH_CLOUD_PRIV_AWS_USER="${QE_BASTION_SSH_USER:-core}"
+    ;;
+aws-usgov)
+    mkdir -p ~/.ssh
+    export SSH_CLOUD_PRIV_AWS_USER="${QE_BASTION_SSH_USER:-core}"
+    export KUBE_SSH_USER=core
+    export TEST_PROVIDER="none"
     ;;
 azure4)
     mkdir -p ~/.ssh
     cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/kube_azure_rsa || true
-    eval export SSH_CLOUD_PRIV_KEY="~/.ssh/kube_azure_rsa"
-    export SSH_CLOUD_PRIV_AZURE_USER=core
+    export SSH_CLOUD_PRIV_AZURE_USER="${QE_BASTION_SSH_USER:-core}"
     export TEST_PROVIDER=azure
     ;;
 azurestack)
@@ -98,7 +114,15 @@ openstack*)
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
 equinix-ocp-metal)
     export TEST_PROVIDER='{"type":"skeleton"}';;
-*) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"; exit 1;;
+*)
+    echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"
+    if [ "W${FORCE_SUCCESS_EXIT}W" == "WnoW" ]; then
+        echo "do not force success exit"
+        exit 1
+    fi
+    echo "force success exit"
+    exit 0
+    ;;
 esac
 
 # create execution directory

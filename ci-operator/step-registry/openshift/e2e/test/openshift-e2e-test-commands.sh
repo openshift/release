@@ -350,8 +350,33 @@ done
 # wait for all nodes to reach Ready=true to ensure that all machines and nodes came up, before we run
 # any e2e tests that might require specific workload capacity.
 echo "$(date) - waiting for nodes to be ready..."
-oc wait nodes --all --for=condition=Ready=true --timeout=10m
-echo "$(date) - all nodes are ready"
+ret=0
+oc wait nodes --all --for=condition=Ready=true --timeout=10m || ret=$?
+if [[ "$ret" == 0 ]]; then
+      cat >"${ARTIFACT_DIR}/junit_node_ready.xml" <<EOF
+      <testsuite name="cluster nodes ready" tests="1" failures="0">
+        <testcase name="all nodes should be ready"/>
+      </testsuite>
+EOF
+    echo "$(date) - all nodes are ready"
+else
+    set +e
+    getNodeResult=$(oc get nodes)
+    set -e
+    cat >"${ARTIFACT_DIR}/junit_node_ready.xml" <<EOF
+    <testsuite name="cluster nodes ready" tests="1" failures="1">
+      <testcase name="all nodes should be ready">
+        <failure message="">
+          Timed out waiting for nodes to be ready. Return code: $ret.
+          oc get nodes
+          $getNodeResult
+        </failure>
+      </testcase>
+    </testsuite>
+EOF
+    echo "Timed out waiting for nodes to be ready. Return code: $ret."
+    exit 1
+fi
 
 # wait for all clusteroperators to reach progressing=false to ensure that we achieved the configuration specified at installation
 # time before we run our e2e tests.
