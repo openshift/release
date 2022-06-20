@@ -63,7 +63,7 @@ compute:
       coresPerSocket: 1
       memoryMiB: 16384
       osDisk:
-        diskSizeMiB: 122880
+        diskSizeGiB: 120
   replicas: 3
 controlPlane:
   architecture: amd64
