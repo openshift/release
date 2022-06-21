@@ -16,6 +16,19 @@
             annotations: {
               message: 'Tide has not merged any pull requests in the last hour, likely indicating an outage in the service.',
             },
+          },
+          {
+            alert: 'TideRequestDurationAbnormal',
+            expr: |||
+              sum(rate(github_request_duration_count{status=~"403",user_agent="tide"}[10m])) > 0.2
+            |||,
+            'for': '10m',
+            labels: {
+              severity: 'critical',
+            },
+            annotations: {
+              message: 'Tide query to GitHub APIs is slow in the last 10 minutes, likely indicating ghproxy is throttling.',
+            },
           }
         ],
       },
