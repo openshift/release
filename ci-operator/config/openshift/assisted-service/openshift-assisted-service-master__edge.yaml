@@ -105,10 +105,11 @@ promotion:
   name: ocm-2.6
   namespace: edge-infrastructure
 releases:
-  candidate:
-    release:
-      channel: candidate
-      version: "4.8"
+  candidate-4-11:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.11"
   initial:
     integration:
       name: "4.10"
@@ -334,8 +335,8 @@ tests:
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       DEVSCRIPTS_CONFIG: |
         EXTRA_WORKER_VCPU=8
@@ -365,8 +366,8 @@ tests:
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       DEVSCRIPTS_CONFIG: |
         EXTRA_WORKER_VCPU=8
@@ -384,9 +385,9 @@ tests:
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
       HYPERSHIFT_IMAGE: hypershift-operator
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       DEVSCRIPTS_CONFIG: |
         EXTRA_WORKER_VCPU=8
@@ -417,13 +418,31 @@ tests:
       IP_STACK: v4v6
       NUM_EXTRA_WORKERS: "1"
     workflow: assisted-baremetal-operator-ztp
+- as: e2e-ai-operator-ztp-ipv4-sno-ocp-410
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate-4-11
+    env:
+      DEVSCRIPTS_CONFIG: |
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=32768
+        EXTRA_WORKER_DISK=120
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      DISCONNECTED: "false"
+      IP_STACK: v4
+      NUM_EXTRA_WORKERS: "1"
+    workflow: assisted-baremetal-operator-ztp
 - as: e2e-metal-assisted-operator-ztp-multinode-spoke-periodic
   cron: '@daily'
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       ASSISTED_ZTP_CONFIG: |
         SPOKE_CONTROLPLANE_AGENTS=3
@@ -463,8 +482,8 @@ tests:
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       ASSISTED_ZTP_CONFIG: |
         SPOKE_CONTROLPLANE_AGENTS=3
@@ -622,14 +641,6 @@ tests:
     env:
       ASSISTED_CONFIG: |
         DEPLOY_TARGET=onprem
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-4-6
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.6
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-4-8
   optional: true

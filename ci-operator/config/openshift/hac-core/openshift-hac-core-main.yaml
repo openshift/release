@@ -13,9 +13,21 @@ resources:
       memory: 200Mi
 tests:
 - as: test
-  commands: ./test.sh
-  container:
-    from: src
+  steps:
+    test:
+    - as: test
+      commands: "export CODECOV_TOKEN=$(cat /tmp/secret/CORE_CODECOV_TOKEN) \n./test.sh\n"
+      credentials:
+      - mount_path: /tmp/secret
+        name: hac-core-deploy-tokens
+        namespace: test-credentials
+      from: src
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: release-build-repo
   postsubmit: true
   steps:
@@ -26,6 +38,19 @@ tests:
         chmod 600 /root/.ssh/ssh_key
         ./build.sh
         ./release-build-repo.sh
+      credentials:
+      - mount_path: /tmp/secret
+        name: hac-core-deploy-tokens
+        namespace: test-credentials
+      from: src
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: push-core-codecov
+      commands: "export CODECOV_TOKEN=$(cat /tmp/secret/CORE_CODECOV_TOKEN) \n./test.sh\n"
       credentials:
       - mount_path: /tmp/secret
         name: hac-core-deploy-tokens
