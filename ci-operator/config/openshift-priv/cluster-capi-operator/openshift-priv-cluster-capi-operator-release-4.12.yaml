@@ -64,15 +64,26 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-serial
-- as: e2e-aws-capi-techpreview
+- as: e2e-aws-techpreview
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-capi
-- as: e2e-gcp-capi-techpreview
+- as: e2e-aws-capi-techpreview
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-aws-capi
+- as: e2e-gcp-techpreview
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-capi
-- as: e2e-azure-capi-techpreview
+- as: e2e-azure-techpreview
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-capi
