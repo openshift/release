@@ -1,0 +1,34 @@
+chain:
+  as: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate-provision
+  steps:
+  - ref: azure-provision-resourcegroup
+  - ref: azure-provision-vnet
+  - ref: azure-provision-nat
+  - chain: azure-provision-bastionhost
+  - ref: proxy-config-generate
+  - ref: openshift-cluster-bot-rbac
+  - chain: mirror-images-by-oc-adm
+  - ref: ipi-conf
+  - ref: ipi-conf-mirror
+  - ref: ipi-conf-azure
+  - ref: ipi-conf-azure-provisionednetwork
+  - ref: ipi-install-monitoringpvc
+  - ref: ipi-install-install
+  - ref: mirror-images-enable-qe-catalogsource
+  - ref: ipi-install-times-collection
+  env:
+  - name: OUTBOUND_TYPE
+    default:  "UserDefinedRouting"
+    documentation: "Routing strategy"
+  - name: OUTBOUND_UDR_TYPE
+    default:  "NAT"
+    documentation: "The outbound type of networking provisioned"
+  - name: PUBLISH
+    default:  "Internal"
+    documentation: "How to expose the user-facing endpoints like the Kubernetes API"
+  - name: RESTRICTED_NETWORK
+    default:  "yes"
+  - name: REGISTER_MIRROR_REGISTRY_DNS
+    default: "yes"
+  documentation: |-
+    Create a fullyprivate Azure IPI cluster via image mirroring in a restricted network for QE e2e tests.
