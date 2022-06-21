@@ -4,7 +4,9 @@ set -euo pipefail
 
 #Set Kubeconfig:
 cd quay-frontend-tests
+#test skoepo to push image to quay
 skopeo -v
+skopeo copy docker://quay.io/quay-qetest/postgres:latest --dest-tls-verify=false --dest-creds quay:password docker://quay370.apps.quayperf370.perfscale.devcluster.openshift.com/qateam/test
 cp -L $KUBECONFIG /tmp/kubeconfig && export KUBECONFIG_PATH=/tmp/kubeconfig
 
 #Create Artifact Directory:
