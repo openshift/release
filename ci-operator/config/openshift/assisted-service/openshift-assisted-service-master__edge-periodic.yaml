@@ -1,0 +1,253 @@
+base_images:
+  assisted-image-service:
+    name: ocm-2.6
+    namespace: edge-infrastructure
+    tag: assisted-image-service
+  assisted-installer:
+    name: ocm-2.6
+    namespace: edge-infrastructure
+    tag: assisted-installer
+  assisted-installer-agent:
+    name: ocm-2.6
+    namespace: edge-infrastructure
+    tag: assisted-installer-agent
+  assisted-installer-controller:
+    name: ocm-2.6
+    namespace: edge-infrastructure
+    tag: assisted-installer-controller
+  assisted-test-infra:
+    name: ocm-2.6
+    namespace: edge-infrastructure
+    tag: assisted-test-infra
+  coreos_centos_stream8:
+    name: stream8
+    namespace: coreos
+    tag: "8"
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  edge_infrastructure_swagger_codegen_cli:
+    name: edge-infrastructure-swagger-codegen-cli
+    namespace: ci
+    tag: 2.4.18
+  goswagger_swagger:
+    name: goswagger-swagger
+    namespace: ci
+    tag: v0.28.0
+  hypershift-operator:
+    name: "4.11"
+    namespace: ocp
+    tag: hypershift-operator
+  openshift_release_golang-1.17:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
+  postgresql-12-centos7:
+    name: postgresql-12-centos7
+    namespace: edge-infrastructure
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
+images:
+- dockerfile_path: Dockerfile.assisted-service
+  from: coreos_centos_stream8
+  inputs:
+    openshift_release_golang-1.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
+  to: assisted-service
+- dockerfile_literal: |
+    FROM coreos/centos
+    COPY . .
+  from: src
+  to: assisted-service-scripts
+operator:
+  bundles:
+  - dockerfile_path: deploy/olm-catalog/bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/edge-infrastructure/assisted-service:latest
+    with: assisted-service
+  - pullspec: quay.io/edge-infrastructure/assisted-installer:latest
+    with: assisted-installer
+  - pullspec: quay.io/edge-infrastructure/assisted-installer-agent:latest
+    with: assisted-installer-agent
+  - pullspec: quay.io/edge-infrastructure/assisted-installer-controller:latest
+    with: assisted-installer-controller
+  - pullspec: quay.io/edge-infrastructure/assisted-image-service:latest
+    with: assisted-image-service
+  - pullspec: quay.io/centos7/postgresql-12-centos7:latest
+    with: postgresql-12-centos7
+releases:
+  candidate-4-11:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.11"
+  initial:
+    integration:
+      name: "4.10"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.10"
+      namespace: ocp
+  stable-4-9:
+    integration:
+      name: "4.9"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: |
+  make build-openshift-ci-test-bin
+  go mod vendor
+  mkdir /.cache && chmod 775 -R /.cache && chmod 775 -R $GOPATH
+tests:
+- as: mirror-nightly-image
+  cron: '@daily'
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-service
+    test:
+    - ref: assisted-baremetal-images-publish
+- as: cloud-subsystem
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.10"
+  cron: 0 */6 * * *
+  steps:
+    allow_best_effort_post_steps: true
+    test:
+    - as: subsystem-deploy-and-run
+      cli: latest
+      commands: |
+        export BUILD_TYPE=CI
+        export REPORTS=${ARTIFACT_DIR}
+        export TARGET=oc
+
+        make deploy-on-openshift-ci
+        make test
+      dependencies:
+      - env: SERVICE
+        name: assisted-service
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
+- as: kube-subsystem
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.10"
+  cron: 0 */6 * * *
+  steps:
+    allow_best_effort_post_steps: true
+    test:
+    - as: subsystem-deploy-and-run
+      cli: latest
+      commands: |
+        export BUILD_TYPE=CI
+        export REPORTS=${ARTIFACT_DIR}
+        export TARGET=oc
+        export GENERATE_CRD=false
+
+        make deploy-on-openshift-ci
+        make enable-kube-api-for-subsystem
+        make test-kube-api
+      dependencies:
+      - env: SERVICE
+        name: assisted-service
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
+- as: e2e-ai-operator-ztp
+  cron: '@daily'
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      DEVSCRIPTS_CONFIG: |
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=32768
+        EXTRA_WORKER_DISK=120
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      DISCONNECTED: "false"
+      IP_STACK: v4
+      NUM_EXTRA_WORKERS: "1"
+    workflow: assisted-baremetal-operator-ztp
+- as: e2e-ai-operator-disconnected
+  cron: '@daily'
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      DEVSCRIPTS_CONFIG: |
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=32768
+        EXTRA_WORKER_DISK=120
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      DISCONNECTED: "true"
+      NUM_EXTRA_WORKERS: "1"
+    workflow: assisted-baremetal-operator-ztp
+- as: e2e-ai-operator-ztp-3masters
+  cron: '@daily'
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      ASSISTED_ZTP_CONFIG: |
+        SPOKE_CONTROLPLANE_AGENTS=3
+      DEVSCRIPTS_CONFIG: |
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=32768
+        EXTRA_WORKER_DISK=120
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      DISCONNECTED: "false"
+      IP_STACK: v4
+      NUM_EXTRA_WORKERS: "3"
+    workflow: assisted-baremetal-operator-ztp
+- as: e2e-ai-operator-ztp-ipv4v6-sno-ocp-4-9
+  cron: '@daily'
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable-4-9
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      DEVSCRIPTS_CONFIG: |
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=32768
+        EXTRA_WORKER_DISK=120
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      DISCONNECTED: "false"
+      IP_STACK: v4v6
+      NUM_EXTRA_WORKERS: "1"
+    workflow: assisted-baremetal-operator-ztp
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: assisted-service
+  variant: edge-periodic
