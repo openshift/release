@@ -52,8 +52,6 @@ cat << EOF > ~/ocp-install.yml
     shell: kcli create plan --skippre --paramfile /home/tester/kcli_parameters.yml upstream_ci $KCLI_PARAM
     args:
       chdir: ~/kcli-openshift4-baremetal
-    async: 60
-    poll: 0
 EOF
 cat << EOF > ~/copy-kubeconfig-to-bastion.yml
 ---
