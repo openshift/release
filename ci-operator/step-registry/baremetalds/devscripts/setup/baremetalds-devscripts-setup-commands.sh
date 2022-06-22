@@ -68,7 +68,7 @@ then
   scp "${SSHOPTS[@]}" "${SHARED_DIR}/dev-scripts-additional-config" "root@${IP}:dev-scripts-additional-config"
 fi
 
-timeout -s 9 175m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
+timeout -s 9 175m ssh -tt "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
 
 set -xeuo pipefail
 
@@ -120,7 +120,19 @@ fi
 
 echo 'export KUBECONFIG=/root/dev-scripts/ocp/ostest/auth/kubeconfig' >> /root/.bashrc
 
-timeout -s 9 105m make ${DEVSCRIPTS_TARGET}
+# Make eats all exit codes: http://www.gnu.org/software/make/manual/html_node/Running.html
+# It seems to be non-configurable. The only way to extract the installer
+# exit code is to read it out of make's output.  We store in ACTUAL_EXIT
+# and use that to exit if make errors.
+set +e
+ACTUAL_EXIT=\$(timeout -s 9 105m make ${DEVSCRIPTS_TARGET} 2>&1 | tee /dev/tty | sed -nr 's/^make: ***.*Error ([0-9]+)/\1/p')
+if [ "\$ACTUAL_EXIT" != "" ];
+then
+  set -e
+  exit "\$ACTUAL_EXIT"
+fi
+set -e
+
 EOF
 
 # Copy dev-scripts variables to be shared with the test step
