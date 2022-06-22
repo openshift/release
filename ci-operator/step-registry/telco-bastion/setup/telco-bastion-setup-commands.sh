@@ -49,11 +49,9 @@ cat << EOF > ~/ocp-install.yml
       path: /home/tester/vm_ready.txt
       state: absent
   - name: Run deployment
-    shell: kcli create plan --paramfile /home/tester/kcli_parameters.yml upstream_ci $KCLI_PARAM
+    shell: kcli create plan --skippre --paramfile /home/tester/kcli_parameters.yml upstream_ci $KCLI_PARAM
     args:
       chdir: ~/kcli-openshift4-baremetal
-    async: 60
-    poll: 0
 EOF
 cat << EOF > ~/copy-kubeconfig-to-bastion.yml
 ---
@@ -98,7 +96,7 @@ cat << EOF > ~/ssh-connection-workaround.yml
     when: ready.stat.exists == False
 EOF
 
-ansible-playbook -i ~/inventory ~/ocp-install.yml -vvvv || sleep 10800 # sleep 3 hours
+ansible-playbook -i ~/inventory ~/ocp-install.yml -vvvv
 
 MINUTES_WAITED=0
 until [ $MINUTES_WAITED -ge 180 ] || ansible-playbook -i ~/inventory ~/ssh-connection-workaround.yml
