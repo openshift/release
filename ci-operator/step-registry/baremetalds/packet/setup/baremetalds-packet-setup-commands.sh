@@ -83,7 +83,7 @@ cat > packet-config.yaml <<-EOF
 EOF
 ansible-playbook packet-config.yaml |& gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0; fflush(); }'
 
-if [ -e "${CLUSTER_PROFILE_DIR}/ofcir_url" ] ; then
+if [ -e "${CLUSTER_PROFILE_DIR}/ofcir_url" ] && [ ${ARCHITECTURE} != "arm64" ] ; then
     echo "Attempting to acquire a Host from OFCIR"
     IPFILE=$SHARED_DIR/server-ip
     CIRFILE=$SHARED_DIR/cir
@@ -126,7 +126,7 @@ cat > packet-setup.yaml <<-EOF
         hostnames: "{{ packet_hostname }}"
         operating_system: ${PACKET_OS}
         plan: ${PACKET_PLAN}
-        facility: any
+        facility: ${PACKET_FACILITY}
         tags: "{{ 'PR:', lookup('env', 'PULL_NUMBER'), 'Job name:', lookup('env', 'JOB_NAME'), 'Job id:', lookup('env', 'PROW_JOB_ID') }}"
       register: hosts
       no_log: true

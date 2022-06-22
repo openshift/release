@@ -36,12 +36,19 @@ sudo systemctl start firewalld
 sudo firewall-cmd --add-port=8213/tcp --permanent
 sudo firewall-cmd --reload
 
+
+SQUID_IMAGE=quay.io/sameersbn/squid:latest
+if [ ${ARCHITECTURE} == 'arm64' ]; then
+  # Test image reference, will update at a later date
+  SQUID_IMAGE=quay.io/openshifttest/squid-proxy:multiarch
+fi
+
 sudo podman run -d --rm \
      --net host \
      --volume \$HOME/squid.conf:/etc/squid/squid.conf \
      --name external-squid \
      --dns 127.0.0.1 \
-     quay.io/sameersbn/squid:latest
+     \$SQUID_IMAGE
 EOF
 
 cat <<EOF> "${SHARED_DIR}/proxy-conf.sh"
