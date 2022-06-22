@@ -65,10 +65,10 @@ tests:
     - as: claim
       commands: |
         echo "fleet binaries:"
-        ls /usr/bin/fleet*
+        ls /usr/bin/fleet* || true
         echo
         echo "docker images -a:"
-        docker images -a
+        docker images -a || true
         printenv KUBECONFIG
         echo
         oc get node
@@ -76,8 +76,12 @@ tests:
         oc whoami
         echo
         oc config view
-        apiVersion: operators.coreos.com/v1
+        echo
+        echo "Applying resources:"
+        echo
+        set +e
         oc apply -f - <<EOF
+        apiVersion: operators.coreos.com/v1
         kind: OperatorGroup
         metadata:
           name: rhacs-operator
