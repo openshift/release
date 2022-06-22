@@ -1,3 +1,8 @@
+base_images:
+  ubi-minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
 build_root:
   image_stream_tag:
     name: collector-test
@@ -13,6 +18,14 @@ images:
 - dockerfile_path: .openshift-ci/build/Dockerfile.build_collector
   from: collector-builder
   to: collector
+- dockerfile_path: collector/container/Dockerfile
+  from: collector
+  inputs:
+    collector:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/stackrox/collector/.
+  to: collector-full
 resources:
   '*':
     limits:
