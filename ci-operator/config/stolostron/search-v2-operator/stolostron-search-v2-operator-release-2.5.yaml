@@ -3,18 +3,6 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  search-indexer:
-    name: "2.5"
-    namespace: stolostron
-    tag: search-indexer
-  search-collector:
-    name: "2.5"
-    namespace: stolostron
-    tag: search-collector
-  search-v2-api:
-    name: "2.5"
-    namespace: stolostron
-    tag: search-v2-api
   stolostron_builder_go1.17-linux:
     name: builder
     namespace: stolostron
@@ -32,16 +20,13 @@ images:
       as:
       - registry.ci.openshift.org/stolostron/builder:go1.17-linux
   to: search-v2-operator
-operator:
-  bundles:
-  - dockerfile_path: bundle.Dockerfile
-  substitutions:
-  - pullspec: quay.io/stolostron/search-indexer:2.5.0
-    with: search-indexer
-  - pullspec: quay.io/stolostron/search-collector:2.5.0
-    with: search-collector
-  - pullspec: quay.io/stolostron/search-v2-api:2.5.0
-    with: search-v2-api
+- dockerfile_path: bundle.Dockerfile
+  from: base
+  inputs:
+    stolostron_builder_go1.17-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.17-linux
+  to: search-operator-bundle
 promotion:
   name: "2.5"
   namespace: stolostron
@@ -134,7 +119,7 @@ tests:
       SOURCE_IMAGE_REF: search-v2-operator
     env:
       IMAGE_REPO: search-v2-operator
-      IMAGE_TAG: "2.5"
+      IMAGE_TAG: 2.5-latest
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
 - as: latest-bundle-mirror
@@ -144,7 +129,7 @@ tests:
       SOURCE_IMAGE_REF: search-operator-bundle
     env:
       IMAGE_REPO: search-operator-bundle
-      IMAGE_TAG: "2.5"
+      IMAGE_TAG: 2.5-latest
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
 - as: sonar-post-submit
