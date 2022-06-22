@@ -70,10 +70,38 @@ tests:
         echo "docker images -a:"
         docker images -a
         printenv KUBECONFIG
-        printenv KUBEADMIN_PASSWORD_FILE
+        echo
         oc get node
         oc config view
         oc whoami
+        echo
+        oc config view
+        apiVersion: operators.coreos.com/v1
+        oc apply -f - <<EOF
+        kind: OperatorGroup
+        metadata:
+          name: rhacs-operator
+          namespace: rhacs-operator
+        EOF
+        oc apply -f - <<EOF
+        apiVersion: operators.coreos.com/v1alpha1
+        kind: Subscription
+        metadata:
+          name: rhacs-operator
+          namespace: rhacs-operator
+        spec:
+          channel: latest
+          installPlanApproval: Automatic
+          name: rhacs-operator
+          source: redhat-operators
+          sourceNamespace: openshift-marketplace
+          startingCSV: "rhacs-operator.v3.70.0"
+        EOF
+        sleep 60
+        echo "namespaces:"
+        oc get ns
+        echo "all resources in rhacs-operator ns:"
+        oc -n rhacs-operator get all
       from: stable-custom:cli
       resources:
         requests:
