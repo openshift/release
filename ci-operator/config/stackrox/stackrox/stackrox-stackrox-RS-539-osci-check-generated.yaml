@@ -91,10 +91,34 @@ tests:
   steps:
     test:
     - ref: stackrox-initial
-- as: grouped-static-checks
+- as: required-static-checks
   steps:
+    env:
+      TEST_SUITE: generated-checks
     test:
     - ref: stackrox-initial
+    - as: todo-checks
+      commands: .openshift-ci/dispatch.sh todo-checks
+      credentials:
+      - mount_path: /tmp/secret/stackrox-stackrox-initial
+        name: stackrox-stackrox-initial
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+    - as: pr-fixes-checks
+      commands: .openshift-ci/dispatch.sh pr-fixes-checks
+      credentials:
+      - mount_path: /tmp/secret/stackrox-stackrox-initial
+        name: stackrox-stackrox-initial
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
 - as: go-unit-tests
   steps:
     test:
