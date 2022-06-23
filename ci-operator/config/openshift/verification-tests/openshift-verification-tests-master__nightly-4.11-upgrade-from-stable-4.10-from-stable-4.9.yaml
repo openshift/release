@@ -37,7 +37,7 @@ resources:
       memory: 200Mi
 tests:
 - as: aws-ipi
-  cron: 0 18 */3 * *
+  cron: 0 0 */7 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -62,6 +62,31 @@ tests:
           cpu: 100m
           memory: 200Mi
     - chain: cucushift-upgrade
+- as: vsphere-ipi-disconnected
+  cron: 0 2 */7 * *
+  steps:
+    cluster_profile: vsphere-discon
+    env:
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.9 and @vsphere-ipi and @disconnected'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.9 and @vsphere-ipi and @disconnected'
+    post:
+    - chain: cucushift-installer-rehearse-vsphere-ipi-disconnected-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-vsphere-ipi-disconnected-provision
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_TARGET}" > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE
+        name: release:intermediate
+      - env: RELEASE_IMAGE_TARGET
+        name: release:target
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - chain: cucushift-upgrade-disconnected
 zz_generated_metadata:
   branch: master
   org: openshift
