@@ -31,22 +31,22 @@ base_images:
     name: golangci-lint
     namespace: ci
     tag: v1.37.1
-  openshift_release_golang-1.16:
+  openshift_release_golang-1.17:
     name: release
     namespace: openshift
-    tag: golang-1.16
+    tag: golang-1.17
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.16
+    tag: golang-1.17
 images:
 - dockerfile_path: Dockerfile.image-service
   from: coreos-centos-stream8
   inputs:
-    openshift_release_golang-1.16:
+    openshift_release_golang-1.17:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.16
+      - registry.ci.openshift.org/openshift/release:golang-1.17
   to: assisted-image-service
 promotion:
   name: ocm-2.6
@@ -129,6 +129,19 @@ tests:
       ASSISTED_CONFIG: |
         MAKEFILE_TARGET="setup run deploy_nodes"
     workflow: assisted-baremetal
+- as: mce-publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-image-service
+    env:
+      IMAGE_REPO: assisted-image-service
+      OSCI_ENV_CONFIG: |
+        OSCI_PUBLISH_DELAY=0
+        OSCI_PIPELINE_PRODUCT_PREFIX=backplane
+        OSCI_PIPELINE_REPO=backplane-pipeline
+      RELEASE_REF: backplane-2.1
+    workflow: ocm-ci-manifest-update
 zz_generated_metadata:
   branch: main
   org: openshift
