@@ -52,6 +52,16 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/stackrox/stackrox/image/postgres/.
   to: central-db
+- dockerfile_path: Dockerfile
+  inputs:
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/stackrox/stackrox/docs/.
+    ubi-minimal:
+      as:
+      - registry.access.redhat.com/ubi8-minimal:latest
+  to: docs
 promotion:
   excluded_images:
   - main-bundle
@@ -76,6 +86,8 @@ tests:
         name: stackrox-stackrox-push
         namespace: test-credentials
       dependencies:
+      - env: PIPELINE_DOCS_IMAGE
+        name: docs
       - env: MAIN_IMAGE
         name: main
       - env: ROXCTL_IMAGE
