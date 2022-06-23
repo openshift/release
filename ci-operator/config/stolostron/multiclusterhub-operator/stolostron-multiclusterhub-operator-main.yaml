@@ -3,7 +3,7 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  builder-go1.17:
+  stolostron_builder_go1.17-linux:
     name: builder
     namespace: stolostron
     tag: go1.17-linux
@@ -12,17 +12,20 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.17-linux
+    tag: go1.18-linux
 images:
 - dockerfile_path: build/Dockerfile.prow
   from: base
   inputs:
-    builder-go1.17:
+    stolostron_builder_go1.17-linux:
       as:
       - registry.ci.openshift.org/stolostron/builder:go1.17-linux
   to: multiclusterhub-operator
 - dockerfile_path: build/Dockerfile.test.prow
-  from: builder-go1.17
+  inputs:
+    stolostron_builder_go1.17-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.17-linux
   to: multiclusterhub-operator-tests
 promotion:
   name: "2.6"
