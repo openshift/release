@@ -21,7 +21,7 @@ GIT_CREDS_PATH="${HOME}/creds/file"
 git config --global credential.helper "store --file ${GIT_CREDS_PATH}"
 echo "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com" > "${GIT_CREDS_PATH}"
 
-git clone --no-checkout "https://${GITHUB_TOKEN}@github.com/psturc/e2e-tests.git" .
-git checkout centralizing-scripts-poc
+git clone --no-checkout "https://${GITHUB_TOKEN}@github.com/psturc/e2e-tests.git"
+cd e2e-tests && git checkout centralizing-scripts-poc
 make ci/test/e2e
 # /bin/bash .ci/oci-e2e-deployment.sh
