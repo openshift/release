@@ -157,7 +157,7 @@ tests:
   steps:
     test:
     - ref: stackrox-e2e
-- as: merge-push-images
+- as: push-and-release
   postsubmit: true
   steps:
     test:
@@ -174,6 +174,17 @@ tests:
         name: roxctl
       - env: CENTRAL_DB_IMAGE
         name: central-db
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+    - as: release-mgmt
+      commands: .openshift-ci/dispatch.sh release-mgmt
+      credentials:
+      - mount_path: /tmp/secret/stackrox-stackrox-push
+        name: stackrox-stackrox-push
+        namespace: test-credentials
       from: src
       resources:
         requests:
