@@ -1,0 +1,85 @@
+base_images:
+  base:
+    name: "4.11"
+    namespace: ocp
+    tag: base
+  cli:
+    name: "4.11"
+    namespace: ocp
+    tag: cli
+  openshift_release_golang-1.17:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
+binary_build_commands: GOARGS="-mod=mod" make binary
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
+images:
+- dockerfile_literal: |-
+    FROM registry.ci.openshift.org/openshift/release:golang-1.17 AS builder
+    WORKDIR /go/src/github.com/stackrox/acs-fleet-manager
+    COPY . .
+    RUN GOARGS="-mod=mod" make binary
+    FROM registry.ci.openshift.org/openshift/origin-v4.5:base
+    COPY --from=builder /go/src/github.com/stackrox/acs-fleet-manager/fleet-manager /usr/bin/
+    COPY --from=builder /go/src/github.com/stackrox/acs-fleet-manager/fleetshard-sync /usr/bin/
+  from: base
+  inputs:
+    openshift_release_golang-1.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
+  to: acs-fleet-manager
+promotion:
+  namespace: acs-fleet-manager
+  tag: latest
+releases:
+  initial:
+    integration:
+      name: "4.11"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.11"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 2000m
+      memory: 4000Mi
+tests:
+- as: e2e
+  cluster_claim:
+    architecture: amd64
+    as: custom
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.7"
+  steps:
+    test:
+    - as: claim
+      cli: custom
+      commands: |
+        if [ -x ".openshift-ci/tests/e2e.sh" ]; then
+          ./.openshift-ci/tests/e2e.sh
+        else
+          echo "No e2e configured, skipping."
+        fi
+      dependencies:
+      - env: BINARIES
+        name: bin
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: main
+  org: stackrox
+  repo: acs-fleet-manager
