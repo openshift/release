@@ -6,6 +6,81 @@ presubmits:
     - ^master$
     - ^master-
     cluster: build03
+    context: ci/prow/e2e-agent-compact
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: equinix-ocp-metal
+      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-metal3-dev-scripts-master-e2e-agent-compact
+    rerun_command: /test e2e-agent-compact
+    skip_if_only_changed: (^docs|.github/)|^config_example.sh$|\.md$|^(DCO|LICENSE)$|((^|/)OWNERS$)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-agent-compact-cluster-profile
+        - --target=e2e-agent-compact
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-agent-compact-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-equinix-ocp-metal
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-agent-compact,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build03
     context: ci/prow/e2e-metal-ipi
     decorate: true
     decoration_config:
@@ -17,7 +92,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-metal3-dev-scripts-master-e2e-metal-ipi
     rerun_command: /test e2e-metal-ipi
-    skip_if_only_changed: (^(agent|docs|.github)/)|^config_example.sh$|(\.md$)|((^|/)OWNERS$)
+    skip_if_only_changed: (^(agent|docs|.github)/)|^config_example.sh$|\.md$|^(DCO|LICENSE)$|((^|/)OWNERS$)
     spec:
       containers:
       - args:
@@ -93,7 +168,7 @@ presubmits:
     name: pull-ci-openshift-metal3-dev-scripts-master-e2e-metal-ipi-ovn-dualstack
     optional: true
     rerun_command: /test e2e-metal-ipi-ovn-dualstack
-    skip_if_only_changed: (^(agent|docs|.github)/)|^config_example.sh$|\.md$|^(DCO|LICENSE|OWNERS)$
+    skip_if_only_changed: (^(agent|docs|.github)/)|^config_example.sh$|\.md$|^(DCO|LICENSE)$|((^|/)OWNERS$)
     spec:
       containers:
       - args:
@@ -168,7 +243,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-metal3-dev-scripts-master-e2e-metal-ipi-ovn-ipv6
     rerun_command: /test e2e-metal-ipi-ovn-ipv6
-    skip_if_only_changed: (^(agent|docs|.github)/)|^config_example.sh$|\.md$|^(DCO|LICENSE|OWNERS)$
+    skip_if_only_changed: (^(agent|docs|.github)/)|^config_example.sh$|\.md$|^(DCO|LICENSE)$|((^|/)OWNERS$)
     spec:
       containers:
       - args:
@@ -244,7 +319,7 @@ presubmits:
     name: pull-ci-openshift-metal3-dev-scripts-master-e2e-metal-ipi-proxy-ipv4
     optional: true
     rerun_command: /test e2e-metal-ipi-proxy-ipv4
-    skip_if_only_changed: (^(agent|docs|.github)/)|^config_example.sh$|\.md$|^(DCO|LICENSE|OWNERS)$
+    skip_if_only_changed: (^(agent|docs|.github)/)|^config_example.sh$|\.md$|^(DCO|LICENSE)$|((^|/)OWNERS$)
     spec:
       containers:
       - args:
@@ -320,7 +395,7 @@ presubmits:
     name: pull-ci-openshift-metal3-dev-scripts-master-e2e-metal-ipi-proxy-ipv6
     optional: true
     rerun_command: /test e2e-metal-ipi-proxy-ipv6
-    skip_if_only_changed: (^(agent|docs|.github)/)|^config_example.sh$|\.md$|^(DCO|LICENSE|OWNERS)$
+    skip_if_only_changed: (^(agent|docs|.github)/)|^config_example.sh$|\.md$|^(DCO|LICENSE)$|((^|/)OWNERS$)
     spec:
       containers:
       - args:
@@ -395,7 +470,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-metal3-dev-scripts-master-e2e-metal-ipi-serial-ipv4
     rerun_command: /test e2e-metal-ipi-serial-ipv4
-    skip_if_only_changed: (^(agent|docs|.github)/)|^config_example.sh$|\.md$|^(DCO|LICENSE|OWNERS)$
+    skip_if_only_changed: (^(agent|docs|.github)/)|^config_example.sh$|\.md$|^(DCO|LICENSE)$|((^|/)OWNERS$)
     spec:
       containers:
       - args:
@@ -471,7 +546,7 @@ presubmits:
     name: pull-ci-openshift-metal3-dev-scripts-master-e2e-metal-ipi-serial-ovn-ipv6
     optional: true
     rerun_command: /test e2e-metal-ipi-serial-ovn-ipv6
-    skip_if_only_changed: (^(agent|docs|.github)/)|^config_example.sh$|\.md$|^(DCO|LICENSE|OWNERS)$
+    skip_if_only_changed: (^(agent|docs|.github)/)|^config_example.sh$|\.md$|^(DCO|LICENSE)$|((^|/)OWNERS$)
     spec:
       containers:
       - args:
@@ -697,7 +772,7 @@ presubmits:
     name: pull-ci-openshift-metal3-dev-scripts-master-e2e-metal-ipi-virtualmedia
     optional: true
     rerun_command: /test e2e-metal-ipi-virtualmedia
-    skip_if_only_changed: (^(agent|docs|.github)/)|^config_example.sh$|\.md$|^(DCO|LICENSE|OWNERS)$
+    skip_if_only_changed: (^(agent|docs|.github)/)|^config_example.sh$|\.md$|^(DCO|LICENSE)$|((^|/)OWNERS$)
     spec:
       containers:
       - args:
