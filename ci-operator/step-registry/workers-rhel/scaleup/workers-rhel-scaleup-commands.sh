@@ -22,6 +22,11 @@ curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.ta
 PATH=/tmp/client:$PATH
 oc version --client
 
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    echo "Setting proxy"
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 echo "$(date -u --rfc-3339=seconds) - Validating parsed Ansible inventory"
 ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
 echo "$(date -u --rfc-3339=seconds) - Running RHEL worker scaleup"

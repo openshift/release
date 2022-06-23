@@ -182,5 +182,10 @@ enabled_metadata = 1
 module_hotfixes = 1
 EOF
 
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    echo "Setting proxy"
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
 ansible-playbook -i "${SHARED_DIR}/ansible-hosts" prep.yaml -vvv
