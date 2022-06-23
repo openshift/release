@@ -15,16 +15,18 @@ images:
 resources:
   '*':
     limits:
-      memory: 2Gi
+      memory: 1Gi
     requests:
-      cpu: 2000m
-      memory: 2Gi
+      cpu: 1000m
+      memory: 500Mi
 tests:
-- as: jh-full-scale
+- as: jh-on-single
   steps:
     post:
-    - as: cluster-destroy
-      commands: run ods clusters destroy
+    - as: destroy-clusters
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        run ods clusters destroy single
       credentials:
       - mount_path: /var/run/psap-ods-secret-1
         name: psap-ods-secret-1
@@ -32,11 +34,13 @@ tests:
       from: ci-artifacts
       resources:
         requests:
-          cpu: 2000m
-          memory: 2Gi
+          cpu: 1000m
+          memory: 500Mi
     pre:
-    - as: cluster-create
-      commands: run ods clusters create
+    - as: create-clusters
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        run ods clusters create single
       credentials:
       - mount_path: /var/run/psap-ods-secret-1
         name: psap-ods-secret-1
@@ -44,11 +48,13 @@ tests:
       from: ci-artifacts
       resources:
         requests:
-          cpu: 2000m
-          memory: 2Gi
+          cpu: 1000m
+          memory: 500Mi
     test:
     - as: test
-      commands: run ods jh-at-scale
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        run ods jh-at-scale
       credentials:
       - mount_path: /var/run/psap-ods-secret-1
         name: psap-ods-secret-1
@@ -56,20 +62,15 @@ tests:
       from: ci-artifacts
       resources:
         requests:
-          cpu: 2000m
-          memory: 2Gi
-- as: jh-at-scale
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 2h0m0s
-    version: "4.10"
+          cpu: 1000m
+          memory: 500Mi
+- as: jh-on-ocp
   steps:
     post:
-    - as: ods-osd-cluster-destroy
-      commands: run ods osd_cluster destroy
+    - as: destroy-clusters
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        run ods clusters destroy ocp
       credentials:
       - mount_path: /var/run/psap-ods-secret-1
         name: psap-ods-secret-1
@@ -77,12 +78,13 @@ tests:
       from: ci-artifacts
       resources:
         requests:
-          cpu: 2000m
-          memory: 2Gi
-    - chain: gather
+          cpu: 1000m
+          memory: 500Mi
     pre:
-    - as: ods-osd-cluster-create
-      commands: run ods osd_cluster create
+    - as: create-clusters
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        run ods clusters create ocp
       credentials:
       - mount_path: /var/run/psap-ods-secret-1
         name: psap-ods-secret-1
@@ -90,12 +92,13 @@ tests:
       from: ci-artifacts
       resources:
         requests:
-          cpu: 2000m
-          memory: 2Gi
-    - ref: ipi-install-rbac
+          cpu: 1000m
+          memory: 500Mi
     test:
     - as: test
-      commands: run ods jh-at-scale
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        run ods jh-at-scale
       credentials:
       - mount_path: /var/run/psap-ods-secret-1
         name: psap-ods-secret-1
@@ -103,9 +106,52 @@ tests:
       from: ci-artifacts
       resources:
         requests:
-          cpu: 2000m
-          memory: 2Gi
-    workflow: generic-claim
+          cpu: 1000m
+          memory: 500Mi
+- as: jh-on-osd
+  steps:
+    post:
+    - as: destroy-clusters
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        run ods clusters destroy osd
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from: ci-artifacts
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    pre:
+    - as: create-clusters
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        run ods clusters create osd
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from: ci-artifacts
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    test:
+    - as: test
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        run ods jh-at-scale
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from: ci-artifacts
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
 - as: gen-mat-bench
   steps:
     test:
@@ -114,8 +160,8 @@ tests:
       from: ci-artifacts
       resources:
         requests:
-          cpu: 2000m
-          memory: 2Gi
+          cpu: 1000m
+          memory: 1Gi
 zz_generated_metadata:
   branch: master
   org: openshift-psap
