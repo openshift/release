@@ -11,12 +11,14 @@ echo "************ telco-bastion setup command ************"
 
 # Workaround 777 perms on secret ssh password file
 SSH_PASS=$(cat /var/run/ssh-pass/password)
+$KNI_SSH_PASS=$(cat /var/run/kni-pass/knipass)
+
+ping -c 8 10.19.16.50
 
 cat << EOF > ~/inventory
 [all]
-sshd.bastion-telco ansible_ssh_user=tester ansible_ssh_common_args="-o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=90" ansible_password=$SSH_PASS
+10.19.16.50 ansible_ssh_user=kni ansible_ssh_common_args="-o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=90" ansible_password=$SSH_PASS
 EOF
-
 set -x
 
 KCLI_PARAM=""
@@ -46,38 +48,51 @@ cat << EOF > ~/ocp-install.yml
     ignore_errors: yes
   - name: Remove lock file
     file:
-      path: /home/tester/vm_ready.txt
+      path: /home/kni/vm_ready.txt
       state: absent
   - name: Run deployment
-    shell: kcli create plan --skippre --paramfile /home/tester/kcli_parameters.yml upstream_ci $KCLI_PARAM
+    shell: kcli create plan --skippre --paramfile /home/kni/kcli_parameters.yml upstream_ci $KCLI_PARAM
     args:
       chdir: ~/kcli-openshift4-baremetal
 EOF
+# cat << EOF > ~/copy-kubeconfig-to-bastion.yml
+# ---
+# - name: Copy kubeconfig from installer to bastion
+#   hosts: all
+#   tasks:
+#   - name: Run playbook to copy kubeconfig from installer vm to bastion vm
+#     shell: ansible-playbook -i /home/tester/inventory /home/tester/kubeconfig.yml
+# EOF
 cat << EOF > ~/copy-kubeconfig-to-bastion.yml
----
-- name: Copy kubeconfig from installer to bastion
+- name: Copy kubeconfig from installer to vm
   hosts: all
   tasks:
-  - name: Run playbook to copy kubeconfig from installer vm to bastion vm
-    shell: ansible-playbook -i /home/tester/inventory /home/tester/kubeconfig.yml
+    - name: Copy kubeconfig from installer vm
+      shell: kcli scp root@cnfdc5-installer:/root/ocp/auth/kubeconfig /home/kni/.kube/config
+    - name: Add skip-tls-verify to kubeconfig
+      lineinfile:
+      path: /home/kni/.kube/config
+      regexp: '    certificate-authority-data:'
+      line: '    insecure-skip-tls-verify: true'
 EOF
-cat << EOF > ~/fetch-kubeconfig.yml
----
-- name: Fetch kubeconfig for cluster
-  hosts: all
-  tasks:
-  - name: Grab the kubeconfig
-    fetch:
-      src: /home/tester/.kube/config
-      dest: $SHARED_DIR/kubeconfig
-      flat: yes
-  - name: Modify local copy of kubeconfig
-    lineinfile:
-      path: $SHARED_DIR/kubeconfig
-      regexp: '    server: https://127.0.0.1:6443'
-      line: "    server: https://sshd.bastion-telco:6443"
-    delegate_to: localhost
-EOF
+
+# cat << EOF > ~/fetch-kubeconfig.yml
+# ---
+# - name: Fetch kubeconfig for cluster
+#   hosts: all
+#   tasks:
+#   - name: Grab the kubeconfig
+#     fetch:
+#       src: /home/kni/.kube/config
+#       dest: $SHARED_DIR/kubeconfig
+#       flat: yes
+#   - name: Modify local copy of kubeconfig
+#     lineinfile:
+#       path: $SHARED_DIR/kubeconfig
+#       regexp: '    server: https://127.0.0.1:6443'
+#       line: "    server: https://sshd.bastion-telco:6443"
+#     delegate_to: localhost
+# EOF
 
 # Workaround for ssh connection killed
 cat << EOF > ~/ssh-connection-workaround.yml
@@ -86,9 +101,9 @@ cat << EOF > ~/ssh-connection-workaround.yml
   hosts: all
   tasks:
   - name: Try to grab file to see install finished
-    shell: kcli scp root@cnfdc5-installer:/root/cluster_ready.txt /home/tester/vm_ready.txt
+    shell: kcli scp root@cnfdc5-installer:/root/cluster_ready.txt /home/kni/vm_ready.txt
   - name: Check if successful
-    stat: path=/home/tester/vm_ready.txt
+    stat: path=/home/kni/vm_ready.txt
     register: ready
   - name: Fail if file was not there
     fail:
@@ -107,4 +122,4 @@ do
 done
 
 ansible-playbook -i ~/inventory ~/copy-kubeconfig-to-bastion.yml
-ansible-playbook -i ~/inventory ~/fetch-kubeconfig.yml -vvvv
+#ansible-playbook -i ~/inventory ~/fetch-kubeconfig.yml -vvvv
