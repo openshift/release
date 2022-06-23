@@ -1094,7 +1094,7 @@ presubmits:
     - ^master$
     - ^master-
     cluster: build01
-    context: ci/prow/ods-jh-at-scale
+    context: ci/prow/ods-jh-on-ocp
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -1102,17 +1102,15 @@ presubmits:
       ci-operator.openshift.io/variant: ods
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-psap-ci-artifacts-master-ods-jh-at-scale
-    rerun_command: /test ods-jh-at-scale
+    name: pull-ci-openshift-psap-ci-artifacts-master-ods-jh-on-ocp
+    rerun_command: /test ods-jh-on-ocp
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=jh-at-scale
+        - --target=jh-on-ocp
         - --variant=ods
         command:
         - ci-operator
@@ -1123,14 +1121,8 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -1140,26 +1132,20 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: hive-hive-credentials
-        secret:
-          secretName: hive-hive-credentials
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ods-jh-at-scale,?($|\s.*)
+    trigger: (?m)^/test( | .* )ods-jh-on-ocp,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^master$
     - ^master-
     cluster: build01
-    context: ci/prow/ods-jh-full-scale
+    context: ci/prow/ods-jh-on-osd
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -1167,15 +1153,15 @@ presubmits:
       ci-operator.openshift.io/variant: ods
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-psap-ci-artifacts-master-ods-jh-full-scale
-    rerun_command: /test ods-jh-full-scale
+    name: pull-ci-openshift-psap-ci-artifacts-master-ods-jh-on-osd
+    rerun_command: /test ods-jh-on-osd
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=jh-full-scale
+        - --target=jh-on-osd
         - --variant=ods
         command:
         - ci-operator
@@ -1203,7 +1189,58 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ods-jh-full-scale,?($|\s.*)
+    trigger: (?m)^/test( | .* )ods-jh-on-osd,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build01
+    context: ci/prow/ods-jh-on-single
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: ods
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-psap-ci-artifacts-master-ods-jh-on-single
+    rerun_command: /test ods-jh-on-single
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=jh-on-single
+        - --variant=ods
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ods-jh-on-single,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
