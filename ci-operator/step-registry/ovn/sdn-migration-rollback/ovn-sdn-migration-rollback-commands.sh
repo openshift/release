@@ -24,6 +24,14 @@ EOT
 # Allow rollback
 # Change network to target network in Network.config.openshift.io the CR to trigger machine config update by MCO.
 oc patch Network.operator.openshift.io cluster --type='merge' --patch "{\"spec\":{\"migration\":{\"networkType\":\"${TARGET}\"}}}"
+timeout 60s bash <<EOT
+until
+  oc get network.config cluster -o jsonpath='{.status.migration.networkType}'| grep OpenShiftSDN;
+do
+  echo "wait until OpenShiftSDN is set at migration.networkType"
+  sleep 3
+done
+EOT
 oc patch Network.config.openshift.io cluster --type='merge' --patch "{\"spec\":{\"networkType\":\"${TARGET}\"}}"
 
 oc wait co network --for='condition=PROGRESSING=True' --timeout=30s
