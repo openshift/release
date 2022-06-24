@@ -60,6 +60,9 @@ spec:
       - name: bugzilla-token
         secret:
           secretName: bugzilla-credentials-openshift-bugzilla-robot
+      - name: jira-token
+        secret:
+          secretName: jira-credentials-openshift-jira-robot
       containers:
       - name: web
         image: ci-search:latest
@@ -70,6 +73,8 @@ spec:
         volumeMounts:
         - name: bugzilla-token
           mountPath: /etc/bugzilla/
+        - name: jira-token
+          mountPath: /etc/jira/
         - mountPath: /var/lib/ci-search/
           name: search
         command:
@@ -85,6 +90,9 @@ spec:
         - --bugzilla-url=https://bugzilla.redhat.com/rest
         - --bugzilla-token-file=/etc/bugzilla/api
         - --bugzilla-search=OPEN version:4.14,4.13,4.12,4.11,4.10,4.9,4.8,4.7,4.6,4.5,4.4,4.3,4.2 product="OpenShift Container Platform" AND delta_ts>-2w
+        - --jira-url=https://issues.redhat.com
+        - --jira-token-file=/etc/jira/api
+        - --jira-search="project=OCPBUGS&created>='-14d'&status!='CLOSED'&affectedVersion IN (4.14,4.13,4.12,4.11,4.10,4.9,4.8,4.7,4.6,4.5,4.4,4.3,4.2)"
   updateStrategy:
     rollingUpdate:
       partition: 0
