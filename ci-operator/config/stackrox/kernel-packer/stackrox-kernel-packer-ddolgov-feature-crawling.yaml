@@ -18,7 +18,18 @@ tests:
   steps:
     test:
     - as: crawl
-      commands: .openshift-ci/crawl/main.sh
+      commands: .openshift-ci/crawler/crawl.sh
+      credentials:
+      - mount_path: /tmp/secret/stackrox-kernel-packer-crawl
+        name: stackrox-kernel-packer-crawl-test
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 4000m
+          memory: 4000Mi
+    - as: repackage
+      commands: .openshift-ci/crawler/repackage.sh
       credentials:
       - mount_path: /tmp/secret/stackrox-kernel-packer-crawl
         name: stackrox-kernel-packer-crawl-test
