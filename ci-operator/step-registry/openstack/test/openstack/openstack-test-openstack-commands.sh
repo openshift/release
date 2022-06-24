@@ -15,4 +15,4 @@ then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-openstack-tests run --run '\[Feature:openstack\]' openshift/conformance
+openstack-tests run openshift/openstack
