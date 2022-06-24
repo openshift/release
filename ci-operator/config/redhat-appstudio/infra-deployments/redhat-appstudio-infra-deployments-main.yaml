@@ -1,3 +1,8 @@
+base_images:
+  test_runner:
+    name: redhat-appstudio-e2e-test-runner
+    namespace: ci
+    tag: latest
 releases:
   latest:
     release:
@@ -22,6 +27,8 @@ tests:
     version: "4.10"
   skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
+    dependencies:
+      CONTAINER_IMAGE: test_runner
     test:
     - ref: redhat-appstudio-e2e
     workflow: generic-claim
@@ -29,6 +36,8 @@ tests:
   cron: 0 */24 * * *
   steps:
     cluster_profile: aws
+    dependencies:
+      CONTAINER_IMAGE: test_runner
     test:
     - ref: redhat-appstudio-e2e
     workflow: ipi-aws
