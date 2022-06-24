@@ -38,7 +38,7 @@ cfg["networking"]["networkType"] = "'${NETWORK_TYPE}'"
 platform = cfg["controlPlane"]["platform"]
 if "aws" in platform:
     platform["aws"]["type"] = "'${SINGLE_NODE_AWS_INSTANCE_TYPE}'"
-    platform["aws"]["rootVolume"] = {"iops": 5000, "size": 150, "type": "gp3" }
+    platform["aws"]["rootVolume"] = {"iops": 15000, "size": 1000, "type": "gp3" }
 else:
     raise ValueError("This step only applies to AWS, please use the correct step for your platform")
 
