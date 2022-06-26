@@ -39,6 +39,7 @@ images=(${ASSISTED_AGENT_IMAGE} ${ASSISTED_CONTROLLER_IMAGE} ${ASSISTED_INSTALLE
 
 cat << VARS >> /root/config
 export DISCONNECTED="${DISCONNECTED:-}"
+export ALLOW_CONVERGED_FLOW="${ALLOW_CONVERGED_FLOW:-}"
 
 # TODO: remove this and support mirroring an index referenced by digest value
 # https://issues.redhat.com/browse/MGMT-6858
