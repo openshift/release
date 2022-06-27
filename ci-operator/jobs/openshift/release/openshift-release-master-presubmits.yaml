@@ -911,6 +911,32 @@ presubmits:
     - ^master$
     - ^master-
     cluster: build04
+    context: ci/prow/jira-lifecycle-config
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-jira-lifecycle-config
+    rerun_command: /test jira-lifecycle-config
+    run_if_changed: ^core-services/jira-lifecycle-plugin/config.yaml
+    spec:
+      containers:
+      - args:
+        - --validate-config=core-services/jira-lifecycle-plugin/config.yaml
+        command:
+        - jira-lifecycle-plugin
+        image: registry.ci.openshift.org/ci/jira-lifecycle-plugin
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )jira-lifecycle-config,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build04
     context: ci/prow/ordered-prow-config
     decorate: true
     labels:
