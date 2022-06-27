@@ -2,6 +2,11 @@ build_root:
   project_image:
     context_dir: kernel-crawler
     dockerfile_path: Dockerfile.ubi
+images:
+- dockerfile_path: Dockerfile
+  from: ubi8
+  context_dir: packers
+  to: kernel-crawler-packers
 resources:
   '*':
     limits:
@@ -34,7 +39,8 @@ tests:
       - mount_path: /tmp/secret/stackrox-kernel-packer-crawl
         name: stackrox-kernel-packer-crawl-test
         namespace: test-credentials
-      from: src
+      container:
+        from: kernel-crawler-packers
       resources:
         requests:
           cpu: 4000m
