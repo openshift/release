@@ -1,0 +1,35 @@
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM podman
+releases:
+  initial:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.9"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.9"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 250Mi
+tests:
+- as: acceptance
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+       echo "From alpine" >> Dockerfile && \
+       podman build -t alpine-test . 
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
