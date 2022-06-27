@@ -53,10 +53,17 @@ tests:
         set -x
         export KUBECONFIG="${SHARED_DIR}/kubeconfig"
         make dev-env
-        make e2e-tests
+        source .venv/bin/activate
+        # doc for secret
+        # https://vault.ci.openshift.org/ui/vault/secrets/kv/show/selfservice/konveyor/pelorus/pelorus-github"
+        # "secretsync/target-name: pelorus-github-secret"
+        # "secretsync/target-namespace: test-credentials"
+        ls /var/run/konveyor/pelorus/pelorus-github
+        export TOKEN=$(cat /var/run/konveyor/pelorus/pelorus-github/TOKEN)
+        ./scripts/run-pelorus-e2e-tests -o konveyor -e failure
       credentials:
-      - mount_path: /var/run/konveyor/pelorus/github
-        name: github
+      - mount_path: /var/run/konveyor/pelorus/pelorus-github
+        name: pelorus-github-secret
         namespace: test-credentials
       from: src
       resources:
