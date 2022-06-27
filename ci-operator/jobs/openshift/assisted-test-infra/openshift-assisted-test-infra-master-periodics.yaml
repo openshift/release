@@ -3,6 +3,8 @@ periodics:
   cluster: build03
   cron: 0 */2 * * *
   decorate: true
+  decoration_config:
+    skip_cloning: true
   extra_refs:
   - base_ref: master
     org: openshift
@@ -10,9 +12,19 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: packet-edge
     ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+    ci-operator.openshift.io/variant: periodic
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-assisted-packet-check
+  name: periodic-ci-openshift-assisted-test-infra-master-periodic-assisted-packet-check
+  reporter_config:
+    slack:
+      channel: '#assisted-deployment-ci'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
+        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs>'
   spec:
     containers:
     - args:
@@ -23,6 +35,7 @@ periodics:
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/assisted-packet-check-cluster-profile
       - --target=assisted-packet-check
+      - --variant=periodic
       command:
       - ci-operator
       image: ci-operator:latest
@@ -71,8 +84,10 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
-  cron: 53 3 * * *
+  cron: 28 2 * * *
   decorate: true
+  decoration_config:
+    skip_cloning: true
   extra_refs:
   - base_ref: master
     org: openshift
@@ -80,9 +95,10 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: packet-edge
     ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+    ci-operator.openshift.io/variant: periodic
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-4-10-periodic
+  name: periodic-ci-openshift-assisted-test-infra-master-periodic-e2e-metal-assisted
   reporter_config:
     slack:
       channel: '#assisted-deployment-ci'
@@ -100,8 +116,9 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-metal-assisted-4-10-periodic-cluster-profile
-      - --target=e2e-metal-assisted-4-10-periodic
+      - --secret-dir=/usr/local/e2e-metal-assisted-cluster-profile
+      - --target=e2e-metal-assisted
+      - --variant=periodic
       command:
       - ci-operator
       image: ci-operator:latest
@@ -117,7 +134,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-metal-assisted-4-10-periodic-cluster-profile
+      - mountPath: /usr/local/e2e-metal-assisted-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -150,8 +167,10 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
-  cron: 6 22 * * *
+  cron: 19 23 * * *
   decorate: true
+  decoration_config:
+    skip_cloning: true
   extra_refs:
   - base_ref: master
     org: openshift
@@ -159,9 +178,10 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: packet-edge
     ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+    ci-operator.openshift.io/variant: periodic
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-4-11-periodic
+  name: periodic-ci-openshift-assisted-test-infra-master-periodic-e2e-metal-assisted-4-10
   reporter_config:
     slack:
       channel: '#assisted-deployment-ci'
@@ -179,8 +199,9 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-metal-assisted-4-11-periodic-cluster-profile
-      - --target=e2e-metal-assisted-4-11-periodic
+      - --secret-dir=/usr/local/e2e-metal-assisted-4-10-cluster-profile
+      - --target=e2e-metal-assisted-4-10
+      - --variant=periodic
       command:
       - ci-operator
       image: ci-operator:latest
@@ -196,7 +217,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-metal-assisted-4-11-periodic-cluster-profile
+      - mountPath: /usr/local/e2e-metal-assisted-4-10-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -229,8 +250,10 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
-  cron: 32 0 * * *
+  cron: 18 22 * * *
   decorate: true
+  decoration_config:
+    skip_cloning: true
   extra_refs:
   - base_ref: master
     org: openshift
@@ -238,9 +261,10 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: packet-edge
     ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+    ci-operator.openshift.io/variant: periodic
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-4-8-periodic
+  name: periodic-ci-openshift-assisted-test-infra-master-periodic-e2e-metal-assisted-4-11
   reporter_config:
     slack:
       channel: '#assisted-deployment-ci'
@@ -258,8 +282,9 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-metal-assisted-4-8-periodic-cluster-profile
-      - --target=e2e-metal-assisted-4-8-periodic
+      - --secret-dir=/usr/local/e2e-metal-assisted-4-11-cluster-profile
+      - --target=e2e-metal-assisted-4-11
+      - --variant=periodic
       command:
       - ci-operator
       image: ci-operator:latest
@@ -275,7 +300,339 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-metal-assisted-4-8-periodic-cluster-profile
+      - mountPath: /usr/local/e2e-metal-assisted-4-11-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-packet-assisted
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build03
+  cron: 20 0 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: assisted-test-infra
+  labels:
+    ci-operator.openshift.io/cloud: packet-edge
+    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+    ci-operator.openshift.io/variant: periodic
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-assisted-test-infra-master-periodic-e2e-metal-assisted-4-8
+  reporter_config:
+    slack:
+      channel: '#assisted-deployment-ci'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
+        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs>'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-metal-assisted-4-8-cluster-profile
+      - --target=e2e-metal-assisted-4-8
+      - --variant=periodic
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-metal-assisted-4-8-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-packet-assisted
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build03
+  cron: 21 1 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: assisted-test-infra
+  labels:
+    ci-operator.openshift.io/cloud: packet-edge
+    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+    ci-operator.openshift.io/variant: periodic
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-assisted-test-infra-master-periodic-e2e-metal-assisted-4-9
+  reporter_config:
+    slack:
+      channel: '#assisted-deployment-ci'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
+        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs>'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-metal-assisted-4-9-cluster-profile
+      - --target=e2e-metal-assisted-4-9
+      - --variant=periodic
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-metal-assisted-4-9-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-packet-assisted
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build03
+  cron: 40 2 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: assisted-test-infra
+  labels:
+    ci-operator.openshift.io/cloud: packet-edge
+    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+    ci-operator.openshift.io/variant: periodic
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-assisted-test-infra-master-periodic-e2e-metal-assisted-cnv
+  reporter_config:
+    slack:
+      channel: '#assisted-deployment-ci'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
+        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs>'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-metal-assisted-cnv-cluster-profile
+      - --target=e2e-metal-assisted-cnv
+      - --variant=periodic
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-metal-assisted-cnv-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-packet-assisted
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build03
+  cron: 33 1 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: assisted-test-infra
+  labels:
+    ci-operator.openshift.io/cloud: packet-edge
+    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+    ci-operator.openshift.io/variant: periodic
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-assisted-test-infra-master-periodic-e2e-metal-assisted-day2
+  reporter_config:
+    slack:
+      channel: '#assisted-deployment-ci'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
+        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs>'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-metal-assisted-day2-cluster-profile
+      - --target=e2e-metal-assisted-day2
+      - --variant=periodic
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-metal-assisted-day2-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -310,6 +667,8 @@ periodics:
   cluster: build03
   cron: 15 1 * * *
   decorate: true
+  decoration_config:
+    skip_cloning: true
   extra_refs:
   - base_ref: master
     org: openshift
@@ -317,9 +676,10 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: packet-edge
     ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+    ci-operator.openshift.io/variant: periodic
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-4-9-periodic
+  name: periodic-ci-openshift-assisted-test-infra-master-periodic-e2e-metal-assisted-day2-single-node
   reporter_config:
     slack:
       channel: '#assisted-deployment-ci'
@@ -337,8 +697,9 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-metal-assisted-4-9-periodic-cluster-profile
-      - --target=e2e-metal-assisted-4-9-periodic
+      - --secret-dir=/usr/local/e2e-metal-assisted-day2-single-node-cluster-profile
+      - --target=e2e-metal-assisted-day2-single-node
+      - --variant=periodic
       command:
       - ci-operator
       image: ci-operator:latest
@@ -354,7 +715,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-metal-assisted-4-9-periodic-cluster-profile
+      - mountPath: /usr/local/e2e-metal-assisted-day2-single-node-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -387,8 +748,10 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
-  cron: 36 22 * * *
+  cron: 12 22 * * *
   decorate: true
+  decoration_config:
+    skip_cloning: true
   extra_refs:
   - base_ref: master
     org: openshift
@@ -396,9 +759,10 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: packet-edge
     ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+    ci-operator.openshift.io/variant: periodic
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-cnv-periodic
+  name: periodic-ci-openshift-assisted-test-infra-master-periodic-e2e-metal-assisted-ipv4v6
   reporter_config:
     slack:
       channel: '#assisted-deployment-ci'
@@ -416,8 +780,9 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-metal-assisted-cnv-periodic-cluster-profile
-      - --target=e2e-metal-assisted-cnv-periodic
+      - --secret-dir=/usr/local/e2e-metal-assisted-ipv4v6-cluster-profile
+      - --target=e2e-metal-assisted-ipv4v6
+      - --variant=periodic
       command:
       - ci-operator
       image: ci-operator:latest
@@ -433,7 +798,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-metal-assisted-cnv-periodic-cluster-profile
+      - mountPath: /usr/local/e2e-metal-assisted-ipv4v6-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -466,8 +831,10 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
-  cron: 39 1 * * *
+  cron: 58 2 * * *
   decorate: true
+  decoration_config:
+    skip_cloning: true
   extra_refs:
   - base_ref: master
     org: openshift
@@ -475,9 +842,10 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: packet-edge
     ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+    ci-operator.openshift.io/variant: periodic
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-day2-periodic
+  name: periodic-ci-openshift-assisted-test-infra-master-periodic-e2e-metal-assisted-ipv6
   reporter_config:
     slack:
       channel: '#assisted-deployment-ci'
@@ -495,8 +863,9 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-metal-assisted-day2-periodic-cluster-profile
-      - --target=e2e-metal-assisted-day2-periodic
+      - --secret-dir=/usr/local/e2e-metal-assisted-ipv6-cluster-profile
+      - --target=e2e-metal-assisted-ipv6
+      - --variant=periodic
       command:
       - ci-operator
       image: ci-operator:latest
@@ -512,7 +881,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-metal-assisted-day2-periodic-cluster-profile
+      - mountPath: /usr/local/e2e-metal-assisted-ipv6-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -545,8 +914,10 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
-  cron: 29 3 * * *
+  cron: 43 23 * * *
   decorate: true
+  decoration_config:
+    skip_cloning: true
   extra_refs:
   - base_ref: master
     org: openshift
@@ -554,9 +925,10 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: packet-edge
     ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+    ci-operator.openshift.io/variant: periodic
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-day2-single-node-periodic
+  name: periodic-ci-openshift-assisted-test-infra-master-periodic-e2e-metal-assisted-ipxe
   reporter_config:
     slack:
       channel: '#assisted-deployment-ci'
@@ -574,8 +946,9 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-metal-assisted-day2-single-node-periodic-cluster-profile
-      - --target=e2e-metal-assisted-day2-single-node-periodic
+      - --secret-dir=/usr/local/e2e-metal-assisted-ipxe-cluster-profile
+      - --target=e2e-metal-assisted-ipxe
+      - --variant=periodic
       command:
       - ci-operator
       image: ci-operator:latest
@@ -591,7 +964,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-metal-assisted-day2-single-node-periodic-cluster-profile
+      - mountPath: /usr/local/e2e-metal-assisted-ipxe-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -624,8 +997,10 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
-  cron: 16 2 * * *
+  cron: 20 0 * * *
   decorate: true
+  decoration_config:
+    skip_cloning: true
   extra_refs:
   - base_ref: master
     org: openshift
@@ -633,9 +1008,10 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: packet-edge
     ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+    ci-operator.openshift.io/variant: periodic
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-ipv4v6-periodic
+  name: periodic-ci-openshift-assisted-test-infra-master-periodic-e2e-metal-assisted-kube-api-late-binding-single-node
   reporter_config:
     slack:
       channel: '#assisted-deployment-ci'
@@ -653,8 +1029,9 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-metal-assisted-ipv4v6-periodic-cluster-profile
-      - --target=e2e-metal-assisted-ipv4v6-periodic
+      - --secret-dir=/usr/local/e2e-metal-assisted-kube-api-late-binding-single-node-cluster-profile
+      - --target=e2e-metal-assisted-kube-api-late-binding-single-node
+      - --variant=periodic
       command:
       - ci-operator
       image: ci-operator:latest
@@ -670,7 +1047,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-metal-assisted-ipv4v6-periodic-cluster-profile
+      - mountPath: /usr/local/e2e-metal-assisted-kube-api-late-binding-single-node-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -703,8 +1080,10 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
-  cron: 22 2 * * *
+  cron: 24 22 * * *
   decorate: true
+  decoration_config:
+    skip_cloning: true
   extra_refs:
   - base_ref: master
     org: openshift
@@ -712,9 +1091,10 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: packet-edge
     ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+    ci-operator.openshift.io/variant: periodic
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-ipv6-periodic
+  name: periodic-ci-openshift-assisted-test-infra-master-periodic-e2e-metal-assisted-kube-api-net-suite
   reporter_config:
     slack:
       channel: '#assisted-deployment-ci'
@@ -732,8 +1112,9 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-metal-assisted-ipv6-periodic-cluster-profile
-      - --target=e2e-metal-assisted-ipv6-periodic
+      - --secret-dir=/usr/local/e2e-metal-assisted-kube-api-net-suite-cluster-profile
+      - --target=e2e-metal-assisted-kube-api-net-suite
+      - --variant=periodic
       command:
       - ci-operator
       image: ci-operator:latest
@@ -749,7 +1130,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-metal-assisted-ipv6-periodic-cluster-profile
+      - mountPath: /usr/local/e2e-metal-assisted-kube-api-net-suite-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -782,8 +1163,10 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
-  cron: 37 23 * * *
+  cron: 43 23 * * *
   decorate: true
+  decoration_config:
+    skip_cloning: true
   extra_refs:
   - base_ref: master
     org: openshift
@@ -791,9 +1174,10 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: packet-edge
     ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+    ci-operator.openshift.io/variant: periodic
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-ipxe-periodic
+  name: periodic-ci-openshift-assisted-test-infra-master-periodic-e2e-metal-assisted-none
   reporter_config:
     slack:
       channel: '#assisted-deployment-ci'
@@ -811,8 +1195,9 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-metal-assisted-ipxe-periodic-cluster-profile
-      - --target=e2e-metal-assisted-ipxe-periodic
+      - --secret-dir=/usr/local/e2e-metal-assisted-none-cluster-profile
+      - --target=e2e-metal-assisted-none
+      - --variant=periodic
       command:
       - ci-operator
       image: ci-operator:latest
@@ -828,7 +1213,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-metal-assisted-ipxe-periodic-cluster-profile
+      - mountPath: /usr/local/e2e-metal-assisted-none-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -861,8 +1246,10 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
-  cron: 0 22 * * *
+  cron: 54 22 * * *
   decorate: true
+  decoration_config:
+    skip_cloning: true
   extra_refs:
   - base_ref: master
     org: openshift
@@ -870,9 +1257,10 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: packet-edge
     ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+    ci-operator.openshift.io/variant: periodic
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-kube-api-net-suite-periodic
+  name: periodic-ci-openshift-assisted-test-infra-master-periodic-e2e-metal-assisted-ocs
   reporter_config:
     slack:
       channel: '#assisted-deployment-ci'
@@ -890,8 +1278,9 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-metal-assisted-kube-api-net-suite-periodic-cluster-profile
-      - --target=e2e-metal-assisted-kube-api-net-suite-periodic
+      - --secret-dir=/usr/local/e2e-metal-assisted-ocs-cluster-profile
+      - --target=e2e-metal-assisted-ocs
+      - --variant=periodic
       command:
       - ci-operator
       image: ci-operator:latest
@@ -907,718 +1296,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-metal-assisted-kube-api-net-suite-periodic-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-packet-assisted
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build03
-  cron: 13 23 * * *
-  decorate: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: assisted-test-infra
-  labels:
-    ci-operator.openshift.io/cloud: packet-edge
-    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-none-periodic
-  reporter_config:
-    slack:
-      channel: '#assisted-deployment-ci'
-      job_states_to_report:
-      - failure
-      - error
-      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
-        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs>'
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-metal-assisted-none-periodic-cluster-profile
-      - --target=e2e-metal-assisted-none-periodic
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/e2e-metal-assisted-none-periodic-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-packet-assisted
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build03
-  cron: 50 0 * * *
-  decorate: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: assisted-test-infra
-  labels:
-    ci-operator.openshift.io/cloud: packet-edge
-    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-ocs-periodic
-  reporter_config:
-    slack:
-      channel: '#assisted-deployment-ci'
-      job_states_to_report:
-      - failure
-      - error
-      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
-        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs>'
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-metal-assisted-ocs-periodic-cluster-profile
-      - --target=e2e-metal-assisted-ocs-periodic
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/e2e-metal-assisted-ocs-periodic-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-packet-assisted
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build03
-  cron: 42 22 * * *
-  decorate: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: assisted-test-infra
-  labels:
-    ci-operator.openshift.io/cloud: packet-edge
-    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-odf-periodic
-  reporter_config:
-    slack:
-      channel: '#assisted-deployment-ci'
-      job_states_to_report:
-      - failure
-      - error
-      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
-        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs>'
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-metal-assisted-odf-periodic-cluster-profile
-      - --target=e2e-metal-assisted-odf-periodic
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/e2e-metal-assisted-odf-periodic-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-packet-assisted
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build03
-  cron: 38 0 * * *
-  decorate: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: assisted-test-infra
-  labels:
-    ci-operator.openshift.io/cloud: packet-edge
-    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-onprem-periodic
-  reporter_config:
-    slack:
-      channel: '#assisted-deployment-ci'
-      job_states_to_report:
-      - failure
-      - error
-      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
-        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs>'
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-metal-assisted-onprem-periodic-cluster-profile
-      - --target=e2e-metal-assisted-onprem-periodic
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/e2e-metal-assisted-onprem-periodic-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-packet-assisted
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build03
-  cron: 52 2 * * *
-  decorate: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: assisted-test-infra
-  labels:
-    ci-operator.openshift.io/cloud: packet-edge
-    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-periodic
-  reporter_config:
-    slack:
-      channel: '#assisted-deployment-ci'
-      job_states_to_report:
-      - failure
-      - error
-      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
-        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs>'
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-metal-assisted-periodic-cluster-profile
-      - --target=e2e-metal-assisted-periodic
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/e2e-metal-assisted-periodic-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-packet-assisted
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build03
-  cron: 30 22 * * *
-  decorate: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: assisted-test-infra
-  labels:
-    ci-operator.openshift.io/cloud: packet-edge
-    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-prod-periodic
-  reporter_config:
-    slack:
-      channel: '#assisted-deployment-ci'
-      job_states_to_report:
-      - failure
-      - error
-      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
-        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs>'
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-metal-assisted-prod-periodic-cluster-profile
-      - --target=e2e-metal-assisted-prod-periodic
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/e2e-metal-assisted-prod-periodic-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-packet-assisted
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build03
-  cron: 22 2 * * *
-  decorate: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: assisted-test-infra
-  labels:
-    ci-operator.openshift.io/cloud: packet-edge
-    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-single-node-periodic
-  reporter_config:
-    slack:
-      channel: '#assisted-deployment-ci'
-      job_states_to_report:
-      - failure
-      - error
-      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
-        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs>'
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-metal-assisted-single-node-periodic-cluster-profile
-      - --target=e2e-metal-assisted-single-node-periodic
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/e2e-metal-assisted-single-node-periodic-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-packet-assisted
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build03
-  cron: 32 0 * * *
-  decorate: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: assisted-test-infra
-  labels:
-    ci-operator.openshift.io/cloud: packet-edge
-    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-static-ip-suite-periodic
-  reporter_config:
-    slack:
-      channel: '#assisted-deployment-ci'
-      job_states_to_report:
-      - failure
-      - error
-      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
-        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs>'
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-metal-assisted-static-ip-suite-periodic-cluster-profile
-      - --target=e2e-metal-assisted-static-ip-suite-periodic
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/e2e-metal-assisted-static-ip-suite-periodic-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-packet-assisted
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build03
-  cron: 23 3 * * *
-  decorate: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: assisted-test-infra
-  labels:
-    ci-operator.openshift.io/cloud: packet-edge
-    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-tang-periodic
-  reporter_config:
-    slack:
-      channel: '#assisted-deployment-ci'
-      job_states_to_report:
-      - failure
-      - error
-      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
-        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs>'
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-metal-assisted-tang-periodic-cluster-profile
-      - --target=e2e-metal-assisted-tang-periodic
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/e2e-metal-assisted-tang-periodic-cluster-profile
+      - mountPath: /usr/local/e2e-metal-assisted-ocs-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -1653,6 +1331,8 @@ periodics:
   cluster: build03
   cron: 34 2 * * *
   decorate: true
+  decoration_config:
+    skip_cloning: true
   extra_refs:
   - base_ref: master
     org: openshift
@@ -1660,9 +1340,10 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: packet-edge
     ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+    ci-operator.openshift.io/variant: periodic
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-e2e-metal-assisted-tpmv2-periodic
+  name: periodic-ci-openshift-assisted-test-infra-master-periodic-e2e-metal-assisted-odf
   reporter_config:
     slack:
       channel: '#assisted-deployment-ci'
@@ -1680,8 +1361,9 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-metal-assisted-tpmv2-periodic-cluster-profile
-      - --target=e2e-metal-assisted-tpmv2-periodic
+      - --secret-dir=/usr/local/e2e-metal-assisted-odf-cluster-profile
+      - --target=e2e-metal-assisted-odf
+      - --variant=periodic
       command:
       - ci-operator
       image: ci-operator:latest
@@ -1697,7 +1379,505 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-metal-assisted-tpmv2-periodic-cluster-profile
+      - mountPath: /usr/local/e2e-metal-assisted-odf-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-packet-assisted
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build03
+  cron: 2 0 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: assisted-test-infra
+  labels:
+    ci-operator.openshift.io/cloud: packet-edge
+    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+    ci-operator.openshift.io/variant: periodic
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-assisted-test-infra-master-periodic-e2e-metal-assisted-onprem
+  reporter_config:
+    slack:
+      channel: '#assisted-deployment-ci'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
+        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs>'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-metal-assisted-onprem-cluster-profile
+      - --target=e2e-metal-assisted-onprem
+      - --variant=periodic
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-metal-assisted-onprem-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-packet-assisted
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build03
+  cron: 26 0 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: assisted-test-infra
+  labels:
+    ci-operator.openshift.io/cloud: packet-edge
+    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+    ci-operator.openshift.io/variant: periodic
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-assisted-test-infra-master-periodic-e2e-metal-assisted-prod
+  reporter_config:
+    slack:
+      channel: '#assisted-deployment-ci'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
+        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs>'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-metal-assisted-prod-cluster-profile
+      - --target=e2e-metal-assisted-prod
+      - --variant=periodic
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-metal-assisted-prod-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-packet-assisted
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build03
+  cron: 42 22 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: assisted-test-infra
+  labels:
+    ci-operator.openshift.io/cloud: packet-edge
+    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+    ci-operator.openshift.io/variant: periodic
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-assisted-test-infra-master-periodic-e2e-metal-assisted-single-node
+  reporter_config:
+    slack:
+      channel: '#assisted-deployment-ci'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
+        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs>'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-metal-assisted-single-node-cluster-profile
+      - --target=e2e-metal-assisted-single-node
+      - --variant=periodic
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-metal-assisted-single-node-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-packet-assisted
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build03
+  cron: 4 2 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: assisted-test-infra
+  labels:
+    ci-operator.openshift.io/cloud: packet-edge
+    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+    ci-operator.openshift.io/variant: periodic
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-assisted-test-infra-master-periodic-e2e-metal-assisted-static-ip-suite
+  reporter_config:
+    slack:
+      channel: '#assisted-deployment-ci'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
+        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs>'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-metal-assisted-static-ip-suite-cluster-profile
+      - --target=e2e-metal-assisted-static-ip-suite
+      - --variant=periodic
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-metal-assisted-static-ip-suite-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-packet-assisted
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build03
+  cron: 33 1 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: assisted-test-infra
+  labels:
+    ci-operator.openshift.io/cloud: packet-edge
+    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+    ci-operator.openshift.io/variant: periodic
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-assisted-test-infra-master-periodic-e2e-metal-assisted-tang
+  reporter_config:
+    slack:
+      channel: '#assisted-deployment-ci'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
+        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs>'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-metal-assisted-tang-cluster-profile
+      - --target=e2e-metal-assisted-tang
+      - --variant=periodic
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-metal-assisted-tang-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-packet-assisted
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build03
+  cron: 46 2 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: assisted-test-infra
+  labels:
+    ci-operator.openshift.io/cloud: packet-edge
+    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+    ci-operator.openshift.io/variant: periodic
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-assisted-test-infra-master-periodic-e2e-metal-assisted-tpmv2
+  reporter_config:
+    slack:
+      channel: '#assisted-deployment-ci'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
+        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs>'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-metal-assisted-tpmv2-cluster-profile
+      - --target=e2e-metal-assisted-tpmv2
+      - --variant=periodic
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-metal-assisted-tpmv2-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -1732,6 +1912,8 @@ periodics:
   cluster: build03
   cron: 0 */2 * * *
   decorate: true
+  decoration_config:
+    skip_cloning: true
   extra_refs:
   - base_ref: master
     org: openshift
@@ -1739,9 +1921,19 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: packet-edge
     ci-operator.openshift.io/cloud-cluster-profile: packet-sno
+    ci-operator.openshift.io/variant: periodic
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-test-infra-master-sno-packet-check
+  name: periodic-ci-openshift-assisted-test-infra-master-periodic-sno-packet-check
+  reporter_config:
+    slack:
+      channel: '#assisted-deployment-ci'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
+        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs>'
   spec:
     containers:
     - args:
@@ -1752,6 +1944,7 @@ periodics:
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/sno-packet-check-cluster-profile
       - --target=sno-packet-check
+      - --variant=periodic
       command:
       - ci-operator
       image: ci-operator:latest
