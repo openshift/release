@@ -35,7 +35,10 @@ echo "### Gathering logs..."
 timeout -s 9 30m ssh "${SSHOPTS[@]}" "root@${IP}" bash - <<EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
 
 set -xeuo pipefail
-cd /home/assisted
+
+cd /home/
+git clone https://github.com/osherdp/assisted-test-infra --branch try/snapshot-machines
+cd assisted-test-infra/
 source /root/config
 
 # Get sosreport including sar data
