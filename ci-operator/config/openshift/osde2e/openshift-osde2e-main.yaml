@@ -266,6 +266,42 @@ tests:
     name: osde2e-credentials
   - mount_path: /usr/local/osde2e-rosa-prod
     name: osde2e-rosa-prod
+- as: osde2e-stage-aws-addon-mcg-osd
+  cron: 0 6,18 * * *
+  steps:
+    test:
+    - as: addon-mcg-osd-tests
+      commands: |
+        export ADDON_IDS="mcg-osd"
+        export ADDON_PARAMETERS="{\"mcg-osd\":{\"notification-email-0\": \"data-federation-engg-team@redhat.com\"}}"
+        export ADDON_POLLING_TIMEOUT="14400"
+        export ADDON_TEST_HARNESSES="quay.io/rexagod/mcg-osd-deployer:harness-32"
+        export CHANNEL="stable"
+        export CLOUD_PROVIDER_REGION="us-west-2"
+        export CONFIGS="aws,stage,addon-suite"
+        export NUM_WORKER_NODES="3"
+        export OCM_CCS="true"
+        export OCM_COMPUTE_MACHINE_TYPE="m5.2xlarge"
+        export REPORT_DIR="${ARTIFACT_DIR}"
+        export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-mcg-osd-credentials"
+
+        /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
+      credentials:
+      - mount_path: /usr/local/osde2e-common
+        name: osde2e-common
+        namespace: test-credentials
+      - mount_path: /usr/local/osde2e-mcg-osd-credentials
+        name: osde2e-mcg-osd-credentials
+        namespace: test-credentials
+      from_image:
+        name: osde2e
+        namespace: ci
+        tag: latest
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 6h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift
