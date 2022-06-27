@@ -52,11 +52,19 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/stackrox/stackrox/image/postgres/.
   to: central-db
+- dockerfile_path: Dockerfile
+  inputs:
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/stackrox/stackrox/docs/.
+  to: docs
 resources:
   '*':
     requests:
       cpu: 2000m
       memory: 4000Mi
+test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
 tests:
 - as: push-images
   steps:
@@ -68,6 +76,8 @@ tests:
         name: stackrox-stackrox-push
         namespace: test-credentials
       dependencies:
+      - env: PIPELINE_DOCS_IMAGE
+        name: docs
       - env: MAIN_IMAGE
         name: main
       - env: ROXCTL_IMAGE
@@ -94,11 +104,11 @@ tests:
 - as: grouped-static-checks
   steps:
     env:
-      TEST_SUITE: generated-checks
+      TEST_SUITE: check-generated
     test:
     - ref: stackrox-initial
     - as: todo-checks
-      commands: .openshift-ci/dispatch.sh todo-checks
+      commands: .openshift-ci/dispatch.sh check-todos
       credentials:
       - mount_path: /tmp/secret/stackrox-stackrox-initial
         name: stackrox-stackrox-initial
@@ -109,7 +119,7 @@ tests:
           cpu: 2000m
           memory: 4000Mi
     - as: pr-fixes-checks
-      commands: .openshift-ci/dispatch.sh pr-fixes-checks
+      commands: .openshift-ci/dispatch.sh check-pr-fixes
       credentials:
       - mount_path: /tmp/secret/stackrox-stackrox-initial
         name: stackrox-stackrox-initial
@@ -149,7 +159,7 @@ tests:
     test:
     - ref: stackrox-e2e
   timeout: 3h30m0s
-- as: gke-openshift-4-e2e-tests
+- as: openshift-4-qa-e2e-tests
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -173,12 +183,44 @@ tests:
   steps:
     test:
     - ref: stackrox-e2e
+- as: gke-kernel-qa-e2e-tests
+  optional: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+  timeout: 3h30m0s
 - as: gke-upgrade-tests
   optional: true
   steps:
     test:
     - ref: stackrox-e2e
-- as: merge-push-images
+- as: gke-postgres-qa-e2e-tests
+  optional: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+  timeout: 3h30m0s
+- as: gke-scale-tests
+  optional: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+- as: gke-postgres-scale-tests
+  optional: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+- as: operator-e2e-tests
+  optional: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+- as: local-roxctl-tests
+  optional: true
+  steps:
+    test:
+    - ref: stackrox-initial
+- as: push-and-release
   postsubmit: true
   steps:
     test:
@@ -200,7 +242,28 @@ tests:
         requests:
           cpu: 2000m
           memory: 4000Mi
+    - as: release-mgmt
+      commands: .openshift-ci/dispatch.sh release-mgmt
+      credentials:
+      - mount_path: /tmp/secret/stackrox-stackrox-push
+        name: stackrox-stackrox-push
+        namespace: test-credentials
+      from: test-bin
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
 - as: merge-style-checks
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-initial
+- as: merge-policy-checks
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-initial
+- as: merge-mitre-bundles-checks
   postsubmit: true
   steps:
     test:
@@ -274,6 +337,34 @@ tests:
   steps:
     test:
     - ref: stackrox-e2e
+- as: merge-local-roxctl-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-initial
+- as: nightly-gke-qa-e2e-tests
+  cron: 0 5 * * *
+  steps:
+    env:
+      QA_TEST_TARGET: test
+    test:
+    - ref: stackrox-e2e
+  timeout: 4h0m0s
+- as: nightly-openshift-4-qa-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 4h0m0s
+    version: "4.8"
+  cron: 0 5 * * *
+  steps:
+    env:
+      QA_TEST_TARGET: test
+    test:
+    - ref: stackrox-e2e
+  timeout: 4h0m0s
 zz_generated_metadata:
   branch: RS-539-osci-check-generated
   org: stackrox
