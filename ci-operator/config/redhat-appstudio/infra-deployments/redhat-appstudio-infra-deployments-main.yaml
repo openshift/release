@@ -1,6 +1,8 @@
-build_root:
-  project_image:
-    dockerfile_path: .ci/openshift-ci/Dockerfile
+base_images:
+  test_runner:
+    name: redhat-appstudio-e2e-test-runner
+    namespace: ci
+    tag: latest
 releases:
   latest:
     release:
@@ -25,73 +27,21 @@ tests:
     version: "4.10"
   skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
+    dependencies:
+      CONTAINER_IMAGE: test_runner
     test:
-    - as: appstudio-e2e-deployment
-      cli: latest
-      commands: |
-        export PATH=$PATH:/tmp/bin
-        mkdir -p /tmp/bin
-        curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"  | bash
-        cp kustomize /tmp/bin/
-        chmod ug+x /tmp/bin/kustomize
-
-        export GITHUB_USER=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github-user)
-        export GITHUB_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github-token)
-        export QUAY_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-token)
-
-        git config --global user.name "redhat-appstudio-qe-bot"
-        git config --global user.email redhat-appstudio-qe-bot@redhat.com
-
-        mkdir -p ${HOME}/creds
-        GIT_CREDS_PATH="${HOME}/creds/file"
-        git config --global credential.helper "store --file ${GIT_CREDS_PATH}"
-        echo "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com" > ${GIT_CREDS_PATH}
-
-        /bin/bash .ci/oci-e2e-deployment.sh
-      credentials:
-      - mount_path: /usr/local/ci-secrets/redhat-appstudio-qe
-        name: ci-secrets
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 100m
+    - ref: redhat-appstudio-e2e
+    post: 
+    - ref: redhat-appstudio-e2e-gather
     workflow: generic-claim
 - as: appstudio-e2e-deployment-periodic
   cron: 0 */24 * * *
   steps:
     cluster_profile: aws
+    dependencies:
+      CONTAINER_IMAGE: test_runner
     test:
-    - as: appstudio-e2e-deployment-periodic
-      cli: latest
-      commands: |
-        export PATH=$PATH:/tmp/bin
-        mkdir -p /tmp/bin
-        curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"  | bash
-        cp kustomize /tmp/bin/
-        chmod ug+x /tmp/bin/kustomize
-
-        export GITHUB_USER=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github-user)
-        export GITHUB_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github-token)
-        export QUAY_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-token)
-
-        git config --global user.name "redhat-appstudio-qe-bot"
-        git config --global user.email redhat-appstudio-qe-bot@redhat.com
-
-        mkdir -p ${HOME}/creds
-        GIT_CREDS_PATH="${HOME}/creds/file"
-        git config --global credential.helper "store --file ${GIT_CREDS_PATH}"
-        echo "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com" > ${GIT_CREDS_PATH}
-
-        /bin/bash .ci/oci-e2e-deployment.sh
-      credentials:
-      - mount_path: /usr/local/ci-secrets/redhat-appstudio-qe
-        name: ci-secrets
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 100m
+    - ref: redhat-appstudio-e2e
     workflow: ipi-aws
 zz_generated_metadata:
   branch: main
