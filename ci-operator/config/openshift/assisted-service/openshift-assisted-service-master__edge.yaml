@@ -876,8 +876,12 @@ tests:
       POST_INSTALL_COMMANDS: |
         export TEST_FUNC=test_late_binding_kube_api_sno
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
-        make deploy_assisted_operator test_kube_api_parallel || true
-        sleep 3600
+        echo ">>>>>> nft list ruleset (BEFORE make deploy_assisted_operator) <<<<<<"
+        /usr/sbin/nft list ruleset
+        make deploy_assisted_operator 
+        echo ">>>>>> nft list ruleset (BEFORE make test_kube_api_parallel) <<<<<<"
+        /usr/sbin/nft list ruleset
+        make test_kube_api_parallel
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-kube-api-late-unbinding-ipv4-single-node
   optional: true

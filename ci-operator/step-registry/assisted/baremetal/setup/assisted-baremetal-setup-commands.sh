@@ -148,11 +148,17 @@ echo "export INSTALLER_KUBECONFIG=\${REPO_DIR}/build/kubeconfig" >> /root/config
 if [[ -e /root/assisted-additional-config ]]; then
   cat /root/assisted-additional-config >> /root/config
 fi
-
+dnf install -y nftables
 source /root/config
-
-make \${MAKEFILE_TARGET:-setup run test_parallel}
-
+echo ">>>>>> nft list ruleset (BEFORE make setup) <<<<<<"
+/usr/sbin/nft list ruleset
+make setup
+echo ">>>>>> nft list ruleset (BEFORE make run) <<<<<<"
+/usr/sbin/nft list ruleset
+make run 
+echo ">>>>>> nft list ruleset (BEFORE make test_parallel) <<<<<<"
+/usr/sbin/nft list ruleset
+make test_parallel
 EOF
 
 
