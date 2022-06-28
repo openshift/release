@@ -17,8 +17,6 @@ resources:
       memory: 4000Mi
 test_binary_build_commands: .openshift-ci/dispatch.sh noop
 tests:
-- as: generate-dump
-  steps: {}
 - as: e2e-tests
   optional: true
   steps:
@@ -33,6 +31,13 @@ tests:
     test:
     - ref: stackrox-e2e
   timeout: 1h0m0s
+- as: generate-dump
+  steps:
+    chain: stackrox-scanner-dump
+- as: merge-generate-dump
+  postsubmit: true
+  steps:
+    chain: stackrox-scanner-dump
 - as: style-checks
   steps:
     test:
