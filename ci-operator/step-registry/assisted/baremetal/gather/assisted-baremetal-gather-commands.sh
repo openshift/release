@@ -74,7 +74,7 @@ fi
 if [ "${GATHER_ALL_CLUSTERS}" == "true" ]; then
   ADDITIONAL_PARAMS="\${ADDITIONAL_PARAMS} --download-all"
 fi
-make download_cluster_logs
+make image_build download_cluster_logs
 
 for kubeconfig in \$(find \${KUBECONFIG} -type f); do
   export KUBECTL="kubectl --kubeconfig=\${kubeconfig}"
