@@ -36,6 +36,27 @@ tests:
         requests:
           cpu: 100m
     workflow: generic-claim
+- as: managed-gitops-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.10"
+  steps:
+    test:
+    - as: managed-gitops-e2e-tests
+      cli: latest
+      commands: |
+        make setup-e2e-openshift
+        timeout 12m make start-e2e &
+        make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: redhat-appstudio
