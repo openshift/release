@@ -107,6 +107,34 @@ tests:
   steps:
     test:
     - ref: stackrox-initial
+- as: grouped-static-checks
+  steps:
+    env:
+      TEST_SUITE: check-generated
+    test:
+    - ref: stackrox-initial
+    - as: check-todos
+      commands: .openshift-ci/dispatch.sh check-todos
+      credentials:
+      - mount_path: /tmp/secret/stackrox-stackrox-initial
+        name: stackrox-stackrox-initial
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+    - as: check-pr-fixes
+      commands: .openshift-ci/dispatch.sh check-pr-fixes
+      credentials:
+      - mount_path: /tmp/secret/stackrox-stackrox-initial
+        name: stackrox-stackrox-initial
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
 - as: go-unit-tests
   steps:
     test:
@@ -246,6 +274,35 @@ tests:
   steps:
     test:
     - ref: stackrox-initial
+- as: merge-grouped-static-checks
+  postsubmit: true
+  steps:
+    env:
+      TEST_SUITE: merge-check-generated
+    test:
+    - ref: stackrox-initial
+    - as: merge-check-todos
+      commands: .openshift-ci/dispatch.sh check-todos
+      credentials:
+      - mount_path: /tmp/secret/stackrox-stackrox-initial
+        name: stackrox-stackrox-initial
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+    - as: merge-check-pr-fixes
+      commands: .openshift-ci/dispatch.sh check-pr-fixes
+      credentials:
+      - mount_path: /tmp/secret/stackrox-stackrox-initial
+        name: stackrox-stackrox-initial
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
 - as: merge-go-unit-tests
   postsubmit: true
   steps:
