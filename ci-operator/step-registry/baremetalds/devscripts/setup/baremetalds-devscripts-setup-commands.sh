@@ -13,12 +13,8 @@ source "${SHARED_DIR}/packet-conf.sh"
 # Get dev-scripts logs and other configuration
 finished()
 {
-  #Save exit code for must-gather to generate junit
+  # Remember dev-scripts setup exit code
   retval=$?
-  echo "Installer exited with $retval"
-  echo "$retval" > "${SHARED_DIR}/install-status.txt"
-
-  set +e
 
   echo "Fetching kubeconfig, other credentials..."
   scp "${SSHOPTS[@]}" "root@${IP}:/root/dev-scripts/ocp/ostest/auth/kubeconfig" "${SHARED_DIR}/"
@@ -37,6 +33,16 @@ finished()
     s/X-Auth-Token.*/X-Auth-Token REDACTED/;
     s/UserData:.*,/UserData: REDACTED,/;
     ' "${ARTIFACT_DIR}"/root/dev-scripts/logs/*
+
+  # Save exit code for must-gather to generate junit. Make eats exit
+  # codes, so we try to fetch it from the dev-scripts artifacts if we can.
+  status_file=${ARTIFACT_DIR}/root/dev-scripts/logs/installer-status.txt
+  if [ -f "$status_file"  ];
+  then
+    cp "$status_file" "${SHARED_DIR}/install-status.txt"
+  else
+    echo "$retval" > "${SHARED_DIR}/install-status.txt"
+  fi
 }
 trap finished EXIT TERM
 

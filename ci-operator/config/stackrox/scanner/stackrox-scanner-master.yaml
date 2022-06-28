@@ -15,7 +15,22 @@ resources:
     requests:
       cpu: 2000m
       memory: 4000Mi
+test_binary_build_commands: .openshift-ci/dispatch.sh noop
 tests:
+- as: e2e-tests
+  optional: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+  timeout: 1h0m0s
+- as: merge-e2e-tests
+  postsubmit: true
+  steps:
+    env:
+      QA_TEST_TARGET: test
+    test:
+    - ref: stackrox-e2e
+  timeout: 1h0m0s
 - as: style-checks
   steps:
     test:
