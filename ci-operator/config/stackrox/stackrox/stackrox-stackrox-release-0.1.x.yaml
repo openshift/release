@@ -70,9 +70,11 @@ resources:
     requests:
       cpu: 2000m
       memory: 4000Mi
-test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
+test_binary_build_commands: |-
+  env | sort || true
+  .openshift-ci/dispatch.sh test-binary-build-commands
 tests:
-- as: push-and-release
+- as: merge-push-and-release
   postsubmit: true
   steps:
     test:
@@ -107,77 +109,21 @@ tests:
         requests:
           cpu: 2000m
           memory: 4000Mi
-- as: merge-style-checks
-  postsubmit: true
-  steps:
-    test:
-    - ref: stackrox-initial
-- as: merge-go-unit-tests
-  postsubmit: true
-  steps:
-    test:
-    - ref: stackrox-initial
-- as: merge-go-unit-tests-release
-  postsubmit: true
-  steps:
-    test:
-    - ref: stackrox-initial
-- as: merge-go-postgres-tests
-  postsubmit: true
-  steps:
-    test:
-    - ref: stackrox-initial
-- as: merge-integration-unit-tests
-  postsubmit: true
-  steps:
-    test:
-    - ref: stackrox-initial
 - as: merge-shell-unit-tests
   postsubmit: true
   steps:
     test:
     - ref: stackrox-initial
-- as: merge-ui-unit-tests
-  postsubmit: true
-  steps:
-    test:
-    - ref: stackrox-initial
-- as: merge-gke-nongroovy-e2e-tests
-  postsubmit: true
-  steps:
-    test:
-    - ref: stackrox-e2e
-- as: merge-gke-qa-e2e-tests
-  postsubmit: true
-  steps:
-    env:
-      QA_TEST_TARGET: test
-    test:
-    - ref: stackrox-e2e
-  timeout: 3h0m0s
-- as: merge-openshift-4-qa-e2e-tests
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 3h0m0s
-    version: "4.8"
-  postsubmit: true
-  steps:
-    env:
-      QA_TEST_TARGET: test
-    test:
-    - ref: stackrox-e2e
-  timeout: 3h0m0s
 - as: merge-gke-ui-e2e-tests
   postsubmit: true
   steps:
     test:
     - ref: stackrox-e2e
-- as: merge-gke-upgrade-tests
-  postsubmit: true
+- as: nightly-shell-unit-tests
+  cron: 0 18 * * *
   steps:
+    env:
+      QA_TEST_TARGET: test
     test:
     - ref: stackrox-e2e
 zz_generated_metadata:
