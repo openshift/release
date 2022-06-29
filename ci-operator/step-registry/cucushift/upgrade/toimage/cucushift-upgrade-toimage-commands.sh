@@ -4,6 +4,30 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+trap 'FRC=$?; createUpgradeJunit' ERR EXIT TERM
+
+# Generate the Junit for upgrade
+function createUpgradeJunit() {
+    echo "Generating the Junit for upgrade"
+    if [[ "${FRC}" =  0  ]]; then
+      cat >"${ARTIFACT_DIR}/junit_upgrade.xml" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="cluster upgrade" tests="1" failures="0">
+  <testcase classname="cluster upgrade" name="upgrade should succeed"/>
+</testsuite>
+EOF
+    else
+      cat >"${ARTIFACT_DIR}/junit_upgrade.xml" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="cluster upgrade" tests="1" failures="1">
+  <testcase classname="cluster upgrade" name="upgrade should succeed"/>
+    <failure message="">openshift cluster upgrade failed</failure>
+  </testcase>
+</testsuite>
+EOF
+    fi
+}
+
 # Extract oc binary which is supposed to be identical with target release
 function extract_oc(){
     local url; url="openshift-release-artifacts.apps.ci.l2s4.p1.openshiftapps.com"
