@@ -20,13 +20,13 @@ workers=3
 if [[ "${SIZE_VARIANT}" == "compact" ]]; then
   workers=0
 fi
-master_type=null
+master_type=n2-standard-4
 if [[ "${SIZE_VARIANT}" == "xlarge" ]]; then
-  master_type=n1-standard-32
+  master_type=n2-standard-32
 elif [[ "${SIZE_VARIANT}" == "large" ]]; then
-  master_type=n1-standard-16
+  master_type=n2-standard-16
 elif [[ "${SIZE_VARIANT}" == "compact" ]]; then
-  master_type=n1-standard-8
+  master_type=n2-standard-8
 fi
 
 cat >> "${CONFIG}" << EOF
