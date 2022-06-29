@@ -82,7 +82,7 @@ platform:
         type: Datacenter
         tagCategory: openshift-region
       zone:
-        name: 1
+        name: us-east-1a
         type: ComputeCluster
         tagCategory: openshift-zone
       topology:
@@ -90,14 +90,14 @@ platform:
         computeCluster: /${vsphere_datacenter}/host/vcs-mdcnc-workload-1
         networks:
         - ${LEASED_RESOURCE}
-        datastore: iscsi-vsanDatastore
+        datastore: workload_share_vcsmdcncworkload_Yfyf6
     - name: us-east-2
       region:
         name: us-east
         type: Datacenter
         tagCategory: openshift-region
       zone:
-        name: 2
+        name: us-east-2a
         type: ComputeCluster
         tagCategory: openshift-zone
       topology:
@@ -105,14 +105,14 @@ platform:
         computeCluster: /${vsphere_datacenter}/host/vcs-mdcnc-workload-2
         networks:
         - ${LEASED_RESOURCE}
-        datastore: iscsi-vsanDatastore
+        datastore: workload_share_vcsmdcncworkload2_vyC6a
     - name: us-east-3
       region:
         name: us-east
         type: Datacenter
         tagCategory: openshift-region
       zone:
-        name: 3
+        name: us-east-3a
         type: ComputeCluster
         tagCategory: openshift-zone
       topology:
@@ -120,14 +120,14 @@ platform:
         computeCluster: /${vsphere_datacenter}/host/vcs-mdcnc-workload-3
         networks:
         - ${LEASED_RESOURCE}
-        datastore: iscsi-vsanDatastore
+        datastore: workload_share_vcsmdcncworkload3_joYiR
     - name: us-west-1
       region:
         name: us-west
         type: Datacenter
         tagCategory: openshift-region
       zone:
-        name: 1
+        name: us-west-1a
         type: ComputeCluster
         tagCategory: openshift-zone
       topology:
@@ -135,7 +135,7 @@ platform:
         computeCluster: /datacenter-2/host/vcs-mdcnc-workload-4
         networks:
         - ${LEASED_RESOURCE}
-        datastore: iscsi-vsanDatastore
+        datastore: workload_share_vcsmdcncworkload3_joYiR
 
 networking:
   machineNetwork:
