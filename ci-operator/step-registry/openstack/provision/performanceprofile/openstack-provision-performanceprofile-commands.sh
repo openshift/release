@@ -85,6 +85,7 @@ spec:
     node-role.kubernetes.io/worker: ''
   realTimeKernel:
     enabled: false
+  globallyDisableIrqLoadBalancing: true
 EOL
 
 oc_version=$(oc version -o json | jq -r '.openshiftVersion')

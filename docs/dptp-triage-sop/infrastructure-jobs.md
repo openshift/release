@@ -5,6 +5,7 @@
 3. [`periodic-branch-protector-openshift-org`](#periodic-branch-protector-openshift-org)
 4. [`periodic-org-sync`](#periodic-org-sync)
 5. [`periodic-openshift-release-fast-forward`](#periodic-openshift-release-fast-forward)
+6. [`periodic-check-gh-automation`](#periodic-check-gh-automation)
 
 ## `branch-ci-openshift-release-master-release-controller-annotate`
 
@@ -208,3 +209,35 @@ The repo is in a bad state where someone has pushed directly to the future relea
 1. Identify the owner(s) of the repo
 2. Reach out and tag them in `#forum-testplatform` asking them to clean up the affected branch.
 3. This job runs hourly, so silencing the alert until they can clean it up is a good idea. 
+
+
+## `periodic-check-gh-automation`
+
+This job runs [`check-gh-automation`](https://github.com/openshift/ci-tools/tree/master/cmd/check-gh-automation) in order 
+to verify that all repos with CI configured are accessible by our automation. It checks that `openshift-merge-robot` and `openshift-ci-robot`
+are collaborators in each repo that has a directory in the [prow config](https://github.com/openshift/release/tree/master/core-services/prow/02_config).
+
+#### Useful Links
+
+- [Recent executions on Deck](https://prow.ci.openshift.org/?job=periodic-check-gh-automation)
+- [infra-periodics.yaml (ProwJob configuration)](https://github.com/openshift/release/blob/master/ci-operator/jobs/infra-periodics.yaml)
+- [Granting Robots Permissions on CI Docs](https://docs.ci.openshift.org/docs/how-tos/onboarding-a-new-component/#granting-robots-privileges-and-installing-the-github-app)
+
+### 403 error when checking collaborators on a repo
+
+If there is a 403 error in the logs it likely means that our app (`openshift-ci`) is not installed in that repo.
+
+#### Resolution
+
+Reach out to the owner(s) of the repo and ask them to install the app. You should also remind them to invite the bots at the same time.
+
+### Job fails with one or more repo inaccessible
+
+When the job fails, it will list all repos that are inaccessible by the bots at the end.
+
+#### Resolution
+
+Reach out to the owner(s) for each 
+repo listed asking them to grant the bots permissions by following the docs.
+
+If there is argument that they do not want the bots to be added to a repo or org, it can be passed to the job as an additional `ignore` parameter.

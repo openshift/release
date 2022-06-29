@@ -232,6 +232,7 @@ openstack-osuosl) ;;
 openstack-ppc64le) ;;
 openstack*) export OS_CLIENT_CONFIG_FILE=${SHARED_DIR}/clouds.yaml ;;
 ovirt) export OVIRT_CONFIG="${SHARED_DIR}/ovirt-config.yaml" ;;
+nutanix) ;;
 *) >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}'"
 esac
 

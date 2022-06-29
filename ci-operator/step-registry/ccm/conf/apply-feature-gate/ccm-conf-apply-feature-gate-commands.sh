@@ -107,6 +107,6 @@ export -f execute
 
 
 applyFeatureGate
-waitFor 20m CCMPodsCreated
+waitFor 30m CCMPodsCreated
 waitForCCMPodsReadiness
 waitForKubeletAndKCMRollout

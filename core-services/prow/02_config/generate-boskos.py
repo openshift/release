@@ -27,9 +27,6 @@ CONFIG = {
     },
     'aws-3-quota-slice': {
         'us-east-1': 40,
-        'us-east-2': 40,
-        'us-west-1': 35,
-        'us-west-2': 40,
     },
     'aws-qe-quota-slice': {
         'us-east-2': 25,
@@ -182,13 +179,13 @@ for i in range(2):
 for i in range(4):
     CONFIG['openstack-ppc64le-quota-slice']['openstack-ppc64le-{0:0>2}'.format(i)] = 1
 
-for i in range(10, 24):
+for i in range(10, 18):
     CONFIG['ovirt-quota-slice']['ovirt-{}'.format(i)] = 1
 
-for i in range(1, 7):
+for i in range(1, 5):
     CONFIG['ovirt-upgrade-quota-slice']['ovirt-upgrade-{}'.format(i)] = 1
 
-for i in range(76,103):
+for i in range(79,106):
     CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 for i in range(56,60):

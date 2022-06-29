@@ -138,3 +138,25 @@ EOF
   /tmp/yq m -x -i "${CONFIG}" "${CONFIG_PATCH_AMI}"
   cp "${SHARED_DIR}/install-config-ami.yaml.patch" "${ARTIFACT_DIR}/"
 fi
+
+
+if [[ ${AWS_METADATA_SERVICE_AUTH} =~ ^(Required|Optional)$ ]]; then
+  echo "setting up metadata auth in install-config.yaml. Set metadata service auth to: ${AWS_METADATA_SERVICE_AUTH}"
+  METADATA_AUTH_PATCH="${SHARED_DIR}/install-config-metadata-auth.yaml.patch"
+
+  cat > "${METADATA_AUTH_PATCH}" << EOF
+controlPlane:
+  platform:
+    aws:
+      metadataService:
+        authentication: ${AWS_METADATA_SERVICE_AUTH}
+compute:
+- platform:
+    aws:
+      metadataService:
+        authentication: ${AWS_METADATA_SERVICE_AUTH}
+EOF
+
+  /tmp/yq m -x -i "${CONFIG}" "${METADATA_AUTH_PATCH}"
+  cp "${METADATA_AUTH_PATCH}" "${ARTIFACT_DIR}/"
+fi

@@ -3,6 +3,16 @@ build_root:
     name: collector-test
     namespace: stackrox
     tag: latest
+images:
+- build_args:
+  - name: BUILDER_ROOT_DIR
+    value: /go/src/github.com/stackrox/collector/builder
+  dockerfile_path: builder/Dockerfile
+  from: src
+  to: collector-builder
+- dockerfile_path: .openshift-ci/build/Dockerfile.build_collector
+  from: collector-builder
+  to: collector
 resources:
   '*':
     limits:
@@ -34,6 +44,16 @@ tests:
     - as: shellcheck-all
       commands: make shellcheck-all
       from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+- as: unit-tests
+  steps:
+    test:
+    - as: collector-unit-tests
+      commands: /go/src/github.com/stackrox/collector/cmake-build/collector/runUnitTests
+      from: collector
       resources:
         requests:
           cpu: 2000m

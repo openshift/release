@@ -37,10 +37,15 @@ tests:
   commands: make fmt vet
   container:
     from: src
+- as: unit
+  commands: HOME=/tmp make test
+  container:
+    from: src
 - as: sonar-pre-submit
   commands: |
     export SELF="make -f /opt/build-harness/Makefile.prow"
     export SONAR_ORG=identitatem
+    export HOME="/tmp"
     make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
     from: src
@@ -51,6 +56,7 @@ tests:
   commands: |
     export SELF="make -f /opt/build-harness/Makefile.prow"
     export SONAR_ORG=identitatem
+    export HOME="/tmp"
     make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
     from: src

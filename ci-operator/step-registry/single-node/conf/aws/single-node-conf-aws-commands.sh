@@ -4,7 +4,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-if [[ "${CLUSTER_TYPE}" == "aws-arm64" ]]; then
+if [[ "${CLUSTER_TYPE}" == "aws-arm64" ]] || [[ "${OCP_ARCH}" == "arm64" ]]; then
     SINGLE_NODE_AWS_INSTANCE_TYPE="m6gd.2xlarge"
 else
     SINGLE_NODE_AWS_INSTANCE_TYPE="m5d.2xlarge"
@@ -32,7 +32,7 @@ cfg["controlPlane"]["replicas"] = 1
 if not "networking" in cfg:
     cfg["networking"] = {}
 
-cfg["networking"]["networkType"] = "OVNKubernetes"
+cfg["networking"]["networkType"] = "'${NETWORK_TYPE}'"
 
 # Single Node Openshift requires extra memory and compute resources
 platform = cfg["controlPlane"]["platform"]

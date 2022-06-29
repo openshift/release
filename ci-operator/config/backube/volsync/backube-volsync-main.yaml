@@ -18,7 +18,7 @@ build_root:
       FROM registry.access.redhat.com/ubi8
       USER root
       ENV GOVERSION=1.18.1
-      RUN yum install -y gcc make diffutils openssl git && \
+      RUN yum install -y gcc make diffutils openssl git jq && \
           yum clean all && rm -rf /var/cache/dnf/*
       # Install Go. This version will only be used for unit tests. The
       # official builds are done via their own container image Dockerfiles
@@ -106,11 +106,17 @@ resources:
       memory: 1Gi
 tests:
 - as: unit
-  commands: |
-    go version
-    make test
-  container:
-    from: src
+  steps:
+    test:
+    - as: unit
+      commands: |
+        go version
+        make test
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
 - as: e2e-openshift
   optional: true
   steps:

@@ -1,4 +1,8 @@
 base_images:
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.46.0
   ocp_4.10_base:
     name: "4.10"
     namespace: ocp
@@ -43,13 +47,15 @@ tests:
   container:
     from: src
   run_if_changed: \.go$
-- as: golangci-lint
+- as: lint
   commands: |
+    export GOCACHE=/tmp/
     export GOLANGCI_LINT_CACHE=/tmp/.cache
-    make lint
+    export GOPROXY=https://proxy.golang.org
+    golangci-lint run --verbose --timeout=5m0s
   container:
-    from: src
-  run_if_changed: \.go$
+    clone: true
+    from: golangci-lint
 - as: unit
   commands: go test ./...
   container:

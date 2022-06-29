@@ -27,6 +27,8 @@ CONFIG="${SHARED_DIR}/install-config.yaml"
 base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
 machine_cidr=$(<"${SHARED_DIR}"/machinecidr.txt)
 
+MACHINE_POOL_OVERRIDES=""
+
 RESOURCE_POOL_DEF=""
 set +o errexit
 VERSION=$(echo "${JOB_NAME}" | grep -o -E '4\.[0-9]+')
@@ -37,19 +39,16 @@ if [ ! -z ${VERSION} ]; then
         echo "4.x installation is later than 4.9, will install with resource pool"
         RESOURCE_POOL_DEF="resourcePool: /${vsphere_datacenter}/host/${vsphere_cluster}/Resources/ipi-ci-clusters"
     fi
-fi
-
-cat >> "${CONFIG}" << EOF
-baseDomain: $base_domain
-controlPlane:
-  name: "master"
+    if [ ${Z_VERSION} -lt 11 ]; then
+      MACHINE_POOL_OVERRIDES="controlPlane:
+  name: master
   replicas: 3
   platform:
     vsphere:
       osDisk:
         diskSizeGB: 120
 compute:
-- name: "worker"
+- name: worker
   replicas: 3
   platform:
     vsphere:
@@ -57,7 +56,13 @@ compute:
       coresPerSocket: 1
       memoryMB: 16384
       osDisk:
-        diskSizeGB: 120
+        diskSizeGB: 120"
+    fi    
+fi
+
+cat >> "${CONFIG}" << EOF
+baseDomain: $base_domain
+$MACHINE_POOL_OVERRIDES
 platform:
   vsphere:
     vcenter: "${vsphere_url}"
@@ -74,3 +79,4 @@ networking:
   machineNetwork:
   - cidr: "${machine_cidr}"
 EOF
+

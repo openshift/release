@@ -25,6 +25,11 @@ if not "controlPlane" in cfg:
 
 cfg["controlPlane"]["replicas"] = 1
 
+if not "networking" in cfg:
+    cfg["networking"] = {}
+
+cfg["networking"]["networkType"] = "'${NETWORK_TYPE}'"
+
 # Single Node Openshift requires extra memory and compute resources
 platform = cfg["controlPlane"]["platform"]
 if "azure" in platform:

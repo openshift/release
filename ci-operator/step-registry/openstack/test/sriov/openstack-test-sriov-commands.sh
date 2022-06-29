@@ -108,8 +108,11 @@ metadata:
   name: testpmd-host-device-sriov
   namespace: ${CNF_NAMESPACE}
   annotations:
+    cpu-load-balancing.crio.io: "disable"
+    cpu-quota.crio.io: "disable"
     ${ANNOTATIONS:-}
 spec:
+  runtimeClassName: performance-cnf-performanceprofile
   containers:
   - name: testpmd
     command: ["sleep", "99999"]
