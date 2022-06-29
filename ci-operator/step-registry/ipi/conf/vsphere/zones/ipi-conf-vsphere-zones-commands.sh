@@ -55,13 +55,14 @@ platform:
     network: ${LEASED_RESOURCE}
     datacenter: "${vsphere_datacenter}"
     cluster: vcs-mdcnc-workload-1
-    defaultDatastore: iscsi-vsanDatastore
+    defaultDatastore: workload_share_vcsmdcncworkload_Yfyf6
     vcenters:
     - server: "${vsphere_url}"
       user: "${GOVC_USERNAME}"
       password: ${GOVC_PASSWORD}
       datacenters:
-      - "${vsphere_datacenter}"
+      - IBMCloud
+      - datacenter-2
     deploymentZones:
     - name: us-east-1
       server: "${vsphere_url}"
