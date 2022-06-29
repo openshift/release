@@ -26,7 +26,7 @@ and are split into the following categories:
  - **[LEGACY]** [`ci-operator/templates`](./ci-operator/templates/) contains black-box test
    workflows for use by the `ci-operator`. The parent directory's
    [README](./ci-operator#end-to-end-tests) documents how to use them. See the
-   [template document](https://github.com/openshift/ci-tools/blob/master/TEMPLATES.md)
+   [template document](https://github.com/openshift/ci-tools/blob/2c9c111a2350ef92a366e6d86e66b82d13d7e704/TEMPLATES.md)
    for general information on template tests. Templates are legacy and new
    ones should not be added. Multi-stage tests using steps from the shared
    registry should be used instead.
