@@ -14,7 +14,7 @@ metadata:
   name: openshift-pipelines-operator-rh
   namespace: $OO_INSTALL_NAMESPACE
 spec:
-  channel: stable
+  channel: latest
   installPlanApproval: Automatic
   name: openshift-pipelines-operator-rh
   source: redhat-operators
