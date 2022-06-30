@@ -3,6 +3,10 @@ base_images:
     name: coreos-assembler
     namespace: coreos
     tag: latest
+  fedora:
+    name: fedora
+    namespace: coreos
+    tag: "36"
 build_root:
   image_stream_tag:
     name: fcos-buildroot
@@ -10,7 +14,7 @@ build_root:
     tag: testing-devel
 images:
 - dockerfile_literal: |
-    # COSA + source code
+    # Container image that has COSA + source code
     FROM registry.ci.openshift.org/coreos/coreos-assembler:latest
     WORKDIR /src
     # Tell the build scripts that we have setup a directory for unprivileged build
@@ -20,12 +24,15 @@ images:
     ENV COSA_SKIP_OVERLAY=1
     # Copy the source code
     COPY . .
-    # We need to make sure that root can read / write to the COSA_DIR so that
-    # when this container is actually run, we have permissions to read and
-    # write to the COSA_DIR to allow the Kola tests to run.
+    # Setup ownership for /src & $COSA_DIR. This is required for:
+    # - Builds that run during the build phase under the builder user
+    # - Builds that run during test jobs under a random non root user but with
+    #   the root group.
     USER root
     RUN chgrp -Rf root "${COSA_DIR}" && \
-      chmod -Rf g+w "${COSA_DIR}"
+        chmod -Rf g+w "${COSA_DIR}" && \
+        chown -R builder:builder /src && \
+        chmod -R a+rX /src
     # Go back to unprivileged user for COSA
     USER builder
     WORKDIR /tmp/cosa
@@ -34,6 +41,89 @@ images:
       as:
       - registry.ci.openshift.org/coreos/coreos-assembler:latest
   to: build-image
+- dockerfile_literal: |
+    # Container image used to build RHCOS in Prow build step to be able to push
+    # it and use it as a native container image for other jobs in Prow CI.
+    #
+    # This stage thus builds the RHCOS OCI image just like the test jobs do
+    # before the tests. However, due to limitations within OpenShift CI, we
+    # need to do the following:
+    # 1. Disable KVM by using the COSA_NO_KVM env var. This is due to OpenShift
+    # CI using the default OpenShift Docker Build strategy, which precludes us
+    # from mounting /dev/kvm into the build context.
+    # 2. Due to a limitation in the version of Buildah that OpenShift Builds
+    # uses (at the time of this writing, it uses a v1.23.z version of Buildah),
+    # we cannot mount the build context into the container build (e.g., `RUN
+    # --mount=type=bind,rw=true,src=.,dst=/buildcontext,bind-propagation=shared
+    # <cmd>`), which would allow it to mutate the build context. This is due to
+    # https://github.com/containers/buildah/pull/3548 not being present.
+    # For now, this necessitates passing this image into the cosa-build image
+    # build below to extract the OCI archive and inject it into the
+    # ImageStream. However, once the OpenShift CI system is upgraded to use
+    # OpenShift 4.11, we can create the RHCOS image in a single shot via this
+    # stage.
+    FROM build-image:latest as base
+    ENV COSA_NO_KVM=1
+    # We need to reduce the size of this image because we can run out of space
+    # on the underlying volume when the layer is committed. All we care about
+    # is the rhcos.x86_64.ociarchive file.
+    # 1. Run only the ostree build step
+    # 2. Keep only the OCI archive
+    # 3. Clean-up the cache
+    RUN /src/ci/prow-entrypoint.sh build && \
+        /src/ci/simplify-ociarchive-path.sh && \
+        mv /tmp/cosa/builds/latest/x86_64/rhcos.x86_64.ociarchive /tmp/cosa/rhcos.x86_64.ociarchive && \
+        rm -rf /tmp/cosa/builds /tmp/cosa/cache
+
+    # We don't need the rest of the build-image container, so we copy the OCI
+    # archive into its own scratch image in preparation for extraction.
+    FROM scratch
+    COPY --from=base /tmp/cosa/rhcos.x86_64.ociarchive /tmp/cosa/rhcos.x86_64.ociarchive
+  inputs:
+    build-image:
+      as:
+      - build-image:latest
+  to: oci-archive
+- dockerfile_literal: |
+    # This extracts the OCI archive from the oci-archive image, injects it into
+    # the build context, and then uses that OCI archive as this image.
+    # This makes use of the following:
+    # - OpenShift Image Builds allows one to pass in a path from another
+    # container image. It places this under /tmp/build/inputs/<path>. See:
+    # https://github.com/openshift/builder/blob/37525a77fa07e26c420962dee47193d672ef0b35/pkg/build/builder/common.go#L72
+    # - Buildah allows one to use oci-archive as a transport. See:
+    # https://www.redhat.com/sysadmin/7-transports-features
+    # - Utilizing the above features in concert with one another and using an
+    # absolute path to refer to the OCI archive in the build context allows us
+    # to "import" the OCI archive into the CI ImageStream.
+    FROM oci-archive:/tmp/build/inputs/magic/cosa/rhcos.x86_64.ociarchive
+  inputs:
+    oci-archive:
+      paths:
+      - destination_dir: magic
+        source_path: /tmp/cosa
+  to: machine-os-oci-content
+- dockerfile_literal: |
+    FROM build-image:latest as builder
+    WORKDIR /src
+    # Prevent go mod from requiring a vendor directory.
+    ENV GOFLAGS=-mod=mod
+    # Compile our layering test binary
+    RUN go test -v -c -o layering_test ./tests/layering
+
+    # Create a slimmer Fedora-based image for the layering test binary. This is
+    # intended to make the startup of the OS layering test faster since we
+    # won't have to pull a larger image.
+    FROM registry.ci.openshift.org/coreos/fedora:36
+    COPY --from=builder /src/layering_test /usr/local/bin/layering_test
+  inputs:
+    build-image:
+      as:
+      - build-image:latest
+    fedora:
+      as:
+      - registry.svc.ci.openshift.org/coreos/fedora:36
+  to: layering-test-image
 promotion:
   excluded_images:
   - build-image
@@ -102,6 +192,11 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: validate-machine-os-oci-image
+  commands: cat /etc/os-release
+  container:
+    from: machine-os-oci-content
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: rhcos-86-build-test-qemu
   cluster: build02
   commands: /src/ci/prow-entrypoint.sh rhcos-86-build-test-qemu
@@ -144,6 +239,24 @@ tests:
     from: build-image
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   timeout: 3h0m0s
+- as: test-in-cluster
+  optional: true
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: boot-from-derived-image
+      cli: latest
+      commands: /usr/local/bin/layering_test -test.v -test.failfast -test.timeout
+        45m -build-log="${ARTIFACT_DIR}/derived-image-build.log"
+      dependencies:
+      - env: BASE_IMAGE_PULLSPEC
+        name: pipeline:machine-os-oci-content
+      from: layering-test-image
+      resources:
+        requests:
+          cpu: 1000m
+    workflow: ipi-gcp
+  timeout: 4h30m0s
 zz_generated_metadata:
   branch: master
   org: openshift
