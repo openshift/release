@@ -10,4 +10,4 @@ export BUGZILLA_API_KEY
 export SLACK_HOOK
 export TEAM_MEMBERS
 
-./doctext.py
+exec ./doctext.py
