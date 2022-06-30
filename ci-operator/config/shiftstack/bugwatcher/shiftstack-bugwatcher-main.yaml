@@ -1,16 +1,13 @@
-binary_build_commands: pip install --requirement requirements.txt
+binary_build_commands: |-
+  pip install --requirement requirements.txt
+  go build -o /bin/pretriage ./cmd/pretriage
 build_root:
-  project_image:
-    dockerfile_literal: |-
-      FROM registry.access.redhat.com/ubi8/python-39
-
-      # Prow expects to be able to check out a repo under /go
-      USER 0:0
-      WORKDIR /go
-      RUN chown 1001:1001 .
-      USER 1001:1001
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.18-openshift-4.11
 images:
-- dockerfile_literal: FROM scratch
+- dockerfile_literal: FROM bin
   from: bin
   to: shiftstack-bugwatcher-image
 resources:
@@ -26,6 +23,15 @@ tests:
   commands: pycodestyle --verbose ./*.py
   container:
     from: test-bin
+- as: go-vet
+  commands: go vet ./...
+  container:
+    from: bin
+- as: go-fmt
+  commands: if [ "$(gofmt -s -l . | tee /dev/stderr | wc -l)" -gt 0 ]; then exit 1;
+    fi
+  container:
+    from: src
 - as: bugwatcher-doctext
   cron: 0 8 * * 1-5
   steps:
@@ -36,9 +42,18 @@ tests:
   steps:
     test:
     - ref: shiftstack-bugwatcher-posttriage
+- as: bugwatcher-pretriage-bugzilla
+  cron: '*/30 * * * *'
+  steps:
+    env:
+      TICKETING_SYSTEM: bugzilla
+    test:
+    - ref: shiftstack-bugwatcher-pretriage
 - as: bugwatcher-pretriage
   cron: '*/30 * * * *'
   steps:
+    env:
+      TICKETING_SYSTEM: jira
     test:
     - ref: shiftstack-bugwatcher-pretriage
 zz_generated_metadata:
