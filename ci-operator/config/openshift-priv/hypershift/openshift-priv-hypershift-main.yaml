@@ -70,7 +70,7 @@ releases:
       product: ocp
       relative: 1
       stream: ci
-      version: "4.11"
+      version: "4.12"
   latest:
     integration:
       include_built_images: true
@@ -145,56 +145,6 @@ tests:
           cpu: 100m
       timeout: 1h0m0s
     workflow: generic-claim
-- as: e2e-aws-all
-  cluster_claim:
-    architecture: amd64
-    as: not_latest
-    cloud: aws
-    owner: hypershift
-    product: ocp
-    timeout: 1h30m0s
-    version: "4.9"
-  optional: true
-  steps:
-    test:
-    - as: install-hypershift
-      cli: latest
-      commands: make ci-install-hypershift
-      credentials:
-      - mount_path: /etc/hypershift-pool-aws-credentials
-        name: hypershift-pool-aws-credentials
-        namespace: test-credentials
-      dependencies:
-      - env: HYPERSHIFT_RELEASE_LATEST
-        name: hypershift-operator
-      from: bin
-      grace_period: 1m0s
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 5m0s
-    - as: test-e2e
-      cli: latest
-      commands: make ci-test-e2e
-      credentials:
-      - mount_path: /etc/hypershift-pool-aws-credentials
-        name: hypershift-pool-aws-credentials
-        namespace: test-credentials
-      - mount_path: /etc/ci-pull-credentials
-        name: ci-pull-credentials
-        namespace: test-credentials
-      dependencies:
-      - env: OCP_IMAGE_LATEST
-        name: release:latest
-      - env: OCP_IMAGE_PREVIOUS
-        name: release:hosted-ocp-previous
-      from: test-bin
-      grace_period: 15m0s
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 2h0m0s
-    workflow: generic-claim
 - as: e2e-aws-metrics
   cluster_claim:
     architecture: amd64
@@ -267,7 +217,6 @@ tests:
     workflow: hypershift-aws-conformance
 - as: capi-provider-agent-sanity
   optional: true
-  run_if_changed: ^(api/.*|hypershift-operator/controllers/hostedcluster/internal/platform/agent/.*)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -277,7 +226,7 @@ tests:
         KUBE_API=yes
         ENABLE_KUBE_API=true
         MINIKUBE_DISK_SIZE=70g
-        MINIKUBE_RAM_MB=10240
+        MINIKUBE_RAM_MB=12000
         TEST=./src/tests/test_kube_api.py
         TEST_FUNC=test_capi_provider
         MAKEFILE_TARGET="setup run deploy_capi_env test"
