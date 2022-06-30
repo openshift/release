@@ -19,6 +19,11 @@ export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+# prepare for the future usage on the kubeconfig generation of different workflow
+test -n "${KUBECONFIG:-}" && echo "${KUBECONFIG}" || echo "no KUBECONFIG is defined"
+test -f "${KUBECONFIG}" && (ls -l "${KUBECONFIG}" || true) || echo "kubeconfig file does not exist"
+ls -l ${SHARED_DIR}/kubeconfig || echo "no kubeconfig in shared_dir"
+
 # create link for oc to kubectl
 mkdir -p "${HOME}"
 if ! which kubectl; then
