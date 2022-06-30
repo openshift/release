@@ -15,27 +15,17 @@ binary_build_commands: GOARGS="-mod=mod" make binary
 build_root:
   project_image:
     dockerfile_path: .openshift-ci/build-root/Dockerfile
+  use_build_cache: true
 images:
-- dockerfile_literal: |
-    FROM src
-    RUN curl --silent --show-error --fail -o "/usr/local/bin/yq" \
-        https://github.com/mikefarah/yq/releases/download/v4.2.0/yq_linux_amd64 && \
-        chmod +x /usr/local/bin/yq
-  from: src
-  to: src-ext
 - dockerfile_literal: |-
-    FROM registry.ci.openshift.org/openshift/release:golang-1.17 AS builder
+    FROM src AS builder
     WORKDIR /go/src/github.com/stackrox/acs-fleet-manager
     COPY . .
     RUN GOARGS="-mod=mod" make binary
     FROM registry.ci.openshift.org/openshift/origin-v4.5:base
     COPY --from=builder /go/src/github.com/stackrox/acs-fleet-manager/fleet-manager /usr/bin/
     COPY --from=builder /go/src/github.com/stackrox/acs-fleet-manager/fleetshard-sync /usr/bin/
-  from: base
-  inputs:
-    openshift_release_golang-1.17:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.17
+  from: src
   to: acs-fleet-manager
 promotion:
   namespace: acs-fleet-manager
@@ -82,7 +72,7 @@ tests:
       dependencies:
       - env: BINARIES
         name: bin
-      from: src-ext
+      from: bin
       resources:
         requests:
           cpu: 100m
