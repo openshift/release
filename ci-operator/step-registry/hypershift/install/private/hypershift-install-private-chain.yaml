@@ -1,0 +1,22 @@
+chain:
+  as: hypershift-install-private
+  steps:
+    - as: install-private
+      cli: latest
+      dependencies:
+        - env: HYPERSHIFT_RELEASE_LATEST
+          name: hypershift-operator
+      from: bin
+      env:
+        - name: HYPERSHIFT_AWS_REGION
+          default: "us-east-1"
+          documentation: "The AWS region of the cluster."
+      commands: make ci-install-hypershift-private
+      credentials:
+        - mount_path: /etc/hypershift-pool-aws-credentials
+          name: hypershift-pool-aws-credentials
+          namespace: test-credentials
+      grace_period: 1m0s
+      resources:
+        requests:
+          cpu: 100m
