@@ -3,7 +3,9 @@ base_images:
     name: builder
     namespace: ocp
     tag: ubi8.python.36
-binary_build_commands: go build -o /bin/pretriage ./cmd/pretriage
+binary_build_commands: |-
+  go build -o /bin/pretriage ./cmd/pretriage
+  go build -o /bin/posttriage ./cmd/posttriage
 build_root:
   image_stream_tag:
     name: builder
@@ -66,6 +68,11 @@ tests:
   steps:
     test:
     - ref: shiftstack-bugwatcher-pretriage
+- as: bugwatcher-posttriage
+  cron: 0 7 * * *
+  steps:
+    test:
+    - ref: shiftstack-bugwatcher-posttriage
 zz_generated_metadata:
   branch: main
   org: shiftstack
