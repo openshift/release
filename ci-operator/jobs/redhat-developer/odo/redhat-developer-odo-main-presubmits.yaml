@@ -6,15 +6,15 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build01
-    context: ci/prow/unit
+    context: ci/prow/unit-and-validate-test
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-redhat-developer-odo-main-unit
-    rerun_command: /test unit
+    name: pull-ci-redhat-developer-odo-main-unit-and-validate-test
+    rerun_command: /test unit-and-validate-test
     skip_if_only_changed: ^website/|docs/|\.md$|\.adoc$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
@@ -22,7 +22,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=unit
+        - --target=unit-and-validate-test
         command:
         - ci-operator
         image: ci-operator:latest
@@ -49,7 +49,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )unit,?($|\s.*)
+    trigger: (?m)^/test( | .* )unit-and-validate-test,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
