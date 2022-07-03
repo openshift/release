@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-echo "************ baremetalds assisted tools ci report command ************"
+echo "************ assisted tools ci report command ************"
 
 set +e
 IS_REHEARSAL=$(expr "${REPO_OWNER:-}" = "openshift" "&" "${REPO_NAME:-}" = "release")
