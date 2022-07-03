@@ -27,7 +27,13 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-8-release-golang-1.16-openshift-4.10
+    tag: rhel-8-release-golang-1.17-openshift-4.10
+releases:
+  nightly:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.10"
 resources:
   '*':
     limits:
@@ -109,6 +115,10 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-microshift-e2e-reboot-tests
+- as: rebase-on-nightlies
+  cron: '* */1 * * *'
+  steps:
+    workflow: openshift-microshift-rebase
 zz_generated_metadata:
   branch: main
   org: openshift
