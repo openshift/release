@@ -2,12 +2,12 @@
 
 set -Eeuo pipefail
 
-JIRA_TOKEN="$(</var/run/bugwatcher/jira-token)"
+BUGZILLA_API_KEY="$(</var/run/bugwatcher/bugzilla-api-key)"
 SLACK_HOOK="$(</var/run/slack-hooks/forum-shiftstack)"
 TEAM_MEMBERS="$(</var/run/team/team.json)"
 
-export JIRA_TOKEN
+export BUGZILLA_API_KEY
 export SLACK_HOOK
 export TEAM_MEMBERS
 
-exec /bin/pretriage
+exec ./pretriage.py
