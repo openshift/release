@@ -1,16 +1,8 @@
 base_images:
-  coreos_coreos-assembler_latest:
+  coreos_coreos-assembler_4.11:
     name: coreos-assembler
     namespace: coreos
-    tag: latest
-  fedora:
-    name: fedora
-    namespace: coreos
-    tag: "35"
-  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.17-openshift-4.10
+    tag: "4.11"
 build_root:
   image_stream_tag:
     name: fcos-buildroot
@@ -18,14 +10,30 @@ build_root:
     tag: testing-devel
 canonical_go_repository: github.com/openshift/os
 images:
-- dockerfile_path: ci/Dockerfile
+- dockerfile_literal: |
+    # COSA + source code
+    FROM registry.svc.ci.openshift.org/coreos/coreos-assembler:4.11
+    WORKDIR /src
+    # Tell the build scripts that we have setup a directory for unprivileged build
+    ENV COSA_DIR=/tmp/cosa
+    RUN mkdir -p "${COSA_DIR}"
+    # Prow doesn't support emptydir for jobs today
+    ENV COSA_SKIP_OVERLAY=1
+    # Copy the source code
+    COPY . .
+    # We need to make sure that root can read / write to the COSA_DIR so that
+    # when this container is actually run, we have permissions to read and
+    # write to the COSA_DIR to allow the Kola tests to run.
+    USER root
+    RUN chgrp -Rf root "${COSA_DIR}" && \
+      chmod -Rf g+w "${COSA_DIR}"
+    # Go back to unprivileged user for COSA
+    USER builder
+    WORKDIR /tmp/cosa
   inputs:
-    coreos_coreos-assembler_latest:
+    coreos_coreos-assembler_4.11:
       as:
-      - registry.svc.ci.openshift.org/coreos/coreos-assembler:latest
-    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
+      - registry.svc.ci.openshift.org/coreos/coreos-assembler:4.11
   to: build-test-qemu-img
 promotion:
   disabled: true
@@ -49,13 +57,6 @@ resources:
       cpu: 1000m
       memory: 1Gi
   build-test-qemu:
-    limits:
-      devices.kubevirt.io/kvm: "1"
-    requests:
-      cpu: 1000m
-      devices.kubevirt.io/kvm: "1"
-      memory: 3Gi
-  periodic-os-build:
     limits:
       devices.kubevirt.io/kvm: "1"
     requests:
