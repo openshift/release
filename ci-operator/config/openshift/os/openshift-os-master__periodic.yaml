@@ -1,0 +1,117 @@
+base_images:
+  coreos_coreos-assembler_latest:
+    name: coreos-assembler
+    namespace: coreos
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: fcos-buildroot
+    namespace: coreos
+    tag: testing-devel
+images:
+- dockerfile_literal: |
+    # COSA + source code
+    FROM registry.svc.ci.openshift.org/coreos/coreos-assembler:latest
+    WORKDIR /src
+    # Tell the build scripts that we have setup a directory for unprivileged build
+    ENV COSA_DIR=/tmp/cosa
+    RUN mkdir -p "${COSA_DIR}"
+    # Prow doesn't support emptydir for jobs today
+    ENV COSA_SKIP_OVERLAY=1
+    # Copy the source code
+    COPY . .
+    # We need to make sure that root can read / write to the COSA_DIR so that
+    # when this container is actually run, we have permissions to read and
+    # write to the COSA_DIR and the /src dir.
+    USER root
+    RUN chgrp -Rf root "${COSA_DIR}" && \
+      chmod -Rf g+w "${COSA_DIR}" && \
+      chown -R builder:builder /src
+    # Go back to unprivileged user for COSA
+    USER builder
+    WORKDIR /tmp/cosa
+  inputs:
+    coreos_coreos-assembler_latest:
+      as:
+      - registry.svc.ci.openshift.org/coreos/coreos-assembler:latest
+  to: build-image
+- build_args:
+  - name: RHELVER
+    value: rhel-8.6
+  dockerfile_literal: |
+    # This performs the RHCOS build itself.
+    # TODO: Move this Dockerfile into the openshift/os repository so we can
+    # easily reuse it for all RHCOS / SCOS versions via setting the build arg.
+    FROM build-image:latest AS base
+    ARG RHELVER="rhel-8.6"
+    ENV RHELVER=$RHELVER
+    ENV COSA_NO_KVM=1
+    # We need to reduce the size of this image because we can run out of space
+    # on the underlying volume when the layer is committed. All we care about
+    # is the rhcos.x86_64.ociarchive file.
+    RUN /src/ci/prow-entrypoint.sh build && \
+      /src/ci/simplify-ociarchive-path.sh && \
+      mv /tmp/cosa/builds/latest/x86_64/rhcos.x86_64.ociarchive /tmp/cosa/rhcos.x86_64.ociarchive && \
+      rm -rf /tmp/cosa/builds /tmp/cosa/cache
+
+    # We don't need the rest of the build-image container, so we copy the OCI
+    # archive into its own scratch image in preparation for extraction.
+    FROM scratch
+    COPY --from=base /tmp/cosa/rhcos.x86_64.ociarchive /tmp/cosa/rhcos.x86_64.ociarchive
+  inputs:
+    build-image:
+      as:
+      - build-image:latest
+  to: rhcos-8.6-build
+- dockerfile_literal: |
+    # This extracts the OCI archive from the rhcos-8.6-build image build, injects it
+    # into the build context, and then uses that OCI archive as this image.
+    # This makes use of the following:
+    # - OpenShift Image Builds allows one to pass in a path from another container
+    # image. It places this under /tmp/build/inputs/<path>. See:
+    # https://github.com/openshift/builder/blob/37525a77fa07e26c420962dee47193d672ef0b35/pkg/build/builder/common.go#L72
+    # - Buildah allows one to use oci-archive as a transport. See:
+    # https://www.redhat.com/sysadmin/7-transports-features
+    # - Utilizing the above features in concert with one another and using an
+    # absolute path to refer to the OCI archive in the build context allows us
+    # to "import" the OCI archive into the CI ImageStream.
+    FROM oci-archive:/tmp/build/inputs/magic/cosa/rhcos.x86_64.ociarchive
+  inputs:
+    rhcos-8.6-build:
+      paths:
+      - destination_dir: magic
+        source_path: /tmp/cosa
+  to: machine-os-oci-content-rhel-8.6
+promotion:
+  additional_images:
+    rhel-coreos: machine-os-oci-content-rhel-8.6
+  excluded_images:
+  - '*'
+  namespace: rhcos-devel
+  tag: latest
+releases:
+  initial:
+    integration:
+      name: "4.12"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.12"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 2000m
+      memory: 4Gi
+tests:
+- as: validate-built-image-rhel-8.6
+  commands: cat /etc/os-release
+  container:
+    from: machine-os-oci-content-rhel-8.6
+  cron: '@daily'
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: os
+  variant: periodic
