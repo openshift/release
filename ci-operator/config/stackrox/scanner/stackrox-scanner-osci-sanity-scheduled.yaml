@@ -1,0 +1,84 @@
+base_images:
+  ubi:
+    name: ubi
+    namespace: ocp
+    tag: "8"
+  ubi-minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+build_root:
+  project_image:
+    dockerfile_path: .openshift-ci/Dockerfile.build_root
+resources:
+  '*':
+    requests:
+      cpu: 2000m
+      memory: 4000Mi
+test_binary_build_commands: .openshift-ci/dispatch.sh noop
+tests:
+- as: e2e-tests
+  optional: true
+  steps:
+    test:
+    - ref: stackrox-scanner
+  timeout: 1h0m0s
+- as: merge-e2e-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-scanner
+  timeout: 1h0m0s
+- as: sanity-check-vuln-updates
+  # TODO: uncomment cron and delete `optional`
+  #cron: 5 0,4,8,12,16,20 * * *
+  optional: true
+  steps:
+    test:
+      - ref: stackrox-scanner
+- as: scale-tests
+  optional: true
+  steps:
+    test:
+    - ref: stackrox-scanner
+  timeout: 2h30m0s
+- as: merge-scale-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-scanner
+  timeout: 2h30m0s
+- as: slim-e2e-tests
+  optional: true
+  steps:
+    test:
+    - ref: stackrox-scanner
+  timeout: 1h0m0s
+- as: merge-slim-e2e-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-scanner
+  timeout: 1h0m0s
+- as: style-checks
+  steps:
+    test:
+    - ref: stackrox-scanner
+- as: merge-style-checks
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-scanner
+- as: unit-tests
+  steps:
+    test:
+    - ref: stackrox-scanner
+- as: merge-unit-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-scanner
+zz_generated_metadata:
+  branch: osci-sanity-scheduled
+  org: stackrox
+  repo: scanner
