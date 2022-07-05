@@ -110,33 +110,6 @@ EOF
     fi
 }
 
-# create ICSP for connected env.
-function create_icsp_connected () {
-    cat <<EOF | oc create -f -
-    apiVersion: operator.openshift.io/v1alpha1
-    kind: ImageContentSourcePolicy
-    metadata:
-    name: brew-registry
-    spec:
-    repositoryDigestMirrors:
-    - mirrors:
-        - brew.registry.redhat.io
-        source: registry.redhat.io
-    - mirrors:
-        - brew.registry.redhat.io
-        source: registry.stage.redhat.io
-    - mirrors:
-        - brew.registry.redhat.io
-        source: registry-proxy.engineering.redhat.com
-EOF
-    if [ $? == 0 ]; then
-        echo "create the ICSP successfully" 
-    else
-        echo "!!! fail to create the ICSP"
-        return 1
-    fi
-}
-
 function create_catalog_sources()
 {
     echo "create QE catalogsource: qe-app-registry"
@@ -166,28 +139,22 @@ EOF
 
 set_proxy
 run_command "oc whoami"
-run_command "oc version"
+run_command "oc version -o yaml"
 
 # private mirror registry host
 # <public_dns>:<port>
 MIRROR_REGISTRY_HOST=`head -n 1 "${SHARED_DIR}/mirror_registry_url"`
-if [ ! -f "${SHARED_DIR}/mirror_registry_url" ]; then
-    echo "File ${SHARED_DIR}/mirror_registry_url does not exist."
-    # if the mirror registry doesn't exist, it more like a connected env
-    create_icsp_connected
-    create_catalog_sources
-else
-    echo "MIRROR_REGISTRY_HOST: ${MIRROR_REGISTRY_HOST}"
-    # the proxy registry port 6001 for quay.io
-    MIRROR_PROXY_REGISTRY_QUAY=`echo "${MIRROR_REGISTRY_HOST}" | sed 's/5000/6001/g' `
-    echo "MIRROR_PROXY_REGISTRY_QUAY: ${MIRROR_PROXY_REGISTRY_QUAY}"
-    # the proxy registry port 6002 for redhat.io
-    MIRROR_PROXY_REGISTRY=`echo "${MIRROR_REGISTRY_HOST}" | sed 's/5000/6002/g' `
-    echo "MIRROR_PROXY_REGISTRY: ${MIRROR_PROXY_REGISTRY}"
-    set_cluster_auth
-    create_settled_icsp
-    create_catalog_sources
-fi
+echo "MIRROR_REGISTRY_HOST: ${MIRROR_REGISTRY_HOST}"
+# the proxy registry port 6001 for quay.io
+MIRROR_PROXY_REGISTRY_QUAY=`echo "${MIRROR_REGISTRY_HOST}" | sed 's/5000/6001/g' `
+echo "MIRROR_PROXY_REGISTRY_QUAY: ${MIRROR_PROXY_REGISTRY_QUAY}"
+# the proxy registry port 6002 for redhat.io
+MIRROR_PROXY_REGISTRY=`echo "${MIRROR_REGISTRY_HOST}" | sed 's/5000/6002/g' `
+echo "MIRROR_PROXY_REGISTRY: ${MIRROR_PROXY_REGISTRY}"
+set_cluster_auth
+create_settled_icsp
+create_catalog_sources
+
 
 
 
