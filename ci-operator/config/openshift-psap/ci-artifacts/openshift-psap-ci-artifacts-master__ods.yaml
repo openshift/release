@@ -20,50 +20,6 @@ resources:
       cpu: 1000m
       memory: 2Gi
 tests:
-- as: jh-on-single
-  steps:
-    post:
-    - as: destroy-clusters
-      commands: |
-        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
-        run ods clusters destroy single
-      credentials:
-      - mount_path: /var/run/psap-ods-secret-1
-        name: psap-ods-secret-1
-        namespace: test-credentials
-      from: ci-artifacts
-      resources:
-        requests:
-          cpu: 1000m
-          memory: 500Mi
-    pre:
-    - as: create-clusters
-      commands: |
-        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
-        run ods clusters create single
-      credentials:
-      - mount_path: /var/run/psap-ods-secret-1
-        name: psap-ods-secret-1
-        namespace: test-credentials
-      from: ci-artifacts
-      resources:
-        requests:
-          cpu: 1000m
-          memory: 500Mi
-    test:
-    - as: test
-      commands: |
-        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
-        run ods jh-at-scale
-      credentials:
-      - mount_path: /var/run/psap-ods-secret-1
-        name: psap-ods-secret-1
-        namespace: test-credentials
-      from: ci-artifacts
-      resources:
-        requests:
-          cpu: 1000m
-          memory: 500Mi
 - as: jh-on-ocp
   steps:
     post:
@@ -152,7 +108,17 @@ tests:
         requests:
           cpu: 1000m
           memory: 500Mi
-- as: gen-mat-bench
+- as: plot-jh-on-osd
+  steps:
+    test:
+    - as: test
+      commands: run ods generate_matrix-benchmarking osd
+      from: ci-artifacts
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 1Gi
+- as: plot-jh-on-ocp
   steps:
     test:
     - as: test
