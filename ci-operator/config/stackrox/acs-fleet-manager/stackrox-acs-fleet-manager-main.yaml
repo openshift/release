@@ -87,7 +87,14 @@ tests:
       best_effort: true
       cli: latest
       commands: |
-        echo "Uploading image here, calling ./.openshift-ci/image-push/entrypoint.sh"
+        entrypoint=".openshift-ci/image-push/entrypoint.sh"
+        if [ -x "$entrypoint" ]; then
+          echo "Executing image-push entrypoint."
+          $entrypoint
+        else
+          echo "No image-push entrypoint ($entrypoint) found."
+          exit 1
+        fi
       credentials:
       - mount_path: /var/run/rhacs-ms-e2e-tests
         name: rhacs-ms-e2e-tests
