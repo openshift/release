@@ -51,15 +51,12 @@ fi
 
 if [[ "${ZONES_COUNT}" == "0" ]]; then
   ZONES_ARGS=""
-elif [[ "${ZONES_COUNT}" == "1" ]]; then
+  FIRST_ZONE=""
+else
   for ((i=0; i<${MAX_ZONES_COUNT}; ++i )) ; do
     ZONES_ARGS+="--availability-zone ${ZONES[$i]} "
   done
-else
-  # For now, we only support a cluster within a single AZ.
-  # This will change in the future.
-  echo "Wrong ZONE_COUNT, can only be 0 or 1, got ${ZONES_COUNT}"
-  exit 1
+  FIRST_ZONE="--availability-zone ${ZONES[0]}"
 fi
 
 if ! openstack image show $BASTION_IMAGE >/dev/null; then
@@ -84,7 +81,9 @@ openstack security group rule create --ingress --protocol tcp --dst-port 3128 --
 openstack security group rule create --ingress --protocol tcp --dst-port 3130 --remote-ip 0.0.0.0/0 --description "${CLUSTER_NAME} squid" "$sg_id" >/dev/null
 >&2 echo "Created necessary security group rules in ${sg_id}"
 
-server_params=" --image $BASTION_IMAGE --flavor $BASTION_FLAVOR $ZONES_ARGS \
+port_id="$(openstack port create -f value -c id --network "$MACHINES_NET_ID" --fixed-ip subnet="$MACHINES_SUBNET_ID" --security-group "$sg_id" --description "Bastion port for $CLUSTER_NAME in machines network" bastionproxy-${CLUSTER_NAME}-${CONFIG_TYPE})"
+>&2 echo "Created bastion port for ${CLUSTER_NAME}: ${port_id}"
+server_params=" --image $BASTION_IMAGE --flavor $BASTION_FLAVOR $FIRST_ZONE \
   --security-group $sg_id --key-name bastionproxy-${CLUSTER_NAME}-${CONFIG_TYPE}"
 
 if [[ -f ${SHARED_DIR}"/BASTION_NET_ID" ]]; then
@@ -92,7 +91,7 @@ if [[ -f ${SHARED_DIR}"/BASTION_NET_ID" ]]; then
   server_params+=" --network $BASTION_NET_ID"
 fi
 
-server_params+=" --network $MACHINES_NET_ID"
+server_params+=" --port $port_id"
 
 server_id="$(openstack server create -f value -c id $server_params \
 		"bastionproxy-$CLUSTER_NAME-${CONFIG_TYPE}")"
@@ -133,19 +132,15 @@ echo ${SQUID_AUTH}>${SHARED_DIR}/SQUID_AUTH
 
 MACHINES_GATEWAY_IP=""
 SQUID_IP=$bastion_fip
-if [[ "${CONFIG_TYPE}" == "proxy" ]]; then
-  # Right now we assume that the bastion will be connected to one machines network via a port.
-  # This command will have to be revisited if we want more ports on this machine.
-  PROXY_INTERFACE="$(openstack port list --network $MACHINES_NET_ID --server "$server_id" \
-    -c fixed_ips -f value |cut -d':' -f3 |cut -f1 -d '}' |sed -e "s/'//" -e "s/'$//")"
-  SQUID_IP=$PROXY_INTERFACE
-  echo ${PROXY_INTERFACE}>${SHARED_DIR}/PROXY_INTERFACE
-  openstack subnet set --no-dns-nameservers --dns-nameserver ${PROXY_INTERFACE} ${MACHINES_SUBNET_ID}
-  echo "Subnet ${MACHINES_SUBNET_ID} was updated to use ${SQUID_IP} as DNS server"
-  if [[ "${NETWORK_TYPE}" == "Kuryr" ]]; then
-    MACHINES_GATEWAY_IP="$(openstack subnet show -c gateway_ip -f value $MACHINES_SUBNET_ID)"
-    echo "Subnet ${MACHINES_SUBNET_ID} has ${MACHINES_GATEWAY_IP} as gateway"
-  fi
+PROXY_INTERFACE="$(openstack port list --network $MACHINES_NET_ID --server "$server_id" \
+  -c fixed_ips -f value |cut -d':' -f3 |cut -f1 -d '}' |sed -e "s/'//" -e "s/'$//" -e '1q')"
+SQUID_IP=$PROXY_INTERFACE
+echo ${PROXY_INTERFACE}>${SHARED_DIR}/PROXY_INTERFACE
+openstack subnet set --no-dns-nameservers --dns-nameserver ${PROXY_INTERFACE} ${MACHINES_SUBNET_ID}
+echo "Subnet ${MACHINES_SUBNET_ID} was updated to use ${SQUID_IP} as DNS server"
+if [[ "${NETWORK_TYPE}" == "Kuryr" ]]; then
+  MACHINES_GATEWAY_IP="$(openstack subnet show -c gateway_ip -f value $MACHINES_SUBNET_ID)"
+  echo "Subnet ${MACHINES_SUBNET_ID} has ${MACHINES_GATEWAY_IP} as gateway"
 fi
 
 echo "Deploying squid on $SQUID_IP"
