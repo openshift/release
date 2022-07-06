@@ -76,9 +76,31 @@ tests:
       from: bin
       resources:
         requests:
+          cpu: 1000m
+          memory: 1000Mi
+    workflow: generic-claim
+- as: image-push
+  steps:
+    allow_best_effort_post_steps: true
+    test:
+    - as: to-quay
+      best_effort: true
+      cli: custom
+      commands: |
+        echo "Uploading image here, calling ./.openshift-ci/image-push/entrypoint.sh"
+      credentials:
+      - mount_path: /var/run/rhacs-ms-e2e-tests
+        name: rhacs-ms-e2e-tests
+        namespace: test-credentials
+      dependencies:
+      - env: FLEET_MANAGER_IMAGE
+        name: acs-fleet-manager
+      from: bin
+      resources:
+        requests:
           cpu: 100m
           memory: 200Mi
-    workflow: generic-claim
+      timeout: 5m0s
 zz_generated_metadata:
   branch: main
   org: stackrox
