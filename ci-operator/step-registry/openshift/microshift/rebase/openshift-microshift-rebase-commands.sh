@@ -4,17 +4,20 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# print info on environment and tools
 echo "Environment:"
 printenv
 
-echo "Credentials:"
-export PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
-ls -al /secrets/ci-pull-credentials || true
-ls -al /etc/pull-secret || true
-ls -al "${PULL_SECRET_PATH}"/etc/pull-secret || true
+echo "Tool versions:"
+echo "  git: $(git version)"
+echo "  go: $(go version)"
+echo "  jq: $(jq --version)"
+echo "  oc: $(oc version)"
 
-mkdir ~/.docker
-cp "${PULL_SECRET_PATH}"/.dockerconfigjson ~/.docker/config.json || true
+# copy pull secret to the location needed for `oc adm`
+mkdir -p ~/.docker
+cp "${CLUSTER_PROFILE_DIR}"/pull-secret ~/.docker/config.json
 
+# call the rebase script
 echo "./scripts/rebase.sh to ${TARGET_RELEASE_IMAGE}"
 ./scripts/rebase.sh to "${TARGET_RELEASE_IMAGE}"
