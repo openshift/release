@@ -54,7 +54,6 @@ build_root:
     tag: golang-1.17
 images:
 - dockerfile_path: Dockerfile.assisted-service-build
-  from: postgresql-12-centos7
   inputs:
     edge_infrastructure_swagger_codegen_cli:
       as:
@@ -65,10 +64,15 @@ images:
     openshift_release_golang-1.17:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.17
+    postgresql-12-centos7:
+      as:
+      - quay.io/centos7/postgresql-12-centos7:latest
   to: assisted-service-build
 - dockerfile_path: Dockerfile.assisted-service
-  from: coreos_centos_stream8
   inputs:
+    coreos_centos_stream8:
+      as:
+      - quay.io/centos/centos:stream8
     openshift_release_golang-1.17:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.17
@@ -413,6 +417,27 @@ tests:
       IP_STACK: v4
       NUM_EXTRA_WORKERS: "2"
     workflow: assisted-baremetal-operator-ztp
+- as: e2e-metal-assisted-operator-ztp-sno-day2-workers-latbnd
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      ASSISTED_ZTP_CONFIG: |
+        SPOKE_CONTROLPLANE_AGENTS=1
+        NUMBER_OF_DAY2_HOSTS=1
+        DAY2_LATE_BINDING=True
+      DEVSCRIPTS_CONFIG: |
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=32768
+        EXTRA_WORKER_DISK=100
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      DISCONNECTED: "false"
+      IP_STACK: v4
+      NUM_EXTRA_WORKERS: "2"
+    workflow: assisted-baremetal-operator-ztp
 - as: e2e-metal-assisted-operator-capi
   optional: true
   run_if_changed: ^(deploy/operator/.*)$
@@ -470,8 +495,8 @@ tests:
       IP_STACK: v4v6
       NUM_EXTRA_WORKERS: "1"
     workflow: assisted-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-ipv4-sno-ocp-410
-  optional: true
+- as: e2e-ai-operator-ztp-converged
+  run_if_changed: ^(deploy/operator/.*)$
   steps:
     cluster_profile: packet-assisted
     dependencies:

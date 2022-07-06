@@ -60,7 +60,7 @@ images:
     openshift_release_golang-1.18:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.18
-  to: cluster-api-kubevirt-controller
+  to: kubevirt-cluster-api-controllers
 - build_args:
   - name: ARCH
     value: amd64
@@ -141,6 +141,19 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: mce-publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cluster-api-provider-kubevirt
+    env:
+      IMAGE_REPO: cluster-api-provider-kubevirt
+      OSCI_ENV_CONFIG: |
+        OSCI_PUBLISH_DELAY=0
+        OSCI_PIPELINE_PRODUCT_PREFIX=backplane
+        OSCI_PIPELINE_REPO=backplane-pipeline
+      RELEASE_REF: backplane-2.1
+    workflow: ocm-ci-manifest-update
 - as: unit-tests
   commands: GOFLAGS="-mod=readonly" make test
   container:
@@ -197,7 +210,7 @@ tests:
         oc wait pod --for=condition=Ready -l cluster.x-k8s.io/provider=infrastructure-kubevirt -n capk-system --timeout=120s
       dependencies:
       - env: CAPK_IMAGE
-        name: cluster-api-kubevirt-controller
+        name: kubevirt-cluster-api-controllers
       from: capk-oc-bin-image
       resources:
         requests:
@@ -274,7 +287,7 @@ tests:
         fi
       dependencies:
       - env: CAPK_IMAGE
-        name: cluster-api-kubevirt-controller
+        name: kubevirt-cluster-api-controllers
       from: hypershift-cli-e2e
       resources:
         requests:
