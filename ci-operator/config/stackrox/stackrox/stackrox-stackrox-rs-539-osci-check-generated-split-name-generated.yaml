@@ -59,12 +59,6 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/stackrox/stackrox/docs/.
   to: docs
-promotion:
-  excluded_images:
-  - main-bundle
-  - central-db-bundle
-  namespace: stackrox
-  tag: latest
 resources:
   '*':
     requests:
@@ -72,29 +66,6 @@ resources:
       memory: 4000Mi
 test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
 tests:
-- as: push-images
-  steps:
-    test:
-    - as: push
-      commands: .openshift-ci/dispatch.sh push-images "RHACS_BRANDING"
-      credentials:
-      - mount_path: /tmp/secret/stackrox-stackrox-push
-        name: stackrox-stackrox-push
-        namespace: test-credentials
-      dependencies:
-      - env: PIPELINE_DOCS_IMAGE
-        name: docs
-      - env: MAIN_IMAGE
-        name: main
-      - env: ROXCTL_IMAGE
-        name: roxctl
-      - env: CENTRAL_DB_IMAGE
-        name: central-db
-      from: src
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 4000Mi
 - as: style-checks
   steps:
     test:
@@ -296,18 +267,10 @@ tests:
 - as: merge-grouped-static-checks
   postsubmit: true
   steps:
+    env:
+      TEST_SUITE: merge-check-generated
     test:
-    - as: merge-check-generated
-      commands: .openshift-ci/dispatch.sh check-generated
-      credentials:
-      - mount_path: /tmp/secret/stackrox-stackrox-initial
-        name: stackrox-stackrox-initial
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 4000Mi
+    - ref: stackrox-initial
     - as: merge-check-todos
       commands: .openshift-ci/dispatch.sh check-todos
       credentials:
@@ -431,111 +394,7 @@ tests:
   steps:
     test:
     - ref: stackrox-initial
-- as: nightly-push-and-release
-  cron: 0 5 * * *
-  steps:
-    test:
-    - as: push
-      commands: .openshift-ci/dispatch.sh push-images "RHACS_BRANDING"
-      credentials:
-      - mount_path: /tmp/secret/stackrox-stackrox-push
-        name: stackrox-stackrox-push
-        namespace: test-credentials
-      dependencies:
-      - env: MAIN_IMAGE
-        name: main
-      - env: ROXCTL_IMAGE
-        name: roxctl
-      - env: CENTRAL_DB_IMAGE
-        name: central-db
-      from: src
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 4000Mi
-    - as: release-mgmt
-      commands: .openshift-ci/dispatch.sh release-mgmt
-      credentials:
-      - mount_path: /tmp/secret/stackrox-stackrox-push
-        name: stackrox-stackrox-push
-        namespace: test-credentials
-      from: test-bin
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 4000Mi
-- as: nightly-gke-qa-e2e-tests
-  cron: 0 5 * * *
-  steps:
-    env:
-      QA_TEST_TARGET: test
-    test:
-    - ref: stackrox-e2e
-  timeout: 4h0m0s
-- as: nightly-openshift-4-qa-e2e-tests
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 4h0m0s
-    version: "4.8"
-  cron: 0 5 * * *
-  steps:
-    env:
-      QA_TEST_TARGET: test
-    test:
-    - ref: stackrox-e2e
-  timeout: 4h0m0s
-- as: nightly-gke-ui-e2e-tests
-  cron: 0 5 * * *
-  steps:
-    test:
-    - ref: stackrox-e2e
-  timeout: 2h30m0s
-- as: nightly-gke-nongroovy-e2e-tests
-  cron: 0 5 * * *
-  steps:
-    test:
-    - ref: stackrox-e2e
-- as: nightly-gke-kernel-qa-e2e-tests
-  cron: 0 5 * * *
-  steps:
-    test:
-    - ref: stackrox-e2e
-  timeout: 3h30m0s
-- as: nightly-gke-upgrade-tests
-  cron: 0 5 * * *
-  steps:
-    test:
-    - ref: stackrox-e2e
-- as: nightly-gke-postgres-qa-e2e-tests
-  cron: 0 5 * * *
-  steps:
-    test:
-    - ref: stackrox-e2e
-  timeout: 3h30m0s
-- as: nightly-gke-scale-tests
-  cron: 0 5 * * *
-  steps:
-    test:
-    - ref: stackrox-e2e
-- as: nightly-gke-postgres-scale-tests
-  cron: 0 5 * * *
-  steps:
-    test:
-    - ref: stackrox-e2e
-- as: nightly-operator-e2e-tests
-  cron: 0 5 * * *
-  steps:
-    test:
-    - ref: stackrox-e2e
-- as: nightly-local-roxctl-tests
-  cron: 0 5 * * *
-  steps:
-    test:
-    - ref: stackrox-initial
 zz_generated_metadata:
-  branch: master
+  branch: rs-539-osci-check-generated-split-name-generated
   org: stackrox
   repo: stackrox
