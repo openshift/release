@@ -75,7 +75,7 @@ tests:
   container:
     from: assisted-test-infra-internal
 - as: assisted-packet-check
-  cron: 0 */2 * * *
+  cron: '*/30 * * * *'
   steps:
     cluster_profile: packet-assisted
     env:
@@ -83,7 +83,7 @@ tests:
     test:
     - ref: baremetalds-packet-check
 - as: sno-packet-check
-  cron: 0 */2 * * *
+  cron: '*/30 * * * *'
   steps:
     cluster_profile: packet-sno
     test:
@@ -494,7 +494,7 @@ tests:
         KUBE_API=yes
         ENABLE_KUBE_API=true
         MINIKUBE_DISK_SIZE=70g
-        MINIKUBE_RAM_MB=10240
+        MINIKUBE_RAM_MB=12000
         TEST_FUNC=test_capi_provider
         MAKEFILE_TARGET="setup run deploy_capi_env test_kube_api_parallel"
       GATHER_CAPI_LOGS: "true"
@@ -555,7 +555,18 @@ tests:
     cluster_profile: vsphere
     env:
       ASSISTED_CONFIG: |
-        WORKER_COUNT=0
+        NUM_WORKERS=0
+        MAKEFILE_TARGET=test
+      PLATFORM: vsphere
+    workflow: assisted-vsphere
+- as: e2e-vsphere-assisted-periodic
+  cron: '@daily'
+  steps:
+    cluster_profile: vsphere
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=0
+        MAKEFILE_TARGET=test
       PLATFORM: vsphere
     workflow: assisted-vsphere
 - as: e2e-metal-assisted-ipxe

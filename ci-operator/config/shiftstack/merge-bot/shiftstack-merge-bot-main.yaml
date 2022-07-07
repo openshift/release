@@ -85,6 +85,33 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+- as: kuryr-kubernetes
+  cron: 0 9 * * Mon,Wed,Fri
+  steps:
+    test:
+    - as: kuryr-kubernetes
+      commands: |
+        merge-bot --source https://opendev.org/openstack/kuryr-kubernetes:master \
+                  --dest openshift/kuryr-kubernetes:master \
+                  --merge shiftstack/kuryr-kubernetes:merge-bot-master \
+                  --bot-name shiftstack-merge-bot --bot-email shiftstack-merge-bot@redhat.com \
+                  --github-app-key /secrets/merge-bot/github_private_key \
+                  --github-cloner-key /secrets/merge-bot/github_cloner_private_key \
+                  --slack-webhook /secrets/slack-hooks/forum-kuryr
+      credentials:
+      - mount_path: /secrets/merge-bot
+        name: shiftstack-merge-bot
+        namespace: test-credentials
+      - mount_path: /secrets/slack-hooks
+        name: shiftstack-slack-hooks
+        namespace: test-credentials
+      from: merge-bot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
 zz_generated_metadata:
   branch: main
   org: shiftstack

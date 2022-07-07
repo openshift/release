@@ -55,13 +55,14 @@ platform:
     network: ${LEASED_RESOURCE}
     datacenter: "${vsphere_datacenter}"
     cluster: vcs-mdcnc-workload-1
-    defaultDatastore: iscsi-vsanDatastore
+    defaultDatastore: workload_share_vcsmdcncworkload_Yfyf6
     vcenters:
     - server: "${vsphere_url}"
       user: "${GOVC_USERNAME}"
       password: ${GOVC_PASSWORD}
       datacenters:
-      - "${vsphere_datacenter}"
+      - IBMCloud
+      - datacenter-2
     deploymentZones:
     - name: us-east-1
       server: "${vsphere_url}"
@@ -143,3 +144,47 @@ networking:
 EOF
 
 curl -o ${SHARED_DIR}/manifest_externalFeatureGate.yaml https://raw.githubusercontent.com/openshift/cluster-cloud-controller-manager-operator/master/hack/externalFeatureGate.yaml
+
+
+ZONAL_SC="${SHARED_DIR}/manifest_zonal-sc.yaml"
+PROM_CONFIG="${SHARED_DIR}/manifest_cluster-monitoring-config.yaml"
+
+
+cat >> ${ZONAL_SC} << EOF
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: sc-zone-us-east-1a
+allowedTopologies:
+- matchLabelExpressions:
+  - key: topology.kubernetes.io/zone: us-east-1a
+    values:
+    - us-east-1a
+parameters:
+  diskformat: thin
+provisioner: kubernetes.io/vsphere-volume
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+EOF
+
+cat >> ${PROM_CONFIG} << EOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cluster-monitoring-config
+  namespace: openshift-monitoring
+data:
+  config.yaml: |
+    prometheusK8s:
+      volumeClaimTemplate:
+        metadata:
+          name: prometheus-data
+          annotations:
+            openshift.io/cluster-monitoring-drop-pvc: "yes"
+       spec:
+         storageClassName: sc-zone-us-east-1a
+         resources:
+           requests:
+             storage: 20Gi
+EOF
+

@@ -4,6 +4,14 @@ build_root:
 images:
 - dockerfile_path: Dockerfile
   to: redhat-appstudio-jvm-build-service-image
+- dockerfile_path: Dockerfile.cache-in-ci
+  to: redhat-appstudio-jvm-build-service-cache-image
+- dockerfile_path: Dockerfile.sidecar-in-ci
+  to: redhat-appstudio-jvm-build-service-sidecar-image
+- dockerfile_path: Dockerfile.analyzer-in-ci
+  to: redhat-appstudio-jvm-build-service-analyzer-image
+- dockerfile_path: Dockerfile.reqprocessor-in-ci
+  to: redhat-appstudio-jvm-build-service-reqprocessor-image
 releases:
   latest:
     release:
@@ -41,7 +49,16 @@ tests:
         GIT_CREDS_PATH="${HOME}/creds/file"
         git config --global credential.helper "store --file ${GIT_CREDS_PATH}"
         echo "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com" > ${GIT_CREDS_PATH}
-        echo ${JVM_BUILD_SERVICE_IMAGE%@*}
+        echo "jvm build service golang operator image:"
+        echo ${JVM_BUILD_SERVICE_IMAGE}
+        echo "jvm build service jvm cache image:"
+        echo ${JVM_BUILD_SERVICE_CACHE_IMAGE}
+        echo "jvm build service jvm sidecar image:"
+        echo ${JVM_BUILD_SERVICE_SIDECAR_IMAGE}
+        echo "jvm build service jvm analyzer image:"
+        echo ${JVM_BUILD_SERVICE_ANALYZER_IMAGE}
+        echo "jvm build service jvm reqprocessor image:"
+        echo ${JVM_BUILD_SERVICE_REQPROCESSOR_IMAGE}
         /bin/bash .ci/oci-e2e-jvm-build-service.sh
       credentials:
       - mount_path: /usr/local/ci-secrets/redhat-appstudio-qe
@@ -50,6 +67,14 @@ tests:
       dependencies:
       - env: JVM_BUILD_SERVICE_IMAGE
         name: redhat-appstudio-jvm-build-service-image
+      - env: JVM_BUILD_SERVICE_CACHE_IMAGE
+        name: redhat-appstudio-jvm-build-service-cache-image
+      - env: JVM_BUILD_SERVICE_SIDECAR_IMAGE
+        name: redhat-appstudio-jvm-build-service-sidecar-image
+      - env: JVM_BUILD_SERVICE_ANALYZER_IMAGE
+        name: redhat-appstudio-jvm-build-service-analyzer-image
+      - env: JVM_BUILD_SERVICE_REQPROCESSOR_IMAGE
+        name: redhat-appstudio-jvm-build-service-reqprocessor-image
       from: src
       resources:
         requests:

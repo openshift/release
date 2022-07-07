@@ -15,6 +15,8 @@ images:
         curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo | tee /etc/yum.repos.d/yarn.repo && \
         PACKAGES="openssh-clients httpd-tools nodejs yarn xorg-x11-server-Xvfb gtk2-devel gtk3-devel libnotify-devel GConf2 nss libXScrnSaver alsa-lib skopeo" && \
         yum install --setopt=tsflags=nodocs -y $PACKAGES && \
+        yum install -y yum-utils && yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo && \
+        yum -y install terraform \
         yum clean all && rm -rf /var/cache/yum/*
   from: src
   to: quay-test-console
@@ -43,8 +45,6 @@ tests:
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
-      ODF_OPERATOR_CHANNEL: stable-4.10
-      QUAY_OPERATOR_CHANNEL: stable-3.7
     test:
     - chain: quay-tests-quay-e2e-test
     workflow: cucushift-installer-rehearse-aws-ipi

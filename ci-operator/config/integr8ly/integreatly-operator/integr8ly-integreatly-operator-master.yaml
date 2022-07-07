@@ -1,8 +1,8 @@
 base_images:
-  openshift_release_golang-1.17:
+  openshift_release_golang-1.18:
     name: release
     namespace: openshift
-    tag: golang-1.17
+    tag: golang-1.18
   os:
     name: ubi
     namespace: ocp
@@ -23,23 +23,23 @@ images:
 - dockerfile_path: Dockerfile.osde2e
   from: os
   inputs:
-    openshift_release_golang-1.17:
+    openshift_release_golang-1.18:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.17
+      - registry.ci.openshift.org/openshift/release:golang-1.18
   to: integreatly-operator-test-harness-osde2e
 - dockerfile_path: Dockerfile.functional
   from: os
   inputs:
-    openshift_release_golang-1.17:
+    openshift_release_golang-1.18:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.17
+      - registry.ci.openshift.org/openshift/release:golang-1.18
   to: integreatly-operator-test-harness
 - dockerfile_path: Dockerfile.scorecard
   from: os
   inputs:
-    openshift_release_golang-1.17:
+    openshift_release_golang-1.18:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.17
+      - registry.ci.openshift.org/openshift/release:golang-1.18
   to: scorecard-test-kuttl
 promotion:
   name: integreatly-operator
@@ -137,6 +137,10 @@ tests:
   container:
     from: src
   run_if_changed: pkg/apis/integreatly/v1alpha1/rhmi_types.go
+- as: commits
+  commands: make commits/check
+  container:
+    from: src
 - as: coverage
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)

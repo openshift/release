@@ -6,13 +6,6 @@ set -o pipefail
 
 echo "************ assisted common setup infra command ************"
 
-# Get packet | vsphere configuration
-# shellcheck source=/dev/null
-set +e
-source "${SHARED_DIR}/packet-conf.sh"
-source "${SHARED_DIR}/ci-machine-config.sh"
-set -e
-
 # TODO: Remove once OpenShift CI will be upgraded to 4.2 (see https://access.redhat.com/articles/4859371)
 ~/fix_uid.sh
 

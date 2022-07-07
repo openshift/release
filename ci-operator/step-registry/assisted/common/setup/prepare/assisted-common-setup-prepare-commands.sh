@@ -42,7 +42,7 @@ cat > packing-test-infra.yaml <<-EOF
         state: touch
     - name: Create ansible inventory
       ansible.builtin.copy:
-        dest: inventory
+        dest: "{{ SHARED_DIR }}/inventory"
         content: |
           [all]
           {{ lookup('env', 'IP') }} ansible_user=root ansible_ssh_user=root ansible_ssh_private_key_file={{ lookup('env', 'SSH_KEY_FILE') }} ansible_ssh_common_args="-o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=90 -o LogLevel=ERROR"
@@ -67,6 +67,8 @@ export CI_CREDENTIALS_DIR=/var/run/assisted-installer-bot
 
 # TODO: Remove once OpenShift CI will be upgraded to 4.2 (see https://access.redhat.com/articles/4859371)
 ~/fix_uid.sh
+
+echo "********** ${ASSISTED_CONFIG} ************* "
 
 cat << EOF > config.sh.j2
 export REPO_DIR={{ REPO_DIR }}
@@ -122,7 +124,9 @@ source /root/platform-conf.sh
 {% set custom_param_list = ASSISTED_CONFIG.split('\n') %}
 # Custom parameters
 {% for item in custom_param_list %}
+{% if item|trim|length %}
 export {{ item }}
+{% endif %}
 {% endfor %}
 {% endif %}
 EOF
@@ -150,6 +154,7 @@ cat > run_test_playbook.yaml <<-EOF
     HYPERSHIFT_IMAGE: "{{ lookup('env', 'HYPERSHIFT_IMAGE') }}"
     ENVIRONMENT: "{{ lookup('env', 'ENVIRONMENT') }}"
     POST_INSTALL_COMMANDS: "{{ lookup('env', 'POST_INSTALL_COMMANDS') }}"
+    ASSISTED_CONFIG: "{{ lookup('env', 'ASSISTED_CONFIG') }}"
   tasks:
     - name: Fail on unsupported environment
       fail:
@@ -237,7 +242,7 @@ cat > run_test_playbook.yaml <<-EOF
         dest: /root/config.sh
     - name: Print config file content
       debug:
-        msg: "{{ lookup('template', './config.sh.j2') }}"
+        msg: "{{ lookup('template', './config.sh.j2').split('\n') }}"
     - name: Use nvme device if exists
       ansible.builtin.shell: |
         mkfs.xfs -f /dev/nvme0n1
@@ -259,4 +264,4 @@ cat > run_test_playbook.yaml <<-EOF
           echo "Finish running post installation script"
 EOF
 
-ansible-playbook run_test_playbook.yaml -i inventory
+ansible-playbook run_test_playbook.yaml -i ${SHARED_DIR}/inventory

@@ -1,43 +1,32 @@
 base_images:
   base:
-    name: "4.11"
+    name: ubi-minimal
     namespace: ocp
-    tag: base
+    tag: "8"
   cli:
     name: "4.11"
     namespace: ocp
     tag: cli
-  openshift_release_golang-1.17:
-    name: release
-    namespace: openshift
-    tag: golang-1.17
 binary_build_commands: GOARGS="-mod=mod" make binary
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.17
+  project_image:
+    dockerfile_path: .openshift-ci/build-root/Dockerfile
+  use_build_cache: true
 images:
-- dockerfile_literal: |
-    FROM src
-    RUN curl --silent --show-error --fail -o "/usr/local/bin/yq" \
-        https://github.com/mikefarah/yq/releases/download/v4.2.0/yq_linux_amd64 && \
-        chmod +x /usr/local/bin/yq
-  from: src
-  to: src-ext
 - dockerfile_literal: |-
-    FROM registry.ci.openshift.org/openshift/release:golang-1.17 AS builder
+    FROM src AS builder
     WORKDIR /go/src/github.com/stackrox/acs-fleet-manager
     COPY . .
     RUN GOARGS="-mod=mod" make binary
-    FROM registry.ci.openshift.org/openshift/origin-v4.5:base
-    COPY --from=builder /go/src/github.com/stackrox/acs-fleet-manager/fleet-manager /usr/bin/
-    COPY --from=builder /go/src/github.com/stackrox/acs-fleet-manager/fleetshard-sync /usr/bin/
+    FROM registry.access.redhat.com/ubi8-minimal:8.6
+    COPY --from=builder /go/src/github.com/stackrox/acs-fleet-manager/fleet-manager /usr/local/bin/
+    COPY --from=builder /go/src/github.com/stackrox/acs-fleet-manager/fleetshard-sync /usr/local/bin/
+    WORKDIR /
   from: base
   inputs:
-    openshift_release_golang-1.17:
+    src:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.17
+      - src
   to: acs-fleet-manager
 promotion:
   namespace: acs-fleet-manager
@@ -82,14 +71,43 @@ tests:
         name: rhacs-ms-e2e-tests
         namespace: test-credentials
       dependencies:
-      - env: BINARIES
-        name: bin
-      from: src-ext
+      - env: FLEET_MANAGER_IMAGE
+        name: acs-fleet-manager
+      from: bin
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 1000Mi
+    workflow: generic-claim
+- as: image-push
+  steps:
+    allow_best_effort_post_steps: true
+    test:
+    - as: to-quay
+      best_effort: true
+      cli: latest
+      commands: |
+        entrypoint=".openshift-ci/image-push/entrypoint.sh"
+        if [ -x "$entrypoint" ]; then
+          echo "Executing image-push entrypoint."
+          $entrypoint
+        else
+          echo "No image-push entrypoint ($entrypoint) found."
+          exit 1
+        fi
+      credentials:
+      - mount_path: /var/run/rhacs-ms-e2e-tests
+        name: rhacs-ms-e2e-tests
+        namespace: test-credentials
+      dependencies:
+      - env: FLEET_MANAGER_IMAGE
+        name: acs-fleet-manager
+      from: bin
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: generic-claim
+      timeout: 15m0s
 zz_generated_metadata:
   branch: main
   org: stackrox

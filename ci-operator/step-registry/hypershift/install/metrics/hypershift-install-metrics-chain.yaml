@@ -1,0 +1,19 @@
+chain:
+  as: hypershift-install-metrics
+  steps:
+  - as: setup-monitoring
+    commands: |-
+      bin/test-setup monitoring \
+        --remote-write-url=$(cat /etc/grafana-prom-push/url) \
+        --remote-write-username-file=/etc/grafana-prom-push/username \
+        --remote-write-password-file=/etc/grafana-prom-push/password
+    credentials:
+      - mount_path: /etc/grafana-prom-push
+        name: hypershift-sjenning-homelab-push
+        namespace: test-credentials
+    from: test-bin
+    grace_period: 1m0s
+    resources:
+      requests:
+        cpu: 100m
+    timeout: 2m0s

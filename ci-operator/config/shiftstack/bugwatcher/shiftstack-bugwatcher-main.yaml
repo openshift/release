@@ -1,18 +1,32 @@
-binary_build_commands: pip install --requirement requirements.txt
+base_images:
+  python:
+    name: builder
+    namespace: ocp
+    tag: ubi8.python.36
+binary_build_commands: |-
+  go build -o /bin/pretriage ./cmd/pretriage
+  go build -o /bin/posttriage ./cmd/posttriage
 build_root:
-  project_image:
-    dockerfile_literal: |-
-      FROM registry.access.redhat.com/ubi8/python-39
-
-      # Prow expects to be able to check out a repo under /go
-      USER 0:0
-      WORKDIR /go
-      RUN chown 1001:1001 .
-      USER 1001:1001
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.18-openshift-4.12
 images:
-- dockerfile_literal: FROM scratch
+- dockerfile_literal: FROM bin
   from: bin
   to: shiftstack-bugwatcher-image
+- dockerfile_literal: |-
+    FROM registry.access.redhat.com/ubi8/python-36
+    COPY ./ ./
+    RUN pip install --requirement requirements.txt
+    RUN pip install pycodestyle
+  from: python
+  to: shiftstack-bugwatcher-bugzilla-image
+- dockerfile_literal: |-
+    FROM shiftstack-bugwatcher-bugzilla-image
+    RUN pip install pycodestyle
+  from: shiftstack-bugwatcher-bugzilla-image
+  to: shiftstack-bugwatcher-bugzilla-test-image
 resources:
   '*':
     limits:
@@ -20,27 +34,45 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-test_binary_build_commands: pip install pycodestyle
 tests:
 - as: pep8
   commands: pycodestyle --verbose ./*.py
   container:
-    from: test-bin
-- as: bugwatcher-doctext
+    from: shiftstack-bugwatcher-bugzilla-test-image
+- as: go-vet
+  commands: go vet ./...
+  container:
+    from: src
+- as: go-fmt
+  commands: if [ "$(gofmt -s -l cmd | tee /dev/stderr | wc -l)" -gt 0 ]; then exit
+    1; fi
+  container:
+    from: src
+- as: bugwatcher-doctext-bugzilla
   cron: 0 8 * * 1-5
   steps:
     test:
-    - ref: shiftstack-bugwatcher-doctext
-- as: bugwatcher-posttriage
+    - ref: shiftstack-bugwatcher-doctext-bugzilla
+- as: bugwatcher-posttriage-bugzilla
   cron: 0 7 * * *
   steps:
     test:
-    - ref: shiftstack-bugwatcher-posttriage
+    - ref: shiftstack-bugwatcher-posttriage-bugzilla
+- as: bugwatcher-pretriage-bugzilla
+  cron: '*/30 * * * *'
+  steps:
+    test:
+    - ref: shiftstack-bugwatcher-pretriage-bugzilla
 - as: bugwatcher-pretriage
   cron: '*/30 * * * *'
   steps:
     test:
     - ref: shiftstack-bugwatcher-pretriage
+- as: bugwatcher-posttriage
+  cron: 0 7 * * *
+  steps:
+    test:
+    - ref: shiftstack-bugwatcher-posttriage
 zz_generated_metadata:
   branch: main
   org: shiftstack

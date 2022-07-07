@@ -99,6 +99,14 @@ compute:
       type: ${OPENSTACK_COMPUTE_FLAVOR}
       zones: ${ZONES_STR}
 EOF
+if [[ "${ZONES_COUNT}" == "1" ]]; then
+cat >> "${CONFIG}" << EOF
+      rootVolume:
+        type: tripleo
+        size: 30
+        zones: ${ZONES_STR}
+EOF
+fi
 if [[ ${ADDITIONAL_WORKERS_NETWORKS} != "" ]]; then
     cat >> "${CONFIG}" << EOF
       additionalNetworkIDs:

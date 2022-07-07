@@ -2,7 +2,8 @@
 
 set -Eeuo pipefail
 
-BUGZILLA_API_KEY="$(</var/run/bugzilla/api-key)"
-export BUGZILLA_API_KEY
+JIRA_TOKEN="$(</var/run/bugwatcher/jira-token)"
 
-./posttriage.py
+export JIRA_TOKEN
+
+exec /bin/posttriage

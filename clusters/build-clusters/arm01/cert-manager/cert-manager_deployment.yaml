@@ -1,126 +1,141 @@
+# Source: cert-manager/templates/cainjector-deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  name: cert-manager-cainjector
+  namespace: "cert-manager"
   labels:
     app: cainjector
-    app.kubernetes.io/component: cainjector
-    app.kubernetes.io/instance: cert-manager
     app.kubernetes.io/name: cainjector
-  name: cert-manager-cainjector
-  namespace: cert-manager
+    app.kubernetes.io/instance: cert-manager
+    app.kubernetes.io/component: "cainjector"
+    app.kubernetes.io/version: "v1.5.4"
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/component: cainjector
-      app.kubernetes.io/instance: cert-manager
       app.kubernetes.io/name: cainjector
+      app.kubernetes.io/instance: cert-manager
+      app.kubernetes.io/component: "cainjector"
   template:
     metadata:
       labels:
         app: cainjector
-        app.kubernetes.io/component: cainjector
-        app.kubernetes.io/instance: cert-manager
         app.kubernetes.io/name: cainjector
+        app.kubernetes.io/instance: cert-manager
+        app.kubernetes.io/component: "cainjector"
+        app.kubernetes.io/version: "v1.5.4"
     spec:
-      containers:
-      - args:
-        - --v=2
-        - --leader-election-namespace=kube-system
-        env:
-        - name: POD_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
-        image: quay.io/jetstack/cert-manager-cainjector:v1.3.1
-        imagePullPolicy: IfNotPresent
-        name: cert-manager
-        resources: {}
       serviceAccountName: cert-manager-cainjector
+      securityContext:
+        runAsNonRoot: true
+      containers:
+        - name: cert-manager
+          image: "quay.io/jetstack/cert-manager-cainjector:v1.5.4"
+          imagePullPolicy: IfNotPresent
+          args:
+          - --v=2
+          - --leader-election-namespace=kube-system
+          env:
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          resources:
+            {}
 ---
+# Source: cert-manager/templates/deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  name: cert-manager
+  namespace: "cert-manager"
   labels:
     app: cert-manager
-    app.kubernetes.io/component: controller
-    app.kubernetes.io/instance: cert-manager
     app.kubernetes.io/name: cert-manager
-  name: cert-manager
-  namespace: cert-manager
+    app.kubernetes.io/instance: cert-manager
+    app.kubernetes.io/component: "controller"
+    app.kubernetes.io/version: "v1.5.4"
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/component: controller
-      app.kubernetes.io/instance: cert-manager
       app.kubernetes.io/name: cert-manager
+      app.kubernetes.io/instance: cert-manager
+      app.kubernetes.io/component: "controller"
   template:
     metadata:
-      annotations:
-        prometheus.io/path: /metrics
-        prometheus.io/port: "9402"
-        prometheus.io/scrape: "true"
       labels:
         app: cert-manager
-        app.kubernetes.io/component: controller
-        app.kubernetes.io/instance: cert-manager
         app.kubernetes.io/name: cert-manager
+        app.kubernetes.io/instance: cert-manager
+        app.kubernetes.io/component: "controller"
+        app.kubernetes.io/version: "v1.5.4"
+      annotations:
+        prometheus.io/path: "/metrics"
+        prometheus.io/scrape: 'true'
+        prometheus.io/port: '9402'
     spec:
-      containers:
-      - args:
-        - --v=2
-        - --cluster-resource-namespace=$(POD_NAMESPACE)
-        - --leader-election-namespace=kube-system
-        - --dns01-recursive-nameservers="8.8.8.8:53"
-        env:
-        - name: AWS_ACCESS_KEY_ID
-          valueFrom:
-            secretKeyRef:
-              name: arm-build-cert-issuer
-              key: AWS_ACCESS_KEY_ID
-        - name: AWS_SECRET_ACCESS_KEY
-          valueFrom:
-            secretKeyRef:
-              name: arm-build-cert-issuer
-              key: AWS_SECRET_ACCESS_KEY
-        - name: POD_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
-        image: quay.io/jetstack/cert-manager-controller:v1.3.1
-        imagePullPolicy: IfNotPresent
-        name: cert-manager
-        ports:
-        - containerPort: 9402
-          protocol: TCP
-        resources: {}
       serviceAccountName: cert-manager
+      securityContext:
+        runAsNonRoot: true
+      containers:
+        - name: cert-manager
+          image: "quay.io/jetstack/cert-manager-controller:v1.5.4"
+          imagePullPolicy: IfNotPresent
+          args:
+          - --v=2
+          - --cluster-resource-namespace=$(POD_NAMESPACE)
+          - --leader-election-namespace=kube-system
+          - --dns01-recursive-nameservers="8.8.8.8:53"
+          ports:
+          - containerPort: 9402
+            protocol: TCP
+          env:
+          - name: AWS_ACCESS_KEY_ID
+            valueFrom:
+              secretKeyRef:
+                name: arm-build-cert-issuer
+                key: AWS_ACCESS_KEY_ID
+          - name: AWS_SECRET_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                name: arm-build-cert-issuer
+                key: AWS_SECRET_ACCESS_KEY
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          resources:
+            {}
 ---
+# Source: cert-manager/templates/webhook-deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  name: cert-manager-webhook
+  namespace: "cert-manager"
   labels:
     app: webhook
-    app.kubernetes.io/component: webhook
-    app.kubernetes.io/instance: cert-manager
     app.kubernetes.io/name: webhook
-  name: cert-manager-webhook
-  namespace: cert-manager
+    app.kubernetes.io/instance: cert-manager
+    app.kubernetes.io/component: "webhook"
+    app.kubernetes.io/version: "v1.5.4"
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app.kubernetes.io/component: webhook
-      app.kubernetes.io/instance: cert-manager
       app.kubernetes.io/name: webhook
+      app.kubernetes.io/instance: cert-manager
+      app.kubernetes.io/component: "webhook"
   template:
     metadata:
       labels:
         app: webhook
-        app.kubernetes.io/component: webhook
-        app.kubernetes.io/instance: cert-manager
         app.kubernetes.io/name: webhook
+        app.kubernetes.io/instance: cert-manager
+        app.kubernetes.io/component: "webhook"
+        app.kubernetes.io/version: "v1.5.4"
     spec:
       affinity:
         podAntiAffinity:
@@ -134,48 +149,52 @@ spec:
                   values:
                   - webhook
               topologyKey: "kubernetes.io/hostname"
-      containers:
-      - args:
-        - --v=2
-        - --secure-port=10250
-        - --dynamic-serving-ca-secret-namespace=$(POD_NAMESPACE)
-        - --dynamic-serving-ca-secret-name=cert-manager-webhook-ca
-        - --dynamic-serving-dns-names=cert-manager-webhook,cert-manager-webhook.cert-manager,cert-manager-webhook.cert-manager.svc
-        env:
-        - name: POD_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
-        image: quay.io/jetstack/cert-manager-webhook:v1.3.1
-        imagePullPolicy: IfNotPresent
-        livenessProbe:
-          failureThreshold: 3
-          httpGet:
-            path: /livez
-            port: 6080
-            scheme: HTTP
-          initialDelaySeconds: 60
-          periodSeconds: 10
-          successThreshold: 1
-          timeoutSeconds: 1
-        name: cert-manager
-        ports:
-        - containerPort: 10250
-          name: https
-        readinessProbe:
-          failureThreshold: 3
-          httpGet:
-            path: /healthz
-            port: 6080
-            scheme: HTTP
-          initialDelaySeconds: 5
-          periodSeconds: 5
-          successThreshold: 1
-          timeoutSeconds: 1
-        resources: {}
       serviceAccountName: cert-manager-webhook
+      securityContext:
+        runAsNonRoot: true
+      containers:
+        - name: cert-manager
+          image: "quay.io/jetstack/cert-manager-webhook:v1.5.4"
+          imagePullPolicy: IfNotPresent
+          args:
+          - --v=2
+          - --secure-port=10250
+          - --dynamic-serving-ca-secret-namespace=$(POD_NAMESPACE)
+          - --dynamic-serving-ca-secret-name=cert-manager-webhook-ca
+          - --dynamic-serving-dns-names=cert-manager-webhook,cert-manager-webhook.cert-manager,cert-manager-webhook.cert-manager.svc
+          ports:
+          - name: https
+            protocol: TCP
+            containerPort: 10250
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: 6080
+              scheme: HTTP
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            timeoutSeconds: 1
+            successThreshold: 1
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 6080
+              scheme: HTTP
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 1
+            successThreshold: 1
+            failureThreshold: 3
+          env:
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          resources:
+            {}
 ---
-apiVersion: policy/v1beta1
+apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: webhook

@@ -4,12 +4,25 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-trap 'FRC=$?; createUpgradeJunit' ERR EXIT TERM
+trap 'FRC=$?; createUpgradeJunit; debug' ERR EXIT TERM
+
+# Print cv, failed node, co, mcp information for debug purpose
+function debug() {
+    if (( FRC != 0 )); then
+        echo -e "oc get clusterversion/version -oyaml\n$(oc get clusterversion/version -oyaml)"
+        echo -e "Describing abnormal nodes...\n"
+        oc get node --no-headers | awk '$2 != "Ready" {print $1}' | while read node; do echo -e "\n#####oc describe node ${node}#####\n$(oc describe node ${node})"; done
+        echo -e "Describing abnormal operators...\n"
+        oc get co --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read co; do echo -e "\n#####oc describe co ${co}#####\n$(oc describe co ${co})"; done
+        echo -e "Describing abnormal mcp...\n"
+        oc get mcp --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read mcp; do echo -e "\n#####oc describe mcp ${mcp}#####\n$(oc describe mcp ${mcp})"; done
+    fi
+}
 
 # Generate the Junit for upgrade
 function createUpgradeJunit() {
     echo "Generating the Junit for upgrade"
-    if [[ "${FRC}" =  0  ]]; then
+    if (( FRC == 0 )); then
       cat >"${ARTIFACT_DIR}/junit_upgrade.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuite name="cluster upgrade" tests="1" failures="0">
@@ -323,7 +336,6 @@ function check_upgrade_status() {
         fi        
     done
     if (( wait_upgrade <= 0 )); then
-        echo "oc get clusterversion/version -oyaml" && oc get clusterversion/version -oyaml
         echo >&2 "Upgrade timeout, exiting" && return 1
     fi
 }

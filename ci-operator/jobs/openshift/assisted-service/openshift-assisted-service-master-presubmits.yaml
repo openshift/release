@@ -57,7 +57,7 @@ presubmits:
     - ^master$
     - ^master-
     cluster: build02
-    context: ci/prow/edge-e2e-ai-operator-ztp-ipv4-sno-ocp-410
+    context: ci/prow/edge-e2e-ai-operator-ztp-converged
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -67,9 +67,9 @@ presubmits:
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-ipv4-sno-ocp-410
-    optional: true
-    rerun_command: /test edge-e2e-ai-operator-ztp-ipv4-sno-ocp-410
+    name: pull-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-converged
+    rerun_command: /test edge-e2e-ai-operator-ztp-converged
+    run_if_changed: ^(deploy/operator/.*)$
     spec:
       containers:
       - args:
@@ -78,8 +78,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-ai-operator-ztp-ipv4-sno-ocp-410-cluster-profile
-        - --target=e2e-ai-operator-ztp-ipv4-sno-ocp-410
+        - --secret-dir=/usr/local/e2e-ai-operator-ztp-converged-cluster-profile
+        - --target=e2e-ai-operator-ztp-converged
         - --variant=edge
         command:
         - ci-operator
@@ -96,7 +96,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-ai-operator-ztp-ipv4-sno-ocp-410-cluster-profile
+        - mountPath: /usr/local/e2e-ai-operator-ztp-converged-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -127,7 +127,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )edge-e2e-ai-operator-ztp-ipv4-sno-ocp-410,?($|\s.*)
+    trigger: (?m)^/test( | .* )edge-e2e-ai-operator-ztp-converged,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -2224,6 +2224,82 @@ presubmits:
     - ^master$
     - ^master-
     cluster: build02
+    context: ci/prow/edge-e2e-metal-assisted-operator-ztp-sno-day2-workers-latbnd
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: packet-edge
+      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+      ci-operator.openshift.io/variant: edge
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-operator-ztp-sno-day2-workers-latbnd
+    rerun_command: /test edge-e2e-metal-assisted-operator-ztp-sno-day2-workers-latbnd
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-metal-assisted-operator-ztp-sno-day2-workers-latbnd-cluster-profile
+        - --target=e2e-metal-assisted-operator-ztp-sno-day2-workers-latbnd
+        - --variant=edge
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-metal-assisted-operator-ztp-sno-day2-workers-latbnd-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-packet-assisted
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )edge-e2e-metal-assisted-operator-ztp-sno-day2-workers-latbnd,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build02
     context: ci/prow/edge-e2e-metal-assisted-single-node
     decorate: true
     decoration_config:
@@ -2990,6 +3066,57 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build02
+    context: ci/prow/mce-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: mce
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-assisted-service-master-mce-images
+    rerun_command: /test mce-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=mce
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )mce-images,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:

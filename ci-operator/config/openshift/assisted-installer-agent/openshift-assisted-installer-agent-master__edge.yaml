@@ -90,6 +90,7 @@ tests:
     make lint
   container:
     from: test-bin
+  skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
 - as: unit-test
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
@@ -99,6 +100,7 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: assisted-installer-agent-codecov-token
+  skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
 - as: unit-test-postsubmit
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
@@ -110,7 +112,7 @@ tests:
     mount_path: /tmp/secret
     name: assisted-installer-agent-codecov-token
 - as: e2e-metal-assisted
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: packet-assisted
     workflow: assisted-baremetal
@@ -165,6 +167,7 @@ tests:
         TEST_FUNC=test_deploy_day2_nodes_cloud
     workflow: assisted-baremetal
 - as: subsystem-test
+  skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: packet-assisted
     workflow: assisted-agent
@@ -173,19 +176,6 @@ tests:
   steps:
     cluster_profile: packet-assisted
     workflow: assisted-agent
-- as: mce-publish
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: assisted-installer-agent
-    env:
-      IMAGE_REPO: assisted-installer-agent
-      OSCI_ENV_CONFIG: |
-        OSCI_PUBLISH_DELAY=0
-        OSCI_PIPELINE_PRODUCT_PREFIX=backplane
-        OSCI_PIPELINE_REPO=backplane-pipeline
-      RELEASE_REF: backplane-2.1
-    workflow: ocm-ci-manifest-update
 zz_generated_metadata:
   branch: master
   org: openshift

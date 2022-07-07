@@ -1,7 +1,7 @@
 presubmits:
   openshift/release:
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^master$
     - ^master-
@@ -12,7 +12,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-release-check-gh-automation
     rerun_command: /test check-gh-automation
-    run_if_changed: ^ci-operator/jobs/.*
     spec:
       containers:
       - args:
@@ -210,7 +209,7 @@ presubmits:
         - core-services/prow/02_config/_boskos.yaml
         command:
         - /app
-        image: gcr.io/k8s-staging-boskos/checkconfig:v20220628-f099c7d
+        image: gcr.io/k8s-staging-boskos/checkconfig:v20220704-37bd9bb
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -690,7 +689,7 @@ presubmits:
             secretKeyRef:
               key: appid
               name: openshift-prow-github-app
-        image: gcr.io/k8s-prow/checkconfig:v20220628-aa928caf31
+        image: gcr.io/k8s-prow/checkconfig:v20220705-20e880da9b
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -905,6 +904,32 @@ presubmits:
       - emptyDir: {}
         name: tmp
     trigger: (?m)^/test( | .* )hive-dry,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build04
+    context: ci/prow/jira-lifecycle-config
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-jira-lifecycle-config
+    rerun_command: /test jira-lifecycle-config
+    run_if_changed: ^core-services/jira-lifecycle-plugin/config.yaml
+    spec:
+      containers:
+      - args:
+        - --validate-config=core-services/jira-lifecycle-plugin/config.yaml
+        command:
+        - jira-lifecycle-plugin
+        image: registry.ci.openshift.org/ci/jira-lifecycle-plugin
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )jira-lifecycle-config,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
