@@ -1,5 +1,14 @@
 #!/usr/bin/env bash
+set -eo pipefail
 
-env
-pwd
-ls -alh
+# function cleanup() {
+#     .openshift-ci/jobs/teardown-vm.sh
+# }
+# 
+# 
+# .openshift-ci/jobs/create-vm.sh
+# .openshift-ci/jobs/run-integration-tests.sh
+
+ls -alh /tmp/secret/
+ls -alh /tmp/secret/stackrox-collector-int-tests
+
