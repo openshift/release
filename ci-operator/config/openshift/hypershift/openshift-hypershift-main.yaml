@@ -142,7 +142,22 @@ tests:
       timeout: 5m0s
     - as: test-e2e
       cli: latest
-      commands: make ci-test-e2e
+      commands: |-
+        # run the test
+        bin/test-e2e \
+        --test.v \
+        --test.timeout=2h10m \
+        --test.run=TestCreateCluster \
+        --e2e.aws-credentials-file=/etc/hypershift-pool-aws-credentials/credentials \
+        --e2e.aws-zones=us-east-1a,us-east-1b,us-east-1c \
+        --e2e.node-pool-replicas=1 \
+        --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson \
+        --e2e.base-domain=ci.hypershift.devcluster.openshift.com \
+        --e2e.latest-release-image="${OCP_IMAGE_LATEST}" \
+        --e2e.previous-release-image="${OCP_IMAGE_PREVIOUS}" \
+        --e2e.additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
+        --e2e.aws-endpoint-access=PublicAndPrivate \
+        --e2e.external-dns-domain=service.ci.hypershift.devcluster.openshift.com
       credentials:
       - mount_path: /etc/hypershift-pool-aws-credentials
         name: hypershift-pool-aws-credentials
@@ -160,7 +175,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-      timeout: 2h0m0s
+      timeout: 2h30m0s
     workflow: generic-claim
 - as: e2e-aws-metrics
   cluster_claim:
