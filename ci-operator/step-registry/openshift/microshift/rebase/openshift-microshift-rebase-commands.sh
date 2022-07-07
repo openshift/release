@@ -14,9 +14,9 @@ echo "  go: $(go version)"
 echo "  jq: $(jq --version)"
 echo "  oc: $(oc version)"
 
-# copy pull secret to the location needed for `oc adm`
+# fetch pull-secret for the central CI registry
 mkdir -p ~/.docker
-cp "${CLUSTER_PROFILE_DIR}"/pull-secret ~/.docker/config.json
+oc --namespace microshift registry login --service-account image-puller --registry-config="${HOME}/.docker/config.json"
 
 # call the rebase script
 echo "./scripts/rebase.sh to ${TARGET_RELEASE_IMAGE}"
