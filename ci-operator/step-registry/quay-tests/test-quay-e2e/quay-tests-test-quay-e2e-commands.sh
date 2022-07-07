@@ -5,6 +5,7 @@ set -euo pipefail
 #Set Kubeconfig:
 cd quay-frontend-tests
 skopeo -v
+terraform version
 (cp -L $KUBECONFIG /tmp/kubeconfig || true) && export KUBECONFIG_PATH=/tmp/kubeconfig
 
 #Create Artifact Directory:
