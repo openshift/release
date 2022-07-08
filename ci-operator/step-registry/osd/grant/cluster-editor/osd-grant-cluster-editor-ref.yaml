@@ -1,0 +1,34 @@
+ref:
+  as: osd-grant-cluster-editor
+  from: cli-ocm
+  grace_period: 10m
+  commands: osd-grant-cluster-editor-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 300Mi
+  timeout: 2h0m0s
+  env:
+  - name: OCM_LOGIN_URL
+    default: "staging"
+    documentation: OCM login URL.
+  - name: CLUSTER_ID
+    default: ""
+    documentation: OSD cluster id for which we will add a cluster editor. If not set then the one defined at ${SHARED_DIR}/cluster-id is used (e.g. step 'osd-create' writes the cluster id to this file).
+  - name: CLUSTER_EDITOR_PREFIX
+    default: "cluster-editor-"
+    documentation: A prefix which will be used for idententifying potential cluster editors.
+  - name: CLUSTER_EDITOR_STRATEGY
+    default: "any"
+    documentation: A strategy for selecting a cluster editor if there are more cluster editors which match the CLUSTER_EDITOR_PREFIX.
+  - name: CLUSTER_SECRET
+    default: "osd-secret"
+    documentation: A cluster secret where the key 'OCM_TOKEN' will be created.
+  - name: CLUSTER_SECRET_NS
+    default: "test-secrets"
+    documentation: A cluster namespace where the cluster secret will be cerated.
+
+  documentation: |-
+    Once you have an OSD cluster, you migth want to share an OCM token so that others (e.g. tests) can edit it.
+    It is important to share OCM tokens assigned to users with restricted privileges and ideally only for one specific cluster. This can be achieved by granting ClusterEditor role to such users.
+    This step will search the ${CLUSTER_PROFILE_DIR} and if there is any match with ${CLUSTER_EDITOR_PREFIX} it will grant the ClusterEditor role to such a user and share its token as 'OCM_TOKEN' in the secret ${CLUSTER_SECRET} in the namespace ${CLUSTER_SECRET_NS}.
