@@ -15,8 +15,7 @@ echo "  go: $(go version)"
 echo "  jq: $(jq --version)"
 echo "  oc: $(oc version)"
 
-RELEASE_NAME=$(oc get configmap/release-release-images-nightly -o json | jq -r .metadata.name)
-echo "Release name: ${RELEASE_NAME}"
+oc get configmaps
 
 sleep 1800
 
@@ -25,7 +24,6 @@ mkdir -p ~/.docker
 oc registry login --registry-config="${HOME}/.docker/config.json"
 
 TARGET_RELEASE_IMAGE="quay.io/openshift-release-dev/ocp-release:4.10.18-x86_64"
-
 # call the rebase script
 echo "./scripts/rebase.sh to ${TARGET_RELEASE_IMAGE}"
 ./scripts/rebase.sh to "${TARGET_RELEASE_IMAGE}"
