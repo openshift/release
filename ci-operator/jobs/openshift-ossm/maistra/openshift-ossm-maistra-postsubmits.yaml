@@ -1,0 +1,651 @@
+postsubmits:
+  maistra/test-infra:
+  - name: test-infra_deploy-prow
+    decorate: true
+    skip_report: false
+    run_if_changed: '^prow/'
+    labels:
+      preset-prow-deployer: "true"
+    max_concurrency: 1
+    branches:
+    - main
+    spec:
+      containers:
+      - image: "quay.io/maistra-dev/maistra-builder:2.0"
+        imagePullPolicy: Always
+        command:
+        - make
+        - gen-check
+        - update-prow
+        resources:
+          limits:
+            memory: 4Gi
+            cpu: "4"
+          requests:
+            cpu: "2"
+            memory: 1Gi
+
+  - name: test-infra_push-containers
+    decorate: true
+    path_alias: github.com/maistra/test-infra
+    skip_report: false
+    run_if_changed: '^docker/maistra-builder_.*\.Dockerfile|^docker/scripts'
+    branches:
+      - main
+    labels:
+      preset-quay-pusher: "true"
+    max_concurrency: 1
+    spec:
+      containers:
+      - image: "quay.io/maistra-dev/maistra-builder:2.0"
+        imagePullPolicy: Always
+        command:
+        - entrypoint
+        - make
+        - maistra-builder.push
+        securityContext:
+          privileged: true
+        resources:
+          limits:
+            memory: 16Gi
+            cpu: "4"
+          requests:
+            cpu: "4"
+            memory: 4Gi
+
+  - name: test-infra_push-proxy-containers
+    decorate: true
+    path_alias: github.com/maistra/test-infra
+    skip_report: false
+    run_if_changed: '^docker/maistra-proxy-builder_.*\.Dockerfile'
+    branches:
+      - main
+    labels:
+      preset-quay-pusher: "true"
+    max_concurrency: 1
+    spec:
+      containers:
+      - image: "quay.io/maistra-dev/maistra-builder:2.0"
+        imagePullPolicy: Always
+        command:
+        - entrypoint
+        - make
+        - maistra-proxy-builder.push
+        securityContext:
+          privileged: true
+        resources:
+          limits:
+            memory: 16Gi
+            cpu: "4"
+          requests:
+            cpu: "4"
+            memory: 4Gi
+
+  maistra/envoy:
+  - name: envoy-update-proxy-2.0
+    decorate: true
+    path_alias: maistra.io/envoy
+    skip_report: false
+    branches:
+      - ^maistra-2.0$
+      - ^maistra-1.1$
+    labels:
+      preset-github: "true"
+    extra_refs:
+    - base_ref: main
+      org: maistra
+      path_alias: maistra.io/test-infra
+      repo: test-infra
+    spec:
+      containers:
+      - image: "quay.io/maistra-dev/maistra-proxy-builder:2.0"
+        imagePullPolicy: Always
+        command:
+        - ../test-infra/tools/automator.sh
+        - -o maistra
+        - -f /creds-github/github-token
+        - -r proxy
+        - -c make maistra-update-everything
+        - '-t Automator: Update Envoy and dependencies'
+        - -l auto-merge
+        - -m bump-envoy
+        resources:
+          limits:
+            memory: 4Gi
+            cpu: "4"
+          requests:
+            cpu: "2"
+            memory: 1Gi
+
+  - name: envoy-update-proxy-2.1
+    decorate: true
+    path_alias: maistra.io/envoy
+    skip_report: false
+    branches:
+      - ^maistra-2.1$
+    labels:
+      preset-github: "true"
+    extra_refs:
+    - base_ref: main
+      org: maistra
+      path_alias: maistra.io/test-infra
+      repo: test-infra
+    spec:
+      containers:
+      - image: "quay.io/maistra-dev/maistra-proxy-builder:2.1"
+        imagePullPolicy: Always
+        command:
+        - ../test-infra/tools/automator.sh
+        - -o maistra
+        - -f /creds-github/github-token
+        - -r proxy
+        - -c make maistra-update-everything
+        - '-t Automator: Update Envoy and dependencies'
+        - -l auto-merge
+        - -m bump-envoy
+        resources:
+          limits:
+            memory: 4Gi
+            cpu: "4"
+          requests:
+            cpu: "2"
+            memory: 1Gi
+
+  - name: envoy-update-proxy-2.2
+    decorate: true
+    path_alias: maistra.io/envoy
+    skip_report: false
+    branches:
+      - ^maistra-2.2$
+      # Allow for testing
+      - playground
+    labels:
+      preset-github: "true"
+    extra_refs:
+    - base_ref: main
+      org: maistra
+      path_alias: maistra.io/test-infra
+      repo: test-infra
+    spec:
+      containers:
+      - image: "quay.io/maistra-dev/maistra-builder:2.2"
+        imagePullPolicy: Always
+        command:
+        - ../test-infra/tools/automator.sh
+        - -o maistra
+        - -f /creds-github/github-token
+        - -r proxy
+        - -c make maistra-update-everything
+        - '-t Automator: Update Envoy and dependencies'
+        - -l auto-merge
+        - -m bump-envoy
+        resources:
+          limits:
+            memory: 4Gi
+            cpu: "4"
+          requests:
+            cpu: "2"
+            memory: 1Gi
+
+  maistra/proxy:
+  - name: proxy-postsubmit-2.1
+    decorate: true
+    decoration_config:
+      timeout: 6h0m0s
+    path_alias: istio.io/proxy
+    skip_report: false
+    max_concurrency: 1
+    branches:
+      - ^maistra-2.1$
+    labels:
+      preset-gcs: "true"
+    spec:
+      containers:
+      - image: "quay.io/maistra-dev/maistra-proxy-builder:2.1"
+        imagePullPolicy: Always
+        command:
+        - ./maistra/ci/post-submit.sh
+        env:
+        - name: BAZEL_REMOTE_CACHE
+          value: http://bazel-cache.default/cache
+        resources:
+          limits:
+            memory: 16Gi
+            cpu: "8"
+          requests:
+            cpu: "4"
+            memory: 4Gi
+
+  - name: proxy-postsubmit-2.2
+    decorate: true
+    decoration_config:
+      timeout: 6h0m0s
+    path_alias: istio.io/proxy
+    skip_report: false
+    max_concurrency: 1
+    branches:
+      - ^maistra-2.2$
+    labels:
+      preset-gcs: "true"
+    spec:
+      containers:
+      - image: "quay.io/maistra-dev/maistra-builder:2.2"
+        imagePullPolicy: Always
+        command:
+        - ./maistra/ci/post-submit.sh
+        env:
+        - name: BAZEL_REMOTE_CACHE
+          value: http://bazel-cache.default/cache
+        resources:
+          limits:
+            memory: 16Gi
+            cpu: "8"
+          requests:
+            cpu: "4"
+            memory: 4Gi
+
+  - name: proxy-postsubmit-2.0
+    decorate: true
+    decoration_config:
+      timeout: 6h0m0s
+    path_alias: istio.io/proxy
+    skip_report: false
+    max_concurrency: 1
+    branches:
+      - ^maistra-2.0$
+    labels:
+      preset-gcs: "true"
+    spec:
+      containers:
+      - image: "quay.io/maistra-dev/maistra-proxy-builder:2.0"
+        imagePullPolicy: Always
+        command:
+        - ./maistra/ci/post-submit.sh
+        env:
+        - name: BAZEL_REMOTE_CACHE
+          value: http://bazel-cache.default/cache
+        resources:
+          limits:
+            memory: 16Gi
+            cpu: "8"
+          requests:
+            cpu: "4"
+            memory: 4Gi
+
+  - name: proxy-update-istio
+    decorate: true
+    decoration_config:
+      timeout: 6h0m0s
+    path_alias: maistra.io/proxy
+    skip_report: false
+    branches:
+      - ^maistra-2.2$
+      - ^maistra-2.1$
+      - ^maistra-2.0$
+    labels:
+      preset-github: "true"
+    extra_refs:
+    - base_ref: main
+      org: maistra
+      path_alias: maistra.io/test-infra
+      repo: test-infra
+    spec:
+      containers:
+      - image: "quay.io/maistra-dev/maistra-proxy-builder:2.0"
+        imagePullPolicy: Always
+        command:
+        - ../test-infra/tools/automator.sh
+        - -o maistra
+        - -r istio
+        - -f /creds-github/github-token
+        - -c bin/update_proxy.sh $AUTOMATOR_SHA
+        - '-t Automator: Update proxy'
+        - -l auto-merge
+        - -m bump-proxy
+        env:
+        - name: ISTIO_ENVOY_BASE_URL
+          value: https://storage.googleapis.com/maistra-prow-testing/proxy
+        resources:
+          limits:
+            memory: 4Gi
+            cpu: "4"
+          requests:
+            cpu: "2"
+            memory: 1Gi
+
+  maistra/api:
+  - name: api-update-istio-2.1
+    decorate: true
+    path_alias: maistra.io/api
+    skip_report: false
+    branches:
+      - ^maistra-2.1$
+    labels:
+      preset-github: "true"
+    extra_refs:
+    - base_ref: main
+      org: maistra
+      path_alias: maistra.io/test-infra
+      repo: test-infra
+    spec:
+      containers:
+      - image: "quay.io/maistra-dev/maistra-builder:2.1"
+        imagePullPolicy: Always
+        command:
+        - ../test-infra/tools/automator.sh
+        - -o maistra
+        - -r istio
+        - -f /creds-github/github-token
+        - -c UPDATE_BRANCH=$AUTOMATOR_SHA bin/update_maistra_deps.sh
+        - '-t Automator: Update maistra/api dependency'
+        - -m update_api_istio
+        env:
+        - name: BUILD_WITH_CONTAINER
+          value: "0"
+        - name: GOFLAGS
+          value: -mod=vendor
+        - name: XDG_CACHE_HOME
+          value: /tmp/cache
+        - name: GOCACHE
+          value: /tmp/cache
+        resources:
+          limits:
+            memory: 4Gi
+            cpu: "4"
+          requests:
+            cpu: "1"
+            memory: 1Gi
+
+  - name: api-update-istio-2.2
+    decorate: true
+    path_alias: maistra.io/api
+    skip_report: false
+    branches:
+      - ^maistra-2.2$
+      # Allow for testing
+      - playground
+    labels:
+      preset-github: "true"
+    extra_refs:
+    - base_ref: main
+      org: maistra
+      path_alias: maistra.io/test-infra
+      repo: test-infra
+    spec:
+      containers:
+      - image: "quay.io/maistra-dev/maistra-builder:2.2"
+        imagePullPolicy: Always
+        command:
+        - ../test-infra/tools/automator.sh
+        - -o maistra
+        - -r istio
+        - -f /creds-github/github-token
+        - -c UPDATE_BRANCH=$AUTOMATOR_SHA bin/update_maistra_deps.sh
+        - '-t Automator: Update maistra/api dependency'
+        - -m update_api_istio
+        env:
+        - name: BUILD_WITH_CONTAINER
+          value: "0"
+        - name: GOFLAGS
+          value: -mod=vendor
+        - name: XDG_CACHE_HOME
+          value: /tmp/cache
+        - name: GOCACHE
+          value: /tmp/cache
+        resources:
+          limits:
+            memory: 4Gi
+            cpu: "4"
+          requests:
+            cpu: "1"
+            memory: 1Gi
+
+  maistra/istio:
+  - name: istio-update-operator-2.1
+    decorate: true
+    path_alias: maistra.io/istio
+    skip_report: false
+    branches:
+      - ^maistra-2.1$
+    labels:
+      preset-github: "true"
+    extra_refs:
+    - base_ref: main
+      org: maistra
+      path_alias: maistra.io/test-infra
+      repo: test-infra
+    spec:
+      containers:
+      - image: "quay.io/maistra-dev/maistra-builder:2.1"
+        imagePullPolicy: Always
+        command:
+        - ../test-infra/tools/automator.sh
+        - -o maistra
+        - -r istio-operator
+        - -f /creds-github/github-token
+        - -c make clean update-2.1-charts
+        - '-t Automator: Update charts from maistra/istio'
+        - -m update_charts_istio
+        env:
+        - name: BUILD_WITH_CONTAINER
+          value: "0"
+        - name: GOFLAGS
+          value: -mod=vendor
+        - name: XDG_CACHE_HOME
+          value: /tmp/cache
+        - name: GOCACHE
+          value: /tmp/cache
+        resources:
+          limits:
+            memory: 4Gi
+            cpu: "4"
+          requests:
+            cpu: "2"
+            memory: 1Gi
+
+  - name: istio-update-operator-2.2
+    decorate: true
+    path_alias: maistra.io/istio
+    skip_report: false
+    branches:
+      - ^maistra-2.2$
+      # Allow for testing
+      - playground
+    labels:
+      preset-github: "true"
+    extra_refs:
+    - base_ref: main
+      org: maistra
+      path_alias: maistra.io/test-infra
+      repo: test-infra
+    spec:
+      containers:
+      - image: "quay.io/maistra-dev/maistra-builder:2.2"
+        imagePullPolicy: Always
+        command:
+        - ../test-infra/tools/automator.sh
+        - -o maistra
+        - -r istio-operator
+        - -f /creds-github/github-token
+        - -c make clean update-2.2-charts
+        - '-t Automator: Update charts from maistra/istio'
+        - -m update_charts_istio
+        env:
+        - name: BUILD_WITH_CONTAINER
+          value: "0"
+        - name: GOFLAGS
+          value: -mod=vendor
+        - name: XDG_CACHE_HOME
+          value: /tmp/cache
+        - name: GOCACHE
+          value: /tmp/cache
+        resources:
+          limits:
+            memory: 4Gi
+            cpu: "4"
+          requests:
+            cpu: "2"
+            memory: 1Gi
+
+  maistra/istio-operator:
+  - name: update-charts-in-2.1
+    decorate: true
+    path_alias: maistra.io/istio-operator
+    skip_report: false
+    branches:
+    - ^maistra-1.0$
+    - ^maistra-1.1$
+    - ^maistra-2.0$
+    labels:
+      preset-github: "true"
+    extra_refs:
+    - base_ref: main
+      org: maistra
+      path_alias: maistra.io/test-infra
+      repo: test-infra
+    spec:
+      containers:
+      - image: "quay.io/maistra-dev/maistra-builder:2.1"
+        imagePullPolicy: Always
+        command:
+        - ../test-infra/tools/automator.sh
+        - -o maistra
+        - -r istio-operator
+        - -b maistra-2.1
+        - -f /creds-github/github-token
+        - -c make clean update-1.0-charts update-1.1-charts update-2.0-charts
+        - '-t Automator: Update charts from previous versions'
+        - -m update_charts_from_previous_versions
+        - -l auto-merge
+        env:
+        - name: BUILD_WITH_CONTAINER
+          value: "0"
+        - name: GOFLAGS
+          value: -mod=vendor
+        - name: XDG_CACHE_HOME
+          value: /tmp/cache
+        - name: GOCACHE
+          value: /tmp/cache
+        resources:
+          limits:
+            memory: 4Gi
+            cpu: "4"
+          requests:
+            cpu: "2"
+            memory: 1Gi
+
+  - name: update-charts-in-2.2
+    decorate: true
+    path_alias: maistra.io/istio-operator
+    skip_report: false
+    branches:
+    - ^maistra-1.0$
+    - ^maistra-1.1$
+    - ^maistra-2.0$
+    - ^maistra-2.1$
+    # Allow for testing
+    - playground
+    labels:
+      preset-github: "true"
+    extra_refs:
+    - base_ref: main
+      org: maistra
+      path_alias: maistra.io/test-infra
+      repo: test-infra
+    spec:
+      containers:
+      - image: "quay.io/maistra-dev/maistra-builder:2.2"
+        imagePullPolicy: Always
+        command:
+        - ../test-infra/tools/automator.sh
+        - -o maistra
+        - -r istio-operator
+        - -b maistra-2.2
+        - -f /creds-github/github-token
+        - -c make clean update-1.0-charts update-1.1-charts update-2.0-charts update-2.1-charts
+        - '-t Automator: Update charts from previous versions'
+        - -m update_charts_from_previous_versions
+        - -l auto-merge
+        env:
+        - name: BUILD_WITH_CONTAINER
+          value: "0"
+        - name: GOFLAGS
+          value: -mod=vendor
+        - name: XDG_CACHE_HOME
+          value: /tmp/cache
+        - name: GOCACHE
+          value: /tmp/cache
+        resources:
+          limits:
+            memory: 4Gi
+            cpu: "4"
+          requests:
+            cpu: "2"
+            memory: 1Gi
+
+  maistra/rpm-common:
+  - name: rpm-common_update
+    decorate: true
+    path_alias: maistra.io/rpm-common
+    skip_report: false
+    branches:
+      - maistra-2.0
+      # Allow for testing
+      - playground
+    labels:
+      preset-github: "true"
+    extra_refs:
+    - base_ref: main
+      org: maistra
+      path_alias: maistra.io/test-infra
+      repo: test-infra
+    spec:
+      containers:
+      - image: "quay.io/maistra-dev/maistra-builder:2.0"
+        imagePullPolicy: Always
+        command:
+        - ../test-infra/tools/automator.sh
+        - -o maistra
+        - -f /creds-github/github-token
+        - -r rpm-ior,rpm-istio-operator
+        - -c make update-common
+        - '-t Automator: update rpm-common files'
+        - -l auto-merge
+        - -m rpm-common
+        resources:
+          limits:
+            memory: 4Gi
+            cpu: "4"
+          requests:
+            cpu: "2"
+            memory: 1Gi
+
+  maistra/header-append-filter:
+  - name: header-append-filter_push-containers
+    decorate: true
+    path_alias: github.com/maistra/header-append-filter
+    skip_report: false
+    branches:
+      - maistra-2.2
+      - maistra-2.1
+      - maistra-2.0
+    labels:
+      preset-quay-pusher: "true"
+    max_concurrency: 1
+    spec:
+      containers:
+      - image: "quay.io/maistra-dev/maistra-builder:2.0"
+        imagePullPolicy: Always
+        command:
+        - entrypoint
+        - make
+        - container.push
+        securityContext:
+          privileged: true
+        resources:
+          limits:
+            memory: 16Gi
+            cpu: "4"
+          requests:
+            cpu: "4"
+            memory: 4Gi
