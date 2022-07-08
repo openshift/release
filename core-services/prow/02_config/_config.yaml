@@ -10,15 +10,9 @@ deck:
     favicon: /static/extensions/favicon.ico
     header_color: black
     logo: /static/extensions/logo.png
-  external_agent_logs:
-  - agent: jenkins
-    selector: master=ci.openshift.redhat.com
-    url_template: http://jenkins-operator/job/{{.Spec.Job}}/{{.Status.JenkinsBuildID}}/consoleText
-  hidden_repos:
-  - openshift/ose
-  - openshift/online-registration
-  rerun_auth_configs:
-    '*':
+  default_rerun_auth_configs:
+  - repo: '*'
+    rerun_auth_configs:
       github_users:
       - stevekuznetsov
       - droslean
@@ -30,18 +24,28 @@ deck:
       - bparees
       - AlexNPavel
       - jupierce
-    openshift/openshift-tests-private:
+  - repo: openshift/openshift-tests-private
+    rerun_auth_configs:
       github_team_slugs:
       - org: openshift
         slug: team-qe
-    openshift/verification-tests:
+  - repo: openshift/verification-tests
+    rerun_auth_configs:
       github_team_slugs:
       - org: openshift
         slug: team-qe
-    smg247/ci-docs:
+  - repo: smg247/ci-docs
+    rerun_auth_configs:
       github_team_slugs:
       - org: smg247-org
         slug: sample
+  external_agent_logs:
+  - agent: jenkins
+    selector: master=ci.openshift.redhat.com
+    url_template: http://jenkins-operator/job/{{.Spec.Job}}/{{.Status.JenkinsBuildID}}/consoleText
+  hidden_repos:
+  - openshift/ose
+  - openshift/online-registration
   spyglass:
     gcs_browser_prefixes:
       '*': https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
