@@ -1,0 +1,42 @@
+base_images:
+  base:
+    name: 4.12-priv
+    namespace: ocp-private
+    tag: base
+binary_build_commands: make
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+canonical_go_repository: github.com/openshift/gcp-filestore-csi-driver-operator
+promotion:
+  name: 4.12-priv
+  namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.12-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.12-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: make test
+tests:
+- as: unit
+  commands: make test-unit
+  container:
+    from: src
+zz_generated_metadata:
+  branch: main
+  org: openshift-priv
+  repo: gcp-filestore-csi-driver-operator
