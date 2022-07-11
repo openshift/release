@@ -403,6 +403,16 @@ do
   count=$((count+1))
   if (( count > 20 )); then
     echo "Failed while waiting on imagestream import"
+    oc -n openshift get -o json imagestreams | jq -r '[.items[] | .metadata as $m | .status.tags[] | .tag as $t | (.conditions // [])[] | select(.type == "ImportSuccess" and .status == "False") | $m.namespace + "/" + $m.name + " " + $t + " " + .lastTransitionTime + " " + .type + "=" + .status + " " + .reason + ": " + .message] | to_entries[] | (.key | tostring) + " " + .value' | while read -r INDEX STREAM TAG FAILURE; do
+      echo "creating JUnit ${INDEX} for ${TAG} ${FAILURE}"
+      cat <<-EOF > "${ARTIFACT_DIR}/junit_image_stream_import_${INDEX}.xml"
+	<testsuite name="Import ${STREAM} ${TAG} ImageStreamTag">
+	  <testcase name="Import ${STREAM} ${TAG} ImageStreamTag">
+	    <failure message="">${FAILURE}</failure>
+	  </testcase>
+	</testsuite>
+	EOF
+    done
     exit 1
   fi
 
