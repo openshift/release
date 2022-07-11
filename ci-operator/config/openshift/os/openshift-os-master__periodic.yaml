@@ -101,9 +101,16 @@ images:
       - destination_dir: magic
         source_path: /tmp/cosa
   to: machine-os-oci-content
+- dockerfile_path: extensions/Dockerfile
+  inputs:
+    machine-os-oci-content:
+      as:
+      - registry.ci.openshift.org/rhcos-devel/rhel-coreos:latest
+  to: rhcos-extensions-8.6
 promotion:
   additional_images:
     rhel-coreos: machine-os-oci-content
+    rhel-coreos-extensions: rhcos-extensions-8.6
   excluded_images:
   - '*'
   namespace: rhcos-devel
@@ -124,11 +131,22 @@ resources:
       cpu: 2000m
       memory: 4Gi
 tests:
-- as: validate-machine-os-oci-image
-  commands: cat /etc/os-release
-  container:
-    from: machine-os-oci-content
+- as: validate-built-images
   cron: '@daily'
+  steps:
+    test:
+    - as: validate-rhcos-base-image
+      commands: cat /etc/os-release
+      from: machine-os-oci-content
+      resources:
+        requests:
+          cpu: 100m
+    - as: validate-rhcos-extensions-image
+      commands: cat /etc/os-release
+      from: rhcos-extensions-8.6
+      resources:
+        requests:
+          cpu: 100m
 zz_generated_metadata:
   branch: master
   org: openshift
