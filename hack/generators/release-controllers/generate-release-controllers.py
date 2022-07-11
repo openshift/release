@@ -63,6 +63,8 @@ def generate_app_ci_content(config, git_clone_dir):
             continue
         if '-stable' in annotation_path.name:  # There are no stable streams in private release controllers
             continue
+        if '-dev-preview' in annotation_path.name:  # There are no dev-preview streams in private release controllers
+            continue
         annotation_filename = os.path.basename(annotation_path)
         with open(annotation_path, mode='r', encoding='utf-8') as f:
             pub_annotation = json.load(f)
