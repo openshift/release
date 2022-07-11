@@ -49,8 +49,10 @@ tests:
     from: src
 - as: sonar-pre-submit
   commands: |
+    export SONAR_GO_TEST_ARGS="$(go list ./... | awk '!/test\/e2e/ {printf $0" "}')"
     export SELF="make -f /opt/build-harness/Makefile.prow"
     export SONAR_ORG=open-cluster-management
+    export HOME="/tmp"
     make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
     from: src
@@ -59,8 +61,10 @@ tests:
     name: acm-sonarcloud-token
 - as: sonar-post-submit
   commands: |
+    export SONAR_GO_TEST_ARGS="$(go list ./... | awk '!/test\/e2e/ {printf $0" "}')"
     export SELF="make -f /opt/build-harness/Makefile.prow"
     export SONAR_ORG=open-cluster-management
+    export HOME="/tmp"
     make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
     from: src
