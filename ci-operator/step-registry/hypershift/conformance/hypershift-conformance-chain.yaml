@@ -10,7 +10,58 @@ chain:
       export AWS_SHARED_CREDENTIALS_FILE=/etc/hypershift-pool-aws-credentials/credentials
       [[ -n ${CLUSTER_PROFILE_DIR:-} ]] && export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
       export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
+
+      CLUSTER_TYPE="$(oc get infrastructure cluster -ojsonpath='{.status.platform}'|tr '[:upper:]' '[:lower:]')"
+      case "${CLUSTER_TYPE}" in
+      gcp)
+          PROJECT="$(oc get -o jsonpath='{.status.platformStatus.gcp.projectID}' infrastructure cluster)"
+          REGION="$(oc get -o jsonpath='{.status.platformStatus.gcp.region}' infrastructure cluster)"
+          export TEST_PROVIDER="{\"type\":\"gce\",\"region\":\"${REGION}\",\"multizone\": true,\"multimaster\":true,\"projectid\":\"${PROJECT}\"}"
+          ;;
+      aws|aws-arm64)
+          REGION="$(oc get -o jsonpath='{.status.platformStatus.aws.region}' infrastructure cluster)"
+          ZONE="$(oc get -o jsonpath='{.items[0].metadata.labels.failure-domain\.beta\.kubernetes\.io/zone}' nodes)"
+          export TEST_PROVIDER="{\"type\":\"aws\",\"region\":\"${REGION}\",\"zone\":\"${ZONE}\",\"multizone\":true,\"multimaster\":true}"
+          ;;
+      azure4) export TEST_PROVIDER=azure;;
+      azurestack)
+          export TEST_PROVIDER="none"
+          ;;
+      vsphere)
+          export TEST_PROVIDER=vsphere;;
+      alibabacloud)
+          REGION="$(oc get -o jsonpath='{.status.platformStatus.alibabacloud.region}' infrastructure cluster)"
+          export TEST_PROVIDER="{\"type\":\"alibabacloud\",\"region\":\"${REGION}\",\"multizone\":true,\"multimaster\":true}"
+          export KUBE_SSH_USER=core
+      ;;
+      openstack*)
+          # shellcheck disable=SC1090
+          source "${SHARED_DIR}/cinder_credentials.sh"
+          if test -n "${HTTP_PROXY:-}" -o -n "${HTTPS_PROXY:-}"; then
+              export TEST_PROVIDER='{"type":"openstack","disconnected":true}'
+          else
+              export TEST_PROVIDER='{"type":"openstack"}'
+          fi
+          ;;
+      ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
+      ibmcloud)
+          export TEST_PROVIDER='{"type":"ibmcloud"}'
+          IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
+          export IC_API_KEY
+          ;;
+      *) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"; exit 1;;
+      esac
+
+      if [[ -n "${TEST_SKIPS}" ]]; then
+          TESTS="$(openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")"
+          echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests
+          echo "Skipping tests:"
+          echo "${TESTS}" | grep "${TEST_SKIPS}" || { exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS regex:'; echo "$TEST_SKIPS"; return $exit_code; }
+          TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
+      fi
+
       openshift-tests run ${TEST_SUITE} ${TEST_ARGS:-} \
+        --provider "${TEST_PROVIDER}" \
         -o "${ARTIFACT_DIR}/e2e.log" \
         --junit-dir "${ARTIFACT_DIR}/junit"
     credentials:
@@ -27,6 +78,13 @@ chain:
       default: openshift/conformance/parallel
       documentation: |-
         The test suite to run. Defaults to openshift/conformance/parallel
+    - name: TEST_SKIPS
+      default: ""
+      documentation: |
+        Regular expression (POSIX basic regular expression) of tests to skip.
+        It is suggested to test the regex to make sure that it matches with the available tests.
+        Tests can be listed by using 'openshift-tests run --dry-run (...)'. Sometimes, the tests
+        that are printed in Prow won't exactly match the list returned by openshift-tests.
     resources:
       requests:
         cpu: "3"

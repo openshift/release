@@ -10,15 +10,9 @@ deck:
     favicon: /static/extensions/favicon.ico
     header_color: black
     logo: /static/extensions/logo.png
-  external_agent_logs:
-  - agent: jenkins
-    selector: master=ci.openshift.redhat.com
-    url_template: http://jenkins-operator/job/{{.Spec.Job}}/{{.Status.JenkinsBuildID}}/consoleText
-  hidden_repos:
-  - openshift/ose
-  - openshift/online-registration
-  rerun_auth_configs:
-    '*':
+  default_rerun_auth_configs:
+  - repo: '*'
+    rerun_auth_configs:
       github_users:
       - stevekuznetsov
       - droslean
@@ -30,19 +24,28 @@ deck:
       - bparees
       - AlexNPavel
       - jupierce
-      - smg247
-    openshift/openshift-tests-private:
+  - repo: openshift/openshift-tests-private
+    rerun_auth_configs:
       github_team_slugs:
       - org: openshift
         slug: team-qe
-    openshift/verification-tests:
+  - repo: openshift/verification-tests
+    rerun_auth_configs:
       github_team_slugs:
       - org: openshift
         slug: team-qe
-    smg247/ci-docs:
+  - repo: smg247/ci-docs
+    rerun_auth_configs:
       github_team_slugs:
       - org: smg247-org
         slug: sample
+  external_agent_logs:
+  - agent: jenkins
+    selector: master=ci.openshift.redhat.com
+    url_template: http://jenkins-operator/job/{{.Spec.Job}}/{{.Status.JenkinsBuildID}}/consoleText
+  hidden_repos:
+  - openshift/ose
+  - openshift/online-registration
   spyglass:
     gcs_browser_prefixes:
       '*': https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
@@ -206,17 +209,17 @@ plank:
             memory: 250Mi
       timeout: 4h0m0s
       utility_images:
-        clonerefs: gcr.io/k8s-prow/clonerefs:v20220705-20e880da9b
-        entrypoint: gcr.io/k8s-prow/entrypoint:v20220705-20e880da9b
-        initupload: gcr.io/k8s-prow/initupload:v20220705-20e880da9b
-        sidecar: gcr.io/k8s-prow/sidecar:v20220705-20e880da9b
+        clonerefs: gcr.io/k8s-prow/clonerefs:v20220707-6c9b2eb5c9
+        entrypoint: gcr.io/k8s-prow/entrypoint:v20220707-6c9b2eb5c9
+        initupload: gcr.io/k8s-prow/initupload:v20220707-6c9b2eb5c9
+        sidecar: gcr.io/k8s-prow/sidecar:v20220707-6c9b2eb5c9
   - cluster: arm01
     config:
       utility_images:
-        clonerefs: gcr.io/k8s-prow/clonerefs:v20220705-20e880da9b-arm64
-        entrypoint: gcr.io/k8s-prow/entrypoint:v20220705-20e880da9b-arm64
-        initupload: gcr.io/k8s-prow/initupload:v20220705-20e880da9b-arm64
-        sidecar: gcr.io/k8s-prow/sidecar:v20220705-20e880da9b-arm64
+        clonerefs: gcr.io/k8s-prow/clonerefs:v20220707-6c9b2eb5c9-arm64
+        entrypoint: gcr.io/k8s-prow/entrypoint:v20220707-6c9b2eb5c9-arm64
+        initupload: gcr.io/k8s-prow/initupload:v20220707-6c9b2eb5c9-arm64
+        sidecar: gcr.io/k8s-prow/sidecar:v20220707-6c9b2eb5c9-arm64
   - config:
       gcs_configuration:
         bucket: origin-ci-private
