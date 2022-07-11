@@ -19,6 +19,14 @@ base_images:
     name: ocm-2.6
     namespace: edge-infrastructure
     tag: assisted-service
+  assisted-service-operator-index:
+    name: ocm-2.6
+    namespace: edge-infrastructure
+    tag: assisted-service-operator-index
+  assisted-service-scripts:
+    name: ocm-2.5
+    namespace: edge-infrastructure
+    tag: assisted-service-scripts
   assisted-test-infra:
     name: ocm-2.6
     namespace: edge-infrastructure
@@ -49,14 +57,14 @@ promotion:
   name: ocm-2.6
   namespace: edge-infrastructure
 releases:
-  initial:
+  candidate-4-11:
     integration:
       name: "4.11"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.11"
+      name: "4.10"
       namespace: ocp
 resources:
   '*':
@@ -129,6 +137,27 @@ tests:
       GATHER_CAPI_LOGS: "true"
       TEST_SUITE: full
     workflow: assisted-baremetal
+- as: e2e-assisted-operator-capi-periodic
+  cron: '@daily'
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate-4-11
+      HYPERSHIFT_IMAGE: hypershift-operator
+      INDEX_IMAGE: assisted-service-operator-index
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      PROVIDER_IMAGE: pipeline:cluster-api-provider-agent
+    env:
+      DEVSCRIPTS_CONFIG: |
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=32768
+        EXTRA_WORKER_DISK=120
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      DISCONNECTED: "false"
+      IP_STACK: v4
+      NUM_EXTRA_WORKERS: "1"
+    workflow: assisted-baremetal-operator-capi
 zz_generated_metadata:
   branch: master
   org: openshift
