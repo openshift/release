@@ -69,7 +69,9 @@ def generate_app_ci_content(config, git_clone_dir):
         print(str(annotation_path))
         priv_annotation = dict(pub_annotation)
         priv_annotation['name'] += '-priv'
-        priv_annotation['mirrorPrefix'] += '-priv'
+        # The "mirrorPrefix" is technically optional:
+        if 'mirrorPrefix' in pub_annotation:
+            priv_annotation['mirrorPrefix'] += '-priv'
         # The "multi" release-controller purposefully does not use the "to" annotation:
         if 'to' in pub_annotation:
             priv_annotation['to'] += '-priv'
