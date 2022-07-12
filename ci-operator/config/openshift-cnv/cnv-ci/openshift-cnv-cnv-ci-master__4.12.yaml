@@ -1,13 +1,13 @@
 base_images:
   cli:
-    name: "4.8"
+    name: "4.12"
     namespace: ocp
     tag: cli
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: golang-1.18
 images:
 - dockerfile_path: hack/Dockerfile.upgrade.src.ci
   from: src
@@ -16,23 +16,16 @@ images:
       paths:
       - destination_dir: .
         source_path: /usr/bin/oc
-  optional: true
   to: src-upgrade-ci
-promotion:
-  additional_images:
-    cnv-ci-src: src
-    src-upgrade-ci: src-upgrade-ci
-  name: "4.8"
-  namespace: cnv
 releases:
   initial:
     integration:
-      name: "4.8"
+      name: "4.12"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.8"
+      name: "4.12"
       namespace: ocp
 resources:
   '*':
@@ -43,7 +36,6 @@ resources:
       memory: 600Mi
 tests:
 - as: e2e-deploy
-  postsubmit: true
   steps:
     cluster_profile: azure4
     test:
@@ -59,9 +51,9 @@ tests:
         name: BREW_IMAGE_REGISTRY_USERNAME
       - default: /var/run/cnv-ci-brew-pull-secret/token
         name: BREW_IMAGE_REGISTRY_TOKEN_PATH
-      - default: v0.38.1
+      - default: v0.53.0
         name: KUBEVIRT_RELEASE
-      - default: "4.8"
+      - default: "4.12"
         name: OCP_VERSION
       - default: /tmp/artifacts
         name: ARTIFACTS_DIR
@@ -74,7 +66,6 @@ tests:
           memory: 600Mi
     workflow: ipi-azure
 - as: e2e-upgrade
-  postsubmit: true
   steps:
     cluster_profile: azure4
     test:
@@ -89,9 +80,9 @@ tests:
         name: BREW_IMAGE_REGISTRY_USERNAME
       - default: /var/run/cnv-ci-brew-pull-secret/token
         name: BREW_IMAGE_REGISTRY_TOKEN_PATH
-      - default: v0.38.1
+      - default: v0.53.0
         name: KUBEVIRT_RELEASE
-      - default: "4.8"
+      - default: "4.12"
         name: OCP_VERSION
       - default: /tmp/artifacts
         name: ARTIFACTS_DIR
@@ -104,6 +95,7 @@ tests:
           memory: 600Mi
     workflow: ipi-azure
 zz_generated_metadata:
-  branch: release-4.8
+  branch: master
   org: openshift-cnv
   repo: cnv-ci
+  variant: "4.12"

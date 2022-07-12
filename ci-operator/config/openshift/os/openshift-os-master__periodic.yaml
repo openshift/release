@@ -3,6 +3,10 @@ base_images:
     name: coreos-assembler
     namespace: coreos
     tag: latest
+  rhcos-devel_rhel-coreos_latest:
+    name: rhel-coreos
+    namespace: rhcos-devel
+    tag: latest
 build_root:
   image_stream_tag:
     name: fcos-buildroot
@@ -60,8 +64,6 @@ images:
     # stage.
     FROM build-image:latest as base
     ENV COSA_NO_KVM=1
-    # TODO: Remove me once https://github.com/openshift/os/pull/882 is merged
-    ENV RHELVER="rhel-8.6"
     # We need to reduce the size of this image because we can run out of space
     # on the underlying volume when the layer is committed. All we care about
     # is the rhcos.x86_64.ociarchive file.
@@ -101,9 +103,16 @@ images:
       - destination_dir: magic
         source_path: /tmp/cosa
   to: machine-os-oci-content
+- dockerfile_path: extensions/Dockerfile
+  inputs:
+    rhcos-devel_rhel-coreos_latest:
+      as:
+      - registry.ci.openshift.org/rhcos-devel/rhel-coreos:latest
+  to: rhcos-extensions
 promotion:
   additional_images:
     rhel-coreos: machine-os-oci-content
+    rhel-coreos-extensions: rhcos-extensions
   excluded_images:
   - '*'
   namespace: rhcos-devel
@@ -124,11 +133,22 @@ resources:
       cpu: 2000m
       memory: 4Gi
 tests:
-- as: validate-machine-os-oci-image
-  commands: cat /etc/os-release
-  container:
-    from: machine-os-oci-content
+- as: validate-built-images
   cron: '@daily'
+  steps:
+    test:
+    - as: validate-rhcos-base-image
+      commands: cat /etc/os-release
+      from: machine-os-oci-content
+      resources:
+        requests:
+          cpu: 100m
+    - as: validate-rhcos-extensions-image
+      commands: cat /etc/os-release
+      from: rhcos-extensions
+      resources:
+        requests:
+          cpu: 100m
 zz_generated_metadata:
   branch: master
   org: openshift
