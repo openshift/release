@@ -1,0 +1,45 @@
+base_images:
+  base:
+    name: "4.10"
+    namespace: ocp
+    tag: base-arm64
+  cli:
+    name: cli
+    namespace: ci
+    tag: amd64-cli
+releases:
+  initial:
+    candidate:
+      architecture: arm64
+      product: ocp
+      relative: 1
+      stream: nightly
+      version: "4.10"
+  latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.10"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: ocp-e2e-aws-arm64
+  cluster: arm01
+  interval: 24h
+  steps:
+    cluster_profile: aws-arm64
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      BASE_DOMAIN: arm-ci.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+    workflow: openshift-e2e-aws
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: multiarch
+  variant: nightly-4.10-arm64
