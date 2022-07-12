@@ -7,6 +7,8 @@ function cleanup() {
 
 trap cleanup EXIT
 
+env
+
 .openshift-ci/jobs/integration-tests/create-vm.sh
 .openshift-ci/jobs/integration-tests/run-integration-tests.sh
 
