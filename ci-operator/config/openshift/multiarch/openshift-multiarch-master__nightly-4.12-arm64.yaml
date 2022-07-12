@@ -1,0 +1,53 @@
+base_images:
+  base:
+    name: "4.10"
+    namespace: ocp
+    tag: base-arm64
+  centos:
+    name: centos
+    namespace: origin
+    tag: "8"
+  cli:
+    name: cli
+    namespace: ci
+    tag: latest
+  upi-installer:
+    name: "4.12"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  initial:
+    candidate:
+      architecture: arm64
+      product: ocp
+      relative: 1
+      stream: nightly
+      version: "4.12"
+  latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.12"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: ocp-e2e-aws-ovn-arm64
+  cluster: arm01
+  interval: 24h
+  steps:
+    cluster_profile: aws-arm64
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      BASE_DOMAIN: arm-ci.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+    workflow: openshift-e2e-aws
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: multiarch
+  variant: nightly-4.12-arm64

@@ -8,8 +8,21 @@ set -o pipefail
 # if certain instance types are used that cannot access persistent volumes.
 
 # Use yq to create cluster monitoring config, as other steps may adjust it
-YQ_URI=https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64
-YQ_HASH=e70e482e7ddb9cf83b52f5e83b694a19e3aaf36acf6b82512cbe66e41d569201
+
+YQ_URI=https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_
+arch=$(uname -m)
+case "${arch}" in
+  x86_64)
+    YQ_URI="${YQ_URI}amd64"
+    YQ_HASH="e70e482e7ddb9cf83b52f5e83b694a19e3aaf36acf6b82512cbe66e41d569201";;
+  aarch64)
+    YQ_URI="${YQ_URI}arm64"
+    YQ_HASH="6f75de6446fd5dbfb654e48418b59c34cbd7f3a58260101c467880b3b1a04bb5";;
+  *)
+    echo "Unsupported architecture ${arch}"
+    exit 1
+ esac
+
 echo "${YQ_HASH} -" > /tmp/sum.txt
 if ! curl -Ls "${YQ_URI}" | tee /tmp/yq | sha256sum -c /tmp/sum.txt >/dev/null 2>/dev/null; then
   echo "Expected file at ${YQ_URI} to have checksum ${YQ_HASH} but instead got $(sha256sum </tmp/yq | cut -d' ' -f1)"
