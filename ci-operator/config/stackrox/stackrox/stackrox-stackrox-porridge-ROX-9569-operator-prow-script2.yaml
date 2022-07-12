@@ -75,6 +75,11 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/stackrox/stackrox/docs/.
   to: docs
+operator:
+  bundles:
+  - as: bundle
+    context_dir: operator
+    # TODO(porridge): set base_index: to last released operator
 promotion:
   excluded_images:
   - main-bundle
@@ -107,6 +112,12 @@ tests:
         name: roxctl
       - env: CENTRAL_DB_IMAGE
         name: central-db
+      - env: OPERATOR_IMAGE
+        name: operator
+      - env: OPERATOR_BUNDLE_IMAGE
+        name: bundle
+      - env: OPERATOR_BUNDLE_INDEX_MAGE
+        name: ci-index-bundle
       from: src
       resources:
         requests:
@@ -241,11 +252,19 @@ tests:
   steps:
     test:
     - ref: stackrox-e2e
-- as: operator-e2e-tests
+- as: openshift-4-operator-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 3h30m0s
+    version: "4.8"
   optional: true
   steps:
     test:
     - ref: stackrox-e2e
+  timeout: 2h
 - as: local-roxctl-tests
   optional: true
   steps:
