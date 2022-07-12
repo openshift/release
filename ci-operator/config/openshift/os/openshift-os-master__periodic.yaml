@@ -64,8 +64,6 @@ images:
     # stage.
     FROM build-image:latest as base
     ENV COSA_NO_KVM=1
-    # TODO: Remove me once https://github.com/openshift/os/pull/882 is merged
-    ENV RHELVER="rhel-8.6"
     # We need to reduce the size of this image because we can run out of space
     # on the underlying volume when the layer is committed. All we care about
     # is the rhcos.x86_64.ociarchive file.
@@ -110,11 +108,11 @@ images:
     rhcos-devel_rhel-coreos_latest:
       as:
       - registry.ci.openshift.org/rhcos-devel/rhel-coreos:latest
-  to: rhcos-extensions-8.6
+  to: rhcos-extensions
 promotion:
   additional_images:
     rhel-coreos: machine-os-oci-content
-    rhel-coreos-extensions: rhcos-extensions-8.6
+    rhel-coreos-extensions: rhcos-extensions
   excluded_images:
   - '*'
   namespace: rhcos-devel
@@ -147,7 +145,7 @@ tests:
           cpu: 100m
     - as: validate-rhcos-extensions-image
       commands: cat /etc/os-release
-      from: rhcos-extensions-8.6
+      from: rhcos-extensions
       resources:
         requests:
           cpu: 100m
