@@ -22,7 +22,8 @@ AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
 # log in with az
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
 # random select the market-place image
-images=$(az vm image list --all --offer ocp-worker --publisher redhat -o tsv --query "[?starts_with(urn,'RedHat:ocp-worker:ocp-worker')].urn")
+offer="rh-ocp-worker"
+images=$(az vm image list --all --offer ${offer} --publisher redhat -o tsv --query "[?starts_with(urn,'RedHat:${offer}:${offer}')].urn")
 mapfile -t marketImages <<< "${images}"
 echo "choice market-place image from:" "${marketImages[@]}"
 imageTotal=${#marketImages[@]}
@@ -43,7 +44,7 @@ compute:
     azure:
       osImage:
         publisher: redhat
-        offer: ocp-worker
+        offer: ${imageInfo[1]}
         sku: ${imageInfo[2]}
         version: ${imageInfo[3]}
 EOF
