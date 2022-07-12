@@ -208,9 +208,12 @@ spec:
         - --bugzilla-endpoint=https://bugzilla.redhat.com
         - --bugzilla-api-key-path=/etc/bugzilla/api
         - --bugzilla-auth-method=bearer
+        - --verify-bugzilla
+        - --jira-endpoint=https://issues.redhat.com
+        - --jira-bearer-token-file=/etc/jira/api
+        - --verify-jira
         - --plugin-config=/etc/plugins/plugins.yaml
         - --supplemental-plugin-config-dir=/etc/plugins
-        - --verify-bugzilla
         - --authentication-message=Pulling these images requires <a href="https://docs.ci.openshift.org/docs/how-tos/use-registries-in-build-farm/">authenticating to the app.ci cluster</a>.
         - --art-suffix=-art-latest-priv
         image: release-controller:latest
@@ -243,6 +246,9 @@ spec:
           readOnly: true
         - mountPath: /etc/bugzilla
           name: bugzilla
+          readOnly: true
+        - mountPath: /etc/jira
+          name: jira
           readOnly: true
         - mountPath: /etc/plugins
           name: plugins
@@ -301,6 +307,10 @@ spec:
         secret:
           defaultMode: 420
           secretName: bugzilla-credentials-openshift-bugzilla-robot
+      - name: jira
+        secret:
+          defaultMode: 420
+          secretName: jira-credentials-openshift-jira-robot
       - configMap:
           defaultMode: 420
           name: plugins
