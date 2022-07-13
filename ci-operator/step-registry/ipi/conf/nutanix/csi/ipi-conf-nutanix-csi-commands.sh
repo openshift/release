@@ -8,22 +8,6 @@ source ${SHARED_DIR}/nutanix_context.sh
 
 
 echo "$(date -u --rfc-3339=seconds) - Creating CSI manifests..."
-cat > "${SHARED_DIR}/manifest_0000-nutanix-csi-catalog-source.yaml" << EOF
-apiVersion: operators.coreos.com/v1alpha1
-kind: CatalogSource
-metadata:
-  name: nutanix-csi-operator-beta
-  namespace: openshift-marketplace
-spec:
-  displayName: Nutanix Beta
-  publisher: Nutanix-dev
-  sourceType: grpc
-  image: quay.io/ntnx-csi/nutanix-csi-operator-catalog:latest
-  updateStrategy:
-    registryPoll:
-      interval: 5m
-EOF
-
 cat > "${SHARED_DIR}/manifest_0000-nutanix-csi-crd-manifest.yaml" << EOF
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
@@ -108,7 +92,7 @@ spec:
   channel: stable
   name: nutanixcsioperator
   installPlanApproval: Automatic
-  source: nutanix-csi-operator-beta
+  source: certified-operators
   sourceNamespace: openshift-marketplace
 EOF
 
