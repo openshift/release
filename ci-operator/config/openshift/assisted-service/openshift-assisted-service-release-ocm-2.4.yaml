@@ -264,7 +264,7 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
-- as: e2e-metal-assisted-operator-ztp
+- as: e2e-ai-operator-ztp
   run_if_changed: ^(cmd/.*|data/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     cluster_profile: packet-assisted
@@ -281,6 +281,61 @@ tests:
       DISCONNECTED: "false"
       IP_STACK: v4
       NUM_EXTRA_WORKERS: "1"
+    workflow: assisted-baremetal-operator-ztp
+- as: e2e-ai-operator-ztp-periodic
+  cron: 0 0 */3 * *
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      DEVSCRIPTS_CONFIG: |
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=32768
+        EXTRA_WORKER_DISK=120
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      DISCONNECTED: "false"
+      IP_STACK: v4
+      NUM_EXTRA_WORKERS: "1"
+    workflow: assisted-baremetal-operator-ztp
+- as: e2e-ai-operator-ztp-3masters
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
+    env:
+      ASSISTED_ZTP_CONFIG: |
+        SPOKE_CONTROLPLANE_AGENTS=3
+      DEVSCRIPTS_CONFIG: |
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=32768
+        EXTRA_WORKER_DISK=120
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      DISCONNECTED: "false"
+      IP_STACK: v4
+      NUM_EXTRA_WORKERS: "3"
+    workflow: assisted-baremetal-operator-ztp
+- as: e2e-ai-operator-ztp-3masters-periodic
+  cron: 0 0 */3 * *
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
+    env:
+      ASSISTED_ZTP_CONFIG: |
+        SPOKE_CONTROLPLANE_AGENTS=3
+      DEVSCRIPTS_CONFIG: |
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=32768
+        EXTRA_WORKER_DISK=120
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      DISCONNECTED: "false"
+      IP_STACK: v4
+      NUM_EXTRA_WORKERS: "3"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-ipv4v6-sno-ocp-49
   optional: true
@@ -300,27 +355,7 @@ tests:
       IP_STACK: v4v6
       NUM_EXTRA_WORKERS: "1"
     workflow: assisted-baremetal-operator-ztp
-- as: e2e-metal-assisted-operator-ztp-multinode-spoke-periodic
-  cron: 0 0 */3 * *
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
-    env:
-      ASSISTED_ZTP_CONFIG: |
-        SPOKE_CONTROLPLANE_AGENTS=3
-      DEVSCRIPTS_CONFIG: |
-        EXTRA_WORKER_VCPU=8
-        EXTRA_WORKER_MEMORY=32768
-        EXTRA_WORKER_DISK=120
-        PROVISIONING_NETWORK_PROFILE=Disabled
-        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
-      DISCONNECTED: "false"
-      IP_STACK: v4
-      NUM_EXTRA_WORKERS: "3"
-    workflow: assisted-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-ipv4v6-3masters-periodic-ocp-49
+- as: e2e-ai-operator-ztp-ipv4v6-sno-ocp-49-periodic
   cron: 0 0 */3 * *
   steps:
     cluster_profile: packet-assisted
@@ -328,8 +363,6 @@ tests:
       ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
-      ASSISTED_ZTP_CONFIG: |
-        SPOKE_CONTROLPLANE_AGENTS=3
       DEVSCRIPTS_CONFIG: |
         EXTRA_WORKER_VCPU=8
         EXTRA_WORKER_MEMORY=32768
@@ -338,50 +371,30 @@ tests:
         REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
       DISCONNECTED: "false"
       IP_STACK: v4v6
-      NUM_EXTRA_WORKERS: "3"
-    workflow: assisted-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-ipv4v6-3masters-periodic-ocp-48
-  cron: '@weekly'
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
-    env:
-      ASSISTED_ZTP_CONFIG: |
-        SPOKE_CONTROLPLANE_AGENTS=3
-      DEVSCRIPTS_CONFIG: |
-        EXTRA_WORKER_VCPU=8
-        EXTRA_WORKER_MEMORY=32768
-        EXTRA_WORKER_DISK=120
-        PROVISIONING_NETWORK_PROFILE=Disabled
-        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
-      DISCONNECTED: "false"
-      IP_STACK: v4v6
-      NUM_EXTRA_WORKERS: "3"
-    workflow: assisted-baremetal-operator-ztp
-- as: e2e-metal-assisted-operator-ztp-multinode-spoke
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
-    env:
-      ASSISTED_ZTP_CONFIG: |
-        SPOKE_CONTROLPLANE_AGENTS=3
-      DEVSCRIPTS_CONFIG: |
-        EXTRA_WORKER_VCPU=8
-        EXTRA_WORKER_MEMORY=32768
-        EXTRA_WORKER_DISK=120
-        PROVISIONING_NETWORK_PROFILE=Disabled
-        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
-      DISCONNECTED: "false"
-      IP_STACK: v4
-      NUM_EXTRA_WORKERS: "3"
+      NUM_EXTRA_WORKERS: "1"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-ipv4v6-3masters-ocp-48
   optional: true
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
+    env:
+      ASSISTED_ZTP_CONFIG: |
+        SPOKE_CONTROLPLANE_AGENTS=3
+      DEVSCRIPTS_CONFIG: |
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=32768
+        EXTRA_WORKER_DISK=120
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      DISCONNECTED: "false"
+      IP_STACK: v4v6
+      NUM_EXTRA_WORKERS: "3"
+    workflow: assisted-baremetal-operator-ztp
+- as: e2e-ai-operator-ztp-ipv4v6-3masters-ocp-48-periodic
+  cron: '@weekly'
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -420,22 +433,7 @@ tests:
       IP_STACK: v4v6
       NUM_EXTRA_WORKERS: "3"
     workflow: assisted-baremetal-operator-ztp
-- as: e2e-metal-assisted-operator-ztp-periodic
-  cron: 0 0 */3 * *
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      DEVSCRIPTS_CONFIG: |
-        EXTRA_WORKER_VCPU=8
-        EXTRA_WORKER_MEMORY=32768
-        EXTRA_WORKER_DISK=120
-        PROVISIONING_NETWORK_PROFILE=Disabled
-        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
-      DISCONNECTED: "false"
-      IP_STACK: v4
-      NUM_EXTRA_WORKERS: "1"
-    workflow: assisted-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-ipv4v6-sno-periodic-ocp-49
+- as: e2e-ai-operator-ztp-ipv4v6-3masters-ocp-49-periodic
   cron: 0 0 */3 * *
   steps:
     cluster_profile: packet-assisted
@@ -443,6 +441,8 @@ tests:
       ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
+      ASSISTED_ZTP_CONFIG: |
+        SPOKE_CONTROLPLANE_AGENTS=3
       DEVSCRIPTS_CONFIG: |
         EXTRA_WORKER_VCPU=8
         EXTRA_WORKER_MEMORY=32768
@@ -451,7 +451,7 @@ tests:
         REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
       DISCONNECTED: "false"
       IP_STACK: v4v6
-      NUM_EXTRA_WORKERS: "1"
+      NUM_EXTRA_WORKERS: "3"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-metal-assisted-ipv6
   optional: true
