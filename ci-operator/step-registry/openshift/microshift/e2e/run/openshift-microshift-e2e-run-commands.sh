@@ -37,7 +37,8 @@ gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
 cat  > "${HOME}"/run-test.sh <<'EOF'
 export KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig
-openshift-tests run -v 2 --provider=none -f suite.txt
+sleep 36000
+#openshift-tests -v 2 run --provider=none -f suite.txt
 EOF
 chmod +x "${HOME}"/run-test.sh
 
