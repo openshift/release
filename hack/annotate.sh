@@ -82,3 +82,10 @@ annotate "ocp-s390x" "release-s390x" "ocp-4.y-stable-s390x.json"
 annotate "ocp-ppc64le" "release-ppc64le" "ocp-4.y-stable-ppc64le.json"
 annotate "ocp-arm64" "release-arm64" "ocp-4.y-stable-arm64.json"
 annotate "ocp-multi" "release-multi" "ocp-4.y-stable-multi.json"
+
+# 4-dev-preview release streams
+annotate "ocp" "4-dev-preview" "ocp-4-dev-preview.json"
+annotate "ocp-s390x" "4-dev-preview-s390x" "ocp-4-dev-preview-s390x.json"
+annotate "ocp-ppc64le" "4-dev-preview-ppc64le" "ocp-4-dev-preview-ppc64le.json"
+annotate "ocp-arm64" "4-dev-preview-arm64" "ocp-4-dev-preview-arm64.json"
+annotate "ocp-multi" "4-dev-preview-multi" "ocp-4-dev-preview-multi.json"

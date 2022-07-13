@@ -31,6 +31,11 @@ def get_rc_volume_mounts():
             'readOnly': True
         },
         {
+            'mountPath': '/etc/jira',
+            'name': 'jira',
+            'readOnly': True
+        },
+        {
             'mountPath': '/etc/plugins',
             'name': 'plugins',
             'readOnly': True
@@ -114,6 +119,13 @@ def get_rc_volumes(context, namespace=None):
             'secret': {
                 'defaultMode': 420,
                 'secretName': 'bugzilla-credentials-openshift-bugzilla-robot'
+            }
+        },
+        {
+            'name': 'jira',
+            'secret': {
+                'defaultMode': 420,
+                'secretName': 'jira-credentials-openshift-jira-robot'
             }
         },
         {

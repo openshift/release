@@ -85,6 +85,20 @@ then
   mount "\${NVME_DEVICE}" "\${REPO_DIR}"
 fi
 
+# create a big enough swap file if memory overcommit is required
+REQUIRED_MEMORY_GB="${REQUIRED_MEMORY_GB:-0}"
+TOTAL_MEMORY_GB=\$(free --giga | grep -oP '\d+' | head -n 1)
+if [ "\${REQUIRED_MEMORY_GB}" -gt "\${TOTAL_MEMORY_GB}" ]
+then
+  # Create a swap file on the NVME device
+  SWAP_SIZE_GB=\$(( (REQUIRED_MEMORY_GB - TOTAL_MEMORY_GB) * 4 )) # may need to be refined
+  fallocate -l "\${SWAP_SIZE_GB}G" "\${REPO_DIR}/swapfile"
+  chmod 600 "\${REPO_DIR}/swapfile"
+  mkswap "\${REPO_DIR}/swapfile"
+  swapon "\${REPO_DIR}/swapfile"
+  swapon --show
+fi
+
 tar -xzvf assisted.tar.gz -C "\${REPO_DIR}"
 chown -R root:root "\${REPO_DIR}"
 

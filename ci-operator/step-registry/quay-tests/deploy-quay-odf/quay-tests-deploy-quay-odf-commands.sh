@@ -9,6 +9,7 @@ set -o pipefail
 OO_INSTALL_NAMESPACE=openshift-storage
 QUAY_OPERATOR_CHANNEL="$QUAY_OPERATOR_CHANNEL"
 ODF_OPERATOR_CHANNEL="$ODF_OPERATOR_CHANNEL"
+ODF_SUBSCRIPTION_NAME="$ODF_SUBSCRIPTION_NAME"
 
 cat <<EOF | oc apply -f -
 apiVersion: v1
@@ -45,12 +46,12 @@ SUB=$(
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
-  name: odf-operator
+  name: $ODF_SUBSCRIPTION_NAME
   namespace: $OO_INSTALL_NAMESPACE
 spec:
   channel: $ODF_OPERATOR_CHANNEL
   installPlanApproval: Automatic
-  name: odf-operator
+  name: $ODF_SUBSCRIPTION_NAME
   source: redhat-operators
   sourceNamespace: openshift-marketplace
 EOF
@@ -66,7 +67,7 @@ for _ in {1..60}; do
     fi
     sleep 10
 done
-echo "ODF Operator is deployed successfully"
+echo "ODF/OCS Operator is deployed successfully"
 
 
 #Deploy Quay Operator to OCP namespace 'quay-enterprise'
