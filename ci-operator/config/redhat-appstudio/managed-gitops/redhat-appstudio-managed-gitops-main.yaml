@@ -29,8 +29,9 @@ tests:
       cli: latest
       commands: |
         make devenv-k8s
-        timeout 10m kubectl port-forward --namespace gitops svc/gitops-postgresql-staging 5432:5432 &
+        kubectl port-forward --namespace gitops svc/gitops-postgresql-staging 5432:5432 &
         make test
+        killall kubectl
       from: src
       resources:
         requests:
@@ -52,9 +53,11 @@ tests:
         make install-argocd-openshift
         make devenv-k8s
         make download-deps
-        timeout 10m kubectl port-forward --namespace gitops svc/gitops-postgresql-staging 5432:5432 &
-        timeout 10m make start-e2e &
+        kubectl port-forward --namespace gitops svc/gitops-postgresql-staging 5432:5432 &
+        make start-e2e &
         make test-e2e
+        killall kubectl
+        killall goreman
       from: src
       resources:
         requests:
