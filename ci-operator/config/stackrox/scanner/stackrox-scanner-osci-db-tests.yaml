@@ -10,14 +10,6 @@ images:
 - dockerfile_path: .openshift-ci/build/Dockerfile.generate-genesis-dump
   from: src
   to: genesis-dump
-- dockerfile_path: .openshift-ci/build/Dockerfile.postgres
-  from: postgres-12
-  inputs:
-    src:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/stackrox/scanner/.
-  to: postgres-test
 resources:
   '*':
     requests:
@@ -26,16 +18,19 @@ resources:
 test_binary_build_commands: .openshift-ci/dispatch.sh noop
 tests:
 - as: db-integration-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.10"
   optional: true
   steps:
     test:
     - as: db-tests
       commands: .openshift-ci/dispatch.sh db-integration-tests
-      credentials:
-      - mount_path: /tmp/secret/stackrox-scanner-secrets
-        name: stackrox-scanner-secrets
-        namespace: test-credentials
-      from: postgres-test
+      from: src
       resources:
         requests:
           cpu: 2000m
@@ -83,16 +78,19 @@ tests:
     test:
     - ref: stackrox-scanner
 - as: merge-db-integration-tests
-  postsubmit: true
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.10"
+  optional: true
   steps:
     test:
     - as: db-tests
       commands: .openshift-ci/dispatch.sh db-integration-tests
-      credentials:
-      - mount_path: /tmp/secret/stackrox-scanner-secrets
-        name: stackrox-scanner-secrets
-        namespace: test-credentials
-      from: postgres-test
+      from: src
       resources:
         requests:
           cpu: 2000m
