@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 
 set -o nounset
-set -o errexit
-set -o pipefail
 
 export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
 CLUSTER_NAME=$(<"${SHARED_DIR}/CLUSTER_NAME")
