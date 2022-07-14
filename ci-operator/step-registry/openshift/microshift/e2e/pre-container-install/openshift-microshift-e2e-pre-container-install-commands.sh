@@ -129,7 +129,7 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
-  --command 'podman pull --authfile=${HOME}/pull-secret '"${IMAGE_PULL_SPEC}"' && podman tag '"${IMAGE_PULL_SPEC}"' quay.io/microshift/microshift:latest'
+  --command 'sudo podman pull --authfile=${HOME}/pull-secret '"${IMAGE_PULL_SPEC}"' && sudo podman tag '"${IMAGE_PULL_SPEC}"' quay.io/microshift/microshift:latest'
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \
