@@ -24,3 +24,8 @@ for port in $(openstack port list -c Name -f value | grep "$CLUSTER_NAME" | sort
 	echo -e "\n$ openstack port show $port" >> "${ARTIFACT_DIR}/openstack_ports.log"
 	openstack port show "$port"               >> "${ARTIFACT_DIR}/openstack_ports.log"
 done
+
+for subnet in $(openstack subnet list -c Name -f value | grep "$CLUSTER_NAME" | sort); do
+	echo -e "\n$ openstack subnet show $subnet" >> "${ARTIFACT_DIR}/openstack_subnets.log"
+	openstack subnet show "$subnet"             >> "${ARTIFACT_DIR}/openstack_subnets.log"
+done
