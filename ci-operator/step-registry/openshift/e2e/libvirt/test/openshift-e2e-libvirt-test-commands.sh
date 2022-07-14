@@ -317,7 +317,7 @@ sigStorageRegistry: quay.io/multiarch-k8s-e2e
 EOREGISTRY
 export KUBE_TEST_REPO_LIST=${SHARED_DIR}/kube-test-repo-list
         ;;
-    4.[789]|4.1[01])
+    4.[789]|4.10)
         TEST_ARGS="${TEST_ARGS:-} --from-repository=quay.io/multi-arch/community-e2e-images"
         ;;
     esac
