@@ -18,14 +18,10 @@ resources:
 test_binary_build_commands: .openshift-ci/dispatch.sh noop
 tests:
 - as: db-integration-tests
-  commands: .openshift-ci/dispatch.sh db-integration-tests
-  container:
-    clone: true
-    from: postgres-12
   optional: true
-  secret:
-    mount_path: /tmp/secret/stackrox-postgres
-    name: stackrox-postgres
+  steps:
+    test:
+    - ref: stackrox-postgres-12
   timeout: 30m0s
 - as: diff-dumps
   optional: true
@@ -69,14 +65,10 @@ tests:
     test:
     - ref: stackrox-scanner
 - as: merge-db-integration-tests
-  commands: .openshift-ci/dispatch.sh db-integration-tests
-  container:
-    clone: true
-    from: postgres-12
   postsubmit: true
-  secret:
-    mount_path: /tmp/secret/stackrox-postgres
-    name: stackrox-postgres
+  steps:
+    test:
+    - ref: stackrox-postgres-12
   timeout: 30m0s
 - as: merge-diff-dumps
   postsubmit: true
