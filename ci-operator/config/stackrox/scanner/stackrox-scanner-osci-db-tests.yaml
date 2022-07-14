@@ -21,7 +21,18 @@ tests:
   optional: true
   steps:
     test:
-    - ref: stackrox-postgres-12
+    - as: db-integration-tests
+      commands: .openshift-ci/dispatch.sh db-integration-tests
+      credentials:
+      - mount_path: /tmp/secret/stackrox-postgres
+        name: stackrox-postgres
+        namespace: test-credentials
+      from: postgres-12
+      clone: true
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
   timeout: 30m0s
 - as: diff-dumps
   optional: true
@@ -68,7 +79,18 @@ tests:
   postsubmit: true
   steps:
     test:
-    - ref: stackrox-postgres-12
+    - as: db-integration-tests
+      commands: .openshift-ci/dispatch.sh db-integration-tests
+      credentials:
+      - mount_path: /tmp/secret/stackrox-postgres
+        name: stackrox-postgres
+        namespace: test-credentials
+      from: postgres-12
+      clone: true
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
   timeout: 30m0s
 - as: merge-diff-dumps
   postsubmit: true
