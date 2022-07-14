@@ -300,7 +300,8 @@ EOSCRIPT
       TEST_ARGS="${TEST_ARGS:-} --file ${SHARED_DIR}/tests"
     fi
 
-    if [ "$BRANCH" = "4.6" ]; then
+    case ${BRANCH} in
+    4.6)
 # use s390x or ppc64le builds of e2e test images
 # this is a multi-arch image
         cat << EOREGISTRY > ${SHARED_DIR}/kube-test-repo-list
@@ -315,9 +316,11 @@ promoterE2eRegistry: quay.io/multiarch-k8s-e2e
 sigStorageRegistry: quay.io/multiarch-k8s-e2e
 EOREGISTRY
 export KUBE_TEST_REPO_LIST=${SHARED_DIR}/kube-test-repo-list
-    else
+        ;;
+    4.[789]|4.1[01])
         TEST_ARGS="${TEST_ARGS:-} --from-repository=quay.io/multi-arch/community-e2e-images"
-    fi
+        ;;
+    esac
 
     VERBOSITY="" # "--v 9"
     set -x

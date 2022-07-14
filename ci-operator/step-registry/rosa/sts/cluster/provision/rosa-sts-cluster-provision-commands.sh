@@ -6,15 +6,16 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-CLUSTER_NAME=${CLUSTER_NAME:-$NAMESPACE}
+subfix=$(openssl rand -hex 2)
+CLUSTER_NAME=${CLUSTER_NAME:-"ci-rosa-s-$subfix"}
 ACCOUNT_ROLES_PREFIX=${ACCOUNT_ROLES_PREFIX:-$NAMESPACE}
 COMPUTE_MACHINE_TYPE=${COMPUTE_MACHINE_TYPE:-"m5.xlarge"}
 OPENSHIFT_VERSION=${OPENSHIFT_VERSION:-}
+CHANNEL_GROUP=${CHANNEL_GROUP}
 MULTI_AZ=${MULTI_AZ:-false}
 ENABLE_AUTOSCALING=${ENABLE_AUTOSCALING:-false}
 ETCD_ENCRYPTION=${ETCD_ENCRYPTION:-false}
 DISABLE_WORKLOAD_MONITORING=${DISABLE_WORKLOAD_MONITORING:-false}
-CHANNEL_GROUP=${CHANNEL_GROUP}
 CLUSTER_TIMEOUT=${CLUSTER_TIMEOUT}
 
 # Configure aws
@@ -78,16 +79,21 @@ echo -e "Available cluster versions:\n${versionList}"
 if [[ -z "$OPENSHIFT_VERSION" ]]; then
   OPENSHIFT_VERSION=$(echo "$versionList" | head -1 | tr -d '"')
 elif [[ $OPENSHIFT_VERSION =~ ^[0-9]+\.[0-9]+$ ]]; then
-  OPENSHIFT_VERSION=$(echo "$versionList" | grep ${OPENSHIFT_VERSION} | tail -1 | tr -d '"')
+  OPENSHIFT_VERSION=$(echo "$versionList" | { grep "${OPENSHIFT_VERSION}" || true; } | tail -1 | tr -d '"')
 else
   # Match the whole line
-  OPENSHIFT_VERSION=$(echo "$versionList" | grep -x ${OPENSHIFT_VERSION} | tr -d '"')
+  OPENSHIFT_VERSION=$(echo "$versionList" | { grep -x "\"${OPENSHIFT_VERSION}\"" || true; } | tr -d '"')
 fi
 
 if [[ -z "$OPENSHIFT_VERSION" ]]; then
   echo "Requested cluster version not available!"
   exit 1
 fi
+
+if [[ "$CHANNEL_GROUP" != "stable" ]]; then
+  OPENSHIFT_VERSION="${OPENSHIFT_VERSION}-${CHANNEL_GROUP}"
+fi
+echo "Choosing openshift version ${OPENSHIFT_VERSION}"
 
 # Switches
 MULTI_AZ_SWITCH=""
@@ -119,6 +125,7 @@ echo "  Compute machine type: ${COMPUTE_MACHINE_TYPE}"
 echo "  Cloud provider region: ${CLOUD_PROVIDER_REGION}"
 echo "  Multi-az: ${MULTI_AZ}"
 echo "  Openshift version: ${OPENSHIFT_VERSION}"
+echo "  Channel group: ${CHANNEL_GROUP}"
 echo "  Etcd encryption: ${ETCD_ENCRYPTION}"
 echo "  Disable workload monitoring: ${DISABLE_WORKLOAD_MONITORING}"
 if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then
@@ -140,6 +147,7 @@ rosa create cluster --sts \
 --worker-iam-role ${Account_Worker_Role_ARN} \
 --region ${CLOUD_PROVIDER_REGION} \
 --version ${OPENSHIFT_VERSION} \
+--channel-group ${CHANNEL_GROUP} \
 --compute-machine-type ${COMPUTE_MACHINE_TYPE} \
 ${MULTI_AZ_SWITCH} \
 ${COMPUTER_NODES_SWITCH} \
@@ -162,6 +170,7 @@ rosa create cluster --sts \
                     --worker-iam-role "${Account_Worker_Role_ARN}" \
                     --region "${CLOUD_PROVIDER_REGION}" \
                     --version "${OPENSHIFT_VERSION}" \
+                    --channel-group ${CHANNEL_GROUP} \
                     --compute-machine-type "${COMPUTE_MACHINE_TYPE}" \
                     ${MULTI_AZ_SWITCH} \
                     ${COMPUTER_NODES_SWITCH} \
@@ -188,41 +197,17 @@ while true; do
     echo "error: Timed out while waiting for cluster to be ready"
     exit 1
   fi
-  if [[ "${CLUSTER_STATE}" != "installing" && "${CLUSTER_STATE}" != "pending" ]]; then
+  if [[ "${CLUSTER_STATE}" != "installing" && "${CLUSTER_STATE}" != "pending" && "${CLUSTER_STATE}" != "waiting" ]]; then
     rosa logs install -c ${CLUSTER_ID} > "${CLUSTER_INSTALL_LOG}" || echo "error: Unable to pull installation log."
     echo "error: Cluster reported invalid state: ${CLUSTER_STATE}"
     exit 1
   fi
 done
 
-# Config htpasswd idp
-echo "Config htpasswd idp ..."
-IDP_USER="rosa-admin"
-IDP_PASSWD=$(openssl rand -base64 15)
-rosa create idp -c ${CLUSTER_ID} \
-                -y \
-                --type htpasswd \
-                --name htpasswd-1 \
-                --username ${IDP_USER} \
-                --password ${IDP_PASSWD}
-if [ $? -ne 0 ]; then
-  exit 1
-else
-  echo "Sleep 90 seconds to wait for the htpasswd configuration to be enabled"
-  sleep 90
-fi
-
-# Grant cluster-admin access to the cluster
-rosa grant user cluster-admin --user=${IDP_USER} --cluster=${CLUSTER_ID}
-echo "Sleep 60 seconds to wait for the cluster-admin configuration to be enabled"
-sleep 60
-
+# Print console.url and api.url
 API_URL=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.api.url')
 CONSOLE_URL=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.console.url')
 echo "API URL: ${API_URL}"
 echo "Console URL: ${CONSOLE_URL}"
 echo "${CONSOLE_URL}" > "${SHARED_DIR}/console.url"
-echo "oc login ${API_URL} -u rosa-admin -p ${IDP_PASSWD}" > "${SHARED_DIR}/api.login"
-
-oc login ${API_URL} -u ${IDP_USER} -p ${IDP_PASSWD}
-cat ~/.kube/config > "${SHARED_DIR}/kubeconfig"
+echo "${API_URL}" > "${SHARED_DIR}/api.url"
