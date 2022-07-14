@@ -23,7 +23,6 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/stackrox-postgres
         - --target=db-integration-tests
         command:
         - ci-operator
@@ -43,9 +42,6 @@ presubmits:
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
-        - mountPath: /secrets/stackrox-postgres
-          name: stackrox-postgres
-          readOnly: true
       serviceAccountName: ci-operator
       volumes:
       - name: pull-secret
@@ -54,9 +50,6 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-      - name: stackrox-postgres
-        secret:
-          secretName: stackrox-postgres
     trigger: (?m)^/test( | .* )db-integration-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
