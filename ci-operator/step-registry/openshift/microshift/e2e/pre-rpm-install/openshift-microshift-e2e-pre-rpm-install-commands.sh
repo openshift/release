@@ -58,7 +58,7 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJE
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
-  --command 'mkdir "$HOME"/microshift && mkdir "$HOME"/selinux'
+  --command 'mkdir "$HOME"/rpms'
 
 SELINUX_RPM=$(readlink -f /opt/microshift-rpms/selinux/*.rpm)
 MICROSHIFT_RPM=$(readlink -f /opt/microshift-rpms/bin/*.rpm)
@@ -66,23 +66,12 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \
   --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
-  --recurse "${SELINUX_RPM}" rhel8user@"${INSTANCE_PREFIX}":~/selinux/"$(basename ${SELINUX_RPM})"
-
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
-  --quiet \
-  --project "${GOOGLE_PROJECT_ID}" \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  --recurse "${MICROSHIFT_RPM}" rhel8user@"${INSTANCE_PREFIX}":~/microshift/"$(basename ${MICROSHIFT_RPM})"
+  --recurse "${SELINUX_RPM}" "${MICROSHIFT_RPM}" rhel8user@"${INSTANCE_PREFIX}":~/rpms/
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
-  --command 'export SELINUX=$(ls $HOME/selinux) && sudo dnf install $HOME/selinux/$SELINUX -y'
-
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  rhel8user@"${INSTANCE_PREFIX}" \
-  --command 'export RPM=$(ls $HOME/microshift) && sudo dnf install $HOME/microshift/$RPM -y'
+  --command 'sudo dnf install $HOME/rpms/*.rpm -y'
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \
