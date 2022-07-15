@@ -31,7 +31,7 @@ case "$CONFIG_TYPE" in
     ;;
 esac
 
-mapfile -t ZONES < <(printf ${ZONES}) >/dev/null
+mapfile -t ZONES < <(printf "%s" "${ZONES}") >/dev/null
 MAX_ZONES_COUNT=${#ZONES[@]}
 
 if [[ ${ZONES_COUNT} -gt ${MAX_ZONES_COUNT} ]]; then
