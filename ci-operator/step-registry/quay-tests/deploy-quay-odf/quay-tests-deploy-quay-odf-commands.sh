@@ -147,10 +147,6 @@ metadata:
   namespace: quay-enterprise
 spec:
   components:
-  - kind: route
-    managed: true
-  - kind: tls
-    managed: true
   - kind: monitoring
     managed: false
 EOF
