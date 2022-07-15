@@ -59,10 +59,30 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/stackrox/stackrox/docs/.
   to: docs
+- build_args:
+  - name: ROX_PRODUCT_BRANDING
+    value: RHACS_BRANDING
+  - name: RACE_CONDITION_DEBUG
+    value: "true"
+  dockerfile_path: .openshift-ci/build/Dockerfile.build-main-and-bundle
+  from: src
+  to: main-rcd-bundle
+- build_args:
+  - name: ROX_PRODUCT_BRANDING
+    value: RHACS_BRANDING
+  dockerfile_path: Dockerfile.gen
+  from: ubi-minimal
+  inputs:
+    main-rcd-bundle:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/stackrox/stackrox/image/rhel/.
+  to: main-rcd
 promotion:
   excluded_images:
   - main-bundle
   - central-db-bundle
+  - main-rcd-bundle
   namespace: stackrox
   tag: latest
 resources:
@@ -90,6 +110,8 @@ tests:
         name: central-db
       - env: PIPELINE_DOCS_IMAGE
         name: docs
+      - env: MAIN_RCD_IMAGE
+        name: main-rcd
       from: src
       resources:
         requests:
@@ -209,6 +231,12 @@ tests:
     test:
     - ref: stackrox-e2e
 - as: gke-postgres-qa-e2e-tests
+  optional: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+  timeout: 3h30m0s
+- as: gke-race-condition-qa-e2e-tests
   optional: true
   steps:
     test:
@@ -402,6 +430,12 @@ tests:
     test:
     - ref: stackrox-e2e
   timeout: 3h30m0s
+- as: merge-gke-race-condition-qa-e2e-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+  timeout: 3h30m0s
 - as: merge-gke-scale-tests
   postsubmit: true
   steps:
@@ -492,6 +526,12 @@ tests:
     test:
     - ref: stackrox-e2e
 - as: nightly-gke-kernel-qa-e2e-tests
+  cron: 0 5 * * *
+  steps:
+    test:
+    - ref: stackrox-e2e
+  timeout: 3h30m0s
+- as: nightly-gke-race-condition-qa-e2e-tests
   cron: 0 5 * * *
   steps:
     test:
