@@ -1,5 +1,5 @@
 #!/bin/bash
-set -euo pipefail
+set -euox pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
@@ -35,7 +35,7 @@ gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
-  --command 'sudo rpm --rebuilddb'
+  --command 'sudo rpm --rebuilddb' || echo "Did't work?"
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
@@ -60,13 +60,13 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJE
   rhel8user@"${INSTANCE_PREFIX}" \
   --command 'mkdir "$HOME"/rpms'
 
-SELINUX_RPM=$(readlink -f /opt/microshift-rpms/selinux/*.rpm)
-MICROSHIFT_RPM=$(readlink -f /opt/microshift-rpms/bin/*.rpm)
+RPMS=$(readlink -f /opt/microshift-rpms/selinux/*.rpm /opt/microshift-rpms/bin/*.rpm)
+ls -la $RPMS
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \
   --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
-  --recurse "${SELINUX_RPM}" "${MICROSHIFT_RPM}" rhel8user@"${INSTANCE_PREFIX}":~/rpms/
+  --recurse ${RPMS} rhel8user@"${INSTANCE_PREFIX}":~/rpms/
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
