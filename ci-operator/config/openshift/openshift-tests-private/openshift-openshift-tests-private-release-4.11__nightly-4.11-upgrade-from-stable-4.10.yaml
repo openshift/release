@@ -133,6 +133,7 @@ tests:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      TEST_FILTERS: ~ConnectedOnly&
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.10 and @azure-ipi and @disconnected'
       UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.10 and @azure-ipi and @disconnected'
     test:
@@ -223,11 +224,49 @@ tests:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-ipi-resourcegroup
+- as: azure-ipi-workers-marketimage
+  cron: 0 15 */3 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.10 and @azure-ipi'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.10 and @azure-ipi'
+    test:
+    - ref: cucushift-installer-check
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-azure-ipi-workers-marketimage
+- as: azure-upi-disconnected
+  cron: 0 17 */3 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      TEST_FILTERS: ~ConnectedOnly&
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.10 and @azure-upi and @disconnected'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.10 and @azure-upi and @disconnected'
+    test:
+    - ref: cucushift-installer-check
+    - chain: openshift-upgrade-qe-test-disconnected
+    workflow: cucushift-installer-rehearse-azure-upi-disconnected
+- as: azure-upi-proxy
+  cron: 0 19 */3 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.10 and @azure-upi'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.10 and @azure-upi'
+    test:
+    - ref: cucushift-installer-check
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-azure-upi-proxy
 - as: gcp-ipi-disconnected-private
   cron: 0 1 */3 * *
   steps:
     cluster_profile: gcp-qe
     env:
+      TEST_FILTERS: ~ConnectedOnly&
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.10 and @gcp-ipi and @disconnected'
       UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.10 and @gcp-ipi and @disconnected'
     test:
