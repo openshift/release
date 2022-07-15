@@ -4,7 +4,9 @@ set -euo pipefail
 
 #Set Kubeconfig:
 cd quay-frontend-tests
+#check current skopeo version
 skopeo -v
+#check current oc client and ocp version
 oc version
 terraform version
 (cp -L $KUBECONFIG /tmp/kubeconfig || true) && export KUBECONFIG_PATH=/tmp/kubeconfig
