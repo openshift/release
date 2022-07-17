@@ -1,0 +1,52 @@
+base_images:
+  ubi:
+    name: ubi
+    namespace: ocp
+    tag: "8"
+  ubi-minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+build_root:
+  project_image:
+    dockerfile_path: .openshift-ci/Dockerfile.build_root
+images:
+- build_args:
+  - name: ROX_PRODUCT_BRANDING
+    value: RHACS_BRANDING
+  dockerfile_path: .openshift-ci/build/Dockerfile.build-operator-artifacts
+  from: src
+  to: operator-artifacts
+- dockerfile_literal: |-
+    FROM ubi-minimal
+    COPY ./manager /usr/local/bin/stackrox-operator
+  from: ubi-minimal
+  inputs:
+    operator-artifacts:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/stackrox/stackrox/operator/bin/.
+  to: operator
+- dockerfile_path: bundle.Dockerfile
+  inputs:
+    operator-artifacts:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/stackrox/stackrox/operator/.
+  to: bundle
+- dockerfile_path: rhacs-operator-index.Dockerfile
+  inputs:
+    operator-artifacts:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/stackrox/stackrox/operator/build/index/.
+  to: index
+resources:
+  '*':
+    requests:
+      cpu: 2000m
+      memory: 4000Mi
+zz_generated_metadata:
+  branch: mc-operator-image-test
+  org: stackrox
+  repo: stackrox
