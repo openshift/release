@@ -7,6 +7,10 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
+  eks:
+    name: automation-flavors
+    namespace: stackrox
+    tag: eks-0.3.0
 build_root:
   project_image:
     dockerfile_path: .openshift-ci/Dockerfile.build_root
@@ -246,6 +250,34 @@ tests:
   steps:
     test:
     - ref: stackrox-e2e
+  timeout: 5h0m0s
+- as: eks-qa-e2e-tests
+  optional: true
+  steps:
+    test:
+    - as: eks-create
+      commands: set -x; pwd && ls && env && uname -a && ls -l /etc
+      credentials:
+      - mount_path: /tmp/secret/stackrox-stackrox-initial
+        name: stackrox-stackrox-initial
+        namespace: test-credentials
+      from: eks
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+    - ref: stackrox-e2e
+    - as: eks-destroy
+      commands: set -x; pwd && ls && env && uname -a && ls -l /etc
+      credentials:
+      - mount_path: /tmp/secret/stackrox-stackrox-initial
+        name: stackrox-stackrox-initial
+        namespace: test-credentials
+      from: eks
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
   timeout: 5h0m0s
 - as: gke-ui-e2e-tests
   optional: true
