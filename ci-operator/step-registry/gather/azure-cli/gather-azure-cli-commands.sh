@@ -55,7 +55,10 @@ for i in $LB_RESOURCES; do
     az monitor metrics list --resource $i --offset 3h --metrics SnatConnectionCount --filter "ConnectionState eq 'Failed'"  --subscription $SUBSCRIPTION_ID > $OUTPUT_DIR/lb-$LB_NAME-SnatConnectionCount-ConnectionFailed.json
 done
 
-# Gather Azure console logs. Note: this is only available for control plane hosts
+echo "$(date -u --rfc-3339=seconds) - Gathering load balancer resources complete"
+
+# Gather Azure console logs.
+echo "$(date -u --rfc-3339=seconds) - Gathering console logs"
 
 if test -f "${KUBECONFIG}"
 then
@@ -78,5 +81,7 @@ do
   # This allows us to continue and try to gather other boot logs.
   LC_ALL=en_US.UTF-8 az vm boot-diagnostics get-boot-log --name "${VM_NAME}" --resource-group "${RESOURCE_GROUP}" --subscription "${SUBSCRIPTION_ID}" > "${ARTIFACT_DIR}/${VM_NAME}-boot.log" || EXIT_CODE="${?}"
 done
+
+echo "$(date -u --rfc-3339=seconds) - Gathering console logs complete"
 
 exit "${EXIT_CODE}"
