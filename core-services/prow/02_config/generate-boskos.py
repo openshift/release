@@ -69,6 +69,9 @@ CONFIG = {
     'azuremag-qe-quota-slice': {
         'usgovvirginia': 5
     },
+    'azurestack-qe-quota-slice': {
+        'mtcazs': 5
+    },
     'equinix-ocp-metal-quota-slice': {
         'default': 40,
     },
