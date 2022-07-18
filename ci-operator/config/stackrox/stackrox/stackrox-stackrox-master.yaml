@@ -256,10 +256,19 @@ tests:
   steps:
     test:
     - as: eks-create
-      commands: set -x; pwd && ls && env && uname -a && ls -l /etc
+      commands: |
+        shopt -s nullglob
+        for cred in /tmp/secret/**/[A-Z]*; do
+          export "$(basename "$cred")"="$(cat "$cred")"
+        done
+        cluster_name="rox-ci-${BUILD_ID:0:90}"
+        mkdir /tmp/data
+        export CREATION_SOURCE=ci
+        export DATA_DIR=/tmp/data
+        /usr/bin/entrypoint create "${cluster_name}"
       credentials:
-      - mount_path: /tmp/secret/stackrox-stackrox-initial
-        name: stackrox-stackrox-initial
+      - mount_path: /tmp/secret/stackrox-automation-flavors
+        name: stackrox-automation-flavors
         namespace: test-credentials
       from: eks
       resources:
@@ -268,10 +277,19 @@ tests:
           memory: 4000Mi
     - ref: stackrox-e2e
     - as: eks-destroy
-      commands: set -x; pwd && ls && env && uname -a && ls -l /etc
+      commands:  |
+        shopt -s nullglob
+        for cred in /tmp/secret/**/[A-Z]*; do
+          export "$(basename "$cred")"="$(cat "$cred")"
+        done
+        cluster_name="rox-ci-${BUILD_ID:0:90}"
+        mkdir /tmp/data
+        export CREATION_SOURCE=ci
+        export DATA_DIR=/tmp/data
+        /usr/bin/entrypoint destroy "${cluster_name}"
       credentials:
-      - mount_path: /tmp/secret/stackrox-stackrox-initial
-        name: stackrox-stackrox-initial
+      - mount_path: /tmp/secret/stackrox-automation-flavors
+        name: stackrox-automation-flavors
         namespace: test-credentials
       from: eks
       resources:
