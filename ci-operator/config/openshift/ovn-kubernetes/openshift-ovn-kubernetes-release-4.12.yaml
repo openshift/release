@@ -21,7 +21,11 @@ build_root:
     namespace: openshift
     tag: golang-1.18
 images:
-- from: base
+- dockerfile_path: Dockerfile.base
+  from: base
+  to: ovn-kubernetes-base
+- dockerfile_path: Dockerfile
+  from: base
   inputs:
     ocp_4.12_cli:
       as:
@@ -30,6 +34,13 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
   to: ovn-kubernetes
+- dockerfile_path: Dockerfile.microshift
+  from: ovn-kubernetes-base
+  inputs:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+  to: ovn-kubernetes-microshift
 promotion:
   disabled: true
   name: "4.12"
