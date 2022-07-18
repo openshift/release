@@ -10,6 +10,6 @@ export REMOTE_HOST_TYPE=gcloud
 export VM_CONFIG="${VM_TYPE}.${IMAGE_FAMILY}"
 export COLLECTOR_REPO="quay.io/rhacs-eng/collector"
 
-exec .openshift-ci/jobs/integration-tests/gcloud-init.sh
-exec .openshift-ci/jobs/integration-tests/create-vm.sh
+.openshift-ci/jobs/integration-tests/gcloud-init.sh
+.openshift-ci/jobs/integration-tests/create-vm.sh
 
