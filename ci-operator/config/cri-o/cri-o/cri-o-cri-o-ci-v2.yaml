@@ -7,19 +7,28 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  fedora:
+    name: fedora
+    namespace: coreos
+    tag: "35"
   openshift_release_golang-1.18:
     name: release
     namespace: openshift
     tag: golang-1.18
 build_root:
-  project_image:
-    dockerfile_path: images/os/Dockerfile.crio-test
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
 images:
 - dockerfile_literal: |
     FROM base
     COPY . .
   from: src
   to: crio-crio-base-src
+- dockerfile_literal: "FROM fedora \nCOPY . .\n"
+  from: src
+  to: crio-crio-fedora-src
 releases:
   initial:
     integration:
