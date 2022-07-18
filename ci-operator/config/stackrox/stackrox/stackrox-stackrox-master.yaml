@@ -257,15 +257,7 @@ tests:
     test:
     - as: eks-create
       commands: |
-        shopt -s nullglob
-        for cred in /tmp/secret/**/[A-Z]*; do
-          export "$(basename "$cred")"="$(cat "$cred")"
-        done
-        cluster_name="rox-ci-${BUILD_ID:0:90}"
-        mkdir /tmp/data
-        export CREATION_SOURCE=ci
-        export DATA_DIR=/tmp/data
-        /usr/bin/entrypoint create "${cluster_name}"
+        /usr/bin/openshift-ci.sh create eks
       credentials:
       - mount_path: /tmp/secret/stackrox-automation-flavors
         name: stackrox-automation-flavors
@@ -278,15 +270,7 @@ tests:
     - ref: stackrox-e2e
     - as: eks-destroy
       commands: |
-        shopt -s nullglob
-        for cred in /tmp/secret/**/[A-Z]*; do
-          export "$(basename "$cred")"="$(cat "$cred")"
-        done
-        cluster_name="rox-ci-${BUILD_ID:0:90}"
-        mkdir /tmp/data
-        export CREATION_SOURCE=ci
-        export DATA_DIR=/tmp/data
-        /usr/bin/entrypoint destroy "${cluster_name}"
+        /usr/bin/openshift-ci.sh destroy eks
       credentials:
       - mount_path: /tmp/secret/stackrox-automation-flavors
         name: stackrox-automation-flavors
