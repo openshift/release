@@ -76,4 +76,4 @@ chmod +x "${HOME}"/run-tests.sh
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   packer@"${INSTANCE_PREFIX}" \
-  --command '/home/packer/run-tests.sh'
+  --command '/home/rhel8user/run-tests.sh'
