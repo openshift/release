@@ -1,0 +1,41 @@
+base_images:
+  centos:
+    name: centos
+    namespace: origin
+    tag: stream8
+build_root:
+  image_stream_tag:
+    name: centos
+    namespace: origin
+    tag: stream8
+images:
+- dockerfile_path: els.Dockerfile
+  from: centos
+  to: eks
+promotion:
+  namespace: stackrox-automation-flavors
+  tag: latest
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: eks
+  pre:
+    test:
+    - as: create
+      commands: ls -la
+      credentials:
+      - mount_path: /tmp/secret/stackrox-automation-flavors
+        name: stackrox-automation-flavors
+        namespace: test-credentials
+      from: eks
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+zz_generated_metadata:
+  branch: gavin-OSCI-onboard-eks
+  org: stackrox
+  repo: automation-flavors
