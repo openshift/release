@@ -38,13 +38,14 @@ controlPlane:
        - "us-east-3"
 compute:
 - name: "worker"
-  replicas: 3
+  replicas: 4
   platform:
     vsphere:
       zones:
        - "us-east-1"
        - "us-east-2"
        - "us-east-3"
+       - "us-west-1"
 platform:
   vsphere:
     apiVIP: "${vips[0]}"
