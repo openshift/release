@@ -254,6 +254,19 @@ tests:
 - as: eks-qa-e2e-tests
   optional: true
   steps:
+    post:
+    - as: eks-destroy
+      commands: |
+        /usr/bin/openshift-ci.sh destroy eks
+      credentials:
+      - mount_path: /tmp/secret/stackrox-automation-flavors
+        name: stackrox-automation-flavors
+        namespace: test-credentials
+      from: eks
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
     pre:
     - as: eks-create
       commands: |
@@ -278,19 +291,6 @@ tests:
         done
         kubectl get nodes -o wide
       from: src
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 4000Mi
-    post:
-    - as: eks-destroy
-      commands: |
-        /usr/bin/openshift-ci.sh destroy eks
-      credentials:
-      - mount_path: /tmp/secret/stackrox-automation-flavors
-        name: stackrox-automation-flavors
-        namespace: test-credentials
-      from: eks
       resources:
         requests:
           cpu: 2000m
