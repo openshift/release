@@ -271,6 +271,10 @@ tests:
     - as: eks-create
       commands: |
         /usr/bin/openshift-ci.sh create eks
+        set -x
+        ls -l "$SHARED_DIR" || true
+        cp /tmp/data/eks-kube.yaml "$SHARED_DIR" || true
+        ls -l "$SHARED_DIR" || true
       credentials:
       - mount_path: /tmp/secret/stackrox-automation-flavors
         name: stackrox-automation-flavors
@@ -281,20 +285,24 @@ tests:
           cpu: 2000m
           memory: 4000Mi
     test:
-    - ref: stackrox-e2e
     - as: hack
       commands: |
+        kubectl get nodes -o wide || true
         touch /tmp/hold
         while [[ -e /tmp/hold ]]; do
             info "Holding this job for debug"
             sleep 60
         done
-        kubectl get nodes -o wide
+      credentials:
+      - mount_path: /tmp/secret/stackrox-stackrox-e2e
+        name: stackrox-stackrox-e2e
+        namespace: test-credentials
       from: src
       resources:
         requests:
           cpu: 2000m
           memory: 4000Mi
+    - ref: stackrox-e2e
   timeout: 5h0m0s
 - as: gke-ui-e2e-tests
   optional: true
