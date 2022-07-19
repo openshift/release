@@ -157,7 +157,7 @@ metadata:
   name: sc-zone-us-east-1a
 allowedTopologies:
 - matchLabelExpressions:
-  - key: topology.kubernetes.io/zone: us-east-1a
+  - key: topology.kubernetes.io/zone
     values:
     - us-east-1a
 parameters:
