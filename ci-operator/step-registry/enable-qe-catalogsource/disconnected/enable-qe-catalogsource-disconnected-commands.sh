@@ -48,6 +48,40 @@ function set_cluster_auth () {
     fi
 }
 
+function disable_default_catalogsource () {
+    run_command "oc patch operatorhub cluster -p '{\"spec\": {\"disableAllDefaultSources\": true}}' --type=merge"; ret=$?
+    if [[ $ret -eq 0 ]]; then
+        echo "disable default Catalog Source succeessfully."
+    else
+        echo "!!! fail to disable default Catalog Source"
+        return 1
+    fi
+}
+
+function enable_qe_proxy_registry () {
+    # get registry host name, no port
+    REGISTRY_HOST=`echo ${MIRROR_PROXY_REGISTRY} | cut -d \: -f 1`
+    # get the QE additional CA
+    QE_ADDITIONAL_CA_FILE="/var/run/vault/mirror-registry/additional_ca"
+    # Configuring additional trust stores for image registry access, details: https://docs.openshift.com/container-platform/4.11/registry/configuring-registry-operator.html#images-configuration-cas_configuring-registry-operator
+    run_command "oc create configmap registry-config --from-file=\"${REGISTRY_HOST}..5000\"=${QE_ADDITIONAL_CA_FILE} --from-file=\"${REGISTRY_HOST}..6001\"=${QE_ADDITIONAL_CA_FILE} --from-file=\"${REGISTRY_HOST}..6002\"=${QE_ADDITIONAL_CA_FILE}  -n openshift-config"; ret=$?
+    if [[ $ret -eq 0 ]]; then
+        echo "set the proxy registry ConfigMap succeessfully."
+    else
+        echo "!!! fail to set the proxy registry ConfigMap"
+        run_command "oc get configmap registry-config -n openshift-config -o yaml"
+        return 1
+    fi
+    run_command "oc patch image.config.openshift.io/cluster --patch '{\"spec\":{\"additionalTrustedCA\":{\"name\":\"registry-config\"}}}' --type=merge"; ret=$?
+    if [[ $ret -eq 0 ]]; then
+        echo "set additionalTrustedCA succeessfully."
+    else
+        echo "!!! Fail to set additionalTrustedCA"
+        run_command "oc get image.config.openshift.io/cluster -o yaml"
+        return 1
+    fi
+}
+
 # Create the ICSP for optional operators dynamiclly, but we don't use it here
 function create_icsp_by_olm () {
     mirror_auths="${SHARED_DIR}/mirror_auths"
@@ -149,6 +183,27 @@ EOF
     fi
 }
 
+function check_default_catalog () {
+    COUNTER=0
+    while [ $COUNTER -lt 600 ]
+    do
+        sleep 1
+        COUNTER=`expr $COUNTER + 1`
+        echo "waiting ${COUNTER}s"
+        STATUS=`oc -n openshift-marketplace get catalogsource redhat-operators -o=jsonpath="{.status.connectionState.lastObservedState}"`
+        if [ $STATUS = "READY" ]; then
+            echo "The default CatalogSource works well"
+            COUNTER=100
+            break
+        fi
+    done
+    if [ $COUNTER -ne 100 ]; then
+        echo "!!! The default CatalogSource doen's work."
+        run_command "oc get catalogsource -n openshift-marketplace"
+        run_command "oc get pods -n openshift-marketplace"
+        return 1
+    fi
+}
 
 set_proxy
 run_command "oc whoami"
@@ -165,10 +220,12 @@ echo "MIRROR_PROXY_REGISTRY_QUAY: ${MIRROR_PROXY_REGISTRY_QUAY}"
 MIRROR_PROXY_REGISTRY=`echo "${MIRROR_REGISTRY_HOST}" | sed 's/5000/6002/g' `
 echo "MIRROR_PROXY_REGISTRY: ${MIRROR_PROXY_REGISTRY}"
 set_cluster_auth
+enable_qe_proxy_registry
 create_settled_icsp
 create_catalog_sources
-
-
-
-
-
+# For now(2022-07-19), the Proxy registry can only proxy the `brew.registry.redhat.io` image, 
+# but the default CatalogSource use `registry.redhat.io` image, such as registry.redhat.io/redhat/redhat-operator-index:v4.11
+# And, there is no brew.registry.redhat.io/redhat/redhat-operator-index:v4.11 , so disable the default CatalogSources.
+# TODO: the Proxy registry support the `registry.redhat.io` images
+# check_default_catalog
+disable_default_catalogsource
