@@ -4,7 +4,6 @@ set -o errexit
 set -o pipefail
 set -x
 
-echo "entering setup!!!!"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
 
@@ -14,7 +13,7 @@ timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
     export GOROOT=/usr/local/go
     echo GOROOT="/usr/local/go" >> /etc/environment
     cat /etc/environment 
-    mkdir /tmp/artifacts 
+    mkdir /tmp/artifacts
     mkdir /logs
     mkdir /logs/artifacts 
     mkdir /tmp/artifacts/logs
@@ -39,5 +38,6 @@ timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
     chown -R root:root "\${REPO_DIR}"
     cd "\${REPO_DIR}/contrib/test/ci"
     echo "localhost" >> hosts
-    ansible-playbook critest-main.yml -i hosts -e "TEST_AGENT=prow" -e "GOPATH=/usr/local/go" --connection=local -vvv
+    ansible-playbook integration-main.yml -i hosts -e "TEST_AGENT=prow" -e "GOPATH=/usr/local/go" --connection=local 
 EOF
+

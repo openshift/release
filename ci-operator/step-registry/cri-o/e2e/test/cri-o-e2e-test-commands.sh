@@ -4,14 +4,8 @@ set -o errexit
 set -o pipefail
 set -x
 
-echo "entering setup!!!!"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
-
-echo "${SSHOPTS[@]}"
-echo "${IP}"
-echo "${CLUSTER_PROFILE_DIR}/packet-ssh-key"
-cat "${CLUSTER_PROFILE_DIR}/packet-ssh-key" 
 
 tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/crio-test.tar.gz"
 timeout --kill-after 10m 400m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF 
@@ -44,5 +38,5 @@ timeout --kill-after 10m 400m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
     chown -R root:root "\${REPO_DIR}"
     cd "\${REPO_DIR}/contrib/test/ci"
     echo "localhost" >> hosts
-    ansible-playbook e2e-main.yml -i hosts -e "TEST_AGENT=prow" -e "GOPATH=/usr/local/go" --connection=local -vvv
+    ansible-playbook e2e-main.yml -i hosts -e "TEST_AGENT=prow" -e "GOPATH=/usr/local/go" --connection=local
 EOF
