@@ -2,7 +2,9 @@
 
 set -eo pipefail
 
-export JOB_ID="${PROW_JOB_ID:0:8}"
+source .openshift-ci/jobs/integration-tests/env.sh
+
+.openshift-ci/jobs/integration-tests/gcloud-init.sh
 
 exec .openshift-ci/jobs/integration-tests/teardown-vm.sh
 
