@@ -1,0 +1,27 @@
+chain:
+  as: cucushift-installer-rehearse-aws-ipi-disconnected-private-sno-provision
+  steps:
+    - ref: aws-provision-vpc-disconnected
+    - chain: aws-provision-bastionhost
+    - ref: aws-provision-cco-manual-users-static
+    - chain: mirror-images-by-oc-adm
+    - ref: ipi-conf
+    - ref: ipi-conf-mirror
+    - ref: ipi-conf-aws-custom-vpc
+    - ref: ipi-conf-manual-creds
+    - ref: ipi-conf-aws
+    - ref: single-node-conf-aws
+    - ref: ipi-install-monitoringpvc
+    - ref: proxy-config-generate
+    - ref: ipi-install-install-aws
+    - ref: enable-qe-catalogsource-disconnected
+    - ref: ipi-install-times-collection
+  env:
+  - name: ADD_INGRESS_RECORDS_MANUALLY
+    default: "yes"
+    documentation: "Enable manually create apps dns record."
+  - name: PUBLISH
+    default: "Internal"
+    documentation: "Cluster publish strategy."
+  documentation: |-
+    Create a single-node IPI cluster in disconnected network on AWS for QE e2e tests.
