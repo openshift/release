@@ -14,19 +14,16 @@ build_root:
   use_build_cache: true
 images:
 - dockerfile_literal: |-
-    FROM src AS builder
-    WORKDIR /go/src/github.com/stackrox/acs-fleet-manager
-    COPY . .
-    RUN GOARGS="-mod=mod" make binary
+    FROM bin AS builder
     FROM registry.access.redhat.com/ubi8-minimal:8.6
     COPY --from=builder /go/src/github.com/stackrox/acs-fleet-manager/fleet-manager /usr/local/bin/
     COPY --from=builder /go/src/github.com/stackrox/acs-fleet-manager/fleetshard-sync /usr/local/bin/
     WORKDIR /
   from: base
   inputs:
-    src:
+    bin:
       as:
-      - src
+      - bin
   to: acs-fleet-manager
 promotion:
   namespace: acs-fleet-manager
@@ -96,8 +93,8 @@ tests:
           exit 1
         fi
       credentials:
-      - mount_path: /var/run/rhacs-ms-e2e-tests
-        name: rhacs-ms-e2e-tests
+      - mount_path: /var/run/rhacs-ms-push
+        name: rhacs-ms-push
         namespace: test-credentials
       dependencies:
       - env: FLEET_MANAGER_IMAGE
