@@ -29,7 +29,7 @@ echo "### Copying test-list file"
 scp -F ${SHARED_DIR}/ssh_config "${SHARED_DIR}/test-list" "root@ci_machine:/tmp/test-list"
 
 echo "### Running tests"
-timeout --kill-after 10m 120m ssh -F ${SHARED_DIR}/ssh_config "root@ci_machine" bash - << EOF
+timeout --kill-after 10m 240m ssh -F ${SHARED_DIR}/ssh_config "root@ci_machine" bash - << EOF
     # download openshift-tests cli tool from container quay.io/openshift/origin-tests
     CONTAINER_ID=\$(podman run -d quay.io/openshift/origin-tests)
     podman cp \${CONTAINER_ID}:/usr/bin/openshift-tests /usr/local/bin/
@@ -44,7 +44,6 @@ timeout --kill-after 10m 120m ssh -F ${SHARED_DIR}/ssh_config "root@ci_machine" 
         export KUBECONFIG=\${kubeconfig}
         name=\$(basename \${kubeconfig})
         openshift-tests run "openshift/conformance/parallel" --dry-run | \
-            grep -Ff /tmp/test-list | \
             openshift-tests run -o /tmp/artifacts/e2e_\${name}.log --junit-dir /tmp/artifacts/reports -f -
     done
 EOF
