@@ -132,43 +132,47 @@ def _library_go_rbac(gendoc):
 
 def _controller_rbac(gendoc):
     config = gendoc.context.config
-    gendoc.add_comments("""These RBAC resources allow the release-payload-controller to update ReleasePayloads
-    in the "ocp" namespace.""")
-    gendoc.append_all([
-        {
-            'apiVersion': 'rbac.authorization.k8s.io/v1',
-            'kind': 'Role',
-            'metadata': {
-                'name': 'release-payload-controller',
-                'namespace': config.rpc_release_namespace
-            },
-            'rules': [
+
+    for private in (False, True):
+        for arch in config.arches:
+            namespace = f'{config.rpc_release_namespace}{config.get_suffix(arch, private)}'
+
+            gendoc.add_comments(f'These RBAC resources allow the release-payload-controller to update ReleasePayloads in the {namespace} namespace.')
+            gendoc.append_all([
                 {
-                    'apiGroups': ['release.openshift.io'],
-                    'resources': ['releasepayloads', 'releasepayloads/status'],
-                    'verbs': ['get', 'list', 'watch', 'update']
+                    'apiVersion': 'rbac.authorization.k8s.io/v1',
+                    'kind': 'Role',
+                    'metadata': {
+                        'name': 'release-payload-controller',
+                        'namespace': namespace
+                    },
+                    'rules': [
+                        {
+                            'apiGroups': ['release.openshift.io'],
+                            'resources': ['releasepayloads', 'releasepayloads/status'],
+                            'verbs': ['get', 'list', 'watch', 'update']
+                        },
+                    ]
                 },
-            ]
-        },
-        {
-            'apiVersion': 'rbac.authorization.k8s.io/v1',
-            'kind': 'RoleBinding',
-            'metadata': {
-                'name': 'release-payload-controller',
-                'namespace': config.rpc_release_namespace
-            },
-            'roleRef': {
-                'apiGroup': 'rbac.authorization.k8s.io',
-                'kind': 'Role',
-                'name': 'release-payload-controller'
-            },
-            'subjects': [{
-                'kind': 'ServiceAccount',
-                'name': 'release-payload-controller',
-                'namespace': config.rc_deployment_namespace
-            }]
-        },
-    ])
+                {
+                    'apiVersion': 'rbac.authorization.k8s.io/v1',
+                    'kind': 'RoleBinding',
+                    'metadata': {
+                        'name': 'release-payload-controller',
+                        'namespace': namespace
+                    },
+                    'roleRef': {
+                        'apiGroup': 'rbac.authorization.k8s.io',
+                        'kind': 'Role',
+                        'name': 'release-payload-controller'
+                    },
+                    'subjects': [{
+                        'kind': 'ServiceAccount',
+                        'name': 'release-payload-controller',
+                        'namespace': config.rc_deployment_namespace
+                    }]
+                },
+            ])
 
 
 def _namespaced_rbac_resources(gendoc):
