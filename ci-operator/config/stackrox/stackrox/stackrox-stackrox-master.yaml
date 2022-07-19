@@ -59,10 +59,30 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/stackrox/stackrox/docs/.
   to: docs
+- build_args:
+  - name: ROX_PRODUCT_BRANDING
+    value: RHACS_BRANDING
+  - name: RACE_CONDITION_DEBUG
+    value: "true"
+  dockerfile_path: .openshift-ci/build/Dockerfile.build-main-and-bundle
+  from: src
+  to: main-rcd-bundle
+- build_args:
+  - name: ROX_PRODUCT_BRANDING
+    value: RHACS_BRANDING
+  dockerfile_path: Dockerfile.gen
+  from: ubi-minimal
+  inputs:
+    main-rcd-bundle:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/stackrox/stackrox/image/rhel/.
+  to: main-rcd
 promotion:
   excluded_images:
   - main-bundle
   - central-db-bundle
+  - main-rcd-bundle
   namespace: stackrox
   tag: latest
 resources:
@@ -90,6 +110,8 @@ tests:
         name: central-db
       - env: PIPELINE_DOCS_IMAGE
         name: docs
+      - env: MAIN_RCD_IMAGE
+        name: main-rcd
       from: src
       resources:
         requests:
@@ -172,26 +194,26 @@ tests:
   steps:
     test:
     - ref: stackrox-e2e
-  timeout: 3h30m0s
+  timeout: 5h0m0s
 - as: openshift-4-qa-e2e-tests
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
-    timeout: 3h30m0s
+    timeout: 5h0m0s
     version: "4.8"
   optional: true
   steps:
     test:
     - ref: stackrox-e2e
-  timeout: 3h30m0s
+  timeout: 5h0m0s
 - as: gke-ui-e2e-tests
   optional: true
   steps:
     test:
     - ref: stackrox-e2e
-  timeout: 2h30m0s
+  timeout: 5h0m0s
 - as: gke-nongroovy-e2e-tests
   optional: true
   steps:
@@ -202,7 +224,7 @@ tests:
   steps:
     test:
     - ref: stackrox-e2e
-  timeout: 3h30m0s
+  timeout: 5h0m0s
 - as: gke-upgrade-tests
   optional: true
   steps:
@@ -213,7 +235,13 @@ tests:
   steps:
     test:
     - ref: stackrox-e2e
-  timeout: 3h30m0s
+  timeout: 5h0m0s
+- as: gke-race-condition-qa-e2e-tests
+  optional: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+  timeout: 5h0m0s
 - as: gke-scale-tests
   optional: true
   steps:
@@ -253,6 +281,8 @@ tests:
         name: central-db
       - env: PIPELINE_DOCS_IMAGE
         name: docs
+      - env: MAIN_RCD_IMAGE
+        name: main-rcd
       from: src
       resources:
         requests:
@@ -358,14 +388,14 @@ tests:
       QA_TEST_TARGET: test
     test:
     - ref: stackrox-e2e
-  timeout: 3h30m0s
+  timeout: 5h0m0s
 - as: merge-openshift-4-qa-e2e-tests
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
-    timeout: 3h30m0s
+    timeout: 5h0m0s
     version: "4.8"
   postsubmit: true
   steps:
@@ -373,13 +403,13 @@ tests:
       QA_TEST_TARGET: test
     test:
     - ref: stackrox-e2e
-  timeout: 3h30m0s
+  timeout: 5h0m0s
 - as: merge-gke-ui-e2e-tests
   postsubmit: true
   steps:
     test:
     - ref: stackrox-e2e
-  timeout: 2h30m0s
+  timeout: 5h0m0s
 - as: merge-gke-nongroovy-e2e-tests
   postsubmit: true
   steps:
@@ -390,7 +420,7 @@ tests:
   steps:
     test:
     - ref: stackrox-e2e
-  timeout: 3h30m0s
+  timeout: 5h0m0s
 - as: merge-gke-upgrade-tests
   postsubmit: true
   steps:
@@ -401,7 +431,13 @@ tests:
   steps:
     test:
     - ref: stackrox-e2e
-  timeout: 3h30m0s
+  timeout: 5h0m0s
+- as: merge-gke-race-condition-qa-e2e-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+  timeout: 5h0m0s
 - as: merge-gke-scale-tests
   postsubmit: true
   steps:
@@ -441,6 +477,8 @@ tests:
         name: central-db
       - env: PIPELINE_DOCS_IMAGE
         name: docs
+      - env: MAIN_RCD_IMAGE
+        name: main-rcd
       from: src
       resources:
         requests:
@@ -464,14 +502,14 @@ tests:
       QA_TEST_TARGET: test
     test:
     - ref: stackrox-e2e
-  timeout: 4h0m0s
+  timeout: 5h0m0s
 - as: nightly-openshift-4-qa-e2e-tests
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
-    timeout: 4h0m0s
+    timeout: 5h0m0s
     version: "4.8"
   cron: 0 5 * * *
   steps:
@@ -479,13 +517,13 @@ tests:
       QA_TEST_TARGET: test
     test:
     - ref: stackrox-e2e
-  timeout: 4h0m0s
+  timeout: 5h0m0s
 - as: nightly-gke-ui-e2e-tests
   cron: 0 5 * * *
   steps:
     test:
     - ref: stackrox-e2e
-  timeout: 2h30m0s
+  timeout: 5h0m0s
 - as: nightly-gke-nongroovy-e2e-tests
   cron: 0 5 * * *
   steps:
@@ -496,7 +534,13 @@ tests:
   steps:
     test:
     - ref: stackrox-e2e
-  timeout: 3h30m0s
+  timeout: 5h0m0s
+- as: nightly-gke-race-condition-qa-e2e-tests
+  cron: 0 5 * * *
+  steps:
+    test:
+    - ref: stackrox-e2e
+  timeout: 5h0m0s
 - as: nightly-gke-upgrade-tests
   cron: 0 5 * * *
   steps:
