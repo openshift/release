@@ -83,8 +83,6 @@ cat <<'EOF' > "${HOME}"/suite.txt
 "[sig-api-machinery][Feature:APIServer][Late] API LBs follow /readyz of kube-apiserver and stop sending requests [Suite:openshift/conformance/parallel]"
 "[sig-api-machinery][Feature:APIServer][Late] kube-apiserver terminates within graceful termination period [Suite:openshift/conformance/parallel]"
 "[sig-api-machinery][Feature:APIServer][Late] kubelet terminates kube-apiserver gracefully [Suite:openshift/conformance/parallel]"
-"[sig-api-machinery][Feature:ServerSideApply] Server-Side Apply should work for image.openshift.io/v1, Resource=images [Suite:openshift/conformance/parallel]"
-"[sig-api-machinery][Feature:ServerSideApply] Server-Side Apply should work for template.openshift.io/v1, Resource=brokertemplateinstances [Suite:openshift/conformance/parallel]"
 "[sig-api-machinery] Garbage collector should delete jobs and pods created by cronjob [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-api-machinery] Garbage collector should delete pods created by rc when not orphaning [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
 "[sig-api-machinery] Garbage collector should delete RS created by deployment when not orphaning [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"

@@ -278,6 +278,51 @@ tests:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-ipi-realtime-kernel
+- as: vsphere-ipi-disconnected
+  cron: 0 8 */7 * *
+  steps:
+    cluster_profile: vsphere-discon
+    env:
+      TEST_FILTERS: ~ConnectedOnly&
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.10 and @vsphere-ipi and @disconnected'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.10 and @vsphere-ipi and @disconnected'
+    test:
+    - ref: cucushift-installer-check
+    - chain: openshift-upgrade-qe-test-disconnected
+    workflow: cucushift-installer-rehearse-vsphere-ipi-disconnected
+- as: vsphere-ipi-ovn
+  cron: 0 23 */3 * *
+  steps:
+    cluster_profile: vsphere
+    env:
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.10 and @vsphere-ipi'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.10 and @vsphere-ipi'
+    test:
+    - ref: cucushift-installer-check
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-vsphere-ipi-ovn
+- as: vsphere-ipi-ovn-ipsec
+  cron: 0 0 */3 * *
+  steps:
+    cluster_profile: vsphere
+    env:
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.10 and @vsphere-ipi'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.10 and @vsphere-ipi'
+    test:
+    - ref: cucushift-installer-check
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-ipsec
+- as: vsphere-ipi-ovn-shared-to-local-gateway-mode-migration
+  cron: 0 4 */3 * *
+  steps:
+    cluster_profile: vsphere
+    env:
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.10 and @vsphere-ipi'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.10 and @vsphere-ipi'
+    test:
+    - ref: cucushift-installer-check
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-shared-to-local-gateway-mode-migration
 - as: vsphere-ipi-proxy
   cron: 0 16 */3 * *
   steps:
@@ -286,8 +331,22 @@ tests:
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.10 and @vsphere-ipi'
       UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.10 and @vsphere-ipi'
     test:
+    - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
+- as: vsphere-upi-disconnected-secureboot
+  cron: 0 12 */7 * *
+  steps:
+    cluster_profile: vsphere-discon
+    env:
+      TEST_FILTERS: ~ConnectedOnly&
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.10 and @vsphere-upi and @disconnected'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.10 and @vsphere-upi and @disconnected'
+    test:
+    - ref: cucushift-installer-check
+    - ref: cucushift-upgrade-vsphere-hw
+    - chain: openshift-upgrade-qe-test-disconnected
+    workflow: cucushift-installer-rehearse-vsphere-upi-disconnected-secureboot
 - as: vsphere-upi-proxy-https
   cron: 0 0 */7 * *
   steps:
