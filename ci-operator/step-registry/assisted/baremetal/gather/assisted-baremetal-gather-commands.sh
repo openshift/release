@@ -49,6 +49,13 @@ cp -v -r /var/lib/libvirt/dnsmasq /tmp/artifacts/libvirt-dnsmasq
 cp -v -r /var/log/swtpm/libvirt/qemu /tmp/artifacts/libvirt-qemu || true
 ls -ltr /var/lib/swtpm-localca/ >> /tmp/artifacts/libvirt-qemu/ls-swtpm-localca.txt || true
 
+# Get information about the machine that was leased against equinix metal (e.g.: location)
+EQUINIX_METADATA_TMP=\$(mktemp)
+curl --output "\${EQUINIX_METADATA_TMP}" "https://metadata.platformequinix.com/metadata" || true
+# Filter out "ssh_keys" section to prevent emails to be leaked
+jq 'del(.ssh_keys)' "\${EQUINIX_METADATA_TMP}" > "/tmp/artifacts/equinix-metadata.json" || true
+rm "\${EQUINIX_METADATA_TMP}"
+
 export LOGS_DEST=/tmp/artifacts
 
 # Get assisted logs

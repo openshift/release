@@ -174,17 +174,10 @@ metadata:
   name: cluster-monitoring-config
   namespace: openshift-monitoring
 data:
-  config.yaml: |
+  config.yaml:
     prometheusK8s:
       volumeClaimTemplate:
-        metadata:
-          name: prometheus-data
-          annotations:
-            openshift.io/cluster-monitoring-drop-pvc: "yes"
-       spec:
-         storageClassName: sc-zone-us-east-1a
-         resources:
-           requests:
-             storage: 20Gi
+        spec:
+          storageClassName: sc-zone-us-east-1a
 EOF
 

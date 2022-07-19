@@ -6,7 +6,7 @@ set -o pipefail
 
 export PROMTAIL_IMAGE="quay.io/openshift-cr/promtail"
 export PROMTAIL_VERSION="v2.4.1"
-export LOKI_ENDPOINT=https://observatorium.api.stage.openshift.com/api/logs/v1/dptp/loki/api/v1
+export LOKI_ENDPOINT=https://observatorium-mst.api.stage.openshift.com/api/logs/v1/dptp/loki/api/v1
 export KUBERNETES_EVENT_EXPORTER_IMAGE="ghcr.io/opsgenie/kubernetes-event-exporter"
 export KUBERNETES_EVENT_EXPORTER_VERSION="v0.11"
 
