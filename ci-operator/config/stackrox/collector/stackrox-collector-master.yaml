@@ -1,8 +1,11 @@
+base_images:
+  ubi-minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
 build_root:
-  image_stream_tag:
-    name: collector-test
-    namespace: stackrox
-    tag: latest
+  project_image:
+    dockerfile_path: .openshift-ci/build/Dockerfile.build_root
 images:
 - build_args:
   - name: BUILDER_ROOT_DIR
@@ -13,6 +16,27 @@ images:
 - dockerfile_path: .openshift-ci/build/Dockerfile.build_collector
   from: collector-builder
   to: collector
+- dockerfile_path: .openshift-ci/build/Dockerfile.drivers
+  from: collector
+  to: collector-drivers
+- dockerfile_path: .openshift-ci/build/Dockerfile.create_bundle
+  from: collector-drivers
+  to: collector-bundle
+- build_args:
+  - name: ROOT_DIR
+    value: /go/src/github.com/stackrox/collector/collector/container/rhel
+  context_dir: collector/container/rhel
+  dockerfile_path: collector/container/Dockerfile.gen
+  from: ubi-minimal
+  inputs:
+    collector-bundle:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/stackrox/collector/.
+  to: collector-full
+promotion:
+  namespace: stackrox
+  tag: osci-test
 resources:
   '*':
     limits:
@@ -43,6 +67,16 @@ tests:
     test:
     - as: shellcheck-all
       commands: make shellcheck-all
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+- as: push-images
+  steps:
+    test:
+    - as: push-collector-images
+      commands: .openshift-ci/build/push-images.sh
       from: src
       resources:
         requests:

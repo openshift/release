@@ -42,10 +42,33 @@ tests:
   commands: make validate
   container:
     from: src
-- as: test-int
-  commands: echo "Test Integration WIP"
-  container:
-    from: src
+- as: integration-test
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 15m0s
+    version: "4.7"
+  optional: true
+  steps:
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        echo "Test Integration WIP"
+        export FAKE_KEY_VALUE=$(cat /tmp/secret/aao-aws-creds/FAKE_KEY_VALUE)
+        echo $FAKE_KEY_VALUE
+        echo $NAMESPACE
+      credentials:
+      - mount_path: /tmp/secret/aao-aws-creds
+        name: aao-aws-creds
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
 zz_generated_metadata:
   branch: master
   org: openshift

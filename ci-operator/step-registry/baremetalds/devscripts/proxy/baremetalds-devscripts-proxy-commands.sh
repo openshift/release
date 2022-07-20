@@ -12,14 +12,15 @@ source "${SHARED_DIR}/packet-conf.sh"
 
 # Setup a squid proxy for accessing the cluster
 ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
-
-# TODO: remove me
-# https://bugzilla.redhat.com/show_bug.cgi?id=2087096
-sed -i -e 's/repo=.*/repo=rocky-AppStream-8.5/g' /etc/yum.repos.d/Rocky-AppStream.repo
-sed -i -e 's/repo=.*/repo=rocky-BaseOS-8.5/g' /etc/yum.repos.d/Rocky-BaseOS.repo
-sed -i -e 's/repo=.*/repo=rocky-extras-8.5/g' /etc/yum.repos.d/Rocky-Extras.repo
-
 sudo dnf install -y podman firewalld
+
+# TODO: we need to fix the IPv6 job and remove this ASAP.
+# Using vault for the anything but the short term isn't a good solution
+# https://bugzilla.redhat.com/show_bug.cgi?id=2087096
+rm -f /etc/yum.repos.d/*
+for REPO in BaseOS AppStream extras ; do
+    echo -e "[\$REPO]\nname=\$REPO\nbaseurl=https://dl.rockylinux.org/vault/rocky/8.5/\$REPO/x86_64/os/\nenabled=1\ngpgcheck=0\n" >> /etc/yum.repos.d/rocky.repo
+done
 
 # Setup squid proxy for accessing cluster
 cat <<SQUID>\$HOME/squid.conf
