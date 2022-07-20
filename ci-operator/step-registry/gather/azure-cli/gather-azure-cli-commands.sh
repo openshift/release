@@ -55,14 +55,16 @@ for i in $LB_RESOURCES; do
     az monitor metrics list --resource $i --offset 3h --metrics SnatConnectionCount --filter "ConnectionState eq 'Failed'"  --subscription $SUBSCRIPTION_ID > $OUTPUT_DIR/lb-$LB_NAME-SnatConnectionCount-ConnectionFailed.json
 done
 
-# Gather Azure console logs. Note: this is only available for control plane hosts
+echo "$(date -u --rfc-3339=seconds) - Gathering load balancer resources complete"
+
+# Gather Azure console logs.
+echo "$(date -u --rfc-3339=seconds) - Gathering console logs"
 
 if test -f "${KUBECONFIG}"
 then
   TMPDIR=/tmp/azure-boot-logs
   mkdir -p $TMPDIR
-  # TODO make the get-boot-log down below non-fatal if it fails, but still provide error output.  For now, restrict to masters which seem to work.
-  oc --request-timeout=5s -n openshift-machine-api get machines -l machine.openshift.io/cluster-api-machine-role=master -o jsonpath --template '{range .items[*]}{.metadata.name}{"\n"}{end}' >> "${TMPDIR}/azure-instance-names.txt"
+  oc --request-timeout=5s -n openshift-machine-api get machines -o jsonpath --template '{range .items[*]}{.metadata.name}{"\n"}{end}' >> "${TMPDIR}/azure-instance-names.txt"
   RESOURCE_GROUP="$(oc get -o jsonpath='{.status.platformStatus.azure.resourceGroupName}' infrastructure cluster)"
 else
   echo "No kubeconfig; skipping boot log extraction."
@@ -71,10 +73,15 @@ fi
 
 az version
 
+EXIT_CODE=0
 cat "${TMPDIR}/azure-instance-names.txt" | sort | grep . | uniq | while read -r VM_NAME
 do
   echo "Gathering console logs for ${VM_NAME} in resource group ${RESOURCE_GROUP}"
-  LC_ALL=en_US.UTF-8 az vm boot-diagnostics get-boot-log --name "${VM_NAME}" --resource-group "${RESOURCE_GROUP}" --subscription "${SUBSCRIPTION_ID}" > "${ARTIFACT_DIR}/${VM_NAME}-boot.log"
+  # || true at the end of this line ensures that if boot diagnostics aren't enabled, we don't exit the script.
+  # This allows us to continue and try to gather other boot logs.
+  LC_ALL=en_US.UTF-8 az vm boot-diagnostics get-boot-log --name "${VM_NAME}" --resource-group "${RESOURCE_GROUP}" --subscription "${SUBSCRIPTION_ID}" > "${ARTIFACT_DIR}/${VM_NAME}-boot.log" || EXIT_CODE="${?}"
 done
 
-exit 0
+echo "$(date -u --rfc-3339=seconds) - Gathering console logs complete"
+
+exit "${EXIT_CODE}"
