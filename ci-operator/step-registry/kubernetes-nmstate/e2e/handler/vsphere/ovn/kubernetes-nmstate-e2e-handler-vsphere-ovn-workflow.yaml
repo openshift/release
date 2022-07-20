@@ -1,0 +1,19 @@
+workflow:
+  as: kubernetes-nmstate-e2e-handler-vsphere-ovn
+  steps:
+    env:
+      SKIP_IMAGE_BUILD: "true"
+      IMAGE_BUILDER: "podman"
+    pre:
+    - ref: ipi-install-hosted-loki
+    - chain: ipi-conf-vsphere
+    - ref: ovn-conf
+    - chain: ipi-install-vsphere
+    test:
+    - ref: kubernetes-nmstate-e2e-handler
+    post:
+    - chain: gather-network
+    - chain: gather-core-dump
+    - chain: ipi-vsphere-post
+  documentation: |-
+    Setup a cluster with OVN on VSphere and run kubernetes-nmstate handler e2e tests.
