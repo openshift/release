@@ -72,10 +72,18 @@ tests:
     test:
     - as: test
       commands: |
+        echo "HUB_OF_HUBS_MANAGER_IMAGE_REF=$HUB_OF_HUBS_MANAGER_IMAGE_REF"
+        echo "HUB_OF_HUBS_AGENT_IMAGE_REF=$HUB_OF_HUBS_AGENT_IMAGE_REF"
+        echo "OPENSHIFT_CI=$OPENSHIFT_CI"
         export SELF="make"
         set -o pipefail
         make e2e-prow-tests 2>&1 | tee ${ARTIFACT_DIR}/e2e-run.log
         set +o pipefail
+      dependencies:
+      - env: HUB_OF_HUBS_MANAGER_IMAGE_REF
+        name: hub-of-hubs-manager
+      - env: HUB_OF_HUBS_AGENT_IMAGE_REF
+        name: hub-of-hubs-agent
       from: src
       resources:
         requests:
