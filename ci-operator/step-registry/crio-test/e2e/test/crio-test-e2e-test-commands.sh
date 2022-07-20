@@ -19,7 +19,43 @@ fi
 
 mkdir -p "${HOME}"/.ssh
 
-mock-nss.sh
+cat > "/etc/yum.repos.d/google-cloud-sdk.repo" << 'EOF'
+[google-cloud-sdk]
+name=Google Cloud SDK
+baseurl=https://packages.cloud.google.com/yum/repos/cloud-sdk-el8-x86_64
+enabled=1
+gpgcheck=1
+repo_gpgcheck=1
+gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg
+       https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+EOF
+
+dnf install google-cloud-sdk genisoimage libvirt-client libvirt-libs nss_wrapper -y
+
+cat  > "${HOME}"/mock-nss.sh << 'EOF'
+#!/bin/bash
+
+# mock passwd and group files
+(
+  exec 2>/dev/null
+  username="${NSS_USERNAME:-$(id -un)}"
+  uid="${NSS_UID:-$(id -u)}"
+
+  groupname="${NSS_GROUPNAME:-$(id -gn)}"
+  gid="${NSS_GID:-$(id -g)}"
+
+  echo "${username}:x:${uid}:${uid}:gecos:${HOME}:/bin/bash" > "${NSS_WRAPPER_PASSWD}"
+  echo "${groupname}:x:${gid}:" > "${NSS_WRAPPER_GROUP}"
+)
+
+# wrap command
+export LD_PRELOAD=/usr/lib64/libnss_wrapper.so
+exec "$@"
+EOF
+
+chmod +x "${HOME}"/mock-nss.sh
+
+"${HOME}"/mock-nss.sh
 
 # gcloud compute will use this key rather than create a new one
 cp "${CLUSTER_PROFILE_DIR}"/ssh-privatekey "${HOME}"/.ssh/google_compute_engine
