@@ -13,4 +13,9 @@ function check_clusteroperators_status() {
 oc wait --for=condition=Progressing=False --timeout=2m clusterversion/version
 check_clusteroperators_status
 
+# tmp hack to test vsphere
+sed -i 's/\[\ \"\${CI}\"\ \=\=\ \"true\"\ \]/\[\ \"\${CI}\"\ \=\=\ \"true\"\ \]\ \&\&\ \[\ \-f\ \${SHARED\_DIR}\/fix\-uid\.sh\ \]/g' hack/ocp-e2e-tests-handler.sh
+sed -i 's/enp1s0/ens192/g' hack/ocp-e2e-tests-handler.sh
+sed -i 's/enp2s0/ens192/g' hack/ocp-e2e-tests-handler.sh
+
 make test-e2e-handler-ocp
