@@ -32,8 +32,12 @@ provider "aws" {
 
 resource "aws_s3_bucket" "quayaws" {
   bucket = var.aws_bucket
-  acl = "private"
   force_destroy = true
+}
+
+resource "aws_s3_bucket_acl" "quayaws_bucket_acl" {
+  bucket = aws_s3_bucket.quayaws.id
+  acl    = "private"
 }
 EOF
 
