@@ -20,6 +20,32 @@ images:
 - dockerfile_literal: |
     FROM base
     COPY . .
+
+    FROM quay.io/centos/centos:stream8
+    RUN <<EOF cat >> /etc/yum.repos.d/google-cloud-sdk.repo
+    [google-cloud-sdk]
+    name=Google Cloud SDK
+    baseurl=https://packages.cloud.google.com/yum/repos/cloud-sdk-el8-x86_64
+    enabled=1
+    gpgcheck=1
+    repo_gpgcheck=1
+    gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg
+    https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+    EOF
+    RUN dnf update -y && \
+        dnf install --setopt=tsflags=nodocs -y \
+        genisoimage \
+        gettext \
+        google-cloud-sdk \
+        libvirt-client \
+        libvirt-libs \
+        nss_wrapper \
+        unzip \
+        sshpass \
+        jq \
+        azure-cli \
+        openssh-clients && \
+        dnf clean all && rm -rf /var/cache/yum/*
   from: src
   to: crio-crio-base-src
 releases:
