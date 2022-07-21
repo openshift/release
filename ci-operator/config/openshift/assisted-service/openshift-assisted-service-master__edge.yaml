@@ -19,6 +19,10 @@ base_images:
     name: ocm-2.6
     namespace: edge-infrastructure
     tag: assisted-test-infra
+  cluster-api-provider-agent:
+    name: ocm-2.6
+    namespace: edge-infrastructure
+    tag: cluster-api-provider-agent
   coreos_centos_stream8:
     name: stream8
     namespace: coreos
@@ -35,6 +39,10 @@ base_images:
     name: edge-infrastructure-swagger-codegen-cli
     namespace: ci
     tag: 2.4.18
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.37.1
   goswagger_swagger:
     name: goswagger-swagger
     namespace: ci
@@ -90,6 +98,10 @@ images:
     FROM base
     COPY --from=quay.io/app-sre/golangci-lint:v1.37.1 /usr/bin/golangci-lint /usr/bin/golangci-lint
   from: assisted-service-centos9
+  inputs:
+    golangci-lint:
+      as:
+      - quay.io/app-sre/golangci-lint:v1.37.1
   to: assisted-service-lint
 - dockerfile_literal: |
     FROM base
@@ -179,10 +191,6 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-test_binary_build_commands: |
-  make build-openshift-ci-test-bin
-  go mod vendor
-  mkdir /.cache && chmod 775 -R /.cache && chmod 775 -R $GOPATH
 tests:
 - as: verify-generated-code
   skip_if_only_changed: ^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNER_ALIASES)$
@@ -232,7 +240,7 @@ tests:
     export GOPROXY=https://proxy.golang.org
     make lint
   container:
-    from: assisted-service-build
+    from: assisted-service-lint
   skip_if_only_changed: ^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNER_ALIASES)$
 - as: unit-test
   commands: |
@@ -277,7 +285,6 @@ tests:
         export REPORTS=${ARTIFACT_DIR}
         export TARGET=oc
         export PERSISTENT_STORAGE="False"
-        export TARGET='oc'
         export GENERATE_CRD='false'
         unset GOFLAGS
         make ci-deploy-for-subsystem
@@ -311,7 +318,6 @@ tests:
         export REPORTS=${ARTIFACT_DIR}
         export TARGET=oc
         export PERSISTENT_STORAGE="False"
-        export TARGET='oc'
         export GENERATE_CRD='false'
         unset GOFLAGS
         make ci-deploy-for-subsystem
@@ -345,7 +351,6 @@ tests:
         export REPORTS=${ARTIFACT_DIR}
         export TARGET=oc
         export PERSISTENT_STORAGE="False"
-        export TARGET='oc'
         export GENERATE_CRD='false'
         unset GOFLAGS
         make ci-deploy-for-subsystem
@@ -380,7 +385,6 @@ tests:
         export REPORTS=${ARTIFACT_DIR}
         export TARGET=oc
         export PERSISTENT_STORAGE="False"
-        export TARGET='oc'
         export GENERATE_CRD='false'
         unset GOFLAGS
         make ci-deploy-for-subsystem
@@ -814,6 +818,7 @@ tests:
     cluster_profile: packet-assisted
     dependencies:
       HYPERSHIFT_IMAGE: hypershift-operator
+      PROVIDER_IMAGE: cluster-api-provider-agent
     env:
       ASSISTED_CONFIG: |
         KUBE_API=yes
