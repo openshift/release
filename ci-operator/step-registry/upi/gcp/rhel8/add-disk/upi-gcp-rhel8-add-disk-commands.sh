@@ -10,12 +10,12 @@ INSTANCE_PREFIX="${NAMESPACE}-${JOB_NAME_HASH}"
 GOOGLE_COMPUTE_ZONE="$(cat "${SHARED_DIR}"/openshift_gcp_compute_zone)"
 
 # Create disk defaults
-GCP_DISK_NAME="${$INSTANCE_PREFIX}-1"
+GCP_DISK_NAME="${INSTANCE_PREFIX}-1"
 GCP_DISK_SIZE="${GCP_DISK_SIZE:-"10GB"}"
 
 # Persist disk name for follow-on steps
 
-echo -n "${$GCP_DISK_NAME}" > "${SHARED_DIR}/google_compute_storage_disk"
+echo -n "${GCP_DISK_NAME}" > "${SHARED_DIR}/google_compute_storage_disk"
 mkdir -p "${HOME}"/.ssh
 mock-nss.sh
 
