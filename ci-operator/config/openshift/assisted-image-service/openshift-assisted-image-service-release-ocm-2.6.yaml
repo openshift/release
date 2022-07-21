@@ -1,22 +1,22 @@
 base_images:
   assisted-installer:
-    name: ocm-2.7
+    name: ocm-2.6
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.7
+    name: ocm-2.6
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.7
+    name: ocm-2.6
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.7
+    name: ocm-2.6
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.7
+    name: ocm-2.6
     namespace: edge-infrastructure
     tag: assisted-test-infra
   coreos-centos-stream8:
@@ -31,25 +31,25 @@ base_images:
     name: golangci-lint
     namespace: ci
     tag: v1.37.1
-  openshift_release_golang-1.17:
+  openshift_release_golang-1.16:
     name: release
     namespace: openshift
-    tag: golang-1.17
+    tag: golang-1.16
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.17
+    tag: golang-1.16
 images:
 - dockerfile_path: Dockerfile.image-service
   from: coreos-centos-stream8
   inputs:
-    openshift_release_golang-1.17:
+    openshift_release_golang-1.16:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.17
+      - registry.ci.openshift.org/openshift/release:golang-1.16
   to: assisted-image-service
 promotion:
-  name: ocm-2.7
+  name: ocm-2.6
   namespace: edge-infrastructure
 releases:
   candidate:
@@ -79,6 +79,8 @@ tests:
   steps:
     dependencies:
       SOURCE_IMAGE_REF: assisted-image-service
+    env:
+      RELEASE_TAG_PREFIX: ocm-2.6
     test:
     - ref: assisted-baremetal-images-publish
 - as: mirror-vcsref-image
@@ -86,6 +88,8 @@ tests:
   steps:
     dependencies:
       SOURCE_IMAGE_REF: assisted-image-service
+    env:
+      RELEASE_TAG_PREFIX: ocm-2.6
     test:
     - ref: assisted-baremetal-images-publish
 - as: lint
@@ -116,21 +120,24 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: assisted-image-service-codecov-token
-- as: e2e-metal-assisted
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    workflow: assisted-baremetal
 - as: e2e-metal-assisted-deploy-nodes
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=release-ocm-2.6
         MAKEFILE_TARGET="setup run deploy_nodes"
     workflow: assisted-baremetal
+- as: e2e-metal-assisted
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=release-ocm-2.6
+    workflow: assisted-baremetal
 zz_generated_metadata:
-  branch: main
+  branch: release-ocm-2.6
   org: openshift
   repo: assisted-image-service
-  variant: edge

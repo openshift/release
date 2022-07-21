@@ -1,22 +1,22 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.7
+    name: ocm-2.6
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.7
+    name: ocm-2.6
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-controller:
-    name: ocm-2.7
+    name: ocm-2.6
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.7
+    name: ocm-2.6
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.7
+    name: ocm-2.6
     namespace: edge-infrastructure
     tag: assisted-test-infra
   coreos-centos-stream8:
@@ -48,7 +48,7 @@ images:
   from: src
   to: assisted-installer-agent-src
 promotion:
-  name: ocm-2.7
+  name: ocm-2.6
   namespace: edge-infrastructure
 releases:
   initial:
@@ -74,6 +74,8 @@ tests:
   steps:
     dependencies:
       SOURCE_IMAGE_REF: assisted-installer-agent
+    env:
+      RELEASE_TAG_PREFIX: ocm-2.6
     test:
     - ref: assisted-baremetal-images-publish
 - as: mirror-vcsref-image
@@ -81,6 +83,8 @@ tests:
   steps:
     dependencies:
       SOURCE_IMAGE_REF: assisted-installer-agent
+    env:
+      RELEASE_TAG_PREFIX: ocm-2.6
     test:
     - ref: assisted-baremetal-images-publish
 - as: lint
@@ -90,7 +94,6 @@ tests:
     make lint
   container:
     from: test-bin
-  skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
 - as: unit-test
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
@@ -100,7 +103,6 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: assisted-installer-agent-codecov-token
-  skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
 - as: unit-test-postsubmit
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
@@ -112,18 +114,12 @@ tests:
     mount_path: /tmp/secret
     name: assisted-installer-agent-codecov-token
 - as: e2e-metal-assisted
-  skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
-  steps:
-    cluster_profile: packet-assisted
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-ipv6
-  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        IPv6=yes
-        IPv4=no
+        SERVICE_BASE_REF=release-ocm-2.6
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-single-node
   optional: true
@@ -131,32 +127,8 @@ tests:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=release-ocm-2.6
         NUM_MASTERS=1
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-cnv
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OLM_OPERATORS=cnv
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-odf
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OLM_OPERATORS=odf
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-ocs
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OLM_OPERATORS=ocs
-        OPENSHIFT_VERSION=4.8
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-day2
   optional: true
@@ -164,10 +136,10 @@ tests:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=release-ocm-2.6
         TEST_FUNC=test_deploy_day2_nodes_cloud
     workflow: assisted-baremetal
 - as: subsystem-test
-  skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: packet-assisted
     workflow: assisted-agent
@@ -177,7 +149,6 @@ tests:
     cluster_profile: packet-assisted
     workflow: assisted-agent
 zz_generated_metadata:
-  branch: master
+  branch: release-ocm-2.6
   org: openshift
   repo: assisted-installer-agent
-  variant: edge
