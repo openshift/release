@@ -1,12 +1,3 @@
-base_images:
-  ubi:
-    name: ubi
-    namespace: ocp
-    tag: "8"
-  ubi-minimal:
-    name: ubi-minimal
-    namespace: ocp
-    tag: "8"
 build_root:
   project_image:
     dockerfile_path: .openshift-ci/Dockerfile.build_root
@@ -14,47 +5,6 @@ images:
 - dockerfile_path: .openshift-ci/build/Dockerfile.generate-genesis-dump
   from: src
   to: genesis-dump
-- dockerfile_path: .openshift-ci/build/Dockerfile.generate-db-dump
-  from: genesis-dump
-  to: db-dump
-- dockerfile_path: .openshift-ci/build/Dockerfile.build-bundle
-  from: genesis-dump
-  to: scanner-bundle
-- dockerfile_path: .openshift-ci/build/Dockerfile.build-db-bundle
-  from: db-dump
-  to: scanner-db-bundle
-- dockerfile_path: Dockerfile
-  from: ubi-minimal
-  inputs:
-    scanner-bundle:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/stackrox/scanner/image/scanner/rhel/.
-  to: scanner
-- dockerfile_path: Dockerfile.slim
-  from: ubi-minimal
-  inputs:
-    scanner-bundle:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/stackrox/scanner/image/scanner/rhel/.
-  to: scanner-slim
-- dockerfile_path: Dockerfile
-  from: ubi
-  inputs:
-    scanner-db-bundle:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/stackrox/scanner/image/db/rhel/.
-  to: scanner-db
-- dockerfile_path: Dockerfile.slim
-  from: ubi
-  inputs:
-    scanner-db-bundle:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/stackrox/scanner/image/db/rhel/.
-  to: scanner-db-slim
 resources:
   '*':
     requests:
@@ -88,29 +38,6 @@ tests:
     test:
     - ref: stackrox-scanner
   timeout: 1h30m0s
-- as: push-images
-  steps:
-    test:
-    - as: push
-      commands: .openshift-ci/dispatch.sh push-images
-      credentials:
-      - mount_path: /tmp/secret/stackrox-scanner-secrets
-        name: stackrox-scanner-secrets
-        namespace: test-credentials
-      dependencies:
-      - env: SCANNER_IMAGE
-        name: scanner
-      - env: SCANNER_SLIM_IMAGE
-        name: scanner-slim
-      - env: SCANNER_DB_IMAGE
-        name: scanner-db
-      - env: SCANNER_DB_SLIM_IMAGE
-        name: scanner-db-slim
-      from: src
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 4000Mi
 - as: scale-tests
   optional: true
   steps:
@@ -123,36 +50,6 @@ tests:
     test:
     - ref: stackrox-scanner
   timeout: 1h30m0s
-- as: store-db-dump
-  optional: true
-  steps:
-    test:
-    - as: store-db-dump
-      commands: .openshift-ci/dispatch.sh store-db-dump
-      credentials:
-      - mount_path: /tmp/secret/stackrox-scanner-secrets
-        name: stackrox-scanner-secrets
-        namespace: test-credentials
-      from: db-dump
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 4000Mi
-- as: store-genesis-dump
-  optional: true
-  steps:
-    test:
-    - as: store-genesis-dump
-      commands: .openshift-ci/dispatch.sh store-genesis-dump
-      credentials:
-      - mount_path: /tmp/secret/stackrox-scanner-secrets
-        name: stackrox-scanner-secrets
-        namespace: test-credentials
-      from: genesis-dump
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 4000Mi
 - as: style-checks
   steps:
     test:
@@ -161,21 +58,6 @@ tests:
   steps:
     test:
     - ref: stackrox-scanner
-- as: upload-db-dump
-  optional: true
-  steps:
-    test:
-    - as: upload-db-dump
-      commands: .openshift-ci/dispatch.sh upload-db-dump
-      credentials:
-      - mount_path: /tmp/secret/stackrox-scanner-secrets
-        name: stackrox-scanner-secrets
-        namespace: test-credentials
-      from: db-dump
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 4000Mi
 - as: merge-db-integration-tests
   postsubmit: true
   steps:
@@ -202,30 +84,6 @@ tests:
     test:
     - ref: stackrox-scanner
   timeout: 1h30m0s
-- as: merge-push-images
-  postsubmit: true
-  steps:
-    test:
-    - as: push
-      commands: .openshift-ci/dispatch.sh push-images
-      credentials:
-      - mount_path: /tmp/secret/stackrox-scanner-secrets
-        name: stackrox-scanner-secrets
-        namespace: test-credentials
-      dependencies:
-      - env: SCANNER_IMAGE
-        name: scanner
-      - env: SCANNER_SLIM_IMAGE
-        name: scanner-slim
-      - env: SCANNER_DB_IMAGE
-        name: scanner-db
-      - env: SCANNER_DB_SLIM_IMAGE
-        name: scanner-db-slim
-      from: src
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 4000Mi
 - as: merge-scale-tests
   postsubmit: true
   steps:
@@ -238,36 +96,6 @@ tests:
     test:
     - ref: stackrox-scanner
   timeout: 1h30m0s
-- as: merge-store-db-dump
-  postsubmit: true
-  steps:
-    test:
-    - as: store-db-dump
-      commands: .openshift-ci/dispatch.sh store-db-dump
-      credentials:
-      - mount_path: /tmp/secret/stackrox-scanner-secrets
-        name: stackrox-scanner-secrets
-        namespace: test-credentials
-      from: db-dump
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 4000Mi
-- as: merge-store-genesis-dump
-  postsubmit: true
-  steps:
-    test:
-    - as: store-genesis-dump
-      commands: .openshift-ci/dispatch.sh store-genesis-dump
-      credentials:
-      - mount_path: /tmp/secret/stackrox-scanner-secrets
-        name: stackrox-scanner-secrets
-        namespace: test-credentials
-      from: genesis-dump
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 4000Mi
 - as: merge-style-checks
   postsubmit: true
   steps:
@@ -278,21 +106,6 @@ tests:
   steps:
     test:
     - ref: stackrox-scanner
-- as: merge-upload-db-dump
-  postsubmit: true
-  steps:
-    test:
-    - as: upload-db-dump
-      commands: .openshift-ci/dispatch.sh upload-db-dump
-      credentials:
-      - mount_path: /tmp/secret/stackrox-scanner-secrets
-        name: stackrox-scanner-secrets
-        namespace: test-credentials
-      from: db-dump
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 4000Mi
 zz_generated_metadata:
   branch: master
   org: stackrox
