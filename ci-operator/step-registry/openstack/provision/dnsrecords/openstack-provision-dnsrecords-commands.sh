@@ -19,7 +19,7 @@ print(json.load(sys.stdin)["HostedZones"][0]["Id"].split("/")[-1])'
 )
 
 echo "Creating DNS record for api.$CLUSTER_NAME.$BASE_DOMAIN. -> $API_IP"
-cat > ${SHARED_DIR}/api-record.json <<EOF
+cat > "${SHARED_DIR}/api-record.json" <<EOF
 {
 "Comment": "Create the public OpenShift API record",
 "Changes": [{
@@ -32,11 +32,11 @@ cat > ${SHARED_DIR}/api-record.json <<EOF
       }
 }]}
 EOF
-cp ${SHARED_DIR}/api-record.json ${ARTIFACT_DIR}/api-record.json
-aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch file://${SHARED_DIR}/api-record.json
+cp "${SHARED_DIR}/api-record.json" "${ARTIFACT_DIR}/api-record.json"
+aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch "file://${SHARED_DIR}/api-record.json"
 
 echo "Creating DNS record for *.apps.$CLUSTER_NAME.$BASE_DOMAIN. -> $INGRESS_IP"
-cat > ${SHARED_DIR}/ingress-record.json <<EOF
+cat > "${SHARED_DIR}/ingress-record.json" <<EOF
 {
 "Comment": "Create the public OpenShift Ingress record",
 "Changes": [{
@@ -49,5 +49,5 @@ cat > ${SHARED_DIR}/ingress-record.json <<EOF
     }
 }]}
 EOF
-cp ${SHARED_DIR}/ingress-record.json ${ARTIFACT_DIR}/ingress-record.json
-aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch file://${SHARED_DIR}/ingress-record.json
+cp "${SHARED_DIR}/ingress-record.json" "${ARTIFACT_DIR}/ingress-record.json"
+aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch "file://${SHARED_DIR}/ingress-record.json"
