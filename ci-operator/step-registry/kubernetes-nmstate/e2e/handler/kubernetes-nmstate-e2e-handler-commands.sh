@@ -18,4 +18,8 @@ sed -i 's/\[\ \"\${CI}\"\ \=\=\ \"true\"\ \]/\[\ \"\${CI}\"\ \=\=\ \"true\"\ \]\
 sed -i 's/enp1s0/ens192/g' hack/ocp-e2e-tests-handler.sh
 sed -i 's/enp2s0/ens192/g' hack/ocp-e2e-tests-handler.sh
 
+# add enp3s0 and enp4s0
+for no in $(oc -n default get no -ojsonpath='{.items[*].metadata.name}'); do oc -n default debug node/$no -- bash -c 'chroot /host  nmcli connection add type dummy ifname enp3s0'; done #somehow kubeconfig in CI has configured a weired namespace
+for no in $(oc -n default get no -ojsonpath='{.items[*].metadata.name}'); do oc -n default debug node/$no -- bash -c 'chroot /host  nmcli connection add type dummy ifname enp4s0'; done
+
 make test-e2e-handler-ocp
