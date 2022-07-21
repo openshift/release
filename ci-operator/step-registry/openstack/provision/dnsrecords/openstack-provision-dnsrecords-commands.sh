@@ -5,6 +5,7 @@ set -o errexit
 set -o pipefail
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+HOSTED_ZONE_ID="$(</var/run/aws/shiftstack-zone-id)"
 
 export AWS_DEFAULT_REGION=us-east-1
 export AWS_DEFAULT_OUTPUT=json
@@ -13,10 +14,6 @@ export AWS_PROFILE=profile
 CLUSTER_NAME=$(<"${SHARED_DIR}"/CLUSTER_NAME)
 API_IP=$(<"${SHARED_DIR}"/API_IP)
 INGRESS_IP=$(<"${SHARED_DIR}"/INGRESS_IP)
-HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "${BASE_DOMAIN}" | python -c '
-import json,sys;
-print(json.load(sys.stdin)["HostedZones"][0]["Id"].split("/")[-1])'
-)
 
 echo "Creating DNS record for api.$CLUSTER_NAME.$BASE_DOMAIN. -> $API_IP"
 cat > "${SHARED_DIR}/api-record.json" <<EOF

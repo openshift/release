@@ -9,10 +9,7 @@ export AWS_DEFAULT_REGION=us-east-1
 export AWS_DEFAULT_OUTPUT=json
 export AWS_PROFILE=profile
 
-HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "${BASE_DOMAIN}" | python -c '
-import json,sys
-print(json.load(sys.stdin)["HostedZones"][0]["Id"].split("/")[-1])'
-)
+HOSTED_ZONE_ID="$(</var/run/aws/shiftstack-zone-id)"
 
 for RECORD_FILE in api-record.json ingress-record.json
 do
