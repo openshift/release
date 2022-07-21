@@ -1,0 +1,275 @@
+base_images:
+  assisted-image-service:
+    name: ocm-2.6
+    namespace: edge-infrastructure
+    tag: assisted-image-service
+  assisted-installer:
+    name: ocm-2.6
+    namespace: edge-infrastructure
+    tag: assisted-installer
+  assisted-installer-agent:
+    name: ocm-2.6
+    namespace: edge-infrastructure
+    tag: assisted-installer-agent
+  assisted-installer-controller:
+    name: ocm-2.6
+    namespace: edge-infrastructure
+    tag: assisted-installer-controller
+  coreos_centos_stream8:
+    name: stream8
+    namespace: coreos
+    tag: "8"
+  coreos_centos_stream9:
+    name: stream9
+    namespace: coreos
+    tag: "9"
+  edge_infrastructure_swagger_codegen_cli:
+    name: edge-infrastructure-swagger-codegen-cli
+    namespace: ci
+    tag: 2.4.18
+  goswagger_swagger:
+    name: goswagger-swagger
+    namespace: ci
+    tag: v0.28.0
+  openshift_release_golang-1.17:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
+  postgresql-12-centos7:
+    name: postgresql-12-centos7
+    namespace: edge-infrastructure
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
+images:
+- dockerfile_literal: |
+    FROM quay.io/centos/centos:stream9
+    RUN dnf install -y 'dnf-command(config-manager)' && \
+        dnf config-manager --set-enabled crb && \
+        dnf install -y git unzip make gcc which
+    COPY --from=registry.ci.openshift.org/openshift/release:golang-1.17 /usr/local/go /usr/local/go
+    ENV GOPATH=/go
+    ENV GOROOT=/usr/local/go
+    ENV PATH=$PATH:$GOROOT/bin:$GOPATH/bin
+    COPY . /assisted-service/
+    WORKDIR /assisted-service/
+    ENV CGO_CFLAGS="-g -O2 -Wno-return-local-addr"
+    RUN go mod vendor
+    RUN chmod 775 -R $GOPATH && chmod 775 -R $(go env GOROOT) && chmod 775 -R /assisted-service/ && \
+        mkdir /.cache && chmod 775 -R /.cache
+  inputs:
+    coreos_centos_stream9:
+      as:
+      - quay.io/centos/centos:stream9
+    openshift_release_golang-1.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
+  to: assisted-service-centos9
+- dockerfile_literal: |
+    FROM base
+    RUN dnf install -y postgresql-server
+    RUN cd / && /assisted-service/hack/setup_env.sh test_tools
+  from: assisted-service-centos9
+  to: assisted-service-unit-test
+- dockerfile_literal: |
+    FROM base
+    COPY --from=quay.io/app-sre/golangci-lint:v1.37.1 /usr/bin/golangci-lint /usr/bin/golangci-lint
+  from: assisted-service-centos9
+  to: assisted-service-lint
+- dockerfile_literal: |
+    FROM base
+    COPY --from=quay.io/openshift/origin-cli:latest /usr/bin/oc /usr/bin
+    RUN ln -s /usr/bin/oc /usr/bin/kubectl
+    RUN make build-openshift-ci-test-bin
+    RUN go mod vendor
+  from: assisted-service-centos9
+  to: assisted-service-subsystem
+- dockerfile_path: Dockerfile.assisted-service-build
+  inputs:
+    edge_infrastructure_swagger_codegen_cli:
+      as:
+      - quay.io/edge-infrastructure/swagger-codegen-cli:2.4.18
+    goswagger_swagger:
+      as:
+      - quay.io/goswagger/swagger:v0.28.0
+    openshift_release_golang-1.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
+    postgresql-12-centos7:
+      as:
+      - quay.io/centos7/postgresql-12-centos7:latest
+  to: assisted-service-build
+- dockerfile_path: Dockerfile.assisted-service
+  inputs:
+    coreos_centos_stream8:
+      as:
+      - quay.io/centos/centos:stream8
+    openshift_release_golang-1.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
+  to: assisted-service
+- dockerfile_literal: |
+    FROM coreos/centos
+    COPY . .
+  from: src
+  to: assisted-service-scripts
+- dockerfile_literal: |
+    FROM coreos/centos
+    RUN yum install -y skopeo
+  from: src
+  to: assisted-service-publish-index
+operator:
+  bundles:
+  - dockerfile_path: deploy/olm-catalog/bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/edge-infrastructure/assisted-service:latest
+    with: assisted-service
+  - pullspec: quay.io/edge-infrastructure/assisted-installer:latest
+    with: assisted-installer
+  - pullspec: quay.io/edge-infrastructure/assisted-installer-agent:latest
+    with: assisted-installer-agent
+  - pullspec: quay.io/edge-infrastructure/assisted-installer-controller:latest
+    with: assisted-installer-controller
+  - pullspec: quay.io/edge-infrastructure/assisted-image-service:latest
+    with: assisted-image-service
+  - pullspec: quay.io/centos7/postgresql-12-centos7:latest
+    with: postgresql-12-centos7
+releases:
+  candidate-4-11:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.11"
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.10"
+      namespace: ocp
+  stable-4-9:
+    integration:
+      name: "4.9"
+      namespace: ocp
+  stable-4-10:
+    integration:
+      name: "4.10"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: |
+  make build-openshift-ci-test-bin
+  go mod vendor
+  mkdir /.cache && chmod 775 -R /.cache && chmod 775 -R $GOPATH
+tests:
+- as: unit-test
+  commands: |
+    export REPORTS=/tmp/reports
+    export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
+    export GINKGO_REPORTFILE=${ARTIFACT_DIR}/junit_unit_test.xml
+    make ci-unit-test
+  container:
+    from: assisted-service-unit-test
+  secret:
+    mount_path: /tmp/secret
+    name: assisted-service-codecov-token
+  skip_if_only_changed: ^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNER_ALIASES)$
+- as: unit-test-postsubmit
+  commands: |
+    export REPORTS=/tmp/reports
+    export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
+    export GINKGO_REPORTFILE=${ARTIFACT_DIR}/junit_unit_test.xml
+    make ci-unit-test
+  container:
+    from: assisted-service-unit-test
+  postsubmit: true
+  secret:
+    mount_path: /tmp/secret
+    name: assisted-service-codecov-token
+- as: subsystem-aws
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.10"
+  run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
+  steps:
+    allow_best_effort_post_steps: true
+    test:
+    - as: subsystem-deploy-and-run
+      cli: latest
+      commands: |
+        export BUILD_TYPE=CI
+        export REPORTS=${ARTIFACT_DIR}
+        export TARGET=oc
+        export PERSISTENT_STORAGE="False"
+        export TARGET='oc'
+        export GENERATE_CRD='false'
+        unset GOFLAGS
+        make ci-deploy-for-subsystem
+        oc get pods
+        make test
+      dependencies:
+      - env: SERVICE
+        name: assisted-service
+      from: assisted-service-subsystem
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
+- as: subsystem-kubeapi-aws
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.10"
+  run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
+  steps:
+    allow_best_effort_post_steps: true
+    test:
+    - as: subsystem-deploy-and-run
+      cli: latest
+      commands: |
+        export BUILD_TYPE=CI
+        export REPORTS=${ARTIFACT_DIR}
+        export TARGET=oc
+        export PERSISTENT_STORAGE="False"
+        export TARGET='oc'
+        export GENERATE_CRD='false'
+        unset GOFLAGS
+        make ci-deploy-for-subsystem
+        oc get pods
+        make enable-kube-api-for-subsystem
+        make test-kube-api
+      dependencies:
+      - env: SERVICE
+        name: assisted-service
+      from: assisted-service-subsystem
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
+- as: lint
+  commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    make lint
+  container:
+    from: assisted-service-lint
+  skip_if_only_changed: ^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNER_ALIASES)$
+zz_generated_metadata:
+  branch: testing-image-changes
+  org: openshift
+  repo: assisted-service
+  variant: edge

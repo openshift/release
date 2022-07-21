@@ -37,7 +37,7 @@ function set_cluster_auth () {
         # set the registry auth for the cluster
         run_command "oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/new-dockerconfigjson"; ret=$?
         if [[ $ret -eq 0 ]]; then
-            echo "set the mirror registry auth succeessfully."
+            echo "set the mirror registry auth successfully."
         else
             echo "!!! fail to set the mirror registry auth"
             return 1
@@ -51,33 +51,9 @@ function set_cluster_auth () {
 function disable_default_catalogsource () {
     run_command "oc patch operatorhub cluster -p '{\"spec\": {\"disableAllDefaultSources\": true}}' --type=merge"; ret=$?
     if [[ $ret -eq 0 ]]; then
-        echo "disable default Catalog Source succeessfully."
+        echo "disable default Catalog Source successfully."
     else
         echo "!!! fail to disable default Catalog Source"
-        return 1
-    fi
-}
-
-function enable_qe_proxy_registry () {
-    # get registry host name, no port
-    REGISTRY_HOST=`echo ${MIRROR_PROXY_REGISTRY} | cut -d \: -f 1`
-    # get the QE additional CA
-    QE_ADDITIONAL_CA_FILE="/var/run/vault/mirror-registry/additional_ca"
-    # Configuring additional trust stores for image registry access, details: https://docs.openshift.com/container-platform/4.11/registry/configuring-registry-operator.html#images-configuration-cas_configuring-registry-operator
-    run_command "oc create configmap registry-config --from-file=\"${REGISTRY_HOST}..5000\"=${QE_ADDITIONAL_CA_FILE} --from-file=\"${REGISTRY_HOST}..6001\"=${QE_ADDITIONAL_CA_FILE} --from-file=\"${REGISTRY_HOST}..6002\"=${QE_ADDITIONAL_CA_FILE}  -n openshift-config"; ret=$?
-    if [[ $ret -eq 0 ]]; then
-        echo "set the proxy registry ConfigMap succeessfully."
-    else
-        echo "!!! fail to set the proxy registry ConfigMap"
-        run_command "oc get configmap registry-config -n openshift-config -o yaml"
-        return 1
-    fi
-    run_command "oc patch image.config.openshift.io/cluster --patch '{\"spec\":{\"additionalTrustedCA\":{\"name\":\"registry-config\"}}}' --type=merge"; ret=$?
-    if [[ $ret -eq 0 ]]; then
-        echo "set additionalTrustedCA succeessfully."
-    else
-        echo "!!! Fail to set additionalTrustedCA"
-        run_command "oc get image.config.openshift.io/cluster -o yaml"
         return 1
     fi
 }
@@ -103,6 +79,44 @@ function create_icsp_by_olm () {
         return 1
     fi
     rm -rf /tmp/olm_mirror 
+}
+
+# Slove: x509: certificate signed by unknown authority
+# Config CA for each cluster node so that it can pull images successfully.
+# It not only be used by Sample operator, but ICSP and all pods that pulling images from the external registry.
+# $ oc debug node/qe-daily-0721-p79bt-worker-3-knbkr
+# sh-4.4# chroot /host
+# sh-4.4# ls -l /etc/pki/ca-trust/source/anchors/
+# total 0
+# -rw-------. 1 root root 0 Jul 20 23:30 openshift-config-user-ca-bundle.crt
+# sh-4.4# ls -l /etc/docker/certs.d
+# total 0
+# drwxr-xr-x. 2 1001 root 20 Jul 20 23:30 image-registry.openshift-image-registry.svc.cluster.local:5000
+# drwxr-xr-x. 2 1001 root 20 Jul 20 23:30 image-registry.openshift-image-registry.svc:5000
+# drwxr-xr-x. 2 1001 root 20 Jul 21 03:30 vmc.mirror-registry.qe.devcluster.openshift.com:5000
+# drwxr-xr-x. 2 1001 root 20 Jul 21 03:30 vmc.mirror-registry.qe.devcluster.openshift.com:6001
+# drwxr-xr-x. 2 1001 root 20 Jul 21 03:30 vmc.mirror-registry.qe.devcluster.openshift.com:6002
+function set_CA_for_nodes () {
+    # get the QE additional CA
+    QE_ADDITIONAL_CA_FILE="/var/run/vault/mirror-registry/additional_ca"
+    REGISTRY_HOST=`echo ${MIRROR_PROXY_REGISTRY} | cut -d \: -f 1`
+    # Configuring additional trust stores for image registry access, details: https://docs.openshift.com/container-platform/4.11/registry/configuring-registry-operator.html#images-configuration-cas_configuring-registry-operator
+    run_command "oc create configmap registry-config --from-file=\"${REGISTRY_HOST}..5000\"=${QE_ADDITIONAL_CA_FILE} --from-file=\"${REGISTRY_HOST}..6001\"=${QE_ADDITIONAL_CA_FILE} --from-file=\"${REGISTRY_HOST}..6002\"=${QE_ADDITIONAL_CA_FILE}  -n openshift-config"; ret=$?
+    if [[ $ret -eq 0 ]]; then
+        echo "set the proxy registry ConfigMap successfully."
+    else
+        echo "!!! fail to set the proxy registry ConfigMap"
+        run_command "oc get configmap registry-config -n openshift-config -o yaml"
+        return 1
+    fi
+    run_command "oc patch image.config.openshift.io/cluster --patch '{\"spec\":{\"additionalTrustedCA\":{\"name\":\"registry-config\"}}}' --type=merge"; ret=$?
+    if [[ $ret -eq 0 ]]; then
+        echo "set additionalTrustedCA successfully."
+    else
+        echo "!!! Fail to set additionalTrustedCA"
+        run_command "oc get image.config.openshift.io/cluster -o yaml"
+        return 1
+    fi
 }
 
 # Create the fixed ICSP for optional operators
@@ -220,7 +234,7 @@ echo "MIRROR_PROXY_REGISTRY_QUAY: ${MIRROR_PROXY_REGISTRY_QUAY}"
 MIRROR_PROXY_REGISTRY=`echo "${MIRROR_REGISTRY_HOST}" | sed 's/5000/6002/g' `
 echo "MIRROR_PROXY_REGISTRY: ${MIRROR_PROXY_REGISTRY}"
 set_cluster_auth
-enable_qe_proxy_registry
+set_CA_for_nodes
 create_settled_icsp
 create_catalog_sources
 # For now(2022-07-19), the Proxy registry can only proxy the `brew.registry.redhat.io` image, 

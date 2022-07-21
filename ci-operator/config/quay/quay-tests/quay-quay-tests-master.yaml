@@ -3,11 +3,15 @@ base_images:
     name: "4.11"
     namespace: ocp
     tag: cli
+  upi-installer:
+    name: "4.11"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: golang-1.18
 images:
 - dockerfile_literal: |
     FROM src
@@ -45,6 +49,17 @@ tests:
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
+    test:
+    - chain: quay-tests-quay-e2e-test
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: quay-e2e-tests-fips
+  cron: 0 12 * * 5
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      FIPS_ENABLED: "true"
     test:
     - chain: quay-tests-quay-e2e-test
     workflow: cucushift-installer-rehearse-aws-ipi

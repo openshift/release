@@ -23,6 +23,10 @@ base_images:
     name: stream8
     namespace: coreos
     tag: "8"
+  coreos_centos_stream9:
+    name: stream9
+    namespace: coreos
+    tag: "9"
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -31,6 +35,10 @@ base_images:
     name: edge-infrastructure-swagger-codegen-cli
     namespace: ci
     tag: 2.4.18
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.37.1
   goswagger_swagger:
     name: goswagger-swagger
     namespace: ci
@@ -49,6 +57,52 @@ build_root:
     namespace: openshift
     tag: golang-1.17
 images:
+- dockerfile_literal: |
+    FROM quay.io/centos/centos:stream9
+    RUN dnf install -y 'dnf-command(config-manager)' && \
+        dnf config-manager --set-enabled crb && \
+        dnf install -y git unzip make gcc which
+    COPY --from=registry.ci.openshift.org/openshift/release:golang-1.17 /usr/local/go /usr/local/go
+    ENV GOPATH=/go
+    ENV GOROOT=/usr/local/go
+    ENV PATH=$PATH:$GOROOT/bin:$GOPATH/bin
+    COPY . /assisted-service/
+    WORKDIR /assisted-service/
+    ENV CGO_CFLAGS="-g -O2 -Wno-return-local-addr"
+    RUN go mod vendor
+    RUN chmod 775 -R $GOPATH && chmod 775 -R $(go env GOROOT) && chmod 775 -R /assisted-service/ && \
+        mkdir /.cache && chmod 775 -R /.cache
+  inputs:
+    coreos_centos_stream9:
+      as:
+      - quay.io/centos/centos:stream9
+    openshift_release_golang-1.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
+  to: assisted-service-centos9
+- dockerfile_literal: |
+    FROM base
+    RUN dnf install -y postgresql-server
+    RUN cd / && /assisted-service/hack/setup_env.sh test_tools
+  from: assisted-service-centos9
+  to: assisted-service-unit-test
+- dockerfile_literal: |
+    FROM base
+    COPY --from=quay.io/app-sre/golangci-lint:v1.37.1 /usr/bin/golangci-lint /usr/bin/golangci-lint
+  from: assisted-service-centos9
+  inputs:
+    golangci-lint:
+      as:
+      - quay.io/app-sre/golangci-lint:v1.37.1
+  to: assisted-service-lint
+- dockerfile_literal: |
+    FROM base
+    COPY --from=quay.io/openshift/origin-cli:latest /usr/bin/oc /usr/bin
+    RUN ln -s /usr/bin/oc /usr/bin/kubectl
+    RUN make build-openshift-ci-test-bin
+    RUN go mod vendor
+  from: assisted-service-centos9
+  to: assisted-service-subsystem
 - dockerfile_path: Dockerfile.assisted-service-build
   from: postgresql-12-centos7
   inputs:
@@ -84,10 +138,6 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-test_binary_build_commands: |
-  make build-openshift-ci-test-bin
-  go mod vendor
-  mkdir /.cache && chmod 775 -R /.cache && chmod 775 -R $GOPATH
 tests:
 - as: mirror-vcsref-image
   postsubmit: true
@@ -100,16 +150,15 @@ tests:
   commands: export GOLANGCI_LINT_CACHE=/tmp/.cache && export GOPROXY=https://proxy.golang.org
     && make lint
   container:
-    from: test-bin
+    from: assisted-service-lint
 - as: unit-test
   commands: |
-    export ROOT_DIR=/tmp
-    export COVER_PROFILE=/tmp/reports/unit_coverage.out
+    export REPORTS=/tmp/reports
     export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
     export GINKGO_REPORTFILE=/tmp/junit_unit_test.xml
     make ci-unit-test
   container:
-    from: assisted-service-build
+    from: assisted-service-unit-test
   secret:
     mount_path: /tmp/secret
     name: assisted-service-codecov-token
@@ -136,13 +185,16 @@ tests:
         export BUILD_TYPE=CI
         export REPORTS=${ARTIFACT_DIR}
         export TARGET=oc
-
-        make deploy-on-openshift-ci
+        export PERSISTENT_STORAGE="False"
+        export GENERATE_CRD='false'
+        unset GOFLAGS
+        make ci-deploy-for-subsystem
+        oc get pods
         make test
       dependencies:
       - env: SERVICE
         name: assisted-service
-      from: test-bin
+      from: assisted-service-subsystem
       resources:
         requests:
           cpu: 100m

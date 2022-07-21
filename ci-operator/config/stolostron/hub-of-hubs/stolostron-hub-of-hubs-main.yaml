@@ -60,11 +60,10 @@ tests:
   container:
     from: src
 - as: test-e2e
-  optional: true
   steps:
     env:
       AWS_CREDENTIALS_SECRET: ocm-obs-china-aws-kind
-      AWS_INSTANCE_TYPE: m5ad.2xlarge
+      AWS_INSTANCE_TYPE: m5ad.xlarge
     post:
     - ref: ocm-e2e-kind-destroy
     pre:
@@ -73,10 +72,18 @@ tests:
     test:
     - as: test
       commands: |
+        echo "HUB_OF_HUBS_MANAGER_IMAGE_REF=$HUB_OF_HUBS_MANAGER_IMAGE_REF"
+        echo "HUB_OF_HUBS_AGENT_IMAGE_REF=$HUB_OF_HUBS_AGENT_IMAGE_REF"
+        echo "OPENSHIFT_CI=$OPENSHIFT_CI"
         export SELF="make"
         set -o pipefail
-        make e2e-prow-tests 2>&1 | tee ${ARTIFACT_DIR}/e2e-run.log
+        make e2e-prow-tests 2>&1 | tee ${ARTIFACT_DIR}/e2e-prow-tests.log
         set +o pipefail
+      dependencies:
+      - env: HUB_OF_HUBS_MANAGER_IMAGE_REF
+        name: hub-of-hubs-manager
+      - env: HUB_OF_HUBS_AGENT_IMAGE_REF
+        name: hub-of-hubs-agent
       from: src
       resources:
         requests:
