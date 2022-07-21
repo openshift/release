@@ -26,6 +26,12 @@ images:
 - build_args:
   - name: ROX_PRODUCT_BRANDING
     value: RHACS_BRANDING
+  dockerfile_path: .openshift-ci/build/Dockerfile.build-operator-artifacts
+  from: src
+  to: operator-artifacts
+- build_args:
+  - name: ROX_PRODUCT_BRANDING
+    value: RHACS_BRANDING
   dockerfile_path: Dockerfile.gen
   from: ubi-minimal
   inputs:
@@ -60,6 +66,32 @@ images:
         source_path: /go/src/github.com/stackrox/stackrox/docs/.
   to: docs
 - build_args:
+  - name: GO_VERSION
+    value: 1.17.2
+  - name: ROX_IMAGE_FLAVOR
+    value: development_build
+  dockerfile_path: operator/Dockerfile
+  inputs:
+    operator-artifacts:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/stackrox/stackrox/.
+  to: operator
+- dockerfile_path: bundle.Dockerfile
+  inputs:
+    operator-artifacts:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/stackrox/stackrox/operator/.
+  to: bundle
+- dockerfile_path: rhacs-operator-index.Dockerfile
+  inputs:
+    operator-artifacts:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/stackrox/stackrox/operator/build/index/.
+  to: index
+- build_args:
   - name: ROX_PRODUCT_BRANDING
     value: RHACS_BRANDING
   - name: RACE_CONDITION_DEBUG
@@ -83,6 +115,7 @@ promotion:
   - main-bundle
   - central-db-bundle
   - main-rcd-bundle
+  - operator-artifacts
   namespace: stackrox
   tag: latest
 resources:
@@ -112,6 +145,12 @@ tests:
         name: docs
       - env: MAIN_RCD_IMAGE
         name: main-rcd
+      - env: OPERATOR_IMAGE
+        name: operator
+      - env: OPERATOR_BUNDLE_IMAGE
+        name: bundle
+      - env: OPERATOR_BUNDLE_INDEX_MAGE
+        name: index
       from: src
       resources:
         requests:
@@ -252,11 +291,19 @@ tests:
   steps:
     test:
     - ref: stackrox-e2e
-- as: operator-e2e-tests
+- as: openshift-4-operator-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 3h30m0s
+    version: "4.8"
   optional: true
   steps:
     test:
     - ref: stackrox-e2e
+  timeout: 2h0m0s
 - as: local-roxctl-tests
   optional: true
   steps:
