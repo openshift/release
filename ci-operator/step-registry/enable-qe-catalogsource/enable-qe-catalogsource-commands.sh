@@ -35,8 +35,14 @@ function update_global_auth () {
 
   # only add quay.io/openshift-qe-optional-operators auth to the global auth
   new_dockerconfig="/tmp/new-dockerconfigjson"
-  qe_registry_auth=`head -n 1 "/var/run/vault/image-registry/qe_optional_auth" | base64 -w 0`
-  brew_registry_auth=`head -n 1 "/var/run/vault/image-registry/brew_registry" | base64 -w 0`
+  # qe_registry_auth=$(cat "/var/run/vault/mirror-registry/qe_optional.json" | jq -r '.auths."quay.io/openshift-qe-optional-operators".auth')
+  optional_auth_user=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.user')
+  optional_auth_password=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.password')
+  qe_registry_auth=`echo -n "${optional_auth_user}:${optional_auth_password}" | base64 -w 0`
+
+  reg_brew_user=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.user')
+  reg_brew_password=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.password')
+  brew_registry_auth=`echo -n "${reg_brew_user}:${reg_brew_password}" | base64 -w 0`
   jq --argjson a "{\"brew.registry.redhat.io\": {\"auth\": \"${brew_registry_auth}\", \"email\":\"jiazha@redhat.com\"},\"quay.io/openshift-qe-optional-operators\": {\"auth\": \"${qe_registry_auth}\", \"email\":\"jiazha@redhat.com\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" > ${new_dockerconfig}
 
  # run_command "cat ${new_dockerconfig} | jq"
@@ -44,7 +50,7 @@ function update_global_auth () {
   # update global auth
   run_command "oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=${new_dockerconfig}"; ret=$?
   if [[ $ret -eq 0 ]]; then
-      echo "update the cluster global auth succeessfully."
+      echo "update the cluster global auth successfully."
   else
       echo "!!! fail to add QE optional registry auth"
       return 1
