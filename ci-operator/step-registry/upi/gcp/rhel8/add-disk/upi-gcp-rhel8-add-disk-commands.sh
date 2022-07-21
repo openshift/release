@@ -25,6 +25,7 @@ cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" "${HOME}/.ssh/google_compute_engine"
 chmod 0600 "${HOME}/.ssh/google_compute_engine"
 cp "${CLUSTER_PROFILE_DIR}/ssh-publickey" "${HOME}/.ssh/google_compute_engine.pub"
 
+gcloud auth activate-service-account --quiet --key-file "${CLUSTER_PROFILE_DIR}/gce.json"
 gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
 gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
