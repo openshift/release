@@ -787,11 +787,11 @@ postsubmits:
     decorate: true
     decoration_config:
       skip_cloning: true
-      timeout: 5h0m0s
+      timeout: 2h0m0s
     labels:
       ci.openshift.io/generator: prowgen
-    max_concurrency: 5
-    name: branch-ci-stackrox-stackrox-master-merge-openshift-4-qa-e2e-tests
+    max_concurrency: 1
+    name: branch-ci-stackrox-stackrox-master-merge-openshift-4-operator-e2e-tests
     spec:
       containers:
       - args:
@@ -800,7 +800,7 @@ postsubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=merge-openshift-4-qa-e2e-tests
+        - --target=merge-openshift-4-operator-e2e-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -847,17 +847,20 @@ postsubmits:
     decorate: true
     decoration_config:
       skip_cloning: true
+      timeout: 5h0m0s
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 5
-    name: branch-ci-stackrox-stackrox-master-merge-operator-e2e-tests
+    name: branch-ci-stackrox-stackrox-master-merge-openshift-4-qa-e2e-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=merge-operator-e2e-tests
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=merge-openshift-4-qa-e2e-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -867,8 +870,14 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -878,6 +887,12 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
