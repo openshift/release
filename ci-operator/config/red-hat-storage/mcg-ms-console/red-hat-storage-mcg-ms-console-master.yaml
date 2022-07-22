@@ -52,10 +52,17 @@ tests:
     test:
     - as: tests
       cli: latest
-      commands: ./prow.sh ${MCG_MS_CONSOLE_IMG_PULL_SPEC}
+      commands: |
+        export AWS_ACCESS_KEY_ID="$(cat /etc/mcg-ms-console-e2e-credentials/aws-access-key-id)"
+        export AWS_SECRET_ACCESS_KEY="$(cat /etc/mcg-ms-console-e2e-credentials/aws-secret-access-key)"
+
+        ./prow.sh ${MCG_MS_CONSOLE_IMG_PULL_SPEC}
       credentials:
       - mount_path: /var/run/operator-secret
         name: operator-secret
+        namespace: test-credentials
+      - mount_path: /etc/mcg-ms-console-e2e-credentials
+        name: mcg-ms-console-e2e-credentials
         namespace: test-credentials
       dependencies:
       - env: MCG_MS_CONSOLE_IMG_PULL_SPEC
