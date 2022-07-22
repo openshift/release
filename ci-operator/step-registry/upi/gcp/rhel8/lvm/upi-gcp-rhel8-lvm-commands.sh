@@ -16,7 +16,6 @@ mkdir -p "${HOME}"/.ssh
 mock-nss.sh
 
 echo "$(date -u --rfc-3339=seconds) - Configuring GCP CLI client"
-
 # gcloud compute will use this key rather than create a new one
 cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" "${HOME}/.ssh/google_compute_engine"
 chmod 0600 "${HOME}/.ssh/google_compute_engine"
@@ -27,7 +26,7 @@ gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
 gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
 
-gcloud compute ssh "${INSTANCE_PREFIX}" --command="
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute ssh "${INSTANCE_PREFIX}" --command="
   sudo dnf install -y lvm2
   sudo pvcreate ${GCP_DISK_NAME}
   sudo vgcreate ${LVM_VOLUME_GROUP} ${GCP_DISK_NAME}"
