@@ -31,7 +31,7 @@ cp "${CLUSTER_PROFILE_DIR}"/ssh-publickey "${HOME}"/.ssh/google_compute_engine.p
 
 instance_name=$(<"${SHARED_DIR}/gcp-instance-ids.txt")
 
-tar -czf - . | gcloud compute ssh --zone="${ZONE}" ${instance_name} -- "cat > ~/crio-test.tar.gz"
+tar -czf - . | gcloud compute ssh --zone="${ZONE}" ${instance_name} -- "cat > ~/cri-o.tar.gz"
 timeout --kill-after 10m 400m gcloud compute ssh --zone="${ZONE}" ${instance_name} -- bash - << EOF 
     export GOROOT=/usr/local/go
     echo GOROOT="/usr/local/go" | sudo tee -a /etc/environment
@@ -44,7 +44,7 @@ timeout --kill-after 10m 400m gcloud compute ssh --zone="${ZONE}" ${instance_nam
     python3.9 -m pip install ansible
 
     # setup the directory where the tests will the run
-    REPO_DIR="/root/cri-o"
+    REPO_DIR="~/cri-o"
     mkdir -p "\${REPO_DIR}"
     # copy the agent sources on the remote machine
     tar -xzvf cri-o.tar.gz -C "\${REPO_DIR}"
