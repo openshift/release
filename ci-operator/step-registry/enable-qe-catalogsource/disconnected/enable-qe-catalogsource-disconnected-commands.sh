@@ -27,10 +27,24 @@ function set_cluster_auth () {
     run_command "oc extract secret/pull-secret -n openshift-config --confirm --to /tmp"; ret=$?
     if [[ $ret -eq 0 ]]; then 
         # reminder: there is no brew pull secret here
-        # echo "$ cat /tmp/.dockerconfigjson"
-        # cat /tmp/.dockerconfigjson
         # add the custom registry auth to the .dockerconfigjson of the cluster
+
+        # # quay.io
+        # optional_auth_user=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.user')
+        # optional_auth_password=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.password')
+        # quay_auth=`echo -n "${optional_auth_user}:${optional_auth_password}" | base64 -w 0`
+        # # brew.registry.redhat.io
+        # reg_brew_user=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.user')
+        # reg_brew_password=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.password')
+        # brew_registry_auth=`echo -n "${reg_brew_user}:${reg_brew_password}" | base64 -w 0`
+        # # registry.redhat.io
+        # reg_user=$(cat "/var/run/vault/mirror-registry/registry.json" | jq -r '.user')
+        # reg_password=$(cat "/var/run/vault/mirror-registry/registry.json" | jq -r '.password')
+        # registry_auth=`echo -n "${reg_user}:${reg_password}" | base64 -w 0`
+        # vmc.mirror-registry.qe.devcluster.openshift.com:6002
+        # vmc.mirror-registry.qe.devcluster.openshift.com:6001
         registry_cred=`head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0`
+
         jq --argjson a "{\"${MIRROR_PROXY_REGISTRY_QUAY}\": {\"auth\": \"$registry_cred\"}, \"${MIRROR_PROXY_REGISTRY}\": {\"auth\": \"$registry_cred\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" > /tmp/new-dockerconfigjson
         # echo "$ cat /tmp/new-dockerconfigjson"
         # cat /tmp/new-dockerconfigjson
@@ -97,6 +111,12 @@ function create_icsp_by_olm () {
 # drwxr-xr-x. 2 1001 root 20 Jul 21 03:30 vmc.mirror-registry.qe.devcluster.openshift.com:6001
 # drwxr-xr-x. 2 1001 root 20 Jul 21 03:30 vmc.mirror-registry.qe.devcluster.openshift.com:6002
 function set_CA_for_nodes () {
+    ca_name=$(oc get image.config.openshift.io/cluster -o=jsonpath="{.spec.additionalTrustedCA.name}")
+    if [ $ca_name ] && [ $ca_name = "registry-config" ] ; then
+        echo "CA is ready, skip config..."
+        return 0
+    fi
+
     # get the QE additional CA
     QE_ADDITIONAL_CA_FILE="/var/run/vault/mirror-registry/additional_ca"
     REGISTRY_HOST=`echo ${MIRROR_PROXY_REGISTRY} | cut -d \: -f 1`
