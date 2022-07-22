@@ -34,9 +34,6 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/stackrox/collector/.
   to: collector-full
-promotion:
-  namespace: stackrox
-  tag: osci-test
 resources:
   '*':
     limits:
@@ -76,7 +73,14 @@ tests:
   steps:
     test:
     - as: push-collector-images
-      commands: .openshift-ci/build/push-images.sh
+      commands: .openshift-ci/jobs/push-images/push-images.sh
+      credentials:
+      - mount_path: /tmp/secret/stackrox-stackrox-push
+        name: stackrox-stackrox-push
+        namespace: test-credentials
+      dependencies:
+      - env: COLLECTOR_FULL
+        name: collector-full
       from: src
       resources:
         requests:
