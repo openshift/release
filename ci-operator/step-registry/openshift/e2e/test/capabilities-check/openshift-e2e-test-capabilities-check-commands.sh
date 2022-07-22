@@ -26,6 +26,9 @@ if [[ "${DELETE_MC}" == "true" ]]; then
     echo "done waiting"
 fi
 
+oc label namespace e2e-test-capabilities-check --overwrite \
+  pod-security.kubernetes.io/enforce=baseline \
+  security.openshift.io/scc.podSecurityLabelSync=false
 # create a fedora pod and get the capabilities enabled in the pod
 oc run fedora-pod --image registry.fedoraproject.org/fedora:34 --restart Never --command -- sleep 1000
 oc wait --for=condition=Ready pod/fedora-pod --timeout=300s
