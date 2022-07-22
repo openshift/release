@@ -10,6 +10,17 @@ function run_command() {
     eval "${CMD}"
 }
 
+function set_proxy () {
+    if test -s "${SHARED_DIR}/proxy-conf.sh" ; then
+        echo "setting the proxy"
+        # cat "${SHARED_DIR}/proxy-conf.sh"
+        echo "source ${SHARED_DIR}/proxy-conf.sh"
+        source "${SHARED_DIR}/proxy-conf.sh"
+    else
+        echo "no proxy setting."
+    fi
+}
+
 # In order to the usr can use the ImageStream that the images stores in the Proxy registry.
 # Config the sample operator to retrive the images data from the proxy registry
 function config_samples_operator()
@@ -22,18 +33,7 @@ function config_samples_operator()
     oc delete is ruby httpd -n openshift
 }
 
-function mirror_tag_images () {
-    echo "quay.io/openshift-qe-optional-operators/ocp4-index:latest=MIRROR_REGISTRY_PLACEHOLDER/openshift-qe-optional-operators/ocp4-index:latest
-registry.redhat.io/ubi8/ruby-30:latest=MIRROR_REGISTRY_PLACEHOLDER/ubi8/ruby-30:latest
-registry.redhat.io/ubi8/ruby-27:latest=MIRROR_REGISTRY_PLACEHOLDER/ubi8/ruby-27:latest
-registry.redhat.io/ubi7/ruby-27:latest=MIRROR_REGISTRY_PLACEHOLDER/ubi7/ruby-27:latest
-registry.redhat.io/rhscl/ruby-25-rhel7:latest=MIRROR_REGISTRY_PLACEHOLDER/rhscl/ruby-25-rhel7:latest
-registry.redhat.io/rhscl/mysql-80-rhel7:latest=MIRROR_REGISTRY_PLACEHOLDER/rhscl/mysql-80-rhel7:latest
-registry.redhat.io/rhel8/mysql-80:latest=MIRROR_REGISTRY_PLACEHOLDER/rhel8/mysql-80:latest
-registry.redhat.io/rhel8/httpd-24:latest=MIRROR_REGISTRY_PLACEHOLDER/rhel8/httpd-24:latest
-quay.io/openshifttest/osus-graph-data-container:latest=MIRROR_REGISTRY_PLACEHOLDER/openshifttest/osus-graph-data-container:latest
-" > /tmp/tag_images_list
-
+function config_mirror_auth () {
     run_command "oc extract secret/pull-secret -n openshift-config --confirm --to /tmp"; ret=$?
     if [[ $ret -eq 0 ]]; then
         echo "Get the cluster global pull secret successfully."
@@ -41,19 +41,79 @@ quay.io/openshifttest/osus-graph-data-container:latest=MIRROR_REGISTRY_PLACEHOLD
         echo "!!! Fail to get the cluster global pull secret"
         return 1
     fi
+    # quay.io
+    optional_auth_user=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.user')
+    optional_auth_password=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.password')
+    quay_auth=`echo -n "${optional_auth_user}:${optional_auth_password}" | base64 -w 0`
+    # # brew.registry.redhat.io
+    # reg_brew_user=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.user')
+    # reg_brew_password=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.password')
+    # brew_registry_auth=`echo -n "${reg_brew_user}:${reg_brew_password}" | base64 -w 0`
+    # vmc.mirror-registry.qe.devcluster.openshift.com:5000
+    registry_cred=`head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0`
+    # registry.redhat.io
+    reg_user=$(cat "/var/run/vault/mirror-registry/registry_redhat.json" | jq -r '.user')
+    reg_password=$(cat "/var/run/vault/mirror-registry/registry_redhat.json" | jq -r '.password')
+    registry_auth=`echo -n "${reg_user}:${reg_password}" | base64 -w 0`
 
-    sed -i "s/MIRROR_REGISTRY_PLACEHOLDER/${REGISTRY_HOST}:5000/g" "/tmp/tag_images_list"
-    run_command "cat /tmp/tag_images_list"
-    run_command "oc image mirror -f \"/tmp/tag_images_list\"  --insecure=true -a \"/tmp/.dockerconfigjson\" --skip-missing=true --skip-verification=true --keep-manifest-list=true --filter-by-os='.*'"; ret=$?
+    jq --argjson a "{\"registry.redhat.io\": {\"auth\": \"${registry_auth}\"}, \"quay.io\": {\"auth\": \"$quay_auth\"}, \"${MIRROR_PROXY_REGISTRY}\": {\"auth\": \"$registry_cred\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" > /tmp/new-dockerconfigjson
+
+}
+
+function set_CA_for_nodes () {
+    ca_name=$(oc get image.config.openshift.io/cluster -o=jsonpath="{.spec.additionalTrustedCA.name}")
+    if [ $ca_name ] && [ $ca_name = "registry-config" ] ; then
+        echo "CA is ready, skip config..."
+        return 0
+    fi
+
+    # get the QE additional CA
+    QE_ADDITIONAL_CA_FILE="/var/run/vault/mirror-registry/additional_ca"
+    REGISTRY_HOST=`echo ${MIRROR_PROXY_REGISTRY} | cut -d \: -f 1`
+    # Configuring additional trust stores for image registry access, details: https://docs.openshift.com/container-platform/4.11/registry/configuring-registry-operator.html#images-configuration-cas_configuring-registry-operator
+    run_command "oc create configmap registry-config --from-file=\"${REGISTRY_HOST}..5000\"=${QE_ADDITIONAL_CA_FILE} --from-file=\"${REGISTRY_HOST}..6001\"=${QE_ADDITIONAL_CA_FILE} --from-file=\"${REGISTRY_HOST}..6002\"=${QE_ADDITIONAL_CA_FILE}  -n openshift-config"; ret=$?
     if [[ $ret -eq 0 ]]; then
-        echo "Mirror tag images to the Proxy registry successfully."
+        echo "set the proxy registry ConfigMap successfully."
     else
-        echo "!!! Fail to mirror tag images to the Proxy registry"
-        run_command "cat /tmp/.dockerconfigjson"
+        echo "!!! fail to set the proxy registry ConfigMap"
+        run_command "oc get configmap registry-config -n openshift-config -o yaml"
+        return 1
+    fi
+    run_command "oc patch image.config.openshift.io/cluster --patch '{\"spec\":{\"additionalTrustedCA\":{\"name\":\"registry-config\"}}}' --type=merge"; ret=$?
+    if [[ $ret -eq 0 ]]; then
+        echo "set additionalTrustedCA successfully."
+    else
+        echo "!!! Fail to set additionalTrustedCA"
+        run_command "oc get image.config.openshift.io/cluster -o yaml"
         return 1
     fi
 }
 
+function mirror_tag_images () {
+    echo "registry.redhat.io/ubi8/ruby-30:latest=MIRROR_REGISTRY_PLACEHOLDER/ubi8/ruby-30:latest
+registry.redhat.io/ubi8/ruby-27:latest=MIRROR_REGISTRY_PLACEHOLDER/ubi8/ruby-27:latest
+registry.redhat.io/ubi7/ruby-27:latest=MIRROR_REGISTRY_PLACEHOLDER/ubi7/ruby-27:latest
+registry.redhat.io/rhscl/ruby-25-rhel7:latest=MIRROR_REGISTRY_PLACEHOLDER/rhscl/ruby-25-rhel7:latest
+registry.redhat.io/rhscl/mysql-80-rhel7:latest=MIRROR_REGISTRY_PLACEHOLDER/rhscl/mysql-80-rhel7:latest
+registry.redhat.io/rhel8/mysql-80:latest=MIRROR_REGISTRY_PLACEHOLDER/rhel8/mysql-80:latest
+registry.redhat.io/rhel8/httpd-24:latest=MIRROR_REGISTRY_PLACEHOLDER/rhel8/httpd-24:latest
+" > /tmp/tag_images_list
+
+    sed -i "s/MIRROR_REGISTRY_PLACEHOLDER/${MIRROR_PROXY_REGISTRY}/g" "/tmp/tag_images_list"
+    run_command "cat /tmp/tag_images_list"
+    # run_command "cat ${CLUSTER_PROFILE_DIR}/pull-secret"
+    # # quay.io/openshift-qe-optional-operators
+    # optional_auth_user=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.user')
+    # optional_auth_password=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.password')
+    # optional_auth=`echo -n "${optional_auth_user}:${optional_auth_password}" | base64 -w 0`
+    
+    registry_cred=`head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0`
+    jq --argjson a "{\"${MIRROR_PROXY_REGISTRY}\": {\"auth\": \"$registry_cred\"}}" '.auths |= . + $a' "${CLUSTER_PROFILE_DIR}/pull-secret" > /tmp/new-dockerconfigjson
+    run_command "oc image mirror -f \"/tmp/tag_images_list\"  --insecure=true -a \"/tmp/new-dockerconfigjson\" --skip-missing=true --skip-verification=true --keep-manifest-list=true --filter-by-os='.*'"
+
+}
+
+set_proxy
 run_command "oc get config.samples.operator.openshift.io cluster"; ret=$?
 if [[ $ret -eq 0 ]]; then
     echo "The Sample operator installed in the cluster, continue..."
@@ -62,8 +122,13 @@ else
     return 0
 fi
 
+# vmc.mirror-registry.qe.devcluster.openshift.com:5000
 MIRROR_PROXY_REGISTRY=`head -n 1 "${SHARED_DIR}/mirror_registry_url"`
-# get registry host name, no port
-REGISTRY_HOST=`echo ${MIRROR_PROXY_REGISTRY} | cut -d \: -f 1`
+echo "MIRROR_PROXY_REGISTRY: ${MIRROR_PROXY_REGISTRY}"
+set_CA_for_nodes
+# config_mirror_auth
+unset http_proxy
+unset https_proxy
 mirror_tag_images
+set_proxy
 config_samples_operator

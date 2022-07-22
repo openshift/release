@@ -1,28 +1,27 @@
-postsubmits:
-  openshift/knative-client:
+presubmits:
+  openshift/platform-operators:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-1\.3$
+    - ^main$
+    - ^main-
     cluster: build01
+    context: ci/prow/sanity
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/is-promotion: "true"
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-openshift-knative-client-release-1.3-images
-    path_alias: github.com/knative/client
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-platform-operators-main-sanity
+    rerun_command: /test sanity
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
-        - --promote
         - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
+        - --target=sanity
         command:
         - ci-operator
         image: ci-operator:latest
@@ -38,9 +37,6 @@ postsubmits:
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
-        - mountPath: /etc/push-secret
-          name: push-secret
-          readOnly: true
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
@@ -49,9 +45,7 @@ postsubmits:
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
-      - name: push-secret
-        secret:
-          secretName: registry-push-credentials-ci-central
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )sanity,?($|\s.*)
