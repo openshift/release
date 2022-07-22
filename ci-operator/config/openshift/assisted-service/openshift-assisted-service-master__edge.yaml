@@ -19,10 +19,10 @@ base_images:
     name: ocm-2.6
     namespace: edge-infrastructure
     tag: assisted-test-infra
-  cluster-api-provider-agent:
-    name: ocm-2.6
-    namespace: edge-infrastructure
-    tag: cluster-api-provider-agent
+  cli:
+    name: "4.11"
+    namespace: ocp
+    tag: cli
   coreos_centos_stream8:
     name: stream8
     namespace: coreos
@@ -111,6 +111,30 @@ images:
     RUN go mod vendor
   from: assisted-service-centos9
   to: assisted-service-subsystem
+- dockerfile_literal: |
+    FROM base
+    ENV VIRTUAL_ENV=/opt/venv
+    ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+    COPY --from=quay.io/goswagger/swagger:v0.28.0 /usr/bin/swagger /usr/bin/goswagger
+    RUN cd / && /assisted-service/hack/setup_env.sh spectral && \
+        /assisted-service/hack/setup_env.sh jq && \
+        /assisted-service/hack/setup_env.sh kustomize && \
+        go install github.com/golang/mock/mockgen@v1.5.0 && \
+        go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.6.2 && \
+        go install golang.org/x/tools/cmd/goimports@v0.1.5 && \
+        chmod 775 -R $GOPATH
+    RUN curl --retry 5 -L https://github.com/operator-framework/operator-sdk/releases/download/v1.10.1/operator-sdk_linux_amd64 --output /tmp/operator-sdk_linux_amd64 && \
+        chmod +x /tmp/operator-sdk_linux_amd64 && \
+        install /tmp/operator-sdk_linux_amd64 /usr/local/bin/operator-sdk
+    RUN python3 -m venv ${VIRTUAL_ENV:-/opt/venv} && \
+        python3 -m pip install --upgrade pip && \
+        python3 -m pip install -r /assisted-service/dev-requirements.txt
+  from: assisted-service-centos9
+  inputs:
+    goswagger_swagger:
+      as:
+      - quay.io/goswagger/swagger:v0.28.0
+  to: assisted-service-generate
 - dockerfile_path: Dockerfile.assisted-service-build
   inputs:
     edge_infrastructure_swagger_codegen_cli:
@@ -196,12 +220,12 @@ tests:
   skip_if_only_changed: ^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNER_ALIASES)$
   steps:
     test:
-    - ref: assisted-verify-generated-code
+    - ref: assisted-verify-generated-code-v2
 - as: verify-generated-code-postsubmit
   postsubmit: true
   steps:
     test:
-    - ref: assisted-verify-generated-code
+    - ref: assisted-verify-generated-code-v2
 - as: publish-python-client
   postsubmit: true
   steps:
@@ -818,7 +842,6 @@ tests:
     cluster_profile: packet-assisted
     dependencies:
       HYPERSHIFT_IMAGE: hypershift-operator
-      PROVIDER_IMAGE: cluster-api-provider-agent
     env:
       ASSISTED_CONFIG: |
         KUBE_API=yes
