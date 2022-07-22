@@ -118,8 +118,8 @@ echo "export ENABLE_LOCAL_REGISTRY=true" >> /root/dev-scripts/config_root.sh
 if [[ "${ARCHITECTURE}" == "arm64" ]]; then
   echo "export DOCKER_REGISTRY_IMAGE=quay.io/libpod/registry:2.8" >> /root/dev-scripts/config_root.sh
   echo "export OPENSHIFT_RELEASE_IMAGE=${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" >> /root/dev-scripts/config_root.sh
-  echo "export IRONIC_LOCAL_IMAGE=\$(oc adm release info -a /root/dev-scripts/pull_secret.json \
-    \${OPENSHIFT_RELEASE_IMAGE} -o json | jq -r '.references.spec.tags[] | select(.name=="ironic").from.name')" \
+  echo "export IRONIC_LOCAL_IMAGE=\\\$(oc adm release info -a /root/dev-scripts/pull_secret.json \
+    \\\${OPENSHIFT_RELEASE_IMAGE} -o json | jq -r '.references.spec.tags[] | select(.name==\"ironic\").from.name')" \
     >> /root/dev-scripts/config_root.sh
   echo "export SUSHY_TOOLS_IMAGE=quay.io/multi-arch/sushy-tools:muiltarch" >> /root/dev-scripts/config_root.sh
   echo "export VBMC_IMAGE=quay.io/multi-arch/vbmc:arm" >> /root/dev-scripts/config_root.sh
