@@ -37,7 +37,12 @@ cat > "${HOME}"/start_microshift.sh <<'EOF'
 #!/bin/bash
 set -xeuo pipefail
 
-trap "sudo journalctl -eu microshift" EXIT
+function on_error {
+  sudo journalctl -u microshift
+  sudo journalctl -u crio
+  sudo KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig kubectl cluster-info dump --all-namespaces
+}
+trap on_error EXIT
 
 sudo systemctl enable microshift --now
 
