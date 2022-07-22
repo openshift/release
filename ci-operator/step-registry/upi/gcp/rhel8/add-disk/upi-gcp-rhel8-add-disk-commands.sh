@@ -15,7 +15,7 @@ GCP_DISK_SIZE="${GCP_DISK_SIZE:-"10GB"}"
 
 # Persist disk name for follow-on steps
 
-echo -n "${$GCP_DISK_NAME}" > "${SHARED_DIR}/google_compute_disk_id"
+echo -n "${GCP_DISK_NAME}" > "${SHARED_DIR}/google_compute_disk_id"
 mkdir -p "${HOME}"/.ssh
 mock-nss.sh
 
