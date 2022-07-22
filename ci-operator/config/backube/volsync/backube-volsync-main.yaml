@@ -126,20 +126,50 @@ tests:
     test:
     - as: e2e
       commands: |
-        # TODO: optimize this
-        set -x
+        set -x -e -o pipefail
         KUBECONFIG="${SHARED_DIR}/kubeconfig"
         export KUBECONFIG
-        cp $(echo "${KUBECONFIG}") /go/src/github.com/backube/volsync/test-kuttl/kubeconfig
+        cp "${KUBECONFIG}" /go/src/github.com/backube/volsync/test-kuttl/kubeconfig
+
+        # Configure default StorageClass to be CSI-based
+        oc annotate sc/gp2 storageclass.kubernetes.io/is-default-class-
+        oc annotate sc/gp2-csi storageclass.kubernetes.io/is-default-class="true"
+
+        # Install MinIO for rclone & restic
         ./hack/run-minio.sh
+
+        # Install VolSync
+        helm upgrade --install --create-namespace -n volsync-system \
+          --debug \
+          --set image.image=${VOLSYNC_OPERATOR} \
+          --set rclone.image=${MOVER_RCLONE} \
+          --set restic.image=${MOVER_RESTIC} \
+          --set rsync.image=${MOVER_RSYNC} \
+          --set syncthing.image=${MOVER_SYNCTHING} \
+          --set metrics.disableAuth=true \
+          --wait --timeout=5m \
+          volsync ./helm/volsync
+
+        # Run tests
         make cli
         make test-e2e
+      dependencies:
+      - env: VOLSYNC_OPERATOR
+        name: volsync
+      - env: MOVER_RSYNC
+        name: volsync-mover-rsync
+      - env: MOVER_RCLONE
+        name: volsync-mover-rclone
+      - env: MOVER_RESTIC
+        name: volsync-mover-restic
+      - env: MOVER_SYNCTHING
+        name: volsync-mover-syncthing
       from: src-oc
       resources:
         requests:
           cpu: 500m
           memory: 1Gi
-    workflow: ipi-aws-volsync-csi
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: backube
