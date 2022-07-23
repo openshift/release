@@ -27,7 +27,6 @@ gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute ssh "${INSTANCE_PREFIX}" \
-  --command=" sudo ls /dev/disks/by-id/ && \
-              sudo dnf install -y lvm2 && \
+  --command=" sudo dnf install -y lvm2 && \
               sudo pvcreate ${GCP_DISK_NAME} && \
               sudo vgcreate ${LVM_VOLUME_GROUP} ${GCP_DISK_NAME}"
