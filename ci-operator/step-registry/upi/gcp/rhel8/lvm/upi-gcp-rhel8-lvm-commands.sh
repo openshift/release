@@ -10,7 +10,7 @@ INSTANCE_PREFIX="${NAMESPACE}-${JOB_NAME_HASH}"
 GOOGLE_COMPUTE_ZONE="$(cat "${SHARED_DIR}"/openshift_gcp_compute_zone)"
 
 # Retrieve disk name written by upi-gcp-rhel8-add-disk
-GCP_DISK_NAME="google-$(cat "${SHARED_DIR}"/google_compute_disk_id)"
+GCP_DISK_NAME="$(cat "${SHARED_DIR}"/google_compute_disk_id)"
 
 mkdir -p "${HOME}"/.ssh
 mock-nss.sh
