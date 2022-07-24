@@ -46,6 +46,22 @@ chmod +x "${HOME}"/wait_for_deployment_ready.sh
 
 # restart the VM
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute instances start "${INSTANCE_PREFIX}" --zone "${GOOGLE_COMPUTE_ZONE}"
+
+# Steps may not be used more than once in a test.  This block duplicates the behavior of wait-for-ssh for reboot tests.
+timeout=300
+start=$(date +"%s")
+until LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  rhel8user@"${INSTANCE_PREFIX}" \
+  --command 'echo Hello, CI';
+do
+  if (( $(date +"%s") - $start >= $timeout )); then
+    echo "timed out out waiting for ssh connection" >&2
+    exit 1
+  fi
+  echo "waiting for ssh connection"
+done
+
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
