@@ -259,7 +259,20 @@ tests:
       commands: |
         /usr/bin/openshift-ci.sh destroy eks
       credentials:
-      - mount_path: /tmp/secret/stackrox-automation-flavors
+      - mount_path: /tmp/vault/stackrox-automation-flavors
+        name: stackrox-automation-flavors
+        namespace: test-credentials
+      from: eks
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+    pre:
+    - as: eks-destroy
+      commands: |
+        /usr/bin/openshift-ci.sh create eks
+      credentials:
+      - mount_path: /tmp/vault/stackrox-automation-flavors
         name: stackrox-automation-flavors
         namespace: test-credentials
       from: eks
@@ -268,39 +281,22 @@ tests:
           cpu: 2000m
           memory: 4000Mi
     test:
-    - as: eks-create
-      commands: |
-        /usr/bin/openshift-ci.sh create eks || true
-        set -x
-        echo "$SHARED_DIR"
-        ls -l "$SHARED_DIR" || true
-        cp /tmp/data/eks-kube.yaml "$SHARED_DIR" || true
-        ls -l "$SHARED_DIR" || true
-        touch /tmp/hold
-        while [[ -e /tmp/hold ]]; do
-            info "Holding this job for debug"
-            sleep 60
-        done
-      credentials:
-      - mount_path: /tmp/secret/stackrox-automation-flavors
-        name: stackrox-automation-flavors
-        namespace: test-credentials
-      from: eks
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 4000Mi
     - as: hack
       commands: |
-        kubectl get nodes -o wide || true
+        echo "SHARED_DIR: ${SHARED_DIR:-}"
+        ls -l "${SHARED_DIR:-}"
+        KUBECONFIG="${SHARED_DIR:-}/kubeconfig" kubectl get nodes -o wide || true
         touch /tmp/hold
         while [[ -e /tmp/hold ]]; do
             info "Holding this job for debug"
             sleep 60
         done
       credentials:
-      - mount_path: /tmp/secret/stackrox-stackrox-e2e-tests
+      - mount_path: /tmp/vault/stackrox-stackrox-e2e-tests
         name: stackrox-stackrox-e2e-tests
+        namespace: test-credentials
+      - mount_path: /tmp/vault/stackrox-automation-flavors
+        name: stackrox-automation-flavors
         namespace: test-credentials
       from: src
       resources:
