@@ -77,26 +77,31 @@ mkdir -p "\${REPO_DIR}"
 mkdir -p "\${REPO_DIR}"/minikube_home
 echo "export MINIKUBE_HOME=\${REPO_DIR}/minikube_home" >> /root/config
 
-# NVMe makes it faster
-NVME_DEVICE="/dev/nvme0n1"
-if [ -e "\$NVME_DEVICE" ];
+PACKET_PLAN=\$(curl --retry 5 --silent "https://metadata.platformequinix.com/metadata" | jq -r ".plan")
+if [ "\${PACKET_PLAN}" = "m3.large.x86" ]
 then
+  # NVMe makes it faster
+  NVME_DEVICE="/dev/nvme0n1"
   mkfs.xfs -f "\${NVME_DEVICE}"
   mount "\${NVME_DEVICE}" "\${REPO_DIR}"
-fi
-
-# create a big enough swap file if memory overcommit is required
-REQUIRED_MEMORY_GB="${REQUIRED_MEMORY_GB:-0}"
-TOTAL_MEMORY_GB=\$(free --giga | grep -oP '\d+' | head -n 1)
-if [ "\${REQUIRED_MEMORY_GB}" -gt "\${TOTAL_MEMORY_GB}" ]
+elif [ "\${PACKET_PLAN}" = "c3.medium.x86" ]
 then
-  # Create a swap file on the NVME device
-  SWAP_SIZE_GB=\$(( (REQUIRED_MEMORY_GB - TOTAL_MEMORY_GB) * 4 )) # may need to be refined
-  fallocate -l "\${SWAP_SIZE_GB}G" "\${REPO_DIR}/swapfile"
-  chmod 600 "\${REPO_DIR}/swapfile"
-  mkswap "\${REPO_DIR}/swapfile"
-  swapon "\${REPO_DIR}/swapfile"
-  swapon --show
+  # c3.medium.x86 has 64GB of RAM which is not enough for most of assisted jobs
+  # we need to mount extra swap space in order over commit memory with libvirt/KVM
+  # the machine has 2x240G disks (one is used for the system) and 2x480GB disks
+
+  # Get disk where / is mounted
+  ROOT_DISK=\$(lsblk -o pkname --noheadings --path | grep -E "^\S+" | sort | uniq)
+
+  # Setup the smallest disk available (240GB) as swap
+  SWAP_DISK=\$(lsblk -o name --noheadings --sort size --path | grep -v "\${ROOT_DISK}" | head -n1)
+  mkswap "\${SWAP_DISK}"
+  swapon "\${SWAP_DISK}"
+
+  # Setup the largest disk available (480GB) for assisted tests
+  REPO_DISK=\$(lsblk -o name --noheadings --sort size --path | grep -v "\${ROOT_DISK}" | tail -n1)
+  mkfs.xfs -f "\${REPO_DISK}"
+  mount "\${REPO_DISK}" "\${REPO_DIR}"
 fi
 
 tar -xzvf assisted.tar.gz -C "\${REPO_DIR}"
