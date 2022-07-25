@@ -24,7 +24,6 @@ EOF
 
 cat >> create_aws_bucket.tf << EOF
 provider "aws" {
-  profile = "default"
   region = "us-east-2"
   access_key = "${QUAY_AWS_ACCESS_KEY}"
   secret_key = "${QUAY_AWS_SECRET_KEY}"
