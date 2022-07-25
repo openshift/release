@@ -48,12 +48,19 @@ resources:
 tests:
 - as: test-unit
   commands: |
-    export SELF="make -f Makefile.prow"
-    make -f Makefile.prow unit-tests
+    export ocm_dir=$(mktemp -d -t ocm-XXXXX)
+    export HOME="$ocm_dir"
+    export SELF="make -f Makefile"
+    make -f Makefile test
   container:
     from: src
 - as: sonar-pre-submit
   commands: |
+    export ocm_dir=$(mktemp -d -t ocm-XXXXX)
+    export HOME="$ocm_dir"
+    make envtest
+    export SONAR_GO_TEST_ARGS=$(go list ./... | grep -E -v test | tr "\n" " ")
+    echo "SONAR_GO_TEST_ARGS=$SONAR_GO_TEST_ARGS"
     export SELF="make -f Makefile.prow"
     make -f Makefile.prow sonar/go/prow
   container:
@@ -63,6 +70,11 @@ tests:
     name: acm-sonarcloud-token
 - as: sonar-post-submit
   commands: |
+    export ocm_dir=$(mktemp -d -t ocm-XXXXX)
+    export HOME="$ocm_dir"
+    make envtest
+    export SONAR_GO_TEST_ARGS=$(go list ./... | grep -E -v test | tr "\n" " ")
+    echo "SONAR_GO_TEST_ARGS=$SONAR_GO_TEST_ARGS"
     export SELF="make -f Makefile.prow"
     make -f Makefile.prow sonar/go/prow
   container:
