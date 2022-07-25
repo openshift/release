@@ -35,7 +35,9 @@ gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
-  --command 'sudo rpm --rebuilddb || { sudo ps aux | grep rpm && exit 1; }'
+  --command 'sudo ps aux | grep rpm'
+
+sleep 10000000000
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
