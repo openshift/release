@@ -26,6 +26,12 @@ images:
 - build_args:
   - name: ROX_PRODUCT_BRANDING
     value: RHACS_BRANDING
+  dockerfile_path: .openshift-ci/build/Dockerfile.build-operator-artifacts
+  from: src
+  to: operator-artifacts
+- build_args:
+  - name: ROX_PRODUCT_BRANDING
+    value: RHACS_BRANDING
   dockerfile_path: Dockerfile.gen
   from: ubi-minimal
   inputs:
@@ -59,10 +65,57 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/stackrox/stackrox/docs/.
   to: docs
+- build_args:
+  - name: GO_VERSION
+    value: 1.17.2
+  - name: ROX_IMAGE_FLAVOR
+    value: development_build
+  dockerfile_path: operator/Dockerfile
+  inputs:
+    operator-artifacts:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/stackrox/stackrox/.
+  to: operator-controller
+- dockerfile_path: bundle.Dockerfile
+  inputs:
+    operator-artifacts:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/stackrox/stackrox/operator/.
+  to: operator-bundle
+- dockerfile_path: rhacs-operator-index.Dockerfile
+  inputs:
+    operator-artifacts:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/stackrox/stackrox/operator/build/index/.
+  to: operator-bundle-index
+- build_args:
+  - name: ROX_PRODUCT_BRANDING
+    value: RHACS_BRANDING
+  - name: RACE_CONDITION_DEBUG
+    value: "true"
+  dockerfile_path: .openshift-ci/build/Dockerfile.build-main-and-bundle
+  from: src
+  to: main-rcd-bundle
+- build_args:
+  - name: ROX_PRODUCT_BRANDING
+    value: RHACS_BRANDING
+  dockerfile_path: Dockerfile.gen
+  from: ubi-minimal
+  inputs:
+    main-rcd-bundle:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/stackrox/stackrox/image/rhel/.
+  to: main-rcd
 promotion:
   excluded_images:
   - main-bundle
   - central-db-bundle
+  - main-rcd-bundle
+  - operator-artifacts
   namespace: stackrox
   tag: latest
 resources:
@@ -90,6 +143,14 @@ tests:
         name: central-db
       - env: PIPELINE_DOCS_IMAGE
         name: docs
+      - env: MAIN_RCD_IMAGE
+        name: main-rcd
+      - env: OPERATOR_IMAGE
+        name: operator-controller
+      - env: OPERATOR_BUNDLE_IMAGE
+        name: operator-bundle
+      - env: OPERATOR_BUNDLE_INDEX_MAGE
+        name: operator-bundle-index
       from: src
       resources:
         requests:
@@ -172,26 +233,26 @@ tests:
   steps:
     test:
     - ref: stackrox-e2e
-  timeout: 3h30m0s
+  timeout: 5h0m0s
 - as: openshift-4-qa-e2e-tests
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
-    timeout: 3h30m0s
+    timeout: 5h0m0s
     version: "4.8"
   optional: true
   steps:
     test:
     - ref: stackrox-e2e
-  timeout: 3h30m0s
+  timeout: 5h0m0s
 - as: gke-ui-e2e-tests
   optional: true
   steps:
     test:
     - ref: stackrox-e2e
-  timeout: 2h30m0s
+  timeout: 5h0m0s
 - as: gke-nongroovy-e2e-tests
   optional: true
   steps:
@@ -202,7 +263,7 @@ tests:
   steps:
     test:
     - ref: stackrox-e2e
-  timeout: 3h30m0s
+  timeout: 5h0m0s
 - as: gke-upgrade-tests
   optional: true
   steps:
@@ -213,7 +274,13 @@ tests:
   steps:
     test:
     - ref: stackrox-e2e
-  timeout: 3h30m0s
+  timeout: 5h0m0s
+- as: gke-race-condition-qa-e2e-tests
+  optional: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+  timeout: 5h0m0s
 - as: gke-scale-tests
   optional: true
   steps:
@@ -224,11 +291,19 @@ tests:
   steps:
     test:
     - ref: stackrox-e2e
-- as: operator-e2e-tests
+- as: openshift-4-operator-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h10m0s
+    version: "4.8"
   optional: true
   steps:
     test:
     - ref: stackrox-e2e
+  timeout: 2h0m0s
 - as: local-roxctl-tests
   optional: true
   steps:
@@ -253,6 +328,8 @@ tests:
         name: central-db
       - env: PIPELINE_DOCS_IMAGE
         name: docs
+      - env: MAIN_RCD_IMAGE
+        name: main-rcd
       from: src
       resources:
         requests:
@@ -358,14 +435,14 @@ tests:
       QA_TEST_TARGET: test
     test:
     - ref: stackrox-e2e
-  timeout: 3h30m0s
+  timeout: 5h0m0s
 - as: merge-openshift-4-qa-e2e-tests
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
-    timeout: 3h30m0s
+    timeout: 5h0m0s
     version: "4.8"
   postsubmit: true
   steps:
@@ -373,13 +450,13 @@ tests:
       QA_TEST_TARGET: test
     test:
     - ref: stackrox-e2e
-  timeout: 3h30m0s
+  timeout: 5h0m0s
 - as: merge-gke-ui-e2e-tests
   postsubmit: true
   steps:
     test:
     - ref: stackrox-e2e
-  timeout: 2h30m0s
+  timeout: 5h0m0s
 - as: merge-gke-nongroovy-e2e-tests
   postsubmit: true
   steps:
@@ -390,7 +467,7 @@ tests:
   steps:
     test:
     - ref: stackrox-e2e
-  timeout: 3h30m0s
+  timeout: 5h0m0s
 - as: merge-gke-upgrade-tests
   postsubmit: true
   steps:
@@ -401,7 +478,13 @@ tests:
   steps:
     test:
     - ref: stackrox-e2e
-  timeout: 3h30m0s
+  timeout: 5h0m0s
+- as: merge-gke-race-condition-qa-e2e-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+  timeout: 5h0m0s
 - as: merge-gke-scale-tests
   postsubmit: true
   steps:
@@ -412,11 +495,19 @@ tests:
   steps:
     test:
     - ref: stackrox-e2e
-- as: merge-operator-e2e-tests
+- as: merge-openshift-4-operator-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h10m0s
+    version: "4.8"
   postsubmit: true
   steps:
     test:
     - ref: stackrox-e2e
+  timeout: 2h0m0s
 - as: merge-local-roxctl-tests
   postsubmit: true
   steps:
@@ -441,6 +532,8 @@ tests:
         name: central-db
       - env: PIPELINE_DOCS_IMAGE
         name: docs
+      - env: MAIN_RCD_IMAGE
+        name: main-rcd
       from: src
       resources:
         requests:
@@ -464,14 +557,14 @@ tests:
       QA_TEST_TARGET: test
     test:
     - ref: stackrox-e2e
-  timeout: 4h0m0s
+  timeout: 5h0m0s
 - as: nightly-openshift-4-qa-e2e-tests
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
-    timeout: 4h0m0s
+    timeout: 5h0m0s
     version: "4.8"
   cron: 0 5 * * *
   steps:
@@ -479,13 +572,13 @@ tests:
       QA_TEST_TARGET: test
     test:
     - ref: stackrox-e2e
-  timeout: 4h0m0s
+  timeout: 5h0m0s
 - as: nightly-gke-ui-e2e-tests
   cron: 0 5 * * *
   steps:
     test:
     - ref: stackrox-e2e
-  timeout: 2h30m0s
+  timeout: 5h0m0s
 - as: nightly-gke-nongroovy-e2e-tests
   cron: 0 5 * * *
   steps:
@@ -496,7 +589,13 @@ tests:
   steps:
     test:
     - ref: stackrox-e2e
-  timeout: 3h30m0s
+  timeout: 5h0m0s
+- as: nightly-gke-race-condition-qa-e2e-tests
+  cron: 0 5 * * *
+  steps:
+    test:
+    - ref: stackrox-e2e
+  timeout: 5h0m0s
 - as: nightly-gke-upgrade-tests
   cron: 0 5 * * *
   steps:
@@ -507,11 +606,19 @@ tests:
   steps:
     test:
     - ref: stackrox-e2e
-- as: nightly-operator-e2e-tests
+- as: nightly-openshift-4-operator-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h10m0s
+    version: "4.8"
   cron: 0 5 * * *
   steps:
     test:
     - ref: stackrox-e2e
+  timeout: 2h0m0s
 - as: nightly-local-roxctl-tests
   cron: 0 5 * * *
   steps:

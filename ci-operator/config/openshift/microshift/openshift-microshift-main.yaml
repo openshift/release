@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.8"
+    name: "4.10"
     namespace: ocp
     tag: cli
   libvirt-installer:
@@ -8,7 +8,7 @@ base_images:
     namespace: ocp
     tag: libvirt-installer
   test-bin:
-    name: "4.8"
+    name: "4.10"
     namespace: ocp
     tag: tests
 build_root:
@@ -17,8 +17,6 @@ build_root:
     namespace: openshift
     tag: rhel-8-release-golang-1.17-openshift-4.10
 images:
-- dockerfile_path: packaging/images/microshift/Dockerfile
-  to: linux-amd64-4.8.0-0.microshift
 - dockerfile_literal: |
     FROM libvirt-installer
     USER root
@@ -96,7 +94,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: "4.8"
+  name: "4.10"
   namespace: ocp
 tests:
 - as: verify
@@ -113,67 +111,56 @@ tests:
     from: src
   run_if_changed: ^(rpm/*|packaging/.*|Makefile)
 - as: e2e-rpm-install
-  optional: true
   run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
   steps:
     cluster_profile: gcp
     workflow: openshift-microshift-e2e-rpm-install
 - as: e2e-openshift-conformance-sig-api-machinery
-  optional: true
   run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
   steps:
     cluster_profile: gcp
     workflow: openshift-microshift-e2e-openshift-conformance-sig-api-machinery
 - as: e2e-openshift-conformance-sig-apps
-  optional: true
   run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
   steps:
     cluster_profile: gcp
     workflow: openshift-microshift-e2e-openshift-conformance-sig-apps
 - as: e2e-openshift-conformance-sig-arch
-  optional: true
   run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
   steps:
     cluster_profile: gcp
     workflow: openshift-microshift-e2e-openshift-conformance-sig-arch
 - as: e2e-openshift-conformance-sig-auth
-  optional: true
   run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod)|Makefile
   steps:
     cluster_profile: gcp
     workflow: openshift-microshift-e2e-openshift-conformance-sig-auth
 - as: e2e-openshift-conformance-sig-cli
-  optional: true
   run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
   steps:
     cluster_profile: gcp
     workflow: openshift-microshift-e2e-openshift-conformance-sig-cli
 - as: e2e-openshift-conformance-sig-instrumentation
-  optional: true
   run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
   steps:
     cluster_profile: gcp
     workflow: openshift-microshift-e2e-openshift-conformance-sig-instrumentation
 - as: e2e-openshift-conformance-sig-network
-  optional: true
   run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
   steps:
     cluster_profile: gcp
     workflow: openshift-microshift-e2e-openshift-conformance-sig-network
 - as: e2e-openshift-conformance-sig-node
-  optional: true
   run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
   steps:
     cluster_profile: gcp
     workflow: openshift-microshift-e2e-openshift-conformance-sig-node
 - as: e2e-openshift-conformance-sig-scheduling
-  optional: true
   run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
   steps:
     cluster_profile: gcp
     workflow: openshift-microshift-e2e-openshift-conformance-sig-scheduling
 - as: e2e-openshift-conformance-sig-storage
-  optional: true
   run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
   steps:
     cluster_profile: gcp

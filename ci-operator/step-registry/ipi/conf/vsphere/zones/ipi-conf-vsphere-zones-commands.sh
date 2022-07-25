@@ -38,13 +38,14 @@ controlPlane:
        - "us-east-3"
 compute:
 - name: "worker"
-  replicas: 3
+  replicas: 4
   platform:
     vsphere:
       zones:
        - "us-east-1"
        - "us-east-2"
        - "us-east-3"
+       - "us-west-1"
 platform:
   vsphere:
     apiVIP: "${vips[0]}"
@@ -157,7 +158,7 @@ metadata:
   name: sc-zone-us-east-1a
 allowedTopologies:
 - matchLabelExpressions:
-  - key: topology.kubernetes.io/zone: us-east-1a
+  - key: topology.kubernetes.io/zone
     values:
     - us-east-1a
 parameters:
@@ -174,17 +175,10 @@ metadata:
   name: cluster-monitoring-config
   namespace: openshift-monitoring
 data:
-  config.yaml: |
+  config.yaml:
     prometheusK8s:
       volumeClaimTemplate:
-        metadata:
-          name: prometheus-data
-          annotations:
-            openshift.io/cluster-monitoring-drop-pvc: "yes"
-       spec:
-         storageClassName: sc-zone-us-east-1a
-         resources:
-           requests:
-             storage: 20Gi
+        spec:
+          storageClassName: sc-zone-us-east-1a
 EOF
 

@@ -93,6 +93,14 @@ spec:
       for: 5m
       labels:
         severity: critical
+    - alert: dptp-controller-managerDown
+      annotations:
+        message: The service dptp-controller-manager has been down for 5 minutes.
+      expr: |
+        absent(up{job="dptp-controller-manager"} == 1)
+      for: 5m
+      labels:
+        severity: critical
     - alert: crierDown
       annotations:
         message: The service crier has been down for 5 minutes.
@@ -114,16 +122,6 @@ spec:
         message: The service pod-scaler-ui has been down for 5 minutes.
       expr: |
         absent(up{job="pod-scaler-ui"} == 1)
-      for: 5m
-      labels:
-        severity: critical
-  - name: ci-absent-pod-monitor
-    rules:
-    - alert: dptp-controller-manager-down
-      annotations:
-        message: The service dptp-controller-manager has been down for 5 minutes.
-      expr: |
-        absent(up{job="prow-monitoring/dptp-controller-manager"} == 1)
       for: 5m
       labels:
         severity: critical
@@ -502,6 +500,15 @@ spec:
       annotations:
         message: Release-controller has reported errors in bugzilla verification.
       expr: rate(release_controller_bugzilla_errors_total[5m]) > 0
+      labels:
+        severity: critical
+        team: release-controller
+  - name: release-controller-jira-errors
+    rules:
+    - alert: releaseControllerJiraError
+      annotations:
+        message: Release-controller has reported errors in jira verification.
+      expr: rate(release_controller_jira_errors_total[5m]) > 0
       labels:
         severity: critical
         team: release-controller

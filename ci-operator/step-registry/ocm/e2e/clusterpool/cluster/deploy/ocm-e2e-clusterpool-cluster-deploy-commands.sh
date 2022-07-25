@@ -179,6 +179,7 @@ fi
 release=${release#release-}
 
 # Based on release, stomp on PIPELINE_STAGE since we changed defaults midstream in 2.5
+log "PIPELINE_STAGE=${PIPELINE_STAGE}"
 if [[ $release = "2.0" ]]; then
   PIPELINE_STAGE="edge"
 elif [[ $release = "2.1" ]]; then
@@ -190,9 +191,9 @@ elif [[ $release = "2.3" ]]; then
 elif [[ $release = "2.4" ]]; then
   PIPELINE_STAGE="edge"
 else
-  PIPELINE_STAGE="dev"
+  PIPELINE_STAGE=${PIPELINE_STAGE:-"dev"}
 fi
-log "Based on release ${release}, overriding your PIPELINE_STAGE override to: $PIPELINE_STAGE"
+log "Based on release ${release}, setting your PIPELINE_STAGE to: $PIPELINE_STAGE"
 
 # Get pipeline branch.
 pipeline_branch="${release}-${PIPELINE_STAGE}"

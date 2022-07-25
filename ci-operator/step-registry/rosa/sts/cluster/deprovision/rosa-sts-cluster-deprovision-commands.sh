@@ -41,10 +41,10 @@ while rosa describe cluster -c "${CLUSTER_ID}" ; do
   sleep 60
 done
 
-echo "Deleting operator"
+echo "Deleting operator roles"
 rosa delete operator-roles -c "${CLUSTER_ID}" -y -m auto
 echo "Deleting oidc-provider"
-rosa delete oidc-providers -c "${CLUSTER_ID}" -y -m auto
+rosa delete oidc-provider -c "${CLUSTER_ID}" -y -m auto
 
 echo "Cluster is no longer accessible; delete successful"
 exit 0
