@@ -170,36 +170,6 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
-- as: subsystem-aws-periodic
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.8"
-  cron: 0 0 */3 * *
-  steps:
-    allow_best_effort_post_steps: true
-    test:
-    - as: subsystem-deploy-and-run
-      cli: latest
-      commands: |
-        export BUILD_TYPE=CI
-        export REPORTS=${ARTIFACT_DIR}
-        export TARGET=oc
-
-        make deploy-on-openshift-ci
-        make test
-      dependencies:
-      - env: SERVICE
-        name: assisted-service
-      from: test-bin
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: generic-claim
 - as: subsystem-kubeapi-aws
   cluster_claim:
     architecture: amd64
@@ -209,38 +179,6 @@ tests:
     timeout: 1h0m0s
     version: "4.8"
   run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
-  steps:
-    allow_best_effort_post_steps: true
-    test:
-    - as: subsystem-deploy-and-run
-      cli: latest
-      commands: |
-        export BUILD_TYPE=CI
-        export REPORTS=${ARTIFACT_DIR}
-        export TARGET=oc
-        export GENERATE_CRD=false
-
-        make deploy-on-openshift-ci
-        make enable-kube-api-for-subsystem
-        make test-kube-api
-      dependencies:
-      - env: SERVICE
-        name: assisted-service
-      from: test-bin
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: generic-claim
-- as: subsystem-kubeapi-aws-periodic
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.8"
-  cron: 0 0 */3 * *
   steps:
     allow_best_effort_post_steps: true
     test:
@@ -282,43 +220,8 @@ tests:
       IP_STACK: v4
       NUM_EXTRA_WORKERS: "1"
     workflow: assisted-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-periodic
-  cron: 0 0 */3 * *
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      DEVSCRIPTS_CONFIG: |
-        EXTRA_WORKER_VCPU=8
-        EXTRA_WORKER_MEMORY=32768
-        EXTRA_WORKER_DISK=120
-        PROVISIONING_NETWORK_PROFILE=Disabled
-        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
-      DISCONNECTED: "false"
-      IP_STACK: v4
-      NUM_EXTRA_WORKERS: "1"
-    workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-3masters
   optional: true
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
-    env:
-      ASSISTED_ZTP_CONFIG: |
-        SPOKE_CONTROLPLANE_AGENTS=3
-      DEVSCRIPTS_CONFIG: |
-        EXTRA_WORKER_VCPU=8
-        EXTRA_WORKER_MEMORY=32768
-        EXTRA_WORKER_DISK=120
-        PROVISIONING_NETWORK_PROFILE=Disabled
-        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
-      DISCONNECTED: "false"
-      IP_STACK: v4
-      NUM_EXTRA_WORKERS: "3"
-    workflow: assisted-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-3masters-periodic
-  cron: 0 0 */3 * *
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -355,24 +258,6 @@ tests:
       IP_STACK: v4v6
       NUM_EXTRA_WORKERS: "1"
     workflow: assisted-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-ipv4v6-sno-ocp-49-periodic
-  cron: 0 0 */3 * *
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-    env:
-      DEVSCRIPTS_CONFIG: |
-        EXTRA_WORKER_VCPU=8
-        EXTRA_WORKER_MEMORY=32768
-        EXTRA_WORKER_DISK=120
-        PROVISIONING_NETWORK_PROFILE=Disabled
-        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
-      DISCONNECTED: "false"
-      IP_STACK: v4v6
-      NUM_EXTRA_WORKERS: "1"
-    workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-ipv4v6-3masters-ocp-48
   optional: true
   steps:
@@ -393,48 +278,8 @@ tests:
       IP_STACK: v4v6
       NUM_EXTRA_WORKERS: "3"
     workflow: assisted-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-ipv4v6-3masters-ocp-48-periodic
-  cron: '@weekly'
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate
-    env:
-      ASSISTED_ZTP_CONFIG: |
-        SPOKE_CONTROLPLANE_AGENTS=3
-      DEVSCRIPTS_CONFIG: |
-        EXTRA_WORKER_VCPU=8
-        EXTRA_WORKER_MEMORY=32768
-        EXTRA_WORKER_DISK=120
-        PROVISIONING_NETWORK_PROFILE=Disabled
-        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
-      DISCONNECTED: "false"
-      IP_STACK: v4v6
-      NUM_EXTRA_WORKERS: "3"
-    workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-ipv4v6-3masters-ocp-49
   optional: true
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-    env:
-      ASSISTED_ZTP_CONFIG: |
-        SPOKE_CONTROLPLANE_AGENTS=3
-      DEVSCRIPTS_CONFIG: |
-        EXTRA_WORKER_VCPU=8
-        EXTRA_WORKER_MEMORY=32768
-        EXTRA_WORKER_DISK=120
-        PROVISIONING_NETWORK_PROFILE=Disabled
-        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
-      DISCONNECTED: "false"
-      IP_STACK: v4v6
-      NUM_EXTRA_WORKERS: "3"
-    workflow: assisted-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-ipv4v6-3masters-ocp-49-periodic
-  cron: 0 0 */3 * *
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -529,21 +374,6 @@ tests:
         export TEST_FUNC=test_kube_api_late_binding_ipv4_single_node
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
         make deploy_assisted_operator test_parallel
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-kube-api-late-binding-single-node-periodic
-  cron: 0 0 */3 * *
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.4
-      POST_INSTALL_COMMANDS: |
-        export INDEX_IMAGE=quay.io/edge-infrastructure/assisted-service-index:ocm-2.4
-        export TEST=./discovery-infra/tests/test_kube_api.py
-        export TEST_FUNC=test_kube_api_late_binding_ipv4_single_node
-        export KUBECONFIG=$(find ${KUBECONFIG} -type f)
-        make deploy_assisted_operator test_parallel
-      TEST_SUITE: full
     workflow: assisted-baremetal
 - as: operator-catalog-publish-to-quay
   postsubmit: true
