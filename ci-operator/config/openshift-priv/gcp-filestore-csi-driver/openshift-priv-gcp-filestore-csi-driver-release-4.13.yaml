@@ -3,13 +3,22 @@ base_images:
     name: 4.13-priv
     namespace: ocp-private
     tag: base
+  ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.18-openshift-4.12
 binary_build_commands: make
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
+  from_repository: true
 canonical_go_repository: github.com/openshift/gcp-filestore-csi-driver
+images:
+- dockerfile_path: Dockerfile.openshift
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+  to: gcp-filestore-csi-driver
 promotion:
   name: 4.13-priv
   namespace: ocp-private

@@ -191,6 +191,31 @@ EOF
   /tmp/fcct --pretty --strict -d "${config_dir}" "${config_dir}/fcct.yml" > "${dir}/bootstrap.ign"
 }
 
+# inject_boot_diagnostics is an azure specific function for enabling boot diagnostics on Azure workers.
+function inject_boot_diagnostics() {
+  local dir=${1}
+
+  if [ ! -f /tmp/yq ]; then
+    curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
+  fi
+
+  PATCH="${SHARED_DIR}/machinesets-boot-diagnostics.yaml.patch"
+  cat > "${PATCH}" << EOF
+spec:
+  template:
+    spec:
+      providerSpec:
+        value:
+          diagnostics:
+            boot:
+              storageAccountType: AzureManaged
+EOF
+
+  for MACHINESET in $dir/openshift/99_openshift-cluster-api_worker-machineset-*.yaml; do
+    /tmp/yq m -x -i "${MACHINESET}" "${PATCH}"
+  done
+}
+
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 trap 'prepare_next_steps' EXIT TERM
 
@@ -249,6 +274,11 @@ echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
 openshift-install --dir="${dir}" create manifests &
 wait "$!"
+
+# Platform specific manifests adjustments
+case "${CLUSTER_TYPE}" in
+azure4) inject_boot_diagnostics ${dir} ;;
+esac
 
 sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
 
