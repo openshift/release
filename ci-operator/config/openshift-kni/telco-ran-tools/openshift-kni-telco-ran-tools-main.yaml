@@ -1,18 +1,38 @@
+base_images:
+  tools:
+    name: "4.12"
+    namespace: ocp
+    tag: tools
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: golang-1.17
+images:
+- dockerfile_path: Dockerfile
+  from: tools
+  to: telco-ran-tools
+promotion:
+  name: telco-ran-tools
+  namespace: ocp-kni
+releases:
+  initial:
+    integration:
+      name: "4.12"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.12"
+      namespace: ocp
 resources:
   '*':
-    limits:
-      memory: 4Gi
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
 - as: ci-unit
-  commands: make test-unit
+  commands: go test ./cmd/...
   container:
     from: src
 zz_generated_metadata:
