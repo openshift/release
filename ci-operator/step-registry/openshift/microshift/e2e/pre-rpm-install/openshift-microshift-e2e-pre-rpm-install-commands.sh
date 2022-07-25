@@ -37,6 +37,13 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJE
   rhel8user@"${INSTANCE_PREFIX}" \
   --command 'sudo ps aux | grep rpm'
 
+# rpm --rebuilddb is required to prevent rpm / dnf / subscription-manager ops from failing
+#   because of  "BDB0091 DB_VERSION_MISMATCH: Database environment version mismatch"
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  rhel8user@"${INSTANCE_PREFIX}" \
+  --command 'sudo rpm --rebuilddb'
+
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
