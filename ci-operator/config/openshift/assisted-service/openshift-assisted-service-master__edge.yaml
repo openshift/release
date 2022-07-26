@@ -201,6 +201,12 @@ releases:
       product: ocp
       stream: nightly
       version: "4.11"
+  candidate-4-11-multi:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.11"
   latest:
     integration:
       include_built_images: true
@@ -642,6 +648,30 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate-4-11
     env:
       ALLOW_CONVERGED_FLOW: "True"
+    workflow: assisted-baremetal-operator-ztp
+- as: e2e-ai-operator-ztp-multiarch-3masters-ocp-411
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate-4-11-multi
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      ASSISTED_ZTP_CONFIG: |
+        SPOKE_CONTROLPLANE_AGENTS=3
+      NUM_EXTRA_WORKERS: "3"
+    workflow: assisted-baremetal-operator-ztp
+- as: e2e-ai-operator-ztp-multiarch-sno-ocp-411
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate-4-11-multi
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      ASSISTED_ZTP_CONFIG: |
+        SPOKE_CONTROLPLANE_AGENTS=1
+      NUM_EXTRA_WORKERS: "1"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-metal-assisted-tpmv2
   optional: true
