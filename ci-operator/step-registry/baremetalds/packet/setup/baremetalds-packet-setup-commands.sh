@@ -98,7 +98,7 @@ ansible-playbook packet-config.yaml |& gawk '{ print strftime("%Y-%m-%d %H:%M:%S
 function getCIR(){
     ## Gather some understanding about ofcir and then potentially update/remove this.
     if [ "${ARCHITECTURE}" == "arm64" ]; then
-      return 0
+      return 1
     fi
 
     OFCIRURL=$1

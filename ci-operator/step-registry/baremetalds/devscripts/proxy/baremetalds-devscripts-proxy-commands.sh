@@ -39,12 +39,6 @@ sudo systemctl start firewalld
 sudo firewall-cmd --add-port=8213/tcp --permanent
 sudo firewall-cmd --reload
 
-SQUID_IMAGE=quay.io/sameersbn/squid:latest
-if [ "${ARCHITECTURE}" == "arm64" ]; then
-  # Test image reference, will update at a later date
-  SQUID_IMAGE=quay.io/openshifttest/squid-proxy:multiarch
-fi
-
 EXTRAVOLUMES=
 if [[ "$CLUSTERTYPE" == "baremetal" ]] ; then
     EXTRAVOLUMES="--volume /etc/resolv.conf:/etc/resolv.conf"
@@ -57,7 +51,7 @@ sudo podman run -d --rm \
      --volume \$HOME/squid.conf:/etc/squid/squid.conf \$EXTRAVOLUMES \
      --name external-squid \
      --dns 127.0.0.1 \
-     \$SQUID_IMAGE
+     quay.io/openshifttest/squid-proxy:multiarch
 EOF
 
 cat <<EOF> "${SHARED_DIR}/proxy-conf.sh"
