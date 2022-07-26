@@ -616,6 +616,21 @@ images:
 - dockerfile_literal: |-
     FROM quay.io/centos/centos:stream8
     RUN dnf install -y git && dnf clean all && rm -rf /var/cache/dnf
+    ADD job-run-aggregator /usr/bin/job-run-aggregator
+    ADD prcreator /usr/bin/prcreator
+    ENTRYPOINT ["job-run-aggregator"]
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/job-run-aggregator
+      - destination_dir: .
+        source_path: /go/bin/prcreator
+  to: auto-aggregator-job-names
+- dockerfile_literal: |-
+    FROM quay.io/centos/centos:stream8
+    RUN dnf install -y git && dnf clean all && rm -rf /var/cache/dnf
     ADD sync-rover-groups /usr/bin/sync-rover-groups
     ADD usr/bin/oc /usr/bin/oc
     ENTRYPOINT ["sync-rover-groups"]
