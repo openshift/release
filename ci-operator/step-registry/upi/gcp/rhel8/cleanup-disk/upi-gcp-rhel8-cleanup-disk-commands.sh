@@ -1,5 +1,5 @@
 #!/bin/bash
-set -xeuo pipefail
+set -xeu
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
