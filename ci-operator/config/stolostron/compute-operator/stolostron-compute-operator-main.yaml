@@ -49,13 +49,13 @@ tests:
     from: src
 - as: sonar-pre-submit
   commands: |
-    export SONAR_GO_TEST_ARGS="$(go list ./... | awk '!/test|hack/ {printf $0" "}')"
+    export SONAR_GO_TEST_USE_GINKGO="yes"
+    make envtest-tools kcp-plugin
     export SELF="make -f /opt/build-harness/Makefile.prow"
     export SONAR_ORG=open-cluster-management
     export HOME="/tmp"
     export XDG_CONFIG_HOME="/tmp/xdg_config"
-    make test
-    cp coverage.out "${ARTIFACT_DIR}/coverage.out"
+    make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
     from: src
   secrets:
@@ -63,13 +63,13 @@ tests:
     name: acm-sonarcloud-token
 - as: sonar-post-submit
   commands: |
-    export SONAR_GO_TEST_ARGS="$(go list ./... | awk '!/test|hack/ {printf $0" "}')"
+    export SONAR_GO_TEST_USE_GINKGO="yes"
+    make envtest-tools kcp-plugin
     export SELF="make -f /opt/build-harness/Makefile.prow"
     export SONAR_ORG=open-cluster-management
     export HOME="/tmp"
     export XDG_CONFIG_HOME="/tmp/xdg_config"
-    make test
-    cp coverage.out "${ARTIFACT_DIR}/coverage.out"
+    make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
     from: src
   postsubmit: true
