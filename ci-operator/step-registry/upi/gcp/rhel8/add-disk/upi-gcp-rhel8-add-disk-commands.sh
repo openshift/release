@@ -39,3 +39,4 @@ echo "$(date -u --rfc-3339=seconds) - Attaching GCP Persistent Disk ${GCP_DISK_N
 gcloud compute instances attach-disk "${INSTANCE_PREFIX}" \
   --disk=${GCP_DISK_NAME} \
   --device-name="${GCP_DISK_NAME}"
+gcloud compute instances set-disk-auto-delete "${INSTANCE_PREFIX}" --disk "${GCP_DISK_NAME}"
