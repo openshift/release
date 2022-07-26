@@ -2343,3 +2343,53 @@ periodics:
     - name: github-app-credentials
       secret:
         secretName: openshift-prow-github-app
+- agent: kubernetes
+  cluster: app.ci
+  cron: 0 5 * * *
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  - base_ref: master
+    org: openshift
+    repo: sippy
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-prow-auto-sippy-config-generator
+  spec:
+    containers:
+    - args:
+      - -c
+      - |
+        set -o errexit
+        set -o nounset
+        set -o pipefail
+        cd sippy
+        # Generate Sippy Configuration
+        /usr/bin/sippy-config-generator
+          --prow-jobs-dir ../release/ci-operator/jobs \
+          --release-config ../release/core-services/release-controller/_releases \
+          --customization-file ./config/openshift-customizations.yaml > ./config/openshift.yaml
+        # Initiate prcreator to open a PR against sippy
+        /usr/bin/prcreator \
+        -github-token-path=/etc/github/oauth \
+        -organization=openshift \
+        -repo=sippy \
+        -pr-title="Automated - Update config ./config/openshift.yaml"
+      command:
+      - /bin/bash
+      image: registry.ci.openshift.org/ci/auto-sippy-config-generator:latest
+      imagePullPolicy: Always
+      name: auto-sippy-config-generator
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: token
+        readOnly: true
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-bot
