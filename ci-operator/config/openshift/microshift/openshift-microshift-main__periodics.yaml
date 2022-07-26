@@ -23,7 +23,19 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-8-release-golang-1.16-openshift-4.10
+    tag: rhel-8-release-golang-1.17-openshift-4.10
+releases:
+  arm64-latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.10"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.10"
 resources:
   '*':
     limits:
@@ -31,9 +43,6 @@ resources:
     requests:
       cpu: 100m
       memory: 800Mi
-tag_specification:
-  name: "4.10"
-  namespace: ocp
 tests:
 - as: copr-rpm-health-check
   cron: 0 0 * * *
@@ -105,6 +114,10 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-microshift-e2e-reboot-tests
+- as: rebase-on-nightlies
+  cron: 0 5 * * *
+  steps:
+    workflow: openshift-microshift-rebase
 zz_generated_metadata:
   branch: main
   org: openshift
