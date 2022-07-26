@@ -147,38 +147,41 @@ EOF
 curl -o ${SHARED_DIR}/manifest_externalFeatureGate.yaml https://raw.githubusercontent.com/openshift/cluster-cloud-controller-manager-operator/master/hack/externalFeatureGate.yaml
 
 
-ZONAL_SC="${SHARED_DIR}/manifest_zonal-sc.yaml"
-PROM_CONFIG="${SHARED_DIR}/manifest_cluster-monitoring-config.yaml"
+# TODO: Add this back in once we have an vsphere
+# environment that will support topology storage
 
-
-cat >> ${ZONAL_SC} << EOF
-apiVersion: storage.k8s.io/v1
-kind: StorageClass
-metadata:
-  name: sc-zone-us-east-1a
-allowedTopologies:
-- matchLabelExpressions:
-  - key: topology.kubernetes.io/zone
-    values:
-    - us-east-1a
-parameters:
-  diskformat: thin
-provisioner: kubernetes.io/vsphere-volume
-reclaimPolicy: Delete
-volumeBindingMode: WaitForFirstConsumer
-EOF
-
-cat >> ${PROM_CONFIG} << EOF
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: cluster-monitoring-config
-  namespace: openshift-monitoring
-data:
-  config.yaml:
-    prometheusK8s:
-      volumeClaimTemplate:
-        spec:
-          storageClassName: sc-zone-us-east-1a
-EOF
+#ZONAL_SC="${SHARED_DIR}/manifest_zonal-sc.yaml"
+#PROM_CONFIG="${SHARED_DIR}/manifest_cluster-monitoring-config.yaml"
+#
+#
+#cat >> ${ZONAL_SC} << EOF
+#apiVersion: storage.k8s.io/v1
+#kind: StorageClass
+#metadata:
+#  name: sc-zone-us-east-1a
+#allowedTopologies:
+#- matchLabelExpressions:
+#  - key: topology.kubernetes.io/zone
+#    values:
+#    - us-east-1a
+#parameters:
+#  diskformat: thin
+#provisioner: kubernetes.io/vsphere-volume
+#reclaimPolicy: Delete
+#volumeBindingMode: WaitForFirstConsumer
+#EOF
+#
+#cat >> ${PROM_CONFIG} << EOF
+#apiVersion: v1
+#kind: ConfigMap
+#metadata:
+#  name: cluster-monitoring-config
+#  namespace: openshift-monitoring
+#data:
+#  config.yaml:
+#    prometheusK8s:
+#      volumeClaimTemplate:
+#        spec:
+#          storageClassName: sc-zone-us-east-1a
+#EOF
 
