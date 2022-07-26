@@ -334,21 +334,13 @@ tests:
   steps:
     test:
     - as: push
-      commands: .openshift-ci/nightlies.sh
-      credentials:
-      - mount_path: /tmp/secret/stackrox-stackrox-initial
-        name: stackrox-stackrox-initial
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 4000Mi
-- as: rehearse-nightly-tag
-  steps:
-    test:
-    - as: push
-      commands: .openshift-ci/nightlies.sh
+      commands: |
+        .openshift-ci/nightlies.sh || true
+        touch /tmp/hold
+        while [[ -f /tmp/hold ]]; do
+          echo holding...
+          sleep 60
+        done
       credentials:
       - mount_path: /tmp/secret/stackrox-stackrox-initial
         name: stackrox-stackrox-initial
