@@ -1,3 +1,8 @@
+base_images:
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.46.0
 binary_build_commands: make manager
 build_root:
   image_stream_tag:
@@ -24,6 +29,15 @@ tests:
   commands: make golangci
   container:
     from: src
+- as: golangci-lint
+  commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    golangci-lint run --verbose --timeout=5m0s
+  container:
+    clone: true
+    from: golangci-lint
 - as: golint
   commands: make golint
   container:
