@@ -7,6 +7,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.18-openshift-4.12
+  operator-index:
+    name: redhat-operator-index
+    namespace: ci
+    tag: v4.10
   ubi_minimal:
     name: ubi-minimal
     namespace: ocp
@@ -82,6 +86,24 @@ images:
       as:
       - golang:1.18
   to: volsync-mover-syncthing
+operator:
+  bundles:
+  - as: volsync-bundle
+    base_index: operator-index
+    context_dir: .
+    dockerfile_path: bundle.Dockerfile
+    update_graph: replaces
+  substitutions:
+  - pullspec: quay.io/backube/volsync:latest
+    with: pipeline:volsync
+  - pullspec: quay.io/backube/volsync-mover-rclone:latest
+    with: pipeline:volsync-mover-rclone
+  - pullspec: quay.io/backube/volsync-mover-restic:latest
+    with: pipeline:volsync-mover-restic
+  - pullspec: quay.io/backube/volsync-mover-rsync:latest
+    with: pipeline:volsync-mover-rsync
+  - pullspec: quay.io/backube/volsync-mover-syncthing:latest
+    with: pipeline:volsync-mover-syncthing
 promotion:
   additional_images:
     volsync: volsync
@@ -121,17 +143,30 @@ tests:
   optional: true
   steps:
     cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-volsync-bundle
     env:
       FIPS_ENABLED: "true"
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-operators
+      OO_PACKAGE: volsync
+      OO_TARGET_NAMESPACES: '!all'
     test:
     - as: e2e
       commands: |
-        # TODO: optimize this
-        set -x
+        set -x -e -o pipefail
         KUBECONFIG="${SHARED_DIR}/kubeconfig"
         export KUBECONFIG
-        cp $(echo "${KUBECONFIG}") /go/src/github.com/backube/volsync/test-kuttl/kubeconfig
+        cp "${KUBECONFIG}" /go/src/github.com/backube/volsync/test-kuttl/kubeconfig
+
+        # Configure default StorageClass to be CSI-based
+        oc annotate sc/gp2 storageclass.kubernetes.io/is-default-class-
+        oc annotate sc/gp2-csi storageclass.kubernetes.io/is-default-class="true"
+
+        # Install MinIO for rclone & restic
         ./hack/run-minio.sh
+
+        # Run tests
         make cli
         make test-e2e
       from: src-oc
@@ -139,7 +174,7 @@ tests:
         requests:
           cpu: 500m
           memory: 1Gi
-    workflow: ipi-aws-volsync-csi
+    workflow: optional-operators-ci-aws
 zz_generated_metadata:
   branch: main
   org: backube
