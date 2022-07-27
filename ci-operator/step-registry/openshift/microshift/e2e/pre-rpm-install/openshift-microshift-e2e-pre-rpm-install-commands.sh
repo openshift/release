@@ -34,8 +34,8 @@ gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
 
 # LSOF getter hack
-cat <<EOF > lsof
-!/bin/bash
+cat <<'EOF' > lsof
+#! /bin/bash
 PROCS=$(ls /proc/ | grep -Eo '[0-9]+')
 for p in $PROCS; do
 	echo "---------------------"
