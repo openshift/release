@@ -39,7 +39,7 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJE
   --command '
   PID=$(sudo ps --no-headers -C dnf-automatic -o pid)
   sudo lslocks
-  wait $PID
+  sudo wait $PID
   sudo lslocks
   '
 
