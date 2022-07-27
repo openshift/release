@@ -1,0 +1,141 @@
+base_images:
+  console-tests:
+    name: "4.3"
+    namespace: ocp
+    tag: console-tests
+releases:
+  initial:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: nightly
+      version: "4.3"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.3"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: console-aws
+  interval: 720h
+  steps:
+    cluster_profile: aws
+    test:
+    - as: e2e-test
+      cli: latest
+      commands: ./test-prow-e2e.sh release
+      from: console-tests
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+- as: e2e-azure-fips
+  interval: 720h
+  steps:
+    cluster_profile: azure-2
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+      FIPS_ENABLED: "true"
+    pre:
+    - chain: ipi-azure-pre
+    - ref: fips-check
+    workflow: openshift-e2e-azure
+- as: e2e-aws-fips
+  interval: 720h
+  steps:
+    cluster_profile: aws
+    env:
+      FIPS_ENABLED: "true"
+    pre:
+    - chain: ipi-aws-pre
+    - ref: fips-check
+    workflow: openshift-e2e-aws
+- as: e2e-gcp-fips
+  interval: 720h
+  steps:
+    cluster_profile: gcp
+    env:
+      FIPS_ENABLED: "true"
+    pre:
+    - chain: ipi-gcp-pre
+    - ref: fips-check
+    workflow: openshift-e2e-gcp
+- as: e2e-azure-fips-serial
+  interval: 720h
+  steps:
+    cluster_profile: azure-2
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+      FIPS_ENABLED: "true"
+      TEST_SUITE: openshift/conformance/serial
+    pre:
+    - chain: ipi-azure-pre
+    - ref: fips-check
+    workflow: openshift-e2e-azure
+- as: e2e-aws-fips-serial
+  interval: 720h
+  steps:
+    cluster_profile: aws
+    env:
+      FIPS_ENABLED: "true"
+      TEST_SUITE: openshift/conformance/serial
+    pre:
+    - chain: ipi-aws-pre
+    - ref: fips-check
+    workflow: openshift-e2e-aws
+- as: e2e-gcp-fips-serial
+  interval: 720h
+  steps:
+    cluster_profile: gcp
+    env:
+      FIPS_ENABLED: "true"
+      TEST_SUITE: openshift/conformance/serial
+    pre:
+    - chain: ipi-gcp-pre
+    - ref: fips-check
+    workflow: openshift-e2e-gcp
+- as: e2e-gcp
+  interval: 720h
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp
+- as: e2e-aws-fips-upgrade
+  interval: 720h
+  steps:
+    cluster_profile: aws
+    env:
+      FIPS_ENABLED: "true"
+    pre:
+    - chain: ipi-aws-pre
+    - ref: fips-check
+    workflow: openshift-upgrade-aws
+- as: e2e-aws
+  interval: 720h
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- as: e2e-aws-serial
+  interval: 720h
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-serial
+- as: e2e-azure
+  interval: 720h
+  steps:
+    cluster_profile: azure-2
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+    workflow: openshift-e2e-azure
+zz_generated_metadata:
+  branch: master
+  org: theokdexperience
+  repo: release
+  variant: nightly-4.3
