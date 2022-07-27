@@ -196,11 +196,12 @@ spec:
     registryPoll:
       interval: 15m
 EOF
+    set +e 
     COUNTER=0
-    while [ $COUNTER -lt 600 ]
+    while [ $COUNTER -lt 30 ]
     do
-        sleep 1
-        COUNTER=`expr $COUNTER + 1`
+        sleep 20
+        COUNTER=`expr $COUNTER + 20`
         echo "waiting ${COUNTER}s"
         STATUS=`oc -n openshift-marketplace get catalogsource qe-app-registry -o=jsonpath="{.status.connectionState.lastObservedState}"`
         if [ $STATUS = "READY" ]; then
@@ -211,10 +212,12 @@ EOF
     done
     if [ $COUNTER -ne 100 ]; then
         echo "!!! fail to create QE CatalogSource"
+        run_command "oc -n openshift-marketplace get pods"
         run_command "oc -n openshift-marketplace get catalogsource qe-app-registry -o yaml"
         run_command "oc -n openshift-marketplace get pods -l olm.catalogSource=qe-app-registry -o yaml"
         return 1
     fi
+    set -e 
 }
 
 function check_default_catalog () {
