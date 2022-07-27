@@ -55,56 +55,7 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: ipi-aws
-- as: che-behind-proxy
-  steps:
-    cluster_profile: aws
-    env:
-      COMPUTE_NODE_TYPE: m5.xlarge
-      TEST_SKIPS: ""
-    test:
-    - as: che-behind-proxy
-      cli: latest
-      commands: |
-        echo ${TEST_SKIPS}
-
-        echo -e "Kubernetes proxy object:"
-        oc get proxy/cluster -o yaml
-
-        echo -e "[INFO] Test script content"
-        cat .ci/oci-proxy.sh
-
-        /bin/bash .ci/oci-proxy.sh
-      dependencies:
-      - env: CI_CHE_OPERATOR_IMAGE
-        name: che-operator-image
-      env:
-      - name: TEST_SKIPS
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: openshift-e2e-aws-proxy
-- as: devworkspace-happy-path
-  steps:
-    cluster_profile: aws
-    test:
-    - as: devworkspace-happy-path
-      cli: latest
-      commands: |
-        echo -e "[INFO] Test script content:"
-        cat .ci/oci-devworkspace-happy-path.sh
-        /bin/bash .ci/oci-devworkspace-happy-path.sh
-      dependencies:
-      - env: CI_CHE_OPERATOR_IMAGE
-        name: che-operator-image
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: ipi-aws
+    workflow: optional-operators-ci-aws
 - as: upgrade-stable-to-next
   steps:
     cluster_profile: aws
