@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -euo pipefail
+set -xeuo pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
@@ -47,7 +47,6 @@ chmod +x "${HOME}"/wait_for_deployment_ready.sh
 # restart the VM
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute instances start "${INSTANCE_PREFIX}" --zone "${GOOGLE_COMPUTE_ZONE}"
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
-  --quiet \
   --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   --recurse "${HOME}"/wait_for_deployment_ready.sh rhel8user@"${INSTANCE_PREFIX}":~/wait_for_deployment_ready.sh
