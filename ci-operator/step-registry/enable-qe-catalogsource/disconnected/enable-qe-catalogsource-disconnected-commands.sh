@@ -198,19 +198,18 @@ spec:
 EOF
     set +e 
     COUNTER=0
-    while [ $COUNTER -lt 30 ]
+    while [ $COUNTER -lt 600 ]
     do
         sleep 20
         COUNTER=`expr $COUNTER + 20`
         echo "waiting ${COUNTER}s"
         STATUS=`oc -n openshift-marketplace get catalogsource qe-app-registry -o=jsonpath="{.status.connectionState.lastObservedState}"`
-        if [ $STATUS = "READY" ]; then
+        if [[ $STATUS = "READY" ]]; then
             echo "create the QE CatalogSource successfully"
-            COUNTER=100
             break
         fi
     done
-    if [ $COUNTER -ne 100 ]; then
+    if [[ $STATUS != "READY" ]]; then
         echo "!!! fail to create QE CatalogSource"
         run_command "oc -n openshift-marketplace get pods"
         run_command "oc -n openshift-marketplace get catalogsource qe-app-registry -o yaml"
