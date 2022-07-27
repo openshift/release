@@ -9,12 +9,12 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.9"
+      version: "4.12"
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.9"
+      version: "4.12"
 resources:
   '*':
     requests:
@@ -22,7 +22,6 @@ resources:
       memory: 250Mi
 tests:
 - as: acceptance
-  run_if_changed: ^.github/workflows/pr-checks-build-images.yaml$|^apis|^build|^config|^controllers|^hack/get-test-namespace|^hack/remove-sbr-finalizers.sh$|^hack/test-cleanup.sh$|^controllers|^make/acceptance.mk$|^make/build.mk$|^make/common.mk$|^make/release.mk$|^make/version.mk$|^pkg|^test/acceptance|^tools|^vendor|^Dockerfile$|^go.mod$|^go.sum$|^install.sh$|^main.go$
   steps:
     cluster_profile: aws
     test:
@@ -34,7 +33,7 @@ tests:
         else
           OPERATOR_INDEX_IMAGE_REF=quay.io/redhat-developer/servicebinding-operator:pr-${PULL_NUMBER}-${PULL_PULL_SHA:0:8}-index;
         fi;
-        make -k VERBOSE=2 OPERATOR_INDEX_IMAGE_REF=$OPERATOR_INDEX_IMAGE_REF CATSRC_NAME=sbo-pr-checks SKIP_REGISTRY_LOGIN=true EXTRA_BEHAVE_ARGS="--tags=~@crdv1beta1 --tags=~@disable-openshift-4.9 --tags=~@disable-openshift-4.8+ --tags=~@disable-openshift-4.9+" -o registry-login test-acceptance-with-bundle test-acceptance-artifacts
+        make -k VERBOSE=2 OPERATOR_INDEX_IMAGE_REF=$OPERATOR_INDEX_IMAGE_REF CATSRC_NAME=sbo-pr-checks SKIP_REGISTRY_LOGIN=true EXTRA_BEHAVE_ARGS="--tags=~@crdv1beta1 --tags=~@disable-openshift-4.12 --tags=~@disable-openshift-4.8+ --tags=~@disable-openshift-4.9+ --tags=~@disable-openshift-4.10+ --tags=~@disable-openshift-4.11+ --tags=~@disable-openshift-4.12+" -o registry-login test-acceptance-with-bundle test-acceptance-artifacts
       from: src
       resources:
         requests:
@@ -48,7 +47,7 @@ tests:
     - as: test
       cli: latest
       commands: |
-        VERBOSE=2 make -k EXTRA_BEHAVE_ARGS="--tags=~@crdv1beta1 --tags=~@disable-openshift-4.9 --tags=~@disable-openshift-4.8+ --tags=~@disable-openshift-4.9+" test-acceptance-with-bundle test-acceptance-artifacts
+        VERBOSE=2 make -k EXTRA_BEHAVE_ARGS="--tags=~@crdv1beta1 --tags=~@disable-openshift-4.12 --tags=~@disable-openshift-4.8+ --tags=~@disable-openshift-4.9+ --tags=~@disable-openshift-4.10+ --tags=~@disable-openshift-4.11+ --tags=~@disable-openshift-4.12+" test-acceptance-with-bundle test-acceptance-artifacts
       from: src
       resources:
         requests:
@@ -58,4 +57,4 @@ zz_generated_metadata:
   branch: master
   org: redhat-developer
   repo: service-binding-operator
-  variant: "4.9"
+  variant: "4.12"
