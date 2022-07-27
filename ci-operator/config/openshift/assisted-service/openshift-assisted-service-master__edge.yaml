@@ -114,6 +114,10 @@ images:
     RUN make build-openshift-ci-test-bin
     RUN go mod vendor
   from: assisted-service-centos9
+  inputs:
+    cli:
+      as:
+      - quay.io/openshift/origin-cli:latest
   to: assisted-service-subsystem
 - dockerfile_literal: |
     FROM base
@@ -130,7 +134,7 @@ images:
     RUN curl --retry 5 -L https://github.com/operator-framework/operator-sdk/releases/download/v1.10.1/operator-sdk_linux_amd64 --output /tmp/operator-sdk_linux_amd64 && \
         chmod +x /tmp/operator-sdk_linux_amd64 && \
         install /tmp/operator-sdk_linux_amd64 /usr/local/bin/operator-sdk
-    RUN python3 -m venv ${VIRTUAL_ENV:-/opt/venv} && \
+    RUN python3 -m venv ${VIRTUAL_ENV} && \
         python3 -m pip install --upgrade pip && \
         python3 -m pip install -r /assisted-service/dev-requirements.txt
   from: assisted-service-centos9
@@ -201,6 +205,12 @@ releases:
       product: ocp
       stream: nightly
       version: "4.11"
+  candidate-4-11-multi:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.11"
   latest:
     integration:
       include_built_images: true
@@ -224,12 +234,12 @@ tests:
   skip_if_only_changed: ^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNER_ALIASES)$
   steps:
     test:
-    - ref: assisted-verify-generated-code-v2
+    - ref: assisted-verify-generated-code
 - as: verify-generated-code-postsubmit
   postsubmit: true
   steps:
     test:
-    - ref: assisted-verify-generated-code-v2
+    - ref: assisted-verify-generated-code
 - as: publish-python-client
   postsubmit: true
   steps:
@@ -642,6 +652,30 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate-4-11
     env:
       ALLOW_CONVERGED_FLOW: "True"
+    workflow: assisted-baremetal-operator-ztp
+- as: e2e-ai-operator-ztp-multiarch-3masters-ocp-411
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate-4-11-multi
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      ASSISTED_ZTP_CONFIG: |
+        SPOKE_CONTROLPLANE_AGENTS=3
+      NUM_EXTRA_WORKERS: "3"
+    workflow: assisted-baremetal-operator-ztp
+- as: e2e-ai-operator-ztp-multiarch-sno-ocp-411
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate-4-11-multi
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      ASSISTED_ZTP_CONFIG: |
+        SPOKE_CONTROLPLANE_AGENTS=1
+      NUM_EXTRA_WORKERS: "1"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-metal-assisted-tpmv2
   optional: true

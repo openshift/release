@@ -76,21 +76,102 @@ cat > packet-config.yaml <<-EOF
         # Checkout packet server
         for x in \$(seq 10) ; do
             test "\${x}" -eq 10 && exit 1
+            # Equinix hosts
             ssh "\${SSHOPTS[@]}" "root@\${IP}" hostname && break
+            # Ironic hosts
+            ssh "\${SSHOPTS[@]}" "centos@\${IP}" sudo dd if=/home/centos/.ssh/authorized_keys of=/root/.ssh/authorized_keys && break
             sleep 10
         done
       dest: "${SHARED_DIR}/packet-conf.sh"
 EOF
 ansible-playbook packet-config.yaml |& gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0; fflush(); }'
 
-if [ -e "${CLUSTER_PROFILE_DIR}/ofcir_url" ] ; then
+function getCIR(){
+    OFCIRURL=$1
+    echo $OFCIRURL > $SHARED_DIR/ofcir
     echo "Attempting to acquire a Host from OFCIR"
     IPFILE=$SHARED_DIR/server-ip
+    EXTRAFILE=$SHARED_DIR/cir-extra
+    NAMEFILE=$SHARED_DIR/name
     CIRFILE=$SHARED_DIR/cir
-    if curl -kfX POST -H "Host: ofcir.apps.ostest.test.metalkube.org" "$(cat ${CLUSTER_PROFILE_DIR}/ofcir_url)?name=$JOB_NAME/$BUILD_ID" -o $CIRFILE ; then
+    if timeout 10s curl -kfX POST -H "Host: ofcir.apps.ostest.test.metalkube.org" "$OFCIRURL?name=$JOB_NAME/$BUILD_ID&type=$CIRTYPE" -o $CIRFILE ; then
         jq -r .ip < $CIRFILE > $IPFILE
+        jq -r .extra < $CIRFILE > $EXTRAFILE
+        jq -r .name < $CIRFILE > $NAMEFILE
+        NAME=$(cat $NAMEFILE)
+        IP=$(cat $IPFILE)
+
+        if [[ "$CLUSTERTYPE" != "baremetal" ]] ; then
+            return 0
+        fi
+
+        NODES=
+        n=0
+        _IFS=$IFS
+        IFS=$'\n'
+        for DATA in $(cat $EXTRAFILE |jq '.[] | "\(.bmcip) \(.mac)"' -rc) ; do
+            IFS=" " read BMCIP MAC <<< "$(echo $DATA)"
+
+            NODES="$NODES{\"name\":\"openshift-$n\",\"driver\":\"ipmi\",\"resource_class\":\"baremetal\",\"driver_info\":{\"username\":\"root\",\"password\":\"calvin\",\"address\":\"ipmi://$BMCIP\",\"deploy_kernel\":\"http://172.22.0.2/images/ironic-python-agent.kernel\",\"deploy_ramdisk\":\"http://172.22.0.2/images/ironic-python-agent.initramfs\",\"disable_certificate_verification\":false},\"ports\":[{\"address\":\"$MAC\",\"pxe_enabled\":true}],\"properties\":{\"local_gb\":\"50\",\"cpu_arch\":\"x86_64\",\"boot_mode\":\"legacy\"}},"
+            n=$((n+1))
+        done
+        IFS=$_IFS
+
+        cat - <<EOF > ${SHARED_DIR}/bm.json
+{
+  "nodes": [
+    ${NODES%,}
+  ]
+}
+EOF
+
+        cat - <<EOF >> "${SHARED_DIR}/dev-scripts-additional-config"
+export NODES_FILE="/root/dev-scripts/bm.json"
+export NODES_PLATFORM=baremetal
+export PRO_IF="eth3"
+export INT_IF="eth2"
+export MANAGE_BR_BRIDGE=n
+export CLUSTER_PRO_IF="enp3s0f1"
+export MANAGE_INT_BRIDGE=n
+export ROOT_DISK_NAME="/dev/sda"
+export CLUSTER_NAME="${NAME%%.*}"
+export BASE_DOMAIN="ocpci.eng.rdu2.redhat.com"
+export EXTERNAL_SUBNET_V4="10.10.129.0/24"
+export ADDN_DNS="10.38.5.26"
+export PROVISIONING_HOST_EXTERNAL_IP=$IP
+export NUM_WORKERS=2
+export LOCAL_REGISTRY_DNS_NAME=host1.$NAME
+EOF
+    else
+        return 1
+    fi
+}
+
+
+# We have 2 ofcir servers,
+# the 1st (contents of ${CLUSTER_PROFILE_DIR}/ofcir_laburl)
+#   manages HW in the lab, at the moment this is all baremetal clusters
+# the 2nd (contents of ${CLUSTER_PROFILE_DIR}/ofcir)
+#   manages HW in equinix, at the moment this is for virt hosts
+# If neither can give us a host to use then we fall back to on demaned
+
+CIRTYPE=cihost
+# If baremetal on check the lab ofcir and exit,
+# as equinix doesn't serve baremetal clusters
+if [[ "$CLUSTERTYPE" == "baremetal" ]] ; then
+    CIRTYPE=cicluster
+    if [ -e "${CLUSTER_PROFILE_DIR}/ofcir_laburl" ] ; then
+        getCIR "$(cat ${CLUSTER_PROFILE_DIR}/ofcir_laburl)"
         exit_with_success
     fi
+    exit_with_failure
+fi
+
+if [ -e "${CLUSTER_PROFILE_DIR}/ofcir_laburl" ] ; then
+    getCIR "$(cat ${CLUSTER_PROFILE_DIR}/ofcir_laburl)" && exit_with_success
+fi
+if [ -e "${CLUSTER_PROFILE_DIR}/ofcir_url" ] ; then
+    getCIR "$(cat ${CLUSTER_PROFILE_DIR}/ofcir_url)" && exit_with_success
 fi
 
 # Avoid requesting a bunch of servers at the same time so they

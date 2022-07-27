@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -euo pipefail
+set -xeuo pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
@@ -46,8 +46,25 @@ chmod +x "${HOME}"/wait_for_deployment_ready.sh
 
 # restart the VM
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute instances start "${INSTANCE_PREFIX}" --zone "${GOOGLE_COMPUTE_ZONE}"
+
+# Steps may not be used more than once in a test, so this block duplicates the behavior of wait-for-ssh for reboot tests.
+timeout=1200 # 20 minute wait.  
+>&2 echo "Polling ssh connectivity before proceeding.  Timeout=$timeout second"
+start=$(date +"%s")
+until LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  rhel8user@"${INSTANCE_PREFIX}" \
+  --command 'echo Hello, CI';
+do
+  if (( $(date +"%s") - $start >= $timeout )); then
+    echo "timed out out waiting for ssh connection" >&2
+    exit 1
+  fi
+  echo "waiting for ssh connection"
+done
+>&2 echo "It took $timeout seconds to connect via ssh"
+
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
-  --quiet \
   --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   --recurse "${HOME}"/wait_for_deployment_ready.sh rhel8user@"${INSTANCE_PREFIX}":~/wait_for_deployment_ready.sh

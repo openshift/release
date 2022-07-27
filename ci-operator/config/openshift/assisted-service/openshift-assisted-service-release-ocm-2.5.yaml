@@ -73,6 +73,10 @@ images:
     RUN yum install -y skopeo
   from: src
   to: assisted-service-publish-index
+- dockerfile_literal: |
+    FROM base
+  from: assisted-service-build
+  to: assisted-service-generate
 operator:
   bundles:
   - dockerfile_path: deploy/olm-catalog/bundle.Dockerfile
@@ -101,10 +105,6 @@ releases:
     release:
       channel: stable
       version: "4.10"
-  stable-4-9:
-    release:
-      channel: stable
-      version: "4.9"
 resources:
   '*':
     requests:
@@ -363,54 +363,6 @@ tests:
     cluster_profile: packet-assisted
     env:
       DISCONNECTED: "true"
-    workflow: assisted-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-ipv4v6-sno-ocp-49
-  optional: true
-  run_if_changed: ^(deploy/.*)$
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable-4-9
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable-4-9
-    env:
-      IP_STACK: v4v6
-    workflow: assisted-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-ipv4v6-sno-ocp-49-periodic
-  cron: '@daily'
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable-4-9
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable-4-9
-    env:
-      IP_STACK: v4v6
-    workflow: assisted-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-ipv4v6-3masters-ocp-49
-  optional: true
-  run_if_changed: ^(deploy/.*)$
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable-4-9
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable-4-9
-    env:
-      ASSISTED_ZTP_CONFIG: |
-        SPOKE_CONTROLPLANE_AGENTS=3
-      IP_STACK: v4v6
-      NUM_EXTRA_WORKERS: "3"
-    workflow: assisted-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-ipv4v6-3masters-ocp-49-periodic
-  cron: '@daily'
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable-4-9
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable-4-9
-    env:
-      ASSISTED_ZTP_CONFIG: |
-        SPOKE_CONTROLPLANE_AGENTS=3
-      IP_STACK: v4v6
-      NUM_EXTRA_WORKERS: "3"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-capi
   optional: true
