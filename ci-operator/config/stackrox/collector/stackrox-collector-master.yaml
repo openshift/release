@@ -39,6 +39,10 @@ images:
   from: src
   to: integration-tests
 promotion:
+  excluded_images:
+  - collector-builder
+  - collector-drivers
+  - collector-bundle
   namespace: stackrox
   tag: osci-test
 resources:
@@ -77,6 +81,24 @@ tests:
           cpu: 2000m
           memory: 4000Mi
 - as: push-images
+  steps:
+    test:
+    - as: push-collector-images
+      commands: .openshift-ci/jobs/push-images/push-images.sh
+      credentials:
+      - mount_path: /tmp/secret/stackrox-stackrox-push
+        name: stackrox-stackrox-push
+        namespace: test-credentials
+      dependencies:
+      - env: COLLECTOR_FULL
+        name: collector-full
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+- as: merge-push-images
+  postsubmit: true
   steps:
     test:
     - as: push-collector-images
