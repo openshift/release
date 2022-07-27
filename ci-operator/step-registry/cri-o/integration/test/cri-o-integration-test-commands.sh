@@ -2,28 +2,46 @@
 set -o nounset
 set -o errexit
 set -o pipefail
-set -x
 
+echo "entering setup!!!!"
 # shellcheck source=/dev/null
-source "${SHARED_DIR}/packet-conf.sh"
-echo "${IP}" 
-echo "${SSHOPTS[@]}"
- 
-tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/cri-o.tar.gz"
-timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF 
-    export HOME=/root
-    mkdir /tmp/artifacts
-    mkdir /logs
-    mkdir /logs/artifacts 
-    mkdir /tmp/artifacts/logs
+source "${SHARED_DIR}/env"
 
-    dnf install python39 -y
+#####################################
+###############Log In################
+#####################################
+
+GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
+export GCP_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/gce.json"
+sa_email=$(jq -r .client_email ${GCP_SHARED_CREDENTIALS_FILE})
+if ! gcloud auth list | grep -E "\*\s+${sa_email}"
+then
+  gcloud auth activate-service-account --key-file="${GCP_SHARED_CREDENTIALS_FILE}"
+  gcloud config set project "${GOOGLE_PROJECT_ID}"
+fi
+
+mkdir -p "${HOME}"/.ssh
+chmod 0700 "${HOME}"/.ssh
+
+cp "${CLUSTER_PROFILE_DIR}"/ssh-privatekey "${HOME}"/.ssh/google_compute_engine
+chmod 0600 "${HOME}"/.ssh/google_compute_engine
+cp "${CLUSTER_PROFILE_DIR}"/ssh-publickey "${HOME}"/.ssh/google_compute_engine.pub
+
+#####################################
+#####################################
+
+instance_name=$(<"${SHARED_DIR}/gcp-instance-ids.txt")
+
+tar -czf - . | gcloud compute ssh --zone="${ZONE}" ${instance_name} -- "cat > ~/cri-o.tar.gz"
+timeout --kill-after 10m 120m gcloud compute ssh --zone="${ZONE}" ${instance_name} -- bash - << EOF 
+    mkdir -p /tmp/artifacts/logs
+    mkdir -p /logs/artifacts
+    sudo dnf install python39 -y
     curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
     python3.9 get-pip.py
     python3.9 -m pip install ansible
-
     # setup the directory where the tests will the run
-    REPO_DIR="/root/cri-o"
+    REPO_DIR="~/cri-o"
     mkdir -p "\${REPO_DIR}"
     # NVMe makes it faster
     NVME_DEVICE="/dev/nvme0n1"
@@ -37,6 +55,5 @@ timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
     chown -R root:root "\${REPO_DIR}"
     cd "\${REPO_DIR}/contrib/test/ci"
     echo "localhost" >> hosts
-    ansible-playbook integration-main.yml -i hosts -e "TEST_AGENT=prow" --connection=local -vvv 
+    ansible-playbook e2e-main.yml -i hosts -e "TEST_AGENT=prow" --connection=local -vvv --tags setup,e2e
 EOF
-
