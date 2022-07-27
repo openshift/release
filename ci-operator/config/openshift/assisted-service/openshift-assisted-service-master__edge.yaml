@@ -166,6 +166,22 @@ images:
     openshift_release_golang-1.17:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.17
+  to: assisted-service-internal
+- dockerfile_literal: |
+    FROM assisted-service-lint
+    ENV GOCACHE=/tmp/
+    ENV GOLANGCI_LINT_CACHE=/tmp/.cache
+    ENV GOPROXY=https://proxy.golang.org
+    RUN make lint
+
+    FROM assisted-service-internal
+  inputs:
+    assisted-service-internal:
+      as:
+      - assisted-service-internal
+    assisted-service-lint:
+      as:
+      - assisted-service-lint
   to: assisted-service
 - dockerfile_literal: |
     FROM coreos/centos
