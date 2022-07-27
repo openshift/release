@@ -33,15 +33,13 @@ gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
 gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
 
+# The dnf-automatic systemd unit holds a lock on /var/lib/.rpm.lock on first-boot.
+# Wait until the service completes the system upgrade before performing further rpm/dnf operations.
+# Fixes error: 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
-  --command '
-  PID=$(sudo ps --no-headers -C dnf-automatic -o pid)
-  sudo lslocks
-  sudo wait $PID
-  sudo lslocks
-  '
+  --command 'while $(sleep 5); do sudo systemctl is-active --quiet dnf-automatic && break; echo "waiting for systemd unit "dnf-automatic" to complete; done'
 
 # rpm --rebuilddb is required to prevent rpm / dnf / subscription-manager ops from failing
 #   because of  "BDB0091 DB_VERSION_MISMATCH: Database environment version mismatch"
