@@ -34,7 +34,7 @@ gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
 
 # LSOF getter hack
-cat <<'EOF' > lsof
+cat <<'EOF' > /tmp/lsof.sh
 #! /bin/bash
 PROCS=$(ls /proc/ | grep -Eo '[0-9]+')
 for p in $PROCS; do
@@ -44,21 +44,16 @@ for p in $PROCS; do
 	ls -la /proc/$p/fd/
 done
 EOF
-chmod +x ./lsof
+chmod +x /tmp/lsof.sh
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" scp \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
-  ./losf rhel8user@"${INSTANCE_PREFIX}:~"
+  /tmp/lsof.sh rhel8user@"${INSTANCE_PREFIX}:~"
 	
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
-  --command 'sudo ps aux | grep rpm && sudo ./lsof'
-
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  rhel8user@"${INSTANCE_PREFIX}" \
-  --command ''
+  --command 'sudo ps aux | grep rpm && sudo $HOME/lsof.sh'
 
 # rpm --rebuilddb is required to prevent rpm / dnf / subscription-manager ops from failing
 #   because of  "BDB0091 DB_VERSION_MISMATCH: Database environment version mismatch"
