@@ -226,7 +226,6 @@ fi
 
 echo "Installing from release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 export SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
-export PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
 export OPENSHIFT_INSTALL_INVOKER=openshift-internal-ci/${JOB_NAME}/${BUILD_ID}
 export HOME=/tmp
 
