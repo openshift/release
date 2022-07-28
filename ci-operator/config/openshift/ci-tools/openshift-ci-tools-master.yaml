@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.10"
+    name: "4.11"
     namespace: ocp
     tag: cli
   golangci-lint:
@@ -771,6 +771,51 @@ tests:
   commands: make verify-frontend-format frontend-checks
   container:
     from: test-bin
+- as: oc-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.10"
+  steps:
+    test:
+    - as: claim
+      commands: |
+        set -x
+        printenv KUBECONFIG
+        printenv KUBEADMIN_PASSWORD_FILE
+        oc get node
+        oc config view
+        oc whoami
+        oc version
+        oc new-project --skip-config-write=true test-oc-cli
+        if ! oc -n test-oc-cli sa create-kubeconfig default > /tmp/out 2> /tmp/error ; then
+            echo "oc sa create-kubeconfig failed"
+            cat /tmp/error
+            exit 1
+        fi
+        if [ -s /tmp/error ] ; then
+          cat /tmp/error
+          echo "oc sa create-kubeconfig has err output"
+          exit 1
+        fi
+        if ! oc -n test-oc-cli create token default > /tmp/out 2> /tmp/error ; then
+            echo "oc create token failed"
+            cat /tmp/error
+            exit 1
+        fi
+        if [ -s /tmp/error ] ; then
+          cat /tmp/error
+          echo "oc create token has err output"
+          exit 1
+        fi
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: lint
   commands: make lint
   container:
