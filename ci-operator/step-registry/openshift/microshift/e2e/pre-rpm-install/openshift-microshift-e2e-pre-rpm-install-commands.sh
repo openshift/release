@@ -39,7 +39,7 @@ gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
-  --command 'while $(sleep 5); do sudo systemctl is-active --quiet dnf-automatic && break; echo "waiting for systemd unit "dnf-automatic" to complete; done'
+  --command 'while $(sleep 5); do sudo systemctl is-active --quiet dnf-automatic || break; echo "waiting for systemd unit dnf-automatic" to complete; done'
 
 # rpm --rebuilddb is required to prevent rpm / dnf / subscription-manager ops from failing
 #   because of  "BDB0091 DB_VERSION_MISMATCH: Database environment version mismatch"
