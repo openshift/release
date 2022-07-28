@@ -116,7 +116,7 @@ EOF
         fi
     done
     if [[ $STATUS != "READY" ]]; then
-        echo "!!! fail to create QE CatalogSource"\
+        echo "!!! fail to create QE CatalogSource"
         run_command "oc -n openshift-marketplace get pods"
         run_command "oc -n openshift-marketplace get catalogsource qe-app-registry -o yaml"
         run_command "oc -n openshift-marketplace get pods -l olm.catalogSource=qe-app-registry -o yaml"
