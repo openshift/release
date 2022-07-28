@@ -1,0 +1,27 @@
+workflow:
+  as: stackrox-collector-integration-tests
+  steps:
+    pre:
+      - ref: stackrox-collector-integration-tests-setup
+    test:
+      - as: push-images
+        commands: .openshift-ci/jobs/push-images/push-images.sh
+        credentials:
+          - mount_path: /tmp/secret/stackrox-stackrox-push
+            name: stackrox-stackrox-push
+            namespace: test-credentials
+        dependencies:
+          - env: COLLECTOR_FULL
+            name: collector-full
+        from: src
+        resources:
+          requests:
+            cpu: 2000m
+            memory: 4000Mi
+      - ref: stackrox-collector-integration-tests
+    post:
+      - ref: stackrox-collector-integration-tests-teardown
+  documentation: |-
+    Runs the stackrox/collector integration tests, including setup and teardown
+    of a GCP VM upon which to test.
+     
