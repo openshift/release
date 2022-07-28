@@ -40,6 +40,17 @@ echo "Configuring proxy registry : \"$OO_CONFIGURE_PROXY_REGISTRY\""
 # step-3: Disable the default OperatorSources/Sources (for redhat-operators, certified-operators, and community-operators) on your 4.5 cluster (or default CatalogSources in 4.6+) with the following command:
 oc patch OperatorHub cluster --type json -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
 
+# If ENABLE_REDHAT_OPERATOR_CATALOG is true, enable redhat-operators catalog
+if [[ "${ENABLE_REDHAT_OPERATOR_CATALOG}" == "true" ]]; then
+    oc patch OperatorHub cluster --type merge --patch '{"spec":{"sources":[{"disabled": false,"name": "redhat-operators"}]}}'
+    if oc get catsrc -n openshift-marketplace | grep -q redhat-operators; then
+      echo "redhat-operators catalog is enabled"
+    else
+      echo "redhat-operators catalog is not enabled"
+      exit 1
+    fi
+fi
+
 # Sleep for 2 minutes to allow for the nodes to begin restarting
 sleep 120
 # Query the node state until all of the nodes are ready
