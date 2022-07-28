@@ -4,9 +4,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-export OS_CLIENT_CONFIG_FILE=${SHARED_DIR}/clouds.yaml
+export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
 
-CLUSTER_NAME=$(<"${SHARED_DIR}/CLUSTER_NAME")
+CLUSTER_NAME="$(<"${SHARED_DIR}/CLUSTER_NAME")"
 OPENSTACK_EXTERNAL_NETWORK="${OPENSTACK_EXTERNAL_NETWORK:-$(<"${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK")}"
 OPENSTACK_CONTROLPLANE_FLAVOR="${OPENSTACK_CONTROLPLANE_FLAVOR:-$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR")}"
 OPENSTACK_COMPUTE_FLAVOR="${OPENSTACK_COMPUTE_FLAVOR:-$(<"${SHARED_DIR}/OPENSTACK_COMPUTE_FLAVOR")}"
@@ -14,11 +14,11 @@ ZONES="${ZONES:-$(<"${SHARED_DIR}/ZONES")}"
 ZONES_COUNT="${ZONES_COUNT:-0}"
 WORKER_REPLICAS="${WORKER_REPLICAS:-3}"
 
-API_IP=$(<"${SHARED_DIR}"/API_IP)
-INGRESS_IP=$(<"${SHARED_DIR}"/INGRESS_IP)
+API_IP=$(<"${SHARED_DIR}/API_IP")
+INGRESS_IP=$(<"${SHARED_DIR}/INGRESS_IP")
 
-PULL_SECRET=$(<"${CLUSTER_PROFILE_DIR}"/pull-secret)
-SSH_PUB_KEY=$(<"${CLUSTER_PROFILE_DIR}"/ssh-publickey)
+PULL_SECRET=$(<"${CLUSTER_PROFILE_DIR}/pull-secret")
+SSH_PUB_KEY=$(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
@@ -131,9 +131,9 @@ controlPlane:
       type: ${OPENSTACK_CONTROLPLANE_FLAVOR}
       zones: ${ZONES_STR}
   replicas: 3
-pullSecret: >
+pullSecret: >-
   ${PULL_SECRET}
-sshKey: |
+sshKey: |-
   ${SSH_PUB_KEY}
 EOF
 if [[ "${CONFIG_TYPE}" == "proxy" && -f "${SHARED_DIR}"/PROXY_INTERFACE ]]; then
@@ -144,11 +144,11 @@ proxy:
   httpProxy: http://${SQUID_AUTH}@${PROXY_INTERFACE}:3128/
   httpsProxy: https://${SQUID_AUTH}@${PROXY_INTERFACE}:3130/
 additionalTrustBundle: |
-$(cat "${SHARED_DIR}"/domain.crt | awk '{print "  "$0}')
+$(awk '{print "  "$0}' "${SHARED_DIR}/domain.crt")
 EOF
 fi
 
-if [ ${FIPS_ENABLED} = "true" ]; then
+if [ "${FIPS_ENABLED}" = "true" ]; then
   echo "Adding 'fips: true' to install-config.yaml"
   cat >> "${CONFIG}" << EOF
 fips: true
@@ -164,16 +164,16 @@ data["pullSecret"] = "redacted"
 if "proxy" in data:
     data["proxy"] = "redacted"
 print(yaml.dump(data))
-' "${SHARED_DIR}/install-config.yaml" > ${ARTIFACT_DIR}/install-config.yaml
+' "${SHARED_DIR}/install-config.yaml" > "${ARTIFACT_DIR}/install-config.yaml"
 
 # This block will remove the ports created in openstack-provision-machinesubnet-commands.sh
 # since the installer will create them again, based on install-config.yaml.
 if [[ ${OPENSTACK_PROVIDER_NETWORK} != "" ]]; then
   echo "Provider network detected, will clean-up reserved ports"
   for p in api ingress; do
-    if openstack port show ${CLUSTER_NAME}-${CONFIG_TYPE}-${p} >/dev/null; then
+    if openstack port show "${CLUSTER_NAME}-${CONFIG_TYPE}-${p}" >/dev/null; then
       echo "Port exists for ${CLUSTER_NAME}-${CONFIG_TYPE}-${p}: removing it"
-      openstack port delete ${CLUSTER_NAME}-${CONFIG_TYPE}-${p}
+      openstack port delete "${CLUSTER_NAME}-${CONFIG_TYPE}-${p}"
     fi
   done
 fi
