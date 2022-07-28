@@ -2,7 +2,7 @@ base_images:
   eks:
     name: automation-flavors
     namespace: stackrox
-    tag: eks-0.3.0
+    tag: eks-0.3.1
   ubi:
     name: ubi
     namespace: ocp
@@ -192,14 +192,7 @@ tests:
     test:
     - as: hack
       commands: |
-        echo "SHARED_DIR: ${SHARED_DIR:-}"
-        ls -l "${SHARED_DIR:-}"
-        KUBECONFIG="${SHARED_DIR:-}/kubeconfig" kubectl get nodes -o wide || true
-        touch /tmp/hold
-        while [[ -e /tmp/hold ]]; do
-            info "Holding this job for debug"
-            sleep 60
-        done
+        .openshift-ci/dispatch.sh eks-qa-e2e-tests
       credentials:
       - mount_path: /tmp/vault/stackrox-stackrox-e2e-tests
         name: stackrox-stackrox-e2e-tests
