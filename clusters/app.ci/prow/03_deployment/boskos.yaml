@@ -4,7 +4,7 @@ parameters:
 - description: The session secret for the component.
   name: SESSION_SECRET
   generate: expression
-  from: "[a-zA-Z0-9]{43}"
+  from: '[a-zA-Z0-9]{43}'
 - description: namespace
   name: namespace
   value: ci
@@ -41,7 +41,7 @@ objects:
                     operator: In
                     values:
                     - boskos
-                topologyKey: "kubernetes.io/hostname"
+                topologyKey: kubernetes.io/hostname
         serviceAccountName: boskos
         terminationGracePeriodSeconds: 30
         containers:
@@ -93,11 +93,11 @@ objects:
               fieldRef:
                 fieldPath: metadata.name
           ports:
-            - containerPort: 8080
-              protocol: TCP
-            - name: metrics
-              containerPort: 9090
-              protocol: TCP
+          - containerPort: 8080
+            protocol: TCP
+          - name: metrics
+            containerPort: 9090
+            protocol: TCP
           volumeMounts:
           - name: boskos-config
             mountPath: /etc/config
@@ -105,26 +105,26 @@ objects:
           - name: service-account-token
             mountPath: /var/sa-token
         volumes:
-          - name: boskos-config
-            configMap:
-              name: resources
-          - name: secret-boskos-htpasswd
-            secret:
-              secretName: boskos-credentials
-              items:
-              - key: ci.htpasswd
-                path: ci.htpasswd
-          - name: secret-boskos-proxy
-            secret:
-              secretName: boskos-proxy
-          - name: secret-boskos-tls
-            secret:
-              secretName: boskos-tls
-          - name: service-account-token
-            projected:
-              sources:
-              - serviceAccountToken:
-                  path: token
+        - name: boskos-config
+          configMap:
+            name: resources
+        - name: secret-boskos-htpasswd
+          secret:
+            secretName: boskos-credentials
+            items:
+            - key: ci.htpasswd
+              path: ci.htpasswd
+        - name: secret-boskos-proxy
+          secret:
+            secretName: boskos-proxy
+        - name: secret-boskos-tls
+          secret:
+            secretName: boskos-tls
+        - name: service-account-token
+          projected:
+            sources:
+            - serviceAccountToken:
+                path: token
 - apiVersion: v1
   kind: Service
   metadata:
@@ -139,7 +139,7 @@ objects:
     selector:
       app: prow
       component: boskos
-      boskos-leader: "true"
+      boskos-leader: 'true'
     ports:
     - name: https
       port: 8082
@@ -161,7 +161,7 @@ objects:
     name: boskos-proxy
     namespace: ${namespace}
   stringData:
-    session_secret: "${SESSION_SECRET}="
+    session_secret: ${SESSION_SECRET}=
 - apiVersion: v1
   kind: Route
   metadata:

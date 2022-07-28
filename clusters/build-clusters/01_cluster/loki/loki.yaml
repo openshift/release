@@ -22,11 +22,11 @@ rules:
   - watch
   - list
 - apiGroups:
-  - 'config.openshift.io'
+  - config.openshift.io
   resources:
-  - 'clusterversions'
+  - clusterversions
   verbs:
-  - 'get'
+  - get
 - apiGroups:
   - security.openshift.io
   resourceNames:
@@ -68,7 +68,7 @@ spec:
         app.kubernetes.io/instance: loki-promtail
         app.kubernetes.io/name: promtail
         app.kubernetes.io/part-of: loki
-        app.kubernetes.io/version: "2.2.1"
+        app.kubernetes.io/version: 2.2.1
       annotations:
         promtail.yaml: |-
           clients:
@@ -176,18 +176,18 @@ spec:
         - --file=/tmp/shared/prod_bearer_token
         name: prod-bearer-token
         env:
-          - name: CLIENT_ID
-            valueFrom:
-              secretKeyRef:
-                name: promtail-prod-creds
-                key: client-id
-          - name: CLIENT_SECRET
-            valueFrom:
-              secretKeyRef:
-                name: promtail-prod-creds
-                key: client-secret
+        - name: CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: promtail-prod-creds
+              key: client-id
+        - name: CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: promtail-prod-creds
+              key: client-secret
         volumeMounts:
-        - mountPath: "/tmp/shared"
+        - mountPath: /tmp/shared
           name: shared-data
         image: quay.io/observatorium/token-refresher
       - command:
@@ -216,7 +216,7 @@ spec:
         readinessProbe:
           failureThreshold: 5
           httpGet:
-            path: "/ready"
+            path: /ready
             port: http-metrics
           initialDelaySeconds: 10
           periodSeconds: 10
@@ -228,19 +228,19 @@ spec:
           runAsGroup: 0
           runAsUser: 0
         volumeMounts:
-        - mountPath: "/etc/promtail"
+        - mountPath: /etc/promtail
           name: config
-        - mountPath: "/run/promtail"
+        - mountPath: /run/promtail
           name: run
-        - mountPath: "/var/lib/docker/containers"
+        - mountPath: /var/lib/docker/containers
           name: docker
           readOnly: true
-        - mountPath: "/var/log/pods"
+        - mountPath: /var/log/pods
           name: pods
           readOnly: true
-        - mountPath: "/tmp/shared"
+        - mountPath: /tmp/shared
           name: shared-data
-        - mountPath: "/var/log/journal"
+        - mountPath: /var/log/journal
           name: journal
           readOnly: true
       serviceAccountName: loki-promtail
@@ -256,16 +256,16 @@ spec:
             fieldRef:
               fieldPath: metadata.annotations['promtail.yaml']
       - hostPath:
-          path: "/run/promtail"
+          path: /run/promtail
         name: run
       - hostPath:
-          path: "/var/lib/docker/containers"
+          path: /var/lib/docker/containers
         name: docker
       - hostPath:
-          path: "/var/log/pods"
+          path: /var/log/pods
         name: pods
       - hostPath:
-          path: "/var/log/journal"
+          path: /var/log/journal
         name: journal
       - emptyDir: {}
         name: shared-data
@@ -341,7 +341,7 @@ metadata:
   namespace: loki
 rules:
 - apiGroups:
-  - ""
+  - ''
   resources:
   - services
   - endpoints
@@ -361,9 +361,9 @@ roleRef:
   kind: Role
   name: promtail-prometheus
 subjects:
-  - kind: ServiceAccount
-    name: prometheus-k8s
-    namespace: openshift-monitoring
+- kind: ServiceAccount
+  name: prometheus-k8s
+  namespace: openshift-monitoring
 ---
 kind: Service
 apiVersion: v1
@@ -374,10 +374,10 @@ metadata:
     app.kubernetes.io/name: promtail
 spec:
   ports:
-    - name: metrics
-      protocol: TCP
-      port: 3101
-      targetPort: http-metrics
+  - name: metrics
+    protocol: TCP
+    port: 3101
+    targetPort: http-metrics
   selector:
     app.kubernetes.io/name: promtail
   type: ClusterIP
@@ -394,7 +394,7 @@ spec:
     scheme: http
   namespaceSelector:
     matchNames:
-      - loki
+    - loki
   selector:
     matchLabels:
       app.kubernetes.io/name: promtail

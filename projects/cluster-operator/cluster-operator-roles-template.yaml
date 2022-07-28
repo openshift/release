@@ -1,4 +1,3 @@
----
 ########
 #
 # Template for auth (service accounts, roles, bindings) to deploy the cluster operator.
@@ -41,13 +40,13 @@ objects:
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRoleBinding
   metadata:
-    name: "clusteroperator.openshift.io:apiserver-auth-delegator"
+    name: clusteroperator.openshift.io:apiserver-auth-delegator
   roleRef:
     apiGroup: rbac.authorization.k8s.io
     kind: ClusterRole
     name: system:auth-delegator
   subjects:
-  - apiGroup: ""
+  - apiGroup: ''
     kind: ServiceAccount
     name: cluster-operator-apiserver
     namespace: ${CLUSTER_OPERATOR_NAMESPACE}
@@ -63,14 +62,14 @@ objects:
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: RoleBinding
   metadata:
-    name: "system:deployers"
+    name: system:deployers
     namespace: ${CLUSTER_OPERATOR_NAMESPACE}
   roleRef:
     apiGroup: rbac.authorization.k8s.io
     kind: ClusterRole
     name: system:deployer
   subjects:
-  - apiGroup: ""
+  - apiGroup: ''
     kind: ServiceAccount
     name: deployer
     namespace: ${CLUSTER_OPERATOR_NAMESPACE}
@@ -79,14 +78,14 @@ objects:
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: RoleBinding
   metadata:
-    name: "system:image-builders"
+    name: system:image-builders
     namespace: ${CLUSTER_OPERATOR_NAMESPACE}
   roleRef:
     apiGroup: rbac.authorization.k8s.io
     kind: ClusterRole
     name: system:image-builder
   subjects:
-  - apiGroup: ""
+  - apiGroup: ''
     kind: ServiceAccount
     name: builder
     namespace: ${CLUSTER_OPERATOR_NAMESPACE}
@@ -95,14 +94,14 @@ objects:
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: RoleBinding
   metadata:
-    name: "system:image-pullers"
+    name: system:image-pullers
     namespace: ${CLUSTER_OPERATOR_NAMESPACE}
   roleRef:
     apiGroup: rbac.authorization.k8s.io
     kind: ClusterRole
     name: system:image-puller
   subjects:
-  - apiGroup: ""
+  - apiGroup: ''
     kind: Group
     name: system:serviceaccounts:${CLUSTER_OPERATOR_NAMESPACE}
   #userNames:
@@ -114,14 +113,14 @@ objects:
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: RoleBinding
   metadata:
-    name: "clusteroperator.openshift.io:apiserver-authentication-reader"
+    name: clusteroperator.openshift.io:apiserver-authentication-reader
     namespace: ${KUBE_SYSTEM_NAMESPACE}
   roleRef:
     apiGroup: rbac.authorization.k8s.io
     kind: Role
     name: extension-apiserver-authentication-reader
   subjects:
-  - apiGroup: ""
+  - apiGroup: ''
     kind: ServiceAccount
     name: cluster-operator-apiserver
     namespace: ${CLUSTER_OPERATOR_NAMESPACE}
@@ -131,51 +130,51 @@ objects:
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
-    name: "clusteroperator.openshift.io:controller-manager"
+    name: clusteroperator.openshift.io:controller-manager
   rules:
   # configmaps for leader election
-  - apiGroups: [""]
-    resources: ["configmaps"]
-    verbs:     ["create"]
-  - apiGroups:     [""]
-    resources:     ["configmaps"]
-    resourceNames: ["cluster-operator-controller-manager"]
-    verbs: ["get","update"]
+  - apiGroups: ['']
+    resources: [configmaps]
+    verbs: [create]
+  - apiGroups: ['']
+    resources: [configmaps]
+    resourceNames: [cluster-operator-controller-manager]
+    verbs: [get, update]
   # events for recording events
-  - apiGroups: [""]
-    resources: ["events"]
-    verbs:     ["create","patch","update"]
+  - apiGroups: ['']
+    resources: [events]
+    verbs: [create, patch, update]
   # allow all operations on all resources in our API group
-  - apiGroups: ["clusteroperator.openshift.io"]
-    resources: ["*"]
-    verbs:     ["create", "get", "list", "watch", "update", "patch", "delete"]
+  - apiGroups: [clusteroperator.openshift.io]
+    resources: ['*']
+    verbs: [create, get, list, watch, update, patch, delete]
   # allow all operations on all resources in the cluster-api API group
-  - apiGroups: ["cluster.k8s.io"]
-    resources: ["*"]
-    verbs:     ["create", "get", "list", "watch", "update", "patch", "delete"]
+  - apiGroups: [cluster.k8s.io]
+    resources: ['*']
+    verbs: [create, get, list, watch, update, patch, delete]
   # allow operations on required resources in any namespace a cluster is created
-  - apiGroups:     [""]
-    resources:     ["configmaps", "pods", "secrets", "serviceaccounts"]
-    verbs: ["*"]
-  - apiGroups:     ["batch"]
-    resources:     ["jobs"]
-    verbs: ["*"]
+  - apiGroups: ['']
+    resources: [configmaps, pods, secrets, serviceaccounts]
+    verbs: ['*']
+  - apiGroups: [batch]
+    resources: [jobs]
+    verbs: ['*']
   # allow reading and creating rolebindings
-  - apiGroups: ["rbac.authorization.k8s.io"]
-    resources: ["rolebindings"]
-    verbs: ["*"]
+  - apiGroups: [rbac.authorization.k8s.io]
+    resources: [rolebindings]
+    verbs: ['*']
 
 # Bind the Controller Manager service account to the role created for it
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRoleBinding
   metadata:
-    name: "clusteroperator.openshift.io:controller-manager"
+    name: clusteroperator.openshift.io:controller-manager
   roleRef:
     apiGroup: rbac.authorization.k8s.io
     kind: ClusterRole
-    name: "clusteroperator.openshift.io:controller-manager"
+    name: clusteroperator.openshift.io:controller-manager
   subjects:
-  - apiGroup: ""
+  - apiGroup: ''
     kind: ServiceAccount
     name: cluster-operator-controller-manager
     namespace: ${CLUSTER_OPERATOR_NAMESPACE}
@@ -185,46 +184,46 @@ objects:
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
-    name: "clusteroperator.openshift.io:master-controller"
+    name: clusteroperator.openshift.io:master-controller
   rules:
   # CRUD secrets with kubeconfig data
-  - apiGroups: [""]
-    resources: ["secrets"]
-    verbs:     ["create", "delete", "get", "list", "update"]
+  - apiGroups: ['']
+    resources: [secrets]
+    verbs: [create, delete, get, list, update]
 
 # Role for upstream cluster api controllers
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
-    name: "clusterapi.openshift.io:controller-manager"
+    name: clusterapi.openshift.io:controller-manager
   rules:
   # events for recording events
-  - apiGroups: [""]
-    resources: ["events"]
-    verbs: ["create", "patch", "update"]
+  - apiGroups: ['']
+    resources: [events]
+    verbs: [create, patch, update]
   # allow all operations on all resources in our API group
-  - apiGroups: ["cluster.k8s.io"]
-    resources: ["*"]
-    verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
+  - apiGroups: [cluster.k8s.io]
+    resources: ['*']
+    verbs: [create, get, list, watch, update, patch, delete]
   # allow operations on required resources in any namespace a cluster is created
-  - apiGroups: [""]
-    resources: ["configmaps", "pods", "secrets", "nodes"]
-    verbs: ["*"]
-  - apiGroups: ["batch"]
-    resources: ["jobs"]
-    verbs: ["*"]
+  - apiGroups: ['']
+    resources: [configmaps, pods, secrets, nodes]
+    verbs: ['*']
+  - apiGroups: [batch]
+    resources: [jobs]
+    verbs: ['*']
 
 # Bind the upstream cluster api controllers role to its ServiceAccount
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRoleBinding
   metadata:
-    name: "clusterapi.openshift.io:controller-manager"
+    name: clusterapi.openshift.io:controller-manager
   roleRef:
     apiGroup: rbac.authorization.k8s.io
     kind: ClusterRole
-    name: "clusterapi.openshift.io:controller-manager"
+    name: clusterapi.openshift.io:controller-manager
   subjects:
-  - apiGroup: ""
+  - apiGroup: ''
     kind: ServiceAccount
     name: cluster-api-controller-manager
     namespace: ${CLUSTER_OPERATOR_NAMESPACE}

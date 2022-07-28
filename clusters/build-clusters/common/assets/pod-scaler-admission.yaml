@@ -1,29 +1,28 @@
----
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
-  name: "pod-scaling.ci.openshift.io"
+  name: pod-scaling.ci.openshift.io
   annotations:
-    service.beta.openshift.io/inject-cabundle: "true"
+    service.beta.openshift.io/inject-cabundle: 'true'
 webhooks:
-- name: "pod-scaling.ci.openshift.io"
+- name: pod-scaling.ci.openshift.io
   namespaceSelector:
     matchExpressions:
-    - key: "ci.openshift.io/scale-pods"
+    - key: ci.openshift.io/scale-pods
       operator: In
-      values: ["true"]
+      values: ['true']
   rules:
-  - apiGroups: [""]
-    apiVersions: ["v1"]
-    operations: ["CREATE"]
-    resources: ["pods"]
-    scope: "Namespaced"
+  - apiGroups: ['']
+    apiVersions: [v1]
+    operations: [CREATE]
+    resources: [pods]
+    scope: Namespaced
   clientConfig:
     service:
-      namespace: "ci"
-      name: "pod-scaler-consumer-admission"
-      path: "/pods"
-  admissionReviewVersions: ["v1"]
+      namespace: ci
+      name: pod-scaler-consumer-admission
+      path: /pods
+  admissionReviewVersions: [v1]
   sideEffects: None
   timeoutSeconds: 5
   failurePolicy: Ignore
@@ -83,10 +82,10 @@ spec:
         - --cpu-cap=10
         - --memory-cap=20Gi
         ports:
-          - name: main
-            containerPort: 8080
-          - name: metrics
-            containerPort: 9090
+        - name: main
+          containerPort: 8080
+        - name: metrics
+          containerPort: 9090
         livenessProbe:
           httpGet:
             path: /healthz
@@ -109,8 +108,8 @@ spec:
           readOnly: true
         resources:
           requests:
-            memory: "2Gi"
-            cpu: "250m"
+            memory: 2Gi
+            cpu: 250m
       volumes:
       - name: gcs-credentials
         secret:

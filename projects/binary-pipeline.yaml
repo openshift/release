@@ -6,11 +6,11 @@ metadata:
       Assists in creating binary builds with runtime images.
 parameters:
 - name: NAME
-  required: True
+  required: true
 - name: REPO
-  required: True
+  required: true
 - name: SOURCE_PATH
-  required: True
+  required: true
 - name: BINARY
   value: |
     FROM scratch
@@ -45,10 +45,10 @@ objects:
       git:
         uri: ${REPO}
       type: Git
-      dockerfile: "${BINARY}"
+      dockerfile: ${BINARY}
     strategy:
       dockerStrategy:
-        from: "${{BINARY_FROM}}"
+        from: ${{BINARY_FROM}}
         imageOptimizationPolicy: SkipLayers
     triggers:
     - type: ConfigChange
@@ -67,17 +67,17 @@ objects:
         kind: ImageStreamTag
         name: ${NAME}:latest
     source:
-      dockerfile: "${RUNTIME}"
+      dockerfile: ${RUNTIME}
       images:
       - from:
           kind: ImageStreamTag
           name: ${NAME}:binaries
         paths:
         - destinationDir: .
-          sourcePath: "${SOURCE_PATH}"
+          sourcePath: ${SOURCE_PATH}
     strategy:
       dockerStrategy:
-        from: "${{RUNTIME_FROM}}"
+        from: ${{RUNTIME_FROM}}
         imageOptimizationPolicy: SkipLayers
     triggers:
     - imageChange:

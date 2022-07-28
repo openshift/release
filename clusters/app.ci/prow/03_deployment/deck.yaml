@@ -4,8 +4,8 @@ parameters:
 - description: The session secret for the component.
   name: SESSION_SECRET
   generate: expression
-  from: "[a-zA-Z0-9]{43}"
-- description: "The namespace. Must come from a var or it will get stripped off"
+  from: '[a-zA-Z0-9]{43}'
+- description: The namespace. Must come from a var or it will get stripped off
   name: NAMESPACE
   value: ci
 objects:
@@ -15,7 +15,7 @@ objects:
     name: deck
     namespace: ${NAMESPACE}
     annotations:
-      haproxy.router.openshift.io/timeout: "90s"
+      haproxy.router.openshift.io/timeout: 90s
   spec:
     port:
       targetPort: 8080
@@ -31,7 +31,7 @@ objects:
     namespace: ${NAMESPACE}
     name: prow
     annotations:
-      haproxy.router.openshift.io/timeout: "90s"
+      haproxy.router.openshift.io/timeout: 90s
   spec:
     port:
       targetPort: 8080
@@ -114,10 +114,10 @@ objects:
                 name: openshift-prow-github-app
                 key: appid
           ports:
-            - name: main
-              containerPort: 8080
-            - name: metrics
-              containerPort: 9090
+          - name: main
+            containerPort: 8080
+          - name: metrics
+            containerPort: 9090
           livenessProbe:
             httpGet:
               path: /healthz
@@ -160,8 +160,8 @@ objects:
             readOnly: true
           resources:
             requests:
-              memory: "5Gi"
-              cpu: "500m"
+              memory: 5Gi
+              cpu: 500m
         volumes:
         - name: github-app-credentials
           secret:
@@ -234,7 +234,7 @@ objects:
     namespace: ${NAMESPACE}
     name: deck-internal
     annotations:
-      haproxy.router.openshift.io/timeout: "90s"
+      haproxy.router.openshift.io/timeout: 90s
   spec:
     tls:
       insecureEdgeTerminationPolicy: Redirect
@@ -304,7 +304,8 @@ objects:
           - -openshift-ca=/etc/pki/tls/cert.pem
           - -openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
           - '-openshift-sar={"verb": "get", "resource": "secrets", "namespace": "openshift-priv"}'
-          - '-openshift-delegate-urls={"/": {"verb": "get", "resource": "secrets", "namespace": "openshift-priv"}}'
+          - '-openshift-delegate-urls={"/": {"verb": "get", "resource": "secrets",
+            "namespace": "openshift-priv"}}'
           - -client-secret-file=/var/run/secrets/kubernetes.io/serviceaccount/token
           - -cookie-secret-file=/etc/proxy/secrets/session_secret
           - -cookie-samesite=none
@@ -346,8 +347,8 @@ objects:
                 name: openshift-prow-github-app
                 key: appid
           ports:
-            - name: http
-              containerPort: 8080
+          - name: http
+            containerPort: 8080
           volumeMounts:
           - name: github-app-credentials
             mountPath: /etc/github
@@ -379,8 +380,8 @@ objects:
             readOnly: true
           resources:
             requests:
-              memory: "3Gi"
-              cpu: "600m"
+              memory: 3Gi
+              cpu: 600m
         volumes:
         - name: github-app-credentials
           secret:
@@ -459,4 +460,4 @@ objects:
     namespace: ${NAMESPACE}
     name: deck-internal-session-secret
   stringData:
-    session_secret: "${SESSION_SECRET}="
+    session_secret: ${SESSION_SECRET}=
