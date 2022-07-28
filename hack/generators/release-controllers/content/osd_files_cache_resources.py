@@ -26,7 +26,7 @@ used by a release controller. Create a service and a route to this public instan
         })
 
         gendoc.append({
-            'apiVersion': 'v1',
+            'apiVersion': 'route.openshift.io/v1',
             'kind': 'Route',
             'metadata': {
                 'name': 'files-cache',
@@ -93,7 +93,7 @@ used by a release controller. Create a service and a route to this public instan
         })
 
         gendoc.append({
-            'apiVersion': 'v1',
+            'apiVersion': 'route.openshift.io/v1',
             'kind': 'Route',
             'metadata': {
                 'name': 'files-cache-oauth-proxy',
