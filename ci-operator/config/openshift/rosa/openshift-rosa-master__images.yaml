@@ -15,7 +15,9 @@ build_root:
 images:
 - dockerfile_literal: |
     FROM registry.ci.openshift.org/openshift/release:golang-1.16 as builder
-    RUN go get -u github.com/openshift/rosa/cmd/rosa
+    WORKDIR /go/src/github.com/openshift/rosa
+    RUN go install ./cmd/rosa
+    RUN rosa version
 
     FROM registry.ci.openshift.org/origin/4.10:cli
     COPY --from=builder /go/bin/rosa /usr/bin/rosa
@@ -26,17 +28,17 @@ images:
         which
     RUN yum clean all
     RUN curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
-        unzip awscliv2.zip && \
+        unzip -q awscliv2.zip && \
         ./aws/install && \
         rm -rf awscliv2.zip aws &&\
         aws --version
   inputs:
-    openshift_release_golang-1.16:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.16
     origin_4.10_cli:
       as:
       - registry.ci.openshift.org/origin/4.10:cli
+    src:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.16
   to: rosa-aws-cli
 promotion:
   namespace: ci
