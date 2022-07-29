@@ -9,6 +9,12 @@ build_root:
     name: release
     namespace: openshift
     tag: golang-1.18
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.11"
+      namespace: ocp
 resources:
   '*':
     limits:
@@ -42,6 +48,20 @@ tests:
   commands: make gofmt || true
   container:
     from: src
+- as: e2e-openstack
+  optional: true
+  steps:
+    cluster_profile: openstack-operators-vexxhost
+    env:
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_TYPE: minimal
+      CONTROLPLANE_REPLICAS: "1"
+      OPENSTACK_COMPUTE_FLAVOR: ci.m1.xxlarge
+      OPENSTACK_CONTROLPLANE_FLAVOR: ci.m1.xxlarge
+      WORKER_REPLICAS: "0"
+    test:
+    - ref: openstack-noop
+    workflow: openshift-e2e-openstack-ipi
 zz_generated_metadata:
   branch: master
   org: openstack-k8s-operators
