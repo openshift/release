@@ -51,6 +51,6 @@ timeout --kill-after 10m 120m gcloud compute ssh --zone="${ZONE}" ${instance_nam
     sudo chown -R root:root "\${REPO_DIR}"
     cd "\${REPO_DIR}/contrib/test/ci"
     echo "localhost" >> hosts
-    sudo ansible-playbook integration-main.yml -i hosts -e "TEST_AGENT=prow" --connection=local -vvv 
+    ansible-playbook integration-main.yml -i hosts -e "TEST_AGENT=prow" --connection=local -vvv 
 EOF
 
