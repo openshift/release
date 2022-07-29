@@ -4,11 +4,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-echo using ${OS_CLOUD}
 export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
 
+set -x
+
 if [[ -f "${SHARED_DIR}/DELETE_FIPS" ]]; then
-    for FIP in $(cat ${SHARED_DIR}/DELETE_FIPS); do
-        openstack floating ip delete ${FIP}  || true
-    done
+	xargs --no-run-if-empty \
+		openstack floating ip delete \
+		< "${SHARED_DIR}/DELETE_FIPS"
 fi
