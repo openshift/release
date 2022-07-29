@@ -43,9 +43,6 @@ sos report --batch --tmp-dir /tmp/artifacts \
   -o memory,container_log,filesys,kvm,libvirt,logs,networkmanager,networking,podman,processor,rpm,sar,virsh,yum \
   -k podman.all -k podman.logs
 
-# TODO: remove when https://github.com/sosreport/sos/pull/2594 is available
-cp -v -r /var/lib/libvirt/dnsmasq /tmp/artifacts/libvirt-dnsmasq
-
 cp -v -r /var/log/swtpm/libvirt/qemu /tmp/artifacts/libvirt-qemu || true
 ls -ltr /var/lib/swtpm-localca/ >> /tmp/artifacts/libvirt-qemu/ls-swtpm-localca.txt || true
 

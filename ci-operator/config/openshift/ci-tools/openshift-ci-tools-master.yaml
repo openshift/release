@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.11"
+    name: "4.10"
     namespace: ocp
     tag: cli
   golangci-lint:
@@ -613,6 +613,21 @@ images:
       - destination_dir: .
         source_path: /go/bin/job-run-aggregator
   to: job-run-aggregator
+- dockerfile_literal: |-
+    FROM quay.io/centos/centos:stream8
+    RUN dnf install -y git && dnf clean all && rm -rf /var/cache/dnf
+    ADD job-run-aggregator /usr/bin/job-run-aggregator
+    ADD prcreator /usr/bin/prcreator
+    ENTRYPOINT ["job-run-aggregator"]
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/job-run-aggregator
+      - destination_dir: .
+        source_path: /go/bin/prcreator
+  to: auto-aggregator-job-names
 - dockerfile_literal: |-
     FROM quay.io/centos/centos:stream8
     RUN dnf install -y git && dnf clean all && rm -rf /var/cache/dnf
