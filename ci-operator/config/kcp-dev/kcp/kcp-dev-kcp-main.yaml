@@ -122,7 +122,29 @@ tests:
         requests:
           cpu: 1000m
           memory: 4Gi
+- as: e2e-periodic
+  cron: 0 */2 * * *
+  steps:
+    test:
+    - as: e2e
+      commands: USE_GOTESTSUM=1 E2E_PARALLELISM=3 make test-e2e
+      from: bin
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 4Gi
 - as: e2e-multiple-runs
+  steps:
+    test:
+    - as: e2e-multiple-runs
+      commands: USE_GOTESTSUM=1 COUNT=3 E2E_PARALLELISM=3 make test-e2e
+      from: bin
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 4Gi
+- as: e2e-multiple-runs-periodic
+  cron: 0 */2 * * *
   steps:
     test:
     - as: e2e-multiple-runs

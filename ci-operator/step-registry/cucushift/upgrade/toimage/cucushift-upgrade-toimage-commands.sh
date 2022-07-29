@@ -33,7 +33,7 @@ EOF
       cat >"${ARTIFACT_DIR}/junit_upgrade.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuite name="cluster upgrade" tests="1" failures="1">
-  <testcase classname="cluster upgrade" name="upgrade should succeed"/>
+  <testcase classname="cluster upgrade" name="upgrade should succeed">
     <failure message="">openshift cluster upgrade failed</failure>
   </testcase>
 </testsuite>
