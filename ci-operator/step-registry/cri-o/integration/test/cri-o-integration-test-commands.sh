@@ -48,9 +48,9 @@ timeout --kill-after 10m 120m gcloud compute ssh --zone="${ZONE}" ${instance_nam
     mkdir -p "\${REPO_DIR}"
     # copy the agent sources on the remote machine
     tar -xzvf cri-o.tar.gz -C "\${REPO_DIR}"
-    chown -R root:root "\${REPO_DIR}"
+    sudo chown -R root:root "\${REPO_DIR}"
     cd "\${REPO_DIR}/contrib/test/ci"
     echo "localhost" >> hosts
-    ansible-playbook integration-main.yml -i hosts -e "TEST_AGENT=prow" --connection=local -vvv 
+    sudo ansible-playbook integration-main.yml -i hosts -e "TEST_AGENT=prow" --connection=local -vvv 
 EOF
 
