@@ -36,8 +36,7 @@ tar -czf - . | gcloud compute ssh --zone "${ZONE}" ${instance_name} -- "cat > \$
 timeout --kill-after 10m 120m gcloud compute ssh --zone "${ZONE}" ${instance_name} -- bash - << EOF 
     export GOROOT=/usr/local/go
     echo GOROOT="/usr/local/go" | sudo tee -a /etc/environment
-    cat /etc/environment 
-    mkdir -p /logs/artifacts
+    mkdir -p \${HOME}/logs/artifacts
     mkdir -p /tmp/artifacts/logs
     sudo dnf install python39 -y
     curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
@@ -48,7 +47,6 @@ timeout --kill-after 10m 120m gcloud compute ssh --zone "${ZONE}" ${instance_nam
     REPO_DIR="\${HOME}/cri-o"
     mkdir -p "\${REPO_DIR}"
     # copy the agent sources on the remote machine
-    chown -R root:root "\${REPO_DIR}"
     cd "\${REPO_DIR}/contrib/test/ci"
     echo "localhost" >> hosts
     ansible-playbook critest-main.yml -i hosts -e "TEST_AGENT=prow" --connection=local -vvv

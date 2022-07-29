@@ -35,7 +35,7 @@ tar -czf - . | gcloud compute ssh --zone="${ZONE}" ${instance_name} -- "cat > \$
 timeout --kill-after 10m 120m gcloud compute ssh --zone="${ZONE}" ${instance_name} -- bash - << EOF 
     export GOROOT=/usr/local/go
     echo GOROOT="/usr/local/go" | sudo tee -a /etc/environment
-    mkdir -p /logs/artifacts
+    mkdir -p \${HOME}/logs/artifacts
     mkdir -p /tmp/artifacts/logs
 
     sudo dnf install python39 -y
