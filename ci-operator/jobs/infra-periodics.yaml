@@ -2393,3 +2393,50 @@ periodics:
     - name: token
       secret:
         secretName: github-credentials-openshift-bot
+- agent: kubernetes
+  cluster: app.ci
+  cron: 0 */6 * * 1-5
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: ci-tools
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-prow-auto-aggregator-job-names
+  spec:
+    containers:
+    - args:
+      - -c
+      - |
+        set -o errexit
+        set -o nounset
+        set -o pipefail
+        # cd into the refernces ci-tools repo, need to be in same directory for prcreator
+        cd ci-tools
+
+        # Generate job run names and overwrite the generated_job_names.txt
+        /usr/bin/job-run-aggregator generate-job-names > pkg/jobrunaggregator/jobtableprimer/generated_job_names.txt
+
+        # Initiate prcreator to open a PR against ci-tools
+        /usr/bin/prcreator \
+        -github-token-path=/etc/github/oauth \
+        -organization=openshift \
+        -repo=ci-tools \
+        -pr-title="Automated - Update generated_job_names.txt"
+      command:
+      - /bin/bash
+      image: registry.ci.openshift.org/ci/auto-aggregator-job-names:latest
+      imagePullPolicy: Always
+      name: auto-aggregator-job-names
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: token
+        readOnly: true
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-bot
