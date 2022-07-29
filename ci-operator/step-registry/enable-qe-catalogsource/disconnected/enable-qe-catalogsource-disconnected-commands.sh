@@ -241,6 +241,37 @@ function check_default_catalog () {
     fi
 }
 
+# From 4.11 on, the marketplace is optional.
+# That means, once the marketplace disabled, its "openshift-marketplace" project will NOT be created as default.
+# But, for OLM, its global namespace still is "openshift-marketplace"(details: https://bugzilla.redhat.com/show_bug.cgi?id=2076878),
+# so we need to create it manually so that optional operator teams' test cases can be run smoothly.
+function check_marketplace () {
+    # caps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.enabledCapabilities}"`
+    # if [[ ${caps} =~ "marketplace" ]]; then
+    #     echo "marketplace installed, skip..."
+    #     return 0
+    # fi
+    
+    run_command "oc get ns openshift-marketplace"; ret=$?
+    if [[ $ret -eq 0 ]]; then
+        echo "openshift-marketplace project AlreadyExists, skip creating."
+        return 0
+    fi
+
+    cat <<EOF | oc create -f -
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    security.openshift.io/scc.podSecurityLabelSync: "false"
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/audit: baseline
+    pod-security.kubernetes.io/warn: baseline
+  name: openshift-marketplace
+EOF
+
+}
+
 set_proxy
 run_command "oc whoami"
 run_command "oc version -o yaml"
@@ -258,6 +289,7 @@ echo "MIRROR_PROXY_REGISTRY: ${MIRROR_PROXY_REGISTRY}"
 set_cluster_auth
 set_CA_for_nodes
 create_settled_icsp
+check_marketplace
 create_catalog_sources
 # For now(2022-07-19), the Proxy registry can only proxy the `brew.registry.redhat.io` image, 
 # but the default CatalogSource use `registry.redhat.io` image, such as registry.redhat.io/redhat/redhat-operator-index:v4.11
