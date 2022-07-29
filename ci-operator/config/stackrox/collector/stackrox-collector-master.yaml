@@ -39,6 +39,10 @@ images:
   from: src
   to: integration-tests
 promotion:
+  excluded_images:
+  - collector-builder
+  - collector-drivers
+  - collector-bundle
   namespace: stackrox
   tag: osci-test
 resources:
@@ -76,6 +80,16 @@ tests:
         requests:
           cpu: 2000m
           memory: 4000Mi
+- as: unit-tests
+  steps:
+    test:
+    - as: collector-unit-tests
+      commands: /go/src/github.com/stackrox/collector/cmake-build/collector/runUnitTests
+      from: collector
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
 - as: push-images
   steps:
     test:
@@ -89,16 +103,6 @@ tests:
       - env: COLLECTOR_FULL
         name: collector-full
       from: src
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 4000Mi
-- as: unit-tests
-  steps:
-    test:
-    - as: collector-unit-tests
-      commands: /go/src/github.com/stackrox/collector/cmake-build/collector/runUnitTests
-      from: collector
       resources:
         requests:
           cpu: 2000m
@@ -125,6 +129,96 @@ tests:
       VM_TYPE: rhel
     workflow: stackrox-collector-integration-tests
 - as: rhel-8-kernel-module-integration-tests
+  steps:
+    env:
+      COLLECTION_METHOD: kernel-module
+      IMAGE_FAMILY: rhel-8
+      VM_TYPE: rhel
+    workflow: stackrox-collector-integration-tests
+- as: merge-lint
+  postsubmit: true
+  steps:
+    test:
+    - as: clang-format
+      commands: make -C collector check
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+    - as: shfmt-check
+      commands: make shfmt-check
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+- as: merge-test-scripts
+  postsubmit: true
+  steps:
+    test:
+    - as: shellcheck-all
+      commands: make shellcheck-all
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+- as: merge-unit-tests
+  postsubmit: true
+  steps:
+    test:
+    - as: collector-unit-tests
+      commands: /go/src/github.com/stackrox/collector/cmake-build/collector/runUnitTests
+      from: collector
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+- as: merge-push-images
+  postsubmit: true
+  steps:
+    test:
+    - as: push-collector-images
+      commands: .openshift-ci/jobs/push-images/push-images.sh
+      credentials:
+      - mount_path: /tmp/secret/stackrox-stackrox-push
+        name: stackrox-stackrox-push
+        namespace: test-credentials
+      dependencies:
+      - env: COLLECTOR_FULL
+        name: collector-full
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+- as: merge-rhel-7-ebpf-integration-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: ebpf
+      IMAGE_FAMILY: rhel-7
+      VM_TYPE: rhel
+    workflow: stackrox-collector-integration-tests
+- as: merge-rhel-7-kernel-module-integration-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: kernel-module
+      IMAGE_FAMILY: rhel-7
+      VM_TYPE: rhel
+    workflow: stackrox-collector-integration-tests
+- as: merge-rhel-8-ebpf-integration-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: ebpf
+      IMAGE_FAMILY: rhel-8
+      VM_TYPE: rhel
+    workflow: stackrox-collector-integration-tests
+- as: merge-rhel-8-kernel-module-integration-tests
+  postsubmit: true
   steps:
     env:
       COLLECTION_METHOD: kernel-module
