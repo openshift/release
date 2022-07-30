@@ -75,11 +75,8 @@ spec:
             - containerPort: 8080
               protocol: TCP
           resources: {}
-          terminationMessagePath: /dev/termination-log
-          terminationMessagePolicy: File
           imagePullPolicy: Always
       restartPolicy: Always
-      terminationGracePeriodSeconds: 30
       dnsPolicy: ClusterFirst
       securityContext: {}
       schedulerName: default-scheduler
@@ -88,8 +85,6 @@ spec:
     rollingUpdate:
       maxUnavailable: 25%
       maxSurge: 25%
-  revisionHistoryLimit: 10
-  progressDeadlineSeconds: 600
 EOF
 
 for _ in {1..60}; do
@@ -105,7 +100,7 @@ for _ in {1..60}; do
     IMV=$(oc -n test-cso get imagemanifestvuln sha256.14237f12c482dcca294e766fc57163d0c0adac43ae690d1328fdc578f4792b95 || true)
     if [[ -n "$IMV" ]]; then
         echo "$IMV"
-        eixt 0
+        exit 0
     fi
     sleep 10
 done
