@@ -1,22 +1,22 @@
 base_images:
   assisted-installer:
-    name: ocm-2.7
+    name: ocm-2.6
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.7
+    name: ocm-2.6
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.7
+    name: ocm-2.6
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.7
+    name: ocm-2.6
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.7
+    name: ocm-2.6
     namespace: edge-infrastructure
     tag: assisted-test-infra
   coreos-centos-stream8:
@@ -49,7 +49,7 @@ images:
       - registry.ci.openshift.org/openshift/release:golang-1.17
   to: assisted-image-service
 promotion:
-  name: ocm-2.7
+  name: ocm-2.6
   namespace: edge-infrastructure
 releases:
   latest:
@@ -70,6 +70,8 @@ tests:
   steps:
     dependencies:
       SOURCE_IMAGE_REF: assisted-image-service
+    env:
+      RELEASE_TAG_PREFIX: ocm-2.6
     test:
     - ref: assisted-baremetal-images-publish
 - as: mirror-vcsref-image
@@ -77,6 +79,8 @@ tests:
   steps:
     dependencies:
       SOURCE_IMAGE_REF: assisted-image-service
+    env:
+      RELEASE_TAG_PREFIX: ocm-2.6
     test:
     - ref: assisted-baremetal-images-publish
 - as: lint
@@ -111,6 +115,9 @@ tests:
   optional: true
   steps:
     cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=release-ocm-2.6
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-deploy-nodes
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
@@ -118,10 +125,10 @@ tests:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=release-ocm-2.6
         MAKEFILE_TARGET="setup run deploy_nodes"
     workflow: assisted-baremetal
 zz_generated_metadata:
-  branch: main
+  branch: release-ocm-2.6
   org: openshift
   repo: assisted-image-service
-  variant: edge

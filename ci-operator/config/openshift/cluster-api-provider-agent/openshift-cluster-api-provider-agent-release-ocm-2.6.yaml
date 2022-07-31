@@ -1,22 +1,22 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.7
+    name: ocm-2.6
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.7
+    name: ocm-2.6
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.7
+    name: ocm-2.6
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.7
+    name: ocm-2.6
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.7
+    name: ocm-2.6
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-service-operator-index:
@@ -28,7 +28,7 @@ base_images:
     namespace: edge-infrastructure
     tag: assisted-service-scripts
   assisted-test-infra:
-    name: ocm-2.7
+    name: ocm-2.6
     namespace: edge-infrastructure
     tag: assisted-test-infra
   base:
@@ -54,7 +54,7 @@ images:
   from: base
   to: cluster-api-provider-agent
 promotion:
-  name: ocm-2.7
+  name: ocm-2.6
   namespace: edge-infrastructure
 releases:
   latest:
@@ -74,6 +74,8 @@ tests:
   steps:
     dependencies:
       SOURCE_IMAGE_REF: cluster-api-provider-agent
+    env:
+      RELEASE_TAG_PREFIX: ocm-2.6
     test:
     - ref: assisted-baremetal-images-publish
 - as: mirror-vcsref-image
@@ -82,7 +84,7 @@ tests:
     dependencies:
       SOURCE_IMAGE_REF: cluster-api-provider-agent
     env:
-      IMAGE_TAG: latest
+      RELEASE_TAG_PREFIX: ocm-2.6
     test:
     - ref: assisted-baremetal-images-publish
 - as: build
@@ -99,6 +101,7 @@ tests:
     from: src
   skip_if_only_changed: (^(docs|config)/)|(\.md$)|((^|/)OWNERS$)
 - as: e2e-metal-assisted-capi
+  skip_if_only_changed: (^(docs|config)/)|(\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -106,6 +109,7 @@ tests:
       PROVIDER_IMAGE: pipeline:cluster-api-provider-agent
     env:
       ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=release-ocm-2.6
         KUBE_API=yes
         ENABLE_KUBE_API=true
         MINIKUBE_DISK_SIZE=70g
@@ -123,6 +127,7 @@ tests:
       PROVIDER_IMAGE: pipeline:cluster-api-provider-agent
     env:
       ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=release-ocm-2.6
         KUBE_API=yes
         ENABLE_KUBE_API=true
         MINIKUBE_DISK_SIZE=70g
@@ -144,6 +149,6 @@ tests:
       PROVIDER_IMAGE: pipeline:cluster-api-provider-agent
     workflow: assisted-baremetal-operator-capi
 zz_generated_metadata:
-  branch: master
+  branch: release-ocm-2.6
   org: openshift
   repo: cluster-api-provider-agent
