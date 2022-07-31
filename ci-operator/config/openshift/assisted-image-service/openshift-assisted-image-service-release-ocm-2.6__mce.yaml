@@ -8,18 +8,20 @@ base_images:
     namespace: openshift
     tag: golang-1.17
 build_root:
-  project_image:
-    dockerfile_path: Dockerfile.assisted_installer_agent-build
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
 images:
-- dockerfile_path: Dockerfile.assisted_installer_agent
+- dockerfile_path: Dockerfile.image-service
   from: coreos-centos-stream8
   inputs:
     openshift_release_golang-1.17:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.17
-  to: assisted-installer-agent
+  to: assisted-image-service
 promotion:
-  name: "2.2"
+  name: "2.1"
   namespace: stolostron
 releases:
   latest:
@@ -36,17 +38,17 @@ tests:
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: assisted-installer-agent
+      SOURCE_IMAGE_REF: assisted-image-service
     env:
-      IMAGE_REPO: assisted-installer-agent
+      IMAGE_REPO: assisted-image-service
       OSCI_ENV_CONFIG: |
         OSCI_PUBLISH_DELAY=0
         OSCI_PIPELINE_PRODUCT_PREFIX=backplane
         OSCI_PIPELINE_REPO=backplane-pipeline
-      RELEASE_REF: backplane-2.2
+      RELEASE_REF: backplane-2.1
     workflow: ocm-ci-manifest-update
 zz_generated_metadata:
-  branch: master
+  branch: release-ocm-2.6
   org: openshift
-  repo: assisted-installer-agent
+  repo: assisted-image-service
   variant: mce

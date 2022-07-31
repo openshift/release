@@ -1,22 +1,22 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.7
+    name: ocm-2.6
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.7
+    name: ocm-2.6
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-controller:
-    name: ocm-2.7
+    name: ocm-2.6
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.7
+    name: ocm-2.6
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.7
+    name: ocm-2.6
     namespace: edge-infrastructure
     tag: assisted-test-infra
   coreos-centos-stream8:
@@ -48,7 +48,7 @@ images:
   from: src
   to: assisted-installer-agent-src
 promotion:
-  name: ocm-2.7
+  name: ocm-2.6
   namespace: edge-infrastructure
 releases:
   latest:
@@ -69,6 +69,8 @@ tests:
   steps:
     dependencies:
       SOURCE_IMAGE_REF: assisted-installer-agent
+    env:
+      RELEASE_TAG_PREFIX: ocm-2.6
     test:
     - ref: assisted-baremetal-images-publish
 - as: mirror-vcsref-image
@@ -76,6 +78,8 @@ tests:
   steps:
     dependencies:
       SOURCE_IMAGE_REF: assisted-installer-agent
+    env:
+      RELEASE_TAG_PREFIX: ocm-2.6
     test:
     - ref: assisted-baremetal-images-publish
 - as: lint
@@ -120,15 +124,9 @@ tests:
   skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: packet-assisted
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-ipv6
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        IPv6=yes
-        IPv4=no
+        SERVICE_BASE_REF=release-ocm-2.6
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-single-node
   optional: true
@@ -136,34 +134,8 @@ tests:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=release-ocm-2.6
         NUM_MASTERS=1
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-cnv
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OLM_OPERATORS=cnv
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-odf
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OLM_OPERATORS=odf
-      PACKET_PLAN: m3.large.x86
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-ocs
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OLM_OPERATORS=ocs
-        OPENSHIFT_VERSION=4.8
-      PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-day2
   optional: true
@@ -171,10 +143,10 @@ tests:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=release-ocm-2.6
         TEST_FUNC=test_deploy_day2_nodes_cloud
     workflow: assisted-baremetal
 zz_generated_metadata:
-  branch: master
+  branch: release-ocm-2.6
   org: openshift
   repo: assisted-installer-agent
-  variant: edge

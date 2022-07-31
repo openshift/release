@@ -1,10 +1,10 @@
 postsubmits:
-  openshift/cluster-api-provider-agent:
+  openshift/assisted-installer-agent:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    cluster: build02
+    - ^release-ocm-2\.6$
+    cluster: build01
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -12,7 +12,7 @@ postsubmits:
       ci-operator.openshift.io/is-promotion: "true"
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-openshift-cluster-api-provider-agent-master-images
+    name: branch-ci-openshift-assisted-installer-agent-release-ocm-2.6-images
     spec:
       containers:
       - args:
@@ -57,8 +57,8 @@ postsubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    cluster: build02
+    - ^release-ocm-2\.6$
+    cluster: build01
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -67,7 +67,7 @@ postsubmits:
       ci-operator.openshift.io/variant: mce
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-openshift-cluster-api-provider-agent-master-mce-images
+    name: branch-ci-openshift-assisted-installer-agent-release-ocm-2.6-mce-images
     spec:
       containers:
       - args:
@@ -113,8 +113,8 @@ postsubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    cluster: build02
+    - ^release-ocm-2\.6$
+    cluster: build01
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -122,14 +122,15 @@ postsubmits:
       ci-operator.openshift.io/variant: mce
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-openshift-cluster-api-provider-agent-master-mce-mce-publish
+    name: branch-ci-openshift-assisted-installer-agent-release-ocm-2.6-mce-publish
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=mce-publish
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=publish
         - --variant=mce
         command:
         - ci-operator
@@ -140,6 +141,9 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -151,6 +155,9 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -160,15 +167,15 @@ postsubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    cluster: build02
+    - ^release-ocm-2\.6$
+    cluster: build01
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-openshift-cluster-api-provider-agent-master-mirror-vcsref-image
+    name: branch-ci-openshift-assisted-installer-agent-release-ocm-2.6-mirror-vcsref-image
     spec:
       containers:
       - args:
@@ -203,6 +210,58 @@ postsubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-ocm-2\.6$
+    cluster: build01
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-openshift-assisted-installer-agent-release-ocm-2.6-unit-test-postsubmit
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/assisted-installer-agent-codecov-token
+        - --target=unit-test-postsubmit
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/assisted-installer-agent-codecov-token
+          name: assisted-installer-agent-codecov-token
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: assisted-installer-agent-codecov-token
+        secret:
+          secretName: assisted-installer-agent-codecov-token
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
