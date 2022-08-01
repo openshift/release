@@ -11,8 +11,8 @@ export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
 # that libcurl doesn't recognize the uppercase variables).
 if test -f "${SHARED_DIR}/proxy-conf.sh"
 then
-    # shellcheck disable=SC1090
-    source "${SHARED_DIR}/proxy-conf.sh"
+	# shellcheck disable=SC1090
+	source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
 openstack-tests run openshift/openstack \
