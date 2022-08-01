@@ -3,6 +3,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# shellcheck source=/dev/null
 source "${SHARED_DIR}/env"
 
 #####################################
@@ -36,6 +37,7 @@ timeout --kill-after 10m 400m gcloud compute ssh --zone="${ZONE}" ${instance_nam
     echo GOROOT="/usr/local/go" | sudo tee -a /etc/environment
     mkdir -p \${HOME}/logs/artifacts
     mkdir -p /tmp/artifacts/logs
+
     sudo dnf install python39 -y
     curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
     python3.9 get-pip.py
@@ -50,3 +52,4 @@ timeout --kill-after 10m 400m gcloud compute ssh --zone="${ZONE}" ${instance_nam
     echo "localhost" >> hosts
     ansible-playbook e2e-main.yml -i hosts -e "TEST_AGENT=prow" --connection=local -vvv --tags setup,e2e
 EOF
+

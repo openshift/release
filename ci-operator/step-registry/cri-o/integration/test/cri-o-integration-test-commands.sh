@@ -32,7 +32,7 @@ cp "${CLUSTER_PROFILE_DIR}"/ssh-publickey "${HOME}"/.ssh/google_compute_engine.p
 instance_name=$(<"${SHARED_DIR}/gcp-instance-ids.txt")
 
 tar -czf - . | gcloud compute ssh --zone="${ZONE}" ${instance_name} -- "cat > \${HOME}/cri-o.tar.gz"
-timeout --kill-after 10m 120m gcloud compute ssh --zone="${ZONE}" ${instance_name} -- bash - << EOF 
+timeout --kill-after 10m 400m gcloud compute ssh --zone="${ZONE}" ${instance_name} -- bash - << EOF 
     export GOROOT=/usr/local/go
     echo GOROOT="/usr/local/go" | sudo tee -a /etc/environment
     mkdir -p \${HOME}/logs/artifacts
@@ -50,6 +50,6 @@ timeout --kill-after 10m 120m gcloud compute ssh --zone="${ZONE}" ${instance_nam
     tar -xzvf cri-o.tar.gz -C "\${REPO_DIR}"
     cd "\${REPO_DIR}/contrib/test/ci"
     echo "localhost" >> hosts
-    ansible-playbook integration-main.yml -i hosts -e "TEST_AGENT=prow" --connection=local -vvv 
+    ansible-playbook e2e-main.yml -i hosts -e "TEST_AGENT=prow" --connection=local -vvv --tags setup,e2e
 EOF
 
