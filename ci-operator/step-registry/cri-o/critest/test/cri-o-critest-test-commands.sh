@@ -44,7 +44,7 @@ timeout --kill-after 10m 120m gcloud compute ssh --zone "${ZONE}" ${instance_nam
     python3.9 -m pip install ansible
 
     # setup the directory where the tests will the run
-    REPO_DIR="\${HOME}/cri-o"
+    REPO_DIR="/home/deadbeef/cri-o"
     mkdir -p "\${REPO_DIR}"
     # copy the agent sources on the remote machine
     cd "\${REPO_DIR}/contrib/test/ci"
