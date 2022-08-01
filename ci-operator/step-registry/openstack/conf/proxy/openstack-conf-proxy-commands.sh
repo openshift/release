@@ -24,8 +24,7 @@ EOF
 # so we don't need to create a new one, and can use the existing.
 if [[ -f "${SHARED_DIR}/squid-credentials.txt" ]]; then
     export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
-    # shellcheck disable=SC2002
-    proxy_host=$(cat "$OS_CLIENT_CONFIG_FILE" | grep auth_url | cut -d'/' -f3 | cut -d ':' -f1)
+    proxy_host=$(yq -r ".clouds.${OS_CLOUD}.auth.auth_url" "$OS_CLIENT_CONFIG_FILE" | cut -d/ -f3 | cut -d: -f1)
     echo "Permanent proxy detected: $proxy_host"
     write_proxy_config "$(<"${SHARED_DIR}/squid-credentials.txt")" "${proxy_host}"
     exit 0
