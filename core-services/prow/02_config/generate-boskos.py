@@ -95,6 +95,9 @@ CONFIG = {
     'openstack-vexxhost-quota-slice': {
         'default': 18,
     },
+    'openstack-operators-vexxhost-quota-slice': {
+        'default': 2,
+    },
     'openstack-hwoffload-quota-slice': {
         'default': 5,
     },
