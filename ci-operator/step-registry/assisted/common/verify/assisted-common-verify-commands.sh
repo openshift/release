@@ -3,7 +3,6 @@
 set -o nounset
 set -o errexit
 set -o pipefail
-set -x
 
 echo "************ assisted common verify command ************"
 
@@ -30,6 +29,26 @@ scp -F ${SHARED_DIR}/ssh_config "${SHARED_DIR}/test-list" "root@ci_machine:/tmp/
 
 echo "### Running tests"
 timeout --kill-after 5m 120m ssh -F ${SHARED_DIR}/ssh_config "root@ci_machine" bash - << EOF
+    set -o nounset
+    set -o errexit
+    set -o pipefail
+    set -o verbose
+
+    case "${CLUSTER_TYPE}" in
+        vsphere)
+            export TEST_PROVIDER=vsphere
+            ;;
+
+        packet-sno | packet-assisted)
+            export TEST_PROVIDER=baremetal
+            ;;
+
+        *)
+            echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"
+            exit 1
+            ;;
+    esac
+
     # download openshift-tests cli tool from container quay.io/openshift/origin-tests
     CONTAINER_ID=\$(podman run -d quay.io/openshift/origin-tests)
     podman cp \${CONTAINER_ID}:/usr/bin/openshift-tests /usr/local/bin/

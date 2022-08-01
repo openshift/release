@@ -3,6 +3,7 @@
 set -o nounset
 set -o errexit
 set -o pipefail
+set -o verbose
 
 echo "************ baremetalds e2e assisted conf command ************"
 
@@ -14,6 +15,10 @@ case "${TEST_SUITE:-full}" in
 [sig-cli] Kubectl client Kubectl api-versions should check if v1 is in available api versions
 #
 EOF
+        ;;
+
+    conformance)
+        INCL=$(openshift-tests run "openshift/conformance/parallel" --dry-run)
         ;;
 
     full)
@@ -131,3 +136,5 @@ esac
 
 
 cat <(echo "$INCL") > "${SHARED_DIR}/test-list"
+
+cp "${SHARED_DIR}/test-list" "${ARTIFACT_DIR}"
