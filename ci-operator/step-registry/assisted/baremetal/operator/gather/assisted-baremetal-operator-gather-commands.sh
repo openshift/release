@@ -27,7 +27,7 @@ trap getlogs EXIT
 
 echo "### Gathering logs..."
 # shellcheck disable=SC2087
-timeout -s 9 30m ssh "${SSHOPTS[@]}" DISCONNECTED="${DISCONNECTED:-}" "root@${IP}" bash - << "EOF"
+timeout -s 9 30m ssh "${SSHOPTS[@]}" "root@${IP}" DISCONNECTED="${DISCONNECTED:-}" bash - << "EOF"
 set -xeo pipefail
 
 # Get sosreport including sar data

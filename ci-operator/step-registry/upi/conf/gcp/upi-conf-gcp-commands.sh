@@ -6,6 +6,9 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+# TODO: move to image
+curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
+
 export HOME=/tmp
 
 if [[ -z "$RELEASE_IMAGE_LATEST" ]]; then
@@ -61,6 +64,10 @@ data["compute"] = [ { "name": "worker", "replicas": 0 } ];
 open(path, "w").write(yaml.dump(data, default_flow_style=False))'
 
 ### Enable private cluster setting (optional)
+origin_publish="$(/tmp/yq r install-config.yaml 'publish')"
+if [[ ${origin_publish} = "" ]]; then
+  origin_publish="External"
+fi
 if [[ -v IS_XPN ]]; then
   echo "Enabling private cluster setting..."
   python -c '
@@ -122,7 +129,7 @@ if [[ -v IS_XPN ]]; then
 fi
 
 ### Enable external ingress (optional)
-if [[ -v IS_XPN ]]; then
+if [[ -v IS_XPN ]] && [[ ${origin_publish} = "External" ]]; then
   echo "Removing publish:internal bits..."
   python -c '
 import yaml;
