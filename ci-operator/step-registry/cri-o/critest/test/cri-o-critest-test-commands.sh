@@ -31,8 +31,11 @@ cp "${CLUSTER_PROFILE_DIR}"/ssh-publickey "${HOME}"/.ssh/google_compute_engine.p
 
 instance_name=$(<"${SHARED_DIR}/gcp-instance-ids.txt")
 
+gcloud compute scp --zone="${ZONE}" ${GCP_SHARED_CREDENTIALS_FILE} ${instance_name}:~/gce.json
+gcloud compute scp --zone="${ZONE}" ${GOOGLE_PROJECT_ID} ${instance_name}:~/openshift_gcp_project
+
 tar -czf - . | gcloud compute ssh --zone="${ZONE}" ${instance_name} -- "cat > \${HOME}/cri-o.tar.gz"
-timeout --kill-after 10m 400m gcloud compute project-info add-metadata --metadata-from-file GCP_SHARED_CREDENTIALS_FILE=${ GCP_SHARED_CREDENTIALS_FILE } ssh --zone="${ZONE}" ${instance_name} -- bash - << EOF 
+timeout --kill-after 10m 400m gcloud compute ssh --zone="${ZONE}" ${instance_name} -- bash - << EOF 
     export GOROOT=/usr/local/go
     echo GOROOT="/usr/local/go" | sudo tee -a /etc/environment
     mkdir -p \${HOME}/logs/artifacts
