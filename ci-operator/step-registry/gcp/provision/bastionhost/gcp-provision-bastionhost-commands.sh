@@ -13,6 +13,12 @@ if [[ ! -f "${bastion_ignition_file}" ]]; then
   echo "'${bastion_ignition_file}' not found, abort." && exit 1
 fi
 
+if [[ -s "${SHARED_DIR}/xpn.json" ]]; then
+  echo "Reading variables from ${SHARED_DIR}/xpn.json..."
+  NETWORK="$(jq -r '.clusterNetwork' "${SHARED_DIR}/xpn.json")"
+  CONTROL_PLANE_SUBNET="$(jq -r '.controlSubnet' "${SHARED_DIR}/xpn.json")"
+fi
+
 if [[ -z "${NETWORK}" || -z "${CONTROL_PLANE_SUBNET}" ]] && [[ ! -s "${SHARED_DIR}/customer_vpc_subnets.yaml" ]]; then
   echo "Lack of VPC info, abort." && exit 1
 fi
@@ -42,6 +48,12 @@ echo "Using FCOS ${IMAGE_RELEASE} IMAGE: ${IMAGE_NAME}"
 ###############Log In################
 #####################################
 
+if [[ -s "${SHARED_DIR}/xpn.json" ]] && [[ -f "${CLUSTER_PROFILE_DIR}/xpn_creds.json" ]]; then
+  echo "Activating XPN service-account..."
+  GOOGLE_CLOUD_XPN_KEYFILE_JSON="${CLUSTER_PROFILE_DIR}/xpn_creds.json"
+  gcloud auth activate-service-account --key-file="${GOOGLE_CLOUD_XPN_KEYFILE_JSON}"
+  GOOGLE_CLOUD_XPN_SA=$(jq -r .client_email "${GOOGLE_CLOUD_XPN_KEYFILE_JSON}")
+fi
 GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 export GCP_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/gce.json"
 sa_email=$(jq -r .client_email ${GCP_SHARED_CREDENTIALS_FILE})
@@ -90,7 +102,7 @@ echo "Waiting for the proxy service starting running..." && sleep 60s
 
 if [[ -s "${SHARED_DIR}/xpn.json" ]]; then
   HOST_PROJECT="$(jq -r '.hostProject' "${SHARED_DIR}/xpn.json")"
-  project_option="--project=${HOST_PROJECT}"
+  project_option="--project=${HOST_PROJECT} --account ${GOOGLE_CLOUD_XPN_SA}"
 else
   project_option=""
 fi
