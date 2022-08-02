@@ -4,9 +4,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-echo "Installing oc binary"
-curl -s https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz | tar zxvf - oc
-chmod +x oc
+#echo "Installing oc binary"
+#curl -s https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz | tar zxvf - oc
+#chmod +x oc
 
 ${CLUSTER:=mycluster}
 ${RESOURCEGROUP:=myrg}
