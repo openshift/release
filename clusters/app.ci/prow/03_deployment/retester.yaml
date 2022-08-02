@@ -37,8 +37,7 @@ spec:
         - --github-token-path=/etc/oauth/oauth
         - --job-config-path=/etc/job-config
         - --cache-file=/cache/backoff
-        - --enable-on-org=openshift
-        - --enable-on-org=openshift-knative
+        - --config-file=/etc/retester/_config.yaml
         volumeMounts:
         - name: github-token
           mountPath: /etc/oauth
@@ -51,6 +50,9 @@ spec:
           readOnly: true
         - name: cache
           mountPath: /cache
+        - name: config
+          mountPath: /etc/retester
+          readOnly: true
         resources:
           requests:
             memory: "500Mi"
@@ -104,6 +106,9 @@ spec:
       - name: cache
         persistentVolumeClaim:
           claimName: retester
+      - name: config
+        configMap:
+          name: retester-config
 ---
 kind: PersistentVolumeClaim
 apiVersion: v1
