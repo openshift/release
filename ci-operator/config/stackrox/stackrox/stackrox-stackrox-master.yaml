@@ -1,4 +1,8 @@
 base_images:
+  eks:
+    name: automation-flavors
+    namespace: stackrox
+    tag: eks-0.3.1
   ubi:
     name: ubi
     namespace: ocp
@@ -309,6 +313,11 @@ tests:
   steps:
     test:
     - ref: stackrox-initial
+- as: eks-qa-e2e-tests
+  optional: true
+  steps:
+    workflow: stackrox-eks-e2e
+  timeout: 5h0m0s
 - as: merge-push-and-release
   postsubmit: true
   steps:
@@ -330,6 +339,12 @@ tests:
         name: docs
       - env: MAIN_RCD_IMAGE
         name: main-rcd
+      - env: OPERATOR_IMAGE
+        name: operator-controller
+      - env: OPERATOR_BUNDLE_IMAGE
+        name: operator-bundle
+      - env: OPERATOR_BUNDLE_INDEX_MAGE
+        name: operator-bundle-index
       from: src
       resources:
         requests:

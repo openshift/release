@@ -53,7 +53,7 @@ images:
     FROM quay.io/centos/centos:stream9
     RUN dnf install -y 'dnf-command(config-manager)' && \
         dnf config-manager --set-enabled crb && \
-        dnf install -y git unzip make gcc which
+        dnf install -y git unzip make gcc which nmstate-devel
     COPY --from=registry.ci.openshift.org/openshift/release:golang-1.17 /usr/local/go /usr/local/go
     ENV GOPATH=/go
     ENV GOROOT=/usr/local/go
@@ -199,7 +199,7 @@ test_binary_build_commands: |
   mkdir /.cache && chmod 775 -R /.cache && chmod 775 -R $GOPATH
 tests:
 - as: verify-generated-code
-  skip_if_only_changed: ^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNER_ALIASES)$
+  skip_if_only_changed: ^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNER_ALIASES)$
   steps:
     test:
     - ref: assisted-verify-generated-code
@@ -214,7 +214,7 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: assisted-service-codecov-token
-  skip_if_only_changed: ^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNER_ALIASES)$
+  skip_if_only_changed: ^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNER_ALIASES)$
 - as: unit-test-postsubmit
   commands: |
     export REPORTS=/tmp/reports
@@ -304,7 +304,7 @@ tests:
     make lint
   container:
     from: assisted-service-lint
-  skip_if_only_changed: ^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNER_ALIASES)$
+  skip_if_only_changed: ^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNER_ALIASES)$
 zz_generated_metadata:
   branch: testing-image-changes
   org: openshift

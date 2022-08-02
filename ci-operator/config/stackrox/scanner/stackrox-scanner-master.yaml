@@ -86,8 +86,23 @@ tests:
   optional: true
   steps:
     test:
-    - ref: stackrox-scanner
-  timeout: 2h30m0s
+    - as: e2e-tests
+      commands: .openshift-ci/dispatch.sh e2e-tests
+      credentials:
+      - mount_path: /tmp/secret/stackrox-scanner-secrets
+        name: stackrox-scanner-secrets
+        namespace: test-credentials
+      dependencies:
+      - env: SCANNER_IMAGE
+        name: scanner
+      - env: SCANNER_DB_IMAGE
+        name: scanner-db
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+  timeout: 3h0m0s
 - as: push-images
   steps:
     test:
@@ -116,13 +131,28 @@ tests:
   steps:
     test:
     - ref: stackrox-scanner
-  timeout: 3h30m0s
+  timeout: 4h0m0s
 - as: slim-e2e-tests
   optional: true
   steps:
     test:
-    - ref: stackrox-scanner
-  timeout: 2h30m0s
+    - as: e2e-tests
+      commands: .openshift-ci/dispatch.sh slim-e2e-tests
+      credentials:
+      - mount_path: /tmp/secret/stackrox-scanner-secrets
+        name: stackrox-scanner-secrets
+        namespace: test-credentials
+      dependencies:
+      - env: SCANNER_SLIM_IMAGE
+        name: scanner-slim
+      - env: SCANNER_DB_SLIM_IMAGE
+        name: scanner-db-slim
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+  timeout: 3h0m0s
 - as: store-db-dump
   optional: true
   steps:
@@ -230,8 +260,23 @@ tests:
   postsubmit: true
   steps:
     test:
-    - ref: stackrox-scanner
-  timeout: 2h30m0s
+    - as: e2e-tests
+      commands: .openshift-ci/dispatch.sh e2e-tests
+      credentials:
+      - mount_path: /tmp/secret/stackrox-scanner-secrets
+        name: stackrox-scanner-secrets
+        namespace: test-credentials
+      dependencies:
+      - env: SCANNER_IMAGE
+        name: scanner
+      - env: SCANNER_DB_IMAGE
+        name: scanner-db
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+  timeout: 3h0m0s
 - as: merge-push-images
   postsubmit: true
   steps:
@@ -260,8 +305,23 @@ tests:
   postsubmit: true
   steps:
     test:
-    - ref: stackrox-scanner
-  timeout: 2h30m0s
+    - as: e2e-tests
+      commands: .openshift-ci/dispatch.sh slim-e2e-tests
+      credentials:
+      - mount_path: /tmp/secret/stackrox-scanner-secrets
+        name: stackrox-scanner-secrets
+        namespace: test-credentials
+      dependencies:
+      - env: SCANNER_SLIM_IMAGE
+        name: scanner-slim
+      - env: SCANNER_DB_SLIM_IMAGE
+        name: scanner-db-slim
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+  timeout: 3h0m0s
 - as: merge-store-db-dump
   postsubmit: true
   steps:
@@ -371,8 +431,23 @@ tests:
   cron: 0 */3 * * *
   steps:
     test:
-    - ref: stackrox-scanner
-  timeout: 2h30m0s
+    - as: e2e-tests
+      commands: .openshift-ci/dispatch.sh e2e-tests
+      credentials:
+      - mount_path: /tmp/secret/stackrox-scanner-secrets
+        name: stackrox-scanner-secrets
+        namespace: test-credentials
+      dependencies:
+      - env: SCANNER_IMAGE
+        name: scanner
+      - env: SCANNER_DB_IMAGE
+        name: scanner-db
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+  timeout: 3h0m0s
 - as: hourly-push-images
   cron: 0 */3 * * *
   steps:
@@ -401,8 +476,23 @@ tests:
   cron: 0 */3 * * *
   steps:
     test:
-    - ref: stackrox-scanner
-  timeout: 2h30m0s
+    - as: e2e-tests
+      commands: .openshift-ci/dispatch.sh slim-e2e-tests
+      credentials:
+      - mount_path: /tmp/secret/stackrox-scanner-secrets
+        name: stackrox-scanner-secrets
+        namespace: test-credentials
+      dependencies:
+      - env: SCANNER_SLIM_IMAGE
+        name: scanner-slim
+      - env: SCANNER_DB_SLIM_IMAGE
+        name: scanner-db-slim
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+  timeout: 3h0m0s
 - as: hourly-store-db-dump
   cron: 0 */3 * * *
   steps:
@@ -488,6 +578,11 @@ tests:
         requests:
           cpu: 2000m
           memory: 4000Mi
+- as: sanity-check-vuln-updates
+  cron: 5 0,4,8,12,16,20 * * *
+  steps:
+    test:
+    - ref: stackrox-scanner
 zz_generated_metadata:
   branch: master
   org: stackrox
