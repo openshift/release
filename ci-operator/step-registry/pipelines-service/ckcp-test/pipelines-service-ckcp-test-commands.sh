@@ -5,8 +5,7 @@ set -o errexit
 set -o pipefail
 
 oc version
-argocd version --client
 yq --version
+which argocd
 echo "list directories ...."
 ls -l
-tree
