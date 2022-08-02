@@ -11,5 +11,6 @@ set -x
 if [[ -f "${SHARED_DIR}/DELETE_FIPS" ]]; then
 	xargs --no-run-if-empty \
 		openstack floating ip delete \
-		< "${SHARED_DIR}/DELETE_FIPS"
+		< "${SHARED_DIR}/DELETE_FIPS" \
+		|| true
 fi
