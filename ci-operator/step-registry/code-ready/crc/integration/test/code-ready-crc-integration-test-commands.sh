@@ -14,6 +14,7 @@ fi
 
 mkdir -p "${HOME}"/.ssh
 BUNDLE_VERSION="$(crc version | grep -oP '^OpenShift version\s*:\s*\K\S+')"
+PODMAN_VERSION="$(crc version | grep -oP '^Podman version\s*:\s*\K\S+')"
 ARCH=$(uname -m)
 case "${ARCH}" in
     x86_64)
@@ -27,6 +28,7 @@ case "${ARCH}" in
        ;;
 esac
 BUNDLE=crc_libvirt_"${BUNDLE_VERSION}"_"${BUNDLE_ARCH}".crcbundle
+PODMAN_BUNDLE=crc_podman_libvirt_"${PODMAN_VERSION}"_"${BUNDLE_ARCH}".crcbundle
 
 mock-nss.sh
 
@@ -58,6 +60,7 @@ function run-tests() {
   set +e
   export PULL_SECRET_PATH="${HOME}"/pull-secret
   export BUNDLE_PATH="${HOME}"/$(cat "${HOME}"/bundle)
+  export PODMAN_BUNDLE_PATH="${HOME}"/$(cat "${HOME}"/podman-bundle)
   make integration
   if [[ $? -ne 0 ]]; then
     exit 1
@@ -73,8 +76,10 @@ chmod +x "${HOME}"/run-tests.sh
 
 # Get the bundle
 curl -L "https://storage.googleapis.com/crc-bundle-github-ci/${BUNDLE}" -o /tmp/${BUNDLE}
+curl -L "https://storage.googleapis.com/crc-bundle-github-ci/${PODMAN_BUNDLE}" -o /tmp/${PODMAN_BUNDLE}
 
 echo "${BUNDLE}" > "${HOME}"/bundle
+echo "${BUNDLE}" > "${HOME}"/podman-bundle
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \
@@ -99,6 +104,12 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   --recurse "${HOME}"/bundle packer@"${INSTANCE_PREFIX}":~/bundle
+
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+  --quiet \
+  --project "${GOOGLE_PROJECT_ID}" \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  --recurse "${HOME}"/podman-bundle packer@"${INSTANCE_PREFIX}":~/podman-bundle
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \
