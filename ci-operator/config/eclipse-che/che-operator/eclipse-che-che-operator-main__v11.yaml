@@ -28,7 +28,7 @@ resources:
 tests:
 - as: operator-test
   steps:
-    cluster_profile: gcp
+    cluster_profile: aws
     env:
       OO_CHANNEL: next
       OO_INSTALL_NAMESPACE: eclipse-che
@@ -55,12 +55,11 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: optional-operators-ci-gcp
+    workflow: optional-operators-ci-aws
 - as: che-behind-proxy
   steps:
     cluster_profile: aws
     env:
-      COMPUTE_NODE_TYPE: m5.xlarge
       TEST_SKIPS: ""
     test:
     - as: che-behind-proxy
@@ -86,6 +85,50 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: openshift-e2e-aws-proxy
+- as: devworkspace-happy-path
+  steps:
+    cluster_profile: aws
+    test:
+    - as: devworkspace-happy-path
+      cli: latest
+      commands: |
+        echo -e "[INFO] Test script content:"
+        cat .ci/oci-devworkspace-happy-path.sh
+        /bin/bash .ci/oci-devworkspace-happy-path.sh
+      dependencies:
+      - env: CI_CHE_OPERATOR_IMAGE
+        name: che-operator-image
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+- as: upgrade-stable-to-next
+  steps:
+    cluster_profile: aws
+    test:
+    - as: upgrade-stable-to-next
+      cli: latest
+      commands: |
+        echo -e "[INFO] Test script content:"
+        export GITHUB_TOKEN=$(cat /usr/local/ci-secrets/test-harness-secrets/github-token)
+        cat .ci/oci-nightly-update.sh
+
+        /bin/bash .ci/oci-nightly-update.sh
+      credentials:
+      - mount_path: /usr/local/ci-secrets/test-harness-secrets
+        name: test-harness-secrets
+        namespace: test-credentials
+      dependencies:
+      - env: CI_CHE_OPERATOR_IMAGE
+        name: che-operator-image
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: eclipse-che
