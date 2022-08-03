@@ -64,7 +64,9 @@ CONFIG = {
         'usgovvirginia': 5
     },
     'azure-qe-quota-slice': {
-        'northcentralus': 5
+        'northcentralus': 10,
+        'westus3': 10,
+        'centralus': 10
     },
     'azuremag-qe-quota-slice': {
         'usgovvirginia': 5
