@@ -1,0 +1,37 @@
+workflow:
+  as: hypershift-kubevirt-conformance
+  documentation: |-
+    The HyperShift KubeVirt conformance workflow executes tests against a new ephemeral
+    HyperShift cluster. Administrative access to the control plane is provided
+    via the `KUBECONFIG` environment variable.
+
+    Note that tests will execute once the control plane is ready, regardless of
+    whether nodes have been requested, have joined, or are available.
+
+    The control plane is hosted on a dedicated standalone OCP cluster running
+    HyperShift in Azure account and is destroyed after tests complete.
+
+    The HyperShift launch capability is currently supported by the HyperShift
+    team.
+
+    Learn more about HyperShift here: https://github.com/openshift/hypershift
+
+    Track HyperShift's development here: https://issues.redhat.com/projects/HOSTEDCP
+  steps:
+    env:
+      SUB_CHANNEL: stable
+      SUB_INSTALL_NAMESPACE: openshift-cnv
+      SUB_PACKAGE: kubevirt-hyperconverged
+      SUB_TARGET_NAMESPACES: '!install'
+      COMPUTE_NODE_TYPE: Standard_D8s_v3
+    pre:
+      - chain: ipi-azure-pre
+      - ref: operatorhub-subscribe
+      - chain: hypershift-install
+      - chain: hypershift-kubevirt-create
+    test:
+      - chain: hypershift-conformance
+    post:
+    - chain: hypershift-dump
+    - chain: hypershift-kubevirt-destroy
+    - chain: ipi-azure-post
