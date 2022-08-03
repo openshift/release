@@ -26,7 +26,7 @@ cp "${CLUSTER_PROFILE_DIR}"/ssh-privatekey "${HOME}"/.ssh/google_compute_engine
 chmod 0600 "${HOME}"/.ssh/google_compute_engine
 cp "${CLUSTER_PROFILE_DIR}"/ssh-publickey "${HOME}"/.ssh/google_compute_engine.pub
 
-gsutil mb gs://CRIO_CI
+gsutil mb gs://crio-ci
 
 #####################################
 #####################################
