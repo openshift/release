@@ -4,13 +4,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-#echo "Installing oc binary"
-#curl -s https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz | tar zxvf - oc
-#chmod +x oc
-
 CLUSTER=${CLUSTER:="${NAMESPACE}-${JOB_NAME_HASH}"}
-RESOURCEGROUP=${RESOURCEGROUP:="${NAMESPACE}-${JOB_NAME_HASH}-rg"}
-VNET=${VNET:=${CLUSTER}-vnet}
+RESOURCEGROUP=${RESOURCEGROUP:=$(cat "${SHARED_DIR}/resourcegroup")}
+VNET=${VNET:=$(cat "$SHARE_DIR/vnet")}
 LOCATION=${LOCATION:=${LEASED_RESOURCE}}
 PULL_SECRET_FILE=${PULL_SECRET_FILE:=/path/to/pull_secret.txt}
 DISK_ENCRYPTION_SET_ENABLE=${DISK_ENCRYPTION_SET_ENABLE:=no}
@@ -20,9 +16,7 @@ AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
 AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
 
 echo $CLUSTER > $SHARED_DIR/cluster-name
-echo $RESOURCEGROUP > $SHARED_DIR/resourcegroup
 echo $LOCATION > $SHARED_DIR/location
-echo $VNET > $SHARED_DIR/vnet
 
 # get az-cli, do feature adds for cloud if needed
 # 
@@ -35,37 +29,12 @@ else
 fi
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
 
+echo "Creating required Azure objects (Network infrastructure)"
 
-# see https://raw.githubusercontent.com/openshift/osde2e/main/ci/create-aro-cluster.sh
-# create the resourcegroup to contain the cluster object and vnet
-az group create \
-    --name $RESOURCEGROUP \
-    --location $LOCATION
-    
-az network vnet create \
-    --resource-group $RESOURCEGROUP \
-    --name $VNET \
-    --address-prefixes 10.0.0.0/22
-
-az network vnet subnet create \
-    --resource-group $RESOURCEGROUP \
-    --vnet-name $VNET \
-    --name master-subnet \
-    --address-prefixes 10.0.0.0/23 \
-    --service-endpoints Microsoft.ContainerRegistry
-
-az network vnet subnet create \
-    --resource-group $RESOURCEGROUP \
-    --vnet-name $VNET \
-    --name worker-subnet \
-    --address-prefixes 10.0.2.0/23 \
-    --service-endpoints Microsoft.ContainerRegistry
-    
-az network vnet subnet update \
-    --name master-subnet \
-    --resource-group $RESOURCEGROUP \
-    --vnet-name $VNET \
-    --disable-private-link-service-network-policies true
+az provider register -n Microsoft.RedHatOpenShift --wait
+az provider register -n Microsoft.Compute --wait
+az provider register -n Microsoft.Storage --wait
+az provider register -n Microsoft.Authorization --wait
 
 CREATE_CMD="az aro create --resource-group ${RESOURCEGROUP} --name ${CLUSTER} --vnet ${VNET} --master-subnet master-subnet --worker-subnet worker-subnet "
 
