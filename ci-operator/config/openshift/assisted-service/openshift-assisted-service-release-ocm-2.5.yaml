@@ -31,6 +31,18 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  edge_infrastructure_swagger_codegen_cli:
+    name: edge-infrastructure-swagger-codegen-cli
+    namespace: ci
+    tag: 2.4.18
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.37.1
+  goswagger_swagger:
+    name: goswagger-swagger
+    namespace: ci
+    tag: v0.28.0
   hypershift-operator:
     name: "4.10"
     namespace: ocp
@@ -50,11 +62,22 @@ build_root:
     tag: golang-1.17
 images:
 - dockerfile_path: Dockerfile.assisted-service-build
-  from: postgresql-12-centos7
   inputs:
+    edge_infrastructure_swagger_codegen_cli:
+      as:
+      - quay.io/edge-infrastructure/swagger-codegen-cli:2.4.18
+    golangci-lint:
+      as:
+      - quay.io/app-sre/golangci-lint:v1.37.1
+    goswagger_swagger:
+      as:
+      - quay.io/goswagger/swagger:v0.28.0
     openshift_release_golang-1.17:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.17
+    postgresql-12-centos7:
+      as:
+      - quay.io/centos7/postgresql-12-centos7:latest
   to: assisted-service-build
 - dockerfile_path: Dockerfile.assisted-service
   from: coreos_centos_stream8
@@ -149,10 +172,13 @@ tests:
     test:
     - ref: assisted-baremetal-operator-publish
 - as: lint
-  commands: export GOLANGCI_LINT_CACHE=/tmp/.cache && export GOPROXY=https://proxy.golang.org
-    && make lint
+  commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    make lint
   container:
-    from: test-bin
+    from: assisted-service-build
   skip_if_only_changed: ^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNER_ALIASES)$
 - as: unit-test
   commands: |
