@@ -319,6 +319,11 @@ if test "${ret}" -eq 0 ; then
   touch  "${SHARED_DIR}/success"
   # Save console URL in `console.url` file so that ci-chat-bot could report success
   echo "https://$(env KUBECONFIG=${dir}/auth/kubeconfig oc -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > "${SHARED_DIR}/console.url"
+else 
+  # if bootstrap.tfvars.json is found, copy into shared dir.
+  if test -f "${dir}/bootstrap.tfvars.json" ; then
+    cp ${dir}/bootstrap.tfvars.json ${SHARED_DIR}/bootstrap.tfvars.json
+  fi
 fi
 
 exit "$ret"
