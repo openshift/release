@@ -61,7 +61,6 @@ custom_tests() {
 }
 
 BREW_DOCKERCONFIGJSON=${BREW_DOCKERCONFIGJSON:-'/var/run/brew-pullsecret/.dockerconfigjson'}
-
 OPENSHIFT_AUTH="${OPENSHIFT_AUTH:-$BREW_DOCKERCONFIGJSON}"
 SCORECARD_CONFIG="${SCORECARD_CONFIG:-/tmp/config/scorecard-basic-config.yml}"
 CUSTOM_SCORECARD_TESTCASE="${CUSTOM_SCORECARD_TESTCASE:''}"
@@ -76,7 +75,6 @@ pushd "${ARTIFACT_DIR}"
 OPERATOR_DIR="test-operator"
 
 echo "Starting the basic operator-sdk scorecard test for ${BUNDLE_IMAGE}"
-
 echo "Extracting the operator bundle image into the operator directory"
 mkdir -p "${OPERATOR_DIR}"
 pushd "${OPERATOR_DIR}"
@@ -99,8 +97,6 @@ if [ -f "${OPERATOR_DIR}/tests/scorecard/config.yaml" ]; then
   SCORECARD_SERVICE_ACCOUNT="default"
   echo "contents of CUSTOM_SERVICE_ACCOUNT = $CUSTOM_SERVICE_ACCOUNT"
   echo "contents of IS_CUSTOM_SERVICE_ACCOUNT_CREATED are $IS_CUSTOM_SERVICE_ACCOUNT_CREATED"
-  echo ""
-  #if [ "${CUSTOM_SERVICE_ACCOUNT}" != "" ] && [ "${CUSTOM_SERVICE_ACCOUNT}" != "null"] && [ "${IS_CUSTOM_SERVICE_ACCOUNT_CREATED}" == "false" ]; then
   if [[ ${CUSTOM_SERVICE_ACCOUNT} != "" && ${CUSTOM_SERVICE_ACCOUNT} != null && ${IS_CUSTOM_SERVICE_ACCOUNT_CREATED} == false ]]; then
     echo "Creating service account ${CUSTOM_SERVICE_ACCOUNT} for usage wih the custom scorecard"
     oc create serviceaccount "${CUSTOM_SERVICE_ACCOUNT}" -n "${NAMESPACE}"

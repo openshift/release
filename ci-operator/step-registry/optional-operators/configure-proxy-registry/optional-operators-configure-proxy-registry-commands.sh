@@ -8,9 +8,8 @@ set -o pipefail
 # 0. needs to add the pull secrets provided by 
 # mirroring the pull secrets
 
-BREW_DOCKERCONFIGJSON=${BREW_DOCKERCONFIGJSON:-'/var/run/brew-pullsecret/.dockerconfigjson'}
-
 # add brew pull secret 
+BREW_DOCKERCONFIGJSON=${BREW_DOCKERCONFIGJSON:-'/var/run/brew-pullsecret/.dockerconfigjson'}
 oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=$BREW_DOCKERCONFIGJSON
 
 # 1. Apply the ICSP to the cluster 
