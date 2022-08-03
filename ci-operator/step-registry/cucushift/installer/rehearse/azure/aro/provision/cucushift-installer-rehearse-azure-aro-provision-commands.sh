@@ -18,10 +18,10 @@ AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
 echo $CLUSTER > $SHARED_DIR/cluster-name
 echo $LOCATION > $SHARED_DIR/location
 
-# get az-cli, do feature adds for cloud if needed
-# 
+echo "az-cli version information"
+az version
 
-# log in with az
+echo "logging in with az using service principal"
 if [[ "${CLUSTER_TYPE}" == "azuremag" ]]; then
     az cloud set --name AzureUSGovernment
 else
@@ -47,7 +47,8 @@ if [ $DISK_ENCRYPTION_SET_ENABLE = "yes" ]; then
     CREATE_CMD="$CREATE_CMD --disk-encryption-set \"$DES_ID\" --master-encryption-at-host --worker-encryption-at-host "
 fi
 
-echo "Running ARO create command"
+echo "Running ARO create command:"
+echo "${CREATE_CMD}"
 
 AROINFO="$(eval "$CREATE_CMD")"
 
