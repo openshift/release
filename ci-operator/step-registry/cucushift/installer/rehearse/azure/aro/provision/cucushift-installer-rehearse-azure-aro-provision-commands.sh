@@ -8,19 +8,33 @@ set -o pipefail
 #curl -s https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz | tar zxvf - oc
 #chmod +x oc
 
-${CLUSTER:=mycluster}
-${RESOURCEGROUP:=myrg}
-${VNET:=$CLUSTER-VNET}
-${LOCATION:=centralus}
-${PULL_SECRET_FILE:=/path/to/pull_secret.txt}
-${DISK_ENCRYPTION_SET_ENABLE:=no}
+CLUSTER=${CLUSTER:="${NAMESPACE}-${JOB_NAME_HASH}"}
+RESOURCEGROUP=${RESOURCEGROUP:="${NAMESPACE}-${JOB_NAME_HASH}-rg"}
+VNET=${VNET:=${CLUSTER}-vnet}
+LOCATION=${LOCATION:=${LEASED_RESOURCE}}
+PULL_SECRET_FILE=${PULL_SECRET_FILE:=/path/to/pull_secret.txt}
+DISK_ENCRYPTION_SET_ENABLE=${DISK_ENCRYPTION_SET_ENABLE:=no}
+AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
+AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
+AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
 
 echo $CLUSTER > $SHARED_DIR/cluster-name
 echo $RESOURCEGROUP > $SHARED_DIR/resourcegroup
 echo $LOCATION > $SHARED_DIR/location
+echo $VNET > $SHARED_DIR/vnet
 
 # get az-cli, do feature adds for cloud if needed
 # 
+
+# log in with az
+if [[ "${CLUSTER_TYPE}" == "azuremag" ]]; then
+    az cloud set --name AzureUSGovernment
+else
+    az cloud set --name AzureCloud
+fi
+az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
+
 
 # see https://raw.githubusercontent.com/openshift/osde2e/main/ci/create-aro-cluster.sh
 # create the resourcegroup to contain the cluster object and vnet
