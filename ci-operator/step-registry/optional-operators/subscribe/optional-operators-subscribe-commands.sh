@@ -115,6 +115,7 @@ else
 fi
 
 CATSRC=""
+IS_CATSRC_CREATED=${IS_CATSRC_CREATED:-false}
 if [ "$IS_CATSRC_CREATED" = false ] ; then
 CATSRC=$(
     oc create -f - -o jsonpath='{.metadata.name}' <<EOF
@@ -132,14 +133,12 @@ EOF
 echo "CatalogSource name is \"$CATSRC\""
 
 else
-	str="$CS_NAMESTANZA"
 	echo "$CS_NAMESTANZA"
-        arrIN=(${CS_NAMESTANZA//:/ })
+        arrIN=("${CS_NAMESTANZA//:/ }")
         CATSRC=${arrIN[1]}
 	CATSRC=`echo $CATSRC | sed 's/ *$//g'`
 fi
 
-IS_CATSRC_CREATED=${IS_CATSRC_CREATED:-false}
 # Wait for 10 minutes until the Catalog source state is 'READY'
 for i in $(seq 1 120); do
     CATSRC_STATE=$(oc get catalogsources/"$CATSRC" -n "$CS_NAMESPACE" -o jsonpath='{.status.connectionState.lastObservedState}')

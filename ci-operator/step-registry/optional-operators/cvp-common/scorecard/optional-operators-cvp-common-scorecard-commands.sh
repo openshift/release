@@ -88,6 +88,7 @@ tree "${OPERATOR_DIR}"
 echo "Running the operator-sdk scorecard test using the basic configuration, json output and storing it in the artifacts directory"
 run_scorecard basic_tests "${ARTIFACT_DIR}"/scorecard-output-basic.json
 
+IS_CUSTOM_SERVICE_ACCOUNT_CREATED=${IS_CUSTOM_SERVICE_ACCOUNT_CREATED:-false}
 if [ -f "${OPERATOR_DIR}/tests/scorecard/config.yaml" ]; then
   echo "CUSTOM SCORECARD TESTS DETECTED"
   CUSTOM_SERVICE_ACCOUNT="$(/usr/local/bin/yq r "${OPERATOR_DIR}/tests/scorecard/config.yaml" 'serviceaccount')"
