@@ -114,6 +114,9 @@ else
   CS_NAMESPACE="${OO_INSTALL_NAMESPACE}"
 fi
 
+CATSRC=""
+if [ "$IS_CATSRC_CREATED" = false ] ; then
+
 CATSRC=$(
     oc create -f - -o jsonpath='{.metadata.name}' <<EOF
 apiVersion: operators.coreos.com/v1alpha1
@@ -129,7 +132,17 @@ EOF
 
 echo "CatalogSource name is \"$CATSRC\""
 
-IS_CATSRC_CREATED=false
+else
+	str="$CS_NAMESTANZA"
+	echo "$CS_NAMESTANZA"
+        arrIN=(${CS_NAMESTANZA//:/ })
+        CATSRC=${arrIN[1]}
+	CATSRC=`echo $CATSRC | sed 's/ *$//g'`
+fi
+
+
+
+IS_CATSRC_CREATED=${IS_CATSRC_CREATED:-false}
 # Wait for 10 minutes until the Catalog source state is 'READY'
 for i in $(seq 1 120); do
     CATSRC_STATE=$(oc get catalogsources/"$CATSRC" -n "$CS_NAMESPACE" -o jsonpath='{.status.connectionState.lastObservedState}')
@@ -180,6 +193,8 @@ EOF
 if [ -n "${INITIAL_CSV}" ]; then
     SUB_MANIFEST="${SUB_MANIFEST}"$'\n'"  startingCSV: ${INITIAL_CSV}"
 fi
+
+echo "SUB_MANIFEST : ${SUB_MANIFEST} "
 
 SUB=$(oc create -f - -o jsonpath='{.metadata.name}' <<< "${SUB_MANIFEST}" )
 
