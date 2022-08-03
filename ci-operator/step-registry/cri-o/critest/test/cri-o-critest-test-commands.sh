@@ -26,8 +26,6 @@ cp "${CLUSTER_PROFILE_DIR}"/ssh-privatekey "${HOME}"/.ssh/google_compute_engine
 chmod 0600 "${HOME}"/.ssh/google_compute_engine
 cp "${CLUSTER_PROFILE_DIR}"/ssh-publickey "${HOME}"/.ssh/google_compute_engine.pub
 
-gsutil mb gs://crio-ci
-
 curl https://github.com/coreos/etcd/releases/download/v3.5.4/etcd-v3.5.4-linux-amd64.tar.gz | gsutil cp - gs://crio-ci/etcd.tar.gz
 
 
