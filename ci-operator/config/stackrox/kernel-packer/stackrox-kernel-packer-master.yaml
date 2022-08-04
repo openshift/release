@@ -11,10 +11,82 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: go-lint
-  commands: .openshift-ci/go-lint.sh
-  container:
-    from: src
+- as: kernel-crawling-periodic
+  cron: 15 */8 * * *
+  steps:
+    post:
+    - as: delete-vm
+      commands: .openshift-ci/crawler/post.sh
+      credentials:
+      - mount_path: /tmp/secret/stackrox-kernel-packer-crawl
+        name: stackrox-collector-driver-push
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 4000m
+          memory: 4000Mi
+    pre:
+    - as: create-vm
+      commands: .openshift-ci/crawler/pre.sh
+      credentials:
+      - mount_path: /tmp/secret/stackrox-kernel-packer-crawl
+        name: stackrox-collector-driver-push
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 4000m
+          memory: 4000Mi
+    test:
+    - as: crawling
+      commands: .openshift-ci/gcp/command.sh .openshift-ci/crawler/crawl.sh
+      credentials:
+      - mount_path: /tmp/secret/stackrox-kernel-packer-crawl
+        name: stackrox-collector-driver-push
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 4000m
+          memory: 4000Mi
+      timeout: 6h0m0s
+    - as: sync
+      commands: .openshift-ci/gcp/command.sh .openshift-ci/crawler/sync.sh
+      credentials:
+      - mount_path: /tmp/secret/stackrox-kernel-packer-crawl
+        name: stackrox-collector-driver-push
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 4000m
+          memory: 4000Mi
+      timeout: 6h0m0s
+    - as: repackaging
+      commands: .openshift-ci/gcp/command.sh .openshift-ci/crawler/repackage.sh
+      credentials:
+      - mount_path: /tmp/secret/stackrox-kernel-packer-crawl
+        name: stackrox-collector-driver-push
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 4000m
+          memory: 4000Mi
+      timeout: 6h0m0s
+    - as: cache
+      commands: .openshift-ci/gcp/command.sh .openshift-ci/crawler/cache.sh
+      credentials:
+      - mount_path: /tmp/secret/stackrox-kernel-packer-crawl
+        name: stackrox-collector-driver-push
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 4000m
+          memory: 4000Mi
+      timeout: 6h0m0s
 zz_generated_metadata:
   branch: master
   org: stackrox
