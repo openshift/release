@@ -1,4 +1,16 @@
 base_images:
+  centos7:
+    name: centos
+    namespace: openshift
+    tag: "7"
+  centos8:
+    name: centos
+    namespace: origin
+    tag: stream8
+  fc36:
+    name: fedora
+    namespace: coreos
+    tag: "36"
   ubi-minimal:
     name: ubi-minimal
     namespace: ocp
@@ -39,6 +51,151 @@ images:
   dockerfile_path: jobs/integration-tests/Dockerfile
   from: src
   to: integration-tests
+- context_dir: .
+  dockerfile_path: .openshift-ci/drivers/scripts.Dockerfile
+  from: fc36
+  to: scripts
+- context_dir: .openshift-ci/drivers/
+  dockerfile_path: fc36-base.Dockerfile
+  from: fc36
+  inputs:
+    scripts:
+      as:
+      - replaced-by-osci:scripts
+  to: fc36-base
+- context_dir: .openshift-ci/drivers/
+  dockerfile_path: rhel8-base.Dockerfile
+  from: centos8
+  inputs:
+    scripts:
+      as:
+      - replaced-by-osci:scripts
+  to: rhel8-base
+- context_dir: .openshift-ci/drivers/
+  dockerfile_path: rhel7-base.Dockerfile
+  from: centos7
+  inputs:
+    scripts:
+      as:
+      - replaced-by-osci:scripts
+  to: rhel7-base
+- build_args:
+  - name: USE_KERNELS_FILE
+    value: "true"
+  dockerfile_path: .openshift-ci/drivers/pre-build.Dockerfile
+  from: src
+  inputs:
+    scripts:
+      as:
+      - replaced-by-osci:scripts
+  to: pre-build
+- build_args:
+  - name: SHARDS_DIR
+    value: /tasks/fc36/shards/
+  context_dir: .
+  dockerfile_path: .openshift-ci/drivers/build.Dockerfile
+  inputs:
+    fc36-base:
+      as:
+      - replaced-by-osci:builder-base
+    pre-build:
+      as:
+      - replaced-by-osci:pre-build
+  to: fc36-drivers
+- build_args:
+  - name: SHARDS_DIR
+    value: /tasks/rhel8/0/shards/
+  context_dir: .
+  dockerfile_path: .openshift-ci/drivers/build.Dockerfile
+  inputs:
+    pre-build:
+      as:
+      - replaced-by-osci:pre-build
+    rhel8-base:
+      as:
+      - replaced-by-osci:builder-base
+  to: rhel8-0-drivers
+- build_args:
+  - name: SHARDS_DIR
+    value: /tasks/rhel8/1/shards/
+  context_dir: .
+  dockerfile_path: .openshift-ci/drivers/build.Dockerfile
+  inputs:
+    pre-build:
+      as:
+      - replaced-by-osci:pre-build
+    rhel8-base:
+      as:
+      - replaced-by-osci:builder-base
+  to: rhel8-1-drivers
+- build_args:
+  - name: SHARDS_DIR
+    value: /tasks/rhel8/2/shards/
+  context_dir: .
+  dockerfile_path: .openshift-ci/drivers/build.Dockerfile
+  inputs:
+    pre-build:
+      as:
+      - replaced-by-osci:pre-build
+    rhel8-base:
+      as:
+      - replaced-by-osci:builder-base
+  to: rhel8-2-drivers
+- build_args:
+  - name: SHARDS_DIR
+    value: /tasks/rhel8/3/shards/
+  context_dir: .
+  dockerfile_path: .openshift-ci/drivers/build.Dockerfile
+  inputs:
+    pre-build:
+      as:
+      - replaced-by-osci:pre-build
+    rhel8-base:
+      as:
+      - replaced-by-osci:builder-base
+  to: rhel8-3-drivers
+- build_args:
+  - name: SHARDS_DIR
+    value: /tasks/rhel7/shards/
+  context_dir: .
+  dockerfile_path: .openshift-ci/drivers/build.Dockerfile
+  inputs:
+    pre-build:
+      as:
+      - replaced-by-osci:pre-build
+    rhel7-base:
+      as:
+      - replaced-by-osci:builder-base
+  to: rhel7-drivers
+- context_dir: .
+  dockerfile_path: .openshift-ci/drivers/drivers.Dockerfile
+  from: src
+  inputs:
+    fc36-drivers:
+      as:
+      - replaced-by-osci:fc36-drivers
+    pre-build:
+      as:
+      - replaced-by-osci:pre-build
+    rhel7-drivers:
+      as:
+      - replaced-by-osci:rhel7-drivers
+    rhel8-0-drivers:
+      as:
+      - replaced-by-osci:rhel8-0-drivers
+    rhel8-1-drivers:
+      as:
+      - replaced-by-osci:rhel8-1-drivers
+    rhel8-2-drivers:
+      as:
+      - replaced-by-osci:rhel8-2-drivers
+    rhel8-3-drivers:
+      as:
+      - replaced-by-osci:rhel8-3-drivers
+    scripts:
+      as:
+      - replaced-by-osci:scripts
+  to: drivers
 promotion:
   excluded_images:
   - collector-builder
@@ -49,10 +206,10 @@ promotion:
 resources:
   '*':
     limits:
-      memory: 4Gi
+      memory: 20Gi
     requests:
-      cpu: 100m
-      memory: 200Mi
+      cpu: "2"
+      memory: 2Gi
 tests:
 - as: lint
   steps:
@@ -81,16 +238,6 @@ tests:
         requests:
           cpu: 2000m
           memory: 4000Mi
-- as: unit-tests
-  steps:
-    test:
-    - as: collector-unit-tests
-      commands: /go/src/github.com/stackrox/collector/cmake-build/collector/runUnitTests
-      from: collector
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 4000Mi
 - as: push-images
   steps:
     test:
@@ -104,6 +251,16 @@ tests:
       - env: COLLECTOR_FULL
         name: collector-full
       from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+- as: unit-tests
+  steps:
+    test:
+    - as: collector-unit-tests
+      commands: /go/src/github.com/stackrox/collector/cmake-build/collector/runUnitTests
+      from: collector
       resources:
         requests:
           cpu: 2000m
@@ -226,6 +383,34 @@ tests:
       IMAGE_FAMILY: rhel-8
       VM_TYPE: rhel
     workflow: stackrox-collector-integration-tests
+- as: drivers-tests
+  optional: true
+  steps:
+    test:
+    - as: drivers-build-failures
+      commands: |
+        FAILURES_DIR=/FAILURES/ /scripts/drivers-build-failures.sh
+      from: drivers
+      resources:
+        requests:
+          cpu: 100m
+          memory: 2000Mi
+- as: push-drivers
+  optional: true
+  steps:
+    test:
+    - as: push-drivers
+      commands: |
+        /scripts/push-drivers.sh
+      credentials:
+      - mount_path: /tmp/secrets
+        name: stackrox-collector-driver-push
+        namespace: test-credentials
+      from: drivers
+      resources:
+        requests:
+          cpu: 100m
+          memory: 2000Mi
 zz_generated_metadata:
   branch: master
   org: stackrox
