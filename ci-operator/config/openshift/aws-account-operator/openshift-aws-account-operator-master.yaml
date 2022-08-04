@@ -52,15 +52,40 @@ tests:
     version: "4.7"
   optional: true
   steps:
+    pre:
+    - as: fetch-branch-name
+      commands: |
+        BRANCH_NAME_PATH="${SHARED_DIR}/${BRANCH_NAME_FILE}"
+        BRANCH_NAME=$(git branch --show-current)
+        cat <<EOF> $BRANCH_NAME_PATH
+        $BRANCH_NAME
+        EOF
+      env:
+      - default: branch_name
+        name: BRANCH_NAME_FILE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     test:
     - as: test
       cli: latest
       commands: |
-        make prow-ci-deploy
+        BRANCH_NAME_PATH="${SHARED_DIR}/${BRANCH_NAME_FILE}"
+        echo $BRANCH_NAME_PATH
+        BRANCH_NAME=cat $BRANCH_NAME_PATH
+        echo $BRANCH_NAME
+        if echo $BRANCH_NAME | grep -iqF "run-int-test"; then
+          make prow-ci-deploy
+        fi
       credentials:
       - mount_path: /tmp/secret/aao-aws-creds
         name: aao-aws-creds
         namespace: test-credentials
+      env:
+      - default: branch_name
+        name: BRANCH_NAME_FILE
       from: src
       resources:
         requests:
