@@ -19,6 +19,10 @@ base_images:
     name: ocm-2.5
     namespace: edge-infrastructure
     tag: assisted-test-infra
+  cli:
+    name: "4.11"
+    namespace: ocp
+    tag: cli
   cluster-api-provider-agent:
     name: ocm-2.5
     namespace: edge-infrastructure
@@ -51,6 +55,10 @@ base_images:
     name: release
     namespace: openshift
     tag: golang-1.17
+  opm-builder:
+    name: opm-builder
+    namespace: ci
+    tag: latest
   postgresql-12-centos7:
     name: postgresql-12-centos7
     namespace: edge-infrastructure
@@ -63,6 +71,9 @@ build_root:
 images:
 - dockerfile_path: Dockerfile.assisted-service-build
   inputs:
+    cli:
+      as:
+      - quay.io/openshift/origin-cli:latest
     edge_infrastructure_swagger_codegen_cli:
       as:
       - quay.io/edge-infrastructure/swagger-codegen-cli:2.4.18
@@ -75,9 +86,12 @@ images:
     openshift_release_golang-1.17:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.17
+    opm-builder:
+      as:
+      - quay.io/operator-framework/upstream-opm-builder:v1.16.1
     postgresql-12-centos7:
       as:
-      - quay.io/centos7/postgresql-12-centos7:latest
+      - quay.io/edge-infrastructure/postgresql-12-centos7:latest
   to: assisted-service-build
 - dockerfile_path: Dockerfile.assisted-service
   from: coreos_centos_stream8
