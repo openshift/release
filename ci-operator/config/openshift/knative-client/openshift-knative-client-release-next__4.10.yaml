@@ -3,10 +3,6 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  cli:
-    name: "4.10"
-    namespace: ocp
-    tag: cli
   knative-serving-activator:
     name: knative-nightly
     namespace: openshift
@@ -43,10 +39,6 @@ base_images:
     name: knative-nightly
     namespace: openshift
     tag: knative-serving-webhook
-  ocp_ubi-minimal_8:
-    name: ubi-minimal
-    namespace: ocp
-    tag: "8"
 binary_build_commands: |
   make install
   make build-cross
@@ -75,6 +67,7 @@ images:
   from: src
   to: test-e2e
 - dockerfile_path: openshift/ci-operator/knative-images/client/Dockerfile.cliartifacts
+  from: base
   inputs:
     bin:
       paths:
@@ -88,9 +81,6 @@ images:
         source_path: /go/src/github.com/knative/client/LICENSE
       - destination_dir: .
         source_path: /go/src/github.com/knative/client/package_cliartifacts.sh
-    ocp_ubi-minimal_8:
-      as:
-      - registry.ci.openshift.org/ocp/ubi-minimal:8
   to: kn-cli-artifacts
 - dockerfile_path: openshift/ci-operator/knative-test-images/helloworld/Dockerfile
   from: base
@@ -125,6 +115,8 @@ images:
         source_path: /go/bin/sidecarcontainer
   to: knative-client-test-sidecarcontainer
 promotion:
+  excluded_images:
+  - "test-e2e"
   name: knative-nightly
   namespace: openshift
 resources:
