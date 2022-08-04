@@ -7,7 +7,6 @@ set -o pipefail
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
-API_URL=$(cat "${SHARED_DIR}/api.url")
 
 # Configure aws
 CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
@@ -44,9 +43,11 @@ IDP_PASSWD=$(openssl rand -base64 15)
 rosa create idp -c ${CLUSTER_ID} \
                 -y \
                 --type htpasswd \
-                --name htpasswd-1 \
+                --name rosa-htpasswd \
                 --username ${IDP_USER} \
                 --password ${IDP_PASSWD}
+
+API_URL=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.api.url')
 echo "oc login ${API_URL} -u ${IDP_USER} -p ${IDP_PASSWD} --insecure-skip-tls-verify=true" > "${SHARED_DIR}/api.login"
 
 # Grant cluster-admin access to the cluster
