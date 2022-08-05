@@ -15,6 +15,10 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
+  ubi:
+    name: ubi
+    namespace: ocp
+    tag: "8"
 build_root:
   project_image:
     dockerfile_path: .openshift-ci/build/Dockerfile.build_root
@@ -196,6 +200,17 @@ images:
       as:
       - replaced-by-osci:scripts
   to: drivers
+- build_args:
+  - name: OPENSHIFT_CI
+    value: "true"
+  dockerfile_path: collector/container/Dockerfile.ubi
+  from: ubi
+  inputs:
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/stackrox/collector/.
+  to: collector-ubi
 promotion:
   excluded_images:
   - collector-builder
@@ -250,6 +265,8 @@ tests:
       dependencies:
       - env: COLLECTOR_FULL
         name: collector-full
+      - env: COLLECTOR_UBI
+        name: collector-ubi
       from: src
       resources:
         requests:
@@ -412,6 +429,6 @@ tests:
           cpu: 100m
           memory: 2000Mi
 zz_generated_metadata:
-  branch: master
+  branch: ROX-11212-collector-ci-migration-ubi-image
   org: stackrox
   repo: collector
