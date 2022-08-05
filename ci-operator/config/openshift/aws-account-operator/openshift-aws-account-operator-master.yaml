@@ -56,7 +56,14 @@ tests:
     - as: test
       cli: latest
       commands: |
-        make prow-ci-deploy
+        echo $PULL_NUMBER
+        if curl -s "https://api.github.com/repos/openshift/aws-account-operator/pulls/${PULL_NUMBER}" | grep -ioPq '"title":\s*"\K[^,"]*run-int-test';
+            then
+                echo -e "\nStarting Integration Test\n"
+                make prow-ci-entrypoint
+            else
+                echo -e "\nSkipped Integration Test\n"
+        fi
       credentials:
       - mount_path: /tmp/secret/aao-aws-creds
         name: aao-aws-creds
