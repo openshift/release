@@ -135,13 +135,13 @@ function check_marketplace () {
     #     echo "marketplace installed, skip..."
     #     return 0
     # fi
-    
-    run_command "oc get ns openshift-marketplace"; ret=$?
+    ret=0
+    run_command "oc get ns openshift-marketplace" || ret=$?
     if [[ $ret -eq 0 ]]; then
         echo "openshift-marketplace project AlreadyExists, skip creating."
         return 0
     fi
-
+    
     cat <<EOF | oc create -f -
 apiVersion: v1
 kind: Namespace
