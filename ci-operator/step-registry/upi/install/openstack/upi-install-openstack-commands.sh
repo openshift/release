@@ -150,7 +150,7 @@ ${SHELL} "$UPI_SCRIPT"
 approve_csrs() {
 	export KUBECONFIG="$PWD/auth/kubeconfig"
 	while [[ ! -f 'install-complete' ]]; do
-		oc get csr -o jsonpath='{.items[*].metadata.name}' | xargs --no-run-if-empty oc adm certificate approve
+		oc get csr -o jsonpath='{.items[*].metadata.name}' | xargs --no-run-if-empty oc adm certificate approve || true
 		sleep 15
 	done
 }
