@@ -61,3 +61,35 @@ oc apply -f /tmp/kube_objects.yaml -n "$OO_INSTALL_NAMESPACE"
 
 # Remove the kube objects file just in case
 rm -rf /tmp/kube_objects.yaml
+
+
+IS_CUSTOM_KUBEOBJECTS_EXISTS=false
+
+echo "Check if the kube objects exists on the vault or not"
+
+KEYWORD_CUSTOM_KUBEOBJECTS="custom-"
+
+CUSTOM_KUBEOBJECTS_PATH=${CUSTOM_KUBEOBJECTS_PATH:=/var/run/}
+
+# the following command lists all the kubeobjects mounted on CUSTOM_KUBEOBJECTS_PATH 
+# with prefix "custom-" and also package name within the name of the file.
+
+LIST_OF_KUBEOBJECTS=( $( ls "$CUSTOM_KUBEOBJECTS_PATH""$KEYWORD_CUSTOM_KUBEOBJECTS""$OO_PACKAGE"* ) )
+
+for i in "${LIST_OF_KUBEOBJECTS[@]}"
+do
+   echo "The following custom kubeobject has been found !  $i"
+   IS_CUSTOM_KUBEOBJECTS_EXISTS=true
+done
+
+echo "If kubeobjects exists, apply the kubeobjects"
+
+if [ $IS_CUSTOM_KUBEOBJECTS_EXISTS == true ]
+then
+    for i in ${LIST_OF_KUBEOBJECTS[@]}
+    do
+        oc apply -f $CUSTOM_KUBEOBJECTS_PATH$i -n "$OO_INSTALL_NAMESPACE"
+    done
+else
+    echo "Custom kubeobjects not found skipping the test"
+fi
