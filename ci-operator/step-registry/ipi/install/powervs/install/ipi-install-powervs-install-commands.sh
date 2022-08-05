@@ -37,10 +37,21 @@ function prepare_next_steps() {
       "${dir}/auth/kubeadmin-password" \
       "${dir}/metadata.json"
 
-  # TODO: remove once BZ#1926093 is done and backported
-  if [[ "${CLUSTER_TYPE}" == "ovirt" ]]; then
-    cp -t "${SHARED_DIR}" "${dir}"/terraform.*
-  fi
+}
+
+function log_to_file()
+{
+	local LOG_FILE=$1
+
+	/bin/rm -f ${LOG_FILE}
+	# Close STDOUT file descriptor
+	exec 1<&-
+	# Close STDERR FD
+	exec 2<&-
+	# Open STDOUT as $LOG_FILE file for read and write.
+	exec 1<>${LOG_FILE}
+	# Redirect STDERR to STDOUT
+	exec 2>&1
 }
 
 function inject_promtail_service() {
@@ -200,14 +211,38 @@ if [[ -z "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" ]]; then
 fi
 
 echo "Installing from release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+IBMCLOUD_API_KEY=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_API_KEY")
+IBMCLOUD_APIKEY_CCM_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_APIKEY_CCM_CREDS")
+IBMCLOUD_APIKEY_INGRESS_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_APIKEY_INGRESS_CREDS")
+IBMCLOUD_APIKEY_MACHINEAPI_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_APIKEY_MACHINEAPI_CREDS")
+POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID")
+POWERVS_RESOURCE_GROUP=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_RESOURCE_GROUP")
+POWERVS_REGION=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_REGION")
+POWERVS_USER_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_USER_ID")
+POWERVS_ZONE=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_ZONE")
+VPCREGION=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/VPCREGION")
+CLUSTER_NAME="rdr-multiarch-ci"
+
 export SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 export PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
 export OPENSHIFT_INSTALL_INVOKER=openshift-internal-ci/${JOB_NAME}/${BUILD_ID}
+export POWERVS_SERVICE_INSTANCE_ID
+export POWERVS_RESOURCE_GROUP
+export POWERVS_USER_ID
+export VPCREGION
+export CLUSTER_NAME
 export HOME=/tmp
-export IBMCLOUD_API_KEY=${IBMCLOUD_API_KEY}
-export IBMCLOUD_APIKEY_CCM_CREDS=${IBMCLOUD_APIKEY_CCM_CREDS}
-export IBMCLOUD_APIKEY_INGRESS_CREDS=${IBMCLOUD_APIKEY_INGRESS_CREDS}
-export IBMCLOUD_APIKEY_MACHINEAPI_CREDS=${IBMCLOUD_APIKEY_MACHINEAPI_CREDS}
+
+dir=/tmp/installer
+mkdir "${dir}/"
+cp "${SHARED_DIR}/install-config.yaml" "${dir}/"
+
+# Powervs requires config.json
+cat > "/tmp/powervs-config.json" << EOF
+{"id":"${POWERVS_USER_ID}","apikey":"${IBMCLOUD_API_KEY}","region":"${POWERVS_REGION}","zone":"${POWERVS_ZONE}"}
+EOF
+cp "/tmp/powervs-config.json" "${SHARED_DIR}/"
+export POWERVS_AUTH_FILEPATH=${SHARED_DIR}/powervs-config.json
 
 # For disconnected or otherwise unreachable environments, we want to
 # have steps use an HTTP(S) proxy to reach the API server. This proxy
@@ -221,31 +256,11 @@ then
 fi
 
 case "${CLUSTER_TYPE}" in
-aws|aws-arm64) export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred;;
-azure4|azuremag) export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json;;
-azurestack) export AZURE_AUTH_LOCATION=${SHARED_DIR}/osServicePrincipal.json;;
-gcp) export GOOGLE_CLOUD_KEYFILE_JSON=${CLUSTER_PROFILE_DIR}/gce.json;;
-ibmcloud)
-    IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
-    export IC_API_KEY
-    ;;
 powervs)
-    IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/powervs-api-key")"
-    export IC_API_KEY
+    export IBMCLOUD_API_KEY
     ;;
-alibabacloud) export ALIBABA_CLOUD_CREDENTIALS_FILE=${SHARED_DIR}/alibabacreds.ini;;
-kubevirt) export KUBEVIRT_KUBECONFIG=${HOME}/.kube/config;;
-vsphere) export VSPHERE_PERSIST_SESSION=true;;
-openstack-osuosl) ;;
-openstack-ppc64le) ;;
-openstack*) export OS_CLIENT_CONFIG_FILE=${SHARED_DIR}/clouds.yaml ;;
-ovirt) export OVIRT_CONFIG="${SHARED_DIR}/ovirt-config.yaml" ;;
 *) >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}'"
 esac
-
-dir=/tmp/installer
-mkdir "${dir}/"
-cp "${SHARED_DIR}/install-config.yaml" "${dir}/"
 
 # move private key to ~/.ssh/ so that installer can use it to gather logs on
 # bootstrap failure
