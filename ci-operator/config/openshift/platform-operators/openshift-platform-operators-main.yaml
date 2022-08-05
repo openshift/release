@@ -53,6 +53,23 @@ tests:
   commands: make unit
   container:
     from: src
+- as: e2e
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: make e2e
+      dependencies:
+      - env: CLUSTER_PLATFORM_OPERATOR_MANAGER_IMAGE
+        name: cluster-platform-operators-manager
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
 zz_generated_metadata:
   branch: main
   org: openshift
