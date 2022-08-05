@@ -32,7 +32,7 @@ oc create -f - <<EOF
 apiVersion: operator.openshift.io/v1
 kind: ClusterCSIDriver
 metadata:
-    name: filestore.csi.gke.io
+    name: filestore.csi.storage.gke.io
 spec:
   managementState: Managed
 EOF
