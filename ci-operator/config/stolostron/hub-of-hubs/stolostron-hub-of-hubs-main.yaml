@@ -17,6 +17,13 @@ build_root:
     namespace: stolostron
     tag: go1.18-linux
 images:
+- dockerfile_path: operator/Dockerfile
+  from: base
+  inputs:
+    stolostron_builder_go1.18-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.18-linux
+  to: hub-of-hubs-operator
 - dockerfile_path: manager/Dockerfile
   from: base
   inputs:
@@ -82,6 +89,8 @@ tests:
         make e2e-prow-tests 2>&1 | tee ${ARTIFACT_DIR}/e2e-prow-tests.log
         set +o pipefail
       dependencies:
+      - env: HUB_OF_HUBS_OPERATOR_IMAGE_REF
+        name: hub-of-hubs-operator
       - env: HUB_OF_HUBS_MANAGER_IMAGE_REF
         name: hub-of-hubs-manager
       - env: HUB_OF_HUBS_AGENT_IMAGE_REF
@@ -111,6 +120,16 @@ tests:
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
+- as: latest-operator-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: hub-of-hubs-operator
+    env:
+      IMAGE_REPO: hub-of-hubs-operator
+      IMAGE_TAG: latest
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
 - as: latest-manager-image-mirror
   postsubmit: true
   steps:
