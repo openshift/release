@@ -56,7 +56,10 @@ tests:
     - as: test
       cli: latest
       commands: |
-        make prow-ci-deploy
+        BRANCH_NAME=$(git branch --show-current)
+        if echo $BRANCH_NAME | grep -iqF "run-int-test"; then
+          make prow-ci-entrypoint
+        fi
       credentials:
       - mount_path: /tmp/secret/aao-aws-creds
         name: aao-aws-creds
