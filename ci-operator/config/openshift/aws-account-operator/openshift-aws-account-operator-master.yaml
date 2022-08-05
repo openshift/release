@@ -55,18 +55,14 @@ tests:
     pre:
     - as: fetch-branch-name
       commands: |
-        BRANCH_NAME_PATH="${SHARED_DIR}/${BRANCH_NAME_FILE}"
-        echo $BRANCH_NAME_PATH
         BRANCH_NAME=$(git branch --show-current)
-        echo $BRANCH_NAME
         cat <<EOF> $BRANCH_NAME_PATH
         $BRANCH_NAME
         EOF
         cat $BRANCH_NAME_PATH
-        chmod 755 $BRANCH_NAME_PATH
       env:
-      - default: branch_name
-        name: BRANCH_NAME_FILE
+      - default: /tmp/secret/aao-aws-creds/BRANCH_NAME
+        name: BRANCH_NAME_PATH
       from: src
       resources:
         requests:
@@ -76,8 +72,6 @@ tests:
     - as: test
       cli: latest
       commands: |
-        BRANCH_NAME_PATH="${SHARED_DIR}/${BRANCH_NAME_FILE}"
-        echo $BRANCH_NAME_PATH
         BRANCH_NAME=cat $BRANCH_NAME_PATH
         echo $BRANCH_NAME
         if echo $BRANCH_NAME | grep -iqF "run-int-test"; then
@@ -88,8 +82,8 @@ tests:
         name: aao-aws-creds
         namespace: test-credentials
       env:
-      - default: branch_name
-        name: BRANCH_NAME_FILE
+      - default: /tmp/secret/aao-aws-creds/BRANCH_NAME
+        name: BRANCH_NAME_PATH
       from: src
       resources:
         requests:
