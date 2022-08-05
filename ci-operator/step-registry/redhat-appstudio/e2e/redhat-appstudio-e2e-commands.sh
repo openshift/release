@@ -24,7 +24,6 @@ git config --global credential.helper "store --file ${GIT_CREDS_PATH}"
 echo "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com" > "${GIT_CREDS_PATH}"
 
 cd "$(mktemp -d)"
-git clone --no-checkout "https://${GITHUB_TOKEN}@github.com/psturc/e2e-tests.git" .
-git checkout HACBS-784
+git clone "https://${GITHUB_TOKEN}@github.com/redhat-appstudio/e2e-tests.git" .
 make ci/prepare/e2e-branch
 make ci/test/e2e
