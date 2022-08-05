@@ -3,11 +3,23 @@ base_images:
     name: "4.12"
     namespace: ocp
     tag: base
+  ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.18-openshift-4.12
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: golang-1.18
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+  to: cluster-platform-operators-manager
 promotion:
   name: "4.12"
   namespace: ocp
@@ -29,10 +41,35 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: sanity
-  commands: echo "sanity"
+- as: verify
+  commands: make verify
   container:
     from: src
+- as: lint
+  commands: make lint
+  container:
+    from: src
+- as: unit
+  commands: make unit
+  container:
+    from: src
+- as: e2e
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: make e2e
+      dependencies:
+      - env: CLUSTER_PLATFORM_OPERATOR_MANAGER_IMAGE
+        name: cluster-platform-operators-manager
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
 zz_generated_metadata:
   branch: main
   org: openshift

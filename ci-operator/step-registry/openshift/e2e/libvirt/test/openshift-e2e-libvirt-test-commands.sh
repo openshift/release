@@ -6,7 +6,7 @@ set -o pipefail
 
 export PATH=/usr/libexec/origin:$PATH
 # Initial check
-if [[ "${CLUSTER_TYPE}" != "libvirt-ppc64le" ]] && [[ "${CLUSTER_TYPE}" != "libvirt-s390x" ]] ; then
+if [[ "${CLUSTER_TYPE}" != "libvirt-ppc64le" ]] && [[ "${CLUSTER_TYPE}" != "libvirt-s390x" ]] && [[ "${CLUSTER_TYPE}" != "powervs" ]] ; then
     echo "Unsupported cluster type '${CLUSTER_TYPE}'"
     exit 1
 fi
