@@ -2415,7 +2415,16 @@ periodics:
         /usr/bin/sippy-config-generator \
           --prow-jobs-dir ../release/ci-operator/jobs \
           --release-config ../release/core-services/release-controller/_releases \
-          --customization-file ./config/openshift-customizations.yaml > ./config/openshift.yaml
+          --customization-file ./config/openshift-customizations.yaml > ./config/openshift.yaml.new
+
+
+        # Compare everything but the header of the file to see if they're identical
+        diff <(tail -n +2 ./config/openshift.yaml.new) <(tail -n +2 ./config/openshift.yaml) 2>&1 > /dev/null && \
+        echo "Files are identical, no update needed." && \
+        exit 0
+
+        mv ./config/openshift.yaml.new ./config/openshift.yaml
+
         # Initiate prcreator to open a PR against sippy
         /usr/bin/prcreator \
         -github-token-path=/etc/github/oauth \
