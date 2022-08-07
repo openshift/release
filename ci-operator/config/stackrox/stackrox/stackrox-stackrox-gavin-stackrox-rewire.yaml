@@ -24,6 +24,17 @@ images:
     WORKDIR $GOPATH/src/github.com/stackrox/stackrox
     COPY . .
   to: build-plus-src
+- dockerfile_literal: |-
+    FROM quay.io/stackrox-io/apollo-ci:stackrox-test-0.3.44-2-ga2b83e99da
+    WORKDIR $GOPATH/src/github.com/stackrox/stackrox
+    COPY . .
+  to: test-plus-src
+- dockerfile_literal: |-
+    FROM quay.io/stackrox-io/apollo-ci:stackrox-test-0.3.44-2-ga2b83e99da
+    WORKDIR $GOPATH/src/github.com/stackrox/stackrox
+    COPY . .
+    RUN .openshift-ci/dispatch.sh test-binary-build-commands
+  to: test-plus-bin
 resources:
   '*':
     requests:
@@ -35,6 +46,21 @@ tests:
   container:
     clone: false
     from: build-plus-src
+- as: style
+  commands: .openshift-ci/dispatch.sh style-checks
+  container:
+    clone: false
+    from: test-plus-src
+- as: gke-qa-e2e-tests
+  commands: .openshift-ci/dispatch.sh gke-qa-e2e-tests
+  container:
+    clone: false
+    from: test-plus-bin
+  optional: true
+  secrets:
+  - mount_path: /tmp/vault/stackrox-stackrox-e2e-tests
+    name: stackrox-stackrox-e2e-tests
+  timeout: 5h0m0s
 zz_generated_metadata:
   branch: gavin-stackrox-rewire
   org: stackrox
