@@ -19,11 +19,23 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/stackrox/stackrox/image/rhel/.
   to: main
+- build_args:
+  dockerfile_literal: |-
+    FROM quay.io/stackrox-io/apollo-ci:stackrox-build-0.3.44-2-ga2b83e99da
+    WORKDIR $GOPATH/src/github.com/stackrox/stackrox
+    COPY . .
+  to: build-plus-src
 resources:
   '*':
     requests:
       cpu: 2000m
       memory: 8000Mi
+tests:
+- as: go-unit-tests
+  commands: .openshift-ci/dispatch.sh go-unit-tests
+  container:
+    from: build-plus-src
+    clone: false
 zz_generated_metadata:
   branch: gavin-stackrox-rewire
   org: stackrox
