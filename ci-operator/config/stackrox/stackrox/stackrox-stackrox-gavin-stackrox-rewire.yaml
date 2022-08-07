@@ -22,12 +22,12 @@ images:
 - dockerfile_literal: |-
     FROM quay.io/stackrox-io/apollo-ci:stackrox-build-0.3.44-2-ga2b83e99da
     WORKDIR $GOPATH/src/github.com/stackrox/stackrox
-    COPY . .
-  to: build-plus-src
+  to: build
 - dockerfile_literal: |-
     FROM quay.io/stackrox-io/apollo-ci:stackrox-build-0.3.44-2-ga2b83e99da
     WORKDIR $GOPATH/src/github.com/stackrox/stackrox
-  to: build-plus-src-2
+    COPY . .
+  to: build-plus-src
 - dockerfile_literal: |-
     FROM quay.io/stackrox-io/apollo-ci:stackrox-test-0.3.44-2-ga2b83e99da
     WORKDIR $GOPATH/src/github.com/stackrox/stackrox
@@ -37,6 +37,7 @@ images:
     FROM quay.io/stackrox-io/apollo-ci:stackrox-test-0.3.44-2-ga2b83e99da
     WORKDIR $GOPATH/src/github.com/stackrox/stackrox
     COPY . .
+    ENV OPENSHIFT_BUILD_NAME=test-binary-build-commands
     RUN .openshift-ci/dispatch.sh test-binary-build-commands
   to: test-plus-bin
 resources:
@@ -45,11 +46,11 @@ resources:
       cpu: 2000m
       memory: 8000Mi
 tests:
-- as: go-unit-tests
+- as: go-unit-tests-clones
   commands: .openshift-ci/dispatch.sh go-unit-tests
   container:
-    clone: false
-    from: build-plus-src
+    clone: true
+    from: build
 - as: style
   commands: .openshift-ci/dispatch.sh style-checks
   container:
