@@ -3,38 +3,97 @@ base_images:
     name: "4.11"
     namespace: ocp
     tag: base
-  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
+  builder:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.17-openshift-4.10
+    tag: rhel-8-golang-1.18-openshift-4.11
+  lokistack-gateway:
+    name: 5.y
+    namespace: logging
+    tag: lokistack-gateway
+  opa-openshift:
+    name: 5.y
+    namespace: logging
+    tag: opa-openshift
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.17
+    tag: golang-1.18
 images:
 - dockerfile_path: Dockerfile.ocp
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
+    builder:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
   to: loki
 - dockerfile_path: Dockerfile.promtail.ocp
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
+    builder:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
   to: promtail
+- context_dir: operator
+  dockerfile_path: Dockerfile
+  from: base
+  inputs:
+    builder:
+      as:
+      - golang:1.18.4
+  to: loki-operator
+operator:
+  bundles:
+  - as: loki-operator-bundle
+    context_dir: operator
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/openshift-logging/loki-operator:v0.0.1
+    with: pipeline:loki-operator
+  - pullspec: quay.io/openshift-logging/loki:v2.6.1
+    with: pipeline:loki
+  - pullspec: quay.io/observatorium/api:latestregistry.ci.openshift.org
+    with: pipeline:lokistack-gateway
+  - pullspec: quay.io/observatorium/opa-openshift:latest
+    with: pipeline:opa-openshift
 promotion:
+  additional_images:
+    loki-operator-bundle: loki-operator-bundle
   name: 5.y
   namespace: logging
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.11"
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- as: operator-install
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-loki-operator-bundle
+    env:
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-operators-redhat
+      OO_PACKAGE: loki-operator
+      OO_TARGET_NAMESPACES: '!all'
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        oc -n openshift-operators-redhat rollout status deployment loki-operator-controller-manager
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: optional-operators-ci-aws
 zz_generated_metadata:
   branch: main
   org: openshift
