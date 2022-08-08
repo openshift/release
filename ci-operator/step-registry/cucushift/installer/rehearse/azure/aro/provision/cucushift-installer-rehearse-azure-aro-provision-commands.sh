@@ -38,6 +38,9 @@ az provider register -n Microsoft.Authorization --wait
 
 CREATE_CMD="az aro create --resource-group ${RESOURCEGROUP} --name ${CLUSTER} --vnet ${VNET} --master-subnet master-subnet --worker-subnet worker-subnet "
 
+echo "Creating managed identity the aro cluster will use for creating service principals"
+az identity create -g "${RESOURCEGROUP}" -n "${CLUSTER}-id"
+
 if [ -f "$PULL_SECRET_FILE"  ]; then
     CREATE_CMD="$CREATE_CMD --pull-secret @\"$PULL_SECRET_FILE\" "
 fi
