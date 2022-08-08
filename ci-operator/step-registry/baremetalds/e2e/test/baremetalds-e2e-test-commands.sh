@@ -232,6 +232,9 @@ do
   if (( count > 20 )); then
     echo "#### LOOK HERE ####"
     ssh "${SSHOPTS[@]}" "root@${IP}" "oc describe is -n openshift"
+    echo "#### PULL SECRET DEBUG ####"
+    ssh "${SSHOPTS[@]}" "root@${IP}" "oc get secret/pull-secret -n openshift-config -o yaml"
+#    sleep 3600
     echo "Failed while waiting on imagestream import"
     exit 1
   fi
