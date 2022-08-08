@@ -1,4 +1,5 @@
 blunderbuss:
+  ignore_drafts: true
   max_request_count: 2
   request_count: 2
 branch_cleaner: {}
@@ -332,6 +333,9 @@ config_updater:
       - vsphere
       namespaces:
       - ocp
+    build_farm_ocp_aarch64:
+      clusters:
+      - arm01
   gzip: false
   maps:
     ci-operator/config/**/*-agent-installer.yaml:
@@ -658,6 +662,12 @@ config_updater:
         - ci
       gzip: true
       name: ci-operator-misc-configs
+    ci-operator/config/**/assisted-*/*testing-image-changes*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
     ci-operator/config/**/assisted-*/*v1*.yaml:
       clusters:
         app.ci:
@@ -832,6 +842,12 @@ config_updater:
         - ci
       gzip: true
       name: ci-operator-misc-configs
+    ci-operator/config/kcp-dev/controller-runtime/kcp-dev-controller-runtime-kcp-*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
     ci-operator/config/kubevirt/**/*release-2.[4-9].yaml:
       clusters:
         app.ci:
@@ -953,6 +969,12 @@ config_updater:
       gzip: true
       name: ci-operator-4.9-configs
     ci-operator/config/redhat-openshift-ecosystem/preflight/*-preflight-ocp-*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
+    ci-operator/config/stackrox/**/*-night*.yaml:
       clusters:
         app.ci:
         - ci
@@ -1097,12 +1119,6 @@ config_updater:
       gzip: true
       name: job-config-master-presubmits
     ci-operator/jobs/**/*-ocp-ci-integration*.yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: job-config-misc
-    ci-operator/jobs/**/*che*/*-7.50.x-*.yaml:
       clusters:
         app.ci:
         - ci
@@ -1384,6 +1400,12 @@ config_updater:
         - ci
       gzip: true
       name: job-config-misc
+    ci-operator/jobs/**/assisted-*/*testing-image-changes*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
     ci-operator/jobs/**/assisted-*/*v1*.yaml:
       clusters:
         app.ci:
@@ -1570,6 +1592,12 @@ config_updater:
         - ci
       gzip: true
       name: job-config-misc
+    ci-operator/jobs/kcp-dev/controller-runtime/kcp-dev-controller-runtime-kcp-*-*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
     ci-operator/jobs/openshift-priv/kubernetes/openshift-priv-kubernetes-{oc,origin,sdn}-*.yaml:
       clusters:
         app.ci:
@@ -1690,6 +1718,12 @@ config_updater:
         - ci
       gzip: true
       name: job-config-misc
+    ci-operator/jobs/stackrox/**/*-night*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
     ci-operator/jobs/stolostron/**/*-backplane-1.0*.yaml:
       clusters:
         app.ci:
@@ -1782,10 +1816,6 @@ config_updater:
       cluster_groups:
       - build_farm_ci
       name: prow-job-cluster-launch-installer-libvirt-e2e
-    ci-operator/templates/openshift/installer/cluster-launch-installer-metal-e2e.yaml:
-      cluster_groups:
-      - build_farm_ci
-      name: prow-job-cluster-launch-installer-metal-e2e
     ci-operator/templates/openshift/installer/cluster-launch-installer-openstack-e2e.yaml:
       cluster_groups:
       - build_farm_ci
@@ -1996,7 +2026,13 @@ config_updater:
     core-services/release-controller/_repos/*:
       cluster_groups:
       - build_farm_ocp
+      - build_farm_ocp_aarch64
       name: base-repos
+    core-services/retester/_config.yaml:
+      clusters:
+        app.ci:
+        - ci
+      name: retester-config
 golint: {}
 goose:
   key_path: /etc/unsplash-api/api-key
@@ -2043,6 +2079,9 @@ override:
     - openshift-release-oversight
 owners:
   filenames:
+    kcp-dev/controller-runtime:
+      owners: DOWNSTREAM_OWNERS
+      owners_aliases: DOWNSTREAM_OWNERS_ALIASES
     openshift-kni/scheduler-plugins:
       owners: DOWNSTREAM_OWNERS
       owners_aliases: DOWNSTREAM_OWNERS_ALIASES

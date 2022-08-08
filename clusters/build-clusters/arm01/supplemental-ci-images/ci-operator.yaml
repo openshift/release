@@ -1,0 +1,69 @@
+kind: List
+apiVersion: v1
+items:
+- kind: ImageStream
+  apiVersion: image.openshift.io/v1
+  metadata:
+    name: ci-tools-builder
+    namespace: ci
+- kind: ImageStream
+  apiVersion: image.openshift.io/v1
+  metadata:
+    name: ci-operator
+    namespace: ci
+- apiVersion: build.openshift.io/v1
+  kind: BuildConfig
+  metadata:
+    name: ci-operator-builder
+    namespace: ci
+    labels:
+      app: ci-operator-builder
+  spec:
+    source:
+      git:
+        uri: https://github.com/openshift/ci-tools
+      dockerfile: |
+        FROM golang:1.18.4-alpine3.16
+        LABEL maintainer="dmistry@redhat.com"
+        WORKDIR /src
+        COPY . .
+        RUN CGO_ENABLED=0 go build ./cmd/ci-operator/
+    strategy:
+      type: Docker
+      dockerStrategy: {}
+    output:
+      to:
+        kind: ImageStreamTag
+        name: ci-tools-builder:latest
+- apiVersion: build.openshift.io/v1
+  kind: BuildConfig
+  metadata:
+    name: ci-operator
+    namespace: ci
+    labels:
+      app: ci-operator
+  spec:
+    source:
+      git:
+        uri: https://github.com/openshift/ci-tools
+      contextDir: ./images/ci-operator
+      images:
+        - from:
+            kind: ImageStreamTag
+            name: ci-tools-builder:latest
+          paths:
+            - sourcePath: /src/ci-operator
+              destinationDir: ./images/ci-operator
+    strategy:
+      type: Docker
+      dockerStrategy: {} # Use the defualt Dockerfile in the repo at /images/ci-operator
+    output:
+      to:
+        kind: ImageStreamTag
+        name: ci-operator:latest
+    triggers:
+      - type: imageChange
+        imageChange:
+          from:
+            kind: "ImageStreamTag"
+            name: "ci-tools-builder:latest"

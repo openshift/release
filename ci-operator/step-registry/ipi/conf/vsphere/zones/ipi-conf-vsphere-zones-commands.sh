@@ -38,13 +38,14 @@ controlPlane:
        - "us-east-3"
 compute:
 - name: "worker"
-  replicas: 3
+  replicas: 4
   platform:
     vsphere:
       zones:
        - "us-east-1"
        - "us-east-2"
        - "us-east-3"
+       - "us-west-1"
 platform:
   vsphere:
     apiVIP: "${vips[0]}"
@@ -146,45 +147,41 @@ EOF
 curl -o ${SHARED_DIR}/manifest_externalFeatureGate.yaml https://raw.githubusercontent.com/openshift/cluster-cloud-controller-manager-operator/master/hack/externalFeatureGate.yaml
 
 
-ZONAL_SC="${SHARED_DIR}/manifest_zonal-sc.yaml"
-PROM_CONFIG="${SHARED_DIR}/manifest_cluster-monitoring-config.yaml"
+# TODO: Add this back in once we have an vsphere
+# environment that will support topology storage
 
-
-cat >> ${ZONAL_SC} << EOF
-apiVersion: storage.k8s.io/v1
-kind: StorageClass
-metadata:
-  name: sc-zone-us-east-1a
-allowedTopologies:
-- matchLabelExpressions:
-  - key: topology.kubernetes.io/zone: us-east-1a
-    values:
-    - us-east-1a
-parameters:
-  diskformat: thin
-provisioner: kubernetes.io/vsphere-volume
-reclaimPolicy: Delete
-volumeBindingMode: WaitForFirstConsumer
-EOF
-
-cat >> ${PROM_CONFIG} << EOF
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: cluster-monitoring-config
-  namespace: openshift-monitoring
-data:
-  config.yaml: |
-    prometheusK8s:
-      volumeClaimTemplate:
-        metadata:
-          name: prometheus-data
-          annotations:
-            openshift.io/cluster-monitoring-drop-pvc: "yes"
-       spec:
-         storageClassName: sc-zone-us-east-1a
-         resources:
-           requests:
-             storage: 20Gi
-EOF
+#ZONAL_SC="${SHARED_DIR}/manifest_zonal-sc.yaml"
+#PROM_CONFIG="${SHARED_DIR}/manifest_cluster-monitoring-config.yaml"
+#
+#
+#cat >> ${ZONAL_SC} << EOF
+#apiVersion: storage.k8s.io/v1
+#kind: StorageClass
+#metadata:
+#  name: sc-zone-us-east-1a
+#allowedTopologies:
+#- matchLabelExpressions:
+#  - key: topology.kubernetes.io/zone
+#    values:
+#    - us-east-1a
+#parameters:
+#  diskformat: thin
+#provisioner: kubernetes.io/vsphere-volume
+#reclaimPolicy: Delete
+#volumeBindingMode: WaitForFirstConsumer
+#EOF
+#
+#cat >> ${PROM_CONFIG} << EOF
+#apiVersion: v1
+#kind: ConfigMap
+#metadata:
+#  name: cluster-monitoring-config
+#  namespace: openshift-monitoring
+#data:
+#  config.yaml:
+#    prometheusK8s:
+#      volumeClaimTemplate:
+#        spec:
+#          storageClassName: sc-zone-us-east-1a
+#EOF
 

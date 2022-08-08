@@ -8,27 +8,27 @@ base_images:
     namespace: ocp
     tag: ansible
   assisted-image-service:
-    name: ocm-2.6
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.6
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.6
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.6
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.6
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.6
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-test-infra
   aws-ebs-csi-driver-operator-test:
@@ -89,7 +89,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-metal-assisted
+- as: e2e-metal-sdn-assisted
   cron: 0 0 * * 1
   steps:
     cluster_profile: packet-assisted
@@ -99,7 +99,7 @@ tests:
       ASSISTED_INSTALLER_IMAGE: pipeline:assisted-installer
       ASSISTED_SERVICE_IMAGE: pipeline:assisted-service
     workflow: assisted-baremetal
-- as: e2e-aws-single-node-workers
+- as: e2e-aws-ovn-single-node-workers
   interval: 24h
   steps:
     cluster_profile: aws-2
@@ -107,21 +107,21 @@ tests:
       BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-e2e-aws-single-node-workers
   timeout: 3h0m0s
-- as: openshift-e2e-aws-single-node-workers-upgrade-conformance
+- as: openshift-e2e-aws-ovn-single-node-workers-upgrade-conformance
   interval: 24h
   steps:
     cluster_profile: aws-2
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-e2e-aws-single-node-workers-upgrade-conformance
-- as: e2e-aws-single-node
+- as: e2e-aws-ovn-single-node
   interval: 24h
   steps:
     cluster_profile: aws-2
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-e2e-aws-single-node
-- as: e2e-aws-single-node-serial
+- as: e2e-aws-ovn-single-node-serial
   interval: 24h
   steps:
     cluster_profile: aws-2
@@ -129,12 +129,12 @@ tests:
       BASE_DOMAIN: aws-2.ci.openshift.org
       TEST_SUITE: openshift/conformance/serial
     workflow: openshift-e2e-aws-single-node
-- as: e2e-metal-single-node-live-iso
+- as: e2e-metal-ovn-single-node-live-iso
   interval: 24h
   steps:
     cluster_profile: packet-sno
     workflow: baremetalds-sno
-- as: e2e-metal-single-node-with-worker-live-iso
+- as: e2e-metal-ovn-single-node-with-worker-live-iso
   interval: 24h
   steps:
     cluster_profile: packet-sno
@@ -142,10 +142,23 @@ tests:
       PACKET_PLAN: c3.medium.x86
       TEST_FUNC: test_bip_add_worker
     workflow: baremetalds-sno
-- as: e2e-metal-sdn-ipi
+- as: e2e-metal-ipi-ovn-ipv4
+  interval: 48h
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-ipv4
+- as: e2e-metal-ipi-sdn
   interval: 6h
   steps:
     cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-sdn-ipv4
+- as: e2e-metal-ipi-sdn-bm
+  cluster: build05
+  interval: 6h
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      CLUSTERTYPE: baremetal
     workflow: baremetalds-e2e-sdn-ipv4
 - as: e2e-metal-ipi-ovn-dualstack-local-gateway
   interval: 48h
@@ -157,11 +170,11 @@ tests:
         NETWORK_TYPE=OVNKubernetes
         OVN_LOCAL_GATEWAY_MODE=true
     workflow: baremetalds-e2e
-- as: e2e-metal-ipi-serial-ipv4
+- as: e2e-metal-ipi-sdn-serial-ipv4
   interval: 6h
   steps:
     cluster_profile: equinix-ocp-metal
-    workflow: baremetalds-e2e-serial-ipv4
+    workflow: baremetalds-e2e-sdn-serial-ipv4
 - as: e2e-metal-ipi-serial-ovn-ipv6
   interval: 48h
   steps:
@@ -177,18 +190,18 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-serial-ovn-dualstack
-- as: e2e-metal-sdn-ipi-serial-compact
+- as: e2e-metal-ipi-sdn-serial-compact
   interval: 48h
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-sdn-serial-compact
-- as: e2e-metal-ipi-upgrade
+- as: e2e-metal-ipi-sdn-upgrade
   cron: 0 0 1 1 *
   steps:
     cluster_profile: equinix-ocp-metal
     env:
       TEST_TYPE: upgrade-conformance
-    workflow: baremetalds-e2e-upgrade
+    workflow: baremetalds-e2e-upgrade-sdn
   timeout: 5h0m0s
 - as: e2e-metal-ipi-upgrade-ovn-ipv6
   cron: 0 0 1 1 *
@@ -208,7 +221,7 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-dualstack
-- as: e2e-metal-ipi-compact
+- as: e2e-metal-ovn-ipi-compact
   cron: 0 0 * * 1
   steps:
     cluster_profile: equinix-ocp-metal
@@ -217,11 +230,11 @@ tests:
         IP_STACK=v6
         NUM_WORKERS=0
     workflow: baremetalds-e2e
-- as: e2e-metal-ipi-virtualmedia
+- as: e2e-metal-ipi-sdn-virtualmedia
   cron: 0 0 * * 1
   steps:
     cluster_profile: equinix-ocp-metal
-    workflow: baremetalds-e2e-virtualmedia
+    workflow: baremetalds-e2e-sdn-virtualmedia
 - as: e2e-aws-proxy
   cron: 0 0 */2 * *
   steps:
@@ -307,7 +320,7 @@ tests:
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
     workflow: openshift-e2e-gcp-libvirt-cert-rotation
-- as: e2e-azure-fips
+- as: e2e-azure-sdn-fips
   interval: 48h
   steps:
     cluster_profile: azure-2
@@ -317,7 +330,7 @@ tests:
     pre:
     - chain: ipi-azure-pre
     - ref: fips-check
-    workflow: openshift-e2e-azure
+    workflow: openshift-e2e-azure-sdn
 - as: e2e-aws-fips
   interval: 48h
   steps:
@@ -354,7 +367,7 @@ tests:
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
     workflow: openshift-e2e-gcp-csi-migration
-- as: e2e-azure-fips-serial
+- as: e2e-azure-sdn-fips-serial
   interval: 48h
   steps:
     cluster_profile: azure-2
@@ -365,7 +378,7 @@ tests:
     pre:
     - chain: ipi-azure-pre
     - ref: fips-check
-    workflow: openshift-e2e-azure
+    workflow: openshift-e2e-azure-sdn
 - as: e2e-aws-fips-serial
   interval: 48h
   steps:
@@ -378,7 +391,7 @@ tests:
     - chain: ipi-aws-pre
     - ref: fips-check
     workflow: openshift-e2e-aws
-- as: e2e-gcp-fips-serial
+- as: e2e-gcp-sdn-fips-serial
   interval: 48h
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
@@ -388,7 +401,7 @@ tests:
     pre:
     - chain: ipi-gcp-pre
     - ref: fips-check
-    workflow: openshift-e2e-gcp
+    workflow: openshift-e2e-gcp-sdn
 - as: console-aws
   interval: 48h
   steps:
@@ -444,14 +457,6 @@ tests:
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-e2e-aws-ovn-serial
-- as: e2e-aws-canary
-  interval: 24h
-  steps:
-    cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
-      TEST_SUITE: experimental/reliability/minimal
-    workflow: openshift-e2e-aws
 - as: e2e-aws-csi
   interval: 24h
   steps:

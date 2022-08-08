@@ -41,6 +41,25 @@ function prepare_next_steps() {
       "${dir}/metadata.json"
 }
 
+function wait_router_lb_provision() {
+    local try=0 retries=20
+    local SERVICE
+    SERVICE="$(oc -n openshift-ingress get service router-default -o json)"
+
+    while test -z "$(echo "${SERVICE}" | jq -r '.status.loadBalancer.ingress[][]')" && test "${try}" -lt "${retries}"; do
+      echo "waiting on router-default service load balancer ingress..."
+      sleep 30
+      SERVICE="$(oc -n openshift-ingress get service router-default -o json)"
+      try="((try + 1))"
+    done
+    if [ "$try" -eq "$retries" ]; then
+      echo "${SERVICE}"
+      echo "ERROR: router-default service failed to provision load balancer ingress"
+      return 1
+    fi
+    return 0
+}
+
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 trap 'prepare_next_steps' EXIT TERM
 
@@ -129,6 +148,9 @@ if test "${ret}" -ne 0 ; then
 fi
 
 if [ "${ADD_INGRESS_RECORDS_MANUALLY}" == "yes" ]; then
+
+  export KUBECONFIG="${dir}/auth/kubeconfig"
+  wait_router_lb_provision || exit 1
 
   if [ "${CLUSTER_TYPE}" == "aws" ] || [ "${CLUSTER_TYPE}" == "aws-arm64" ]; then
     # creating app record
@@ -223,7 +245,6 @@ EOF
 
   private_route53_hostzone_name="${CLUSTER_NAME}.${BASE_DOMAIN}"
   private_route53_hostzone_id=$(aws route53 list-hosted-zones-by-name --dns-name "${private_route53_hostzone_name}" --max-items 1 | jq -r '.HostedZones[].Id' | awk -F '/' '{print $3}')
-  export KUBECONFIG="${dir}/auth/kubeconfig"
   router_lb=$(oc -n openshift-ingress get service router-default -o json | jq -r '.status.loadBalancer.ingress[].hostname')
 
   if [ "${CLUSTER_TYPE}" == "aws" ] || [ "${CLUSTER_TYPE}" == "aws-arm64" ]; then

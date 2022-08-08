@@ -1,28 +1,36 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.6
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.6
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.6
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.6
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.6
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-service
+  cluster-api-provider-agent:
+    name: ocm-2.7
+    namespace: edge-infrastructure
+    tag: cluster-api-provider-agent
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  govc:
+    name: govc
+    namespace: ci
+    tag: v0.29.0
   hypershift-operator:
     name: "4.11"
     namespace: ocp
@@ -45,18 +53,17 @@ images:
   from: dev-scripts
   to: assisted-test-infra-dev-script
 - dockerfile_path: Dockerfile.assisted-test-infra
+  inputs:
+    govc:
+      as:
+      - quay.io/ocp-splat/govc:v0.29.0
   to: assisted-test-infra-internal
 promotion:
-  name: ocm-2.6
+  name: ocm-2.7
   namespace: edge-infrastructure
 releases:
-  initial:
-    integration:
-      name: "4.9"
-      namespace: ocp
   latest:
     integration:
-      include_built_images: true
       name: "4.9"
       namespace: ocp
   ocp-4-11:
@@ -74,27 +81,12 @@ tests:
     make lint
   container:
     from: assisted-test-infra-internal
-- as: assisted-packet-check
-  cron: '*/30 * * * *'
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      LEAK_THRESHOLD_SECONDS: "18000"
-    test:
-    - ref: baremetalds-packet-check
-- as: sno-packet-check
-  cron: '*/30 * * * *'
-  steps:
-    cluster_profile: packet-sno
-    test:
-    - ref: baremetalds-packet-check
 - as: e2e-metal-assisted
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: packet-assisted
     env:
       PACKET_PLAN: c3.medium.x86
-      REQUIRED_MEMORY_GB: "72"
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-prod
   optional: true
@@ -267,6 +259,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=odf
+      PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-odf-periodic
   cron: '@daily'
@@ -275,6 +268,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=odf
+      PACKET_PLAN: m3.large.x86
       TEST_SUITE: full
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-ocs
@@ -285,6 +279,7 @@ tests:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=ocs
         OPENSHIFT_VERSION=4.8
+      PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-ocs-periodic
   cron: '@daily'
@@ -294,6 +289,7 @@ tests:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=ocs
         OPENSHIFT_VERSION=4.8
+      PACKET_PLAN: m3.large.x86
       TEST_SUITE: full
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-day2
@@ -492,6 +488,7 @@ tests:
     cluster_profile: packet-assisted
     dependencies:
       HYPERSHIFT_IMAGE: hypershift-operator
+      PROVIDER_IMAGE: cluster-api-provider-agent
     env:
       ASSISTED_CONFIG: |
         KUBE_API=yes
@@ -526,6 +523,7 @@ tests:
       ASSISTED_CONFIG: |
         STATIC_IPS=true
         TEST_FUNC=test_networking
+      PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-static-ip-suite-periodic
   cron: '@daily'
@@ -535,6 +533,7 @@ tests:
       ASSISTED_CONFIG: |
         STATIC_IPS=true
         TEST_FUNC=test_networking
+      PACKET_PLAN: m3.large.x86
       TEST_SUITE: full
     workflow: assisted-baremetal
 - as: e2e-metal-single-node-live-iso

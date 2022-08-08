@@ -18,9 +18,20 @@ promotion:
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
+      cat <<REPOFILE > /opt/ose.repo
+      [rhel-server-ose]
+      name = rhel-server-ose
+      baseurl = http://base-4-9.ocp.svc/rhel-server-ose
+      enabled = 1
+      gpgcheck = 0
+      priority = 1
+      skip_if_unavailable = false
+      exclude=openshift-ansible*
+      REPOFILE
       INSTALL_PKGS="which tar wget hostname sysvinit-tools util-linux socat tree findutils lsof bind-utils shadow-utils"
       cat <<DOCKERFILE > /opt/Dockerfile
       FROM os
+      COPY ose.repo /etc/yum.repos.d/ose.repo
       RUN mkdir -p /var/lib/origin && \
           yum install -y ${INSTALL_PKGS} && \
           rpm -V ${INSTALL_PKGS} && \
@@ -36,6 +47,8 @@ raw_steps:
         paths:
         - destination_dir: .
           source_path: /opt/Dockerfile
+        - destination_dir: .
+          source_path: /opt/ose.repo
     to: base
 releases:
   initial:

@@ -216,6 +216,40 @@ tests:
         requests:
           cpu: 1000m
           memory: 1Gi
+- as: cleanup-velero-buckets
+  cron: 0 6 * * *
+  steps:
+    test:
+    - as: test
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        run ods cleanup/velero-buckets
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from: ci-artifacts
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 1Gi
+- as: cleanup-zombies
+  cron: 0 3 * * *
+  steps:
+    test:
+    - as: test
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        run ods cleanup/zombies
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from: ci-artifacts
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 1Gi
 zz_generated_metadata:
   branch: master
   org: openshift-psap

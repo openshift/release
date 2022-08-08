@@ -73,7 +73,7 @@ export BOOTSTRAP_URI
 # begin bootstrapping
 if openshift-install coreos print-stream-json 2>/tmp/err.txt >coreos.json; then
   RHCOS_AMI="$(jq -r --arg region "$AWS_REGION" '.architectures.x86_64.images.aws.regions[$region].image' coreos.json)"
-  if [[ "${CLUSTER_TYPE}" == "aws-arm64" ]] || [[ x"${OCP_ARCH}" == x"arm64" ]]; then
+  if [[ "${CLUSTER_TYPE}" == "aws-arm64" ]] || [[ "${OCP_ARCH}" == "arm64" ]]; then
     RHCOS_AMI="$(jq -r --arg region "$AWS_REGION" '.architectures.aarch64.images.aws.regions[$region].image' coreos.json)"
   fi
 else

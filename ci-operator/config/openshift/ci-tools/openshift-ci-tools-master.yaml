@@ -455,6 +455,21 @@ images:
       - destination_dir: .
         source_path: /go/bin/serviceaccount-secret-rotation-trigger
   to: serviceaccount-secret-rotation-trigger
+- dockerfile_literal: |-
+    FROM quay.io/centos/centos:stream8
+    RUN dnf install -y git diffutils && dnf clean all && rm -rf /var/cache/dnf
+    ADD sippy-config-generator /usr/bin/sippy-config-generator
+    ADD prcreator /usr/bin/prcreator
+    ENTRYPOINT ["/usr/bin/sippy-config-generator"]
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/sippy-config-generator
+      - destination_dir: .
+        source_path: /go/bin/prcreator
+  to: auto-sippy-config-generator
 - context_dir: images/ocp-build-data-enforcer/
   from: os
   inputs:
@@ -598,6 +613,21 @@ images:
       - destination_dir: .
         source_path: /go/bin/job-run-aggregator
   to: job-run-aggregator
+- dockerfile_literal: |-
+    FROM quay.io/centos/centos:stream8
+    RUN dnf install -y git && dnf clean all && rm -rf /var/cache/dnf
+    ADD job-run-aggregator /usr/bin/job-run-aggregator
+    ADD prcreator /usr/bin/prcreator
+    ENTRYPOINT ["job-run-aggregator"]
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/job-run-aggregator
+      - destination_dir: .
+        source_path: /go/bin/prcreator
+  to: auto-aggregator-job-names
 - dockerfile_literal: |-
     FROM quay.io/centos/centos:stream8
     RUN dnf install -y git && dnf clean all && rm -rf /var/cache/dnf

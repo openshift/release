@@ -1,22 +1,22 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.6
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.6
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-controller:
-    name: ocm-2.6
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.6
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.6
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-test-infra
   coreos-centos-stream8:
@@ -48,16 +48,11 @@ images:
   from: src
   to: assisted-installer-agent-src
 promotion:
-  name: ocm-2.6
+  name: ocm-2.7
   namespace: edge-infrastructure
 releases:
-  initial:
-    integration:
-      name: "4.9"
-      namespace: ocp
   latest:
     integration:
-      include_built_images: true
       name: "4.9"
       namespace: ocp
 resources:
@@ -111,6 +106,16 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: assisted-installer-agent-codecov-token
+- as: subsystem-test
+  skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  steps:
+    cluster_profile: packet-assisted
+    workflow: assisted-agent
+- as: subsystem-test-periodic
+  cron: '@daily'
+  steps:
+    cluster_profile: packet-assisted
+    workflow: assisted-agent
 - as: e2e-metal-assisted
   skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
@@ -148,6 +153,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=odf
+      PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-ocs
   optional: true
@@ -157,6 +163,7 @@ tests:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=ocs
         OPENSHIFT_VERSION=4.8
+      PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-day2
   optional: true
@@ -166,16 +173,6 @@ tests:
       ASSISTED_CONFIG: |
         TEST_FUNC=test_deploy_day2_nodes_cloud
     workflow: assisted-baremetal
-- as: subsystem-test
-  skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
-  steps:
-    cluster_profile: packet-assisted
-    workflow: assisted-agent
-- as: subsystem-test-periodic
-  cron: '@daily'
-  steps:
-    cluster_profile: packet-assisted
-    workflow: assisted-agent
 zz_generated_metadata:
   branch: master
   org: openshift

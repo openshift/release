@@ -8,7 +8,7 @@ base_images:
     namespace: ocp
     tag: ansible
   assisted-test-infra:
-    name: ocm-2.6
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-test-infra
   aws-ebs-csi-driver-operator-test:
@@ -71,6 +71,14 @@ releases:
       product: ocp
       stream: nightly
       version: "4.11"
+  oldest-supported-credentials-request:
+    release:
+      channel: candidate
+      version: 4.11.0-fc.0
+  oldest-supported-z-rollback:
+    release:
+      channel: candidate
+      version: 4.11.0-fc.0
 resources:
   '*':
     requests:
@@ -120,6 +128,14 @@ tests:
       PACKET_PLAN: c3.medium.x86
       TEST_FUNC: test_bip_add_worker
     workflow: baremetalds-sno
+- as: e2e-metal-ipi-bm
+  cluster: build05
+  interval: 6h
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      CLUSTERTYPE: baremetal
+    workflow: baremetalds-e2e-ipv4
 - as: e2e-metal-ipi
   interval: 6h
   steps:
@@ -135,6 +151,11 @@ tests:
         NETWORK_TYPE=OVNKubernetes
         OVN_LOCAL_GATEWAY_MODE=true
     workflow: baremetalds-e2e
+- as: e2e-metal-ipi-ovn-ipv4
+  interval: 48h
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-ipv4
 - as: e2e-metal-ipi-serial-ipv4
   interval: 6h
   steps:
@@ -393,6 +414,25 @@ tests:
       COMPUTE_NODE_TYPE: n2-standard-8
       RT_ENABLED: "true"
     workflow: openshift-e2e-gcp-realtime
+- as: e2e-aws-upgrade-rollback-oldest-supported
+  interval: 48h
+  steps:
+    cluster_profile: aws-2
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:oldest-supported-z-rollback
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      TEST_TYPE: upgrade-conformance
+      TEST_UPGRADE_OPTIONS: abort-at=random
+    workflow: openshift-upgrade-aws
+- as: credentials-request-freeze
+  interval: 48h
+  steps:
+    dependencies:
+      OPENSHIFT_FROZEN_RELEASE_IMAGE: release:oldest-supported-credentials-request
+      OPENSHIFT_LATEST_RELEASE_IMAGE: release:latest
+    workflow: openshift-credentials-request-freeze
 - as: e2e-aws-upgrade
   interval: 24h
   steps:
@@ -422,14 +462,6 @@ tests:
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-e2e-aws-ovn-serial
-- as: e2e-aws-canary
-  interval: 24h
-  steps:
-    cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
-      TEST_SUITE: experimental/reliability/minimal
-    workflow: openshift-e2e-aws
 - as: e2e-aws-csi
   interval: 24h
   steps:
@@ -563,7 +595,7 @@ tests:
     workflow: ipi-aws
 - as: e2e-telco5g
   cluster: build05
-  interval: 6h
+  interval: 24h
   steps:
     workflow: telco5g
 - as: e2e-alibaba

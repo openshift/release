@@ -6,6 +6,56 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build03
+    context: ci/prow/ci-index-volsync-bundle
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      job-release: "4.12"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-backube-volsync-main-ci-index-volsync-bundle
+    rerun_command: /test ci-index-volsync-bundle
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=ci-index-volsync-bundle
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ci-index-volsync-bundle,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
     context: ci/prow/e2e-openshift
     decorate: true
     decoration_config:
@@ -14,7 +64,7 @@ presubmits:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
-      job-release: "4.11"
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-backube-volsync-main-e2e-openshift
     optional: true
@@ -88,7 +138,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.11"
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-backube-volsync-main-images
     rerun_command: /test images
@@ -143,7 +193,7 @@ presubmits:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.11"
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-backube-volsync-main-unit
     rerun_command: /test unit

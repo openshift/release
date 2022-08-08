@@ -38,13 +38,6 @@ tests:
     test:
     - as: integration-e2e-steps
       commands: scripts/openshiftci-presubmit-all-tests.sh
-      credentials:
-      - mount_path: /usr/local/ci-secrets/odo-rabbitmq
-        name: odo-rabbitmq
-        namespace: test-credentials
-      env:
-      - default: /usr/local/ci-secrets/odo-rabbitmq/amqpuri
-        name: ODO_RABBITMQ_AMQP_URL
       from: oc-bin-image
       resources:
         requests:
@@ -59,6 +52,20 @@ tests:
     test:
     - as: integration-e2e-periodic-steps
       commands: scripts/openshiftci-periodic-tests.sh
+      from: oc-bin-image
+      resources:
+        requests:
+          cpu: "2"
+          memory: 6Gi
+      timeout: 4h0m0s
+    workflow: ipi-aws
+- as: sbo-nightly-odo-tests
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: aws
+    test:
+    - as: sbo-nightly-odo-tests-steps
+      commands: scripts/openshiftci-Nightly-SBO-tests.sh
       from: oc-bin-image
       resources:
         requests:

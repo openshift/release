@@ -100,11 +100,29 @@ tests:
         requests:
           cpu: 100m
     workflow: generic-claim
-- as: sonarcloud
+- as: sonar-pre-submit
   steps:
     test:
     - as: test
       commands: |
+        export SONAR_GO_TEST_ARGS="./..."
+        export SELF="make -f /opt/build-harness/Makefile.prow"
+        make -f /opt/build-harness/Makefile.prow sonar/go/prow
+      credentials:
+      - mount_path: /etc/sonarcloud/
+        name: acm-sonarcloud-token
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+- as: sonar-post-submit
+  postsubmit: true
+  steps:
+    test:
+    - as: test
+      commands: |
+        export SONAR_GO_TEST_ARGS="./..."
         export SELF="make -f /opt/build-harness/Makefile.prow"
         make -f /opt/build-harness/Makefile.prow sonar/go/prow
       credentials:

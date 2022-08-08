@@ -50,7 +50,9 @@ cd "\${REPO_DIR}/deploy/operator/capi/"
 
 echo "### Deploying CAPI cluster..."
 
-export EXTRA_BAREMETALHOSTS_FILE="/root/dev-scripts/\${EXTRA_BAREMETALHOSTS_FILE}"
+echo "export PROVIDER_IMAGE=${PROVIDER_IMAGE}" >> /root/config
+echo "export HYPERSHIFT_IMAGE=${HYPERSHIFT_IMAGE}" >> /root/config
+echo "export EXTRA_BAREMETALHOSTS_FILE=/root/dev-scripts/\${EXTRA_BAREMETALHOSTS_FILE}" >> /root/config
 
 source /root/config
 
