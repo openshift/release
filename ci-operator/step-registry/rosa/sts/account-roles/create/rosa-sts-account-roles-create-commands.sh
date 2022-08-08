@@ -37,6 +37,8 @@ fi
 echo "Create the account roles with the prefix '${ACCOUNT_ROLES_PREFIX}'"
 rosa create account-roles --prefix "${ACCOUNT_ROLES_PREFIX}" -y --mode auto
 
+# Store the account-role-prefix for the post steps and the account roles deletion
+echo -n "${ACCOUNT_ROLES_PREFIX}" > "${SHARED_DIR}/account-roles-prefix"
 
 # List the created account roles
 echo -e "\nList the account roles with the prefix ${ACCOUNT_ROLES_PREFIX}"

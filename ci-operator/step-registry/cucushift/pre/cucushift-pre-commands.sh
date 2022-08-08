@@ -36,23 +36,12 @@ done
 gen=$(oc get deployment oauth-openshift -n openshift-authentication -o jsonpath='{.metadata.generation}')
 
 # add users to cluster
-oc create secret generic htpass-secret --from-file=htpasswd=${htpass_file} -n openshift-config
-oc apply -f - <<EOF
-apiVersion: config.openshift.io/v1
-kind: OAuth
-metadata:
-  name: cluster
-spec:
-  identityProviders:
-  - name: htpassidp
-    challenge: true
-    login: true
-    mappingMethod: claim
-    type: HTPasswd
-    htpasswd:
-      fileData:
-        name: htpass-secret
-EOF
+oc create secret generic cucushift-htpass-secret --from-file=htpasswd=${htpass_file} -n openshift-config
+oauth_file_src=/tmp/cucushift-oauth-src.yaml
+oauth_file_dst=/tmp/cucushift-oauth-dst.yaml
+oc get oauth cluster -o json > "${oauth_file_src}"
+jq '.spec.identityProviders += [{"htpasswd":{"fileData":{"name":"cucushift-htpass-secret"}},"challenge":"true","login":"true","mappingMethod":"claim","name":"cucushift-htpasswd-provider","type":"HTPasswd"}]' "${oauth_file_src}" > "${oauth_file_dst}"
+oc replace -f "${oauth_file_dst}"
 
 # wait for oauth-openshift to rollout
 wait_auth=true

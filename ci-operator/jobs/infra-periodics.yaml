@@ -211,7 +211,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20220802-33e6c8437f
+      image: gcr.io/k8s-prow/commenter:v20220805-565e38c0a7
       imagePullPolicy: Always
       name: ""
       resources:
@@ -285,7 +285,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20220802-33e6c8437f
+      image: gcr.io/k8s-prow/commenter:v20220805-565e38c0a7
       imagePullPolicy: Always
       name: ""
       resources:
@@ -325,7 +325,7 @@ periodics:
       - --random
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20220802-33e6c8437f
+      image: gcr.io/k8s-prow/commenter:v20220805-565e38c0a7
       imagePullPolicy: Always
       name: ""
       resources:
@@ -371,7 +371,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20220802-33e6c8437f
+      image: gcr.io/k8s-prow/commenter:v20220805-565e38c0a7
       imagePullPolicy: Always
       name: ""
       resources:
@@ -417,7 +417,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20220802-33e6c8437f
+      image: gcr.io/k8s-prow/commenter:v20220805-565e38c0a7
       imagePullPolicy: Always
       name: ""
       resources:
@@ -467,7 +467,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20220802-33e6c8437f
+      image: gcr.io/k8s-prow/commenter:v20220805-565e38c0a7
       imagePullPolicy: Always
       name: ""
       resources:
@@ -517,7 +517,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20220802-33e6c8437f
+      image: gcr.io/k8s-prow/commenter:v20220805-565e38c0a7
       imagePullPolicy: Always
       name: ""
       resources:
@@ -566,7 +566,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20220802-33e6c8437f
+      image: gcr.io/k8s-prow/commenter:v20220805-565e38c0a7
       imagePullPolicy: Always
       name: ""
       resources:
@@ -615,7 +615,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20220802-33e6c8437f
+      image: gcr.io/k8s-prow/commenter:v20220805-565e38c0a7
       imagePullPolicy: Always
       name: ""
       resources:
@@ -643,13 +643,32 @@ periodics:
       - --config=/etc/config/labels.yaml
       - --confirm=true
       - --orgs=openshift,cri-o,operator-framework,openshift-priv,redhat-openshift-ecosystem,openshift-psap,openshift-metal3,shipwright-io,openshift-assisted,kcp-dev,konveyor,openshift-eng
-      - --token=/etc/github/oauth
-      - --endpoint=http://ghproxy
-      - --graphql-endpoint=http://ghproxy/graphql
+      - --github-throttle-org=openshift:300:100
+      - --github-throttle-org=cri-o:300:100
+      - --github-throttle-org=operator-framework:300:100
+      - --github-throttle-org=openshift-priv:300:100
+      - --github-throttle-org=redhat-openshift-ecosystem:300:100
+      - --github-throttle-org=openshift-psap:300:100
+      - --github-throttle-org=openshift-metal3:300:100
+      - --github-throttle-org=shipwright-io:300:100
+      - --github-throttle-org=openshift-assisted:300:100
+      - --github-throttle-org=kcp-dev:300:100
+      - --github-throttle-org=konveyor:300:100
+      - --github-throttle-org=openshift-eng:300:100
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
+      - --github-endpoint=http://ghproxy
+      - --github-graphql-endpoint=http://ghproxy/graphql
       - --debug
       command:
       - /ko-app/label_sync
-      image: gcr.io/k8s-prow/label_sync:v20220802-33e6c8437f
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-prow-github-app
+      image: gcr.io/k8s-prow/label_sync:v20220805-565e38c0a7
       imagePullPolicy: Always
       name: ""
       resources:
@@ -657,15 +676,15 @@ periodics:
           cpu: 500m
       volumeMounts:
       - mountPath: /etc/github
-        name: token
+        name: github-app-credentials
         readOnly: true
       - mountPath: /etc/config
         name: config
         readOnly: true
     volumes:
-    - name: token
+    - name: github-app-credentials
       secret:
-        secretName: github-credentials-openshift-ci-robot
+        secretName: openshift-prow-github-app
     - configMap:
         name: labels
       name: config
@@ -952,7 +971,7 @@ periodics:
       - --config=core-services/prow/02_config/_bumper.yaml
       command:
       - /ko-app/generic-autobumper
-      image: gcr.io/k8s-prow/generic-autobumper:v20220802-33e6c8437f
+      image: gcr.io/k8s-prow/generic-autobumper:v20220805-565e38c0a7
       imagePullPolicy: IfNotPresent
       name: autobump
       resources:
@@ -1120,7 +1139,7 @@ periodics:
       - --github-enabled-org=openshift
       command:
       - /ko-app/branchprotector
-      image: gcr.io/k8s-prow/branchprotector:v20220802-33e6c8437f
+      image: gcr.io/k8s-prow/branchprotector:v20220805-565e38c0a7
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1174,7 +1193,7 @@ periodics:
           secretKeyRef:
             key: appid
             name: openshift-prow-github-app
-      image: gcr.io/k8s-prow/branchprotector:v20220802-33e6c8437f
+      image: gcr.io/k8s-prow/branchprotector:v20220805-565e38c0a7
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1231,7 +1250,7 @@ periodics:
       - --github-allowed-burst=600
       command:
       - /ko-app/peribolos
-      image: gcr.io/k8s-prow/peribolos:v20220802-33e6c8437f
+      image: gcr.io/k8s-prow/peribolos:v20220805-565e38c0a7
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1309,7 +1328,7 @@ periodics:
       - --kubeconfig-dir=/etc/build-farm-credentials
       command:
       - hack/config-bootstrapper.sh
-      image: gcr.io/k8s-prow/config-bootstrapper:v20220802-33e6c8437f
+      image: gcr.io/k8s-prow/config-bootstrapper:v20220805-565e38c0a7
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1885,7 +1904,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: gcr.io/k8s-prow/invitations-accepter:v20220802-33e6c8437f
+      image: gcr.io/k8s-prow/invitations-accepter:v20220805-565e38c0a7
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1917,7 +1936,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: gcr.io/k8s-prow/invitations-accepter:v20220802-33e6c8437f
+      image: gcr.io/k8s-prow/invitations-accepter:v20220805-565e38c0a7
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1949,7 +1968,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: gcr.io/k8s-prow/invitations-accepter:v20220802-33e6c8437f
+      image: gcr.io/k8s-prow/invitations-accepter:v20220805-565e38c0a7
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2415,7 +2434,16 @@ periodics:
         /usr/bin/sippy-config-generator \
           --prow-jobs-dir ../release/ci-operator/jobs \
           --release-config ../release/core-services/release-controller/_releases \
-          --customization-file ./config/openshift-customizations.yaml > ./config/openshift.yaml
+          --customization-file ./config/openshift-customizations.yaml > ./config/openshift.yaml.new
+
+
+        # Compare everything but the header of the file to see if they're identical
+        diff <(tail -n +2 ./config/openshift.yaml.new) <(tail -n +2 ./config/openshift.yaml) 2>&1 > /dev/null && \
+        echo "Files are identical, no update needed." && \
+        exit 0
+
+        mv ./config/openshift.yaml.new ./config/openshift.yaml
+
         # Initiate prcreator to open a PR against sippy
         /usr/bin/prcreator \
         -github-token-path=/etc/github/oauth \
