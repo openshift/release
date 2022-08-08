@@ -36,9 +36,20 @@ gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 # Run openshift/conformance test suite
 # Later on a list of skipped tests can be provided and filtered out
 # from the suite using combination of "openshift-tests run openshift/conformance --dry-run | grep "client-go should negotiate watch and report errors with accept" | openshift-tests run -v 2 --provider=none -o /home/rhel8user/e2e.log --junit-dir /home/rhel8user/junit -f -"
-cat  > "${HOME}"/run-test.sh <<'EOF'
+# #openshift-tests run openshift/conformance -v 2 --provider=none -o /home/rhel8user/e2e.log --junit-dir /home/rhel8user/junit
+echo "TEST_SKIPS: ${TEST_SKIPS}"
+
+if [[ -n "${TEST_SKIPS}" ]]; then
+    export TESTS="$(openshift-tests run --dry-run --provider=none "${TEST_SUITE}")"
+    echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests
+    echo "Skipping tests:"
+    echo "${TESTS}" | grep "${TEST_SKIPS}" || { exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS regex:'; echo "$TEST_SKIPS"; return $exit_code; }
+    TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
+fi
+
+cat  > "${HOME}"/run-test.sh <<EOF
 export KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig
-openshift-tests run openshift/conformance -v 2 --provider=none -o /home/rhel8user/e2e.log --junit-dir /home/rhel8user/junit
+openshift-tests run ${TEST_SUITE} ${TEST_ARGS:-} -v 2 --provider=none -o /home/rhel8user/e2e.log --junit-dir /home/rhel8user/junit
 chown rhel8user:rhel8user /home/rhel8user/e2e.log
 chown -R rhel8user:rhel8user /home/rhel8user/junit
 EOF
