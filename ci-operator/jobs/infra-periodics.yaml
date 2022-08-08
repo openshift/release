@@ -643,12 +643,31 @@ periodics:
       - --config=/etc/config/labels.yaml
       - --confirm=true
       - --orgs=openshift,cri-o,operator-framework,openshift-priv,redhat-openshift-ecosystem,openshift-psap,openshift-metal3,shipwright-io,openshift-assisted,kcp-dev,konveyor,openshift-eng
-      - --token=/etc/github/oauth
-      - --endpoint=http://ghproxy
-      - --graphql-endpoint=http://ghproxy/graphql
+      - --github-throttle-org=openshift:300:100
+      - --github-throttle-org=cri-o:300:100
+      - --github-throttle-org=operator-framework:300:100
+      - --github-throttle-org=openshift-priv:300:100
+      - --github-throttle-org=redhat-openshift-ecosystem:300:100
+      - --github-throttle-org=openshift-psap:300:100
+      - --github-throttle-org=openshift-metal3:300:100
+      - --github-throttle-org=shipwright-io:300:100
+      - --github-throttle-org=openshift-assisted:300:100
+      - --github-throttle-org=kcp-dev:300:100
+      - --github-throttle-org=konveyor:300:100
+      - --github-throttle-org=openshift-eng:300:100
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
+      - --github-endpoint=http://ghproxy
+      - --github-graphql-endpoint=http://ghproxy/graphql
       - --debug
       command:
       - /ko-app/label_sync
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-prow-github-app
       image: gcr.io/k8s-prow/label_sync:v20220803-65793402b8
       imagePullPolicy: Always
       name: ""
@@ -657,15 +676,15 @@ periodics:
           cpu: 500m
       volumeMounts:
       - mountPath: /etc/github
-        name: token
+        name: github-app-credentials
         readOnly: true
       - mountPath: /etc/config
         name: config
         readOnly: true
     volumes:
-    - name: token
+    - name: github-app-credentials
       secret:
-        secretName: github-credentials-openshift-ci-robot
+        secretName: openshift-prow-github-app
     - configMap:
         name: labels
       name: config
