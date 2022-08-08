@@ -29,7 +29,7 @@ cp "${CLUSTER_PROFILE_DIR}"/ssh-publickey "${HOME}"/.ssh/google_compute_engine.p
 latest=$(curl -sL https://api.github.com/repos/etcd-io/etcd/releases/latest | jq -r ".tag_name")
 if gcloud alpha storage ls gs://crio-ci | grep ${latest} ; then 
     echo "caching etcd" 
-    curl https://github.com/coreos/etcd/releases/download/${latest}/etcd-${latest}-linux-amd64.tar.gz | gsutil cp - gs://crio-ci/etcd${latest}.tar.gz
+    curl https://github.com/coreos/etcd/releases/download/${latest}/etcd-${latest}-linux-amd64.tar.gz | gsutil cp - gs://crio-ci/etcd-${latest}.tar.gz
 else 
     echo "etcd is up to date"
 fi 

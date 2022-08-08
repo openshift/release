@@ -31,7 +31,7 @@ if gcloud alpha storage ls gs://crio-ci | grep ${latest}; then
     echo "etcd is up to date"
 else
     echo "caching etcd" 
-    curl https://github.com/coreos/etcd/releases/download/${latest}/etcd-${latest}-linux-amd64.tar.gz | gsutil cp - gs://crio-ci/etcd${latest}.tar.gz
+    curl https://github.com/coreos/etcd/releases/download/${latest}/etcd-${latest}-linux-amd64.tar.gz | gsutil cp - gs://crio-ci/etcd-${latest}.tar.gz
 fi 
 
 #####################################
