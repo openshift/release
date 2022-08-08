@@ -23,9 +23,10 @@ images:
     stolostron_builder_go1.18-linux:
       as:
       - registry.ci.openshift.org/stolostron/builder:go1.18-linux
-  to: multicluster-operators-application
+  to: multicluster-operators-subscription
 promotion:
-  name: "2.6"
+  disabled: true
+  name: "2.7"
   namespace: stolostron
 resources:
   '*':
@@ -46,6 +47,7 @@ tests:
     export SELF="make -f /opt/build-harness/Makefile.prow"
     export HOME="/tmp"
     export XDG_CACHE_HOME="/tmp/.cache"
+    export TEST_GIT_REPO_URL=github.com/stolostron/multicloud-operators-subscription
     make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
     from: src
@@ -58,6 +60,7 @@ tests:
     export SELF="make -f /opt/build-harness/Makefile.prow"
     export HOME="/tmp"
     export XDG_CACHE_HOME="/tmp/.cache"
+    export TEST_GIT_REPO_URL=github.com/stolostron/multicloud-operators-subscription
     make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
     from: src
@@ -68,15 +71,15 @@ tests:
 - as: pr-image-mirror
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: multicluster-operators-application
+      SOURCE_IMAGE_REF: multicluster-operators-subscription
     workflow: ocm-ci-image-mirror
 - as: publish
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: multicluster-operators-application
+      SOURCE_IMAGE_REF: multicluster-operators-subscription
     env:
-      IMAGE_REPO: multicluster-operators-application
+      IMAGE_REPO: multicluster-operators-subscription
       REGISTRY_ORG: stolostron
     test:
     - as: publish
@@ -99,13 +102,13 @@ tests:
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: multicluster-operators-application
+      SOURCE_IMAGE_REF: multicluster-operators-subscription
     env:
-      IMAGE_REPO: multicluster-operators-application
-      IMAGE_TAG: 2.6.0
+      IMAGE_REPO: multicluster-operators-subscription
+      IMAGE_TAG: 2.7.0
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: release-2.6
+  branch: release-2.7
   org: stolostron
-  repo: multicloud-operators-application
+  repo: multicloud-operators-subscription
