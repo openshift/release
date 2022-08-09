@@ -211,7 +211,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20220803-65793402b8
+      image: gcr.io/k8s-prow/commenter:v20220809-b8cebb9266
       imagePullPolicy: Always
       name: ""
       resources:
@@ -285,7 +285,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20220803-65793402b8
+      image: gcr.io/k8s-prow/commenter:v20220809-b8cebb9266
       imagePullPolicy: Always
       name: ""
       resources:
@@ -325,7 +325,7 @@ periodics:
       - --random
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20220803-65793402b8
+      image: gcr.io/k8s-prow/commenter:v20220809-b8cebb9266
       imagePullPolicy: Always
       name: ""
       resources:
@@ -340,8 +340,8 @@ periodics:
         secretName: github-credentials-openshift-bot
 - agent: kubernetes
   cluster: app.ci
+  cron: 0 0,8 * * *
   decorate: true
-  interval: 6h
   labels:
     ci.openshift.io/role: infra
   name: periodic-issue-close
@@ -371,7 +371,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20220803-65793402b8
+      image: gcr.io/k8s-prow/commenter:v20220809-b8cebb9266
       imagePullPolicy: Always
       name: ""
       resources:
@@ -386,8 +386,8 @@ periodics:
         secretName: github-credentials-openshift-bot
 - agent: kubernetes
   cluster: app.ci
+  cron: 15 0,8 * * *
   decorate: true
-  interval: 6h
   labels:
     ci.openshift.io/role: infra
   name: periodic-enhancements-close
@@ -417,7 +417,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20220803-65793402b8
+      image: gcr.io/k8s-prow/commenter:v20220809-b8cebb9266
       imagePullPolicy: Always
       name: ""
       resources:
@@ -432,8 +432,8 @@ periodics:
         secretName: github-credentials-openshift-bot
 - agent: kubernetes
   cluster: app.ci
+  cron: 30 0,8 * * *
   decorate: true
-  interval: 6h
   labels:
     ci.openshift.io/role: infra
   name: periodic-issue-rotten
@@ -467,7 +467,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20220803-65793402b8
+      image: gcr.io/k8s-prow/commenter:v20220809-b8cebb9266
       imagePullPolicy: Always
       name: ""
       resources:
@@ -482,8 +482,8 @@ periodics:
         secretName: github-credentials-openshift-bot
 - agent: kubernetes
   cluster: app.ci
+  cron: 45 0,8 * * *
   decorate: true
-  interval: 6h
   labels:
     ci.openshift.io/role: infra
   name: periodic-enhancements-rotten
@@ -517,7 +517,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20220803-65793402b8
+      image: gcr.io/k8s-prow/commenter:v20220809-b8cebb9266
       imagePullPolicy: Always
       name: ""
       resources:
@@ -532,8 +532,8 @@ periodics:
         secretName: github-credentials-openshift-bot
 - agent: kubernetes
   cluster: app.ci
+  cron: 0 1,9 * * *
   decorate: true
-  interval: 6h
   labels:
     ci.openshift.io/role: infra
   name: periodic-issue-stale
@@ -566,7 +566,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20220803-65793402b8
+      image: gcr.io/k8s-prow/commenter:v20220809-b8cebb9266
       imagePullPolicy: Always
       name: ""
       resources:
@@ -581,8 +581,8 @@ periodics:
         secretName: github-credentials-openshift-bot
 - agent: kubernetes
   cluster: app.ci
+  cron: 15 1,9 * * *
   decorate: true
-  interval: 6h
   labels:
     ci.openshift.io/role: infra
   name: periodic-enhancements-stale
@@ -615,7 +615,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20220803-65793402b8
+      image: gcr.io/k8s-prow/commenter:v20220809-b8cebb9266
       imagePullPolicy: Always
       name: ""
       resources:
@@ -630,10 +630,10 @@ periodics:
         secretName: github-credentials-openshift-bot
 - agent: kubernetes
   cluster: app.ci
+  cron: 0 0 * * 0
   decorate: true
   decoration_config:
-    timeout: 10h0m0s
-  interval: 24h
+    timeout: 12h0m0s
   labels:
     ci.openshift.io/role: infra
   name: periodic-label-sync
@@ -643,13 +643,32 @@ periodics:
       - --config=/etc/config/labels.yaml
       - --confirm=true
       - --orgs=openshift,cri-o,operator-framework,openshift-priv,redhat-openshift-ecosystem,openshift-psap,openshift-metal3,shipwright-io,openshift-assisted,kcp-dev,konveyor,openshift-eng
-      - --token=/etc/github/oauth
-      - --endpoint=http://ghproxy
-      - --graphql-endpoint=http://ghproxy/graphql
+      - --github-throttle-org=openshift:600:200
+      - --github-throttle-org=cri-o:600:200
+      - --github-throttle-org=operator-framework:600:200
+      - --github-throttle-org=openshift-priv:600:200
+      - --github-throttle-org=redhat-openshift-ecosystem:600:200
+      - --github-throttle-org=openshift-psap:600:200
+      - --github-throttle-org=openshift-metal3:600:200
+      - --github-throttle-org=shipwright-io:600:200
+      - --github-throttle-org=openshift-assisted:600:200
+      - --github-throttle-org=kcp-dev:600:200
+      - --github-throttle-org=konveyor:600:200
+      - --github-throttle-org=openshift-eng:600:200
+      - --github-app-id=$(GITHUB_APP_ID)
+      - --github-app-private-key-path=/etc/github/cert
+      - --github-endpoint=http://ghproxy
+      - --github-graphql-endpoint=http://ghproxy/graphql
       - --debug
       command:
       - /ko-app/label_sync
-      image: gcr.io/k8s-prow/label_sync:v20220803-65793402b8
+      env:
+      - name: GITHUB_APP_ID
+        valueFrom:
+          secretKeyRef:
+            key: appid
+            name: openshift-prow-github-app
+      image: gcr.io/k8s-prow/label_sync:v20220809-b8cebb9266
       imagePullPolicy: Always
       name: ""
       resources:
@@ -657,15 +676,15 @@ periodics:
           cpu: 500m
       volumeMounts:
       - mountPath: /etc/github
-        name: token
+        name: github-app-credentials
         readOnly: true
       - mountPath: /etc/config
         name: config
         readOnly: true
     volumes:
-    - name: token
+    - name: github-app-credentials
       secret:
-        secretName: github-credentials-openshift-ci-robot
+        secretName: openshift-prow-github-app
     - configMap:
         name: labels
       name: config
@@ -937,7 +956,7 @@ periodics:
         secretName: cluster-secrets-gcp-openshift-gce-devel-ci-2
 - agent: kubernetes
   cluster: app.ci
-  cron: '@yearly'
+  cron: 0 08,22 * * 1-5
   decorate: true
   extra_refs:
   - base_ref: master
@@ -952,7 +971,7 @@ periodics:
       - --config=core-services/prow/02_config/_bumper.yaml
       command:
       - /ko-app/generic-autobumper
-      image: gcr.io/k8s-prow/generic-autobumper:v20220803-65793402b8
+      image: gcr.io/k8s-prow/generic-autobumper:v20220809-b8cebb9266
       imagePullPolicy: IfNotPresent
       name: autobump
       resources:
@@ -968,7 +987,7 @@ periodics:
         secretName: github-credentials-openshift-bot
 - agent: kubernetes
   cluster: app.ci
-  cron: '@hourly'
+  cron: 0 */4 * * 1-5
   decorate: true
   extra_refs:
   - base_ref: master
@@ -1120,7 +1139,7 @@ periodics:
       - --github-enabled-org=openshift
       command:
       - /ko-app/branchprotector
-      image: gcr.io/k8s-prow/branchprotector:v20220803-65793402b8
+      image: gcr.io/k8s-prow/branchprotector:v20220809-b8cebb9266
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1174,7 +1193,7 @@ periodics:
           secretKeyRef:
             key: appid
             name: openshift-prow-github-app
-      image: gcr.io/k8s-prow/branchprotector:v20220803-65793402b8
+      image: gcr.io/k8s-prow/branchprotector:v20220809-b8cebb9266
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1231,7 +1250,7 @@ periodics:
       - --github-allowed-burst=600
       command:
       - /ko-app/peribolos
-      image: gcr.io/k8s-prow/peribolos:v20220803-65793402b8
+      image: gcr.io/k8s-prow/peribolos:v20220809-b8cebb9266
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1309,7 +1328,7 @@ periodics:
       - --kubeconfig-dir=/etc/build-farm-credentials
       command:
       - hack/config-bootstrapper.sh
-      image: gcr.io/k8s-prow/config-bootstrapper:v20220803-65793402b8
+      image: gcr.io/k8s-prow/config-bootstrapper:v20220809-b8cebb9266
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1326,12 +1345,12 @@ periodics:
         secretName: hook
 - agent: kubernetes
   cluster: app.ci
-  cron: '@hourly'
   decorate: true
   extra_refs:
   - base_ref: master
     org: openshift
     repo: release
+  interval: 2h
   labels:
     ci.openshift.io/role: infra
   name: periodic-openshift-release-fast-forward
@@ -1363,13 +1382,13 @@ periodics:
         secretName: github-credentials-openshift-merge-robot
 - agent: kubernetes
   cluster: app.ci
-  cron: '@hourly'
   decorate: true
   extra_refs:
   - base_ref: master
     org: openshift
     repo: release
   hidden: true
+  interval: 2h
   labels:
     ci.openshift.io/role: infra-internal
   max_concurrency: 1
@@ -1403,12 +1422,12 @@ periodics:
         secretName: github-credentials-openshift-merge-robot
 - agent: kubernetes
   cluster: app.ci
-  cron: '@hourly'
   decorate: true
   extra_refs:
   - base_ref: master
     org: openshift
     repo: release
+  interval: 2h
   labels:
     ci.openshift.io/role: infra
   name: periodic-openshift-release-merge-blockers
@@ -1618,7 +1637,6 @@ periodics:
         secretName: config-updater
 - agent: kubernetes
   cluster: app.ci
-  cron: '@yearly'
   decorate: true
   decoration_config:
     gcs_configuration:
@@ -1628,6 +1646,7 @@ periodics:
         log: text/plain
     gcs_credentials_secret: gce-sa-credentials-gcs-private
   hidden: true
+  interval: 10m
   labels:
     ci.openshift.io/role: infra-internal
   name: periodic-ci-secret-bootstrap
@@ -1885,7 +1904,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: gcr.io/k8s-prow/invitations-accepter:v20220803-65793402b8
+      image: gcr.io/k8s-prow/invitations-accepter:v20220809-b8cebb9266
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1917,7 +1936,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: gcr.io/k8s-prow/invitations-accepter:v20220803-65793402b8
+      image: gcr.io/k8s-prow/invitations-accepter:v20220809-b8cebb9266
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1949,7 +1968,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: gcr.io/k8s-prow/invitations-accepter:v20220803-65793402b8
+      image: gcr.io/k8s-prow/invitations-accepter:v20220809-b8cebb9266
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2415,7 +2434,16 @@ periodics:
         /usr/bin/sippy-config-generator \
           --prow-jobs-dir ../release/ci-operator/jobs \
           --release-config ../release/core-services/release-controller/_releases \
-          --customization-file ./config/openshift-customizations.yaml > ./config/openshift.yaml
+          --customization-file ./config/openshift-customizations.yaml > ./config/openshift.yaml.new
+
+
+        # Compare everything but the header of the file to see if they're identical
+        diff <(tail -n +2 ./config/openshift.yaml.new) <(tail -n +2 ./config/openshift.yaml) 2>&1 > /dev/null && \
+        echo "Files are identical, no update needed." && \
+        exit 0
+
+        mv ./config/openshift.yaml.new ./config/openshift.yaml
+
         # Initiate prcreator to open a PR against sippy
         /usr/bin/prcreator \
         -github-token-path=/etc/github/oauth \

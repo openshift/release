@@ -19,10 +19,6 @@ base_images:
     name: "4.8"
     namespace: ocp
     tag: base
-  cnv-ci-src:
-    name: "4.8"
-    namespace: cnv
-    tag: cnv-ci-src
   console-tests:
     name: "4.8"
     namespace: ocp
@@ -43,10 +39,6 @@ base_images:
     name: "4.8"
     namespace: ocp
     tag: libvirt-installer
-  src-upgrade-ci:
-    name: "4.8"
-    namespace: cnv
-    tag: src-upgrade-ci
   upi-installer:
     name: "4.8"
     namespace: ocp
@@ -374,75 +366,6 @@ tests:
     env:
       BASE_DOMAIN: ci2.azure.devcluster.openshift.com
     workflow: openshift-e2e-azure
-- as: e2e-azure-deploy-cnv
-  interval: 12h
-  steps:
-    cluster_profile: azure-2
-    env:
-      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
-    test:
-    - as: test
-      cli: latest
-      commands: make deploy_test
-      credentials:
-      - mount_path: /var/run/cnv-ci-brew-pull-secret
-        name: cnv-ci-brew-pull-secret
-        namespace: test-credentials
-      env:
-      - default: '|7820aea2-0d75-11e7-9259-28d244ea5a6d.hhav.f63e13'
-        name: BREW_IMAGE_REGISTRY_USERNAME
-      - default: /var/run/cnv-ci-brew-pull-secret/token
-        name: BREW_IMAGE_REGISTRY_TOKEN_PATH
-      - default: v0.38.1
-        name: KUBEVIRT_RELEASE
-      - default: "4.8"
-        name: OCP_VERSION
-      - default: /tmp/artifacts
-        name: ARTIFACTS_DIR
-      - default: openshift-cnv
-        name: TARGET_NAMESPACE
-      - default: "true"
-        name: PRODUCTION_RELEASE
-      from: cnv-ci-src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 600Mi
-    workflow: ipi-azure
-- as: e2e-azure-upgrade-cnv
-  interval: 12h
-  steps:
-    cluster_profile: azure-2
-    env:
-      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
-    test:
-    - as: test
-      commands: make upgrade_test
-      credentials:
-      - mount_path: /var/run/cnv-ci-brew-pull-secret
-        name: cnv-ci-brew-pull-secret
-        namespace: test-credentials
-      env:
-      - default: '|7820aea2-0d75-11e7-9259-28d244ea5a6d.hhav.f63e13'
-        name: BREW_IMAGE_REGISTRY_USERNAME
-      - default: /var/run/cnv-ci-brew-pull-secret/token
-        name: BREW_IMAGE_REGISTRY_TOKEN_PATH
-      - default: v0.38.1
-        name: KUBEVIRT_RELEASE
-      - default: "4.8"
-        name: OCP_VERSION
-      - default: /tmp/artifacts
-        name: ARTIFACTS_DIR
-      - default: openshift-cnv
-        name: TARGET_NAMESPACE
-      - default: "true"
-        name: PRODUCTION_RELEASE
-      from: src-upgrade-ci
-      resources:
-        requests:
-          cpu: 100m
-          memory: 600Mi
-    workflow: ipi-azure
 - as: e2e-aws-driver-toolkit
   cron: 0 */8 * * *
   steps:
