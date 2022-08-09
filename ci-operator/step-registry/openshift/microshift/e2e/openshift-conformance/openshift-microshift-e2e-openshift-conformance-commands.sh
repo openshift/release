@@ -40,12 +40,26 @@ gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 echo "TEST_SKIPS: ${TEST_SKIPS}"
 
 if [[ -n "${TEST_SKIPS}" ]]; then
-    export TESTS="$(openshift-tests run --dry-run --provider=none "${TEST_SUITE}")"
-    echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests
+    echo "TU"
+    getconf ARG_MAX
+    echo "TU2"
+    openshift-tests run --dry-run --provider=none "${TEST_SUITE}" >/tmp/all-tests
+    echo "TU3"
+    cat /tmp/all-tests
+    echo "TU4"
+    echo "${TEST_SKIPS}"
+    echo "TU5"
+    cat /tmp/all-tests | grep -v "${TEST_SKIPS}" >/tmp/tests
     echo "Skipping tests:"
-    echo "${TESTS}" | grep "${TEST_SKIPS}" || { exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS regex:'; echo "$TEST_SKIPS"; return $exit_code; }
+    cat /tmp/all-tests | grep "${TEST_SKIPS}" || { exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS regex:'; echo "$TEST_SKIPS"; return $exit_code; }
     TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
 fi
+
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+  --quiet \
+  --project "${GOOGLE_PROJECT_ID}" \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  --recurse /tmp/tests rhel8user@"${INSTANCE_PREFIX}":/tmp/tests
 
 cat  > "${HOME}"/run-test.sh <<EOF
 export KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig
