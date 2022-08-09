@@ -1,0 +1,27 @@
+binary_build_commands: make manager
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit-tests
+  commands: ci/prow/unit-tests
+  container:
+    from: src
+- as: lint
+  commands: ci/prow/lint
+  container:
+    from: src
+  optional: true
+zz_generated_metadata:
+  branch: main
+  org: rh-ecosystem-edge
+  repo: kernel-module-management
