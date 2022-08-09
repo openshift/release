@@ -6,25 +6,22 @@ presubmits:
     - ^gavin-stackrox-rewire$
     - ^gavin-stackrox-rewire-
     cluster: build01
-    context: ci/prow/gke-qa-e2e-tests
+    context: ci/prow/go-unit-tests-base-build
     decorate: true
     decoration_config:
       skip_cloning: true
-      timeout: 5h0m0s
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-stackrox-gavin-stackrox-rewire-gke-qa-e2e-tests
-    optional: true
-    rerun_command: /test gke-qa-e2e-tests
+    name: pull-ci-stackrox-stackrox-gavin-stackrox-rewire-go-unit-tests-base-build
+    rerun_command: /test go-unit-tests-base-build
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/stackrox-stackrox-e2e-tests
-        - --target=gke-qa-e2e-tests
+        - --target=go-unit-tests-base-build
         command:
         - ci-operator
         image: ci-operator:latest
@@ -43,9 +40,6 @@ presubmits:
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
-        - mountPath: /secrets/stackrox-stackrox-e2e-tests
-          name: stackrox-stackrox-e2e-tests
-          readOnly: true
       serviceAccountName: ci-operator
       volumes:
       - name: pull-secret
@@ -54,32 +48,29 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-      - name: stackrox-stackrox-e2e-tests
-        secret:
-          secretName: stackrox-stackrox-e2e-tests
-    trigger: (?m)^/test( | .* )gke-qa-e2e-tests,?($|\s.*)
+    trigger: (?m)^/test( | .* )go-unit-tests-base-build,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^gavin-stackrox-rewire$
     - ^gavin-stackrox-rewire-
     cluster: build01
-    context: ci/prow/go-unit-tests-clones
+    context: ci/prow/go-unit-tests-inline-build
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-stackrox-gavin-stackrox-rewire-go-unit-tests-clones
-    rerun_command: /test go-unit-tests-clones
+    name: pull-ci-stackrox-stackrox-gavin-stackrox-rewire-go-unit-tests-inline-build
+    rerun_command: /test go-unit-tests-inline-build
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=go-unit-tests-clones
+        - --target=go-unit-tests-inline-build
         command:
         - ci-operator
         image: ci-operator:latest
@@ -106,7 +97,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )go-unit-tests-clones,?($|\s.*)
+    trigger: (?m)^/test( | .* )go-unit-tests-inline-build,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -162,22 +153,22 @@ presubmits:
     - ^gavin-stackrox-rewire$
     - ^gavin-stackrox-rewire-
     cluster: build01
-    context: ci/prow/style
+    context: ci/prow/style-base-test
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-stackrox-gavin-stackrox-rewire-style
-    rerun_command: /test style
+    name: pull-ci-stackrox-stackrox-gavin-stackrox-rewire-style-base-test
+    rerun_command: /test style-base-test
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=style
+        - --target=style-base-test
         command:
         - ci-operator
         image: ci-operator:latest
@@ -204,4 +195,53 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )style,?($|\s.*)
+    trigger: (?m)^/test( | .* )style-base-test,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^gavin-stackrox-rewire$
+    - ^gavin-stackrox-rewire-
+    cluster: build01
+    context: ci/prow/style-inline-test
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-stackrox-gavin-stackrox-rewire-style-inline-test
+    rerun_command: /test style-inline-test
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=style-inline-test
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )style-inline-test,?($|\s.*)
