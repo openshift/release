@@ -34,9 +34,8 @@ gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
 
 # The dnf-automatic systemd unit holds a lock on /var/lib/.rpm.lock on first-boot.
-# Wait until the service completes the system upgrade before performing further rpm/dnf operations.
-# Fixes error: "error: can't create transaction lock on /var/lib/rpm/.rpm.lock (Resource temporarily unavailable)" 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+  --ssh-flag='-o ConnectTimeout=600' \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
   --command 'while $(sleep 5); do sudo systemctl is-active --quiet dnf-automatic || break; echo "waiting for systemd unit dnf-automatic" to complete; done'
@@ -44,11 +43,13 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJE
 # rpm --rebuilddb is required to prevent rpm / dnf / subscription-manager ops from failing
 #   because of  "BDB0091 DB_VERSION_MISMATCH: Database environment version mismatch"
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+  --ssh-flag='-o ConnectTimeout=600' \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
   --command 'sudo rpm --rebuilddb'
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+  --ssh-flag='-o ConnectTimeout=600' \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
   --command "sudo subscription-manager register \
@@ -56,17 +57,20 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJE
   --activationkey=$(cat /var/run/rhsm/subscription-manager-act-key)"
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+  --ssh-flag='-o ConnectTimeout=600' \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
   --command "sudo subscription-manager repos --enable rhocp-4.10-for-rhel-8-x86_64-rpms --enable fast-datapath-for-rhel-8-x86_64-rpms"
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+  --ssh-flag='-o ConnectTimeout=600' \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
   --command 'sudo dnf install jq firewalld -y'
 
 # scp and install microshift-selinux & microshift RPMs
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+  --ssh-flag='-o ConnectTimeout=600' \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
   --command 'mkdir "$HOME"/rpms'
