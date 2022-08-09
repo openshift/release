@@ -1,7 +1,7 @@
 #!/bin/bash
 set -o nounset
 set -o errexit
-set -o pipefail
+set -xeuo pipefail
 
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/env"
