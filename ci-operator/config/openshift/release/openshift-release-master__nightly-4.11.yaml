@@ -24,11 +24,11 @@ base_images:
     namespace: ocp
     tag: base
   cnv-ci-src:
-    name: "4.10"
+    name: "4.11"
     namespace: cnv
     tag: cnv-ci-src
   cnv-ci-src-upgrade:
-    name: "4.10"
+    name: "4.11"
     namespace: cnv
     tag: cnv-ci-src-upgrade
   console-tests:
@@ -518,7 +518,12 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: make deploy_test
+      commands: |
+        curl -L https://github.com/openshift-cnv/cnv-ci/tarball/release-4.11 -o /tmp/cnv-ci.tgz
+        mkdir -p /tmp/cnv-ci
+        tar -xvzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
+        cd /tmp/cnv-ci
+        make deploy_test
       credentials:
       - mount_path: /var/run/cnv-ci-brew-pull-secret
         name: cnv-ci-brew-pull-secret
@@ -528,7 +533,7 @@ tests:
         name: BREW_IMAGE_REGISTRY_USERNAME
       - default: /var/run/cnv-ci-brew-pull-secret/token
         name: BREW_IMAGE_REGISTRY_TOKEN_PATH
-      - default: v0.45.0
+      - default: v0.53.2
         name: KUBEVIRT_RELEASE
       - default: "4.11"
         name: OCP_VERSION
@@ -536,7 +541,7 @@ tests:
         name: ARTIFACTS_DIR
       - default: openshift-cnv
         name: TARGET_NAMESPACE
-      - default: "true"
+      - default: "false"
         name: PRODUCTION_RELEASE
       from: cnv-ci-src
       resources:
@@ -552,7 +557,12 @@ tests:
       BASE_DOMAIN: ci2.azure.devcluster.openshift.com
     test:
     - as: test
-      commands: make upgrade_test
+      commands: |
+        curl -L https://github.com/openshift-cnv/cnv-ci/tarball/release-4.11 -o /tmp/cnv-ci.tgz
+        mkdir -p /tmp/cnv-ci
+        tar -xvzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
+        cd /tmp/cnv-ci
+        make upgrade_test
       credentials:
       - mount_path: /var/run/cnv-ci-brew-pull-secret
         name: cnv-ci-brew-pull-secret
@@ -562,7 +572,7 @@ tests:
         name: BREW_IMAGE_REGISTRY_USERNAME
       - default: /var/run/cnv-ci-brew-pull-secret/token
         name: BREW_IMAGE_REGISTRY_TOKEN_PATH
-      - default: v0.45.0
+      - default: v0.53.2
         name: KUBEVIRT_RELEASE
       - default: "4.11"
         name: OCP_VERSION
@@ -570,7 +580,7 @@ tests:
         name: ARTIFACTS_DIR
       - default: openshift-cnv
         name: TARGET_NAMESPACE
-      - default: "true"
+      - default: "false"
         name: PRODUCTION_RELEASE
       from: cnv-ci-src-upgrade
       resources:

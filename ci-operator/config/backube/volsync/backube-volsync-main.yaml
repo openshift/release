@@ -22,7 +22,7 @@ build_root:
       FROM registry.access.redhat.com/ubi9
       USER root
       ENV GOVERSION=1.18.1
-      RUN yum install -y gcc make diffutils openssl git jq && \
+      RUN yum install -y diffutils gcc git jq make openssl python python-pip && \
           yum clean all && rm -rf /var/cache/dnf/*
       # Install Go. This version will only be used for unit tests. The
       # official builds are done via their own container image Dockerfiles
@@ -155,9 +155,7 @@ tests:
     - as: e2e
       commands: |
         set -x -e -o pipefail
-        KUBECONFIG="${SHARED_DIR}/kubeconfig"
-        export KUBECONFIG
-        cp "${KUBECONFIG}" /go/src/github.com/backube/volsync/test-kuttl/kubeconfig
+        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
         # Configure default StorageClass to be CSI-based
         oc annotate sc/gp2 storageclass.kubernetes.io/is-default-class-
@@ -168,7 +166,19 @@ tests:
 
         # Run tests
         make cli
+        cp "${KUBECONFIG}" /go/src/github.com/backube/volsync/test-kuttl/kubeconfig
         make test-e2e
+
+        # Run ansible-based tests
+        # Add .local/bin to path so we can execute Python packages we install below
+        export PATH="${PATH}:/alabama/.local/bin"
+        # Ansible k8s modules don't use the standard KUBECONFIG env var. WTF?
+        export K8S_AUTH_KUBECONFIG="${KUBECONFIG}"
+        cd test-e2e
+        python -m pip install pipenv
+        pipenv install --deploy --no-site-packages -v
+        pipenv run ansible-galaxy install -r requirements.yml
+        ./run_tests_in_parallel.sh
       from: src-oc
       resources:
         requests:
