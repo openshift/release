@@ -31,12 +31,12 @@ echo "Running the Installer's 'destroy cluster' command..."
 OPENSHIFT_INSTALL_REPORT_QUOTA_FOOTPRINT="true"; export OPENSHIFT_INSTALL_REPORT_QUOTA_FOOTPRINT
 # TODO: Remove after infra bugs are fixed 
 # TO confirm resources are cleared properly
+set +e
 for i in {1..3}; do 
   echo "Destroying cluster $i attempt..."
   openshift-install --dir /tmp/installer destroy cluster 
 done
 
-set +e
 wait "$!"
 ret="$?"
 set -e
