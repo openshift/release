@@ -28,6 +28,8 @@ else
     az cloud set --name AzureCloud
 fi
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
+az account show
+az role assignment list --assignee "${AZURE_AUTH_CLIENT_ID}"
 
 echo "Creating required Azure objects (Network infrastructure)"
 
@@ -38,8 +40,6 @@ az provider register -n Microsoft.Authorization --wait
 
 CREATE_CMD="az aro create --resource-group ${RESOURCEGROUP} --name ${CLUSTER} --vnet ${VNET} --master-subnet master-subnet --worker-subnet worker-subnet "
 
-echo "Creating managed identity the aro cluster will use for creating service principals"
-az identity create -g "${RESOURCEGROUP}" -n "${CLUSTER}-id"
 
 if [ -f "$PULL_SECRET_FILE"  ]; then
     CREATE_CMD="$CREATE_CMD --pull-secret @\"$PULL_SECRET_FILE\" "
