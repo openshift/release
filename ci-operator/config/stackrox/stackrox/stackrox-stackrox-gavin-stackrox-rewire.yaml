@@ -28,39 +28,21 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/stackrox/stackrox/image/rhel/.
   to: main
-- dockerfile_literal: |-
-    FROM quay.io/stackrox-io/apollo-ci:stackrox-build-0.3.44-2-ga2b83e99da
-    WORKDIR $GOPATH/src/github.com/stackrox/stackrox
-  to: inline-build
-- dockerfile_literal: |-
-    FROM quay.io/stackrox-io/apollo-ci:stackrox-test-0.3.44-2-ga2b83e99da
-    WORKDIR $GOPATH/src/github.com/stackrox/stackrox
-  to: inline-test
 resources:
   '*':
     requests:
       cpu: 2000m
       memory: 8000Mi
 tests:
-- as: go-unit-tests-inline-build
-  commands: .openshift-ci/dispatch.sh go-unit-tests
-  container:
-    clone: true
-    from: inline-build
 - as: go-unit-tests-base-build
   commands: .openshift-ci/dispatch.sh go-unit-tests
   container:
-    clone: true
+    clone: false
     from: base-build
-- as: style-inline-test
-  commands: .openshift-ci/dispatch.sh style-checks
-  container:
-    clone: true
-    from: inline-test
 - as: style-base-test
   commands: .openshift-ci/dispatch.sh style-checks
   container:
-    clone: true
+    clone: false
     from: base-test
 zz_generated_metadata:
   branch: gavin-stackrox-rewire
