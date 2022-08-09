@@ -35,7 +35,7 @@ gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
 # The dnf-automatic systemd unit holds a lock on /var/lib/.rpm.lock on first-boot.
 # Wait until the service completes the system upgrade before performing further rpm/dnf operations.
-# Fixes error: 
+# Fixes error: "error: can't create transaction lock on /var/lib/rpm/.rpm.lock (Resource temporarily unavailable)" 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
