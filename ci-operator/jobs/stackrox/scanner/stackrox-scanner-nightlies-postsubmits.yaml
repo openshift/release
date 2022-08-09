@@ -11,14 +11,14 @@ postsubmits:
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-stackrox-scanner-nightlies-merge-db-integration-tests
+    name: branch-ci-stackrox-scanner-nightlies-db-integration-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=merge-db-integration-tests
+        - --target=db-integration-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -56,14 +56,14 @@ postsubmits:
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-stackrox-scanner-nightlies-merge-diff-dumps
+    name: branch-ci-stackrox-scanner-nightlies-diff-dumps
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=merge-diff-dumps
+        - --target=diff-dumps
         command:
         - ci-operator
         image: ci-operator:latest
@@ -98,109 +98,18 @@ postsubmits:
     decorate: true
     decoration_config:
       skip_cloning: true
-      timeout: 2h30m0s
+      timeout: 3h0m0s
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-stackrox-scanner-nightlies-merge-e2e-tests
+    name: branch-ci-stackrox-scanner-nightlies-e2e-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=merge-e2e-tests
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^nightlies$
-    cluster: build01
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-scanner-nightlies-merge-push-images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=merge-push-images
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^nightlies$
-    cluster: build01
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-      timeout: 2h30m0s
-    labels:
-      ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-scanner-nightlies-merge-slim-e2e-tests
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=merge-slim-e2e-tests
+        - --target=e2e-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -238,14 +147,106 @@ postsubmits:
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-stackrox-scanner-nightlies-merge-store-db-dump
+    name: branch-ci-stackrox-scanner-nightlies-push-images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=merge-store-db-dump
+        - --target=push-images
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^nightlies$
+    cluster: build01
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 4h0m0s
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-stackrox-scanner-nightlies-scale-tests
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=scale-tests
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^nightlies$
+    cluster: build01
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 3h0m0s
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-stackrox-scanner-nightlies-slim-e2e-tests
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=slim-e2e-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -283,14 +284,14 @@ postsubmits:
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-stackrox-scanner-nightlies-merge-store-genesis-dump
+    name: branch-ci-stackrox-scanner-nightlies-store-db-dump
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=merge-store-genesis-dump
+        - --target=store-db-dump
         command:
         - ci-operator
         image: ci-operator:latest
@@ -328,14 +329,14 @@ postsubmits:
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-stackrox-scanner-nightlies-merge-style-checks
+    name: branch-ci-stackrox-scanner-nightlies-store-genesis-dump
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=merge-style-checks
+        - --target=store-genesis-dump
         command:
         - ci-operator
         image: ci-operator:latest
@@ -373,14 +374,14 @@ postsubmits:
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-stackrox-scanner-nightlies-merge-unit-tests
+    name: branch-ci-stackrox-scanner-nightlies-style-checks
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=merge-unit-tests
+        - --target=style-checks
         command:
         - ci-operator
         image: ci-operator:latest
@@ -418,14 +419,14 @@ postsubmits:
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-stackrox-scanner-nightlies-merge-upload-db-dump
+    name: branch-ci-stackrox-scanner-nightlies-unit-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=merge-upload-db-dump
+        - --target=unit-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -463,14 +464,14 @@ postsubmits:
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-stackrox-scanner-nightlies-merge-upload-dumps-for-downstream
+    name: branch-ci-stackrox-scanner-nightlies-upload-db-dump
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=merge-upload-dumps-for-downstream
+        - --target=upload-db-dump
         command:
         - ci-operator
         image: ci-operator:latest
@@ -508,14 +509,59 @@ postsubmits:
     labels:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-stackrox-scanner-nightlies-merge-upload-dumps-for-embedding
+    name: branch-ci-stackrox-scanner-nightlies-upload-dumps-for-downstream
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=merge-upload-dumps-for-embedding
+        - --target=upload-dumps-for-downstream
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^nightlies$
+    cluster: build01
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-stackrox-scanner-nightlies-upload-dumps-for-embedding
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=upload-dumps-for-embedding
         command:
         - ci-operator
         image: ci-operator:latest
