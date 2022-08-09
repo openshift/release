@@ -1,3 +1,12 @@
+base_images:
+  base-build:
+    name: apollo-ci
+    namespace: stackrox
+    tag: stackrox-build-0.3.44-2-ga2b83e99da
+  base-test:
+    name: apollo-ci
+    namespace: stackrox
+    tag: stackrox-test-0.3.44-2-ga2b83e99da
 build_root:
   image_stream_tag:
     name: release
@@ -22,50 +31,37 @@ images:
 - dockerfile_literal: |-
     FROM quay.io/stackrox-io/apollo-ci:stackrox-build-0.3.44-2-ga2b83e99da
     WORKDIR $GOPATH/src/github.com/stackrox/stackrox
-  to: build
-- dockerfile_literal: |-
-    FROM quay.io/stackrox-io/apollo-ci:stackrox-build-0.3.44-2-ga2b83e99da
-    WORKDIR $GOPATH/src/github.com/stackrox/stackrox
-    COPY . .
-  to: build-plus-src
+  to: inline-build
 - dockerfile_literal: |-
     FROM quay.io/stackrox-io/apollo-ci:stackrox-test-0.3.44-2-ga2b83e99da
     WORKDIR $GOPATH/src/github.com/stackrox/stackrox
-    COPY . .
-  to: test-plus-src
-- dockerfile_literal: |-
-    FROM quay.io/stackrox-io/apollo-ci:stackrox-test-0.3.44-2-ga2b83e99da
-    WORKDIR $GOPATH/src/github.com/stackrox/stackrox
-    COPY . .
-    ENV OPENSHIFT_BUILD_NAME=test-binary-build-commands
-    RUN .openshift-ci/dispatch.sh test-binary-build-commands
-  to: test-plus-bin
+  to: inline-test
 resources:
   '*':
     requests:
       cpu: 2000m
       memory: 8000Mi
 tests:
-- as: go-unit-tests-clones
+- as: go-unit-tests-inline-build
   commands: .openshift-ci/dispatch.sh go-unit-tests
   container:
     clone: true
-    from: build
-- as: style
-  commands: .openshift-ci/dispatch.sh style-checks
+    from: inline-build
+- as: go-unit-tests-base-build
+  commands: .openshift-ci/dispatch.sh go-unit-tests
   container:
-    clone: false
-    from: test-plus-src
-- as: gke-qa-e2e-tests
-  commands: .openshift-ci/dispatch.sh gke-qa-e2e-tests
+    clone: true
+    from: base-build
+- as: style-inline-test
+  commands: .openshift-ci/dispatch.sh style
   container:
-    clone: false
-    from: test-plus-bin
-  optional: true
-  secrets:
-  - mount_path: /tmp/vault/stackrox-stackrox-e2e-tests
-    name: stackrox-stackrox-e2e-tests
-  timeout: 5h0m0s
+    clone: true
+    from: inline-test
+- as: style-base-test
+  commands: .openshift-ci/dispatch.sh style
+  container:
+    clone: true
+    from: base-test
 zz_generated_metadata:
   branch: gavin-stackrox-rewire
   org: stackrox
