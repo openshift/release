@@ -1,12 +1,12 @@
 presubmits:
-  medik8s/self-node-remediation:
+  medik8s/node-maintenance-operator:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.13$
-    - ^release-4\.13-
+    - ^release-0\.13$
+    - ^release-0\.13-
     cluster: build01
-    context: ci/prow/ci-index-self-node-remediation-bundle
+    context: ci/prow/ci-index
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -14,15 +14,15 @@ presubmits:
       ci.openshift.io/generator: prowgen
       job-release: "4.11"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-medik8s-self-node-remediation-release-4.13-ci-index-self-node-remediation-bundle
-    rerun_command: /test ci-index-self-node-remediation-bundle
+    name: pull-ci-medik8s-node-maintenance-operator-release-0.13-ci-index
+    rerun_command: /test ci-index
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=ci-index-self-node-remediation-bundle
+        - --target=ci-index
         command:
         - ci-operator
         image: ci-operator:latest
@@ -49,14 +49,64 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ci-index-self-node-remediation-bundle,?($|\s.*)
+    trigger: (?m)^/test( | .* )ci-index,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.13$
-    - ^release-4\.13-
+    - ^release-0\.13$
+    - ^release-0\.13-
     cluster: build01
-    context: ci/prow/e2e-test
+    context: ci/prow/images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      job-release: "4.11"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-medik8s-node-maintenance-operator-release-0.13-images
+    rerun_command: /test images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )images,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-0\.13$
+    - ^release-0\.13-
+    cluster: build01
+    context: ci/prow/openshift-e2e
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -66,8 +116,9 @@ presubmits:
       ci.openshift.io/generator: prowgen
       job-release: "4.11"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-medik8s-self-node-remediation-release-4.13-e2e-test
-    rerun_command: /test e2e-test
+    name: pull-ci-medik8s-node-maintenance-operator-release-0.13-openshift-e2e
+    rerun_command: /test openshift-e2e
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -76,8 +127,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-test-cluster-profile
-        - --target=e2e-test
+        - --secret-dir=/usr/local/openshift-e2e-cluster-profile
+        - --target=openshift-e2e
         command:
         - ci-operator
         image: ci-operator:latest
@@ -93,7 +144,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-test-cluster-profile
+        - mountPath: /usr/local/openshift-e2e-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -124,106 +175,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-test,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-4\.13$
-    - ^release-4\.13-
-    cluster: build01
-    context: ci/prow/images
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      job-release: "4.11"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-medik8s-self-node-remediation-release-4.13-images
-    rerun_command: /test images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        - --target=[release:latest]
-        - --target=ci-index-self-node-remediation-bundle
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )images,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-4\.13$
-    - ^release-4\.13-
-    cluster: build01
-    context: ci/prow/test
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      job-release: "4.11"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-medik8s-self-node-remediation-release-4.13-test
-    rerun_command: /test test
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=test
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )test,?($|\s.*)
+    trigger: (?m)^/test( | .* )openshift-e2e,?($|\s.*)
