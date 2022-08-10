@@ -62,12 +62,12 @@ resources:
       memory: 4000Mi
 test_binary_build_commands: .openshift-ci/dispatch.sh noop
 tests:
-- as: merge-db-integration-tests
+- as: db-integration-tests
   postsubmit: true
   steps:
     test:
     - ref: stackrox-scanner
-- as: merge-diff-dumps
+- as: diff-dumps
   postsubmit: true
   steps:
     test:
@@ -82,13 +82,28 @@ tests:
         requests:
           cpu: 2000m
           memory: 4000Mi
-- as: merge-e2e-tests
+- as: e2e-tests
   postsubmit: true
   steps:
     test:
-    - ref: stackrox-scanner
-  timeout: 2h30m0s
-- as: merge-push-images
+    - as: e2e-tests
+      commands: .openshift-ci/dispatch.sh e2e-tests
+      credentials:
+      - mount_path: /tmp/secret/stackrox-scanner-secrets
+        name: stackrox-scanner-secrets
+        namespace: test-credentials
+      dependencies:
+      - env: SCANNER_IMAGE
+        name: scanner
+      - env: SCANNER_DB_IMAGE
+        name: scanner-db
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+  timeout: 3h0m0s
+- as: push-images
   postsubmit: true
   steps:
     test:
@@ -112,13 +127,49 @@ tests:
         requests:
           cpu: 2000m
           memory: 4000Mi
-- as: merge-slim-e2e-tests
+- as: scale-tests
   postsubmit: true
   steps:
     test:
-    - ref: stackrox-scanner
-  timeout: 2h30m0s
-- as: merge-store-db-dump
+    - as: scale-tests
+      commands: .openshift-ci/dispatch.sh scale-tests
+      credentials:
+      - mount_path: /tmp/secret/stackrox-scanner-secrets
+        name: stackrox-scanner-secrets
+        namespace: test-credentials
+      dependencies:
+      - env: SCANNER_IMAGE
+        name: scanner
+      - env: SCANNER_DB_IMAGE
+        name: scanner-db
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+  timeout: 4h0m0s
+- as: slim-e2e-tests
+  postsubmit: true
+  steps:
+    test:
+    - as: e2e-tests
+      commands: .openshift-ci/dispatch.sh slim-e2e-tests
+      credentials:
+      - mount_path: /tmp/secret/stackrox-scanner-secrets
+        name: stackrox-scanner-secrets
+        namespace: test-credentials
+      dependencies:
+      - env: SCANNER_SLIM_IMAGE
+        name: scanner-slim
+      - env: SCANNER_DB_SLIM_IMAGE
+        name: scanner-db-slim
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+  timeout: 3h0m0s
+- as: store-db-dump
   postsubmit: true
   steps:
     test:
@@ -133,7 +184,7 @@ tests:
         requests:
           cpu: 2000m
           memory: 4000Mi
-- as: merge-store-genesis-dump
+- as: store-genesis-dump
   postsubmit: true
   steps:
     test:
@@ -148,17 +199,17 @@ tests:
         requests:
           cpu: 2000m
           memory: 4000Mi
-- as: merge-style-checks
+- as: style-checks
   postsubmit: true
   steps:
     test:
     - ref: stackrox-scanner
-- as: merge-unit-tests
+- as: unit-tests
   postsubmit: true
   steps:
     test:
     - ref: stackrox-scanner
-- as: merge-upload-db-dump
+- as: upload-db-dump
   postsubmit: true
   steps:
     test:
@@ -173,7 +224,7 @@ tests:
         requests:
           cpu: 2000m
           memory: 4000Mi
-- as: merge-upload-dumps-for-downstream
+- as: upload-dumps-for-downstream
   postsubmit: true
   steps:
     test:
@@ -188,7 +239,7 @@ tests:
         requests:
           cpu: 2000m
           memory: 4000Mi
-- as: merge-upload-dumps-for-embedding
+- as: upload-dumps-for-embedding
   postsubmit: true
   steps:
     test:
