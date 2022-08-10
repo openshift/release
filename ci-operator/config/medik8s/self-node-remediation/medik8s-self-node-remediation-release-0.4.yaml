@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.10"
+    name: "4.11"
     namespace: ocp
     tag: cli
   operator-base:
@@ -10,9 +10,9 @@ base_images:
 binary_build_commands: make build
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.18-openshift-4.11
 images:
 - dockerfile_path: Dockerfile
   from: operator-base
@@ -34,13 +34,6 @@ operator:
   substitutions:
   - pullspec: quay.io/medik8s/self-node-remediation-operator:.*
     with: pipeline:self-node-remediation-operator
-promotion:
-  additional_images:
-    self-node-remediation-index: ci-index-self-node-remediation-bundle
-  excluded_images:
-  - src-oc
-  name: "4.13"
-  namespace: ocp
 releases:
   latest:
     candidate:
@@ -58,7 +51,9 @@ tests:
   commands: make test
   container:
     from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: e2e-test
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
     dependencies:
@@ -78,6 +73,6 @@ tests:
           memory: 200Mi
     workflow: optional-operators-ci-aws
 zz_generated_metadata:
-  branch: release-4.13
+  branch: release-0.4
   org: medik8s
   repo: self-node-remediation
