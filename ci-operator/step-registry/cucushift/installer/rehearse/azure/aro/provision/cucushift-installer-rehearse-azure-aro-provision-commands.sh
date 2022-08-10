@@ -28,8 +28,6 @@ else
     az cloud set --name AzureCloud
 fi
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
-az account show
-az role assignment list --assignee "${AZURE_AUTH_CLIENT_ID}"
 
 echo "Creating required Azure objects (Network infrastructure)"
 
