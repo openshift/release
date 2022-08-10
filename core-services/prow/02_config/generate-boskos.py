@@ -163,6 +163,9 @@ CONFIG = {
     'alibabacloud-cn-qe-quota-slice': {
         'cn-hangzhou': 10,
     },
+    'nutanix-qe-quota-slice': {
+        'uvm_network1': 1,
+    },
 }
 
 for i in range(3):
