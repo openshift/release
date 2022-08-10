@@ -21,11 +21,6 @@ images:
   to: stable
 - dockerfile_path: graph-data.rs/Dockerfile
   to: graphdata-unittests
-promotion:
-  excluded_images:
-  - graphdata-unittests
-  name: cincinnati-graph-data
-  namespace: cincinnati-ci-public
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
@@ -45,16 +40,6 @@ raw_steps:
         - destination_dir: .
           source_path: /tmp/Dockerfile
     to: webhook-unittests
-releases:
-  initial:
-    integration:
-      name: "4.10"
-      namespace: ocp
-  latest:
-    integration:
-      include_built_images: true
-      name: "4.10"
-      namespace: ocp
 resources:
   '*':
     requests:
@@ -102,6 +87,7 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+    workflow: generic-claim
 - as: errata-webhook-unittests
   commands: python3 -m unittest
   container:
