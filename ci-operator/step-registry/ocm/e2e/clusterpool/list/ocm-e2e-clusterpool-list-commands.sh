@@ -80,8 +80,8 @@ if [[ -n "$CLUSTERPOOL_LIST_EXCLUSION_FILTER" ]]; then
     echo "     CLUSTERPOOL_LIST_EXCLUSION_FILTER: $CLUSTERPOOL_LIST_EXCLUSION_FILTER"
 
     echo "INFO Applying exclusion filter"
-    grep -v -e "$CLUSTERPOOL_LIST_INCLUSION_FILTER" "${LIST_FILE}" > "${LIST_FILE}.tmp" || true
-    grep -v -e "$CLUSTERPOOL_LIST_INCLUSION_FILTER" "${LIST_FILE}-all" > "${LIST_FILE}-all.tmp" || true
+    grep -v -e "$CLUSTERPOOL_LIST_EXCLUSION_FILTER" "${LIST_FILE}" > "${LIST_FILE}.tmp" || true
+    grep -v -e "$CLUSTERPOOL_LIST_EXCLUSION_FILTER" "${LIST_FILE}-all" > "${LIST_FILE}-all.tmp" || true
 
     echo "INFO Clusterpool list after filtering:"
     cat "${LIST_FILE}-all.tmp"
@@ -120,8 +120,9 @@ echo "INFO Verifying ready or standby clusterpool list..."
 if [[ $(wc -l < "${LIST_FILE}") == 0 ]]; then
     echo "WARNING No ready or standby clusterpools left. Replacing the list with the list of all clusterpools."
     mv "${LIST_FILE}-all" "${LIST_FILE}"
+else
+    rm "${LIST_FILE}-all"
 fi
-rm "${LIST_FILE}-all"
 
 echo "INFO Checking if list needs to be reordered"
 echo "     CLUSTERPOOL_LIST_ORDER: $CLUSTERPOOL_LIST_ORDER"
