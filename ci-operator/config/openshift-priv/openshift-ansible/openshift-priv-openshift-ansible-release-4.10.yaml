@@ -1,8 +1,8 @@
 base_rpm_images:
   os:
     name: centos
-    namespace: openshift
-    tag: "7"
+    namespace: origin
+    tag: stream8
 build_root:
   image_stream_tag:
     name: release
@@ -20,21 +20,21 @@ raw_steps:
 - pipeline_image_cache_step:
     commands: |
       cat <<REPOFILE > /opt/ose.repo
-      [rhel-server-ose]
-      name = rhel-server-ose
-      baseurl = http://base-4-10.ocp.svc/rhel-server-ose
+      [rhel-8-server-ose]
+      name = rhel-8-server-ose
+      baseurl = http://base-4-10-rhel8.ocp.svc/rhel-8-server-ose
       enabled = 1
       gpgcheck = 0
       priority = 1
       skip_if_unavailable = false
       exclude=openshift-ansible*
       REPOFILE
-      INSTALL_PKGS="which tar wget hostname sysvinit-tools util-linux socat tree findutils lsof bind-utils shadow-utils"
+      INSTALL_PKGS="which tar wget hostname util-linux socat tree findutils lsof bind-utils shadow-utils"
       cat <<DOCKERFILE > /opt/Dockerfile
       FROM os
       COPY ose.repo /etc/yum.repos.d/ose.repo
       RUN mkdir -p /var/lib/origin && \
-          yum install -y ${INSTALL_PKGS} && \
+          yum install --setopt=tsflags=nodocs --setopt=install_weak_deps=False -y ${INSTALL_PKGS} && \
           rpm -V ${INSTALL_PKGS} && \
           yum clean all && rm -rf /var/cache/yum/*
       DOCKERFILE
@@ -76,7 +76,7 @@ rpm_build_commands: tito tag --offline --accept-auto-changelog --use-release '99
   createrepo _output/local/releases/rpms
 test_binary_build_commands: |
   set -eo pipefail
-  yum install -y gcc libffi-devel python-devel openssl-devel python3
+  yum install -y gcc libffi-devel openssl-devel python3-devel
   pip3 install tox virtualenv==16.7.9
   chmod uga+w /etc/passwd
 tests:
