@@ -226,15 +226,6 @@ tests:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.11
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-4-11-periodic
-  cron: '@daily'
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.11
-      TEST_SUITE: minimal
-    workflow: assisted-baremetal
 - as: e2e-metal-assisted-cnv
   optional: true
   steps:
@@ -308,7 +299,6 @@ tests:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.11
         NUM_MASTERS=1
         NUM_WORKERS=0
         TEST_FUNC=test_deploy_day2_nodes_cloud
@@ -320,18 +310,6 @@ tests:
     env:
       ASSISTED_CONFIG: |
         TEST_FUNC=test_deploy_day2_nodes_cloud
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-day2-single-node-periodic
-  cron: '@daily'
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.11
-        NUM_MASTERS=1
-        NUM_WORKERS=0
-        TEST_FUNC=test_deploy_day2_nodes_cloud
-      TEST_SUITE: minimal
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-kube-api-late-binding-single-node
   optional: true
@@ -569,6 +547,21 @@ tests:
       ASSISTED_CONFIG: |
         NUM_WORKERS=0
         MAKEFILE_TARGET=test
+      PLATFORM: vsphere
+    workflow: assisted-vsphere
+- as: e2e-vsphere-assisted-kube-api
+  optional: true
+  steps:
+    cluster_profile: vsphere
+    env:
+      ASSISTED_CONFIG: |
+        KUBE_API=true
+        ENABLE_KUBE_API=true
+        IPv4=true
+        ISO_IMAGE_TYPE=minimal-iso
+        STATIC_IPS=true
+        TEST_FUNC=test_kubeapi
+        MAKEFILE_TARGET="create_full_environment run test_kube_api_parallel"
       PLATFORM: vsphere
     workflow: assisted-vsphere
 - as: e2e-metal-assisted-ipxe
