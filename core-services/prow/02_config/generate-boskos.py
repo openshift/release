@@ -180,7 +180,7 @@ for i in range(3):
     CONFIG['nutanix-quota-slice']['nutanix-segment-{0:0>2}'.format(i)] = 1
 
 for i in range(3):
-    CONFIG['nutanix-qe-quota-slice']['nutanix-segment-{0:0>2}'.format(i)] = 1
+    CONFIG['nutanix-qe-quota-slice']['nutanix-qe-segment-{0:0>2}'.format(i)] = 1
 
 for i in range(2):
     CONFIG['openstack-osuosl-quota-slice']['openstack-osuosl-{0:0>2}'.format(i)] = 1
