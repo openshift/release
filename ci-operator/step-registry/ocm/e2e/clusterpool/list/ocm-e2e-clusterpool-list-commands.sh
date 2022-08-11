@@ -120,8 +120,9 @@ echo "INFO Verifying ready or standby clusterpool list..."
 if [[ $(wc -l < "${LIST_FILE}") == 0 ]]; then
     echo "WARNING No ready or standby clusterpools left. Replacing the list with the list of all clusterpools."
     mv "${LIST_FILE}-all" "${LIST_FILE}"
+else
+    rm "${LIST_FILE}-all"
 fi
-rm "${LIST_FILE}-all"
 
 echo "INFO Checking if list needs to be reordered"
 echo "     CLUSTERPOOL_LIST_ORDER: $CLUSTERPOOL_LIST_ORDER"
