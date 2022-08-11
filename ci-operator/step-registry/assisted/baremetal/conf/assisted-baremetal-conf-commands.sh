@@ -7,8 +7,22 @@ set -o verbose
 
 echo "************ baremetalds e2e assisted conf command ************"
 
-# List of include cases
+case "${CLUSTER_TYPE}" in
+    vsphere)
+        export TEST_PROVIDER=vsphere
+        ;;
 
+    packet-sno | packet-assisted)
+        export TEST_PROVIDER=baremetal
+        ;;
+
+    *)
+        echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"
+        exit 1
+        ;;
+esac
+
+# List of include cases
 case "${TEST_SUITE:-full}" in
     minimal)
         read -d '#' INCL << EOF
