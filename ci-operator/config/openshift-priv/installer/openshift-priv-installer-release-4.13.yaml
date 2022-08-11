@@ -1,26 +1,26 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.6
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.6
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.6
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.6
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.6
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.6
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-test-infra
   base:
@@ -39,10 +39,6 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.17-openshift-4.10
-  ocp_builder_rhel-8-golang-1.17-openshift-4.11:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.17-openshift-4.11
   ocp_builder_rhel-8-golang-1.18-openshift-4.12:
     name: builder
     namespace: ocp
@@ -65,9 +61,6 @@ images:
     ocp_builder_rhel-8-golang-1.17-openshift-4.10:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
-    ocp_builder_rhel-8-golang-1.17-openshift-4.11:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
     ocp_builder_rhel-8-golang-1.18-openshift-4.12:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
@@ -78,9 +71,9 @@ images:
     ocp_builder_rhel-8-golang-1.17-openshift-4.10:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
-    ocp_builder_rhel-8-golang-1.17-openshift-4.11:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
   to: installer-artifacts
 - dockerfile_path: images/libvirt/Dockerfile.ci
   from: base
@@ -118,9 +111,6 @@ images:
     ocp_builder_rhel-8-golang-1.17-openshift-4.10:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
-    ocp_builder_rhel-8-golang-1.17-openshift-4.11:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
     ocp_builder_rhel-8-golang-1.18-openshift-4.12:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
@@ -131,9 +121,6 @@ images:
     ocp_builder_rhel-8-golang-1.17-openshift-4.10:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
-    ocp_builder_rhel-8-golang-1.17-openshift-4.11:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
     ocp_builder_rhel-8-golang-1.18-openshift-4.12:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
@@ -401,6 +388,16 @@ tests:
       CONFIG_TYPE: minimal
       TEST_SUITE: experimental/reliability/minimal
     workflow: openshift-e2e-openstack-ipi
+- as: e2e-openstack-upi
+  optional: true
+  run_if_changed: (^images/openstack/)|(^docs/user/openstack/install_upi\.md$)|(^upi/openstack/)
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      OPENSTACK_TEST_SKIPS: The OpenStack platform creates Worker nodes in a server
+        group\|The OpenStack platform creates Control plane nodes in a server group
+      TEST_SUITE: experimental/reliability/minimal
+    workflow: openshift-e2e-openstack-upi
 - as: e2e-openstack-parallel
   optional: true
   run_if_changed: openstack

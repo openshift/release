@@ -99,7 +99,7 @@ periodics:
   decorate: true
   decoration_config:
     skip_cloning: true
-    timeout: 2h30m0s
+    timeout: 3h0m0s
   extra_refs:
   - base_ref: master
     org: stackrox
@@ -194,7 +194,7 @@ periodics:
   decorate: true
   decoration_config:
     skip_cloning: true
-    timeout: 2h30m0s
+    timeout: 3h0m0s
   extra_refs:
   - base_ref: master
     org: stackrox
@@ -539,6 +539,53 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --report-credentials-file=/etc/report/credentials
       - --target=hourly-upload-dumps-for-embedding
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
+  cron: 5 0,4,8,12,16,20 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: stackrox
+    repo: scanner
+  labels:
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-stackrox-scanner-master-sanity-check-vuln-updates
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --target=sanity-check-vuln-updates
       command:
       - ci-operator
       image: ci-operator:latest

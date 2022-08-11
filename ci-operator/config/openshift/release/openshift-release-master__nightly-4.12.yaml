@@ -8,27 +8,27 @@ base_images:
     namespace: ocp
     tag: ansible
   assisted-image-service:
-    name: ocm-2.6
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.6
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.6
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.6
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.6
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.6
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-test-infra
   aws-ebs-csi-driver-operator-test:
@@ -43,6 +43,14 @@ base_images:
     name: "4.12"
     namespace: ocp
     tag: base
+  cnv-ci-src:
+    name: "4.12"
+    namespace: cnv
+    tag: cnv-ci-src
+  cnv-ci-src-upgrade:
+    name: "4.12"
+    namespace: cnv
+    tag: cnv-ci-src-upgrade
   console-tests:
     name: "4.12"
     namespace: ocp
@@ -142,10 +150,23 @@ tests:
       PACKET_PLAN: c3.medium.x86
       TEST_FUNC: test_bip_add_worker
     workflow: baremetalds-sno
+- as: e2e-metal-ipi-ovn-ipv4
+  interval: 48h
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-ipv4
 - as: e2e-metal-ipi-sdn
   interval: 6h
   steps:
     cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-sdn-ipv4
+- as: e2e-metal-ipi-sdn-bm
+  cluster: build05
+  interval: 6h
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      CLUSTERTYPE: baremetal
     workflow: baremetalds-e2e-sdn-ipv4
 - as: e2e-metal-ipi-ovn-dualstack-local-gateway
   interval: 48h
@@ -167,11 +188,11 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-serial-ovn-ipv6
-- as: e2e-metal-ipi-serial-virtualmedia
+- as: e2e-metal-ipi-sdn-serial-virtualmedia
   interval: 48h
   steps:
     cluster_profile: equinix-ocp-metal
-    workflow: baremetalds-e2e-serial-virtualmedia
+    workflow: baremetalds-e2e-sdn-serial-virtualmedia
 - as: e2e-metal-ipi-serial-ovn-dualstack
   interval: 48h
   steps:
@@ -217,11 +238,11 @@ tests:
         IP_STACK=v6
         NUM_WORKERS=0
     workflow: baremetalds-e2e
-- as: e2e-metal-ipi-virtualmedia
+- as: e2e-metal-ipi-sdn-virtualmedia
   cron: 0 0 * * 1
   steps:
     cluster_profile: equinix-ocp-metal
-    workflow: baremetalds-e2e-virtualmedia
+    workflow: baremetalds-e2e-sdn-virtualmedia
 - as: e2e-aws-proxy
   cron: 0 0 */2 * *
   steps:
@@ -307,7 +328,7 @@ tests:
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
     workflow: openshift-e2e-gcp-libvirt-cert-rotation
-- as: e2e-azure-fips
+- as: e2e-azure-sdn-fips
   interval: 48h
   steps:
     cluster_profile: azure-2
@@ -317,7 +338,7 @@ tests:
     pre:
     - chain: ipi-azure-pre
     - ref: fips-check
-    workflow: openshift-e2e-azure
+    workflow: openshift-e2e-azure-sdn
 - as: e2e-aws-fips
   interval: 48h
   steps:
@@ -354,7 +375,7 @@ tests:
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
     workflow: openshift-e2e-gcp-csi-migration
-- as: e2e-azure-fips-serial
+- as: e2e-azure-sdn-fips-serial
   interval: 48h
   steps:
     cluster_profile: azure-2
@@ -365,7 +386,7 @@ tests:
     pre:
     - chain: ipi-azure-pre
     - ref: fips-check
-    workflow: openshift-e2e-azure
+    workflow: openshift-e2e-azure-sdn
 - as: e2e-aws-fips-serial
   interval: 48h
   steps:
@@ -378,7 +399,7 @@ tests:
     - chain: ipi-aws-pre
     - ref: fips-check
     workflow: openshift-e2e-aws
-- as: e2e-gcp-fips-serial
+- as: e2e-gcp-sdn-fips-serial
   interval: 48h
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
@@ -388,7 +409,7 @@ tests:
     pre:
     - chain: ipi-gcp-pre
     - ref: fips-check
-    workflow: openshift-e2e-gcp
+    workflow: openshift-e2e-gcp-sdn
 - as: console-aws
   interval: 48h
   steps:
@@ -491,6 +512,85 @@ tests:
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-e2e-aws-sdn-crun
+- as: e2e-azure-deploy-cnv
+  interval: 12h
+  steps:
+    cluster_profile: azure-2
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        curl -L https://github.com/openshift-cnv/cnv-ci/tarball/release-4.12 -o /tmp/cnv-ci.tgz
+        mkdir -p /tmp/cnv-ci
+        tar -xvzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
+        cd /tmp/cnv-ci
+        make deploy_test
+      credentials:
+      - mount_path: /var/run/cnv-ci-brew-pull-secret
+        name: cnv-ci-brew-pull-secret
+        namespace: test-credentials
+      env:
+      - default: '|7820aea2-0d75-11e7-9259-28d244ea5a6d.hhav.f63e13'
+        name: BREW_IMAGE_REGISTRY_USERNAME
+      - default: /var/run/cnv-ci-brew-pull-secret/token
+        name: BREW_IMAGE_REGISTRY_TOKEN_PATH
+      - default: v0.55.0
+        name: KUBEVIRT_RELEASE
+      - default: "4.12"
+        name: OCP_VERSION
+      - default: /tmp/artifacts
+        name: ARTIFACTS_DIR
+      - default: openshift-cnv
+        name: TARGET_NAMESPACE
+      - default: "false"
+        name: PRODUCTION_RELEASE
+      from: cnv-ci-src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 600Mi
+    workflow: ipi-azure
+- as: e2e-azure-upgrade-cnv
+  interval: 12h
+  steps:
+    cluster_profile: azure-2
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+    test:
+    - as: test
+      commands: |
+        curl -L https://github.com/openshift-cnv/cnv-ci/tarball/release-4.12 -o /tmp/cnv-ci.tgz
+        mkdir -p /tmp/cnv-ci
+        tar -xvzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
+        cd /tmp/cnv-ci
+        make upgrade_test
+      credentials:
+      - mount_path: /var/run/cnv-ci-brew-pull-secret
+        name: cnv-ci-brew-pull-secret
+        namespace: test-credentials
+      env:
+      - default: '|7820aea2-0d75-11e7-9259-28d244ea5a6d.hhav.f63e13'
+        name: BREW_IMAGE_REGISTRY_USERNAME
+      - default: /var/run/cnv-ci-brew-pull-secret/token
+        name: BREW_IMAGE_REGISTRY_TOKEN_PATH
+      - default: v0.55.0
+        name: KUBEVIRT_RELEASE
+      - default: "4.12"
+        name: OCP_VERSION
+      - default: /tmp/artifacts
+        name: ARTIFACTS_DIR
+      - default: openshift-cnv
+        name: TARGET_NAMESPACE
+      - default: "false"
+        name: PRODUCTION_RELEASE
+      from: cnv-ci-src-upgrade
+      resources:
+        requests:
+          cpu: 100m
+          memory: 600Mi
+    workflow: ipi-azure
 - as: e2e-aws-driver-toolkit
   cron: 0 */8 * * *
   steps:

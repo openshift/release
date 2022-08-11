@@ -8,7 +8,7 @@ base_images:
     namespace: ocp
     tag: ansible
   assisted-test-infra:
-    name: ocm-2.6
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-test-infra
   aws-ebs-csi-driver-operator-test:
@@ -24,11 +24,11 @@ base_images:
     namespace: ocp
     tag: base
   cnv-ci-src:
-    name: "4.10"
+    name: "4.11"
     namespace: cnv
     tag: cnv-ci-src
   cnv-ci-src-upgrade:
-    name: "4.10"
+    name: "4.11"
     namespace: cnv
     tag: cnv-ci-src-upgrade
   console-tests:
@@ -71,6 +71,14 @@ releases:
       product: ocp
       stream: nightly
       version: "4.11"
+  oldest-supported-credentials-request:
+    release:
+      channel: candidate
+      version: 4.11.0-fc.0
+  oldest-supported-z-rollback:
+    release:
+      channel: candidate
+      version: 4.11.0-fc.0
 resources:
   '*':
     requests:
@@ -143,6 +151,11 @@ tests:
         NETWORK_TYPE=OVNKubernetes
         OVN_LOCAL_GATEWAY_MODE=true
     workflow: baremetalds-e2e
+- as: e2e-metal-ipi-ovn-ipv4
+  interval: 48h
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-ipv4
 - as: e2e-metal-ipi-serial-ipv4
   interval: 6h
   steps:
@@ -401,6 +414,25 @@ tests:
       COMPUTE_NODE_TYPE: n2-standard-8
       RT_ENABLED: "true"
     workflow: openshift-e2e-gcp-realtime
+- as: e2e-aws-upgrade-rollback-oldest-supported
+  interval: 48h
+  steps:
+    cluster_profile: aws-2
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:oldest-supported-z-rollback
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      TEST_TYPE: upgrade-conformance
+      TEST_UPGRADE_OPTIONS: abort-at=random
+    workflow: openshift-upgrade-aws
+- as: credentials-request-freeze
+  interval: 48h
+  steps:
+    dependencies:
+      OPENSHIFT_FROZEN_RELEASE_IMAGE: release:oldest-supported-credentials-request
+      OPENSHIFT_LATEST_RELEASE_IMAGE: release:latest
+    workflow: openshift-credentials-request-freeze
 - as: e2e-aws-upgrade
   interval: 24h
   steps:
@@ -486,7 +518,12 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: make deploy_test
+      commands: |
+        curl -L https://github.com/openshift-cnv/cnv-ci/tarball/release-4.11 -o /tmp/cnv-ci.tgz
+        mkdir -p /tmp/cnv-ci
+        tar -xvzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
+        cd /tmp/cnv-ci
+        make deploy_test
       credentials:
       - mount_path: /var/run/cnv-ci-brew-pull-secret
         name: cnv-ci-brew-pull-secret
@@ -496,7 +533,7 @@ tests:
         name: BREW_IMAGE_REGISTRY_USERNAME
       - default: /var/run/cnv-ci-brew-pull-secret/token
         name: BREW_IMAGE_REGISTRY_TOKEN_PATH
-      - default: v0.45.0
+      - default: v0.53.2
         name: KUBEVIRT_RELEASE
       - default: "4.11"
         name: OCP_VERSION
@@ -504,7 +541,7 @@ tests:
         name: ARTIFACTS_DIR
       - default: openshift-cnv
         name: TARGET_NAMESPACE
-      - default: "true"
+      - default: "false"
         name: PRODUCTION_RELEASE
       from: cnv-ci-src
       resources:
@@ -520,7 +557,12 @@ tests:
       BASE_DOMAIN: ci2.azure.devcluster.openshift.com
     test:
     - as: test
-      commands: make upgrade_test
+      commands: |
+        curl -L https://github.com/openshift-cnv/cnv-ci/tarball/release-4.11 -o /tmp/cnv-ci.tgz
+        mkdir -p /tmp/cnv-ci
+        tar -xvzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
+        cd /tmp/cnv-ci
+        make upgrade_test
       credentials:
       - mount_path: /var/run/cnv-ci-brew-pull-secret
         name: cnv-ci-brew-pull-secret
@@ -530,7 +572,7 @@ tests:
         name: BREW_IMAGE_REGISTRY_USERNAME
       - default: /var/run/cnv-ci-brew-pull-secret/token
         name: BREW_IMAGE_REGISTRY_TOKEN_PATH
-      - default: v0.45.0
+      - default: v0.53.2
         name: KUBEVIRT_RELEASE
       - default: "4.11"
         name: OCP_VERSION
@@ -538,7 +580,7 @@ tests:
         name: ARTIFACTS_DIR
       - default: openshift-cnv
         name: TARGET_NAMESPACE
-      - default: "true"
+      - default: "false"
         name: PRODUCTION_RELEASE
       from: cnv-ci-src-upgrade
       resources:
