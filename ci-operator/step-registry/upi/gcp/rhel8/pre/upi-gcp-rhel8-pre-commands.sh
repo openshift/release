@@ -47,3 +47,5 @@ gcloud compute instances create "${INSTANCE_PREFIX}" \
   --subnet "${INSTANCE_PREFIX}" \
   --network "${INSTANCE_PREFIX}" \
   --hostname "release-ci-${INSTANCE_PREFIX}.microshift-ci.com"
+
+sleep 1000000000000
