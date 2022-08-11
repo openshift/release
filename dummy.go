@@ -1,1 +1,5 @@
 package release
+
+func main() {
+
+}
