@@ -90,6 +90,7 @@ CONFIG = {
         'default': 1000,
     },
     'nutanix-quota-slice': {},
+    'nutanix-qe-quota-slice': {},
     'openstack-osuosl-quota-slice': {},
     'openstack-quota-slice': {
         'default': 7,
@@ -162,9 +163,6 @@ CONFIG = {
     },
     'alibabacloud-cn-qe-quota-slice': {
         'cn-hangzhou': 10,
-    },
-    'nutanix-qe-quota-slice': {
-        'uvm-network1': 1,
     },
 }
 
