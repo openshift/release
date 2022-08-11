@@ -80,8 +80,8 @@ if [[ -n "$CLUSTERPOOL_LIST_EXCLUSION_FILTER" ]]; then
     echo "     CLUSTERPOOL_LIST_EXCLUSION_FILTER: $CLUSTERPOOL_LIST_EXCLUSION_FILTER"
 
     echo "INFO Applying exclusion filter"
-    grep -v -e "$CLUSTERPOOL_LIST_INCLUSION_FILTER" "${LIST_FILE}" > "${LIST_FILE}.tmp" || true
-    grep -v -e "$CLUSTERPOOL_LIST_INCLUSION_FILTER" "${LIST_FILE}-all" > "${LIST_FILE}-all.tmp" || true
+    grep -v -e "$CLUSTERPOOL_LIST_EXCLUSION_FILTER" "${LIST_FILE}" > "${LIST_FILE}.tmp" || true
+    grep -v -e "$CLUSTERPOOL_LIST_EXCLUSION_FILTER" "${LIST_FILE}-all" > "${LIST_FILE}-all.tmp" || true
 
     echo "INFO Clusterpool list after filtering:"
     cat "${LIST_FILE}-all.tmp"
