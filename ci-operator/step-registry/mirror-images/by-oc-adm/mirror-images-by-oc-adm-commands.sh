@@ -9,7 +9,7 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 mirror_output="${SHARED_DIR}/mirror_output"
 new_pull_secret="${SHARED_DIR}/new_pull_secret"
 install_config_icsp_patch="${SHARED_DIR}/install-config-icsp.yaml.patch"
-
+icsp_file="${SHARED_DIR}/mirror_registry_icsp_file"
 
 # private mirror registry host
 # <public_dns>:<port>
@@ -43,7 +43,7 @@ oc adm release -a "${new_pull_secret}" mirror --insecure=true \
  --to=${target_release_image_repo} \
  --to-release-image=${target_release_image} | tee "${mirror_output}"
 
-# grep -B 1 -A 10 "kind: ImageContentSourcePolicy" ${mirror_output}
+grep -B 1 -A 10 "kind: ImageContentSourcePolicy" ${mirror_output} > "${icsp_file}"
 grep -A 6 "imageContentSources" ${mirror_output} > "${install_config_icsp_patch}"
 
 echo "${install_config_icsp_patch}:"
