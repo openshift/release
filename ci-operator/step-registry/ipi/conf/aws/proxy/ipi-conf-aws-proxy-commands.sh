@@ -235,9 +235,6 @@ EOF
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
-# TODO: move to image
-curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
-
 EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
 TAGS="Key=expirationDate,Value=${EXPIRATION_DATE}"
 
@@ -245,8 +242,8 @@ CONFIG="${SHARED_DIR}/install-config.yaml"
 
 PROXY_IMAGE=registry.ci.openshift.org/origin/4.5:egress-http-proxy
 
-PROXY_NAME="$(/tmp/yq r "${CONFIG}" 'metadata.name')"
-REGION="$(/tmp/yq r "${CONFIG}" 'platform.aws.region')"
+PROXY_NAME="$(yq-go r "${CONFIG}" 'metadata.name')"
+REGION="$(yq-go r "${CONFIG}" 'platform.aws.region')"
 echo Using region: ${REGION}
 test -n "${REGION}"
 
@@ -262,7 +259,7 @@ echo "Using FCOS ${RELEASE} AMI: ${AMI}"
 ssh_pub_key=$(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")
 
 # get the VPC ID from a subnet -> subnet.VpcId
-aws_subnet="$(/tmp/yq r "${CONFIG}" 'platform.aws.subnets[0]')"
+aws_subnet="$(yq-go r "${CONFIG}" 'platform.aws.subnets[0]')"
 echo "Using aws_subnet: ${aws_subnet}"
 vpc_id="$(aws --region "${REGION}" ec2 describe-subnets --subnet-ids "${aws_subnet}" | jq -r '.[][0].VpcId')"
 echo "Using vpc_id: ${vpc_id}"
@@ -271,7 +268,7 @@ echo "Using vpc_id: ${vpc_id}"
 # aws ec2 describe-route-tables --filters Name=association.subnet-id,Values=${value} | grep '"GatewayId": "igw.*'
   # if $? then use it as the public subnet
 
-SUBNETS="$(/tmp/yq r -P "${CONFIG}" 'platform.aws.subnets' | sed 's/- //g')"
+SUBNETS="$(yq-go r -P "${CONFIG}" 'platform.aws.subnets' | sed 's/- //g')"
 public_subnet=""
 for subnet in ${SUBNETS}; do
   if aws --region "${REGION}" ec2 describe-route-tables --filters Name=association.subnet-id,Values="${subnet}" | grep '"GatewayId": "igw.*' 1>&2 > /dev/null; then

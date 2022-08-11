@@ -57,8 +57,7 @@ fi
 if [ -z "${VNET_NAME}" ]; then
   vnet_file="${SHARED_DIR}/customer_vnet_subnets.yaml"
   if [ -f "${vnet_file}" ]; then
-    curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
-    bastion_vnet_name=$(/tmp/yq r ${vnet_file} 'platform.azure.virtualNetwork')
+    bastion_vnet_name=$(yq-go r ${vnet_file} 'platform.azure.virtualNetwork')
   else
     echo "Did not find ${vnet_file}!"
     exit 1

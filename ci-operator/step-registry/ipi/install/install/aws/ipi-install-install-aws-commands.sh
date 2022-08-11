@@ -4,10 +4,8 @@ set -o nounset
 # set -o errexit
 # set -o pipefail
 
-curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
-
-CLUSTER_NAME="$(/tmp/yq r "${SHARED_DIR}/install-config.yaml" 'metadata.name')"
-BASE_DOMAIN="$(/tmp/yq r "${SHARED_DIR}/install-config.yaml" 'baseDomain')"
+CLUSTER_NAME="$(yq-go r "${SHARED_DIR}/install-config.yaml" 'metadata.name')"
+BASE_DOMAIN="$(yq-go r "${SHARED_DIR}/install-config.yaml" 'baseDomain')"
 
 function populate_artifact_dir() {
   set +e
@@ -108,8 +106,8 @@ openshift-install --dir="${dir}" create manifests &
 wait "$!"
 
 if [ "${ADD_INGRESS_RECORDS_MANUALLY}" == "yes" ]; then
-  /tmp/yq d -i "${dir}/manifests/cluster-dns-02-config.yml" spec.privateZone
-  /tmp/yq d -i "${dir}/manifests/cluster-dns-02-config.yml" spec.publicZone
+  yq-go d -i "${dir}/manifests/cluster-dns-02-config.yml" spec.privateZone
+  yq-go d -i "${dir}/manifests/cluster-dns-02-config.yml" spec.publicZone
 fi
 
 sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"

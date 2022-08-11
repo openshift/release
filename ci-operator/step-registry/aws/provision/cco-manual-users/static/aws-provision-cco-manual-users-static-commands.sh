@@ -8,9 +8,6 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
-curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
-curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /tmp/jq && chmod +x /tmp/jq
-
 REGION="${LEASED_RESOURCE}"
 
 function run_command() {
@@ -119,10 +116,10 @@ do
     # 
     cr_yaml="${cr_yaml_d}/${item}"
     cr_json="${cr_json_d}/${item:0:-5}.json"
-    /tmp/yq r -j "${cr_yaml}" > "${cr_json}"
+    yq-go r -j "${cr_yaml}" > "${cr_json}"
 
-    name=$(cat "${cr_json}" | /tmp/jq -r '.spec.secretRef.name')
-    ns=$(cat "${cr_json}" | /tmp/jq -r '.spec.secretRef.namespace')
+    name=$(cat "${cr_json}" | jq -r '.spec.secretRef.name')
+    ns=$(cat "${cr_json}" | jq -r '.spec.secretRef.namespace')
     
     #  Create policy document
     # 
@@ -133,8 +130,8 @@ do
         | sed 's/"effect"/"Effect"/g' \
         | sed 's/"policyCondition"/"Condition"/g' \
         | sed 's/"resource"/"Resource"/g' \
-        | /tmp/jq '{Version: "2012-10-17", Statement: .spec.providerSpec.statementEntries}' > "${policy_json}"
-    policy_doc=$(cat "${policy_json}" | /tmp/jq -c .)
+        | jq '{Version: "2012-10-17", Statement: .spec.providerSpec.statementEntries}' > "${policy_json}"
+    policy_doc=$(cat "${policy_json}" | jq -c .)
     echo "policy_doc: $policy_doc"
     
     #  Create policy
@@ -144,7 +141,7 @@ do
     output_policy="${resources_d}/policy_${policy_name}.json"
     aws_create_policy $REGION "${policy_name}" "${policy_doc}" "${output_policy}"
 	
-    policy_arn=$(cat "${output_policy}" | /tmp/jq -r '.Policy.Arn')
+    policy_arn=$(cat "${output_policy}" | jq -r '.Policy.Arn')
     
     echo "${policy_arn}" >> "${SHARED_DIR}/aws_policy_arns"
 
@@ -157,8 +154,8 @@ do
     output_access_keys="${resources_d}/accesskey_${user_name}.json"
     aws_create_user $REGION "${user_name}" "${policy_arn}" "${output_users}" "${output_access_keys}"
 
-    key_id=$(cat "${output_access_keys}" | /tmp/jq -r '.AccessKey.AccessKeyId')
-    key_sec=$(cat "${output_access_keys}" | /tmp/jq -r '.AccessKey.SecretAccessKey')
+    key_id=$(cat "${output_access_keys}" | jq -r '.AccessKey.AccessKeyId')
+    key_sec=$(cat "${output_access_keys}" | jq -r '.AccessKey.SecretAccessKey')
     echo "${user_name}" >> "${SHARED_DIR}/aws_user_names"
 
     # Generate users manifests

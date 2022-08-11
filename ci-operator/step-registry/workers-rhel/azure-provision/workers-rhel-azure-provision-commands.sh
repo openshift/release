@@ -4,9 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# TODO: move to image
-curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
-
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
 AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
@@ -33,8 +30,8 @@ echo "${vnet_RG}"
 # Get existing vnet info
 if [ -f "${SHARED_DIR}/customer_vnet_subnets.yaml" ]; then
   VNET_FILE="${SHARED_DIR}/customer_vnet_subnets.yaml"
-  vnet_name=$(/tmp/yq r ${VNET_FILE} 'platform.azure.virtualNetwork')
-  computeSubnet=$(/tmp/yq r ${VNET_FILE} 'platform.azure.computeSubnet')
+  vnet_name=$(yq-go r ${VNET_FILE} 'platform.azure.virtualNetwork')
+  computeSubnet=$(yq-go r ${VNET_FILE} 'platform.azure.computeSubnet')
 fi
 
 # Get computeSubnet ID
