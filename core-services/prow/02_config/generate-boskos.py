@@ -164,7 +164,7 @@ CONFIG = {
         'cn-hangzhou': 10,
     },
     'nutanix-qe-quota-slice': {
-        'uvm_network1': 1,
+        'uvm-network1': 1,
     },
 }
 
