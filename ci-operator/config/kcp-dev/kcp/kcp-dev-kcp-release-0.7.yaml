@@ -54,6 +54,7 @@ resources:
       memory: 200Mi
 tests:
 - as: lint
+  skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     test:
     - as: lint
@@ -64,6 +65,7 @@ tests:
           cpu: 100m
           memory: 200Mi
 - as: codegen
+  skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     test:
     - as: codegen
@@ -74,6 +76,7 @@ tests:
           cpu: 100m
           memory: 200Mi
 - as: deps
+  skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     test:
     - as: deps
@@ -84,6 +87,7 @@ tests:
           cpu: 100m
           memory: 200Mi
 - as: imports
+  skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     test:
     - as: imports
@@ -94,6 +98,7 @@ tests:
           cpu: 100m
           memory: 200Mi
 - as: boilerplate
+  skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     test:
     - as: boilerplate
@@ -104,6 +109,7 @@ tests:
           cpu: 100m
           memory: 200Mi
 - as: test
+  skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     test:
     - as: test
@@ -114,6 +120,18 @@ tests:
           cpu: 1000m
           memory: 4Gi
 - as: e2e
+  skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  steps:
+    test:
+    - as: e2e
+      commands: USE_GOTESTSUM=1 E2E_PARALLELISM=3 make test-e2e
+      from: bin
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 4Gi
+- as: e2e-periodic
+  cron: 0 */2 * * *
   steps:
     test:
     - as: e2e
@@ -124,6 +142,18 @@ tests:
           cpu: 1000m
           memory: 4Gi
 - as: e2e-multiple-runs
+  skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  steps:
+    test:
+    - as: e2e-multiple-runs
+      commands: USE_GOTESTSUM=1 COUNT=3 E2E_PARALLELISM=3 make test-e2e
+      from: bin
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 4Gi
+- as: e2e-multiple-runs-periodic
+  cron: 0 */2 * * *
   steps:
     test:
     - as: e2e-multiple-runs
