@@ -14,17 +14,27 @@ function populate_artifact_dir() {
     s/X-Auth-Token.*/X-Auth-Token REDACTED/;
     s/UserData:.*,/UserData: REDACTED,/;
     ' "${dir}/.openshift_install.log" > "${ARTIFACT_DIR}/.openshift_install.log"
+  sed '
+    s/password: .*/password: REDACTED/;
+    s/X-Auth-Token.*/X-Auth-Token REDACTED/;
+    s/UserData:.*,/UserData: REDACTED,/;
+    ' "${SHARED_DIR}/installation_stats.log" > "${ARTIFACT_DIR}/installation_stats.log"
   case "${CLUSTER_TYPE}" in
     powervs)
-      ibmcloud pi ins --json | jq -r '.Payload.pvmInstances[] | select (.serverName|test("'${CLUSTER_NAME}'")) | [.serverName, .pvmInstanceID, .addresses[].ip, .addresses[].macAddress]';;
-  *) >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}' to collect machine IDs"
+      echo "8<--------8<--------8<--------8<-------- Instance names, ids, and MAC addresses 8<--------8<--------8<--------8<--------"
+      ibmcloud pi instances --json | jq -r '.Payload.pvmInstances[] | select (.serverName|test("'${CLUSTER_NAME}'")) | [.serverName, .pvmInstanceID, .addresses[].ip, .addresses[].macAddress]'
+      echo "8<--------8<--------8<--------8<-------- DONE! 8<--------8<--------8<--------8<--------"
+      ;;
+    *)
+      >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}' to collect machine IDs"
+      ;;
   esac
 }
 
 function prepare_next_steps() {
+  set +e
   #Save exit code for must-gather to generate junit
   echo "$?" > "${SHARED_DIR}/install-status.txt"
-  set +e
   echo "Setup phase finished, prepare env for next steps"
   populate_artifact_dir
   echo "Copying required artifacts to shared dir"
@@ -37,8 +47,7 @@ function prepare_next_steps() {
 
 }
 
-function log_to_file()
-{
+function log_to_file() {
 	local LOG_FILE=$1
 
 	/bin/rm -f ${LOG_FILE}
@@ -199,45 +208,70 @@ EOF
   curl -sL https://github.com/coreos/butane/releases/download/v0.7.0/fcct-x86_64-unknown-linux-gnu >/tmp/fcct && chmod ug+x /tmp/fcct
   /tmp/fcct --pretty --strict -d "${config_dir}" "${config_dir}/fcct.yml" > "${dir}/bootstrap.ign"
 }
-function init_ibmcloud()
-{
+
+function init_ibmcloud() {
+  set +e
+
+  #install the tools required
+  cd /tmp
+
+  if [ ! -f /tmp/IBM_CLOUD_CLI_amd64.tar.gz ]; then
+    curl --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/2.9.0/IBM_Cloud_CLI_2.9.0_amd64.tar.gz
+    tar xvzf /tmp/IBM_CLOUD_CLI_amd64.tar.gz
+
+    for I in infrastructure-service power-iaas cloud-internet-services cloud-object-storage dl-cli dns; do
+      /tmp/Bluemix_CLI/bin/ibmcloud plugin install ${I}
+    done
+
+    #PATH=${PATH}:/tmp/Bluemix_CLI/bin:/tmp/Bluemix_CLI/bin/ibmcloud
+    PATH=${PATH}:/tmp/Bluemix_CLI/bin
+  fi
+
+  if [ ! -f /tmp/jq ]; then
+    curl -L --output /tmp/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 && chmod +x /tmp/jq
+
+    /tmp/jq --version
+
+    #PATH=${PATH}:/tmp/:/tmp/jq
+    PATH=${PATH}:/tmp
+  fi
+
+  PATH=${PATH}:$(pwd)/bin
+  export PATH
+
+  BASE64_API_KEY="$(echo -n ${IBMCLOUD_API_KEY} | base64)"
+  export BASE64_API_KEY
+
+  IC_API_KEY=${IBMCLOUD_API_KEY}
+  export IC_API_KEY
+
   if ! ibmcloud iam oauth-tokens 1>/dev/null 2>&1
   then
     ibmcloud login --apikey "${IBMCLOUD_API_KEY}" -r ${VPCREGION}
     ibmcloud target -g "${POWERVS_RESOURCE_GROUP}"
-    SERVICE_INSTANCE_CRN="$(ibmcloud resource service-instances --output JSON | jq -r '.[] | select(.guid|test("'${POWERVS_SERVICE_INSTANCE_ID}'")) | .id')"
-    ibmcloud pi service-target ${SERVICE_INSTANCE_CRN}
   fi
-}
-function check_resources(){
-  #This function checks for any remaining DHCP leases/leftover/uncleaned resources and cleans them up before installing a new cluster
-  set +e
-  #install the tools required
-  cd /tmp
-  curl --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/2.9.0/IBM_Cloud_CLI_2.9.0_amd64.tar.gz
-  tar xvzf /tmp/IBM_CLOUD_CLI_amd64.tar.gz
-  for I in infrastructure-service power-iaas cloud-internet-services cloud-object-storage dl-cli dns; do /tmp/Bluemix_CLI/bin/ibmcloud plugin install ${I}; done
-  curl -L --output /tmp/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 && chmod +x /tmp/jq
-  /tmp/jq --version
+  
+  CIS_INSTANCE_CRN=$(ibmcloud cis instances --output json | jq -r '.[].id');
+  export CIS_INSTANCE_CRN
 
+  SERVICE_INSTANCE_CRN="$(ibmcloud resource service-instances --output JSON | jq -r '.[] | select(.guid|test("'${POWERVS_SERVICE_INSTANCE_ID}'")) | .crn')"
+  export SERVICE_INSTANCE_CRN
+
+  ibmcloud pi service-target ${SERVICE_INSTANCE_CRN}
+
+  CLOUD_INSTANCE_ID="$(echo ${SERVICE_INSTANCE_CRN} | cut -d: -f8)"
+  export CLOUD_INSTANCE_ID
+
+  set -e
+}
+
+function check_resources() {
+  set +e
+
+  #This function checks for any remaining DHCP leases/leftover/uncleaned resources and cleans them up before installing a new cluster
   echo "Check resource phase initiated"
 
-  set -euo pipefail
-
-  PATH=${PATH}:$(pwd)/bin:/tmp/:/tmp/jq:/tmp/Bluemix_CLI/bin:/tmp/Bluemix_CLI/bin/ibmcloud
-  BASE64_API_KEY="$(echo -n ${IBMCLOUD_API_KEY} | base64)"
-  IC_API_KEY=${IBMCLOUD_API_KEY}
-  export PATH
-  export BASE64_API_KEY
-  export IC_API_KEY
-  init_ibmcloud
   flag_destroy_resources=false
-
-  #Uncomment for even more debugging!
-  #export TF_LOG_PROVIDER=TRACE
-  #export TF_LOG=TRACE
-  #export TF_LOG_PATH=/tmp/tf.log
-  #export IBMCLOUD_TRACE=true
 
   #
   # Quota check DNS
@@ -248,29 +282,15 @@ function check_resources(){
     ibmcloud cis instance-set "$(ibmcloud cis instances --output json | jq -r '.[].name')"
     DNS_DOMAIN_ID="$(ibmcloud cis domains --output json | jq -r '.[].id')"
     export DNS_DOMAIN_ID
-    RECORDS="$(ibmcloud cis dns-records ${DNS_DOMAIN_ID} --output json | jq -r '.[] | select (.name|test("'${CLUSTER_NAME}'.*")) | "\(.name) - \(.id)"')"
-    if [ -n "${RECORDS}" ]
+    DNS_RECORDS="$(ibmcloud cis dns-records ${DNS_DOMAIN_ID} --output json | jq -r '.[] | select (.name|test("'${CLUSTER_NAME}'.*")) | "\(.name) - \(.id)"')"
+    if [ -n "${DNS_RECORDS}" ]
     then
-      echo "${RECORDS}"
+      echo "DNS_RECORDS=${DNS_RECORDS}"
       if [ "$flag_destroy_resources" != true ] ; then
         flag_destroy_resources=true
       fi
     fi
   fi
-  
-  CIS_INSTANCE_CRN=$(ibmcloud cis instances --output json | jq -r '.[].id');
-  export CIS_INSTANCE_CRN
-  SERVICE_INSTANCE_CRN="$(ibmcloud resource service-instances --output JSON | jq -r '.[] | select(.guid|test("'${POWERVS_SERVICE_INSTANCE_ID}'")) | .crn')"
-  export SERVICE_INSTANCE_CRN
-  ibmcloud pi service-target ${SERVICE_INSTANCE_CRN}
-  CLOUD_INSTANCE_ID="$(echo ${SERVICE_INSTANCE_CRN} | cut -d: -f8)"
-  export CLOUD_INSTANCE_ID
-  set +x
-  BEARER_TOKEN=$(curl --silent -X POST "https://iam.cloud.ibm.com/identity/token" -H "content-type: application/x-www-form-urlencoded" -H "accept: application/json" -d "grant_type=urn%3Aibm%3Aparams%3Aoauth%3Agrant-type%3Aapikey&apikey=${IBMCLOUD_API_KEY}" | jq -r .access_token)
-  export BEARER_TOKEN
-  [ -z "${BEARER_TOKEN}" ] && exit 1
-  [ "${BEARER_TOKEN}" == "null" ] && exit 1
-  DHCP_NETWORKS_RESULT="$(curl --silent --location --request GET "https://${POWERVS_REGION}.power-iaas.cloud.ibm.com/pcloud/v1/cloud-instances/${CLOUD_INSTANCE_ID}/services/dhcp" --header 'Content-Type: application/json' --header "CRN: ${SERVICE_INSTANCE_CRN}" --header "Authorization: Bearer ${BEARER_TOKEN}")"
 
   #
   # Quota check for image imports
@@ -278,7 +298,7 @@ function check_resources(){
   JOBS=$(ibmcloud pi jobs --operation-action imageImport --json | jq -r '.Payload.jobs[] | select (.status.state|test("running")) | .id')
   if [ -n "${JOBS}" ]
   then
-    echo "${JOBS}"
+    echo "JOBS=${JOBS}"
     exit 1
   fi
 
@@ -289,13 +309,20 @@ function check_resources(){
   fi
 }
 
-function destroy_resources(){
+function destroy_resources() {
 
-  mkdir /tmp/ocp-test
-  cat > "/tmp/ocp-test/metadata.json" << EOF
-{"clusterName":"${CLUSTER_NAME}","clusterID":"","infraID":"${CLUSTER_NAME}","powervs":{"BaseDomain":"${BASE_DOMAIN}","cisInstanceCRN":"${CIS_INSTANCE_CRN}","powerVSResourceGroup":"${POWERVS_RESOURCE_GROUP}","region":"${POWERVS_REGION}","vpcRegion":"","zone":"${POWERVS_ZONE}","serviceInstanceID":"${POWERVS_SERVICE_INSTANCE_ID}"}}
-EOF
+  set +e
 
+  #
+  # TODO: Remove after infra bugs are fixed
+  # TO confirm resources are cleared properly
+  #
+
+  #
+  # Clean up DHCP networks via curl.
+  # At the moment, this is the only api and 4.11 version of destroy cluster
+  # only cleans up DHCP networks in use by VMs, which is not always the case.
+  #
   [ -z "${CLOUD_INSTANCE_ID}" ] && exit 1
   echo "CLOUD_INSTANCE_ID=${CLOUD_INSTANCE_ID}"
   set +x
@@ -325,35 +352,52 @@ EOF
     done < <(echo "${DHCP_NETWORKS_RESULT}" | jq -r '.[] | .id')
   done
 
-  # TODO: Remove after infra bugs are fixed
-  # TO confirm resources are cleared properly
-  set +e
+  #
+  # Create a fake cluster metadata file
+  #
+  mkdir /tmp/ocp-test
+  cat > "/tmp/ocp-test/metadata.json" << EOF
+{"clusterName":"${CLUSTER_NAME}","clusterID":"","infraID":"${CLUSTER_NAME}","powervs":{"BaseDomain":"${BASE_DOMAIN}","cisInstanceCRN":"${CIS_INSTANCE_CRN}","powerVSResourceGroup":"${POWERVS_RESOURCE_GROUP}","region":"${POWERVS_REGION}","vpcRegion":"","zone":"${POWERVS_ZONE}","serviceInstanceID":"${POWERVS_SERVICE_INSTANCE_ID}"}}
+EOF
   
+  #
+  # Call destroy cluster on fake metadata file
+  #
   for i in {1..3}; do
     echo "Destroying cluster $i attempt..."
-    date --utc +"%Y-%m-%dT%H:%M:%S%:z"
+    echo "DATE=$(date --utc '+%Y-%m-%dT%H:%M:%S%:z')"
     date "+%F %X" > "${SHARED_DIR}/CLUSTER_CLEAR_RESOURCE_START_TIME_$i"
     openshift-install --dir /tmp/ocp-test destroy cluster --log-level=debug
+    ret=$?
     date "+%F %X" > "${SHARED_DIR}/CLUSTER_CLEAR_RESOURCE_END_TIME_$i"
+    echo "ret=${ret}"
+    if [ ${ret} -eq 0 ]; then
+      break
+    fi
   done
+
   set -e
 }
 
-function dump_resources(){
+function dump_resources() {
+
+  set +e
 
   init_ibmcloud
 
+  INFRA_ID=$(jq -r '.infraID' ${dir}/metadata.json)
+  echo "INFRA_ID=${INFRA_ID}"
+  export INFRA_ID
+
   echo "8<--------8<--------8<--------8<-------- Cloud Connection 8<--------8<--------8<--------8<--------"
 
-  INFRA_ID=$(jq -r '.infraID' ${dir}/metadata.json)
-  export INFRA_ID
   CLOUD_UUID=$(ibmcloud pi connections --json | jq -r '.Payload.cloudConnections[] | select (.name|test("'${INFRA_ID}'")) | .cloudConnectionID')
 
   if [ -z "${CLOUD_UUID}" ]
   then
     echo "Error: Could not find a Cloud Connection with the name ${INFRA_ID}"
   else
-    ibmcloud pi connection ${CLOUD_UUID} || true
+    ibmcloud pi connection ${CLOUD_UUID}
   fi
 
   echo "8<--------8<--------8<--------8<-------- Direct Link 8<--------8<--------8<--------8<--------"
@@ -364,7 +408,7 @@ function dump_resources(){
   then
     echo "Error: Could not find a Direct Link with the name ${INFRA_ID}"
   else
-    ibmcloud dl gateway ${DL_UUID} || true
+    ibmcloud dl gateway ${DL_UUID}
   fi
 
   echo "8<--------8<--------8<--------8<-------- VPC 8<--------8<--------8<--------8<--------"
@@ -375,7 +419,7 @@ function dump_resources(){
   then
     echo "Error: Could not find a VPC with the name ${INFRA_ID}"
   else
-    ibmcloud is vpc ${VPC_UUID} || true
+    ibmcloud is vpc ${VPC_UUID}
   fi
 
   echo "8<--------8<--------8<--------8<-------- DHCP networks 8<--------8<--------8<--------8<--------"
@@ -384,27 +428,34 @@ function dump_resources(){
   export BEARER_TOKEN
   [ -z "${BEARER_TOKEN}" ] && exit 1
   [ "${BEARER_TOKEN}" == "null" ] && exit 1
-  DHCP_NETWORKS_RESULT=$(curl --silent --location --request GET "https://${POWERVS_REGION}.power-iaas.cloud.ibm.com/pcloud/v1/cloud-instances/${CLOUD_INSTANCE_ID}/services/dhcp" --header 'Content-Type: application/json' --header "CRN: ${POWERVS_SERVICE_INSTANCE_ID}" --header "Authorization: Bearer ${BEARER_TOKEN}")
+  DHCP_NETWORKS_RESULT=$(curl --silent --location --request GET "https://${POWERVS_REGION}.power-iaas.cloud.ibm.com/pcloud/v1/cloud-instances/${CLOUD_INSTANCE_ID}/services/dhcp" --header 'Content-Type: application/json' --header "CRN: ${SERVICE_INSTANCE_CRN}" --header "Authorization: Bearer ${BEARER_TOKEN}")
   echo "${DHCP_NETWORKS_RESULT}" | jq -r '.[] | "\(.id) - \(.network.name)"'
+  if [ $? -gt 0 ]
+  then
+    echo "DHCP_NETWORKS_RESULT=${DHCP_NETWORKS_RESULT}"
+  fi
 
   echo "8<--------8<--------8<--------8<-------- DHCP network information 8<--------8<--------8<--------8<--------"
 
   while read DHCP_UUID
   do
-    RESULT=$(curl --silent --location --request GET "https://${POWERVS_REGION}.power-iaas.cloud.ibm.com/pcloud/v1/cloud-instances/${CLOUD_INSTANCE_ID}/services/dhcp/${DHCP_UUID}" --header 'Content-Type: application/json' --header "CRN: ${POWERVS_SERVICE_INSTANCE_ID}" --header "Authorization: Bearer ${BEARER_TOKEN}")
-    echo "${RESULT}" | jq -r '.'
+    DHCP_UUID_RESULT=$(curl --silent --location --request GET "https://${POWERVS_REGION}.power-iaas.cloud.ibm.com/pcloud/v1/cloud-instances/${CLOUD_INSTANCE_ID}/services/dhcp/${DHCP_UUID}" --header 'Content-Type: application/json' --header "CRN: ${SERVICE_INSTANCE_CRN}" --header "Authorization: Bearer ${BEARER_TOKEN}")
+    echo "${DHCP_UUID_RESULT}" | jq -r '.'
+    if [ $? -gt 0 ]
+    then
+      echo "DHCP_UUID_RESULT=${DHCP_UUID_RESULT}"
+    fi
 
   done < <( echo "${DHCP_NETWORKS_RESULT}" | jq -r '.[] | .id' )
 
-  echo "8<--------8<--------8<--------8<-------- Instance names, ids, and MAC addresses 8<--------8<--------8<--------8<--------"
-
-  ibmcloud pi instances --json | jq -r '.Payload.pvmInstances[] | select (.serverName|test("'${INFRA_ID}'")) | [.serverName, .pvmInstanceID, .addresses[].ip, .addresses[].macAddress]'
+  echo "8<--------8<--------8<--------8<-------- DONE! 8<--------8<--------8<--------8<--------"
 
   egrep '(Creation complete|level=error|: [0-9ms]*")' ${dir}/.openshift_install.log > ${SHARED_DIR}/installation_stats.log
 
-  echo ${SHARED_DIR}/installation_stats.log
-
+  set -e
 }
+
+set -euo pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 trap 'prepare_next_steps' EXIT TERM
@@ -415,6 +466,7 @@ if [[ -z "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" ]]; then
 fi
 
 echo "Installing from release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+
 IBMCLOUD_API_KEY=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_API_KEY")
 IBMCLOUD_APIKEY_CCM_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_APIKEY_CCM_CREDS")
 IBMCLOUD_APIKEY_INGRESS_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_APIKEY_INGRESS_CREDS")
@@ -448,7 +500,12 @@ EOF
 cp "/tmp/powervs-config.json" "${SHARED_DIR}/"
 export POWERVS_AUTH_FILEPATH=${SHARED_DIR}/powervs-config.json
 
-check_resources
+init_ibmcloud
+
+#
+# Don't call check_resources.  Always call destroy_resources since it is safe.
+#
+destroy_resources
 
 case "${CLUSTER_TYPE}" in
 powervs)
@@ -464,11 +521,20 @@ cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/
 
 date "+%s" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
-# Add ignition configs
-date --utc "+%Y-%m-%dT%H:%M:%S%:z"
-openshift-install --dir="${dir}" create ignition-configs
+echo "POWERVS_REGION=${POWERVS_REGION}"
+echo "POWERVS_ZONE=${POWERVS_ZONE}"
+echo
 
-date --utc "+%Y-%m-%dT%H:%M:%S%:z"
+# Add ignition configs
+echo "DATE=$(date --utc '+%Y-%m-%dT%H:%M:%S%:z')"
+openshift-install --dir="${dir}" create ignition-configs
+if [ ! -z "${OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP:-}" ]; then
+  echo "Inject promtail in bootstrap.ign"
+  inject_promtail_service
+fi
+
+# Create installation manifests
+echo "DATE=$(date --utc '+%Y-%m-%dT%H:%M:%S%:z')"
 openshift-install --dir="${dir}" create manifests
 
 # copy ccoctl files
@@ -537,26 +603,35 @@ do
   cp "${item}" "${dir}/tls/${manifest##tls_}"
 done <   <( find "${SHARED_DIR}" \( -name "tls_*.key" -o -name "tls_*.pub" \) -print0)
 
-if [ ! -z "${OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP:-}" ]; then
-  # Inject promtail in bootstrap.ign
-  date --utc "+%Y-%m-%dT%H:%M:%S%:z"
-  openshift-install --dir="${dir}" create ignition-configs
-  inject_promtail_service
-fi
-
-set +e
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
-date --utc "+%Y-%m-%dT%H:%M:%S%:z"
-TF_LOG=debug openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:'
 
-date --utc "+%Y-%m-%dT%H:%M:%S%:z"
-TF_LOG=debug openshift-install wait-for install-complete --dir="${dir}" | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:'
+export TF_LOG=debug
+# Uncomment for even more debugging!
+#export TF_LOG_PROVIDER=TRACE
+#export TF_LOG=TRACE
+#export TF_LOG_PATH=/tmp/tf.log
+#export IBMCLOUD_TRACE=true
+
+echo "8<--------8<--------8<--------8<-------- BEGIN: create cluster 8<--------8<--------8<--------8<--------"
+echo "DATE=$(date --utc '+%Y-%m-%dT%H:%M:%S%:z')"
+openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:'
 ret=${PIPESTATUS[0]}
-dump_resources
-set -e
+echo "ret=${ret}"
+echo "8<--------8<--------8<--------8<-------- END: create cluster 8<--------8<--------8<--------8<--------"
+
+if [ ${ret} -gt 0 ]; then
+  echo "8<--------8<--------8<--------8<-------- BEGIN: wait-for install-complete 8<--------8<--------8<--------8<--------"
+  echo "DATE=$(date --utc '+%Y-%m-%dT%H:%M:%S%:z')"
+  openshift-install wait-for install-complete --dir="${dir}" | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:'
+  ret=${PIPESTATUS[0]}
+  echo "ret=${ret}"
+  echo "8<--------8<--------8<--------8<-------- END: wait-for install-complete 8<--------8<--------8<--------8<--------"
+fi
 
 date "+%s" > "${SHARED_DIR}/TEST_TIME_INSTALL_END"
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
+
+dump_resources
 
 if test "${ret}" -eq 0 ; then
   touch  "${SHARED_DIR}/success"
