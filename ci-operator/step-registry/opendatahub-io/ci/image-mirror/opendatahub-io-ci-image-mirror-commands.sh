@@ -27,11 +27,12 @@ if [[ -z "$IMAGE_TAG" ]]; then
     case "$JOB_TYPE" in
         presubmit)
             log "INFO Building default image tag for a $JOB_TYPE job"
-            IMAGE_TAG="${RELEASE_VERSION}-pr-${PULL_NUMBER}-${PULL_PULL_SHA:0:7}"
+            IMAGE_TAG="pr-${PULL_NUMBER}"
             ;;
         postsubmit)
             log "INFO Building default image tag for a $JOB_TYPE job"
             IMAGE_TAG="${RELEASE_VERSION}-${PULL_BASE_SHA:0:7}"
+            IMAGE_FLOATING_TAG="${RELEASE_VERSION}"
             ;;
         periodic)
             log "INFO Building default image tag for a $JOB_TYPE job"
@@ -78,7 +79,12 @@ if [[ "$JOB_TYPE" == "presubmit" ]]; then
 fi
 
 # Build destination image reference
-DESTINATION_IMAGE_REF="$REGISTRY_HOST/$REGISTRY_ORG/$IMAGE_REPO:$IMAGE_TAG"
+DESTINATION_REGISTRY_REPO="$REGISTRY_HOST/$REGISTRY_ORG/$IMAGE_REPO"
+DESTINATION_IMAGE_REF="$DESTINATION_REGISTRY_REPO:$IMAGE_TAG"
+if [[ -n "${IMAGE_FLOATING_TAG-}" ]]; then
+    FLOATING_IMAGE_REF="$DESTINATION_REGISTRY_REPO:$IMAGE_FLOATING_TAG"
+    DESTINATION_IMAGE_REF="$DESTINATION_IMAGE_REF $FLOATING_IMAGE_REF"
+fi
 
 log "INFO Mirroring Image"
 log "    From   : $SOURCE_IMAGE_REF"
