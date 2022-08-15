@@ -85,6 +85,16 @@ def get_rc_volumes(context, namespace=None):
                     },
                     {
                         'configMap': {
+                            'name': 'job-config-stolostron'
+                        }
+                    },
+                    {
+                        'configMap': {
+                            'name': 'job-config-stackrox'
+                        }
+                    },
+                    {
+                        'configMap': {
                             'name': 'job-config-master-periodics'
                         }
                     },
