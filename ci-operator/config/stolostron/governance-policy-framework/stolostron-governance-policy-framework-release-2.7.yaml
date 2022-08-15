@@ -18,6 +18,7 @@ images:
       - registry.ci.openshift.org/stolostron/builder:go1.18-linux
   to: grc-policy-framework-tests
 promotion:
+  disabled: true
   name: "2.7"
   namespace: stolostron
 resources:
@@ -74,12 +75,10 @@ tests:
           memory: 200Mi
     workflow: ocm-e2e-kind
 - as: test-e2e-grc-framework
-  run_if_changed: ^test/integration/.*
   steps:
     dependencies:
       COMPONENT_IMAGE_REF: grc-policy-framework-tests
     env:
-      ACM_RELEASE_VERSION: release-2.6
       CLUSTERPOOL_GROUP_NAME: policy-grc
       CLUSTERPOOL_HOST_NAMESPACE: acm-grc-security
       CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-grc-clusterpool
@@ -106,37 +105,35 @@ tests:
       SOURCE_IMAGE_REF: grc-policy-framework-tests
     env:
       IMAGE_REPO: grc-policy-framework-tests
-      IMAGE_TAG: latest
+      IMAGE_TAG: latest-2.7
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
-- as: periodic-build
-  cron: 0 6 * * *
+- as: publish
+  postsubmit: true
   steps:
+    dependencies:
+      SOURCE_IMAGE_REF: grc-policy-framework-tests
+    env:
+      IMAGE_REPO: grc-policy-framework-tests
+      REGISTRY_ORG: stolostron
     test:
-    - as: grc-pipeline-validation
-      commands: |
+    - as: publish
+      commands: |-
+        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
+        export OSCI_PUBLISH_DELAY="0"
         export SELF="make -f Makefile.prow"
-        export GITHUB_TOKEN=$(cat ${GITHUB_TOKEN_FILE})
-        ./build/periodic.sh
+        make -f Makefile.prow osci/publish
       credentials:
-      - mount_path: /etc/acm-cicd-github
+      - mount_path: /etc/github
         name: acm-cicd-github
         namespace: test-credentials
-      env:
-      - default: acm-cicd-github
-        documentation: The GitHub user name.
-        name: GITHUB_USER
-      - default: /etc/acm-cicd-github/token
-        documentation: |-
-          The file that stores the GitHub token. Should match credentials stanza
-          mount path.
-        name: GITHUB_TOKEN_FILE
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: main
+  branch: release-2.7
   org: stolostron
   repo: governance-policy-framework
