@@ -34,9 +34,13 @@ OPENSHIFT_INSTALL_REPORT_QUOTA_FOOTPRINT="true"; export OPENSHIFT_INSTALL_REPORT
 set +e
 for i in {1..3}; do 
   echo "Destroying cluster $i attempt..."
-  date --utc "+%Y-%m-%dT%H:%M:%S%:z"
+  echo "DATE=$(date --utc '+%Y-%m-%dT%H:%M:%S%:z')"
   openshift-install --dir /tmp/installer destroy cluster 
   ret="$?"
+  echo "ret=${ret}"
+  if [ ${ret} -eq 0 ]; then
+    break
+  fi
 done
 set -e
 
