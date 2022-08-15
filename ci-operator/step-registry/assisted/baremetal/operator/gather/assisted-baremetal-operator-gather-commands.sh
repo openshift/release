@@ -28,6 +28,9 @@ trap getlogs EXIT
 echo "### Gathering logs..."
 # shellcheck disable=SC2087
 timeout -s 9 30m ssh "${SSHOPTS[@]}" "root@${IP}" DISCONNECTED="${DISCONNECTED:-}" bash - << "EOF"
+# prepending each printed line with a timestamp
+exec > >(awk '{ print strftime("[%Y-%m-%d %H:%M:%S]"), $0 }') 2>&1
+
 set -xeo pipefail
 
 # Get sosreport including sar data
