@@ -4,7 +4,7 @@ build_root:
     namespace: openshift
     tag: golang-1.18
 images:
-- dockerfile_literal: |
+- dockerfile_literal: |-
     FROM src
     RUN curl --location -o /usr/local/bin/argocd https://github.com/argoproj/argo-cd/releases/download/v2.4.7/argocd-linux-amd64 && \
         chmod +x /usr/local/bin/argocd && \
@@ -83,7 +83,13 @@ tests:
     - as: run-yamllint
       cli: latest
       commands: |
-        yamllint .
+        cat <<EOF > .yamllint.yml
+        extends: default
+        rules:
+          line-length: disable
+        EOF
+
+        yamllint --no-warnings .
       from: plnsvc-test-image
       resources:
         requests:
