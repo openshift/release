@@ -55,7 +55,7 @@ if [[ -z "${NETWORK}" || -z "${CONTROL_PLANE_SUBNET}" ]]; then
   echo "Could not find VPC network and control-plane subnet" && exit 1
 fi
 ZONE_0=$(gcloud compute regions describe ${REGION} --format=json | jq -r .zones[0] | cut -d "/" -f9)
-MACHINE_TYPE="n2-standard-8"
+MACHINE_TYPE="n2-standard-16"
 
 #####################################
 ##########Create server_#############
@@ -69,6 +69,7 @@ server_name="${CLUSTER_NAME}-buildhost"
 gcloud compute instances create "${server_name}" \
   ${IMAGE_ARGS} \
   --image-project=${IMAGE_PROJECT} \
+  --boot-disk-type pd-ssd \
   --boot-disk-size=200GB \
   --machine-type=${MACHINE_TYPE} \
   --metadata-from-file ssh-keys="${CLUSTER_PROFILE_DIR}/ssh-publickey" \
