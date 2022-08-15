@@ -31,6 +31,9 @@ tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/assisted-service.ta
 # shellcheck disable=SC2087
 ssh "${SSHOPTS[@]}" "root@${IP}" bash - << 'EOF' |& sed -e 's/.*auths\{0,1\}".*/*** PULL_SECRET ***/g'
 
+# prepending each printed line with a timestamp
+exec > >(awk '{ print strftime("[%Y-%m-%d %H:%M:%S]"), $0 }') 2>&1
+
 set -xeo pipefail
 
 cd /root/dev-scripts
@@ -54,7 +57,7 @@ export EXTRA_BAREMETALHOSTS_FILE="/root/dev-scripts/${EXTRA_BAREMETALHOSTS_FILE}
 
 source /root/config
 
-# Inject job configuration for ZTP, if available 
+# Inject job configuration for ZTP, if available
 if [[ -e /root/assisted-ztp-config ]]
 then
   source /root/assisted-ztp-config
