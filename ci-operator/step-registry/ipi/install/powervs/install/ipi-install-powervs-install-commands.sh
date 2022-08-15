@@ -552,12 +552,11 @@ TF_LOG=debug openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-
 date --utc "+%Y-%m-%dT%H:%M:%S%:z"
 TF_LOG=debug openshift-install wait-for install-complete --dir="${dir}" | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:'
 ret=${PIPESTATUS[0]}
+dump_resources
 set -e
 
 date "+%s" > "${SHARED_DIR}/TEST_TIME_INSTALL_END"
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
-
-dump_resources
 
 if test "${ret}" -eq 0 ; then
   touch  "${SHARED_DIR}/success"
