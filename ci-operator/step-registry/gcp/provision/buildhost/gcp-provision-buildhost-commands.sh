@@ -8,19 +8,19 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 CLUSTER_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
 NETWORK=${NETWORK:-}
-IMAGE_ARGS=""
-if [[ -z "${IMAGE_FAMILY}" ]] && [[ ! -z "${IMAGE_NAME}" ]] ; then
-   IMAGE_ARGS="--image=${IMAGE_NAME}"
-fi
+IMAGE_ARGS="--image=${IMAGE_NAME}"
+# if [[ -z "${IMAGE_FAMILY}" ]] && [[ ! -z "${IMAGE_NAME}" ]] ; then
+#    IMAGE_ARGS="--image=${IMAGE_NAME}"
+# fi
 
-if [[ ! -z "${IMAGE_FAMILY}" ]] && [[ -z "${IMAGE_NAME}" ]] ; then
-   IMAGE_ARGS="--image-family=${IMAGE_FAMILY}"
-fi
+# if [[ ! -z "${IMAGE_FAMILY}" ]] && [[ -z "${IMAGE_NAME}" ]] ; then
+#    IMAGE_ARGS="--image-family=${IMAGE_FAMILY}"
+# fi
 
-if [[ -z "${IMAGE_ARGS}" ]]; then
-  echo "image info not correct"
-  exit 1 
-fi
+# if [[ -z "${IMAGE_ARGS}" ]]; then
+#   echo "image info not correct"
+#   exit 1 
+# fi
 
 
 #####################################
@@ -70,6 +70,7 @@ gcloud compute instances create "${server_name}" \
   ${IMAGE_ARGS} \
   --image-project=${IMAGE_PROJECT} \
   --boot-disk-type pd-ssd \
+  --local-ssd=interface=NVME \
   --boot-disk-size=200GB \
   --machine-type=${MACHINE_TYPE} \
   --metadata-from-file ssh-keys="${CLUSTER_PROFILE_DIR}/ssh-publickey" \
