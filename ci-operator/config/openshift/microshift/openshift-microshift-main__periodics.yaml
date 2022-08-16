@@ -31,7 +31,7 @@ build_root:
 images:
 - dockerfile_literal: |
     # build
-    FROM ubi-minimal as base
+    FROM ubi-minimal
     ENV YQ_URL=https://github.com/mikefarah/yq/releases/download/v4.26.1/yq_linux_amd64
     ENV YQ_HASH=9e35b817e7cdc358c1fcd8498f3872db169c3303b61645cc1faf972990f37582
     RUN echo -n "${YQ_HASH} -" > /tmp/sum.txt ; \
@@ -39,15 +39,8 @@ images:
           echo "ERROR: Expected file at ${YQ_URL} to have checksum ${YQ_HASH} but instead got $(sha256sum </tmp/yq | cut -d' ' -f1)" ; \
           exit 1 ; \
         fi ; \
-        chmod +x /tmp/yq
-    # output
-    FROM ubi-minimal
-    COPY --from=base /tmp/yq /usr/bin/yq
+        chmod +x /tmp/yq && mv /tmp/yq /usr/bin/yq
   from: ubi-minimal
-  inputs:
-    ubi-minimal:
-      as:
-      - ubi-minimal
   to: yq-cli
 - dockerfile_literal: |
     FROM src
