@@ -3,66 +3,78 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  stolostron_builder_go1.18-linux:
-    name: builder
-    namespace: stolostron
-    tag: go1.18-linux
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
     tag: go1.18-linux
 images:
-- dockerfile_path: Dockerfile.ocp
+- dockerfile_path: Dockerfile.multi-stage
   from: base
-  inputs:
-    stolostron_builder_go1.18-linux:
-      as:
-      - registry.ci.openshift.org/stolostron/builder:go1.18-linux
-  to: node-exporter
+  to: thanos
 promotion:
-  name: "2.6"
+  name: "2.7"
   namespace: stolostron
 releases:
   initial:
     integration:
-      name: "4.9"
+      name: "4.7"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.9"
+      name: "4.7"
       namespace: ocp
 resources:
   '*':
+    limits:
+      memory: 6Gi
     requests:
       cpu: 100m
-      memory: 200Mi
+      memory: 1Gi
+test_binary_build_commands: "true"
 tests:
 - as: test-unit
-  commands: make test
+  commands: |
+    export SELF="make -f Makefile"
+    make -f Makefile test-local
   container:
     from: src
-- as: test-e2e
-  commands: make test
-  container:
-    from: src
+- as: e2e-kind
+  steps:
+    env:
+      AWS_CREDENTIALS_SECRET: ocm-obs-china-aws-kind
+      AWS_INSTANCE_TYPE: t3.small
+    post:
+    - ref: ocm-e2e-kind-destroy
+    pre:
+    - ref: ocm-ci-rbac
+    - ref: ocm-e2e-kind-create
+    test:
+    - as: test
+      commands: "export SELF=\"make\"\n./test-kind-prow.sh \n"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-e2e-kind
 - as: publish
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: node-exporter
+      SOURCE_IMAGE_REF: thanos
     env:
-      IMAGE_REPO: node-exporter
+      IMAGE_REPO: thanos
       REGISTRY_ORG: stolostron
     test:
     - as: publish
       commands: |-
         export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
-        export SELF="make"
+        export SELF="make -f /opt/build-harness/Makefile.prow"
         export OSCI_PUBLISH_DELAY="0"
-        export OSCI_COMPONENT_NAME="node-exporter"
-        make osci/publish
+        export OSCI_COMPONENT_NAME="thanos"
+        make -f /opt/build-harness/Makefile.prow osci/publish
       credentials:
       - mount_path: /etc/github
         name: acm-cicd-github
@@ -74,6 +86,6 @@ tests:
           memory: 200Mi
     workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: release-2.6
+  branch: release-2.7
   org: stolostron
-  repo: node-exporter
+  repo: thanos

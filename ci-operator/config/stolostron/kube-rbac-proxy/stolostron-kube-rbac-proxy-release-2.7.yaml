@@ -13,56 +13,49 @@ build_root:
     namespace: stolostron
     tag: go1.18-linux
 images:
-- dockerfile_path: Dockerfile.ocp
+- dockerfile_path: Dockerfile.prow
   from: base
   inputs:
     stolostron_builder_go1.18-linux:
       as:
       - registry.ci.openshift.org/stolostron/builder:go1.18-linux
-  to: node-exporter
+  to: kube-rbac-proxy
 promotion:
-  name: "2.6"
+  name: "2.7"
   namespace: stolostron
-releases:
-  initial:
-    integration:
-      name: "4.9"
-      namespace: ocp
-  latest:
-    integration:
-      include_built_images: true
-      name: "4.9"
-      namespace: ocp
 resources:
   '*':
+    limits:
+      memory: 6Gi
     requests:
       cpu: 100m
-      memory: 200Mi
+      memory: 1Gi
+test_binary_build_commands: "true"
 tests:
-- as: test-unit
-  commands: make test
+- as: vendor
+  commands: go mod vendor && git diff --exit-code
   container:
     from: src
-- as: test-e2e
-  commands: make test
+- as: test-unit
+  commands: make test-unit
   container:
     from: src
 - as: publish
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: node-exporter
+      SOURCE_IMAGE_REF: kube-rbac-proxy
     env:
-      IMAGE_REPO: node-exporter
+      IMAGE_REPO: kube-rbac-proxy
       REGISTRY_ORG: stolostron
     test:
     - as: publish
       commands: |-
         export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
-        export SELF="make"
+        export SELF="make -f /opt/build-harness/Makefile.prow"
         export OSCI_PUBLISH_DELAY="0"
-        export OSCI_COMPONENT_NAME="node-exporter"
-        make osci/publish
+        export OSCI_COMPONENT_NAME="kube-rbac-proxy"
+        make -f /opt/build-harness/Makefile.prow osci/publish
       credentials:
       - mount_path: /etc/github
         name: acm-cicd-github
@@ -74,6 +67,6 @@ tests:
           memory: 200Mi
     workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: release-2.6
+  branch: release-2.7
   org: stolostron
-  repo: node-exporter
+  repo: kube-rbac-proxy
