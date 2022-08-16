@@ -20,6 +20,7 @@ images:
       - registry.ci.openshift.org/stolostron/builder:go1.18-linux
   to: volsync-addon-controller
 promotion:
+  disabled: true
   name: "2.7"
   namespace: stolostron
 resources:
@@ -56,13 +57,34 @@ tests:
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
-- as: fast-forward
+- as: publish
   postsubmit: true
   steps:
+    dependencies:
+      SOURCE_IMAGE_REF: volsync-addon-controller
     env:
-      DESTINATION_BRANCH: release-2.7
-    workflow: ocm-ci-fastforward
+      IMAGE_REPO: volsync-addon-controller
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
+        export SELF="make -f Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        export OSCI_COMPONENT_NAME="volsync-addon-controller"
+        export OSCI_COMPONENT_VERSION="2.7.0"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: main
+  branch: release-2.7
   org: stolostron
   repo: volsync-addon-controller
