@@ -7,6 +7,10 @@ base_images:
     name: builder
     namespace: stolostron
     tag: go1.17-linux
+  stolostron_builder_go1.18-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.18-linux
 binary_build_commands: |-
   GOFLAGS="" go build ./cmd/clusterlifecycle-state-metrics; \
   GOFLAGS="" go test -covermode=atomic -coverpkg=github.com/stolostron/clusterlifecycle-state-metrics/pkg/... -c -tags testrunmain ./cmd/clusterlifecycle-state-metrics -o clusterlifecycle-state-metrics-coverage
@@ -14,14 +18,14 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.17-linux
+    tag: go1.18-linux
 images:
 - dockerfile_path: build/Dockerfile.prow
   from: base
   inputs:
-    stolostron_builder_go1.17-linux:
+    stolostron_builder_go1.18-linux:
       as:
-      - registry.ci.openshift.org/stolostron/builder:go1.17-linux
+      - registry.ci.openshift.org/stolostron/builder:go1.18-linux
   to: clusterlifecycle-state-metrics
 - dockerfile_path: build/Dockerfile.coverage.prow
   from: clusterlifecycle-state-metrics
@@ -32,12 +36,12 @@ promotion:
 releases:
   initial:
     integration:
-      name: "4.8"
+      name: "4.10"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.8"
+      name: "4.10"
       namespace: ocp
 resources:
   '*':
@@ -61,7 +65,9 @@ tests:
   container:
     from: src
 - as: unit
-  commands: make test
+  commands: |
+    export HOME="/tmp"
+    make test
   container:
     from: src
 - as: pr-image-mirror
@@ -81,7 +87,36 @@ tests:
       IMAGE_REPO: clusterlifecycle-state-metrics
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
+- as: publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: clusterlifecycle-state-metrics
+    env:
+      IMAGE_REPO: clusterlifecycle-state-metrics
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_COMPONENT_NAME=clusterlifecycle-state-metrics
+        export OSCI_COMPONENT_VERSION=2.2.0
+        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
+        export OSCI_PIPELINE_PRODUCT_PREFIX=backplane
+        export OSCI_PIPELINE_REPO=backplane-pipeline
+        export SELF="make -f /opt/build-harness/Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        make -f /opt/build-harness/Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: release-2.2
+  branch: backplane-2.2
   org: stolostron
   repo: clusterlifecycle-state-metrics
