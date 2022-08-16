@@ -37,27 +37,33 @@ tests:
       IMAGE_REPO: search-collector
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
-- as: e2e
+- as: test-on-kind-cluster
   steps:
-    dependencies:
-      COMPONENT_IMAGE_REF: search-collector
     env:
-      CLUSTERPOOL_GROUP_NAME: Search
-      CLUSTERPOOL_HOST_NAMESPACE: acm-observability-usa
-      CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-obs-usa-clusterpool
-      CLUSTERPOOL_LIST_INCLUSION_FILTER: prow
-      PIPELINE_STAGE: dev
+      AWS_CREDENTIALS_SECRET: ocm-obs-usa-aws-kind
+      AWS_INSTANCE_TYPE: t3.xlarge
+    post:
+    - ref: ocm-e2e-kind-destroy
+    pre:
+    - ref: ocm-ci-rbac
+    - ref: ocm-e2e-kind-create
     test:
     - as: e2e
       commands: |
+        echo "COMPONENT_IMAGE_REF=$COMPONENT_IMAGE_REF"
         export SELF="make -f Makefile.prow"
+        set -o pipefail
         make -f Makefile.prow test-e2e
+        set +o pipefail
+      dependencies:
+      - env: COMPONENT_IMAGE_REF
+        name: search-collector
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: ocm-e2e-clusterpool
+    workflow: ocm-e2e-kind
 - as: git-fast-forward
   postsubmit: true
   steps:
