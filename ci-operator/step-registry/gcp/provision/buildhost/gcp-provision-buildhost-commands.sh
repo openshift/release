@@ -70,6 +70,7 @@ gcloud compute instances create "${server_name}" \
   ${IMAGE_ARGS} \
   --image-project=${IMAGE_PROJECT} \
   --boot-disk-type pd-ssd \
+  --local-ssd=interface=NVME
   --boot-disk-size=200GB \
   --machine-type=${MACHINE_TYPE} \
   --metadata-from-file ssh-keys="${CLUSTER_PROFILE_DIR}/ssh-publickey" \
