@@ -45,9 +45,6 @@ else
   exit 1
 fi
 
-# Init env
-rosa init
-
 # Check whether the cluster with the same cluster name existes.
 OLD_CLUSTER=$(rosa list clusters | { grep  ${CLUSTER_NAME} || true; })
 if [[ ! -z "$OLD_CLUSTER" ]]; then
