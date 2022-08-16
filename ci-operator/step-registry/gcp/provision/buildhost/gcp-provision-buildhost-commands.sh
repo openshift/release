@@ -55,7 +55,7 @@ if [[ -z "${NETWORK}" || -z "${CONTROL_PLANE_SUBNET}" ]]; then
   echo "Could not find VPC network and control-plane subnet" && exit 1
 fi
 ZONE_0=$(gcloud compute regions describe ${REGION} --format=json | jq -r .zones[0] | cut -d "/" -f9)
-MACHINE_TYPE="c2-standard-8"
+MACHINE_TYPE="c2-standard-16"
 
 #####################################
 ##########Create server_#############
