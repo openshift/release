@@ -57,6 +57,7 @@ on_exit(){
 trap "on_exit; exit;" EXIT
 
 set -xe
+dnf install subscription-manager -y
 subscription-manager repos --enable rhocp-4.10-for-rhel-8-x86_64-rpms
 dnf install -y cri-o cri-tools firewalld
 systemctl enable crio --now
