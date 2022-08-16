@@ -37,7 +37,6 @@ gcloud compute firewall-rules create "${INSTANCE_PREFIX}" \
   --network "${INSTANCE_PREFIX}" \
   --allow tcp:22,icmp
 
-# TODO: make this rhel8, need subscription
 gcloud compute instances create "${INSTANCE_PREFIX}" \
   --image=rhel-8-v20220719 \
   --image-project=rhel-cloud \
