@@ -16,10 +16,10 @@ cp /secrets/ci-pull-secret/.dockercfg "$HOME/.pull-secret.json" || {
 
 # Determine pull specs for release images
 release_amd64="$(oc get configmap/release-release-images-latest -o yaml \
-    | /tmp/yq '.data."release-images-latest.yaml"' \
+    | yq '.data."release-images-latest.yaml"' \
     | jq -r '.metadata.name')"
 release_arm64="$(oc get configmap/release-release-images-arm64-latest -o yaml \
-    | /tmp/yq '.data."release-images-arm64-latest.yaml"' \
+    | yq '.data."release-images-arm64-latest.yaml"' \
     | jq -r '.metadata.name')"
 
 pullspec_release_amd64="registry.ci.openshift.org/ocp/release:${release_amd64}"
