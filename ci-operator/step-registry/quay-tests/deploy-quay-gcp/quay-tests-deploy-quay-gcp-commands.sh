@@ -77,6 +77,8 @@ spec:
 EOF
 )
 
+echo "The Quay Operator subscription is $SUB"
+
 for _ in {1..60}; do
     CSV=$(oc -n quay-enterprise get subscription quay-operator -o jsonpath='{.status.installedCSV}' || true)
     if [[ -n "$CSV" ]]; then
