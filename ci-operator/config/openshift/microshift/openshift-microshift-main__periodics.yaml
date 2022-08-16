@@ -19,7 +19,7 @@ base_images:
     name: "4.10"
     namespace: ocp
     tag: tests
-  ubi8-minimal:
+  ubi-minimal:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
@@ -31,7 +31,7 @@ build_root:
 images:
 - dockerfile_literal: |
     # build
-    FROM ubi8-minimal as base
+    FROM ubi-minimal as base
     ENV YQ_URL=https://github.com/mikefarah/yq/releases/download/v4.26.1/yq_linux_amd64
     ENV YQ_HASH=9e35b817e7cdc358c1fcd8498f3872db169c3303b61645cc1faf972990f37582
     RUN echo -n "${YQ_HASH} -" > /tmp/sum.txt ; \
@@ -41,13 +41,13 @@ images:
         fi ; \
         chmod +x /tmp/yq
     # output
-    FROM ubi8-minimal
+    FROM ubi-minimal
     COPY --from=base /tmp/yq /usr/bin/yq
-  from: ubi8-minimal
+  from: ubi-minimal
   inputs:
-    ubi8-minimal:
+    ubi-minimal:
       as:
-      - ubi8-minimal
+      - ubi-minimal
   to: yq-cli
 - dockerfile_literal: |
     FROM src
