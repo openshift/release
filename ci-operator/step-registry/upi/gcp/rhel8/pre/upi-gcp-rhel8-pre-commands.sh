@@ -39,7 +39,7 @@ gcloud compute firewall-rules create "${INSTANCE_PREFIX}" \
 
 # TODO: make this rhel8, need subscription
 gcloud compute instances create "${INSTANCE_PREFIX}" \
-  --image-family=rhel-8 \
+  --image=rhel-8-v20220719 \
   --image-project=rhel-cloud \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   --machine-type e2-standard-8 \
