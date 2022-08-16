@@ -1,8 +1,8 @@
 base_images:
   base:
-    name: ubi-minimal
+    name: "4.7"
     namespace: ocp
-    tag: "8"
+    tag: base
   stolostron_builder_go1.18-linux:
     name: builder
     namespace: stolostron
@@ -19,19 +19,19 @@ images:
     stolostron_builder_go1.18-linux:
       as:
       - registry.ci.openshift.org/stolostron/builder:go1.18-linux
-  to: node-exporter
+  to: grafana
 promotion:
-  name: "2.6"
+  name: "2.7"
   namespace: stolostron
 releases:
   initial:
     integration:
-      name: "4.9"
+      name: "4.7"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.9"
+      name: "4.7"
       namespace: ocp
 resources:
   '*':
@@ -39,30 +39,33 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: test-unit
-  commands: make test
-  container:
-    from: src
-- as: test-e2e
-  commands: make test
-  container:
-    from: src
+- as: ocm-ci-rbac
+  steps:
+    workflow: ocm-ci-rbac
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: grafana
+    env:
+      IMAGE_REPO: grafana
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
 - as: publish
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: node-exporter
+      SOURCE_IMAGE_REF: grafana
     env:
-      IMAGE_REPO: node-exporter
+      IMAGE_REPO: grafana
       REGISTRY_ORG: stolostron
     test:
     - as: publish
       commands: |-
         export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
-        export SELF="make"
+        export SELF="make -f /opt/build-harness/Makefile.prow"
         export OSCI_PUBLISH_DELAY="0"
-        export OSCI_COMPONENT_NAME="node-exporter"
-        make osci/publish
+        export OSCI_COMPONENT_NAME="grafana"
+        make -f /opt/build-harness/Makefile.prow osci/publish
       credentials:
       - mount_path: /etc/github
         name: acm-cicd-github
@@ -74,6 +77,6 @@ tests:
           memory: 200Mi
     workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: release-2.6
+  branch: release-2.7
   org: stolostron
-  repo: node-exporter
+  repo: grafana
