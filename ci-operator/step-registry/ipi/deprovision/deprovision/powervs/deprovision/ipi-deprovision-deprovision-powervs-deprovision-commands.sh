@@ -1,8 +1,8 @@
 #!/bin/bash
 
 set -o nounset
-set -o errexit
-set -o pipefail
+set +o errexit
+set +o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
@@ -50,4 +50,5 @@ if [[ -s /tmp/installer/quota.json ]]; then
 	cp /tmp/installer/quota.json "${ARTIFACT_DIR}"
 fi
 
-exit "$ret"
+echo "Exiting with ret=${ret}"
+exit "${ret}"
