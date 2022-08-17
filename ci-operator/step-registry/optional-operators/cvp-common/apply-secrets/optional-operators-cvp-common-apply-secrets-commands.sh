@@ -70,9 +70,9 @@ CUSTOM_KUBEOBJECTS_PATH=${CUSTOM_KUBEOBJECTS_PATH:=/var/run/}
 # the following command lists all the kubeobjects mounted on CUSTOM_KUBEOBJECTS_PATH 
 # with prefix "custom-" and also package name within the name of the file.
 
-LIST_OF_KUBEOBJECTS=$(find "${CUSTOM_KUBEOBJECTS_PATH}${KEYWORD_CUSTOM_KUBEOBJECTS}${OO_PACKAGE}"* -type f -name kube_objects)
+LIST_OF_KUBEOBJECTS2=$(find "${CUSTOM_KUBEOBJECTS_PATH}${KEYWORD_CUSTOM_KUBEOBJECTS}${OO_PACKAGE}"* -type f -name kube_objects)
 
-for i in "${LIST_OF_KUBEOBJECTS[@]}"
+for i in "${LIST_OF_KUBEOBJECTS2[@]}"
 do
     echo "The following custom kubeobject has been found ! $i"
     oc apply -f "$CUSTOM_KUBEOBJECTS_PATH$i" -n "$OO_INSTALL_NAMESPACE"
