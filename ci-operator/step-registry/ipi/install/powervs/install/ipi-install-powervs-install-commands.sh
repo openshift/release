@@ -1,6 +1,8 @@
 #!/bin/bash
 
 set -o nounset
+set +o errexit
+set +o pipefail
 
 function populate_artifact_dir() {
   # https://bash.cyberciti.biz/bash-reference-manual/Programmable-Completion-Builtins.html
@@ -220,6 +222,13 @@ function init_ibmcloud() {
       /tmp/Bluemix_CLI/bin/ibmcloud plugin install ${I}
     done
 
+    hash file 2>/dev/null && file /tmp/Bluemix_CLI/bin/ibmcloud
+    echo "Checking ibmcloud version..."
+    if ! /tmp/Bluemix_CLI/bin/ibmcloud --version; then
+      echo "Error: /tmp/Bluemix_CLI/bin/ibmcloud is not working?"
+      exit 1
+    fi
+
     #PATH=${PATH}:/tmp/Bluemix_CLI/bin:/tmp/Bluemix_CLI/bin/ibmcloud
     PATH=${PATH}:/tmp/Bluemix_CLI/bin
   fi
@@ -227,7 +236,12 @@ function init_ibmcloud() {
   if [ ! -f /tmp/jq ]; then
     curl -L --output /tmp/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 && chmod +x /tmp/jq
 
-    /tmp/jq --version
+    hash file 2>/dev/null && file /tmp/jq
+    echo "Checking jq version..."
+    if ! /tmp/jq --version; then
+      echo "Error: /tmp/jq is not working?"
+      exit 1
+    fi
 
     #PATH=${PATH}:/tmp/:/tmp/jq
     PATH=${PATH}:/tmp
@@ -505,6 +519,8 @@ date "+%s" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 echo "POWERVS_REGION=${POWERVS_REGION}"
 echo "POWERVS_ZONE=${POWERVS_ZONE}"
 echo
+
+openshift-install version
 
 # Add ignition configs
 echo "DATE=$(date --utc '+%Y-%m-%dT%H:%M:%S%:z')"
