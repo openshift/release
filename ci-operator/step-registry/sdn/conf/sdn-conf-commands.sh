@@ -11,4 +11,4 @@ echo "   yq installed"
 
 echo "install-config.yaml"
 echo "-------------------"
-cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username"
+cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret"
