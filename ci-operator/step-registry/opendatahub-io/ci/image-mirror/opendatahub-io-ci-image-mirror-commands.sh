@@ -90,7 +90,7 @@ log "INFO Mirroring Image"
 log "    From   : $SOURCE_IMAGE_REF"
 log "    To     : $DESTINATION_IMAGE_REF"
 log "    Dry Run: $dry"
-oc image mirror "$SOURCE_IMAGE_REF" "$DESTINATION_IMAGE_REF" --dry-run=$dry || {
+oc image mirror $SOURCE_IMAGE_REF $DESTINATION_IMAGE_REF --dry-run=$dry || {
     log "ERROR Unable to mirror image"
     exit 1
 }
