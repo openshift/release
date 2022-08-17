@@ -1,13 +1,13 @@
 #!/bin/bash
 
 set -o nounset
-set -o errexit
-set -o pipefail
 
 function populate_artifact_dir() {
-  set +e
-  echo "Copying log bundle..."
-  cp "${dir}"/log-bundle-*.tar.gz "${ARTIFACT_DIR}/" 2>/dev/null
+  # https://bash.cyberciti.biz/bash-reference-manual/Programmable-Completion-Builtins.html
+  if compgen -G "${dir}/log-bundle-*.tar.gz" > /dev/null; then
+    echo "Copying log bundle..."
+    cp "${dir}"/log-bundle-*.tar.gz "${ARTIFACT_DIR}/" 2>/dev/null
+  fi
   echo "Removing REDACTED info from log..."
   sed '
     s/password: .*/password: REDACTED/;
@@ -32,7 +32,6 @@ function populate_artifact_dir() {
 }
 
 function prepare_next_steps() {
-  set +e
   #Save exit code for must-gather to generate junit
   echo "$?" > "${SHARED_DIR}/install-status.txt"
   echo "Setup phase finished, prepare env for next steps"
@@ -44,21 +43,21 @@ function prepare_next_steps() {
       "${dir}/auth/kubeconfig" \
       "${dir}/auth/kubeadmin-password" \
       "${dir}/metadata.json"
-
+  echo "Finished prepare_next_steps"
 }
 
 function log_to_file() {
-	local LOG_FILE=$1
+  local LOG_FILE=$1
 
-	/bin/rm -f ${LOG_FILE}
-	# Close STDOUT file descriptor
-	exec 1<&-
-	# Close STDERR FD
-	exec 2<&-
-	# Open STDOUT as $LOG_FILE file for read and write.
-	exec 1<>${LOG_FILE}
-	# Redirect STDERR to STDOUT
-	exec 2>&1
+  /bin/rm -f ${LOG_FILE}
+  # Close STDOUT file descriptor
+  exec 1<&-
+  # Close STDERR FD
+  exec 2<&-
+  # Open STDOUT as $LOG_FILE file for read and write.
+  exec 1<>${LOG_FILE}
+  # Redirect STDERR to STDOUT
+  exec 2>&1
 }
 
 function inject_promtail_service() {
@@ -210,10 +209,8 @@ EOF
 }
 
 function init_ibmcloud() {
-  set +e
-
   #install the tools required
-  cd /tmp
+  cd /tmp || exit 1
 
   if [ ! -f /tmp/IBM_CLOUD_CLI_amd64.tar.gz ]; then
     curl --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/2.9.0/IBM_Cloud_CLI_2.9.0_amd64.tar.gz
@@ -261,13 +258,9 @@ function init_ibmcloud() {
 
   CLOUD_INSTANCE_ID="$(echo ${SERVICE_INSTANCE_CRN} | cut -d: -f8)"
   export CLOUD_INSTANCE_ID
-
-  set -e
 }
 
 function check_resources() {
-  set +e
-
   #This function checks for any remaining DHCP leases/leftover/uncleaned resources and cleans them up before installing a new cluster
   echo "Check resource phase initiated"
 
@@ -310,9 +303,6 @@ function check_resources() {
 }
 
 function destroy_resources() {
-
-  set +e
-
   #
   # TODO: Remove after infra bugs are fixed
   # TO confirm resources are cleared properly
@@ -375,14 +365,9 @@ EOF
       break
     fi
   done
-
-  set -e
 }
 
 function dump_resources() {
-
-  set +e
-
   init_ibmcloud
 
   INFRA_ID=$(jq -r '.infraID' ${dir}/metadata.json)
@@ -451,11 +436,7 @@ function dump_resources() {
   echo "8<--------8<--------8<--------8<-------- DONE! 8<--------8<--------8<--------8<--------"
 
   egrep '(Creation complete|level=error|: [0-9ms]*")' ${dir}/.openshift_install.log > ${SHARED_DIR}/installation_stats.log
-
-  set -e
 }
-
-set -euo pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 trap 'prepare_next_steps' EXIT TERM
@@ -639,4 +620,5 @@ if test "${ret}" -eq 0 ; then
   echo "https://$(env KUBECONFIG=${dir}/auth/kubeconfig oc -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > "${SHARED_DIR}/console.url"
 fi
 
-exit "$ret"
+echo "Exiting with ret=${ret}"
+exit "${ret}"
