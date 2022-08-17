@@ -31,7 +31,7 @@ cat > gather_logs.yaml <<-EOF
         ansible.builtin.shell: |
           source /root/config.sh
           # Get sosreport including sar data
-          sos report --batch --tmp-dir {{ LOGS_DIR }} \
+          sos report --batch --tmp-dir {{ LOGS_DIR }} --all-logs \
             -o memory,container_log,filesys,kvm,libvirt,logs,networkmanager,networking,podman,processor,rpm,sar,virsh,yum \
             -k podman.all -k podman.logs
       - name: Copy libvirt qemu log
