@@ -1,0 +1,72 @@
+base_images:
+  base:
+    name: "4.11"
+    namespace: ocp
+    tag: base
+  cli:
+    name: "4.11"
+    namespace: ocp
+    tag: cli
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.11"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: aws-msp-osd-4-11
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-osd-msp
+    dependency_overrides:
+      BUNDLE_IMAGE: brew.registry.redhat.io/rh-osbs-stage/e2e-e2e-test-operator-bundle-container:8.0-11
+      OO_INDEX: brew.registry.redhat.io/rh-osbs-stage/iib:40523
+    env:
+      CLUSTER_DURATION: "10800"
+      CLUSTER_VERSION: "4.11"
+      COMPUTE_NODES: "3"
+      CUSTOM_SCORECARD_TESTCASE: ""
+      OO_CHANNEL: "4.3"
+      OO_INSTALL_NAMESPACE: '!create'
+      OO_PACKAGE: e2e-test-operator
+      OO_TARGET_NAMESPACES: '!install'
+      PYXIS_URL: ""
+      TEST_MODE: msp
+    post:
+    - as: gather-must-gather
+      best_effort: true
+      commands: |
+        curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/must-gather/gather-must-gather-commands.sh | /bin/bash -s
+      from: cli
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 300m
+          memory: 300Mi
+      timeout: 30m0s
+    - ref: gather-extra
+    - ref: gather-audit-logs
+    - ref: osd-delete-delete
+    pre:
+    - ref: ipi-install-rbac
+    - ref: osd-create-create
+    - ref: optional-operators-configure-proxy-registry
+    - ref: optional-operators-cvp-common-apply-secrets
+    - ref: optional-operators-subscribe
+    test:
+    - ref: optional-operators-cvp-common-scorecard
+    - ref: optional-operators-cvp-common-test
+zz_generated_metadata:
+  branch: osd-4.11
+  org: redhat-openshift-ecosystem
+  repo: msp

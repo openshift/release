@@ -56,7 +56,7 @@ images:
       - registry.ci.openshift.org/stolostron/builder:go1.18-linux
   to: grafana-dashboard-loader
 promotion:
-  name: "2.6"
+  name: "2.7"
   namespace: stolostron
 releases:
   initial:
@@ -77,6 +77,49 @@ resources:
       memory: 1Gi
 test_binary_build_commands: "true"
 tests:
+- as: ocm-ci-rbac
+  steps:
+    workflow: ocm-ci-rbac
+- as: pr-image-mirror-multicluster-observability-operator
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: multicluster-observability-operator
+    env:
+      IMAGE_REPO: multicluster-observability-operator
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: pr-image-mirror-bac-query-proxy
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: rbac-query-proxy
+    env:
+      IMAGE_REPO: rbac-query-proxy
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: pr-image-mirror-endpoint-monitoring-operator
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: endpoint-monitoring-operator
+    env:
+      IMAGE_REPO: endpoint-monitoring-operator
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: pr-image-mirror-grafana-dashboard-loader
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: grafana-dashboard-loader
+    env:
+      IMAGE_REPO: grafana-dashboard-loader
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: pr-image-mirror-metrics-collector
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: metrics-collector
+    env:
+      IMAGE_REPO: metrics-collector
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
 - as: test-unit
   commands: |
     export SELF="make"
@@ -128,6 +171,7 @@ tests:
     dependencies:
       COMPONENT_IMAGE_REF: multicluster-observability-operator
     env:
+      ACM_RELEASE_VERSION: release-2.6
       CLUSTERPOOL_GROUP_NAME: Core-Services
       CLUSTERPOOL_HOST_NAMESPACE: acm-observability-china
       CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-obs-china-clusterpool
@@ -203,7 +247,7 @@ tests:
   postsubmit: true
   steps:
     env:
-      DESTINATION_BRANCH: release-2.6
+      DESTINATION_BRANCH: release-2.7
     workflow: ocm-ci-fastforward
 zz_generated_metadata:
   branch: main

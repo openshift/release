@@ -1,9 +1,42 @@
+base_images:
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.46.0
+  ocp_4.11_base:
+    name: "4.11"
+    namespace: ocp
+    tag: base
+  ocp_builder_rhel-8-golang-1.18-openshift-4.11:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.18-openshift-4.11
+  ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.18-openshift-4.12
 binary_build_commands: make manager
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: golang-1.18
+images:
+- dockerfile_path: Dockerfile
+  inputs:
+    ocp_4.11_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.11:base
+    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
+  to: kernel-module-management
+- dockerfile_path: Dockerfile.must-gather
+  to: kernel-module-management-must-gather
+promotion:
+  namespace: edge-infrastructure
+  tag: latest
+  tag_by_commit: true
 resources:
   '*':
     limits:
@@ -15,12 +48,13 @@ tests:
 - as: unit-tests
   commands: ci/prow/unit-tests
   container:
-    from: src
+    clone: true
+    from: ocp_builder_rhel-8-golang-1.18-openshift-4.12
 - as: lint
   commands: ci/prow/lint
   container:
-    from: src
-  optional: true
+    clone: true
+    from: golangci-lint
 zz_generated_metadata:
   branch: main
   org: rh-ecosystem-edge

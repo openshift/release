@@ -100,6 +100,16 @@ def get_rc_volumes(context, namespace=None):
                     },
                     {
                         'configMap': {
+                            'name': 'job-config-1.x'
+                        }
+                    },
+                    {
+                        'configMap': {
+                            'name': 'job-config-2.x'
+                        }
+                    },
+                    {
+                        'configMap': {
                             'name': 'job-config-3.x'
                         }
                     },
