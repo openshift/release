@@ -4,6 +4,7 @@ temp=$(mktemp -d -t ocm-XXXXX)
 cd $temp || exit 1
 
 export OS=${OS:-uname -s | tr '[:upper:]' '[:lower:]'}
+export BUILD_HARNESS_OS=${BUILD_HARNESS_OS:-$OS}
 
 cp "$MAKEFILE" ./Makefile
 
