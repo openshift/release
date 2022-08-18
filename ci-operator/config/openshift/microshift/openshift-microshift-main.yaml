@@ -18,49 +18,28 @@ build_root:
     tag: rhel-8-release-golang-1.17-openshift-4.10
 images:
 - dockerfile_literal: |
-    FROM libvirt-installer
-    USER root
-    ADD validate-microshift /tmp/
-    COPY microshift-containerized.service /tmp/microshift-containerized.service
-    RUN bash -c 'sed -i "s/autoupdate=registry/autoupdate=local/g" /tmp/microshift-containerized.service'
-    COPY microshift.conf /tmp/microshift.conf
-    COPY oc /usr/bin/oc
-    COPY openshift-tests /usr/bin/openshift-tests
-  from: libvirt-installer
-  inputs:
-    cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-    src:
-      paths:
-      - destination_dir: validate-microshift
-        source_path: /go/src/github.com/openshift/microshift/validate-microshift/
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/microshift/packaging/systemd/microshift-containerized.service
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/microshift/packaging/crio.conf.d/microshift.conf
-    test-bin:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/openshift-tests
-  to: microshift-test-binaries
-- dockerfile_literal: |
-    FROM registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.17-openshift-4.10 as builder
+    FROM src
     RUN dnf install --setopt=tsflags=nodocs -y \
-        rpm-build glibc-static gcc selinux-policy-devel util-linux && \
-        dnf clean all && \
-        rm -rf /var/cache/dnf/*
-    RUN ls -lA
+          selinux-policy-devel util-linux && \
+          dnf clean all && \
+          rm -rf /var/cache/dnf/*
     RUN make rpm
+  to: rpm
+  inputs:
+    src:
+      as:
+      - src
+- dockerfile_literal: |
     FROM libvirt-installer
+    WORKDIR /opt/microshift-rpms
     USER root
     ENV HOME=/tmp/secret
     ENV PAYLOAD_PATH=$HOME/payload
     WORKDIR $PAYLOAD_PATH
     COPY oc openshift-tests usr/bin/
     RUN chmod 755 usr/bin/oc && ln -rs usr/bin/oc usr/bin/kubectl
-    COPY --from=builder /go/src/github.com/openshift/microshift/_output/rpmbuild/RPMS/*/*.rpm packages/
+    COPY RPMS/*/*.rpm packages/
+    COPY validate-microshift /tmp/validate-microshift/
     RUN tar -cvf payload.tar . && chmod -R a+rw "${HOME}"
   inputs:
     cli:
@@ -70,9 +49,14 @@ images:
     libvirt-installer:
       as:
       - libvirt-installer
-    src:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.17-openshift-4.10
+    rpm:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/microshift/packaging/rpm/_rpmbuild/RPMS
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/microshift/packaging/crio.conf.d/microshift.conf
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/microshift/validate-microshift
     test-bin:
       paths:
       - destination_dir: .
