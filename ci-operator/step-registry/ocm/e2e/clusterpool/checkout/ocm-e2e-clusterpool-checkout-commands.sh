@@ -3,8 +3,13 @@
 temp=$(mktemp -d -t ocm-XXXXX)
 cd $temp || exit 1
 
-echo "==== BUILD_HARNESS_OS: ${BUILD_HARNESS_OS}"
-
+if [[ -z "$BUILD_HARNESS_OS" ]] ; then
+  echo "=== BUILD_HARNESS_OS NOT SET!!!"
+  export BUILD_HARNESS_OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+  echo "=== NOW SET TO BUILD_HARNESS_OS: ${BUILD_HARNESS_OS}"
+else
+  echo "=== BUILD_HARNESS_OS already set to: ${BUILD_HARNESS_OS}"    
+fi
 
 cp "$MAKEFILE" ./Makefile
 
