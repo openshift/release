@@ -9,7 +9,7 @@ PYXIS_URL="${PYXIS_URL:-""}"
 # The namespace into which the operator and catalog will be
 # installed. Special value `!create` means that a new namespace will be created.
 OO_INSTALL_NAMESPACE="${OO_INSTALL_NAMESPACE:-$REHEARSAL_INSTALL_NAMESPACE}"
-OO_PACKAGE="${OO_PACKAGE:-""}"
+OO_PACKAGE="${OO_PACKAGE:-"cpaas-test-operator-bundle"}"
 
 echo "Creating a new NAMESPACE"
 if [[ "$OO_INSTALL_NAMESPACE" == "!create" ]]; then
@@ -70,10 +70,33 @@ CUSTOM_KUBEOBJECTS_PATH="${CUSTOM_KUBEOBJECTS_PATH:=/var/run/}"
 # the following command lists all the kubeobjects mounted on CUSTOM_KUBEOBJECTS_PATH 
 # with prefix "custom-" and also package name within the name of the file.
 
-LIST_OF_KUBEOBJECTS=$(find "${CUSTOM_KUBEOBJECTS_PATH}${KEYWORD_CUSTOM_KUBEOBJECTS}${OO_PACKAGE}"* -type f -name kube_objects)
+echo "The following variables are being used:"
+echo "custom kubeobjects path: ${CUSTOM_KUBEOBJECTS_PATH}"
+echo "keyword_custom_kubeobjects: ${KEYWORD_CUSTOM_KUBEOBJECTS}"
+echo "The OO_package : ${OO_PACKAGE}"
 
-for i in "${LIST_OF_KUBEOBJECTS[@]}"
-do
-    echo "The following custom kubeobject has been found ! $i"
-    oc apply -f "$i" -n "$OO_INSTALL_NAMESPACE" 
-done
+CUSTOM_KUBEOBJECTS_PATH="${CUSTOM_KUBEOBJECTS_PATH}${KEYWORD_CUSTOM_KUBEOBJECTS}${OO_PACKAGE}"
+
+# check if the directory exists or not in first place 
+# if not send message and gracefully exit.
+
+if [ ! -d "${CUSTOM_KUBEOBJECTS_PATH}" ]
+then
+    echo "Directory ${CUSTOM_KUBEOBJECTS_PATH} DOES NOT exists."
+    echo "Please check the vault"
+    echo "The following step gracefully exits now"
+    exit 0 
+else
+    echo "The ${CUSTOM_KUBEOBJECTS_PATH} found "
+    echo "We find the kube_objects files inside path"
+    LIST_OF_KUBEOBJECTS=$(find "${CUSTOM_KUBEOBJECTS_PATH}${KEYWORD_CUSTOM_KUBEOBJECTS}${OO_PACKAGE}"* -type f -name kube_objects)
+    # checks if we found any custom kube objects in the respective paths
+    if [ ${#LIST_OF_KUBEOBJECTS[@]} -gt 0 ] && [ -n "${LIST_OF_KUBEOBJECTS[0]}" ] ; then
+        for i in "${LIST_OF_KUBEOBJECTS[@]}"
+        do
+            echo "The following custom kubeobject has been found ! $i"
+            echo "Applying kube_objects on to the Namespace $OO_INSTALL_NAMESPACE"
+            oc apply -f "$i" -n "$OO_INSTALL_NAMESPACE"
+        done
+    fi
+fi
