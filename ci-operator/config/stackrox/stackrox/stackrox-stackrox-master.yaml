@@ -304,14 +304,28 @@ tests:
   steps:
     test:
     - ref: stackrox-e2e
-- as: openshift-4-operator-e2e-tests
+- as: openshift-oldest-operator-e2e-tests
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 5h0m0s
-    version: "4.8"
+    version: "4.6"
+  optional: true
+  run_if_changed: ^((generated|image|operator|pkg|make|deploy|scripts)/.*|Makefile|status\.sh|EXPECTED_GO_VERSION)
+  steps:
+    test:
+    - ref: stackrox-e2e
+  timeout: 5h0m0s
+- as: openshift-newest-operator-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 5h0m0s
+    version: "4.11"
   optional: true
   run_if_changed: ^((generated|image|operator|pkg|make|deploy|scripts)/.*|Makefile|status\.sh|EXPECTED_GO_VERSION)
   steps:
@@ -530,14 +544,27 @@ tests:
   steps:
     test:
     - ref: stackrox-e2e
-- as: merge-openshift-4-operator-e2e-tests
+- as: merge-openshift-oldest-operator-e2e-tests
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 5h0m0s
-    version: "4.8"
+    version: "4.6"
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+  timeout: 5h0m0s
+- as: merge-openshift-newest-operator-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 5h0m0s
+    version: "4.11"
   postsubmit: true
   steps:
     test:
