@@ -1,14 +1,14 @@
 base_images:
   base:
-    name: "4.11"
+    name: "4.12"
     namespace: ocp
     tag: base
 binary_build_commands: make build
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.18-openshift-4.12
 images:
 - dockerfile_path: Dockerfile
   from: base
@@ -24,7 +24,7 @@ releases:
     candidate:
       product: ocp
       stream: ci
-      version: "4.11"
+      version: "4.12"
 resources:
   '*':
     requests:
@@ -32,6 +32,7 @@ resources:
       memory: 1000Mi
 tests:
 - as: openshift-e2e
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
     env:

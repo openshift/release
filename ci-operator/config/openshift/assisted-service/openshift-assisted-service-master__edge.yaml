@@ -154,6 +154,18 @@ images:
     openshift_release_golang-1.17:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.17
+  to: assisted-service-build-base
+- dockerfile_literal: |
+    FROM base-build
+    COPY . .
+  inputs:
+    assisted-service-build-base:
+      as:
+      - base-build
+    src:
+      paths:
+      - destination_dir: ./
+        source_path: /go/src/github.com/openshift/assisted-service/.
   to: assisted-service-build
 - dockerfile_path: Dockerfile.assisted-service
   inputs:
@@ -233,7 +245,7 @@ tests:
     test:
     - ref: assisted-publish-python-client
 - as: mirror-nightly-image
-  cron: '@daily'
+  cron: 56 10 */7 * *
   steps:
     dependencies:
       SOURCE_IMAGE_REF: assisted-service
@@ -342,7 +354,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.10"
-  cron: 0 */6 * * *
+  cron: 3 22 */7 * *
   steps:
     allow_best_effort_post_steps: true
     test:
@@ -409,7 +421,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.10"
-  cron: 0 */6 * * *
+  cron: 27 23 */7 * *
   steps:
     allow_best_effort_post_steps: true
     test:
@@ -444,7 +456,7 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-periodic
-  cron: '@daily'
+  cron: 13 11 */7 * *
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -465,7 +477,7 @@ tests:
       NUM_EXTRA_WORKERS: "3"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-3masters-periodic
-  cron: '@daily'
+  cron: 7 20 */7 * *
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -489,7 +501,7 @@ tests:
       IP_STACK: v6
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-disconnected-periodic
-  cron: '@daily'
+  cron: 9 4 */7 * *
   steps:
     cluster_profile: packet-assisted
     env:
@@ -509,7 +521,7 @@ tests:
       NUM_EXTRA_WORKERS: "2"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-sno-day2-workers-periodic
-  cron: '@daily'
+  cron: 23 2 */7 * *
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -535,7 +547,7 @@ tests:
       NUM_EXTRA_WORKERS: "2"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-sno-day2-workers-late-binding-periodic
-  cron: '@daily'
+  cron: 35 21 */7 * *
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -595,7 +607,7 @@ tests:
       IP_STACK: v4v6
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-ipv4v6-sno-ocp-410-periodic
-  cron: '@daily'
+  cron: 30 2 */7 * *
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -632,7 +644,7 @@ tests:
       NUM_EXTRA_WORKERS: "3"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-ipv4v6-3masters-ocp-410-periodic
-  cron: '@daily'
+  cron: 4 9 */7 * *
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -655,7 +667,7 @@ tests:
       ALLOW_CONVERGED_FLOW: "True"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-converged-periodic
-  cron: '@daily'
+  cron: 5 14 */7 * *
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -869,7 +881,7 @@ tests:
         make deploy_assisted_operator test_kube_api_parallel
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-kube-api-late-binding-single-node-periodic
-  cron: '@daily'
+  cron: 38 17 */7 * *
   steps:
     cluster_profile: packet-assisted
     env:

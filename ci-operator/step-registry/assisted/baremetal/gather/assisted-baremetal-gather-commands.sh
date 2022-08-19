@@ -34,6 +34,9 @@ trap getlogs EXIT
 echo "### Gathering logs..."
 timeout -s 9 30m ssh "${SSHOPTS[@]}" "root@${IP}" bash - <<EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
 
+# prepending each printed line with a timestamp
+exec > >(awk '{ print strftime("[%Y-%m-%d %H:%M:%S]"), \$0 }') 2>&1
+
 set -xeuo pipefail
 cd /home/assisted
 source /root/config

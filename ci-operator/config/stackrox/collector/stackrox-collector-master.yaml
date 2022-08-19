@@ -28,12 +28,9 @@ images:
   to: collector-builder
 - dockerfile_path: .openshift-ci/build/Dockerfile.build_collector
   from: collector-builder
-  to: collector
-- dockerfile_path: .openshift-ci/build/Dockerfile.drivers
-  from: collector
-  to: collector-drivers
+  to: collector-binary
 - dockerfile_path: .openshift-ci/build/Dockerfile.create_bundle
-  from: collector-drivers
+  from: collector-binary
   to: collector-bundle
 - build_args:
   - name: ROOT_DIR
@@ -46,6 +43,16 @@ images:
       paths:
       - destination_dir: .
         source_path: /go/src/github.com/stackrox/collector/.
+  to: collector-slim
+- context_dir: .
+  dockerfile_path: .openshift-ci/build/Dockerfile.latest
+  inputs:
+    collector-slim:
+      as:
+      - replaced-by-osci:collector-slim
+    drivers:
+      as:
+      - replaced-by-osci:drivers
   to: collector-full
 - context_dir: .openshift-ci
   dockerfile_path: jobs/integration-tests/Dockerfile
@@ -248,6 +255,8 @@ tests:
         name: stackrox-stackrox-push
         namespace: test-credentials
       dependencies:
+      - env: COLLECTOR_SLIM
+        name: collector-slim
       - env: COLLECTOR_FULL
         name: collector-full
       from: src
@@ -344,6 +353,8 @@ tests:
         name: stackrox-stackrox-push
         namespace: test-credentials
       dependencies:
+      - env: COLLECTOR_SLIM
+        name: collector-slim
       - env: COLLECTOR_FULL
         name: collector-full
       from: src

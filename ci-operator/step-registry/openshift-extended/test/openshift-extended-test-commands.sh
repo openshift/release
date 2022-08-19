@@ -239,8 +239,10 @@ function run {
     # it ensure the the step after this step in test will be executed per https://docs.ci.openshift.org/docs/architecture/step-registry/#workflow
     # please refer to the junit result for case result, not depends on step result.
     if [ "W${FORCE_SUCCESS_EXIT}W" == "WnoW" ]; then
+        echo "force success exit"
         exit 1
     fi
+    echo "normal exit"
     exit 0
 }
 

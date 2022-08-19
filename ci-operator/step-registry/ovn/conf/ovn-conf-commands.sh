@@ -10,7 +10,7 @@ touch "${SHARED_DIR}/install-config.yaml"
 
 echo "install-config.yaml"
 echo "-------------------"
-cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username"
+cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret"
 
 if [[ ! -z "${GATEWAY_MODE}" ]]; then
   echo "Overriding OVN gateway mode with \"${GATEWAY_MODE}\""

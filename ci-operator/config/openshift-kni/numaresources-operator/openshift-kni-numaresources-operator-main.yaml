@@ -106,6 +106,27 @@ tests:
           cpu: 500m
           memory: 1Gi
     workflow: optional-operators-ci-aws
+- as: ci-must-gather-e2e
+  cron: 42 0 * * *
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: openshift-numaresources
+      OO_PACKAGE: numaresources-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: must-gather-e2e-test
+      cli: latest
+      commands: make test-must-gather-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-aws
 zz_generated_metadata:
   branch: main
   org: openshift-kni

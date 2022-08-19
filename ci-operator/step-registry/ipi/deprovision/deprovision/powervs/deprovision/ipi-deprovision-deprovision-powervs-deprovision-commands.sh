@@ -1,8 +1,8 @@
 #!/bin/bash
 
 set -o nounset
-set -o errexit
-set -o pipefail
+set +o errexit
+set +o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
@@ -31,14 +31,17 @@ echo "Running the Installer's 'destroy cluster' command..."
 OPENSHIFT_INSTALL_REPORT_QUOTA_FOOTPRINT="true"; export OPENSHIFT_INSTALL_REPORT_QUOTA_FOOTPRINT
 # TODO: Remove after infra bugs are fixed 
 # TO confirm resources are cleared properly
+set +e
 for i in {1..3}; do 
   echo "Destroying cluster $i attempt..."
+  echo "DATE=$(date --utc '+%Y-%m-%dT%H:%M:%S%:z')"
   openshift-install --dir /tmp/installer destroy cluster 
+  ret="$?"
+  echo "ret=${ret}"
+  if [ ${ret} -eq 0 ]; then
+    break
+  fi
 done
-
-set +e
-wait "$!"
-ret="$?"
 set -e
 
 echo "Copying the Installer logs to the artifacts directory..."
@@ -47,4 +50,5 @@ if [[ -s /tmp/installer/quota.json ]]; then
 	cp /tmp/installer/quota.json "${ARTIFACT_DIR}"
 fi
 
-exit "$ret"
+echo "Exiting with ret=${ret}"
+exit "${ret}"
