@@ -6,6 +6,14 @@ set -o pipefail
 
 echo "************ baremetalds packet setup command ************"
 
+function send_slack(){
+    echo Packet setup failed: $1
+    SLACK_AUTH_TOKEN="T027F3GAJ/B011TAG710V/$(cat $CLUSTER_PROFILE_DIR/slackhook)"
+
+    curl -X POST --data "payload={\"text\":\"<https://prow.ci.openshift.org/view/gs/origin-ci-test/logs/$JOB_NAME/$BUILD_ID|Packet setup failed> $1\n\"}" \
+        "https://hooks.slack.com/services/${SLACK_AUTH_TOKEN}"
+}
+
 function exit_with_success(){
   cat >"${ARTIFACT_DIR}/junit_metal_setup.xml" <<EOF
   <testsuite name="metal infra" tests="1" failures="0">
@@ -216,15 +224,6 @@ cat > packet-setup.yaml <<-EOF
         content="{{ hosts }}"
         dest="${SHARED_DIR}/hosts.json"
 EOF
-
-function send_slack(){
-    echo Packet setup failed: $1
-    SLACK_AUTH_TOKEN="T027F3GAJ/B011TAG710V/$(cat $CLUSTER_PROFILE_DIR/slackhook)"
-
-    curl -X POST --data "payload={\"text\":\"<https://prow.ci.openshift.org/view/gs/origin-ci-test/logs/$JOB_NAME/$BUILD_ID|Packet setup failed> $1\n\"}" \
-        "https://hooks.slack.com/services/${SLACK_AUTH_TOKEN}"
-}
-
 
 ansible-playbook packet-setup.yaml -e "packet_hostname=ipi-${NAMESPACE}-${JOB_NAME_HASH}-${BUILD_ID}"  |& gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0; fflush(); }'
 
