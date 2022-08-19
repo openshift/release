@@ -31,7 +31,7 @@ echo "target_release_image_repo: $target_release_image_repo"
 readable_version=$(oc adm release info "${RELEASE_IMAGE_LATEST}" --output=json | jq .metadata.version)
 echo "readable_version: $readable_version"
 
-echo "kubeconfig: $KUBECONFIG"
+unset KUBECONFIG
 oc registry login --loglevel 9
 
 # combine custom registry credential and default pull secret
