@@ -9,7 +9,10 @@ set -o pipefail
 # incoming connections, firewall rules, etc.
 oc -n openshift-machine-api get secret "${WINDOWS_USER_DATA_SECRET}"
 
-REGION="${LEASED_RESOURCE}"
+# config AWS profile
+export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+export REGION="${LEASED_RESOURCE}"
+
 # get most recent AMI ID for Windows Server
 ami_id=$(aws ec2 describe-images \
   --region "${REGION}" \

@@ -1,4 +1,16 @@
 base_images:
+  eks:
+    name: automation-flavors
+    namespace: stackrox
+    tag: eks-0.3.1
+  golang-1.17.2:
+    name: golang
+    namespace: stackrox
+    tag: 1.17.2
+  osd:
+    name: automation-flavors
+    namespace: stackrox
+    tag: osd-0.3.6
   ubi:
     name: ubi
     namespace: ocp
@@ -66,12 +78,13 @@ images:
         source_path: /go/src/github.com/stackrox/stackrox/docs/.
   to: docs
 - build_args:
-  - name: GO_VERSION
-    value: 1.17.2
   - name: ROX_IMAGE_FLAVOR
     value: development_build
   dockerfile_path: operator/Dockerfile
   inputs:
+    golang-1.17.2:
+      as:
+      - golang:1.17.2
     operator-artifacts:
       paths:
       - destination_dir: .
@@ -125,14 +138,14 @@ resources:
       memory: 4000Mi
 test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
 tests:
-- as: merge-push-and-release
+- as: push-and-release
   postsubmit: true
   steps:
     test:
     - as: push
       commands: .openshift-ci/dispatch.sh push-images "RHACS_BRANDING"
       credentials:
-      - mount_path: /tmp/secret/stackrox-stackrox-push
+      - mount_path: /tmp/vault/stackrox-stackrox-push
         name: stackrox-stackrox-push
         namespace: test-credentials
       dependencies:
@@ -146,6 +159,12 @@ tests:
         name: docs
       - env: MAIN_RCD_IMAGE
         name: main-rcd
+      - env: OPERATOR_IMAGE
+        name: operator-controller
+      - env: OPERATOR_BUNDLE_IMAGE
+        name: operator-bundle
+      - env: OPERATOR_BUNDLE_INDEX_MAGE
+        name: operator-bundle-index
       from: src
       resources:
         requests:
@@ -154,7 +173,7 @@ tests:
     - as: release-mgmt
       commands: .openshift-ci/dispatch.sh release-mgmt
       credentials:
-      - mount_path: /tmp/secret/stackrox-stackrox-push
+      - mount_path: /tmp/vault/stackrox-stackrox-push
         name: stackrox-stackrox-push
         namespace: test-credentials
       from: test-bin
@@ -162,29 +181,29 @@ tests:
         requests:
           cpu: 2000m
           memory: 4000Mi
-- as: merge-style-checks
+- as: style-checks
   postsubmit: true
   steps:
     test:
     - ref: stackrox-initial
-- as: merge-policy-checks
+- as: policy-checks
   postsubmit: true
   steps:
     test:
     - ref: stackrox-initial
-- as: merge-mitre-bundles-checks
+- as: mitre-bundles-checks
   postsubmit: true
   steps:
     test:
     - ref: stackrox-initial
-- as: merge-grouped-static-checks
+- as: grouped-static-checks
   postsubmit: true
   steps:
     test:
-    - as: merge-check-generated
+    - as: check-generated
       commands: .openshift-ci/dispatch.sh check-generated
       credentials:
-      - mount_path: /tmp/secret/stackrox-stackrox-initial
+      - mount_path: /tmp/vault/stackrox-stackrox-initial
         name: stackrox-stackrox-initial
         namespace: test-credentials
       from: src
@@ -192,10 +211,10 @@ tests:
         requests:
           cpu: 2000m
           memory: 4000Mi
-    - as: merge-check-todos
+    - as: check-todos
       commands: .openshift-ci/dispatch.sh check-todos
       credentials:
-      - mount_path: /tmp/secret/stackrox-stackrox-initial
+      - mount_path: /tmp/vault/stackrox-stackrox-initial
         name: stackrox-stackrox-initial
         namespace: test-credentials
       from: src
@@ -203,10 +222,10 @@ tests:
         requests:
           cpu: 2000m
           memory: 4000Mi
-    - as: merge-check-pr-fixes
+    - as: check-pr-fixes
       commands: .openshift-ci/dispatch.sh check-pr-fixes
       credentials:
-      - mount_path: /tmp/secret/stackrox-stackrox-initial
+      - mount_path: /tmp/vault/stackrox-stackrox-initial
         name: stackrox-stackrox-initial
         namespace: test-credentials
       from: src
@@ -214,37 +233,37 @@ tests:
         requests:
           cpu: 2000m
           memory: 4000Mi
-- as: merge-go-unit-tests
+- as: go-unit-tests
   postsubmit: true
   steps:
     test:
     - ref: stackrox-initial
-- as: merge-go-unit-tests-release
+- as: go-unit-tests-release
   postsubmit: true
   steps:
     test:
     - ref: stackrox-initial
-- as: merge-go-postgres-tests
+- as: go-postgres-tests
   postsubmit: true
   steps:
     test:
     - ref: stackrox-initial
-- as: merge-integration-unit-tests
+- as: integration-unit-tests
   postsubmit: true
   steps:
     test:
     - ref: stackrox-initial
-- as: merge-shell-unit-tests
+- as: shell-unit-tests
   postsubmit: true
   steps:
     test:
     - ref: stackrox-initial
-- as: merge-ui-unit-tests
+- as: ui-unit-tests
   postsubmit: true
   steps:
     test:
     - ref: stackrox-initial
-- as: merge-gke-qa-e2e-tests
+- as: gke-qa-e2e-tests
   postsubmit: true
   steps:
     env:
@@ -252,7 +271,7 @@ tests:
     test:
     - ref: stackrox-e2e
   timeout: 5h0m0s
-- as: merge-openshift-4-qa-e2e-tests
+- as: openshift-4-qa-e2e-tests
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -267,68 +286,83 @@ tests:
     test:
     - ref: stackrox-e2e
   timeout: 5h0m0s
-- as: merge-gke-ui-e2e-tests
+- as: gke-ui-e2e-tests
   postsubmit: true
   steps:
     test:
     - ref: stackrox-e2e
   timeout: 5h0m0s
-- as: merge-gke-nongroovy-e2e-tests
+- as: gke-nongroovy-e2e-tests
   postsubmit: true
   steps:
     test:
     - ref: stackrox-e2e
-- as: merge-gke-kernel-qa-e2e-tests
-  postsubmit: true
-  steps:
-    test:
-    - ref: stackrox-e2e
-  timeout: 5h0m0s
-- as: merge-gke-upgrade-tests
-  postsubmit: true
-  steps:
-    test:
-    - ref: stackrox-e2e
-- as: merge-gke-postgres-qa-e2e-tests
+- as: gke-kernel-qa-e2e-tests
   postsubmit: true
   steps:
     test:
     - ref: stackrox-e2e
   timeout: 5h0m0s
-- as: merge-gke-race-condition-qa-e2e-tests
+- as: gke-upgrade-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+- as: gke-postgres-qa-e2e-tests
   postsubmit: true
   steps:
     test:
     - ref: stackrox-e2e
   timeout: 5h0m0s
-- as: merge-gke-scale-tests
+- as: gke-race-condition-qa-e2e-tests
   postsubmit: true
   steps:
     test:
     - ref: stackrox-e2e
-- as: merge-gke-postgres-scale-tests
+  timeout: 5h0m0s
+- as: gke-scale-tests
   postsubmit: true
   steps:
     test:
     - ref: stackrox-e2e
-- as: merge-openshift-4-operator-e2e-tests
+- as: gke-postgres-scale-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+- as: openshift-4-operator-e2e-tests
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
-    timeout: 2h10m0s
+    timeout: 5h0m0s
     version: "4.8"
   postsubmit: true
   steps:
     test:
     - ref: stackrox-e2e
-  timeout: 2h0m0s
-- as: merge-local-roxctl-tests
+  timeout: 5h0m0s
+- as: local-roxctl-tests
   postsubmit: true
   steps:
     test:
     - ref: stackrox-initial
+- as: eks-qa-e2e-tests
+  postsubmit: true
+  steps:
+    workflow: stackrox-automation-flavors-eks-e2e
+  timeout: 5h0m0s
+- as: osd-aws-qa-e2e-tests
+  postsubmit: true
+  steps:
+    workflow: stackrox-automation-flavors-osd-aws-e2e
+  timeout: 5h0m0s
+- as: osd-gcp-qa-e2e-tests
+  postsubmit: true
+  steps:
+    workflow: stackrox-automation-flavors-osd-gcp-e2e
+  timeout: 5h0m0s
 - as: nightly-tag
   cron: 0 5 * * *
   steps:
@@ -337,7 +371,7 @@ tests:
       commands: |
         .openshift-ci/nightlies.sh
       credentials:
-      - mount_path: /tmp/secret/stackrox-stackrox-initial
+      - mount_path: /tmp/vault/stackrox-stackrox-initial
         name: stackrox-stackrox-initial
         namespace: test-credentials
       from: src

@@ -1,0 +1,139 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+  stolostron_builder_go1.18-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.18-linux
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile.e2etest
+  from: base
+  inputs:
+    stolostron_builder_go1.18-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.18-linux
+  to: grc-policy-framework-tests
+promotion:
+  disabled: true
+  name: "2.7"
+  namespace: stolostron
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: grc-policy-framework-tests
+    env:
+      IMAGE_REPO: grc-policy-framework-tests
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: test-e2e-kind
+  steps:
+    env:
+      AWS_CREDENTIALS_SECRET: ocm-grc-aws-kind
+      AWS_REGION: us-east-1
+    test:
+    - as: kind-test
+      commands: |
+        echo "IMAGE_REF=$IMAGE_REF"
+        ./build/run-test-kind-prow.sh
+      dependencies:
+      - env: IMAGE_REF
+        name: grc-policy-framework-tests
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-e2e-kind
+- as: test-e2e-kind-deployonhub
+  steps:
+    env:
+      AWS_CREDENTIALS_SECRET: ocm-grc-aws-kind
+      AWS_REGION: us-east-1
+    test:
+    - as: kind-test
+      commands: |
+        echo "IMAGE_REF=$IMAGE_REF"
+        export deployOnHub="true"
+        ./build/run-test-kind-prow.sh
+      dependencies:
+      - env: IMAGE_REF
+        name: grc-policy-framework-tests
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-e2e-kind
+- as: test-e2e-grc-framework
+  steps:
+    dependencies:
+      COMPONENT_IMAGE_REF: grc-policy-framework-tests
+    env:
+      CLUSTERPOOL_GROUP_NAME: policy-grc
+      CLUSTERPOOL_HOST_NAMESPACE: acm-grc-security
+      CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-grc-clusterpool
+      CLUSTERPOOL_LIFETIME: 4h
+      CLUSTERPOOL_LIST_EXCLUSION_FILTER: dev\|autoclaims
+      CLUSTERPOOL_LIST_INCLUSION_FILTER: prow
+      PIPELINE_STAGE: dev
+      SKIP_COMPONENT_INSTALL: "true"
+    test:
+    - as: e2e
+      commands: |
+        export SELF="make -f Makefile.prow"
+        ./build/run-e2e-tests-policy-framework-prow.sh
+      from: grc-policy-framework-tests
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-e2e-clusterpool
+- as: latest-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: grc-policy-framework-tests
+    env:
+      IMAGE_REPO: grc-policy-framework-tests
+      IMAGE_TAG: latest-2.7
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: grc-policy-framework-tests
+    env:
+      IMAGE_REPO: grc-policy-framework-tests
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
+        export OSCI_PUBLISH_DELAY="0"
+        export SELF="make -f Makefile.prow"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+zz_generated_metadata:
+  branch: release-2.7
+  org: stolostron
+  repo: governance-policy-framework

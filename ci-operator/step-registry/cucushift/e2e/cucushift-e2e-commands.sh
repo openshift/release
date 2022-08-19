@@ -38,6 +38,8 @@ if [ -z "${E2E_SKIP_TAGS}" ] ; then
 else
     export E2E_SKIP_TAGS="${E2E_SKIP_TAGS} and not @customer and not @security"
 fi
+echo "E2E_RUN_TAGS is '${E2E_RUN_TAGS}'"
+echo "E2E_SKIP_TAGS is '${E2E_SKIP_TAGS}'"
 
 cd verification-tests
 export BUSHSLICER_LOG_LEVEL=plain

@@ -3,6 +3,10 @@ base_images:
     name: release
     namespace: openshift
     tag: rhel-8-release-golang-1.17-openshift-4.10
+  operator-index:
+    name: redhat-operator-index
+    namespace: ci
+    tag: v4.10
 build_root:
   image_stream_tag:
     name: release
@@ -15,6 +19,18 @@ images:
       as:
       - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.17-openshift-4.10
   to: file-integrity-operator
+operator:
+  bundles:
+  - as: file-integrity-operator-bundle
+    base_index: operator-index
+    context_dir: .
+    dockerfile_path: bundle.Dockerfile
+    update_graph: replaces
+  substitutions:
+  - pullspec: quay.io/file-integrity-operator/file-integrity-operator:0.1.28
+    with: pipeline:file-integrity-operator
+  - pullspec: quay.io/file-integrity-operator/file-integrity-operator:latest
+    with: pipeline:file-integrity-operator
 promotion:
   name: "4.13"
   namespace: ocp
@@ -61,6 +77,53 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- as: e2e-bundle-aws
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-file-integrity-operator-bundle
+    env:
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: file-integrity
+      OO_PACKAGE: file-integrity-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: test-bundle
+      cli: latest
+      commands: TEST_BUNDLE_INSTALL=1 TEST_WATCH_NAMESPACE=file-integrity TEST_OPERATOR_NAMESPACE=file-integrity
+        make e2e
+      dependencies:
+      - env: IMAGE_FROM_CI
+        name: file-integrity-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: optional-operators-ci-aws
+- as: e2e-bundle-aws-upgrade
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-file-integrity-operator-bundle
+    env:
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: file-integrity
+      OO_LATEST_CSV: file-integrity-operator.v0.1.30
+      OO_PACKAGE: file-integrity-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: test-bundle-upgrade
+      cli: latest
+      commands: TEST_BUNDLE_INSTALL=1 TEST_WATCH_NAMESPACE=file-integrity TEST_OPERATOR_NAMESPACE=file-integrity
+        make e2e
+      dependencies:
+      - env: IMAGE_FROM_CI
+        name: file-integrity-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: optional-operators-ci-aws-upgrade
 zz_generated_metadata:
   branch: release-4.13
   org: openshift

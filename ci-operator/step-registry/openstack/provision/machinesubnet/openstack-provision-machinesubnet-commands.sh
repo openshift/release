@@ -69,7 +69,7 @@ if [[ ${OPENSTACK_PROVIDER_NETWORK} != "" ]]; then
   API_VIP=$(openstack port create --network ${OPENSTACK_PROVIDER_NETWORK} ${CLUSTER_NAME}-${CONFIG_TYPE}-api -c fixed_ips -f value | grep -E -o "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)")
   INGRESS_VIP=$(openstack port create --network ${OPENSTACK_PROVIDER_NETWORK} ${CLUSTER_NAME}-${CONFIG_TYPE}-ingress -c fixed_ips -f value | grep -E -o "(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)")
   echo "API VIP will be ${API_VIP} and Ingress VIP will be ${INGRESS_VIP}"
-  echo "These ports should be deleted by openstack-conf-generateconfig-commands.sh"
+  echo "These ports should be deleted by openstack-conf-installconfig-commands.sh"
 else
   MACHINES_NET_ID="$(openstack network create --format value --column id \
     "${CLUSTER_NAME}-${CONFIG_TYPE}-machines-network" --description "Machines network for ${CLUSTER_NAME}-${CONFIG_TYPE}")"

@@ -29,16 +29,11 @@ echo "### Copying test-list file"
 scp -F ${SHARED_DIR}/ssh_config "${SHARED_DIR}/test-list" "root@ci_machine:/tmp/test-list"
 
 echo "### Running tests"
-timeout --kill-after 10m 120m ssh -F ${SHARED_DIR}/ssh_config "root@ci_machine" bash - << EOF
+timeout --kill-after 5m 120m ssh -F ${SHARED_DIR}/ssh_config "root@ci_machine" bash - << EOF
     # download openshift-tests cli tool from container quay.io/openshift/origin-tests
     CONTAINER_ID=\$(podman run -d quay.io/openshift/origin-tests)
     podman cp \${CONTAINER_ID}:/usr/bin/openshift-tests /usr/local/bin/
     podman rm -f \${CONTAINER_ID}
-
-    # Vsphere CI machine does not use dnsmasq for DNS so reflecting the configuration in /etc/hosts file
-    for FILE in /etc/NetworkManager/dnsmasq.d/*; do
-      awk '{split(\$0,a,"/"); print a[3] "\t\t" a[2] }' \${FILE} >> /etc/hosts
-    done
 
     for kubeconfig in \$(find \${KUBECONFIG} -type f); do
         export KUBECONFIG=\${kubeconfig}

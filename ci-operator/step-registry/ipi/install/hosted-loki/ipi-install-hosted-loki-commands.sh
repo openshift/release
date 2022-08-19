@@ -18,6 +18,8 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: openshift-e2e-loki
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
 EOF
 cat >> "${SHARED_DIR}/manifest_clusterrole.yml" << EOF
 apiVersion: rbac.authorization.k8s.io/v1

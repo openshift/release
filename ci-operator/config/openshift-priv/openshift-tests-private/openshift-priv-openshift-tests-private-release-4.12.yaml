@@ -32,15 +32,6 @@ images:
   to: tests-private
 - dockerfile_literal: |
     FROM src
-    RUN curl --silent --location https://rpm.nodesource.com/setup_lts.x | bash - && \
-        curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo | tee /etc/yum.repos.d/yarn.repo && \
-        PACKAGES="openssh-clients httpd-tools nodejs yarn xorg-x11-server-Xvfb gtk2-devel gtk3-devel libnotify-devel GConf2 nss libXScrnSaver alsa-lib" && \
-        yum install --setopt=tsflags=nodocs -y $PACKAGES && \
-        yum clean all && rm -rf /var/cache/yum/*
-  from: src
-  to: tests-private-ui
-- dockerfile_literal: |
-    FROM src
     RUN unset GOFLAGS && \
         go install golang.org/x/lint/golint@latest && \
         which golint
@@ -61,7 +52,6 @@ promotion:
   disabled: true
   excluded_images:
   - tests-private
-  - tests-private-ui
   - tests-private-pr
   - tests-private-cck
   name: 4.12-priv
@@ -147,7 +137,7 @@ tests:
     - as: console-test
       cli: latest
       commands: cd frontend;./console-test-frontend.sh
-      from: tests-private-ui
+      from: tests-private
       resources:
         requests:
           cpu: "2"

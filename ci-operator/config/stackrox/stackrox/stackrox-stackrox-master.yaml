@@ -1,4 +1,16 @@
 base_images:
+  eks:
+    name: automation-flavors
+    namespace: stackrox
+    tag: eks-0.3.1
+  golang-1.17.2:
+    name: golang
+    namespace: stackrox
+    tag: 1.17.2
+  osd:
+    name: automation-flavors
+    namespace: stackrox
+    tag: osd-0.3.6
   ubi:
     name: ubi
     namespace: ocp
@@ -66,12 +78,13 @@ images:
         source_path: /go/src/github.com/stackrox/stackrox/docs/.
   to: docs
 - build_args:
-  - name: GO_VERSION
-    value: 1.17.2
   - name: ROX_IMAGE_FLAVOR
     value: development_build
   dockerfile_path: operator/Dockerfile
   inputs:
+    golang-1.17.2:
+      as:
+      - golang:1.17.2
     operator-artifacts:
       paths:
       - destination_dir: .
@@ -297,18 +310,34 @@ tests:
     cloud: aws
     owner: openshift-ci
     product: ocp
-    timeout: 2h10m0s
+    timeout: 5h0m0s
     version: "4.8"
   optional: true
+  run_if_changed: ^((generated|image|operator|pkg|make|deploy|scripts)/.*|Makefile|status\.sh|EXPECTED_GO_VERSION)
   steps:
     test:
     - ref: stackrox-e2e
-  timeout: 2h0m0s
+  timeout: 5h0m0s
 - as: local-roxctl-tests
   optional: true
   steps:
     test:
     - ref: stackrox-initial
+- as: eks-qa-e2e-tests
+  optional: true
+  steps:
+    workflow: stackrox-automation-flavors-eks-e2e
+  timeout: 5h0m0s
+- as: osd-aws-qa-e2e-tests
+  optional: true
+  steps:
+    workflow: stackrox-automation-flavors-osd-aws-e2e
+  timeout: 5h0m0s
+- as: osd-gcp-qa-e2e-tests
+  optional: true
+  steps:
+    workflow: stackrox-automation-flavors-osd-gcp-e2e
+  timeout: 5h0m0s
 - as: merge-push-and-release
   postsubmit: true
   steps:
@@ -330,6 +359,12 @@ tests:
         name: docs
       - env: MAIN_RCD_IMAGE
         name: main-rcd
+      - env: OPERATOR_IMAGE
+        name: operator-controller
+      - env: OPERATOR_BUNDLE_IMAGE
+        name: operator-bundle
+      - env: OPERATOR_BUNDLE_INDEX_MAGE
+        name: operator-bundle-index
       from: src
       resources:
         requests:
@@ -501,13 +536,13 @@ tests:
     cloud: aws
     owner: openshift-ci
     product: ocp
-    timeout: 2h10m0s
+    timeout: 5h0m0s
     version: "4.8"
   postsubmit: true
   steps:
     test:
     - ref: stackrox-e2e
-  timeout: 2h0m0s
+  timeout: 5h0m0s
 - as: merge-local-roxctl-tests
   postsubmit: true
   steps:
