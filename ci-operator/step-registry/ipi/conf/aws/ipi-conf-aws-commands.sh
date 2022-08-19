@@ -70,7 +70,21 @@ echo "${MAX_ZONES_COUNT}" >> "${SHARED_DIR}/maxzonescount"
 existing_zones_setting=$(/tmp/yq r "${CONFIG}" 'controlPlane.platform.aws.zones')
 
 if [[ ${existing_zones_setting} == "" ]]; then
-  ZONES_COUNT=${ZONES_COUNT:-2}
+  ZONES_COUNT=${ZONES_COUNT:-auto}
+
+  if [[ "${ZONES_COUNT}" == "auto" ]]; then
+    if [[ "${JOB_TYPE}" == "presubmit" ]]; then
+      if [[ "${JOB_NAME:-} ${REPO_OWNER:-} ${REPO_NAME:-}" == *storage* ]]; then
+        # some storage tests rely on there being multiple AZs
+        ZONES_COUNT="2"
+      else
+        ZONES_COUNT="1"
+      fi
+    else
+      ZONES_COUNT="2"
+    fi
+  fi
+
   ZONES=("${ZONES[@]:0:${ZONES_COUNT}}")
   ZONES_STR="[ $(join_by , "${ZONES[@]}") ]"
   echo "AWS region: ${REGION} (zones: ${ZONES_STR})"
