@@ -96,7 +96,7 @@ else
         do
             echo "The following custom kubeobject has been found ! $i"
             echo "Applying kube_objects on to the Namespace $OO_INSTALL_NAMESPACE"
-            oc apply -f "$i" -n "$OO_INSTALL_NAMESPACE"
+            oc apply -f "$i"
         done
     fi
 fi
