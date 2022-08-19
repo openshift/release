@@ -15,7 +15,7 @@ if ! whoami &> /dev/null; then
 fi
 
 mkdir -p /tmp/client
-curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz | tar --directory=/tmp/client -xzf -
+curl -L --fail https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz | tar --directory=/tmp/client -xzf -
 PATH=/tmp/client:$PATH
 oc version --client
 
