@@ -18,7 +18,7 @@ function join_by { local IFS="$1"; shift; echo "$*"; }
 REGION="${LEASED_RESOURCE}"
 # BootstrapInstanceType gets its value from pkg/types/aws/defaults/platform.go
 architecture=${OCP_ARCH:-"amd64"}
-arch_instance_type=m5
+arch_instance_type=m6i
 if [[ "${CLUSTER_TYPE}" == "aws-arm64" ]]; then
   architecture="arm64"
 fi
