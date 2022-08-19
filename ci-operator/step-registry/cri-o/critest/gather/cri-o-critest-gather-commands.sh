@@ -34,7 +34,7 @@ instance_name=$(<"${SHARED_DIR}/gcp-instance-ids.txt")
 
 function getlogs() {
   echo "### Downloading logs..."
-  gcloud compute scp --zone "${ZONE}" "${instance_name}:/tmp/artifacts/*" "${ARTIFACT_DIR}"
+  gcloud compute scp --recurse --zone "${ZONE}" "${instance_name}:/tmp/artifacts/*" "${ARTIFACT_DIR}"
 }
 
 # Gather logs regardless of what happens after this
