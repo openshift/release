@@ -13,6 +13,10 @@ KNI_SSH_PASS=$(cat /var/run/kni-pass/knipass)
 HYPERV_IP=10.19.16.50
 TEST_CLUSTER_API_IP=10.19.16.74
 
+ping -c 4 10.19.16.50 || true
+ip route
+tracepath -n 10.19.16.50
+
 cat << EOF > ~/inventory
 [all]
 ${HYPERV_IP} ansible_ssh_user=kni ansible_ssh_common_args="-o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=90" ansible_password=$KNI_SSH_PASS
