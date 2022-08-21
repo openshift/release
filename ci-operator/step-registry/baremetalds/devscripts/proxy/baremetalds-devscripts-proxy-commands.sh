@@ -13,16 +13,22 @@ source "${SHARED_DIR}/packet-conf.sh"
 # Setup a squid proxy for accessing the cluster
 # shellcheck disable=SC2087 # We need $CLUSTERTYPE in the here doc to expand locally
 ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
+
 sudo dnf install -y podman firewalld
 
 # TODO: we need to fix the IPv6 job and remove this ASAP.
 # Using vault for the anything but the short term isn't a good solution
 # https://bugzilla.redhat.com/show_bug.cgi?id=2087096
+echo "Checking if OS is not Centos based..."
 if ! grep -iq Centos /etc/redhat-release ; then
-    rm -f /etc/yum.repos.d/*
+    echo "Pinning the Rocky Linux repositories to Rocky 8.5..."
+    rm -vf /etc/yum.repos.d/*
+    ls -la /etc/yum.repos.d/
     for REPO in BaseOS AppStream extras ; do
         echo -e "[\$REPO]\nname=\$REPO\nbaseurl=https://dl.rockylinux.org/vault/rocky/8.5/\$REPO/x86_64/os/\nenabled=1\ngpgcheck=0\n" >> /etc/yum.repos.d/rocky.repo
     done
+    ls -la /etc/yum.repos.d/
+    echo "Finished setting up yum.repos.d!"
 fi
 
 # Setup squid proxy for accessing cluster
