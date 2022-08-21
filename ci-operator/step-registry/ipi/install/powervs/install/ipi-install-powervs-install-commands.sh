@@ -234,12 +234,24 @@ function init_ibmcloud() {
   fi
 
   if [ ! -f /tmp/jq ]; then
-    curl -L --output /tmp/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 && chmod +x /tmp/jq
 
-    hash file 2>/dev/null && file /tmp/jq
-    echo "Checking jq version..."
-    if ! /tmp/jq --version; then
-      echo "Error: /tmp/jq is not working?"
+    for I in $(seq 1 5)
+    do
+      curl -L --output /tmp/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 && chmod +x /tmp/jq
+
+      hash file 2>/dev/null && file /tmp/jq
+      echo "Checking jq version..."
+      if /tmp/jq --version; then
+        break
+      else
+        echo "Error: /tmp/jq is not working?"
+        /bin/rm /tmp/jq
+        sleep 30s
+      fi
+    done
+
+    if [ ! -f /tmp/jq ]; then
+      echo "Error: Could not successfully download jq!"
       exit 1
     fi
 
