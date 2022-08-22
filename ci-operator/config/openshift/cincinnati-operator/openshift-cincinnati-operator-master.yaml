@@ -23,21 +23,6 @@ images:
 - dockerfile_path: dev/Dockerfile
   from: base
   to: cincinnati-graph-data-container
-promotion:
-  excluded_images:
-  - cincinnati-operator
-  name: "4.12"
-  namespace: ocp
-releases:
-  initial:
-    integration:
-      name: "4.12"
-      namespace: ocp
-  latest:
-    integration:
-      include_built_images: true
-      name: "4.12"
-      namespace: ocp
 resources:
   '*':
     limits:
@@ -51,40 +36,52 @@ tests:
   container:
     from: src
 - as: operator-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.10"
   steps:
-    cluster_profile: gcp
     test:
     - as: e2e-test
-      cli: initial
+      cli: latest
       commands: |
         make func-test \
         RELATED_IMAGE_OPERAND=quay.io/app-sre/cincinnati@sha256:921b7a2e579d4cfe0e58ecf3abcc2262b321b6d0f8be7f6ebcb700acfca5ba55 \
         OPENSHIFT_BUILD_NAMESPACE=
       dependencies:
       - env: OPERATOR_IMAGE
-        name: stable:cincinnati-operator
+        name: pipeline:cincinnati-operator
       - env: RELATED_IMAGE_OPERATOR
-        name: stable:cincinnati-operator
+        name: pipeline:cincinnati-operator
       - env: GRAPH_DATA_IMAGE
-        name: stable:cincinnati-graph-data-container
+        name: pipeline:cincinnati-graph-data-container
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: openshift-e2e-gcp
+    workflow: generic-claim
 - as: operator-e2e-latest-osus
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.10"
   steps:
-    cluster_profile: gcp
     test:
     - as: e2e-test
-      cli: initial
+      cli: latest
       commands: make func-test OPENSHIFT_BUILD_NAMESPACE=
       dependencies:
       - env: OPERATOR_IMAGE
-        name: stable:cincinnati-operator
+        name: pipeline:cincinnati-operator
       - env: RELATED_IMAGE_OPERATOR
-        name: stable:cincinnati-operator
+        name: pipeline:cincinnati-operator
       - env: GRAPH_DATA_IMAGE
         name: graphdata
       - env: RELATED_IMAGE_OPERAND
@@ -94,7 +91,7 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: openshift-e2e-gcp
+    workflow: generic-claim
 zz_generated_metadata:
   branch: master
   org: openshift
