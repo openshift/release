@@ -188,6 +188,29 @@
         ],
       },
       {
+        name: 'pod-scaler-admission-memory-warning',
+        rules: [
+          {
+            alert: 'pod-scaler-admission-memory-warning',
+            expr: |||
+             sum by (error) (
+               increase(
+                 pod_scaler_admission_error_rate{}[15m]
+               )
+             )
+             > 0
+            |||,
+            'for': '1m',
+            labels: {
+              severity: 'warning',
+            },
+            annotations: {
+              message: '{{ $labels.error }}. See <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/pod-scaler-admission.md|SOP>.',
+            },
+          }
+        ],
+      },
+      {
         name: 'openshift-mirroring-failures',
         rules: [
           {
