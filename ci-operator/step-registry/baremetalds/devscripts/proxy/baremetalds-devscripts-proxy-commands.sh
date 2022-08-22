@@ -19,7 +19,7 @@ sudo dnf install -y podman firewalld
 # Using vault for the anything but the short term isn't a good solution
 # https://bugzilla.redhat.com/show_bug.cgi?id=2087096
 if ! grep -iq Centos /etc/redhat-release ; then
-    rm -f /etc/yum.repos.d/*
+    sudo dnf config-manager --set-disabled '*'
     for REPO in BaseOS AppStream extras ; do
         echo -e "[\$REPO]\nname=\$REPO\nbaseurl=https://dl.rockylinux.org/vault/rocky/8.5/\$REPO/x86_64/os/\nenabled=1\ngpgcheck=0\n" >> /etc/yum.repos.d/rocky.repo
     done
