@@ -3,6 +3,10 @@ base_images:
     name: "4.10"
     namespace: ocp
     tag: cli
+  operator-index:    
+    namespace: "ci"
+    name: "redhat-operator-index"
+    tag: "v4.10"
 binary_build_commands: make bin
 build_root:
   project_image:
@@ -16,6 +20,15 @@ images:
       - destination_dir: .
         source_path: /usr/bin/oc
   to: oc-bin-image
+operator:
+  bundles: 
+  - as: gitops-operator-bundle                        
+    context_dir: bundle/
+    dockerfile_path: bundle.Dockerfile
+    base_index: operator-index       
+  substitutions:
+  - pullspec: quay.io/redhat-developer/gitops-backend:test
+    with: oc-bin-image
 releases:
   initial:
     integration:
@@ -38,6 +51,13 @@ tests:
     test:
     - as: e2e-steps
       commands: scripts/openshiftci-olm-kuttl-tests.sh
+      credentials:
+      - mount_path: /var/run/gitops-operator-data/quay-credentials
+        name: quay-credentials
+        namespace: test-credentials
+      env:
+      - default: /var/run/gitops-operator-data/quay-credentials/quay-credentials
+        name: QUAY_CREDENTIAL
       from: oc-bin-image
       resources:
         requests:
