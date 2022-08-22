@@ -422,6 +422,42 @@ function dump_resources() {
     ibmcloud dl gateway ${DL_UUID}
   fi
 
+# "8<--------8<--------8<--------8<-------- Load Balancers 8<--------8<--------8<--------8<--------"
+
+(
+  LB_INT_FILE=$(mktemp)
+  LB_MCS_POOL_FILE=$(mktemp)
+  trap '/bin/rm "${LB_INT_FILE}" "${LB_MCS_POOL_FILE}"' EXIT
+
+  ibmcloud is load-balancers --output json | jq -r '.[] | select (.name|test("'${INFRA_ID}'-loadbalancer-int"))' > ${LB_INT_FILE}
+  LB_INT_ID=$(jq -r .id ${LB_INT_FILE})
+  if [ -z "${LB_INT_ID}" ]
+  then
+    echo "Error: LB_INT_ID is empty"
+    exit
+  fi
+
+  echo "8<--------8<--------8<--------8<-------- Internal Load Balancer 8<--------8<--------8<--------8<--------"
+  ibmcloud is load-balancer ${LB_INT_ID}
+
+  LB_MCS_ID=$(jq -r '.pools[] | select (.name|test("machine-config-server")) | .id' ${LB_INT_FILE})
+  if [ -z "${LB_MCS_ID}" ]
+  then
+    echo "Error: LB_MCS_ID is empty"
+    exit
+  fi
+
+  echo "8<--------8<--------8<--------8<-------- LB Machine Config Server 8<--------8<--------8<--------8<--------"
+  ibmcloud is load-balancer-pool ${LB_INT_ID} ${LB_MCS_ID}
+
+  echo "8<--------8<--------8<--------8<-------- LB MCS Pool 8<--------8<--------8<--------8<--------"
+  ibmcloud is load-balancer-pool ${LB_INT_ID} ${LB_MCS_ID} --output json > ${LB_MCS_POOL_FILE}
+  while read UUID
+  do
+    ibmcloud is load-balancer-pool-member ${LB_INT_ID} ${LB_MCS_ID} ${UUID}
+  done < <(jq -r '.members[].id' ${LB_MCS_POOL_FILE})
+)
+
   echo "8<--------8<--------8<--------8<-------- VPC 8<--------8<--------8<--------8<--------"
 
   VPC_UUID=$(ibmcloud is vpcs --output json | jq -r '.[] | select (.name|test("'${INFRA_ID}'")) | .id')
@@ -458,6 +494,56 @@ function dump_resources() {
     fi
 
   done < <( echo "${DHCP_NETWORKS_RESULT}" | jq -r '.[] | .id' )
+
+  echo "8<--------8<--------8<--------8<-------- oc get clusterversion 8<--------8<--------8<--------8<--------"
+
+  (
+    DEBUG=true
+
+    CV_FILE=$(mktemp)
+    F_FILE=$(mktemp)
+    trap '/bin/rm "${CV_FILE}" "${F_FILE}"' EXIT
+
+    export KUBECONFIG=${dir}/auth/kubeconfig
+
+    oc --request-timeout=5s get clusterversion -o json > ${CV_FILE} 2>/dev/null
+    RC=$?
+    echo "oc --request-timeout=5s get clusterversion -o json"
+    echo "RC=${RC}"
+    if ${DEBUG}
+    then
+      oc --request-timeout=5s get clusterversion 2>/dev/null > ${ARTIFACT_DIR}/get-clusterversion.output
+    fi
+    if [ ${RC} -gt 0 ]
+    then
+      exit 1
+    fi
+    if ${DEBUG}
+    then
+      echo "===== BEGIN: oc get clusterversion: CV_FILE =====" >> ${ARTIFACT_DIR}/get-clusterversion.output
+      cat ${CV_FILE} >> ${ARTIFACT_DIR}/get-clusterversion.output
+      echo "===== END: oc get clusterversion: CV_FILE =====" >> ${ARTIFACT_DIR}/get-clusterversion.output
+    fi
+    jq -r '.items[].status.conditions[] | select (.status|test("False"))' ${CV_FILE} > ${F_FILE}
+    RC=$?
+    echo "jq -r '.items[].status.conditions[] | ..."
+    echo "RC=${RC}"
+    if ${DEBUG}
+    then
+      echo "===== BEGIN: oc get clusterversion: F_FILE =====" >> ${ARTIFACT_DIR}/get-clusterversion.output
+      cat ${F_FILE} >> ${ARTIFACT_DIR}/get-clusterversion.output
+      echo "===== END: oc get clusterversion: F_FILE =====" >> ${ARTIFACT_DIR}/get-clusterversion.output
+    fi
+    if [ ${RC} -gt 0 ]
+    then
+      exit 1
+    fi
+    echo "Select ALL, where \"status\": \"False\" returns:"
+    cat ${F_FILE}
+    echo
+    echo "Select \"type\": \"Available\", where \"status\": \"False\" returns:"
+    jq -r 'select (.type|test("Available"))' ${F_FILE}
+)
 
   echo "8<--------8<--------8<--------8<-------- DONE! 8<--------8<--------8<--------8<--------"
 
