@@ -20,7 +20,51 @@ resources:
       cpu: 1000m
       memory: 2Gi
 tests:
-- as: jh-on-ocp
+- as: nb-ux-on-customer
+  steps:
+    post:
+    - as: destroy-clusters
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        run ods clusters destroy single
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from: ci-artifacts
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    pre:
+    - as: create-clusters
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        run ods clusters create single
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from: ci-artifacts
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    test:
+    - as: test
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        run ods run_customer_notebook_ux_e2e_scale_test
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from: ci-artifacts
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+- as: nb-ux-on-ocp
   steps:
     post:
     - as: destroy-clusters
@@ -54,7 +98,7 @@ tests:
     - as: test
       commands: |
         export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
-        run ods jh-at-scale run_ci_e2e_test
+        run ods notebook_ux_e2e_scale_test run_ci_e2e_test
       credentials:
       - mount_path: /var/run/psap-ods-secret-1
         name: psap-ods-secret-1
@@ -64,7 +108,7 @@ tests:
         requests:
           cpu: 1000m
           memory: 500Mi
-- as: jh-on-osd
+- as: nb-ux-on-osd
   steps:
     post:
     - as: destroy-clusters
@@ -98,7 +142,7 @@ tests:
     - as: test
       commands: |
         export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
-        run ods jh-at-scale run_ci_e2e_test
+        run ods notebook_ux_e2e_scale_test run_ci_e2e_test
       credentials:
       - mount_path: /var/run/psap-ods-secret-1
         name: psap-ods-secret-1
@@ -108,7 +152,7 @@ tests:
         requests:
           cpu: 1000m
           memory: 500Mi
-- as: jh-on-single
+- as: nb-ux-on-single
   steps:
     post:
     - as: destroy-clusters
@@ -186,7 +230,7 @@ tests:
     - as: test
       commands: |
         export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
-        run ods jh-at-scale run_ci_e2e_test
+        run ods notebook_ux_e2e_scale_test run_ci_e2e_test
       credentials:
       - mount_path: /var/run/psap-ods-secret-1
         name: psap-ods-secret-1
@@ -196,7 +240,7 @@ tests:
         requests:
           cpu: 1000m
           memory: 500Mi
-- as: plot-jh-on-osd
+- as: plot-nb-ux-on-ocp-osd
   steps:
     test:
     - as: test
@@ -206,7 +250,7 @@ tests:
         requests:
           cpu: 1000m
           memory: 1Gi
-- as: plot-jh-on-ocp
+- as: plot-nb-ux-on-ocp-ocp
   steps:
     test:
     - as: test
