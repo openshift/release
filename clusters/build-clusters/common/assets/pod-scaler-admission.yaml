@@ -119,3 +119,25 @@ spec:
         secret:
           defaultMode: 420
           secretName: pod-scaler-admission-serving-cert
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    app: prow
+    component: pod-scaler-consumer-admission
+    prow-app: pod-scaler-consumer-admission
+  name: pod-scaler-consumer-admission
+  namespace: prow-monitoring
+spec:
+  endpoints:
+    - interval: 30s
+      port: metrics
+      scheme: http
+  namespaceSelector:
+    matchNames:
+      - ci
+  selector:
+    matchLabels:
+      app: prow
+      component: pod-scaler-consumer-admission
