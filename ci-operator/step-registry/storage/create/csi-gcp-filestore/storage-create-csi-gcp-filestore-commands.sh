@@ -42,15 +42,13 @@ echo "Created ClusterCSIDriver object"
 # Create test manifest
 echo "Creating a manifest file"
 cat <<EOF >>$MANIFEST_LOCATION
+ShortName: filestore-csi
 StorageClass:
   FromExistingClassName: filestore-csi
 SnapshotClass:
   FromName: true
 DriverInfo:
   Name: filestore.csi.storage.gke.io
-  SupportedFsType:
-    xfs: {}
-    ext4: {}
   SupportedSizeRange:
     Min: 1Gi
     Max: 64Ti
@@ -61,6 +59,14 @@ DriverInfo:
     controllerExpansion: true
     snapshotDataSource: true
     multipods: true
+# Values take from https://github.com/kubernetes-sigs/gcp-filestore-csi-driver/blob/fa2463561c2f19e253a30d172e067e2f8628fa88/test/k8s-integration/driver-config.go#L32-L41
+Timeouts:
+  PodStart: 15m
+  ClaimProvision: 15m
+  PVCreate: 15m
+  PVDelete: 15m
+  DataSourceProvision: 15m
+  SnapshotCreate: 15m
 EOF
 
 echo "Using manifest file ${MANIFEST_LOCATION}"
