@@ -1,28 +1,24 @@
-presubmits:
+postsubmits:
   stackrox/collector:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build02
-    context: ci/prow/drivers-tests
+    - ^ddolgov-feature-slack-notification$
+    cluster: build01
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-collector-master-drivers-tests
-    optional: true
-    rerun_command: /test drivers-tests
+    max_concurrency: 1
+    name: branch-ci-stackrox-collector-ddolgov-feature-slack-notification-drivers-tests-post
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=drivers-tests
+        - --target=drivers-tests-post
         command:
         - ci-operator
         image: ci-operator:latest
@@ -49,27 +45,26 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )drivers-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build02
-    context: ci/prow/images
+    - ^ddolgov-feature-slack-notification$
+    cluster: build01
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/is-promotion: "true"
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-collector-master-images
-    rerun_command: /test images
+    max_concurrency: 1
+    name: branch-ci-stackrox-collector-ddolgov-feature-slack-notification-images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+        - --promote
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
         command:
@@ -87,6 +82,9 @@ presubmits:
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
+        - mountPath: /etc/push-secret
+          name: push-secret
+          readOnly: true
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
@@ -95,32 +93,31 @@ presubmits:
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
+      - name: push-secret
+        secret:
+          secretName: registry-push-credentials-ci-central
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build02
-    context: ci/prow/lint
+    - ^ddolgov-feature-slack-notification$
+    cluster: build01
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-collector-master-lint
-    rerun_command: /test lint
+    max_concurrency: 1
+    name: branch-ci-stackrox-collector-ddolgov-feature-slack-notification-merge-lint
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=lint
+        - --target=merge-lint
         command:
         - ci-operator
         image: ci-operator:latest
@@ -147,30 +144,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )lint,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build02
-    context: ci/prow/push-drivers
+    - ^ddolgov-feature-slack-notification$
+    cluster: build01
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-collector-master-push-drivers
-    optional: true
-    rerun_command: /test push-drivers
+    max_concurrency: 1
+    name: branch-ci-stackrox-collector-ddolgov-feature-slack-notification-merge-push-images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=push-drivers
+        - --target=merge-push-images
         command:
         - ci-operator
         image: ci-operator:latest
@@ -197,29 +189,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )push-drivers,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build02
-    context: ci/prow/push-images
+    - ^ddolgov-feature-slack-notification$
+    cluster: build01
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-collector-master-push-images
-    rerun_command: /test push-images
+    max_concurrency: 1
+    name: branch-ci-stackrox-collector-ddolgov-feature-slack-notification-merge-rhel-7-ebpf-integration-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=push-images
+        - --target=merge-rhel-7-ebpf-integration-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -246,29 +234,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )push-images,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build02
-    context: ci/prow/rhel-7-ebpf-integration-tests
+    - ^ddolgov-feature-slack-notification$
+    cluster: build01
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-collector-master-rhel-7-ebpf-integration-tests
-    rerun_command: /test rhel-7-ebpf-integration-tests
+    max_concurrency: 1
+    name: branch-ci-stackrox-collector-ddolgov-feature-slack-notification-merge-rhel-7-kernel-module-integration-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=rhel-7-ebpf-integration-tests
+        - --target=merge-rhel-7-kernel-module-integration-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -295,29 +279,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rhel-7-ebpf-integration-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build02
-    context: ci/prow/rhel-7-kernel-module-integration-tests
+    - ^ddolgov-feature-slack-notification$
+    cluster: build01
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-collector-master-rhel-7-kernel-module-integration-tests
-    rerun_command: /test rhel-7-kernel-module-integration-tests
+    max_concurrency: 1
+    name: branch-ci-stackrox-collector-ddolgov-feature-slack-notification-merge-rhel-8-ebpf-integration-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=rhel-7-kernel-module-integration-tests
+        - --target=merge-rhel-8-ebpf-integration-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -344,29 +324,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rhel-7-kernel-module-integration-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build02
-    context: ci/prow/rhel-8-ebpf-integration-tests
+    - ^ddolgov-feature-slack-notification$
+    cluster: build01
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-collector-master-rhel-8-ebpf-integration-tests
-    rerun_command: /test rhel-8-ebpf-integration-tests
+    max_concurrency: 1
+    name: branch-ci-stackrox-collector-ddolgov-feature-slack-notification-merge-rhel-8-kernel-module-integration-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=rhel-8-ebpf-integration-tests
+        - --target=merge-rhel-8-kernel-module-integration-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -393,29 +369,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rhel-8-ebpf-integration-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build02
-    context: ci/prow/rhel-8-kernel-module-integration-tests
+    - ^ddolgov-feature-slack-notification$
+    cluster: build01
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-collector-master-rhel-8-kernel-module-integration-tests
-    rerun_command: /test rhel-8-kernel-module-integration-tests
+    max_concurrency: 1
+    name: branch-ci-stackrox-collector-ddolgov-feature-slack-notification-merge-test-scripts
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=rhel-8-kernel-module-integration-tests
+        - --target=merge-test-scripts
         command:
         - ci-operator
         image: ci-operator:latest
@@ -442,29 +414,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rhel-8-kernel-module-integration-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build02
-    context: ci/prow/test-scripts
+    - ^ddolgov-feature-slack-notification$
+    cluster: build01
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-collector-master-test-scripts
-    rerun_command: /test test-scripts
+    max_concurrency: 1
+    name: branch-ci-stackrox-collector-ddolgov-feature-slack-notification-merge-unit-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=test-scripts
+        - --target=merge-unit-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -491,29 +459,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )test-scripts,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build02
-    context: ci/prow/unit-tests
+    - ^ddolgov-feature-slack-notification$
+    cluster: build01
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-collector-master-unit-tests
-    rerun_command: /test unit-tests
+    max_concurrency: 1
+    name: branch-ci-stackrox-collector-ddolgov-feature-slack-notification-push-drivers-post
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=unit-tests
+        - --target=push-drivers-post
         command:
         - ci-operator
         image: ci-operator:latest
@@ -540,4 +504,3 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )unit-tests,?($|\s.*)
