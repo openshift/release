@@ -89,7 +89,7 @@ then
 else
     echo "The ${CUSTOM_KUBEOBJECTS_PATH} found "
     echo "We find the kube_objects files inside path"
-    LIST_OF_KUBEOBJECTS=$(find "${CUSTOM_KUBEOBJECTS_PATH}${KEYWORD_CUSTOM_KUBEOBJECTS}${OO_PACKAGE}"* -type f -name kube_objects)
+    LIST_OF_KUBEOBJECTS=$(find "${CUSTOM_KUBEOBJECTS_PATH}"* -type f -name kube_objects)
     # checks if we found any custom kube objects in the respective paths
     if [ ${#LIST_OF_KUBEOBJECTS[@]} -gt 0 ] && [ -n "${LIST_OF_KUBEOBJECTS[0]}" ] ; then
         for i in "${LIST_OF_KUBEOBJECTS[@]}"
