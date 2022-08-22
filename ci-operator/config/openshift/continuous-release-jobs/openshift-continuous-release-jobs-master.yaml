@@ -1,12 +1,12 @@
 base_images:
   base:
-    name: "4.10"
+    name: "4.12"
     namespace: ocp
     tag: base
-  openshift_release_golang-1.17:
+  openshift_release_golang-1.18:
     name: release
     namespace: openshift
-    tag: golang-1.17
+    tag: golang-1.18
   os:
     name: centos
     namespace: origin
@@ -18,13 +18,22 @@ images:
 - dockerfile_path: go/dpcr-bugzilla-updater/Dockerfile
   from: base
   inputs:
-    openshift_release_golang-1.17:
+    openshift_release_golang-1.18:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.17
+      - registry.ci.openshift.org/openshift/release:golang-1.18
   to: dpcr-bugzilla-updater
 - dockerfile_path: images/impacts/Dockerfile
   from: os
   to: impacts
+- dockerfile_path: images/base/Dockerfile
+  from: os
+  to: continuous-release-jobs
+- dockerfile_path: images/render/Dockerfile
+  from: continuous-release-jobs
+  to: continuous-release-jobs-render
+- dockerfile_path: images/applier/Dockerfile
+  from: continuous-release-jobs
+  to: continuous-release-jobs-applier
 promotion:
   namespace: continuous-release-jobs
   tag: latest
