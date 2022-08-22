@@ -80,6 +80,8 @@ CUSTOM_KUBEOBJECTS_PATH="${CUSTOM_KUBEOBJECTS_PATH}${KEYWORD_CUSTOM_KUBEOBJECTS}
 # check if the directory exists or not in first place 
 # if not send message and gracefully exit.
 
+LIST_OF_KUBEOBJECTS=""
+
 if [ ! -d "${CUSTOM_KUBEOBJECTS_PATH}" ]
 then
     echo "Directory ${CUSTOM_KUBEOBJECTS_PATH} DOES NOT exists."
