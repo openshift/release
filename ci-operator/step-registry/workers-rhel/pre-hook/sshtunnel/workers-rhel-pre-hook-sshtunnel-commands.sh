@@ -47,9 +47,6 @@ cat > scaleup-pre-hook-ssh-tunnel.yaml <<-'EOF'
     bastion_ssh_private_key_file: "{{ lookup('env', 'BASTION_SSH_PRIV_KEY_PATH') }}"
 
   tasks:
-  - name: install checkpolicy
-    yum: name=checkpolicy state=present
-
   - name: Copy private SSH
     copy:
       src: "{{ bastion_ssh_private_key_file }}"

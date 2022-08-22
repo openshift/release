@@ -1,4 +1,16 @@
 base_images:
+  eks:
+    name: automation-flavors
+    namespace: stackrox
+    tag: eks-0.3.1
+  golang-1.17.2:
+    name: golang
+    namespace: stackrox
+    tag: 1.17.2
+  osd:
+    name: automation-flavors
+    namespace: stackrox
+    tag: osd-0.3.6
   ubi:
     name: ubi
     namespace: ocp
@@ -66,12 +78,13 @@ images:
         source_path: /go/src/github.com/stackrox/stackrox/docs/.
   to: docs
 - build_args:
-  - name: GO_VERSION
-    value: 1.17.2
   - name: ROX_IMAGE_FLAVOR
     value: development_build
   dockerfile_path: operator/Dockerfile
   inputs:
+    golang-1.17.2:
+      as:
+      - golang:1.17.2
     operator-artifacts:
       paths:
       - destination_dir: .
@@ -317,19 +330,45 @@ tests:
   steps:
     test:
     - ref: stackrox-e2e
-- as: openshift-4-operator-e2e-tests
+- as: openshift-oldest-operator-e2e-tests
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
-    timeout: 2h10m0s
-    version: "4.8"
+    timeout: 5h0m0s
+    version: "4.6"
   postsubmit: true
   steps:
     test:
     - ref: stackrox-e2e
-  timeout: 2h0m0s
+  timeout: 5h0m0s
+- as: openshift-penultimate-operator-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 5h0m0s
+    version: "4.10"
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+  timeout: 5h0m0s
+- as: openshift-newest-operator-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 5h0m0s
+    version: "4.11"
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+  timeout: 5h0m0s
 - as: local-roxctl-tests
   postsubmit: true
   steps:
@@ -338,7 +377,17 @@ tests:
 - as: eks-qa-e2e-tests
   postsubmit: true
   steps:
-    workflow: stackrox-eks-e2e
+    workflow: stackrox-automation-flavors-eks-e2e
+  timeout: 5h0m0s
+- as: osd-aws-qa-e2e-tests
+  postsubmit: true
+  steps:
+    workflow: stackrox-automation-flavors-osd-aws-e2e
+  timeout: 5h0m0s
+- as: osd-gcp-qa-e2e-tests
+  postsubmit: true
+  steps:
+    workflow: stackrox-automation-flavors-osd-gcp-e2e
   timeout: 5h0m0s
 - as: nightly-tag
   cron: 0 5 * * *

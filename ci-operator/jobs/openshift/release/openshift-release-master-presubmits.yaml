@@ -1,7 +1,7 @@
 presubmits:
   openshift/release:
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^master$
     - ^master-
@@ -12,6 +12,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-release-check-gh-automation
     rerun_command: /test check-gh-automation
+    run_if_changed: ^ci-operator/config/.*
     spec:
       containers:
       - args:
@@ -209,7 +210,7 @@ presubmits:
         - core-services/prow/02_config/_boskos.yaml
         command:
         - /app
-        image: gcr.io/k8s-staging-boskos/checkconfig:v20220729-35595e8
+        image: gcr.io/k8s-staging-boskos/checkconfig:v20220815-0e9ae74
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -689,7 +690,7 @@ presubmits:
             secretKeyRef:
               key: appid
               name: openshift-prow-github-app
-        image: gcr.io/k8s-prow/checkconfig:v20220801-76ef860388
+        image: gcr.io/k8s-prow/checkconfig:v20220820-e66ce2febd
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -1495,7 +1496,7 @@ presubmits:
     spec:
       containers:
       - args:
-        - --config-path=/etc/config/config.yaml
+        - --config-path=clusters/app.ci/pr-reminder/pr-reminder-config.yaml
         - --github-mapping-config-path=/etc/github-mapping/mapping.yaml
         - --slack-token-path=/etc/slack/oauth_token
         - --validate-only=true
@@ -1508,9 +1509,6 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/config
-          name: config
-          readOnly: true
         - mountPath: /etc/github-mapping
           name: github-mapping
           readOnly: true
@@ -1518,9 +1516,6 @@ presubmits:
           name: slack
           readOnly: true
       volumes:
-      - configMap:
-          name: pr-reminder-config
-        name: config
       - configMap:
           name: sync-rover-groups
         name: github-mapping

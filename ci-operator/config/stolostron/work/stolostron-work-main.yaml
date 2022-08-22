@@ -3,6 +3,10 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
+  stolostron_builder_go1.18-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.18-linux
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
@@ -12,10 +16,14 @@ build_root:
 images:
 - dockerfile_path: Dockerfile
   from: base
+  inputs:
+    stolostron_builder_go1.18-linux:
+      as:
+      - golang:1.18
   to: work
 promotion:
   disabled: true
-  name: "2.1"
+  name: "2.2"
   namespace: stolostron
 releases:
   initial:
@@ -71,7 +79,7 @@ tests:
   postsubmit: true
   steps:
     env:
-      DESTINATION_BRANCH: backplane-2.1
+      DESTINATION_BRANCH: backplane-2.2
     workflow: ocm-ci-fastforward
 zz_generated_metadata:
   branch: main

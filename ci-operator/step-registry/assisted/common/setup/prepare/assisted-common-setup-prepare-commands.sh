@@ -71,6 +71,7 @@ export CI_CREDENTIALS_DIR=/var/run/assisted-installer-bot
 echo "********** ${ASSISTED_CONFIG} ************* "
 
 cat << EOF > config.sh.j2
+export DATA_DIR={{ DATA_DIR }}
 export REPO_DIR={{ REPO_DIR }}
 export MINIKUBE_HOME={{ MINIKUBE_HOME }}
 export INSTALLER_KUBECONFIG={{ REPO_DIR }}/build/kubeconfig
@@ -138,10 +139,11 @@ cat > run_test_playbook.yaml <<-EOF
     PLATFORM: "{{ lookup('env', 'PLATFORM') }}"
     PULL_PULL_SHA: "{{ lookup('env', 'PULL_PULL_SHA') | default('master', True) }}"
     JOB_TYPE: "{{ lookup('env', 'JOB_TYPE') }}"
+    DATA_DIR: /home
     REPO_OWNER: "{{ lookup('env', 'REPO_OWNER') }}"
     REPO_NAME: "{{ lookup('env', 'REPO_NAME') }}"
-    REPO_DIR: /home/assisted
-    MINIKUBE_HOME: "{{ REPO_DIR }}/minikube_home"
+    REPO_DIR: "{{ DATA_DIR }}/assisted"
+    MINIKUBE_HOME: "{{ DATA_DIR }}/minikube_home"
     CI_CREDENTIALS_DIR: "{{ lookup('env', 'CI_CREDENTIALS_DIR') }}"
     CLUSTER_PROFILE_DIR: "{{ lookup('env', 'CLUSTER_PROFILE_DIR') }}"
     IP: "{{ lookup('env', 'IP') }}"
@@ -213,6 +215,10 @@ cat > run_test_playbook.yaml <<-EOF
       ansible.builtin.file:
         path: /tmp/artifacts
         state: directory
+    - name: Create repo directory if it does not exist
+      ansible.builtin.file:
+        path: "{{ REPO_DIR }}"
+        state: directory
     - name: Create minikube directory if it does not exist
       ansible.builtin.file:
         path: "{{ MINIKUBE_HOME }}"
@@ -246,7 +252,7 @@ cat > run_test_playbook.yaml <<-EOF
     - name: Use nvme device if exists
       ansible.builtin.shell: |
         mkfs.xfs -f /dev/nvme0n1
-        mount /dev/nvme0n1 {{ REPO_DIR }}
+        mount /dev/nvme0n1 {{ DATA_DIR }}
       when: nvme.stat.exists
     - name: Extract test-infra repo archive
       ansible.builtin.unarchive:

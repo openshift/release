@@ -51,11 +51,16 @@ CONFIG="${SHARED_DIR}/install-config.yaml"
 
 # Populate install-config with Powervs Platform specifics
 # Note: we will visit this creation of install-config.yaml file section once the profile support is added to the powervs environment
-export POWERVS_SERVICE_INSTANCE_ID=${POWERVS_SERVICE_INSTANCE_ID}
-export POWERVS_USER_ID=${POWERVS_USER_ID}
-export POWERVS_ZONE=${POWERVS_ZONE}
-export VPCREGION=${VPCREGION}
-export POWERVS_REGION=${POWERVS_REGION}
+POWERVS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.powervscred"
+CLUSTER_NAME="rdr-multiarch-ci"
+POWERVS_RESOURCE_GROUP=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_RESOURCE_GROUP")
+POWERVS_REGION=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_REGION")
+POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID")
+POWERVS_USER_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_USER_ID")
+POWERVS_ZONE=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_ZONE")
+VPCREGION=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/VPCREGION")
+export POWERVS_SHARED_CREDENTIALS_FILE
+
 cat > "${CONFIG}" << EOF
 apiVersion: v1
 baseDomain: ${BASE_DOMAIN}
@@ -73,9 +78,6 @@ controlPlane:
   name: master
   platform: {}
   replicas: 3
-metadata:
-  creationTimestamp: null
-  name: powervs-ci
 networking:
   clusterNetwork:
   - cidr: 10.128.0.0/14
@@ -87,7 +89,7 @@ networking:
   - 172.30.0.0/16
 platform:
   powervs:
-    powervsResourceGroup: "ipi-cicd-resource-group"
+    powervsResourceGroup: "${POWERVS_RESOURCE_GROUP}"
     region: ${POWERVS_REGION}
     serviceInstanceID: "${POWERVS_SERVICE_INSTANCE_ID}"
     userID: ${POWERVS_USER_ID}

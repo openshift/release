@@ -13,7 +13,7 @@ curl -sL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 > /t
 chmod ug+x /tmp/bin/jq
 
 # install newest oc
-curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
+curl -L --fail https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
 chmod ug+x /tmp/bin/oc
 
 

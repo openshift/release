@@ -19,6 +19,10 @@ base_images:
     name: ocm-2.5
     namespace: edge-infrastructure
     tag: assisted-test-infra
+  cli:
+    name: "4.11"
+    namespace: ocp
+    tag: cli
   cluster-api-provider-agent:
     name: ocm-2.5
     namespace: edge-infrastructure
@@ -31,6 +35,18 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  edge_infrastructure_swagger_codegen_cli:
+    name: edge-infrastructure-swagger-codegen-cli
+    namespace: ci
+    tag: 2.4.18
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.37.1
+  goswagger_swagger:
+    name: goswagger-swagger
+    namespace: ci
+    tag: v0.28.0
   hypershift-operator:
     name: "4.10"
     namespace: ocp
@@ -39,6 +55,10 @@ base_images:
     name: release
     namespace: openshift
     tag: golang-1.17
+  opm-builder:
+    name: opm-builder
+    namespace: ci
+    tag: latest
   postgresql-12-centos7:
     name: postgresql-12-centos7
     namespace: edge-infrastructure
@@ -50,11 +70,28 @@ build_root:
     tag: golang-1.17
 images:
 - dockerfile_path: Dockerfile.assisted-service-build
-  from: postgresql-12-centos7
   inputs:
+    cli:
+      as:
+      - quay.io/openshift/origin-cli:latest
+    edge_infrastructure_swagger_codegen_cli:
+      as:
+      - quay.io/edge-infrastructure/swagger-codegen-cli:2.4.18
+    golangci-lint:
+      as:
+      - quay.io/app-sre/golangci-lint:v1.37.1
+    goswagger_swagger:
+      as:
+      - quay.io/goswagger/swagger:v0.28.0
     openshift_release_golang-1.17:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.17
+    opm-builder:
+      as:
+      - quay.io/operator-framework/upstream-opm-builder:v1.16.1
+    postgresql-12-centos7:
+      as:
+      - quay.io/edge-infrastructure/postgresql-12-centos7:latest
   to: assisted-service-build
 - dockerfile_path: Dockerfile.assisted-service
   from: coreos_centos_stream8
@@ -126,7 +163,7 @@ tests:
     test:
     - ref: assisted-verify-generated-code
 - as: mirror-nightly-image
-  cron: '@daily'
+  cron: 9 16 */7 * *
   steps:
     dependencies:
       SOURCE_IMAGE_REF: assisted-service
@@ -149,10 +186,13 @@ tests:
     test:
     - ref: assisted-baremetal-operator-publish
 - as: lint
-  commands: export GOLANGCI_LINT_CACHE=/tmp/.cache && export GOPROXY=https://proxy.golang.org
-    && make lint
+  commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    make lint
   container:
-    from: test-bin
+    from: assisted-service-build
   skip_if_only_changed: ^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNER_ALIASES)$
 - as: unit-test
   commands: |
@@ -220,7 +260,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.10"
-  cron: 0 */6 * * *
+  cron: 59 16 */7 * *
   steps:
     allow_best_effort_post_steps: true
     test:
@@ -285,7 +325,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.10"
-  cron: 0 */6 * * *
+  cron: 11 1 */7 * *
   steps:
     allow_best_effort_post_steps: true
     test:
@@ -320,7 +360,7 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-periodic
-  cron: '@daily'
+  cron: 36 11 */7 * *
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -339,7 +379,7 @@ tests:
       NUM_EXTRA_WORKERS: "3"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-3masters-periodic
-  cron: '@daily'
+  cron: 46 22 */7 * *
   steps:
     cluster_profile: packet-assisted
     env:
@@ -358,7 +398,7 @@ tests:
       IP_STACK: v6
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-disconnected-periodic
-  cron: '@daily'
+  cron: 14 2 */7 * *
   steps:
     cluster_profile: packet-assisted
     env:
@@ -376,7 +416,7 @@ tests:
       PROVIDER_IMAGE: cluster-api-provider-agent
     workflow: assisted-baremetal-operator-capi
 - as: e2e-ai-operator-ztp-capi-periodic
-  cron: '@daily'
+  cron: 5 4 */7 * *
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -421,7 +461,7 @@ tests:
         TEST_FUNC=test_deploy_day2_nodes_cloud
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-kube-api-late-binding-single-node-periodic
-  cron: '@daily'
+  cron: 20 3 */7 * *
   steps:
     cluster_profile: packet-assisted
     env:

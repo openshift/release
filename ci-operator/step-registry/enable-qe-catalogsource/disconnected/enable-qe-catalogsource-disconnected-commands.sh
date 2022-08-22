@@ -211,9 +211,12 @@ EOF
     done
     if [[ $STATUS != "READY" ]]; then
         echo "!!! fail to create QE CatalogSource"
-        run_command "oc -n openshift-marketplace get pods"
+        run_command "oc get pods -o wide -n openshift-marketplace"
         run_command "oc -n openshift-marketplace get catalogsource qe-app-registry -o yaml"
         run_command "oc -n openshift-marketplace get pods -l olm.catalogSource=qe-app-registry -o yaml"
+        run_command "oc get mcp"
+        run_command "oc get mcp worker -o yaml"
+        run_command "oc get mc $(oc get mcp/worker --no-headers | awk '{print $2}')  -o yaml"
         return 1
     fi
     set -e 
@@ -251,13 +254,13 @@ function check_marketplace () {
     #     echo "marketplace installed, skip..."
     #     return 0
     # fi
-    
-    run_command "oc get ns openshift-marketplace"; ret=$?
+    ret=0
+    run_command "oc get ns openshift-marketplace" || ret=$?
     if [[ $ret -eq 0 ]]; then
         echo "openshift-marketplace project AlreadyExists, skip creating."
         return 0
     fi
-
+    
     cat <<EOF | oc create -f -
 apiVersion: v1
 kind: Namespace

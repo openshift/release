@@ -11,7 +11,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: golang-1.18
 images:
 - dockerfile_path: Dockerfile.openshift
   from: base
@@ -20,6 +20,13 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
   to: ingress-node-firewall
+- dockerfile_path: Dockerfile.daemon.openshift
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+  to: ingress-node-firewall-daemon
 promotion:
   name: "4.12"
   namespace: ocp
@@ -34,13 +41,11 @@ tag_specification:
   name: "4.12"
   namespace: ocp
 tests:
-- as: e2e-aws
-  steps:
-    cluster_profile: aws
-    workflow: openshift-e2e-aws
-- as: ingress-node-firewall-e2e-metal-ipi
-  steps:
-    cluster_profile: packet
+- as: test-fmt
+  commands: |
+    make fmt
+  container:
+    from: src
 zz_generated_metadata:
   branch: master
   org: openshift

@@ -31,6 +31,9 @@ tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/assisted-service.ta
 # shellcheck disable=SC2087
 ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths\{0,1\}".*/*** PULL_SECRET ***/g'
 
+# prepending each printed line with a timestamp
+exec > >(awk '{ print strftime("[%Y-%m-%d %H:%M:%S]"), \$0 }') 2>&1
+
 set -xeo pipefail
 
 cd /root/dev-scripts
@@ -52,6 +55,7 @@ echo "### Deploying CAPI cluster..."
 
 echo "export PROVIDER_IMAGE=${PROVIDER_IMAGE}" >> /root/config
 echo "export HYPERSHIFT_IMAGE=${HYPERSHIFT_IMAGE}" >> /root/config
+echo "export EXTRA_BAREMETALHOSTS_FILE=/root/dev-scripts/\${EXTRA_BAREMETALHOSTS_FILE}" >> /root/config
 
 source /root/config
 

@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-trap 'FRC=$?; createUpgradeJunit; debug' ERR EXIT TERM
+trap 'FRC=$?; createUpgradeJunit; debug' EXIT TERM
 
 # Print cv, failed node, co, mcp information for debug purpose
 function debug() {
@@ -41,6 +41,76 @@ EOF
     fi
 }
 
+# Update RHEL repo before upgrade
+function rhel_repo(){
+    echo "Updating RHEL node repo"
+    # Ensure our UID, which is randomly generated, is in /etc/passwd. This is required
+    # to be able to SSH.
+    if ! whoami &> /dev/null; then
+        if [[ -w /etc/passwd ]]; then
+            echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+        else
+            echo "/etc/passwd is not writeable, and user matching this uid is not found."
+            exit 1
+        fi
+    fi
+    SOURCE_REPO_VERSION=$(echo "${SOURCE_VERSION}" | cut -d'.' -f1,2)
+    TARGET_REPO_VERSION=$(echo "${TARGET_VERSION}" | cut -d'.' -f1,2)
+    export SOURCE_REPO_VERSION
+    export TARGET_REPO_VERSION
+
+    cat > repo.yaml <<-'EOF'
+---
+- name: Update repo Playbook
+  hosts: workers
+  any_errors_fatal: true
+  gather_facts: false
+  vars:
+    source_repo_version: "{{ lookup('env', 'SOURCE_REPO_VERSION') }}"
+    target_repo_version: "{{ lookup('env', 'TARGET_REPO_VERSION') }}"
+    platform_version: "{{ lookup('env', 'PLATFORM_VERSION') }}"
+    major_platform_version: "{{ platform_version[:1] }}"
+  tasks:
+  - name: Wait for host connection to ensure SSH has started
+    wait_for_connection:
+      timeout: 600
+  - name: Replace source release version with target release version in the files
+    replace:
+      path: "/etc/yum.repos.d/rhel-{{ major_platform_version }}-server-ose-rpms.repo"
+      regexp: "{{ source_repo_version }}"
+      replace: "{{ target_repo_version }}"
+  - name: Clean up yum cache
+    command: yum clean all
+EOF
+
+    ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
+    ansible-playbook -i "${SHARED_DIR}/ansible-hosts" repo.yaml -vvv
+}
+
+# Upgrade RHEL node
+function rhel_upgrade(){
+    echo "Upgrading RHEL nodes"
+    echo "Validating parsed Ansible inventory"
+    ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
+    echo "Running RHEL worker upgrade"
+    ansible-playbook -i "${SHARED_DIR}/ansible-hosts" playbooks/upgrade.yml -vvv
+
+    echo "Check K8s version on the RHEL node"
+    master_0=$(oc get nodes -l node-role.kubernetes.io/master -o jsonpath='{range .items[0]}{.metadata.name}{"\n"}{end}')
+    rhel_0=$(oc get nodes -l node.openshift.io/os_id=rhel -o jsonpath='{range .items[0]}{.metadata.name}{"\n"}{end}')
+    exp_version=$(oc get node ${master_0} --output=jsonpath='{.status.nodeInfo.kubeletVersion}' | cut -d '.' -f 1,2)
+    act_version=$(oc get node ${rhel_0} --output=jsonpath='{.status.nodeInfo.kubeletVersion}' | cut -d '.' -f 1,2)
+
+    echo -e "Expected K8s version is: ${exp_version}\nActual K8s version is: ${act_version}"
+    if [[ ${exp_version} == "${act_version}" ]]; then
+        echo "RHEL worker has correct K8s version"
+    else
+        echo "RHEL worker has incorrect K8s version" && exit 1
+    fi
+    echo -e "oc get node -owide\n$(oc get node -owide)"
+    echo "RHEL worker upgrade complete"
+}
+
 # Extract oc binary which is supposed to be identical with target release
 function extract_oc(){
     local url; url="openshift-release-artifacts.apps.ci.l2s4.p1.openshiftapps.com"
@@ -51,7 +121,7 @@ function extract_oc(){
     do
         echo -ne "Tools have not yet extracted at the server, please wait ${progress}\r"
         progress+="."
-        sleep 10
+        sleep 300
     done
 
     echo -e "downloading oc ${TARGET_VERSION} from server ${url}"
@@ -377,20 +447,25 @@ echo "Upgrade targets are ${TARGET_RELEASES[*]}"
 export OC="run_command_oc"
 
 # Target version oc will be extract in the /tmp/client directory, use it first
-mkdir -p /tmp/client
+mkdir -p /tmp/client /tmp/jq
 export OC_DIR="/tmp/client"
-export PATH=${OC_DIR}:$PATH
+export JQ_DIR="/tmp/jq"
+export PATH=${OC_DIR}:${JQ_DIR}:$PATH
+
+curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o ${JQ_DIR}/jq && chmod +x ${JQ_DIR}/jq
 
 for target in "${TARGET_RELEASES[@]}"
 do
     export TARGET="${target}"
-    echo -e "oc version:\n$(oc version)"
-
-    SOURCE_MINOR_VERSION="$(oc get clusterversion --no-headers | awk '{print $2}' | cut -f2 -d.)"
-    export SOURCE_MINOR_VERSION
-    echo -e "Source release minor version is: ${SOURCE_MINOR_VERSION}"
-
     TARGET_VERSION="$(oc adm release info "${TARGET}" --output=json | jq -r '.metadata.version')"
+    extract_oc
+
+    SOURCE_VERSION="$(oc get clusterversion --no-headers | awk '{print $2}')"
+    SOURCE_MINOR_VERSION="$(echo "${SOURCE_VERSION}" | cut -f2 -d.)"
+    export SOURCE_VERSION
+    export SOURCE_MINOR_VERSION
+    echo -e "Source release version is: ${SOURCE_VERSION}\nSource minor version is: ${SOURCE_MINOR_VERSION}"
+   
     TARGET_MINOR_VERSION="$(echo "${TARGET_VERSION}" | cut -f2 -d.)"
     export TARGET_VERSION
     export TARGET_MINOR_VERSION
@@ -404,10 +479,15 @@ do
     if [[ "${FORCE_UPDATE}" == "false" ]]; then
         admin_ack
     fi
-
-    extract_oc   
+      
     upgrade 
     check_upgrade_status 
     check_history 
+
+    if [[ $(oc get nodes -l node.openshift.io/os_id=rhel) != "" ]]; then
+        echo -e "oc get node -owide\n$(oc get node -owide)"
+        rhel_repo
+        rhel_upgrade
+    fi
     health_check
 done
