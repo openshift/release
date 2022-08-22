@@ -1,0 +1,112 @@
+apiVersion: v1
+kind: List
+items:
+- apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    name: gh-pull-through-cache
+    namespace: jguzik-playground
+  data:
+    "nginx.conf": |
+      pid /tmp/nginx.pid;
+      http {
+        client_body_temp_path /tmp/client_temp;
+        proxy_temp_path       /tmp/proxy_temp_path;
+        fastcgi_temp_path     /tmp/fastcgi_temp;
+        uwsgi_temp_path       /tmp/uwsgi_temp;
+        scgi_temp_path        /tmp/scgi_temp;
+        proxy_cache_path /tmp/cache levels=1:2 keys_zone=shared_cache:10m max_size=5g inactive=6h use_temp_path=off;
+        server {
+          listen 8080;
+          server_name localhost;
+          add_header X-Cache-Status $upstream_cache_status;
+          proxy_cache_use_stale error timeout invalid_header updating http_500 http_502 http_503 http_504;
+          proxy_ignore_headers Expires Cache-Control X-Accel-Expires Set-Cookie;
+          proxy_intercept_errors on;
+          proxy_cache_valid 200 206 6h;
+          location / {
+            proxy_buffering on;
+            proxy_cache shared_cache;
+            proxy_cache_key $scheme$proxy_host$uri;
+            proxy_pass https://github.com;
+            recursive_error_pages on;
+            error_page 301 302 307 = @handle_redirects;
+          }
+          location @handle_redirects {
+            set $original_uri $uri;
+            set $original_location $upstream_http_location;
+            proxy_pass $original_location;
+            proxy_cache shared_cache;
+            proxy_cache_key $original_uri;
+            error_page 301 302 307 = @handle_redirect;
+            resolver 8.8.8.8;
+          }
+        }
+      }
+      events {
+        worker_connections  4096;
+      }
+- apiVersion: route.openshift.io/v1
+  kind: Route
+  metadata:
+    name: gh-pull-through-cache
+    namespace: jguzik-playground
+  spec:
+    to:
+      kind: Service
+      name: gh-pull-through-cache
+    tls:
+      termination: Edge
+      insecureEdgeTerminationPolicy: Redirect
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: gh-pull-through-cache
+    namespace: jguzik-playground
+  spec:
+    selector:
+      app: gh-pull-through-cache
+    ports:
+    - port: 80
+      targetPort: 8080
+    type: ClusterIP
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: gh-pull-through-cache
+    namespace: jguzik-playground
+    labels:
+      app: gh-pull-through-cache
+  spec:
+    replicas: 2
+    selector:
+      matchLabels:
+        app: gh-pull-through-cache
+    template:
+      metadata:
+        labels:
+          app: gh-pull-through-cache
+      spec:
+        volumes:
+        - name: cache
+          emptyDir: {}
+        - name: config
+          configMap:
+            name: gh-pull-through-cache
+        containers:
+        - name: gh-cache
+          image: registry.ci.openshift.org/ci/nginx-unprivileged:stable
+          #command:
+          #- nginx
+          #- -c /tmp/nginx/nginx.conf
+          ports:
+            - name: http
+              containerPort: 8080
+          volumeMounts:
+          - name: cache
+            mountPath: /tmp/cache
+          - name: config
+            mountPath: /etc/nginx/nginx.conf
+            subPath: nginx.conf
+            
+
