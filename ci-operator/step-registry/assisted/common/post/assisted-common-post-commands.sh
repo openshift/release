@@ -17,3 +17,6 @@ echo "export KUBECONFIG=/home/assisted/build/kubeconfig" >> /root/.bashrc
 export KUBECONFIG=/home/assisted/build/kubeconfig
 source /root/assisted-post-install.sh
 EOF
+
+echo "### Copying kubeconfig files"
+scp -F ${SHARED_DIR}/ssh_config -r root@ci_machine:/home/assisted/build/kubeconfig/* ${SHARED_DIR}
