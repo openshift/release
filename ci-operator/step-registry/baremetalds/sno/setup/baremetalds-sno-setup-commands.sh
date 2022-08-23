@@ -10,6 +10,8 @@ echo "************ baremetalds single-node setup command ************"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
 
+git clone https://github.com/osherdp/assisted-test-infra --branch fix/thanos-endpoint-for-bip-jobs
+cd assisted-test-infra
 # Copy assisted-test-infra source from current directory to the remote server
 tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/sno.tar.gz"
 
