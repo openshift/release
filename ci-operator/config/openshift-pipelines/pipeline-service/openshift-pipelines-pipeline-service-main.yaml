@@ -1,3 +1,8 @@
+base_images:
+  hadolint-image:
+    name: hadolint
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: release
@@ -88,6 +93,12 @@ tests:
       resources:
         requests:
           cpu: 100m
+- as: plnsvc-hadolint
+  commands: |
+    find . -name Dockerfile -exec hadolint -c test/config/hadolint.yaml {} +
+  container:
+    clone: true
+    from: hadolint-image
 zz_generated_metadata:
   branch: main
   org: openshift-pipelines
