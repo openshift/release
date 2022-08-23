@@ -506,6 +506,31 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+- as: osde2e-stage-aws-e2e-upgrade-to-latest
+  cron: 0 */6 * * 0-5
+  steps:
+    test:
+    - as: osde2e-stage-aws-e2e-upgrade-to-latest-test
+      commands: |
+        export CONFIGS="aws,stage,e2e-suite,upgrade-to-latest"
+        export SECRET_LOCATIOSNS="/usr/local/osde2e-common,/usr/local/osde2e-credentials"
+
+        /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
+      credentials:
+      - mount_path: /usr/local/osde2e-credentials
+        name: osde2e-credentials
+        namespace: ci
+      - mount_path: /usr/local/osde2e-common
+        name: osde2e-common
+        namespace: ci
+      from_image:
+        name: osde2e
+        namespace: ci
+        tag: latest
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 zz_generated_metadata:
   branch: main
   org: openshift
