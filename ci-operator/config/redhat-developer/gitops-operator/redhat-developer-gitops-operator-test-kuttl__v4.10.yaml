@@ -48,9 +48,24 @@ tests:
 - as: e2e
   steps:
     cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-gitops-operator-bundle
+    env:
+      OO_CHANNEL: latest
+      OO_INSTALL_NAMESPACE: openshift-gitops
+      OO_PACKAGE: openshift-gitops-operator
+      OO_TARGET_NAMESPACES: '!all'
     test:
     - as: e2e-steps
       commands: scripts/openshiftci-olm-kuttl-tests.sh
+      dependencies:
+      - env: OO_INDEX
+        name: ci-index-gitops-operator-bundle
+      env:
+      - name: OO_CHANNEL
+      - name: OO_INSTALL_NAMESPACE
+      - name: OO_PACKAGE
+      - name: OO_TARGET_NAMESPACES
       from: oc-bin-image
       resources:
         requests:
