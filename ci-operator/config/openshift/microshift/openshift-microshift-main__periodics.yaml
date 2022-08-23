@@ -19,11 +19,39 @@ base_images:
     name: "4.10"
     namespace: ocp
     tag: tests
+  ubi-minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: rhel-8-release-golang-1.17-openshift-4.10
+images:
+- dockerfile_literal: |
+    # build
+    FROM ubi-minimal
+    ENV YQ_URL=https://github.com/mikefarah/yq/releases/download/v4.26.1/yq_linux_amd64
+    ENV YQ_HASH=9e35b817e7cdc358c1fcd8498f3872db169c3303b61645cc1faf972990f37582
+    RUN echo -n "${YQ_HASH} -" > /tmp/sum.txt ; \
+        if ! (curl -Ls "${YQ_URL}" | tee /tmp/yq | sha256sum -c /tmp/sum.txt &>/dev/null); then \
+          echo "ERROR: Expected file at ${YQ_URL} to have checksum ${YQ_HASH} but instead got $(sha256sum </tmp/yq | cut -d' ' -f1)" ; \
+          exit 1 ; \
+        fi ; \
+        chmod +x /tmp/yq && mv /tmp/yq /usr/bin/yq
+  from: ubi-minimal
+  to: yq-cli
+- dockerfile_literal: |
+    FROM src
+    COPY yq /usr/bin/yq
+  from: src
+  inputs:
+    yq-cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/yq
+  to: microshift-rebase
 releases:
   arm64-latest:
     candidate:
