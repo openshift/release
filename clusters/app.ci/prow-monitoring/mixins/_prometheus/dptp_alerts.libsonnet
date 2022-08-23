@@ -195,7 +195,7 @@
             expr: |||
              sum by (error) (
                increase(
-                 pod_scaler_admission_error_rate{}[15m]
+                 pod_scaler_admission_error_rate{}[5m]
                )
              )
              > 0
