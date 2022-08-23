@@ -276,6 +276,28 @@ wait "$!"
 
 # Platform specific manifests adjustments
 case "${CLUSTER_TYPE}" in
+aws|aws-arm64|aws-usgov)
+	if [[ "${SPOT_MACHINES}" == 'true' ]]; then
+		if [ ! -f /tmp/yq ]; then
+			curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
+		fi
+
+		PATCH="/tmp/machinesets-spot.yaml.patch"
+		cat <<-EOF > "${PATCH}"
+			spec:
+			  template:
+			    spec:
+			      providerSpec:
+			        value:
+			          spotMarketOptions: {}
+			EOF
+
+		for MACHINESET in "${dir}"/openshift/99_openshift-cluster-api_worker-machineset-*.yaml; do
+			/tmp/yq m -x -i "${MACHINESET}" "${PATCH}"
+			echo "Patched spotMarketOptions into ${MACHINESET}"
+		done
+	fi
+	;;
 azure4) inject_boot_diagnostics ${dir} ;;
 esac
 
