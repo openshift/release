@@ -80,25 +80,25 @@ CUSTOM_KUBEOBJECTS_PATH="${CUSTOM_KUBEOBJECTS_PATH}${KEYWORD_CUSTOM_KUBEOBJECTS}
 # check if the directory exists or not in first place 
 # if not send message and gracefully exit.
 
-LIST_OF_KUBEOBJECTS="${LIST_OF_KUBEOBJECTS:=''}"
-
 if [ ! -d "${CUSTOM_KUBEOBJECTS_PATH}" ]
 then
     echo "Directory ${CUSTOM_KUBEOBJECTS_PATH} DOES NOT exists."
     echo "Please check the vault"
     echo "The following step gracefully exits now"
     exit 0 
+fi
+
+echo "CUSTOM_KUBEOBJECTS_PATH found: $CUSTOM_KUBEOBJECTS_PATH"
+echo "Looking for kube_objects inside path"
+LIST_OF_KUBEOBJECTS=$(find "${CUSTOM_KUBEOBJECTS_PATH}"* -type f -name kube_objects)
+# checks if we found any custom kube objects in the respective paths
+if [ -n "${LIST_OF_KUBEOBJECTS[0]}" ] ; then
+    for i in "${LIST_OF_KUBEOBJECTS[@]}"
+    do
+        echo "The following custom kubeobject has been found ! $i"
+        echo "Applying kube_objects on to the Namespace $OO_INSTALL_NAMESPACE"
+        oc apply -f "$i"
+    done
 else
-    echo "The ${CUSTOM_KUBEOBJECTS_PATH} found "
-    echo "We find the kube_objects files inside path"
-    LIST_OF_KUBEOBJECTS=$(find "${CUSTOM_KUBEOBJECTS_PATH}"* -type f -name kube_objects)
-    # checks if we found any custom kube objects in the respective paths
-    if [ ${#LIST_OF_KUBEOBJECTS[@]} -gt 0 ] && [ -n "${LIST_OF_KUBEOBJECTS[0]}" ] ; then
-        for i in "${LIST_OF_KUBEOBJECTS[@]}"
-        do
-            echo "The following custom kubeobject has been found ! $i"
-            echo "Applying kube_objects on to the Namespace $OO_INSTALL_NAMESPACE"
-            oc apply -f "$i"
-        done
-    fi
+    echo "Could not find any kubeobjects please check the vault"
 fi
