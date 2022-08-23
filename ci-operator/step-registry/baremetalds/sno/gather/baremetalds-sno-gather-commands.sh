@@ -29,7 +29,7 @@ timeout -s 9 20m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << "EOF" |& sed -e 's/.
 set -xeo pipefail
 
 # Get sosreport including sar data
-sos report --batch --tmp-dir /tmp/artifacts \
+sos report --batch --tmp-dir /tmp/artifacts --all-logs \
   -o memory,container_log,filesys,kvm,libvirt,logs,networkmanager,networking,podman,processor,rpm,sar,virsh,yum \
   -k podman.all -k podman.logs
 

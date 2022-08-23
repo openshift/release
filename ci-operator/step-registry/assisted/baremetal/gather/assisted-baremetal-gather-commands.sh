@@ -42,7 +42,7 @@ cd /home/assisted
 source /root/config
 
 # Get sosreport including sar data
-sos report --batch --tmp-dir /tmp/artifacts \
+sos report --batch --tmp-dir /tmp/artifacts --all-logs \
   -o memory,container_log,filesys,kvm,libvirt,logs,networkmanager,networking,podman,processor,rpm,sar,virsh,yum \
   -k podman.all -k podman.logs
 
