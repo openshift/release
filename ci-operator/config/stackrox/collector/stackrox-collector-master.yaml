@@ -788,6 +788,62 @@ tests:
       IMAGE_NAME: gardenlinux-gcp-cloud-gardener--prod-576-9-229156
       VM_TYPE: garden-linux
     workflow: stackrox-collector-integration-tests
+- as: drivers-tests
+  optional: true
+  steps:
+    test:
+    - as: drivers-build-failures
+      commands: |
+        FAILURES_DIR=/FAILURES/ /scripts/drivers-build-failures.sh
+      from: drivers
+      resources:
+        requests:
+          cpu: 100m
+          memory: 2000Mi
+- as: drivers-tests-post
+  postsubmit: true
+  steps:
+    test:
+    - as: drivers-build-failures
+      commands: |
+        FAILURES_DIR=/FAILURES/ /scripts/drivers-build-failures.sh
+      from: drivers
+      resources:
+        requests:
+          cpu: 100m
+          memory: 2000Mi
+- as: push-drivers
+  optional: true
+  steps:
+    test:
+    - as: push-drivers
+      commands: |
+        /scripts/push-drivers.sh
+      credentials:
+      - mount_path: /tmp/secrets
+        name: stackrox-collector-driver-push
+        namespace: test-credentials
+      from: drivers
+      resources:
+        requests:
+          cpu: 100m
+          memory: 2000Mi
+- as: push-drivers-post
+  postsubmit: true
+  steps:
+    test:
+    - as: push-drivers
+      commands: |
+        /scripts/push-drivers.sh
+      credentials:
+      - mount_path: /tmp/secrets
+        name: stackrox-collector-driver-push
+        namespace: test-credentials
+      from: drivers
+      resources:
+        requests:
+          cpu: 100m
+          memory: 2000Mi
 zz_generated_metadata:
   branch: master
   org: stackrox
