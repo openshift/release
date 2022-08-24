@@ -41,11 +41,10 @@ else
     echo "PYXIS_URL is defined, proceeding with cvp-common-apply-secrets from PYXIS"
     # Creating file that contains namespace name
     echo "$OO_INSTALL_NAMESPACE" > "${SHARED_DIR}"/operator-install-namespace.txt
-
-    GPG_KEY='/var/run/cvp-pyxis-gpg-secret/cvp-gpg.key' # Secret file which will be mounted by DPTP
-    GPG_PASS='/var/run/cvp-pyxis-gpg-secret/cvp-gpg.pass' # Secret file which will be mounted by DPTP
-    PKCS12_CERT='/var/run/cvp-pyxis-gpg-secret/cvp-dptp.cert' # Secret file which will be mounted by DPTP
-    PKCS12_KEY='/var/run/cvp-pyxis-gpg-secret/cvp-dptp.key' # Secret file which will be mounted by DPTP
+    GPG_KEY=${GPG_KEY:-/var/run/cvp-pyxis-gpg-secret/cvp-gpg.key} # Secret file which will be mounted by DPTP
+    GPG_PASS=${GPG_PASS:-/var/run/cvp-pyxis-gpg-secret/cvp-gpg.pass} # Secret file which will be mounted by DPTP
+    PKCS12_CERT=${PKCS12_CERT:-/var/run/cvp-pyxis-gpg-secret/cvp-dptp.cert} # Secret file which will be mounted by DPTP
+    PKCS12_KEY=${PKCS12_KEY:-/var/run/cvp-pyxis-gpg-secret/cvp-dptp.key} # Secret file which will be mounted by DPTP
 
     echo "Fetching the kube_objects from Pyxis for ISV pid ${PYXIS_URL}"
     touch /tmp/get_kubeObjects.txt

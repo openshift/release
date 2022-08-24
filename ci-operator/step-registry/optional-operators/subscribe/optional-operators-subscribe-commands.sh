@@ -114,6 +114,9 @@ else
   CS_NAMESPACE="${OO_INSTALL_NAMESPACE}"
 fi
 
+CATSRC=""
+IS_CATSRC_CREATED=${IS_CATSRC_CREATED:-false}
+if [ "$IS_CATSRC_CREATED" = false ] ; then
 CATSRC=$(
     oc create -f - -o jsonpath='{.metadata.name}' <<EOF
 apiVersion: operators.coreos.com/v1alpha1
@@ -129,7 +132,13 @@ EOF
 
 echo "CatalogSource name is \"$CATSRC\""
 
-IS_CATSRC_CREATED=false
+else
+	echo "$CS_NAMESTANZA"
+        arrIN=("${CS_NAMESTANZA//:/ }")
+        CATSRC=${arrIN[1]}
+	CATSRC=`echo $CATSRC | sed 's/ *$//g'`
+fi
+
 # Wait for 10 minutes until the Catalog source state is 'READY'
 for i in $(seq 1 120); do
     CATSRC_STATE=$(oc get catalogsources/"$CATSRC" -n "$CS_NAMESPACE" -o jsonpath='{.status.connectionState.lastObservedState}')
@@ -152,7 +161,6 @@ fi
 
 DEPLOYMENT_START_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 echo "Set the deployment start time: ${DEPLOYMENT_START_TIME}"
-
 echo "Creating Subscription"
 
 if [[ "${TEST_MODE}" == "msp" ]]; then
@@ -181,11 +189,12 @@ if [ -n "${INITIAL_CSV}" ]; then
     SUB_MANIFEST="${SUB_MANIFEST}"$'\n'"  startingCSV: ${INITIAL_CSV}"
 fi
 
+echo "SUB_MANIFEST : ${SUB_MANIFEST} "
+
 SUB=$(oc create -f - -o jsonpath='{.metadata.name}' <<< "${SUB_MANIFEST}" )
 
 echo "Subscription name is \"$SUB\""
 echo "Waiting for installPlan to be created"
-
 # store subscription name and install namespace to shared directory for upgrade step
 echo "${OO_INSTALL_NAMESPACE}" > "${SHARED_DIR}"/oo-install-namespace
 echo "${SUB}" > "${SHARED_DIR}"/oo-subscription
@@ -202,11 +211,9 @@ for _ in $(seq 1 60); do
     sleep 5
 done
 
-
 if [ "$FOUND_INSTALLPLAN" = true ] ; then
     echo "Install Plan approved"
     echo "Waiting for ClusterServiceVersion to become ready..."
-
     for _ in $(seq 1 60); do
       CSV=$(oc -n "$OO_INSTALL_NAMESPACE" get subscription "$SUB" -o jsonpath='{.status.installedCSV}' || true)
       if [[ -n "$CSV" ]]; then
