@@ -4,7 +4,7 @@ chain:
   - as: dump-management-cluster
     cli: latest
     commands: |-
-      CLUSTER_NAME="$(echo -n $PROW_JOB_ID|cut -d- -f-2)-mgmt"
+      CLUSTER_NAME="$(echo -n $PROW_JOB_ID|cut -d- -f4- |sed 's/-hypershift//')-mgmt"
       export KUBECONFIG=/etc/hypershift-kubeconfig/hypershift-ops-admin.kubeconfig
       bin/hypershift dump cluster --dump-guest-cluster=true --artifact-dir=$ARTIFACT_DIR --name="${CLUSTER_NAME}"
     credentials:
@@ -22,7 +22,7 @@ chain:
   - as: destroy-management-cluster
     cli: latest
     commands: |-
-      CLUSTER_NAME="$(echo -n $PROW_JOB_ID|cut -d- -f-2)-mgmt"
+      CLUSTER_NAME="$(echo -n $PROW_JOB_ID|cut -d- -f4- |sed 's/-hypershift//')-mgmt"
       export KUBECONFIG=/etc/hypershift-kubeconfig/hypershift-ops-admin.kubeconfig
       bin/hypershift destroy cluster aws \
       --aws-creds=/etc/hypershift-ci-jobs-awscreds/credentials  \

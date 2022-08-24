@@ -5,9 +5,10 @@ chain:
     cli: latest
     commands: |-
       set -exuo pipefail
+      CLUSTER_NAME="$(echo -n $PROW_JOB_ID|cut -d- -f4- |sed 's/-hypershift//')"
       bin/hypershift dump cluster --artifact-dir=$ARTIFACT_DIR \
       --dump-guest-cluster=true \
-      --name="$(echo -n $PROW_JOB_ID|cut -d- -f-2)"
+      --name="${CLUSTER_NAME}"
     from_image:
       namespace: ocp
       name: "4.12"
