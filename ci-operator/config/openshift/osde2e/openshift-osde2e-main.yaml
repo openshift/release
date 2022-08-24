@@ -36,143 +36,8 @@ tests:
     name: osde2e-common
   - mount_path: /usr/local/sd-cicd-aws-prod
     name: sd-cicd-aws-prod
-- as: osde2e-ocm-stage-adoption
-  cron: '@daily'
-  steps:
-    post:
-    - as: cluster-destroy
-      commands: |
-        source ./ci/destroy-ocp-cluster.sh
-      credentials:
-      - mount_path: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    pre:
-    - as: cluster-create
-      commands: |
-        source ./ci/create-ocp-cluster.sh
-      credentials:
-      - mount_path: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    test:
-    - as: stage-adoption
-      commands: |
-        source ./ci/prow-ocm-adoption.sh
-      credentials:
-      - mount_path: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-- as: osde2e-stage-conformance
-  cron: '@weekly'
-  steps:
-    post:
-    - as: cluster-destroy
-      commands: |
-        source ./ci/delete-osd-cluster.sh
-      credentials:
-      - mount_path: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    pre:
-    - as: cluster-create
-      commands: |
-        source ./ci/create-osd-cluster.sh
-      credentials:
-      - mount_path: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    test:
-    - as: conformance
-      commands: |
-        source ./ci/osd-conformance.sh
-      credentials:
-      - mount_path: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-- as: osde2e-rosa-stage-conformance
-  cron: '@weekly'
-  steps:
-    post:
-    - as: cluster-destroy
-      commands: |
-        source ./ci/delete-rosa-cluster.sh
-      credentials:
-      - mount_path: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        namespace: test-credentials
-      - mount_path: /usr/local/osde2e-rosa-staging
-        name: osde2e-rosa-staging
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    pre:
-    - as: cluster-create
-      commands: |
-        source ./ci/create-rosa-cluster.sh
-      credentials:
-      - mount_path: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        namespace: test-credentials
-      - mount_path: /usr/local/osde2e-rosa-staging
-        name: osde2e-rosa-staging
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    test:
-    - as: conformance
-      commands: |
-        source ./ci/osd-conformance.sh
-      credentials:
-      - mount_path: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        namespace: test-credentials
-      - mount_path: /usr/local/osde2e-rosa-staging
-        name: osde2e-rosa-staging
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
 - as: osde2e-aro-e2e-latest-y
-  cron: 0 0 3 * * *
+  cron: 0 0 3 * *
   steps:
     post:
     - as: cluster-destroy
@@ -240,7 +105,7 @@ tests:
           cpu: 100m
           memory: 200Mi
 - as: osde2e-aro-e2e-latest-z
-  cron: 0 0 6 * * *
+  cron: 0 0 6 * *
   steps:
     post:
     - as: cluster-destroy
@@ -308,7 +173,7 @@ tests:
           cpu: 100m
           memory: 200Mi
 - as: osde2e-aro-e2e-ovn-latest-y
-  cron: 0 0 9 * * *
+  cron: 0 0 9 * *
   steps:
     post:
     - as: cluster-destroy
@@ -376,7 +241,7 @@ tests:
           cpu: 100m
           memory: 200Mi
 - as: osde2e-aro-e2e-ovn-latest-z
-  cron: 0 0 12 * * *
+  cron: 0 0 12 * *
   steps:
     post:
     - as: cluster-destroy
@@ -443,54 +308,6 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-- as: osde2e-aro-cncf-conformance
-  cron: '@weekly'
-  steps:
-    post:
-    - as: cluster-destroy
-      commands: |
-        cd /tmp/
-        git clone https://github.com/openshift/osde2e.git
-        cd
-        source /tmp/osde2e/ci/destroy-aro-cluster.sh
-      credentials:
-      - mount_path: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        namespace: test-credentials
-      from: azure
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    pre:
-    - as: cluster-create
-      commands: |
-        cd /tmp/
-        git clone https://github.com/openshift/osde2e.git
-        cd
-        source /tmp/osde2e/ci/create-aro-cluster.sh
-      credentials:
-      - mount_path: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        namespace: test-credentials
-      from: azure
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    test:
-    - as: cncf-conformance-test
-      commands: |
-        source ./ci/osd-conformance.sh
-      credentials:
-      - mount_path: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
 - as: osde2e-aro-nightly-cleanup
   cron: '@midnight'
   steps:
@@ -510,7 +327,7 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-- as: osde2e-stage-aws-e2e-upgrade-to-latest
+- as: osde2e-aws-stage-e2e-upgrade-to-latest
   commands: |
     export CONFIGS="aws,stage,e2e-suite,upgrade-to-latest"
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials"
@@ -525,6 +342,172 @@ tests:
     name: osde2e-common
   - mount_path: /usr/local/osde2e-credentials
     name: osde2e-credentials
+- as: osde2e-rosa-stage-e2e-default
+  commands: |
+    export CONFIGS="rosa,e2e-suite"
+    export ROSA_ENV="stage"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-rosa-stage"
+
+    /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
+  container:
+    clone: true
+    from: osde2e
+  cron: 0 */6 * * 0-5
+  secrets:
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
+  - mount_path: /usr/local/osde2e-rosa-stage
+    name: osde2e-rosa-stage
+- as: osde2e-rosa-sts-stage-e2e-default
+  commands: |
+    export CONFIGS="rosa,e2e-suite"
+    export ROSA_ENV="stage"
+    export ROSA_STS="true"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-rosa-stage"
+
+    /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
+  container:
+    clone: true
+    from: osde2e
+  cron: 0 */6 * * 0-5
+  secrets:
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
+  - mount_path: /usr/local/osde2e-rosa-stage
+    name: osde2e-rosa-stage
+- as: osde2e-aws-stage-e2e-default
+  commands: |
+    export CONFIGS="aws,stage,e2e-suite"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials"
+
+    /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
+  container:
+    clone: true
+    from: osde2e
+  cron: 0 */6 * * 0-5
+  secrets:
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
+- as: osde2e-gcp-stage-e2e-default
+  commands: |
+    export CONFIGS="gcp,stage,e2e-suite"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials"
+
+    /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
+  container:
+    clone: true
+    from: osde2e
+  cron: 0 */6 * * 0-5
+  secrets:
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
+- as: osde2e-aws-prod-e2e-default
+  commands: |
+    export CONFIGS="aws,prod,e2e-suite"
+    export ENABLE_ALERTS="true"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials"
+
+    /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
+  container:
+    clone: true
+    from: osde2e
+  cron: 0 */6 * * 0-5
+  secrets:
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
+- as: osde2e-aws-prod-informing-default
+  commands: |
+    export CONFIGS="aws,prod,informing-suite"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials"
+
+    /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
+  container:
+    clone: true
+    from: osde2e
+  cron: 0 */6 * * 0-5
+  secrets:
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
+- as: osde2e-prod-cleanup
+  commands: |
+    export CONFIGS="prod"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials"
+
+    /osde2e cleanup --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
+  container:
+    clone: true
+    from: osde2e
+  cron: 45 * * * *
+  secrets:
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
+- as: osde2e-gcp-prod-e2e-default
+  commands: |
+    export CONFIGS="gcp,prod,e2e-suite"
+    export ENABLE_ALERTS="true"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials"
+
+    /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
+  container:
+    clone: true
+    from: osde2e
+  cron: 0 */6 * * 0-5
+  secrets:
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
+- as: osde2e-rosa-prod-e2e-default
+  commands: |
+    export CONFIGS="rosa,e2e-suite"
+    export ROSA_ENV="prod"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-rosa-prod"
+
+    /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
+  container:
+    clone: true
+    from: osde2e
+  cron: 0 */6 * * 0-5
+  secrets:
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
+  - mount_path: /usr/local/osde2e-rosa-prod
+    name: osde2e-rosa-prod
+- as: osde2e-rosa-sts-prod-e2e-default
+  commands: |
+    export CONFIGS="rosa,e2e-suite"
+    export ROSA_ENV="prod"
+    export ROSA_STS="true"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-rosa-prod"
+
+    /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
+  container:
+    clone: true
+    from: osde2e
+  cron: 0 */6 * * 0-5
+  secrets:
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
+  - mount_path: /usr/local/osde2e-rosa-prod
+    name: osde2e-rosa-prod
 zz_generated_metadata:
   branch: main
   org: openshift
