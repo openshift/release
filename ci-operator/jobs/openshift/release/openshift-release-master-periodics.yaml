@@ -10098,6 +10098,82 @@ periodics:
   decorate: true
   decoration_config:
     skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  interval: 72h
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-2
+    ci-operator.openshift.io/variant: ci-4.12-upgrade-from-stable-4.11
+    ci.openshift.io/generator: prowgen
+    ci.openshift.io/no-builds: "true"
+    job-release: "4.12"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ci-4.12-upgrade-from-stable-4.11-e2e-aws-sdn-upgrade-infra
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-aws-sdn-upgrade-infra-cluster-profile
+      - --target=e2e-aws-sdn-upgrade-infra
+      - --variant=ci-4.12-upgrade-from-stable-4.11
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-aws-sdn-upgrade-infra-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws-2
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
+  decorate: true
+  decoration_config:
+    skip_cloning: true
     timeout: 6h0m0s
   extra_refs:
   - base_ref: master
@@ -10179,82 +10255,6 @@ periodics:
   - base_ref: master
     org: openshift
     repo: release
-  interval: 72h
-  labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-2
-    ci-operator.openshift.io/variant: ci-4.12-upgrade-from-stable-4.11
-    ci.openshift.io/generator: prowgen
-    ci.openshift.io/no-builds: "true"
-    job-release: "4.12"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-master-ci-4.12-upgrade-from-stable-4.11-e2e-aws-upgrade-infra
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-aws-upgrade-infra-cluster-profile
-      - --target=e2e-aws-upgrade-infra
-      - --variant=ci-4.12-upgrade-from-stable-4.11
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/e2e-aws-upgrade-infra-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws-2
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build01
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: release
   interval: 24h
   labels:
     ci-operator.openshift.io/cloud: aws
@@ -10264,7 +10264,7 @@ periodics:
     ci.openshift.io/no-builds: "true"
     job-release: "4.12"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-master-ci-4.12-upgrade-from-stable-4.11-e2e-aws-upgrade-workload
+  name: periodic-ci-openshift-release-master-ci-4.12-upgrade-from-stable-4.11-e2e-aws-sdn-upgrade-workload
   spec:
     containers:
     - args:
@@ -10273,8 +10273,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-aws-upgrade-workload-cluster-profile
-      - --target=e2e-aws-upgrade-workload
+      - --secret-dir=/usr/local/e2e-aws-sdn-upgrade-workload-cluster-profile
+      - --target=e2e-aws-sdn-upgrade-workload
       - --variant=ci-4.12-upgrade-from-stable-4.11
       command:
       - ci-operator
@@ -10291,7 +10291,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-aws-upgrade-workload-cluster-profile
+      - mountPath: /usr/local/e2e-aws-sdn-upgrade-workload-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -10900,7 +10900,7 @@ periodics:
     ci.openshift.io/no-builds: "true"
     job-release: "4.12"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-master-ci-4.12-upgrade-from-stable-4.11-e2e-vsphere-upgrade
+  name: periodic-ci-openshift-release-master-ci-4.12-upgrade-from-stable-4.11-e2e-vsphere-sdn-upgrade
   spec:
     containers:
     - args:
@@ -10909,8 +10909,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-vsphere-upgrade-cluster-profile
-      - --target=e2e-vsphere-upgrade
+      - --secret-dir=/usr/local/e2e-vsphere-sdn-upgrade-cluster-profile
+      - --target=e2e-vsphere-sdn-upgrade
       - --variant=ci-4.12-upgrade-from-stable-4.11
       command:
       - ci-operator
@@ -10927,7 +10927,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-vsphere-upgrade-cluster-profile
+      - mountPath: /usr/local/e2e-vsphere-sdn-upgrade-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -37873,7 +37873,7 @@ periodics:
     ci.openshift.io/no-builds: "true"
     job-release: "4.12"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-master-nightly-4.12-upgrade-from-stable-4.10-e2e-aws-upgrade-paused
+  name: periodic-ci-openshift-release-master-nightly-4.12-upgrade-from-stable-4.10-e2e-aws-sdn-upgrade-paused
   spec:
     containers:
     - args:
@@ -37882,8 +37882,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-aws-upgrade-paused-cluster-profile
-      - --target=e2e-aws-upgrade-paused
+      - --secret-dir=/usr/local/e2e-aws-sdn-upgrade-paused-cluster-profile
+      - --target=e2e-aws-sdn-upgrade-paused
       - --variant=nightly-4.12-upgrade-from-stable-4.10
       command:
       - ci-operator
@@ -37900,7 +37900,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-aws-upgrade-paused-cluster-profile
+      - mountPath: /usr/local/e2e-aws-sdn-upgrade-paused-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -38199,7 +38199,7 @@ periodics:
     ci.openshift.io/no-builds: "true"
     job-release: "4.12"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-master-nightly-4.12-upgrade-from-stable-4.11-e2e-metal-ipi-bm-upgrade
+  name: periodic-ci-openshift-release-master-nightly-4.12-upgrade-from-stable-4.11-e2e-metal-ipi-sdn-bm-upgrade
   spec:
     containers:
     - args:
@@ -38208,8 +38208,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-metal-ipi-bm-upgrade-cluster-profile
-      - --target=e2e-metal-ipi-bm-upgrade
+      - --secret-dir=/usr/local/e2e-metal-ipi-sdn-bm-upgrade-cluster-profile
+      - --target=e2e-metal-ipi-sdn-bm-upgrade
       - --variant=nightly-4.12-upgrade-from-stable-4.11
       command:
       - ci-operator
@@ -38226,7 +38226,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-metal-ipi-bm-upgrade-cluster-profile
+      - mountPath: /usr/local/e2e-metal-ipi-sdn-bm-upgrade-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
