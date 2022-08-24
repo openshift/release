@@ -162,7 +162,7 @@ CONFIG = {
         'us-east-1': 10,
     },
     'alibabacloud-cn-qe-quota-slice': {
-        'cn-hangzhou': 10,
+        'us-east-1': 10,
     },
 }
 
