@@ -29,7 +29,8 @@ function deprovision() {
 
 if [[ -n ${HYPERSHIFT_PRUNER:-} ]]; then
   had_failure=0
-  for hostedcluster in  $(oc get hostedcluster -n clusters -o json | jq -r --argjson timestamp 21600 '.items[] | select (.metadata.creationTimestamp | sub("\\..*";"Z") | sub("\\s";"T") | fromdate < now - $timestamp).metadata.name'); do
+  hostedclusters="$(oc get hostedcluster -n clusters -o json | jq -r --argjson timestamp 21600 '.items[] | select (.metadata.creationTimestamp | sub("\\..*";"Z") | sub("\\s";"T") | fromdate < now - $timestamp).metadata.name')"
+  for hostedcluster in  $hostedclusters; do
     hypershift destroy cluster aws --aws-creds "${AWS_SHARED_CREDENTIALS_FILE}" --namespace clusters --name "${hostedcluster}" || had_failure=$((had_failure+1))
   done
   # Exit here if we had errors, otherwise we destroy the OIDC providers for the hostedclusters and deadlock deletion as cluster api creds stop working so it will never be able to remove machine finalizers
