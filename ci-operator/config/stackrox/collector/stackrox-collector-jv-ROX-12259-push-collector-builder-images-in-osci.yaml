@@ -297,7 +297,7 @@ tests:
   steps:
     test:
     - as: push-collector-images
-      commands: .openshift-ci/jobs/push-images/push-images.sh
+      commands: .openshift-ci/jobs/push-images/push-images.sh collector
       credentials:
       - mount_path: /tmp/secret/stackrox-stackrox-push
         name: stackrox-stackrox-push
@@ -307,6 +307,23 @@ tests:
         name: collector-slim
       - env: COLLECTOR_FULL
         name: collector-full
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+- as: push-builder-image
+  steps:
+    test:
+    - as: push-builder-image
+      commands: .openshift-ci/jobs/push-images/push-images.sh collector-builder
+      credentials:
+      - mount_path: /tmp/secret/stackrox-stackrox-push
+        name: stackrox-stackrox-push
+        namespace: test-credentials
+      dependencies:
+      - env: COLLECTOR_BUILDER
+        name: collector-builder
       from: src
       resources:
         requests:
@@ -565,7 +582,7 @@ tests:
   steps:
     test:
     - as: push-collector-images
-      commands: .openshift-ci/jobs/push-images/push-images.sh
+      commands: .openshift-ci/jobs/push-images/push-images.sh collector
       credentials:
       - mount_path: /tmp/secret/stackrox-stackrox-push
         name: stackrox-stackrox-push
@@ -575,6 +592,24 @@ tests:
         name: collector-slim
       - env: COLLECTOR_FULL
         name: collector-full
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+- as: merge-push-builder-image
+  postsubmit: true
+  steps:
+    test:
+    - as: push-builder-image
+      commands: .openshift-ci/jobs/push-images/push-images.sh collector-builder
+      credentials:
+      - mount_path: /tmp/secret/stackrox-stackrox-push
+        name: stackrox-stackrox-push
+        namespace: test-credentials
+      dependencies:
+      - env: COLLECTOR_BUILDER
+        name: collector-builder
       from: src
       resources:
         requests:
@@ -863,6 +898,6 @@ tests:
           cpu: 100m
           memory: 2000Mi
 zz_generated_metadata:
-  branch: master
+  branch: jv-ROX-12259-push-collector-builder-images-in-osci
   org: stackrox
   repo: collector
