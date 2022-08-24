@@ -183,6 +183,7 @@ periodics:
   labels:
     ci-operator.openshift.io/variant: ods
     ci.openshift.io/generator: prowgen
+    job-release: "4.11"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-psap-ci-artifacts-master-ods-cleanup-velero-buckets
   reporter_config:
@@ -201,6 +202,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
       - --target=cleanup-velero-buckets
       - --variant=ods
       command:
@@ -212,6 +214,9 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -223,6 +228,9 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -242,6 +250,7 @@ periodics:
   labels:
     ci-operator.openshift.io/variant: ods
     ci.openshift.io/generator: prowgen
+    job-release: "4.11"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-psap-ci-artifacts-master-ods-cleanup-zombies
   reporter_config:
@@ -260,6 +269,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
       - --target=cleanup-zombies
       - --variant=ods
       command:
@@ -271,6 +281,9 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -282,6 +295,9 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
