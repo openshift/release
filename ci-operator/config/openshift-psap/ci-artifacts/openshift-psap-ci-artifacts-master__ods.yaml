@@ -12,6 +12,12 @@ images:
 - dockerfile_path: build/Dockerfile
   from: os
   to: ci-artifacts
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.11"
 resources:
   '*':
     limits:
@@ -20,6 +26,24 @@ resources:
       cpu: 1000m
       memory: 2Gi
 tests:
+- as: nb-ux-on-private
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        run ods run_private_notebook_ux_e2e_scale_test
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from: ci-artifacts
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    workflow: ipi-aws
 - as: nb-ux-on-customer
   steps:
     post:
@@ -186,7 +210,7 @@ tests:
     - as: test
       commands: |
         export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
-        run ods jh-at-scale run_ci_e2e_test
+        run ods notebook_ux_e2e_scale_test run_ci_e2e_test
       credentials:
       - mount_path: /var/run/psap-ods-secret-1
         name: psap-ods-secret-1
