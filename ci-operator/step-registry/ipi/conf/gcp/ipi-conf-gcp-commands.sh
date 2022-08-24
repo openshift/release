@@ -4,10 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# TODO: move to image
-curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
-
-
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
 GCP_BASE_DOMAIN="$(< ${CLUSTER_PROFILE_DIR}/public_hosted_zone)"
@@ -63,6 +59,5 @@ EOF
 fi
 
 if [[ -s "${SHARED_DIR}/customer_vpc_subnets.yaml" ]]; then
-  /tmp/yq m -x -i "${CONFIG}" "${SHARED_DIR}/customer_vpc_subnets.yaml"
-  cat "${CONFIG}"
+  yq-go m -x -i "${CONFIG}" "${SHARED_DIR}/customer_vpc_subnets.yaml"
 fi

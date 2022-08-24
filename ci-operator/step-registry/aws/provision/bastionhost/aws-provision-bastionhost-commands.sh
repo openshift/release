@@ -8,8 +8,6 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
-curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
-
 REGION="${LEASED_RESOURCE}"
 
 # Using source region for C2S and SC2S
@@ -21,7 +19,7 @@ fi
 VpcId=$(cat "${SHARED_DIR}/vpc_id")
 echo "VpcId: $VpcId"
 
-PublicSubnet="$(/tmp/yq r "${SHARED_DIR}/public_subnet_ids" '[0]')"
+PublicSubnet="$(yq-go r "${SHARED_DIR}/public_subnet_ids" '[0]')"
 echo "PublicSubnet: $PublicSubnet"
 
 CLUSTER_NAME="${NAMESPACE}-${JOB_NAME_HASH}"

@@ -21,10 +21,6 @@ if ! whoami &> /dev/null; then
     fi
 fi
 
-# Install an updated version of the client
-mkdir -p /tmp/client
-curl https://mirror2.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz | tar --directory=/tmp/client -xzf -
-PATH=/tmp/client:$PATH
 oc version --client
 
 MIRROR_USERNAME="$(<'/var/run/mirror-repo-basic-auth/username')"
