@@ -1,3 +1,12 @@
+base_images:
+  origin_4.12_artifacts:
+    name: "4.12"
+    namespace: origin
+    tag: artifacts
+  origin_4.12_mcd:
+    name: "4.12"
+    namespace: origin
+    tag: machine-config-operator
 build_root:
   image_stream_tag:
     name: release
@@ -6,17 +15,23 @@ build_root:
 images:
 - dockerfile_path: Dockerfile.ci
   to: cosa-build
+- dockerfile_path: Dockerfile.rpms
+  inputs:
+    origin_4.12_artifacts:
+      as:
+      - registry.ci.openshift.org/origin/4.12:artifacts
+    origin_4.12_mcd:
+      as:
+      - registry.ci.openshift.org/origin/4.12:machine-config-operator
+  to: okd-rpms
 - inputs:
     cosa-build:
       paths:
       - destination_dir: .
         source_path: /tmp/Dockerfile
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/okd-machine-os/manifests/
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/okd-machine-os/bootstrap/
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/okd-machine-os/extensions/
+    okd-rpms:
+      as:
+      - registry.ci.openshift.org/origin/4.12:okd-rpms
   to: machine-os-content
 promotion:
   disabled: true
