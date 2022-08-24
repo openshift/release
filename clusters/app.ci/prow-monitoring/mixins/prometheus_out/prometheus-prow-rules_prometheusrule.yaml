@@ -331,6 +331,21 @@ spec:
       for: 1m
       labels:
         severity: critical
+  - name: pod-scaler-admission-memory-warning
+    rules:
+    - alert: pod-scaler-admission-memory-warning
+      annotations:
+        message: '{{ $labels.error }}. See <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/pod-scaler-admission.md|SOP>.'
+      expr: |
+        sum by (error) (
+          increase(
+            pod_scaler_admission_error_rate{}[5m]
+          )
+        )
+        > 0
+      for: 1m
+      labels:
+        severity: warning
   - name: ghproxy
     rules:
     - alert: ghproxy-too-many-pending-alerts
